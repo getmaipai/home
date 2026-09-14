@@ -129,7 +129,7 @@ that fixes the five priority defects):
 | 8 | AGE-01 core (the band in `canRead()`, the default, the deferral line) | the child invariant | S | SPEC-01, ASK-01 |
 | 9 | LOOKUP-01 | promises and offers | S-M | ACT-01 |
 | 10 | CHAT-13 with CHAT-10 folded | subject, corrections, the lookup decision | M | SPEC-01, ASK-01, LOOKUP-01 |
-| 11 | CHAT-16 with ACT-03 core | reads search results like an article | M plus M | CHAT-13, MEM-06 |
+| 11 | CHAT-16 with ACT-03 core, one work order | reads search results like an article | M plus M | CHAT-13, MEM-06 |
 | 12 | CHAT-08 | read-time validity | M | SPEC-01 |
 | 13 | CUR-01 core (duplicates, expiry, disputed, open questions) | store hygiene | S-M | MEM-06, CHAT-08 |
 | 14 | EVAL-07 memory mode (LongMemEval sampled, LoCoMo) | the public baseline | M | MEM-06 |
@@ -403,7 +403,8 @@ subsystem: LongMemEval's sampled accuracy by class (recall, the
 supersede path), LoCoMo's F1 by class (recall, the reported stance),
 DailyDialog's act and emotion F1 (the rule layer, the heads). The
 mining's rewritten rows are the household bench's own mechanism and
-land after CHAT-16.
+land after CHAT-16. Results are reported per phenomenon with failure
+examples, never as one aggregate score.
 
 Order: LongMemEval-cleaned first (MIT, and abstention is our weakest
 class), then LoCoMo, then the phenomenon mining on Taskmaster-1 and

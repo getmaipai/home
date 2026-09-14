@@ -16097,3 +16097,84 @@ default with no switch, as decided; only the date moves. (3) The
 composer's second completion makes a lookup turn about a second slower
 to first text than a chat turn; the `status` line covers it, and the
 alternative (one completion, package text spoken as-is) is finding 18.
+
+**The outside review (Codex), reconciled, 2026-09-14.** An independent
+reading of the same six questions arrived after this section was
+committed (99ece5e). It agrees on the verdicts (the signal wins over the
+shape, the clause subject is a reference into the SubjectRef stack, the
+plan wins over the fixed four moves, `child_disclosure` wins over
+`audience`, one migration per record, the judge off the interactive
+path, sections 14 and 15 and the companions off the critical path).
+Taken, and folded into the items:
+
+- *Names that expose the distinction.* The memory record's field is
+  `fact_confidence`, never a bare `confidence` beside the signal's
+  `act_confidence` and `emotion_confidence` (SPEC-01).
+- *Bounded evidence to the composer.* CHAT-15 retains up to 8 KB of
+  result data per outcome, and handing that whole to CHAT-16's composer
+  is the surest way past the first-text budget (about 2,000 tokens).
+  The composer receives a bounded projection of at most 512 tokens with
+  references to the retained outcomes, never the raw result; the
+  control context a turn adds (the plan line, the subject line, the
+  unknown line, the presentation wording) is capped at 160 tokens, and
+  the signal is never narrated to the model (CHAT-16, ACT-03).
+- *The judge's bounds as numbers.* At most four eligible clauses per
+  turn and one candidate fact per clause reach the extraction; the
+  output is capped at 192 tokens; a structurally invalid answer is
+  rejected with its diagnostics kept, never retried (MEM-06). Today's
+  dedupe and contradiction calls stay bounded per fact as they are.
+- *The curator in two layers.* A deterministic maintenance pass
+  (expiry, exact duplicates, the state transitions, the recompute once
+  CRED-01 exists) and an offline semantic pass that only proposes merge
+  and conflict candidates; promotion of a person-scoped inference into
+  household knowledge still needs the person's answer or an adult's
+  confirmation, never the curator's own judgment (CUR-01).
+- *The boundary between 3a and ASK-01, stated.* Step 3a owns every
+  transition (confirm, `promoteToStated`, the orphan rule); ASK-01 owns
+  the asking and the deterministic answer parser that calls 3a's paths,
+  and adds no transition of its own (ASK-01).
+- *Notices on the turn record.* `conversation-turn` carries nullable
+  `notice_ids`, so AGE-02's dedupe and audit key is on the shared record
+  (SPEC-01).
+- *Timing as an effect.* The `[turn]` line and the bench header carry
+  per-stage timings (routing, recall, prompt assembly, first token,
+  finalization, retries) so a first-text budget is a measured row, not
+  a claim (ACT-01, the bench).
+- *EVAL-07 reports per phenomenon,* with failure examples, never one
+  aggregate score; the memory mode drives the real record writer,
+  reader and finalizer, as the program already requires.
+- *OUT-01's retry,* for Session A's own report rather than an edit to
+  an item in flight: retry only a short malformed output, under a small
+  token cap, and emit the deterministic repair when the cap is hit, so
+  one slow generation never becomes two.
+- *CHAT-16 and ACT-03 core are one work order,* which the queue now
+  says in words.
+
+Rejected, with the reason:
+
+- *"No current p50/p95 first-text measurement."* session-a.md records
+  it: the baseline bench's forty model turns at first delta p50 836 ms
+  and p95 1,269 ms, and #93's three runs at medians 705, 697 and 703 ms;
+  question 2 above cites them.
+- *A reduced first enum for acts (question, command, inform,
+  correction, backchannel) and emotions (none, positive, negative,
+  worried).* Two taxonomies for one field is the drift the pass exists
+  to prevent; the spec carries the full enums once and the rule layer
+  emits only what it detects with confidence (neutral, `unknown` and
+  the conservative fallback otherwise), which is the same shipped
+  behavior with one definition.
+- *A first plan of answer, acknowledge, ask, offer and link.* The same
+  argument: one move vocabulary, declared once (react, care, say, pick,
+  point, ask_back, close, defer); the core plan fills say, react,
+  ask_back, point and close and leaves the rest allowed by default, so
+  nothing is renamed later.
+- *MEM-06 after CHAT-13 and AGE-01 after MEM-06; EXP-01 after the
+  core.* "Acts as if it knows what it was never told" is a priority
+  defect on both sides of the store, and MEM-06 core reads outcomes
+  before SubjectRefs exist, so it stays ahead of CHAT-13; EXP-01 is a
+  guard change of an hour and stays in the core block.
+- *Renaming credulity to `presentation_disposition` and cutting the
+  rapport calibration.* Both are deferred whole already; when the slice
+  is built, section 15's invariant (phrasing only, never the fact, the
+  retrieval, privacy or whether a contradiction is raised) is the rule,
+  whatever the field is called.

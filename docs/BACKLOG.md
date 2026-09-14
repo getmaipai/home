@@ -641,7 +641,10 @@ not permission to expand scope.
     section 12's plan permits (the coherence review, 2026-09-14: the plan
     decides which exist; these four are the default realization of a
     lookup answer, and typed move fields exist on composed turns only,
-    never on a streamed chat turn) (react in the companion's register; pick the one or
+    never on a streamed chat turn; the composer receives a bounded
+    projection of at most 512 tokens with references to the retained
+    outcomes, never a raw result, and this item and ACT-03 core are one
+    work order) (react in the companion's register; pick the one or
     two results that answer, never the list; say it as a person who
     just looked; point at the sources and the details pane, "the
     link's on your phone" on voice), a length (two sentences in chat,
@@ -1230,8 +1233,9 @@ invented for the roster's household, and added to
     engine item waits on a later spec item (dev.md, "Coherence review,
     2026-09-14", question 4). Files: `spec/schemas/memory-record.schema.json`
     (`child_disclosure: child_ok | teen_ok | adult_only` with `set_by`
-    and `set_at`, null on person and self scope; `confidence`,
-    `confidence_evidence`, `conflicts_with` as section 14 defines them,
+    and `set_at`, null on person and self scope; `fact_confidence`
+    (named against the signal's `act_confidence`, the outside review's
+    point), `confidence_evidence`, `conflicts_with` as section 14 defines them,
     default 1.0 with one `legacy_assertion` entry, no writer until
     CRED-01; `scope` gains `companion` with `companion_id`; `expired_at`;
     the per-record retrieval signal REVIEW-01 reads), `entity.schema.json`
@@ -1240,7 +1244,8 @@ invented for the roster's household, and added to
     (the adult-to-tell classes and section 14's life-events classes, one
     file), a new `conversation-turn.schema.json` (the shared turn record
     the robot syncs: `signal`, `plan`, `subjects`, `outcomes`, `document`
-    nullable, `review_id` nullable), `turn-signal.schema.json`
+    nullable, `review_id` nullable, `notice_ids` nullable for AGE-02's
+    dedupe and audit key), `turn-signal.schema.json`
     (`refers_to_prior` nullable until CHAT-13), `reply-plan.schema.json`
     (the moves declared once: react, care, say, pick, point, ask_back,
     close, defer; `required | allowed | forbidden` each; playfulness;
@@ -1351,7 +1356,10 @@ invented for the roster's household, and added to
     household (a relation phrase, "my" or "our", a pronoun for it in the
     same turn, or the roster's shape); a bare proper noun with no frame
     is an `unresolved` SubjectRef with no ask, and part 4's open question
-    catches a household inference the judge makes. Two rows join:
+    catches a household inference the judge makes. Step 3a owns every
+    transition (confirm, `promoteToStated`, the orphan rule); this item
+    owns the asking and the answer parser that calls 3a's paths, and
+    adds no transition of its own. Two rows join:
     `who-ask-declined` ("never mind" to "Who's Juniper?": the ask
     cleared, no entity, no second ask) and `open-question-once` (asked
     once at the end of the next reply, never again after "not now").
@@ -1458,7 +1466,11 @@ invented for the roster's household, and added to
     2026-09-14 (the coherence review): the section 14 half that follows
     waits as CRED-01; its fields ride in SPEC-01 with no writer, and the
     judge's "nominate routine, major, same or contradiction" field is
-    deleted, the vocabulary and the dedupe pass deciding instead.**
+    deleted, the vocabulary and the dedupe pass deciding instead. The judge's
+    bounds, from the outside review: at most four eligible clauses per
+    turn and one candidate fact per clause reach the extraction, the
+    output is capped at 192 tokens, and a structurally invalid answer is
+    rejected with its diagnostics kept, never retried.**
     **Amended 2026-09-14 (dev.md section 14):** `confidence` (required on
     `record_kind: memory`, existing records migrated to 1.0 with a
     `legacy_assertion` evidence entry), `confidence_evidence` (source
@@ -1833,7 +1845,13 @@ invented for the roster's household, and added to
     conflicted records excluded from profile synthesis, a later
     contradiction lowering without deleting evidence, and never a decay
     with time. Never resolves a conflict itself: the next relevant
-    conversation asks. Acceptance: a seeded store with each defect class comes out
+    conversation asks. Two layers (the outside review, 2026-09-14): a
+    deterministic maintenance pass (expiry, exact duplicates, the state
+    transitions) that this item builds first, and an offline semantic
+    pass that only proposes merge and conflict candidates; promotion of
+    a person-scoped inference into household knowledge needs the
+    person's answer or an adult's confirmation, never the curator's own
+    judgment. Acceptance: a seeded store with each defect class comes out
     with the right statuses and no invented resolution; a disputed
     record is absent from the next prompt; the open question is asked
     on the next turn; a record past `valid_to` absent from the next
@@ -1940,7 +1958,10 @@ invented for the roster's household, and added to
     closing turn is skipped; no consumer reads a second shape; `refers_to_prior` stays null until
     CHAT-13; the fixture gains the `signal`, `memoryRows` and `subjects`
     expectations of the coherence review's question 5 (the runner reads
-    them from the turn row and the memory table, never the log line).
+    them from the turn row and the memory table, never the log line);
+    the `[turn]` line and the bench header carry per-stage timings
+    (routing, recall, prompt assembly, first token, finalization,
+    retries) so a first-text budget is a measured row.
     Out of
     scope: the heads (ACT-02), the plan and the composer (ACT-03), the
     clause contract and the curator rules (MEM-06, CUR-01). Exit: the
@@ -2107,7 +2128,10 @@ invented for the roster's household, and added to
     boundary by the sentence guards reading deterministic signs (a
     question sentence is an ask_back, a closing phrase a close, a word
     from the reaction list a react, a length over the cap overlong), and
-    the 8B never emits JSON on the streamed path; `claim_state`, the
+    the 8B never emits JSON on the streamed path; the control context a
+    turn adds (the plan line, the subject line, the unknown line, the
+    presentation wording) is capped at 160 tokens and the signal is
+    never narrated to the model; `claim_state`, the
     surprise and contradiction moves, the seven credence plan defects
     and the `credulity` block are deferred (CRED-01, the COMP slices),
     the defects collapsing into `plan_violation`, `repeat_question` and
