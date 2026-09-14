@@ -1823,15 +1823,14 @@ invented for the roster's household, and added to
 
 <a id="age-02"></a>
 
-- [ ] **AGE-02: The worrying-conversation notice to the household's adults** (S, after AGE-01; gated on Jesse's option)
+- [ ] **AGE-02: The worrying-conversation notice to the household's adults** (S, after AGE-01)
 
     Objective: when a child's turn falls in the worrying class, the
     household's adults learn that a worrying conversation happened,
     never the child's words, and the child is told the hub may mention
-    it; which option applies (dev.md section 13, part 4: never beyond
-    the safety categories; notify and tell the child; or that plus an
-    adult-set off switch) is Jesse's product decision, recorded on this
-    item before it is built (the recommendation is the second). Files:
+    it. Jesse's decision (2026-09-14, dev.md section 13, part 4): the
+    parents are notified, on by default, with no switch per child or
+    per household. Files:
     `backend/src/lib/notificationTypes.ts` (`child.worrying_conversation`,
     level warning, audience `adults`, fixed copy with no slot for the
     child's text), `backend/src/lib/turnEngine.ts` (`notifyOncePerTurn()`
@@ -1840,17 +1839,19 @@ invented for the roster's household, and added to
     other` naming a household adult or an unknown person, or a subject
     in the fixed list, or today's `notify_parent`), `lib/register.ts`
     (the "I might mention to a grown-up that you seemed sad" clause in
-    the child's plan when the notice fires), `spec/settings/keys.json`
-    (the per-child switch, adult-written, only under the third option),
-    `docs/user/privacy.md` (what the notice carries, in plain words).
+    the child's plan when the notice fires), `docs/user/privacy.md` and
+    `docs/user/people.md` (what the notice carries and that it cannot be
+    turned off, in plain words).
     Mirror: `safety.flagged_turn` and its delivery. Acceptance: the
     `child-family-conflict` conversation (section 13, part 8), three
     seeded runs: the notification exists for the adults with no
     fragment of the child's words or the reply in its body, the child's
     reply carries the clause, a teen's identical turn produces no
-    notice, and under the third option an adult-set off switch stops
-    it while a child-role write to the switch is refused. Out of
-    scope: any reading of the child's words by a model to decide.
+    notice, no settings key exists that can stop it (a test that the
+    settings registry carries none), and a second worrying turn in the
+    same conversation produces no second notice within the per-turn
+    dedupe window. Out of scope: any reading of the child's words by a
+    model to decide; any switch.
     Exit: the named tests, `bash scripts/check.sh`.
 
 ## Chat direction 2026-09-12: the next block, two tracks

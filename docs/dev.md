@@ -14749,19 +14749,22 @@ own `notify_parent` fires (today's rule, unchanged). The options:
 - (c) As (b), plus a per-child setting an adult can turn off, for a
   household that decides a particular child's chats are private.
 
-The recommendation is (b), because the org's child-safety invariant is
-"safe by default, adult opt-in", and (c)'s off switch is an adult
+The recommendation was (b), because the org's child-safety invariant
+is "safe by default, adult opt-in", and (c)'s off switch is an adult
 opt-out of a safety default, which the household can still get by the
-parental view. On the teen band, the notification stays the safety
+parental view. **Jesse's decision (2026-09-14): (b).** The parents are
+notified; the notice carries the child's name, the time and the class
+and never the child's words; it is on by default and there is no
+switch for it, per child or per household; the reply tells the child
+the hub may mention it. On the teen band, the notification stays the safety
 categories' alone (today's rule); a teen's family conflict is a state
 about the teen and the parental view. The child is always told, in the
 reply, when the hub will mention it: no notification about a child is
-ever silent to the child. Whichever option Jesse picks, the mechanism
-is the same (`notificationTypes.ts` gains the type; `notifyOncePerTurn()`
-fires it from the signal and the subject the same way it fires the
-safety one; the notification body is fixed product copy with no slot
-for the child's text), so the item is written now and its acceptance
-carries the chosen option.
+ever silent to the child. The mechanism: `notificationTypes.ts` gains the type;
+`notifyOncePerTurn()` fires it from the signal and the subject the
+same way it fires the safety one; the notification body is fixed
+product copy with no slot for the child's text; AGE-02's acceptance
+carries (b).
 
 **5. What the judge writes from a child's turn (MEM-06).** A child's
 assertion about an adult's private life ("mommy and daddy are always
@@ -14875,7 +14878,7 @@ CHAT-16 (amended); the audience field, the `adult-to-tell` vocabulary,
 the `canRead()` band and the `defer` move are a new item, AGE-01 (spec
 S, engine S-M), before CHAT-16's composer work and after ASK-01 (it
 reuses the open question); the notification is a new item, AGE-02 (S),
-after AGE-01, written now and gated on Jesse's option; the judge rule
+after AGE-01, under Jesse's decision (b); the judge rule
 `child_about_adult` rides inside MEM-06 (amended); the unknown-speaker
 rule is COMP-06's text already and COMP-04 gains the adult-written keys
 (amended). Nothing here waits on a model: every rule is a table, a
@@ -14923,6 +14926,7 @@ field or a vocabulary the engine reads.
    with CHAT-16; AGE-01 (the `audience` field, the adult-to-tell
    vocabulary, the band in `canRead()`, the `defer` move) after ASK-01
    and before CHAT-16's composer work; AGE-02 (the worrying-
-   conversation notice) after AGE-01, gated on Jesse's option;
+   conversation notice, Jesse's decision: the adults are notified,
+   never the words, no switch) after AGE-01;
    `child_about_adult` inside MEM-06; the adult-written keys in
    COMP-04.
