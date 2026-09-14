@@ -12766,6 +12766,11 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- CHAT-15, typed outcomes retained for every accepted package call: a
+  `rejected` status with its reason, whole-batch validation before any
+  run or ask, whole-message consent, a `conversation_turns.outcomes`
+  column read back per conversation, and the producer inventory each
+  with a test: [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - #99 (a blank line between two sentences reaches storage and the
   screen) and #98 (a wildcard after a locative preposition does not
   capture a trailing "today"; the Home weather card's place is

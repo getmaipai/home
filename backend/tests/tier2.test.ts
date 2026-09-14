@@ -177,6 +177,203 @@ function offeredFrom(ranked: RankedCandidate[]): Set<string> {
   return new Set(ranked.map((r) => r.id));
 }
 
+// CHAT-15 (docs/plans/media-conversation-program-2026-09-13.md step 2;
+// docs/dev/session-a.md's design note): every proposal the model makes
+// is retained on the turn, in model order, and one that will not run
+// says why; the whole batch is validated before anything runs or asks.
+describe("CHAT-15: resolveToolCalls() retains every proposal, and refuses with a reason", () => {
+  const memoryTexts = () => db.select({ text: memoryRecords.text }).from(memoryRecords).all().map((r) => r.text);
+
+  test("one success and one failure are retained together, each with its arguments, path and time", async () => {
+    const { actor } = await owner();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const calls: ToolCall[] = [
+      { id: "c1", tool: "remember", args: { fact: "the wifi password is on the fridge" } },
+      { id: "c2", tool: "recall", args: { topic: "the lost city of atlantis" } },
+    ];
+    const ranked = [REMEMBER_CANDIDATE, RECALL_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    expect(value?.source).toBe("plugin");
+    expect(outcomes.map((o) => [o.callId, o.packageId, o.status])).toEqual([
+      ["c1", "remember", "succeeded"],
+      ["c2", "recall", "failed"],
+    ]);
+    expect(outcomes[0]!.args).toEqual({ fact: "the wifi password is on the fridge" });
+    expect(outcomes[0]!.via).toBe("tool_call");
+    expect(outcomes[0]!.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(outcomes[1]!.errorCode).toBe("not_found");
+    expect(outcomes[1]!.userMessage).toBe("I don't remember anything about that."); // household-safe, never a diagnostic
+  });
+
+  test("an invalid second argument set is refused before anything runs, and the valid call still runs", async () => {
+    const { actor } = await owner();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const calls: ToolCall[] = [
+      { id: "c1", tool: "remember", args: { fact: "pizza night is Friday" } },
+      { id: "c2", tool: "remember", args: { fct: "a typo, no fact" } },
+    ];
+    const ranked = [REMEMBER_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    expect(value?.source).toBe("plugin");
+    expect(outcomes.map((o) => [o.callId, o.status, o.reason])).toEqual([
+      ["c1", "succeeded", undefined],
+      ["c2", "rejected", "invalid_args"],
+    ]);
+    expect(memoryTexts()).toEqual(["pizza night is Friday"]); // the invalid one had no effect
+  });
+
+  test("malformed arguments (not an object) never reach a host", async () => {
+    const { actor } = await owner();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const calls = [
+      { id: "c1", tool: "remember", args: ["pizza night is Friday"] },
+      { id: "c2", tool: "remember", args: "pizza night is Friday" },
+    ] as unknown as ToolCall[];
+    const ranked = [REMEMBER_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    expect(value).toBeNull();
+    expect(outcomes.map((o) => [o.status, o.reason])).toEqual([
+      ["rejected", "malformed"],
+      ["rejected", "malformed"],
+    ]);
+    expect(memoryTexts()).toEqual([]);
+  });
+
+  test("a duplicate wire id in a batch, or a retry of a completed id, cannot repeat the call", async () => {
+    const { actor } = await owner();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const ranked = [REMEMBER_CANDIDATE];
+    const twice: ToolCall[] = [
+      { id: "c1", tool: "remember", args: { fact: "pizza night is Friday" } },
+      { id: "c1", tool: "remember", args: { fact: "pizza night is Friday" } },
+    ];
+    await resolveToolCalls(twice, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    expect(outcomes.map((o) => [o.status, o.reason])).toEqual([
+      ["succeeded", undefined],
+      ["rejected", "duplicate"],
+    ]);
+    // A redelivery of the same batch on the same turn (the stream's peek
+    // and its retry share one outcomes list): nothing runs again.
+    await resolveToolCalls([twice[0]!], offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    expect(outcomes.map((o) => [o.status, o.reason])).toEqual([
+      ["succeeded", undefined],
+      ["rejected", "duplicate"],
+      ["rejected", "duplicate"],
+    ]);
+    expect(memoryTexts()).toEqual(["pizza night is Friday"]);
+  });
+
+  test("a tool the model was not shown, and the third call, are retained as refused in model order", async () => {
+    const { actor } = await owner();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const calls: ToolCall[] = [
+      { id: "c1", tool: "lock-front-door", args: {} },
+      { id: "c2", tool: "remember", args: { fact: "one" } },
+      { id: "c3", tool: "remember", args: { fact: "two" } },
+      { id: "c4", tool: "remember", args: { fact: "three" } },
+    ];
+    const ranked = [REMEMBER_CANDIDATE];
+    await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    expect(outcomes.map((o) => [o.callId, o.status, o.reason])).toEqual([
+      ["c1", "rejected", "not_offered"],
+      ["c2", "succeeded", undefined],
+      ["c3", "succeeded", undefined],
+      ["c4", "rejected", "over_cap"],
+    ]);
+    expect(memoryTexts().sort()).toEqual(["one", "two"]);
+  });
+
+  test("a withheld argument (4a) is retained as pending even when its sibling fails, and both of two withheld calls are retained", async () => {
+    const { actor } = await owner();
+    const { loadAllManifests } = await import("@/lib/turnEngine");
+    const timer = loadAllManifests().find((l) => l.id === "timer")!;
+    const listAdd = loadAllManifests().find((l) => l.id === "list-add")!;
+    const TIMER: RankedCandidate = { id: "timer", score: 0.8, manifest: timer.manifest };
+    const LIST: RankedCandidate = { id: "list-add", score: 0.8, manifest: listAdd.manifest };
+    // A failing sibling: recall of nothing beside a timer with an unsaid length.
+    let outcomes: ToolExecutionOutcome[] = [];
+    let ranked = [TIMER, RECALL_CANDIDATE];
+    const value = await resolveToolCalls(
+      [
+        { id: "c1", tool: "recall", args: { topic: "atlantis" } },
+        { id: "c2", tool: "timer", args: { expression: "ten minutes" } },
+      ],
+      offeredFrom(ranked),
+      ranked,
+      actor,
+      "conv-1",
+      "turn-1",
+      SAFE,
+      undefined,
+      outcomes,
+      "look up atlantis and set a timer",
+    );
+    expect(value).toBeNull(); // the failed lookup falls through to the model (the 4a review's rule)
+    // Its question was never put, so it is not left parked forever.
+    expect(outcomes.map((o) => [o.callId, o.status, o.reason])).toEqual([
+      ["c1", "failed", undefined],
+      ["c2", "rejected", "not_asked"],
+    ]);
+    // Two withheld action calls: both retained, one asked.
+    outcomes = [];
+    ranked = [TIMER, LIST];
+    const asked = await resolveToolCalls(
+      [
+        { id: "c1", tool: "timer", args: { expression: "ten minutes" } },
+        { id: "c2", tool: "list-add", args: { item: "it" } },
+      ],
+      offeredFrom(ranked),
+      ranked,
+      actor,
+      "conv-1",
+      "turn-2",
+      SAFE,
+      undefined,
+      outcomes,
+      "set a timer and add it to the list",
+    );
+    expect(asked?.source).toBe("confirm");
+    expect(outcomes.map((o) => [o.callId, o.status, o.reason])).toEqual([
+      ["c1", "pending", undefined],
+      ["c2", "rejected", "not_asked"],
+    ]);
+  });
+
+  test("a colliding wire id with a different call is not a duplicate; the same call again is", async () => {
+    const { actor } = await owner();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const ranked = [REMEMBER_CANDIDATE];
+    await resolveToolCalls([{ id: "call_0", tool: "remember", args: { fact: "one" } }], offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    // A second completion in the same turn whose server restarted ids.
+    await resolveToolCalls([{ id: "call_0", tool: "remember", args: { fact: "two" } }], offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    await resolveToolCalls([{ id: "call_0", tool: "remember", args: { fact: "two" } }], offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    expect(outcomes.map((o) => [o.status, o.reason])).toEqual([
+      ["succeeded", undefined],
+      ["succeeded", undefined],
+      ["rejected", "duplicate"],
+    ]);
+  });
+
+  test("a consequential proposal asks once and executes none of the batch; its companion is retained as blocked", async () => {
+    const { actor, conversationId } = await owner();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const calls: ToolCall[] = [
+      { id: "c1", tool: "remember", args: { fact: "pizza night is Friday" } },
+      { id: "c2", tool: "lock-front-door", args: {} },
+    ];
+    const ranked = [CONSEQUENTIAL_CANDIDATE, REMEMBER_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, conversationId, "turn-1", SAFE, undefined, outcomes);
+    expect(value?.source).toBe("confirm");
+    expect(outcomes.map((o) => [o.callId, o.status, o.reason])).toEqual([
+      ["c1", "rejected", "blocked_by_confirmation"],
+      ["c2", "pending", undefined],
+    ]); // model order, whatever settled first
+    expect(outcomes[1]!.args).toEqual({});
+    expect(memoryTexts()).toEqual([]); // nothing ran
+    expect(getPendingAsk(conversationId)?.packageId).toBe("lock-front-door");
+  });
+});
+
 describe("resolveToolCalls() (Fix E: the model's own native tool_calls decision, resolved)", () => {
   test("a real tool call runs the package with validated args", async () => {
     const { actor } = await owner();
@@ -612,14 +809,51 @@ describe("resolvePendingAsk()", () => {
     expect(getPendingAsk(conversationId)).toBeNull();
   });
 
-  test("kind: confirm, an ambiguous reply is cleared (single-shot) and falls through to normal routing", async () => {
+  // CHAT-15: an answer that is neither a whole-message yes nor a no
+  // runs nothing and is asked once more, plainly; a second unclear
+  // answer clears the confirmation and routes as itself.
+  test("kind: confirm, an unclear reply asks 'yes or no?' once and runs nothing; the second clears and falls through", async () => {
     const { actor, conversationId } = await owner();
     setPendingAsk(conversationId, { kind: "confirm", prompt: "Remember that?", packageId: "remember", args: { fact: "pizza night is Friday" } });
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error("setup failed");
-    const value = await resolvePendingAsk("what's on my list", actor, conv.value, [], "turn-2", SAFE, undefined);
-    expect(value).toBeNull();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const first = await resolvePendingAsk("yes, but don't do it", actor, conv.value, [], "turn-2", SAFE, undefined, outcomes);
+    expect(first?.source).toBe("confirm");
+    expect(first?.reply.text).toBe("Remember that? Yes or no?");
+    expect(outcomes.map((o) => o.status)).toEqual(["pending"]);
+    expect(getPendingAsk(conversationId)?.clarified).toBe(true);
+    const dropped: ToolExecutionOutcome[] = [];
+    const second = await resolvePendingAsk("what's on my list", actor, conv.value, [], "turn-3", SAFE, undefined, dropped);
+    expect(second).toBeNull();
     expect(getPendingAsk(conversationId)).toBeNull();
+    expect(dropped.map((o) => [o.status, o.reason, o.via])).toEqual([["rejected", "unconfirmed", "confirm"]]); // the history says it was dropped, not parked forever
+  });
+
+  test("kind: confirm, consent is the whole message: 'yes please.' runs it, 'yes, but don't do it' and 'yes if it is cheap' do not", async () => {
+    const { actor, conversationId } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error("setup failed");
+    for (const [answer, runs] of [
+      ["yes please.", true],
+      ["Sure thing!", true],
+      ["ok, go ahead", true],
+      ["yeah, sure", true],
+      ["yes yes", true],
+      ["yes I am sure", true],
+      ["Yes,", true],
+      ["yes, but don't do it", false],
+      ["yes if it is cheap", false],
+      ["yes, delete them", false],
+    ] as const) {
+      setPendingAsk(conversationId, { kind: "confirm", prompt: "Remember that?", packageId: "remember", args: { fact: "pizza night is Friday" } });
+      const outcomes: ToolExecutionOutcome[] = [];
+      const value = await resolvePendingAsk(answer, actor, conv.value, [], `turn-${answer.length}`, SAFE, undefined, outcomes);
+      expect(runs ? value?.source : value?.reply.text).toBe(runs ? "plugin" : "Remember that? Yes or no?");
+      expect(outcomes[0]?.status).toBe(runs ? "succeeded" : "pending");
+      expect(outcomes[0]?.via).toBe("confirm");
+      setPendingAsk(conversationId, null);
+    }
   });
 
   test("kind: ask, the next utterance binds to the package's own required arg and runs it", async () => {

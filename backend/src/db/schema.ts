@@ -364,6 +364,13 @@ export const conversationTurns = sqliteTable(
     // seem to parse.
     judgeStatus: text("judge_status"),
     judgeAttempts: integer("judge_attempts").notNull().default(0),
+    // CHAT-15: the typed outcomes of every package call this turn ran,
+    // parked, or rejected (lib/turnContext.ts's ToolExecutionOutcome[]
+    // as JSON; null for a turn that proposed none). Hub-internal like
+    // judge_status: read back by lib/conversationHistory.ts's
+    // outcomesForConversation() for the composer (CHAT-16) and the
+    // guards, never by the judge, never a memory record.
+    outcomes: text("outcomes"),
     // Session C step 1: null for every non-plugin turn (a command, the
     // model, a safety refusal). "pattern"/"embedding"/"keyword" for a
     // plugin turn - which tier of route()'s decision actually fired it,

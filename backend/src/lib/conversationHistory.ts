@@ -50,6 +50,8 @@ import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import { nextHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
+import type { ToolExecutionOutcome } from "@/lib/turnContext";
+import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
 import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
 export type { ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
@@ -65,6 +67,68 @@ export type { ConversationTurnRow } from "@/wire";
 export type ConversationOpResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 403 | 404; error: string };
+
+/** How large one outcome's JSON may be on the row. A result's actions
+ * never go on the row (the composer never reads them); past the budget
+ * the result's `data` goes, then its article, then the reply text is
+ * cut. */
+const OUTCOME_ROW_BUDGET = 8_192;
+
+/** CHAT-15: an outcome as the row keeps it. The credential detector
+ * runs over every string in it (a remember's argument, a recall's
+ * reply, a result's data), the CHAT-03 last door the text columns
+ * already pass, and a package result that would swell the row is
+ * trimmed to what the composer reads (reply, data, the citation). */
+function outcomeForRow(o: ToolExecutionOutcome): ToolExecutionOutcome {
+  const redactDeep = (value: unknown): unknown => {
+    if (typeof value === "string") return redactCredentials(value);
+    if (Array.isArray(value)) return value.map(redactDeep);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactDeep(v)]));
+    return value;
+  };
+  let slim = redactDeep(o) as ToolExecutionOutcome;
+  if (slim.result) slim = { ...slim, result: { ...slim.result, actions: [] } };
+  if (JSON.stringify(slim).length > OUTCOME_ROW_BUDGET && slim.result?.data !== undefined) {
+    const { data: _dropped, ...rest } = slim.result;
+    slim = { ...slim, result: rest };
+  }
+  if (JSON.stringify(slim).length > OUTCOME_ROW_BUDGET && slim.result && "article" in slim.result) {
+    const { article: _dropped, ...rest } = slim.result as PluginResult & { article?: unknown };
+    slim = { ...slim, result: rest };
+  }
+  if (JSON.stringify(slim).length > OUTCOME_ROW_BUDGET && slim.result?.reply) {
+    slim = { ...slim, result: { ...slim.result, reply: { text: slim.result.reply.text.slice(0, 2_000) } } };
+  }
+  return slim;
+}
+
+/** CHAT-15: the retained outcomes of a conversation's turns, oldest
+ * turn first, each with the turn it belongs to; the most recent
+ * `limit` turns that have any (fifty by default), so a long
+ * conversation's read stays bounded. Read by the composer
+ * (CHAT-16) and the guards' action-claim check across turns; never by
+ * the judge. A row whose column does not parse is skipped, never
+ * thrown on (a hand-edited database is not a reason to lose a turn). */
+export function outcomesForConversation(conversationId: string, limit = 50): { turnId: string; createdAt: string; outcomes: ToolExecutionOutcome[] }[] {
+  const rows = db
+    .select({ id: conversationTurns.id, createdAt: conversationTurns.createdAt, outcomes: conversationTurns.outcomes })
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, conversationId), isNotNull(conversationTurns.outcomes)))
+    .orderBy(desc(conversationTurns.createdAt))
+    .limit(limit)
+    .all()
+    .reverse();
+  const out: { turnId: string; createdAt: string; outcomes: ToolExecutionOutcome[] }[] = [];
+  for (const row of rows) {
+    try {
+      const parsed = JSON.parse(row.outcomes!) as unknown;
+      if (Array.isArray(parsed)) out.push({ turnId: row.id, createdAt: row.createdAt, outcomes: parsed as ToolExecutionOutcome[] });
+    } catch {
+      console.warn(`[conversation] turn ${row.id}: outcomes column did not parse; skipped`);
+    }
+  }
+  return out;
+}
 
 /** Writes one row for a completed turn, any source, refusals included: a
  * parent reviewing a child's history should be able to see that a request
@@ -113,7 +177,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[] } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -166,6 +230,11 @@ export function logTurn(
     // lib/memoryJudge.ts) - never anything but null/0 at insert time.
     judgeStatus: null,
     judgeAttempts: 0,
+    // CHAT-15: the turn's typed outcomes, retained as they were
+    // produced, through the same credential door as the text columns
+    // and trimmed to a bounded row; null when the turn proposed no
+    // package call.
+    outcomes: opts.outcomes && opts.outcomes.length > 0 ? JSON.stringify(opts.outcomes.map(outcomeForRow)) : null,
     hlc: nextHlc(),
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
@@ -328,6 +397,9 @@ export interface PendingAsk {
    * matcher; turnEngine.ts's own consumption is documented at its call
    * site since the shape genuinely doesn't say more than this. */
   expects?: string;
+  /** CHAT-15: set once a confirmation has asked "yes or no?" after an
+   * answer that was neither; a second unclear answer clears it. */
+  clarified?: boolean;
   /** Item 4a: the argument the engine withheld and is asking for; the
    * answer binds to it by name, whatever the manifest's required list
    * says (a review: binding through the one-required-string rule

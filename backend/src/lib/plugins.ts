@@ -14,6 +14,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
+import ERROR_CATALOG from "@maipai/spec/errors/errors.json" with { type: "json" };
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { Recipe } from "@maipai/spec/gen/ts/recipe.js";
 import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
@@ -244,6 +245,28 @@ function validateArgs(id: string, manifest: PackageManifest, inputs: Record<stri
   const validate = ajv.compile(manifest.args as object);
   if (validate(inputs)) return null;
   return ajv.errorsText(validate.errors, { separator: "; " });
+}
+
+/** CHAT-15: the one argument validator, exported so the turn engine
+ * checks a whole batch of proposed calls against each package's own
+ * args schema before any of them executes or asks for confirmation;
+ * runPlugin() runs the identical check again at the door. A missing
+ * package or a non-object argument set is a refusal too, so nothing
+ * malformed ever reaches a host. */
+export function validatePackageArgs(manifest: PackageManifest, inputs: unknown): { ok: true } | { ok: false; error: string } {
+  if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)) return { ok: false, error: "arguments must be an object" };
+  const argsError = validateArgs(manifest.id, manifest, inputs as Record<string, unknown>);
+  return argsError ? { ok: false, error: `${manifest.id}'s inputs failed validation: ${argsError}` } : { ok: true };
+}
+
+/** CHAT-15: the household-safe line for a failed run, never the
+ * diagnostic: a Tier 1 handler's own fallback line (502), the error
+ * catalogue's spoken fallback for a typed code, or the plain apology. */
+export function safeFailureMessage(result: Extract<PluginOpResult<PluginResult>, { ok: false }>): string {
+  if (result.status === 502 && result.fallback_reply?.reply?.text) return result.fallback_reply.reply.text;
+  const code = (result as { code?: string }).code;
+  const catalogued = code ? ERROR_CATALOG.find((e) => e.code === code) : undefined;
+  return catalogued?.spoken_fallback ?? "Sorry, I couldn't do that.";
 }
 
 /** Runs a bundled package - Tier 0's own recipe, or (session-d-packages-

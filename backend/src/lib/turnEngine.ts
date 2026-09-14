@@ -14,14 +14,14 @@
 import { evaluateSafety, evaluateReply, forOutput, carriesCrisisSignal } from "@/lib/safety";
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin, safeFailureMessage, validatePackageArgs } from "@/lib/plugins";
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, utteranceShape, commandOpenersFrom, type UtteranceShape } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, markIncluded, guardContextFrom, type TurnContext, type TurnEvidence, type ToolExecutionOutcome } from "@/lib/turnContext";
+import { intentFor, markIncluded, guardContextFrom, outcomeOf, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
@@ -137,9 +137,10 @@ interface TurnLogRecord {
   guard: GuardReason[];
   safety_action: string;
   duration_ms: number;
+  outcomes?: { package: string; status: string; reason?: string; code?: string }[];
 }
 
-function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[]): void {
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = []): void {
   const record: TurnLogRecord = {
     turn_id: value.turn_id,
     conversation_id: value.conversation_id,
@@ -151,6 +152,10 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     guard: [...guardHits],
     safety_action: value.safety.action,
     duration_ms: Date.now() - startedAt,
+    // CHAT-15: the retained outcomes, summarized (the row holds them
+    // whole), so a [turn] line says what ran, what was parked and what
+    // was refused, and why.
+    ...(outcomes.length > 0 ? { outcomes: outcomes.map((o) => ({ package: o.packageId, status: o.status, ...(o.reason ? { reason: o.reason } : {}), ...(o.errorCode ? { code: o.errorCode } : {}) })) } : {}),
   };
   const line = `[turn] ${JSON.stringify(record)}`;
   // One writer (#73): the hub's console mirror (lib/log.ts, installed
@@ -166,7 +171,7 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[] },
 ): void {
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
@@ -186,12 +191,12 @@ function logTurnSafely(
       // REPLACED the reply; a cut that kept the model's own prefix leaves
       // a real (shortened) answer on the row, and the episode store may
       // recall it.
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes });
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes });
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
   }
-  logTurnLine(surface, value, meta.startedAt, meta.guardHits);
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes);
   if (meta.ephemeral) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
@@ -1243,7 +1248,15 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
 }
 
 type PreparedTurn =
-  | { kind: "immediate"; value: TurnValue; turnId: string }
+  | {
+      kind: "immediate";
+      value: TurnValue;
+      turnId: string;
+      /** CHAT-15: the direct paths' outcomes (a literal or fuzzy winner,
+       * an answered confirmation or ask, a household command), retained
+       * on the turn row like a model turn's. */
+      outcomes: ToolExecutionOutcome[];
+    }
   | {
       kind: "model";
       messages: LlmMessage[];
@@ -1297,10 +1310,14 @@ type PreparedTurn =
 // deterministically and instantly (a "yes" waiting on an LLM round trip
 // to be recognized as "yes" is its own small reliability problem to
 // invite for no reason).
-// Matched at the START of the trimmed reply, not the whole string: "no
-// thanks" and "yeah, go for it" are exactly as real as a bare "yes" or
-// "no" and shouldn't need to match it exactly to be understood.
-const AFFIRMATIVE_RE = /^(yes|yeah|yep|yup|sure|ok|okay|go ahead|do it|please do|confirmed?)\b/i;
+// CHAT-15: consent is the whole message, never a prefix ("no thanks"
+// still opens with "no" and is a no). "Yes, but don't do it" opens with
+// "yes" and is not consent; only consent words, as many as the person
+// likes ("yeah, sure", "yes yes", "ok go ahead"), with at most a
+// courtesy and terminal punctuation, run a consequential action.
+// Anything else asks "yes or no?" once and runs nothing.
+const CONSENT_WORD = String.raw`(?:yes|yeah|yep|yup|sure|ok|okay|go ahead|do it|please do|confirm(?:ed)?|sure thing|go for it|do that|absolutely|of course|correct|right|affirmative|i'?m sure|i am sure|fine|alright)`;
+const AFFIRMATIVE_RE = new RegExp(String.raw`^\s*${CONSENT_WORD}(?:[,\s!.]+(?:${CONSENT_WORD}|please|thanks|thank you|and do it))*\s*[.!,]*\s*$`, "i");
 const NEGATIVE_RE = /^(no|nope|nah|cancel|never ?mind|don'?t|stop)\b/i;
 // Item 4a: the cancel of an ask is the whole utterance, never a prefix.
 const ASK_CANCEL_RE = /^(?:(?:no|nah|nope|actually|ok(?:ay)?|oh)[,\s]+)*(?:no|nope|nah|cancel(?: (?:that|it))?|never ?mind(?: (?:that|it|about it))?|forget (?:it|that|about it)|stop|no thanks|no thank you|don'?t(?: bother| worry(?: about it)?)?|skip it|leave it)\s*[.!]?$/i;
@@ -1377,14 +1394,26 @@ export async function resolvePendingAsk(
   turnId: string,
   safety: SafetyResult,
   crisisResources: string | undefined,
+  // CHAT-15: the turn's outcomes; an answered confirmation or ask runs a
+  // package and leaves the same evidence the tool path does.
+  outcomes: ToolExecutionOutcome[] = [],
 ): Promise<TurnValue | null> {
   const pending = getPendingAsk(conversation.id);
   if (!pending) return null;
 
   if (pending.kind === "confirm") {
     if (AFFIRMATIVE_RE.test(text.trim())) {
+      // Consumed once, bound to the exact package and arguments the
+      // proposal carried; a retry of the same "yes" finds no pending ask.
       setPendingAsk(conversation.id, null);
       const result = await runPlugin(pending.packageId, actor, pending.args, turnId);
+      outcomes.push(
+        outcomeOf(
+          result.ok
+            ? { callId: `${turnId}:confirm`, packageId: pending.packageId, status: "succeeded", args: pending.args, via: "confirm", result: result.value }
+            : { callId: `${turnId}:confirm`, packageId: pending.packageId, status: "failed", args: pending.args, via: "confirm", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
+        ),
+      );
       if (result.ok) {
         return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
       }
@@ -1409,9 +1438,19 @@ export async function resolvePendingAsk(
       setPendingAsk(conversation.id, null);
       return { reply: { text: "Okay, I won't do that." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
     }
-    // Ambiguous: cleared anyway (single-shot), utterance falls through
-    // to normal routing rather than being force-fit as an answer.
+    // Neither a whole-message yes nor a no ("yes, but don't do it",
+    // "maybe later", a new question): nothing runs. Asked once more,
+    // plainly; a second unclear answer clears the confirmation and the
+    // utterance routes as itself, never force-fit as consent (CHAT-15).
+    if (!pending.clarified) {
+      setPendingAsk(conversation.id, { ...pending, clarified: true });
+      outcomes.push(outcomeOf({ callId: `${turnId}:confirm`, packageId: pending.packageId, status: "pending", args: pending.args, via: "confirm", userMessage: pending.prompt }));
+      return { reply: { text: `${pending.prompt} Yes or no?` }, source: "confirm", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    }
     setPendingAsk(conversation.id, null);
+    // Dropped after two unclear answers: retained as such, so the
+    // history never shows a consequential action parked forever.
+    outcomes.push(outcomeOf({ callId: `${turnId}:confirm`, packageId: pending.packageId, status: "rejected", reason: "unconfirmed", args: pending.args, via: "confirm" }));
     return null;
   }
 
@@ -1444,7 +1483,15 @@ export async function resolvePendingAsk(
   // the one-required-string rule as before.
   const boundArg = pending.argName ? { [pending.argName]: text.trim() } : manifest ? deterministicArgs(manifest.args, text) : null;
   if (!boundArg) return null; // can't bind - fall through to normal routing rather than guess
-  const result = await runPlugin(pending.packageId, actor, { ...pending.args, ...boundArg }, turnId);
+  const boundArgs = { ...pending.args, ...boundArg };
+  const result = await runPlugin(pending.packageId, actor, boundArgs, turnId);
+  outcomes.push(
+    outcomeOf(
+      result.ok
+        ? { callId: `${turnId}:ask`, packageId: pending.packageId, status: "succeeded", args: boundArgs, via: "ask", result: result.value }
+        : { callId: `${turnId}:ask`, packageId: pending.packageId, status: "failed", args: boundArgs, via: "ask", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
+    ),
+  );
   if (!result.ok) return null; // the continuation attempt failed - fall through rather than report a confusing error for an utterance that wasn't really about this
   return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
 }
@@ -1491,10 +1538,14 @@ async function prepareTurn(
   // 2026-09-05, found the two fields copy-pasted into every one of
   // them - a future branch added here is a copy-paste-and-forget site
   // waiting to happen).
+  // CHAT-15: every package call a direct path runs, parks or refuses on
+  // this turn lands here, and rides out with the immediate return.
+  const directOutcomes: ToolExecutionOutcome[] = [];
   const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">): PreparedTurn => ({
     kind: "immediate",
     value: { ...value, conversation_id: conversation.id, turn_id: turnId },
     turnId,
+    outcomes: directOutcomes,
   });
   // CHAT-01: one clock per turn, shared by the safety check's age band,
   // the prompt's speaker line and clock line, and the turn context.
@@ -1542,8 +1593,8 @@ async function prepareTurn(
   // replaced reply asked; the replaced exchange's pending ask is dropped
   // rather than bound to the edited text.
   if (supersedes) setPendingAsk(conversation.id, null);
-  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources);
-  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId };
+  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources, directOutcomes);
+  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId, outcomes: directOutcomes };
 
   // Item 4b: "forget that" / "forget what I told you about X" is the
   // engine's own command (lib/forgetCommand.ts), answered here before
@@ -1570,6 +1621,16 @@ async function prepareTurn(
   const matchedCommand = matchCommand(text, actor);
   if (matchedCommand) {
     const result = await runCommand(matchedCommand);
+    // CHAT-15: a household command is a package call too (a reply, or a
+    // Home Assistant service through the same host), so it leaves the
+    // same evidence a pattern winner does.
+    directOutcomes.push(
+      outcomeOf(
+        result.ok
+          ? { callId: `${turnId}:command`, packageId: `command:${matchedCommand.id}`, status: "succeeded", via: "command", result: { reply: { text: result.value.text }, actions: [] } }
+          : { callId: `${turnId}:command`, packageId: `command:${matchedCommand.id}`, status: "failed", via: "command", errorCode: String(result.status), userMessage: "Sorry, I couldn't do that." },
+      ),
+    );
     if (result.ok) {
       return immediate({
         reply: { text: result.value.text, speech: result.value.speech },
@@ -1664,9 +1725,21 @@ async function prepareTurn(
       const prompt = askPromptFor(routed.id, unspoken.name, unspoken.reason);
       setPendingAsk(conversation.id, { kind: "ask", prompt, packageId: routed.id, args: rest, argName: unspoken.name });
       console.log(`[turn] plugin ${routed.id} not run: the ${unspoken.name} "${unspoken.value}" was not said (${unspoken.reason}); asking`);
+      directOutcomes.push(outcomeOf({ callId: `${turnId}:floor`, packageId: routed.id, status: "pending", args: rest, via: "pattern", userMessage: prompt }));
       return immediate({ reply: { text: prompt }, source: "confirm", plugin_id: routed.id, safety, crisis_resources: crisisResources });
     }
     const result = await runPlugin(routed.id, actor, routed.args, turnId);
+    // CHAT-15: the floor's own outcome, the same shape the model's tool
+    // call leaves: succeeded with the result, pending when the result
+    // parks the action, failed with the typed code and a household-safe
+    // line (a #92 lookup miss stays failed/not_found and rides on the
+    // model turn's context below instead).
+    const floorParked = result.ok && !!((result.value as PluginResultWithConfirmAsk).confirm || (result.value as PluginResultWithConfirmAsk).ask);
+    const floorOutcome = outcomeOf(
+      result.ok
+        ? { callId: `${turnId}:floor`, packageId: routed.id, status: floorParked ? "pending" : "succeeded", args: routed.args, via: "pattern", result: result.value }
+        : { callId: `${turnId}:floor`, packageId: routed.id, status: "failed", args: routed.args, via: "pattern", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
+    );
     // The miss is a lookup's: a pattern winner of an outside-looking
     // package whose run raised the typed not_found (a recipe fetch's, or
     // a Tier 1 handler's). The loader's own 404 ("no such package", a
@@ -1678,7 +1751,9 @@ async function prepareTurn(
     if (!result.ok && lookupMiss) {
       console.log(`[turn] plugin ${routed.id} found nothing: ${result.error}`);
       tier0Miss = { packageId: routed.id, error: result.error };
+      directOutcomes.push(floorOutcome);
     } else if (result.ok) {
+      directOutcomes.push(floorOutcome);
       const pending = pendingAskFromPluginResult(routed.id, routed.args, result.value as PluginResultWithConfirmAsk, conversation.id);
       if (pending) {
         return immediate({ reply: { text: pending.prompt }, source: "confirm", plugin_id: routed.id, safety, crisis_resources: crisisResources });
@@ -1712,6 +1787,7 @@ async function prepareTurn(
     // `.ok` alone). The typed miss (a recipe's 404, a Tier 1 handler's
     // `not_found`) is handled above (#92) and never reaches this branch.
       console.log(`[turn] plugin ${routed.id} matched but failed to run: ${result.error}`);
+      directOutcomes.push(floorOutcome);
       return immediate({
         reply: (result.status === 502 ? result.fallback_reply.reply : undefined) ?? { text: "Sorry, I couldn't do that." },
         source: "plugin_error",
@@ -1797,7 +1873,10 @@ async function prepareTurn(
     includedEvidenceIds: [],
     offeredToolIds: [],
     // #92: a Tier 0 lookup that found nothing is this turn's first outcome.
-    outcomes: tier0Miss ? [{ callId: `tier0:${tier0Miss.packageId}`, packageId: tier0Miss.packageId, status: "failed", errorCode: "not_found" }] : [],
+    // CHAT-15: whatever a direct path already recorded on this turn (a
+    // #92 lookup miss, an answered ask whose run failed) rides on; the
+    // tool calls below push after it.
+    outcomes: [...directOutcomes],
     intent: intentFor(text, shape),
     persona: { id: persona.id, displayName: persona.display_name, examples: persona.examples ?? [] },
     ageBand,
@@ -1964,6 +2043,34 @@ export const TIER2_AMBIGUOUS_FLOOR = 0.68;
  * the one thing this function still doesn't take on faith. */
 export async function resolveToolCalls(
   calls: ToolCall[],
+  offeredIds: ReadonlySet<string>,
+  ranked: RankedCandidate[],
+  actor: PersonRow,
+  conversationId: string,
+  turnId: string,
+  safety: SafetyResult,
+  crisisResources: string | undefined,
+  outcomes: ToolExecutionOutcome[] = [],
+  utterance?: string,
+): Promise<TurnValue | null> {
+  // CHAT-15: the outcomes this batch adds are retained in model order,
+  // however early a refusal was known (the whole batch is checked
+  // before a companion runs).
+  const startAt = outcomes.length;
+  const order = new Map<ToolExecutionOutcome, number>();
+  const settleWithheld: { current: (() => void) | null } = { current: null };
+  try {
+    return await resolveToolCallsInOrder(calls, offeredIds, ranked, actor, conversationId, turnId, safety, crisisResources, outcomes, utterance, order, settleWithheld);
+  } finally {
+    settleWithheld.current?.();
+    const added = outcomes.splice(startAt);
+    added.sort((a, b) => (order.get(a) ?? calls.length) - (order.get(b) ?? calls.length));
+    outcomes.push(...added);
+  }
+}
+
+async function resolveToolCallsInOrder(
+  calls: ToolCall[],
   // The exact candidates actually SENT to the model as `tools`
   // (prepared.tools, ToolSpec.id) - a code review (2026-09-07) found
   // this function used to validate a call's id against `ranked` (every
@@ -1988,27 +2095,88 @@ export async function resolveToolCalls(
   // checked against before a package runs; absent (a caller that has
   // none) the check is skipped, never run against an empty string.
   utterance?: string,
+  order: Map<ToolExecutionOutcome, number> = new Map(),
+  settleWithheld: { current: (() => void) | null } = { current: null },
 ): Promise<TurnValue | null> {
   const rankedById = new Map(ranked.map((r) => [r.id, r]));
-  const capped = calls.filter((c) => offeredIds.has(c.tool) && rankedById.has(c.tool)).slice(0, MAX_TIER2_CALLS_PER_TURN);
-  if (capped.length === 0) return null;
   // A server that omits wire ids gets one per outcome across the whole
   // turn (this function can run twice in a turn: the initial batch and
   // a forced lookup, or the stream's peek and its retry).
   const callId = (c: ToolCall) => c.id ?? `${turnId}:call${outcomes.length}`;
+  const argsOf = (c: ToolCall) => (c.args ?? {}) as Record<string, unknown>;
+  // CHAT-15: retained in model order whatever order they settle in (a
+  // refusal is known before a companion runs); `order` is read by the
+  // wrapper once this function returns.
+  const modelIndex = new Map<ToolCall, number>(calls.map((c, i) => [c, i]));
+  const retain = (c: ToolCall, o: ToolExecutionOutcome) => {
+    order.set(o, modelIndex.get(c) ?? calls.length);
+    outcomes.push(o);
+  };
+  // CHAT-15: every proposal is retained, in model order, and a proposal
+  // that will not run says why. A tool the model was not shown, a wire
+  // id already retained on this turn (a duplicate delivery or a retry
+  // must not repeat a completed call), the third call and beyond, an
+  // argument set that is not an object, and arguments the package's
+  // own schema refuses (the whole batch is validated here, before any
+  // call executes or asks) are `rejected`, never implied successes.
+  // A duplicate is a retained call with the same wire id, the same
+  // tool and the same arguments (a redelivery), never a colliding id
+  // from a server that restarts ids per completion (the forced lookup
+  // is a second completion in the same turn). Only a call that was
+  // actually retained as run, parked or failed counts.
+  const argsKey = (a: unknown) => JSON.stringify(a ?? {});
+  const completed = new Set(outcomes.filter((o) => o.status !== "rejected").map((o) => `${o.callId}|${o.packageId}|${argsKey(o.args)}`));
+  const seenIds = new Set<string>();
+  const reject = (c: ToolCall, reason: RejectedReason, userMessage?: string) => {
+    const id = callId(c);
+    retain(c, outcomeOf({ callId: id, packageId: c.tool, status: "rejected", reason, args: typeof c.args === "object" && c.args ? argsOf(c) : undefined, via: "tool_call", ...(userMessage ? { userMessage } : {}) }));
+    if (reason !== "duplicate") seenIds.add(id);
+  };
+  const accepted: ToolCall[] = [];
+  for (const c of calls) {
+    if (!offeredIds.has(c.tool) || !rankedById.has(c.tool)) {
+      reject(c, "not_offered");
+      continue;
+    }
+    if (c.id && (seenIds.has(c.id) || completed.has(`${c.id}|${c.tool}|${argsKey(c.args)}`))) {
+      reject(c, "duplicate");
+      continue;
+    }
+    if (accepted.length >= MAX_TIER2_CALLS_PER_TURN) {
+      reject(c, "over_cap");
+      continue;
+    }
+    if (c.args !== undefined && (c.args === null || typeof c.args !== "object" || Array.isArray(c.args))) {
+      reject(c, "malformed");
+      continue;
+    }
+    const valid = validatePackageArgs(rankedById.get(c.tool)!.manifest, argsOf(c));
+    if (!valid.ok) {
+      console.log(`[turn] plugin ${c.tool} not run: ${valid.error}`);
+      reject(c, "invalid_args");
+      continue;
+    }
+    accepted.push(c);
+    if (c.id) seenIds.add(c.id);
+  }
+  const capped = accepted;
+  if (capped.length === 0) return null;
   // A `consequential` proposal never runs on the model's say-so alone
   // (4.9: "raises the routing bar") - the turn engine itself asks first,
   // the identical PendingAsk flow a recipe's own `confirm` field feeds.
   // Any OTHER call proposed in the same batch is dropped for this turn
   // (a documented simplification: one confirmation question at a time,
-  // not "yes, and also...").
+  // not "yes, and also...") and retained as rejected for that reason
+  // (CHAT-15: the confirmation asks once and executes none of the
+  // batch).
   const consequential = capped.find((c) => rankedById.get(c.tool)?.manifest.consequential);
   if (consequential) {
     const manifest = rankedById.get(consequential.tool)!.manifest;
     const prompt = confirmPromptFor(manifest.description);
-    const args = (consequential.args ?? {}) as Record<string, unknown>;
+    const args = argsOf(consequential);
     setPendingAsk(conversationId, { kind: "confirm", prompt, packageId: consequential.tool, args });
-    outcomes.push({ callId: callId(consequential), packageId: consequential.tool, status: "pending", userMessage: prompt });
+    retain(consequential, outcomeOf({ callId: callId(consequential), packageId: consequential.tool, status: "pending", args, via: "tool_call", userMessage: prompt }));
+    for (const other of capped) if (other !== consequential) reject(other, "blocked_by_confirmation");
     return { reply: { text: prompt }, source: "confirm", plugin_id: consequential.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
   }
 
@@ -2029,17 +2197,38 @@ export async function resolveToolCalls(
           .map((c) => ({ call: c, unspoken: unspokenArgument((c.args ?? {}) as Record<string, unknown>, utterance) }))
           .filter((x) => x.unspoken !== null);
   const runnable = capped.filter((c) => !withheld.some((w) => w.call === c));
+  // CHAT-15: every withheld call is retained as pending the moment it
+  // is withheld, whatever the rest of the batch does (a sibling that
+  // fails used to leave it with no record); asking is a separate step.
+  const withheldOutcomes = new Map<ToolCall, ToolExecutionOutcome>();
   for (const w of withheld) {
     console.log(`[turn] plugin ${w.call.tool} not run: the ${w.unspoken!.name} "${w.unspoken!.value}" was not said (${w.unspoken!.reason})`);
+    const { [w.unspoken!.name]: _dropped, ...rest } = argsOf(w.call);
+    const o = outcomeOf({ callId: callId(w.call), packageId: w.call.tool, status: "pending", args: rest, via: "tool_call", userMessage: askPromptFor(w.call.tool, w.unspoken!.name, w.unspoken!.reason) });
+    retain(w.call, o);
+    withheldOutcomes.set(w.call, o);
   }
+  // Only the first withheld call is ever asked about (one question at a
+  // time); a withheld call whose question is never put on this turn is
+  // settled as rejected/not_asked at the end (the wrapper's own finally
+  // runs `settleWithheld`), so the row never carries a "pending" no one
+  // will answer (the review of this diff).
+  let asked: ToolCall | null = null;
   const askForWithheld = (): { prompt: string } | null => {
     const first = withheld[0];
     if (!first) return null;
-    const { [first.unspoken!.name]: _dropped, ...rest } = (first.call.args ?? {}) as Record<string, unknown>;
+    const { [first.unspoken!.name]: _dropped, ...rest } = argsOf(first.call);
     const prompt = askPromptFor(first.call.tool, first.unspoken!.name, first.unspoken!.reason);
     setPendingAsk(conversationId, { kind: "ask", prompt, packageId: first.call.tool, args: rest, argName: first.unspoken!.name });
-    outcomes.push({ callId: callId(first.call), packageId: first.call.tool, status: "pending", userMessage: prompt });
+    asked = first.call;
     return { prompt };
+  };
+  settleWithheld.current = () => {
+    for (const [call, o] of withheldOutcomes) {
+      if (call === asked || o.status !== "pending") continue;
+      o.status = "rejected";
+      o.reason = "not_asked";
+    }
   };
   if (runnable.length === 0) {
     const ask = askForWithheld();
@@ -2066,14 +2255,18 @@ export async function resolveToolCalls(
     // A result that parks the action behind a confirm/ask is pending,
     // not succeeded: nothing ran (a code review).
     const parked = r.result.ok && ((r.result.value as PluginResultWithConfirmAsk).confirm || (r.result.value as PluginResultWithConfirmAsk).ask);
-    outcomes.push(
-      !r.result.ok
-        ? { callId: callId(r.call), packageId: r.call.tool, status: "failed", errorCode: String(r.result.status) }
-        : recalledNothing(r)
-          ? { callId: callId(r.call), packageId: r.call.tool, status: "failed", errorCode: "not_found" }
-          : parked
-            ? { callId: callId(r.call), packageId: r.call.tool, status: "pending", result: r.result.value }
-            : { callId: callId(r.call), packageId: r.call.tool, status: "succeeded", result: r.result.value },
+    const base = { callId: callId(r.call), packageId: r.call.tool, args: argsOf(r.call), via: "tool_call" as const };
+    retain(
+      r.call,
+      outcomeOf(
+        !r.result.ok
+          ? { ...base, status: "failed", errorCode: (r.result as { code?: string }).code ?? String(r.result.status), userMessage: safeFailureMessage(r.result) }
+          : recalledNothing(r)
+            ? { ...base, status: "failed", errorCode: "not_found", userMessage: NOTHING_RECALLED }
+            : parked
+              ? { ...base, status: "pending", result: r.result.value }
+              : { ...base, status: "succeeded", result: r.result.value },
+      ),
     );
   }
   const oks = ran.filter((r): r is { call: ToolCall; result: Extract<(typeof r)["result"], { ok: true }> } => r.result.ok && !recalledNothing(r));
@@ -2105,7 +2298,6 @@ export async function resolveToolCalls(
       const first = withheld[0];
       if (first) {
         const prompt = askPromptFor(first.call.tool, first.unspoken!.name, first.unspoken!.reason);
-        outcomes.push({ callId: callId(first.call), packageId: first.call.tool, status: "pending", userMessage: prompt });
         pending.prompt = `${pending.prompt} And then: ${prompt.charAt(0).toLowerCase()}${prompt.slice(1)}`;
       }
       // A code review (2026-09-06) found this discarding any OTHER
@@ -2528,7 +2720,7 @@ async function runTurnHoldingLease(
   }
 
   value = finalizeReply(actor, value);
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes });
   return { ok: true, value };
 }
 
@@ -3007,7 +3199,7 @@ async function runTurnStreamHoldingLease(
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [], supersedes: opts.supersedes, ephemeral: opts.ephemeral });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [], supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes });
     return { ok: true, kind: "immediate", value };
   }
 
@@ -3108,7 +3300,7 @@ async function runTurnStreamHoldingLease(
         // place logTurnSafely() runs for it.
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [], supersedes: opts.supersedes, ephemeral: opts.ephemeral });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [], supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -3173,7 +3365,7 @@ async function runTurnStreamHoldingLease(
         // finalize() no longer leaks anything, since holdLease()'s
         // `finally` releases on the aborted fetch's throw.
         finalized = value;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes });
         return value;
       },
     };
@@ -3303,6 +3495,13 @@ async function runTurnStreamHoldingLease(
       console.error(
         `[turn] a streamed reply yielded real text before proposing tool_calls (${trailingCalls.map((c: ToolCall) => c.tool).join(", ")}) - dropped, never run; this contradicts what this engine build has always done and needs a real fix, not just a log line`,
       );
+      // CHAT-15: retained as proposals nothing ran, so the row says
+      // they existed (CHAT-17 owns running them).
+      for (const c of trailingCalls as ToolCall[]) {
+        modelPrepared.turnContext.outcomes.push(
+          outcomeOf({ callId: c.id ?? `${modelPrepared.turnId}:trailing${modelPrepared.turnContext.outcomes.length}`, packageId: c.tool, status: "rejected", reason: "trailing", args: (c.args ?? {}) as Record<string, unknown>, via: "tool_call" }),
+        );
+      }
     }
     return undefined;
   }

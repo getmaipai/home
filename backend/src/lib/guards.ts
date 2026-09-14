@@ -86,7 +86,7 @@ export interface GuardContext {
    * claim is matched to the package family its verb names; one
    * unrelated success is never sufficient, and a pending or failed
    * outcome counts as nothing ran. */
-  outcomes?: readonly Pick<ToolExecutionOutcome, "packageId" | "status">[];
+  outcomes?: readonly Pick<ToolExecutionOutcome, "packageId" | "status" | "reason">[];
   /** CHAT-04: the utterance's shape as the router read it (with the
    * installed packages' command openers). Absent, the guards read the
    * shape themselves with no openers, which can differ from the router
@@ -896,7 +896,10 @@ function bareCompletion(sentence: string, ctx: GuardContext): { family: ActionFa
   if (!isCommand(ctx) || !BARE_DONE_RE.test(sentence)) return null;
   const outcomes = ctx.outcomes ?? [];
   if (outcomes.some((o) => o.status === "succeeded")) return null;
-  const unfinished = outcomes.find((o) => o.status === "pending") ?? outcomes.find((o) => o.status === "failed");
+  // CHAT-15: a proposal the package's schema refused was the model's
+  // failed attempt, the same reading familyOutcome() takes.
+  const attempted = (o: (typeof outcomes)[number]) => o.status === "failed" || (o.status === "rejected" && (o.reason === "invalid_args" || o.reason === "malformed"));
+  const unfinished = outcomes.find((o) => o.status === "pending") ?? outcomes.find(attempted);
   if (!unfinished) return REMEMBER_REQUEST_RE.test(ctx.utterance) ? null : { family: null, state: "none" };
   return { family: ACTION_FAMILIES.find((f) => f.packages.includes(unfinished.packageId)) ?? null, state: unfinished.status === "pending" ? "pending" : "failed" };
 }
@@ -929,7 +932,15 @@ function actionFamiliesOf(sentence: string, ctx: GuardContext): ActionFamily[] {
 }
 
 function familyOutcome(family: ActionFamily, ctx: GuardContext): "succeeded" | "failed" | "pending" | "none" {
-  const own = (ctx.outcomes ?? []).filter((o) => family.packages.includes(o.packageId));
+  // CHAT-15: a proposal the engine set aside unattempted (not offered,
+  // over the cap, a duplicate, blocked behind a confirmation) is no
+  // outcome, so the honest state is "none"; one the package's own
+  // schema refused (invalid or malformed arguments) was the model's
+  // attempt at the action, and "that didn't get saved" is the truer
+  // line than "I haven't saved anything" (CHAT-04's own case).
+  const own = (ctx.outcomes ?? []).filter(
+    (o) => family.packages.includes(o.packageId) && (o.status !== "rejected" || o.reason === "invalid_args" || o.reason === "malformed"),
+  );
   if (own.some((o) => o.status === "succeeded")) return "succeeded";
   if (own.some((o) => o.status === "pending")) return "pending";
   if (own.length > 0) return "failed";

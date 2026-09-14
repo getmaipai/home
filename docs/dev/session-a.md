@@ -3288,3 +3288,164 @@ pattern, so it reached the package only when the model proposed the
 tool; "is it going to rain in *" and "will it rain in *" are patterns
 now (catalog 0a05307), and the trailing "today" comes off the place by
 the #98 rule.
+
+## CHAT-15: typed outcomes retained for every accepted package call (design, 2026-09-13)
+
+The promise is universal ("every accepted package call, on the turn
+and the conversation, never as memory"), so the design starts from the
+inventory of producers, each a code path that runs or parks a package
+on a person's turn:
+
+1. The model's tool calls (`resolveToolCalls`, the blocking and the
+   streaming path, the initial batch and the forced lookup).
+2. The Tier 0 literal pattern winner and the Tier 1 fuzzy winner
+   (`prepareTurn`'s plugin branch), including the #92 lookup miss and
+   the 4a withheld argument.
+3. A pending confirmation answered ("yes" to a consequential proposal)
+   and a pending ask answered (`resolvePendingAsk`).
+4. A household command (`matchCommand`/`runCommand`).
+5. The engine's own forget command (4b) is not a package call and is
+   out of the inventory; a safety refusal runs nothing.
+
+One record type, `ToolExecutionOutcome` (turnContext.ts, the internal
+type the item names), gains a `rejected` status for a proposal that
+was never run, with a reason: `not_offered` (a tool the model was not
+shown), `over_cap` (beyond the two-call cap, in model order),
+`duplicate` (the same wire call id twice in a batch), `invalid_args`
+(the package's own JSON-schema check, run once for the whole batch
+before anything executes or asks), `malformed` (arguments that are
+not an object), `blocked_by_confirmation` (a companion of a
+consequential proposal, which asks once and executes none of the
+batch). A failed call keeps its `errorCode` and a household-safe
+`userMessage` (the manifest's fallback line or the error catalogue's
+spoken fallback, never a diagnostic). The validator is one exported
+function of the package runner (`validatePackageArgs` in plugins.ts,
+the same AJV compile `runPlugin` uses), so the retained batch is
+validated before any execution or confirmation without a second
+schema implementation.
+
+Retention: every producer pushes onto the turn's one `outcomes` list
+(the TurnContext's for a model turn; a list the immediate return
+carries for the direct paths), and `logTurn` writes it to a new
+`outcomes` JSON column on `conversation_turns` beside `judge_status`,
+hub-internal like that column (no spec change, no API field yet;
+CHAT-16 reads it server-side, and a wire field is additive later).
+`outcomesForConversation(conversationId)` reads the conversation's
+retained outcomes in turn order. Nothing about an outcome is ever a
+memory record: the judge reads user text and reply text, never this
+column.
+
+Consent: a pending confirmation binds the exact package and arguments
+and is consumed once (as today). "Yes, but don't do it" is not
+consent: the affirmative must be the whole message (the existing
+vocabulary, an optional courtesy, optional terminal punctuation);
+other text asks one clarification ("Do you want me to <do it>? Yes
+or no.") and runs nothing, and a second unclear answer clears the
+confirmation and routes the utterance as itself. A duplicate delivery
+or a retry cannot repeat a completed call: a wire call id already
+retained on the turn as succeeded or failed is rejected as
+`duplicate`, and the streaming path's no-tools retry never re-runs
+the batch it already resolved.
+
+Acceptance, per the item: one success and one failure retained
+together; an invalid second argument prevents any unvalidated effect;
+a duplicate cannot repeat a completed call; a consequential call
+blocks its companion; malformed JSON never reaches a host; the direct
+paths produce the same evidence shape as the tool path. Each producer
+in the inventory gets its own test, failure path included.
+
+**Built (the inventory is the acceptance).** Every producer of an
+accepted package call now leaves a `ToolExecutionOutcome` on the
+turn's one list, and `logTurn` writes the list to the new
+`conversation_turns.outcomes` column (migration 0032, schema version
+31); `outcomesForConversation()` reads a conversation's back in turn
+order, and the `[turn]` log line carries a summary (package, status,
+reason, code). The producers, each with its test, failure path
+included:
+
+1. The model's tool calls (`resolveToolCalls`, blocking and streaming,
+   initial batch and forced lookup): every proposal retained in model
+   order however early its refusal was known; a tool not shown to the
+   model is `rejected/not_offered`, a wire id already on the turn
+   `rejected/duplicate` (a redelivery of the same batch on the same
+   turn runs nothing again), the third call `rejected/over_cap`,
+   arguments that are not an object `rejected/malformed` (they never
+   reach a host), arguments the package's schema refuses
+   `rejected/invalid_args`, the whole batch checked before anything
+   runs or asks through the one exported validator
+   (`validatePackageArgs`, the same AJV compile `runPlugin` uses); a
+   consequential proposal is `pending` and its companions
+   `rejected/blocked_by_confirmation` (it asks once and executes none
+   of the batch); a run that fails is `failed` with the typed code and
+   a household-safe `userMessage` (`safeFailureMessage`: the Tier 1
+   fallback line, the error catalogue's spoken fallback, or the plain
+   apology). Tests: tier2.test.ts "CHAT-15" (six) and the streaming
+   test in turnEngine.test.ts.
+2. The Tier 0/1 winner in `prepareTurn`: `via: "pattern"`, succeeded
+   with the result and the bound arguments, pending when the result
+   parks the action or the 4a rule withholds an argument, failed with
+   the code and the safe line (a 403 reads "I'm not allowed to do
+   that."), the #92 lookup miss failed/not_found and carried into the
+   model turn's context. Tests: the pattern winner and its failure.
+3. The answered confirmation and the answered ask
+   (`resolvePendingAsk`): `via: "confirm"` and `via: "ask"`, bound to
+   the exact package and arguments the proposal carried, consumed
+   once; a failing run is `failed` with the safe line. Consent is the
+   whole message now: "yes please.", "Sure thing!", "ok, go ahead" run <!-- prose-lint: allow -->
+   it; "yes, but don't do it" and "yes if it is cheap" run nothing,
+   are asked "Yes or no?" once (a pending outcome), and a second
+   unclear answer clears the confirmation and routes as itself.
+   Tests: tier2.test.ts (two) and turnEngine.test.ts.
+4. A household command (`runCommand`): `via: "command"`, package id
+   `command:<id>`, succeeded with the reply or failed with the
+   apology when its service call fails. Tests: a reply command and a
+   Home Assistant command with no Home Assistant behind it.
+5. Not producers: the engine's own forget command (4b) and a safety
+   refusal run no package and retain nothing (tested: the refusal's
+   row has no outcomes). Nothing of an outcome is a memory record: the
+   judge reads user and reply text only, and the persistence test
+   checks the memory store holds the remembered facts alone.
+
+The guards read a proposal the engine set aside unattempted (not
+offered, over the cap, a duplicate, blocked behind a confirmation) as
+no outcome ("I haven't added anything to your list"), and one the
+package's schema refused (invalid or malformed arguments) as the
+model's failed attempt ("Adding that to your list didn't work"), which
+is CHAT-04's own case and keeps its tests. Each outcome carries what a spec Source record needs
+(the package id as origin, `at` as the fetched time, and `source`
+{title, url, site, snippet} when the result's `data` or `article`
+carries a title), so CHAT-16 emits `sources` straight from retained
+outcomes: one store, no second table for citations.
+
+**The review of the diff, eight findings, all taken.** A withheld (4a)
+call left no outcome when its sibling failed, and a second withheld
+call was never retained: every withheld call is retained as pending
+the moment it is withheld, and asking is a separate step. The
+outcomes column bypassed the CHAT-03 credential door: every string in
+an outcome (a remember's argument, a recall's reply, a result's data)
+now passes `redactCredentials` on its way to the row, tested with a
+key in a confirmed argument. The whole-message consent regex rejected
+"yeah, sure", "yes yes" and "yes I am sure", and two such answers <!-- prose-lint: allow -->
+dropped the action: consent words may repeat, a fixed courtesy may
+follow, "yes, delete them" still asks. A confirmation dropped after
+two unclear answers left no record: it is `rejected/unconfirmed` on
+that turn. Duplicate detection trusted wire ids across completions
+(a server that restarts ids per completion would have refused every
+call of the forced lookup): a duplicate is the same id, the same
+tool and the same arguments as a call already retained as run,
+parked or failed. The row's payload was uncapped: a result's actions
+are dropped, then its data past 8 KB, then the reply text cut to
+2,000 characters, and `outcomesForConversation` reads the most recent
+fifty turns with outcomes. A streamed reply's trailing tool calls
+(prose first, then a call, which nothing runs today; CHAT-17) are
+retained as `rejected/trailing` instead of vanishing. A stale
+comment above the consent regex was rewritten.
+A second review confirmed the eight closed and added three low: a
+withheld call whose question is never put (the turn fell through to
+the model, or another ask stood) is settled `rejected/not_asked` when
+the batch resolves, so the row never shows it parked forever; the bare
+"Done." guard reads a schema-refused proposal as the failed attempt the
+family guard already reads; "Yes," with a trailing comma (a voice
+transcript's habit) is consent. The row trim (actions dropped, then
+data past the budget, then a page-sized article, then the reply cut)
+and the unparsable-row skip got their test.

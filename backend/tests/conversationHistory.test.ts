@@ -985,6 +985,34 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.messages.some((m) => m.role === "system" && m.content.includes("safety rules declined"))).toBe(true);
   });
 
+  // CHAT-15: the row keeps a bounded outcome: a result's actions never
+  // go on it, a result whose data would swell it loses the data, and
+  // the reply text is cut past that; a row that fails to parse is
+  // skipped by the reader, never thrown on.
+  test("a retained outcome is trimmed to the row budget, and an unparsable row is skipped", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const big = "x".repeat(20_000);
+    logTurn(actor, "chat", "what is the weather", {
+      reply: { text: "Sunny." },
+      source: "plugin",
+      plugin_id: "weather",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-15-big",
+    }, { outcomes: [{ callId: "c1", packageId: "weather", status: "succeeded", via: "tool_call", at: "2026-09-13T12:00:00.000Z", result: { reply: { text: "Sunny." }, actions: [{ kind: "noise", payload: big }], data: { blob: big } } }] });
+    const { outcomesForConversation } = await import("@/lib/conversationHistory");
+    const [kept] = outcomesForConversation(conv.value.id);
+    expect(kept?.outcomes[0]?.result?.actions).toEqual([]);
+    expect(kept?.outcomes[0]?.result?.data).toBeUndefined();
+    expect(kept?.outcomes[0]?.result?.reply?.text).toBe("Sunny.");
+    const { sqlite } = await import("@/db");
+    expect((sqlite.query("SELECT length(outcomes) AS n FROM conversation_turns WHERE id = ?").get("turn-15-big") as { n: number }).n).toBeLessThan(8_192);
+    sqlite.query("UPDATE conversation_turns SET outcomes = 'not json' WHERE id = ?").run("turn-15-big");
+    expect(outcomesForConversation(conv.value.id)).toEqual([]);
+  });
+
   // Item 4b: the forget command is the engine's own, not a household
   // command row; the note says what happened instead of "unknown".
   test("a forget turn enters the window as a note quoting the hub's answer, never as an unknown command", async () => {

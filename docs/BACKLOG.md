@@ -511,7 +511,9 @@ not permission to expand scope.
 
 <a id="chat-15"></a>
 
-- [ ] **CHAT-15: Retain typed outcomes for every accepted package call** (M)
+- [x] **CHAT-15: Retain typed outcomes for every accepted package call** (M)
+    Verified at the commit that carries this line (the producer
+    inventory, each with a test, in docs/dev/session-a.md "CHAT-15").
 
     Depends on: CHAT-01. Files: `backend/src/lib/llm.ts`, `turnEngine.ts`,
     `turnContext.ts`, `plugins.ts`, `spec/llm/ts/types.ts`,

@@ -38,14 +38,86 @@ export interface TurnEvidence {
   entityIds: string[];
 }
 
+/** CHAT-15: why a proposed call was never run. `not_offered`: a tool
+ * the model was not shown; `over_cap`: beyond the two-call cap, in
+ * model order; `duplicate`: the same wire call id twice; `malformed`:
+ * arguments that are not an object; `invalid_args`: the package's own
+ * schema refused them (checked for the whole batch before anything
+ * runs or asks); `blocked_by_confirmation`: a companion of a
+ * consequential proposal, which asks once and executes none of the
+ * batch; `unconfirmed`: a confirmation dropped after two unclear
+ * answers; `trailing`: a tool call a streamed reply proposed after it
+ * had already spoken, which nothing runs (CHAT-17 owns the retry);
+ * `not_asked`: a call withheld for an unsaid argument (4a) whose
+ * question was never put, because the turn fell through to the model
+ * or another ask stood, so the row never shows it parked forever. */
+export type RejectedReason = "not_offered" | "over_cap" | "duplicate" | "malformed" | "invalid_args" | "blocked_by_confirmation" | "unconfirmed" | "trailing" | "not_asked";
+
+/** What a spec Source record needs from a package result, kept on the
+ * outcome so CHAT-16 emits `sources` straight from retained outcomes:
+ * one store, no second table for citations. Filled when the result
+ * carries a title (its `data` or `article`); a lookup with no page
+ * (the weather) has none and cites its package by id. */
+export interface OutcomeSource {
+  title: string;
+  url?: string;
+  site?: string;
+  snippet?: string | null;
+}
+
+/** CHAT-15: one record per package call a turn proposed, ran, parked
+ * or rejected, whichever path produced it (the model's tool calls, a
+ * literal or fuzzy winner, an answered confirmation or ask, a
+ * household command). Retained on the turn row (`conversation_turns.
+ * outcomes`) and read back per conversation; never a memory record. */
 export interface ToolExecutionOutcome {
   callId: string;
   packageId: string;
-  status: "succeeded" | "failed" | "pending";
+  status: "succeeded" | "failed" | "pending" | "rejected";
+  /** Only with status `rejected`. */
+  reason?: RejectedReason;
+  /** The exact arguments the call was bound to (a rejected call's as
+   * proposed), so a confirmation binds to these and nothing else. */
+  args?: Record<string, unknown>;
+  /** Which path produced it: the model's tool call, the deterministic
+   * floor (a pattern or a fuzzy match), an answered confirmation or
+   * ask, or a household command. */
+  via?: "tool_call" | "pattern" | "confirm" | "ask" | "command";
+  /** When the outcome was resolved (ISO 8601), the fetched time a
+   * citation shows. */
+  at?: string;
   result?: PluginResult;
   errorCode?: string;
   /** Safe for the household; never a developer diagnostic. */
   userMessage?: string;
+  source?: OutcomeSource;
+}
+
+/** Stamps the time and, from a succeeded result, the citation fields,
+ * so every producer records the same shape. */
+export function outcomeOf(partial: Omit<ToolExecutionOutcome, "at" | "source"> & { at?: string }): ToolExecutionOutcome {
+  const source = partial.status === "succeeded" && partial.result ? sourceFromResult(partial.result) : undefined;
+  return { ...partial, at: partial.at ?? new Date().toISOString(), ...(source ? { source } : {}) };
+}
+
+function sourceFromResult(result: PluginResult): OutcomeSource | undefined {
+  const candidates = [result.data, (result as { article?: unknown }).article].filter((c): c is Record<string, unknown> => !!c && typeof c === "object");
+  for (const c of candidates) {
+    const title = typeof c.title === "string" && c.title.trim() ? c.title.trim() : null;
+    if (!title) continue;
+    const url = typeof c.url === "string" && /^https?:\/\//.test(c.url) ? c.url : undefined;
+    let site = typeof c.site === "string" && c.site.trim() ? c.site.trim() : undefined;
+    if (!site && url) {
+      try {
+        site = new URL(url).hostname.replace(/^www\./, "");
+      } catch {
+        site = undefined;
+      }
+    }
+    const snippet = typeof c.snippet === "string" ? c.snippet : typeof c.extract === "string" ? c.extract : null;
+    return { title, ...(url ? { url } : {}), ...(site ? { site } : {}), snippet };
+  }
+  return undefined;
 }
 
 export interface TurnIntent {
@@ -137,7 +209,7 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     sources: ofKind("memory", "package_result"),
     episodes: ofKind("episode"),
     grounding: ofKind("profile", "summary", "household", "clock"),
-    outcomes: ctx.outcomes.map((o) => ({ packageId: o.packageId, status: o.status })),
+    outcomes: ctx.outcomes.map((o) => ({ packageId: o.packageId, status: o.status, ...(o.reason ? { reason: o.reason } : {}) })),
     personaExamples: ctx.persona.examples,
     roster: ctx.roster,
     shape: ctx.shape,

@@ -38,6 +38,20 @@ describe("item 4b: the forget family (the review's findings 8 and 9)", () => {
   });
 });
 
+describe("CHAT-15: a rejected proposal is no outcome for the guards", () => {
+  test("a list-add the engine set aside unattempted narrates 'nothing added'; one the schema refused narrates the failure", () => {
+    const aside = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "list-add", status: "rejected", reason: "over_cap" }] }));
+    expect(aside.reason).toBe("unsupported_action");
+    expect(aside.reply).toBe("I haven't added anything to your list.");
+    const refused = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "list-add", status: "rejected", reason: "invalid_args" }] }));
+    expect(refused.reason).toBe("unsupported_action");
+    expect(refused.reply).toBe("Adding that to your list didn't work."); // the family's own failed line
+    // A bare "Done." reads the same outcome the same way.
+    const bare = guardReply("Done.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "list-add", status: "rejected", reason: "invalid_args" }] }));
+    expect(bare.reply).toBe("Adding that to your list didn't work.");
+  });
+});
+
 describe("capability claims (bot-legacy: claimed_action/accepted_request)", () => {
   test("a claimed action on a request is replaced - 'I've added milk to your list' (CHAT-04: a completed claim with no list-add outcome is unsupported_action)", () => {
     const g = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list on my phone" }));
