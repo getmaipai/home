@@ -416,6 +416,40 @@ runs beside the household bench. Privacy row: the download endpoints
 (GitHub, Hugging Face) are development-only and never part of the
 product; no privacy page change.
 
+## The milestone gate: one companion through complete conversations (2026-09-14, from an outside review)
+
+The household-usable chat is done when one companion (MaiPai, the
+ordinary register) carries complete conversations, not when the items
+tick. The acceptance set, each a bench conversation with roster names,
+three seeded runs on a quiet machine, effects not style:
+
+1. A disclosure and its follow-up (a fact about the speaker, a
+   pronoun follow-up two turns later, the fact recalled by subject).
+2. A lookup inside the conversation (a world question answered
+   through the evidence ladder in the companion's voice, one line,
+   sources on the message, no article).
+3. A correction ("no, I meant Friday") that supersedes and is
+   recalled corrected in a later conversation.
+4. An emotional moment: "ugh, what a long day" gets an acknowledgment
+   of the actual situation, no advice unless asked, a question only
+   when useful; "I just wanted to vent" on the next turn is answered
+   as a person would (no apology loop, no fix); the state is written
+   as a dated state, never a trait.
+5. A closing ("ok, talk later") that closes: one line, no question, no
+   offer, nothing written to memory.
+6. A return the next day (the pinned clock advanced): the companion
+   picks up what was said, does not repeat yesterday's question, and
+   does not recite the memory back.
+7. An unknown name in passing ("Quill said the game was too scary")
+   gets one natural question about who Quill is, once, and the answer
+   is stored as stated.
+
+The seven run as one household over two conversations and a day, and
+they run under MaiPai only until CHAT-16 lands; the per-companion runs
+belong to COMP-03. Step 5's film and household conversations stay as
+the subject-kind proof beside this set. Session A adds the rows when
+it reaches CHAT-16 with ACT-03; until then they are written to fail.
+
 ## Rules
 
 Each step's acceptance is three identical bench runs; the film rows
