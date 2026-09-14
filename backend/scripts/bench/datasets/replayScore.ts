@@ -8,6 +8,26 @@
 // false premise, never repeating the adversarial answer back - LoCoMo's
 // own eval treats a model doing that as the failure case, not a score
 // against a right answer that does not exist for that category.
+/** One dataset-named evidence turn, and whether its own text reached
+ * the model's context this question's live turn actually saw - so a
+ * miss is classified as retrieval (never reached context) or reasoning
+ * (reached context, the reply still got it wrong), the coordinator's
+ * own read on a failing row. */
+export interface RecallHit {
+  turnId: string | null;
+  text: string;
+  foundInContext: boolean;
+}
+
+/** One memory record the judge actually wrote from this question's own
+ * ingested history, however it stands at question time - so "never
+ * stored" and "stored but not retrieved" read differently even when
+ * the question's own answer came out wrong either way. */
+export interface JudgeWrittenRecord {
+  text: string;
+  status: string;
+}
+
 export interface LongMemEvalResult {
   questionId: string;
   questionType: string;
@@ -21,6 +41,14 @@ export interface LongMemEvalResult {
    * this question - the run keeps going (one bad question is scored
    * incorrect, not a lost run), and the message says why. */
   error?: string;
+  /** The live question turn's own context message (the recording
+   * proxy's systemText, joined) - the memory and episode lines recall
+   * actually put in front of the model, verbatim. Null when no model
+   * call was made (a thrown question, matching the household bench's
+   * own contextMessage: null convention for that case). */
+  contextMessage: string | null;
+  recallHits: RecallHit[];
+  judgeWrittenRecords: JudgeWrittenRecord[];
 }
 
 export interface LocomoResult {
@@ -36,6 +64,9 @@ export interface LocomoResult {
    * repeat the adversarial answer's own words back. Null for every
    * other category. */
   refusedAdversarialPremise: boolean | null;
+  contextMessage: string | null;
+  recallHits: RecallHit[];
+  judgeWrittenRecords: JudgeWrittenRecord[];
 }
 
 const STOPWORDS = new Set(["a", "an", "the", "is", "are", "was", "were", "of", "to", "in", "on", "at", "and", "or"]);
@@ -75,6 +106,28 @@ export function tokenF1(predicted: string, gold: string): number {
   return (2 * precision * recall) / (precision + recall);
 }
 
+/** Below this share of an evidence turn's own words appearing in the
+ * context message, the turn is read as not having reached the model -
+ * a substantial majority, not every word: the context often paraphrases
+ * or truncates a long turn (a memory line summarizes it, an episode
+ * line clips it), so this checks whether the FACT reached the model,
+ * never an exact quote. */
+const RECALL_HIT_THRESHOLD = 0.6;
+
+/** For each dataset-named evidence turn, whether its own text reached
+ * the context message the live question turn actually saw - read from
+ * what happened (the recording proxy's own captured request), never
+ * assumed from "a memory record exists somewhere" (a written record
+ * that recall never queries back into context is still a miss). */
+export function computeRecallHits(evidence: readonly { turnId: string | null; text: string }[], contextMessage: string | null): RecallHit[] {
+  const contextWords = new Set(contextMessage ? normalize(contextMessage) : []);
+  return evidence.map((e) => {
+    const words = normalize(e.text);
+    const hitShare = words.length === 0 ? 0 : words.filter((w) => contextWords.has(w)).length / words.length;
+    return { turnId: e.turnId, text: e.text, foundInContext: hitShare >= RECALL_HIT_THRESHOLD };
+  });
+}
+
 /** Below this overlap with the adversarial answer's own words, a reply
  * is read as not having repeated it back. Not zero: a reply may share
  * an incidental word (a name in the question) without asserting the
@@ -83,12 +136,24 @@ export function tokenF1(predicted: string, gold: string): number {
  * trap answer. */
 const ADVERSARIAL_REPEAT_THRESHOLD = 0.5;
 
-export function scoreLocomo(conversationId: string, category: 1 | 2 | 3 | 4 | 5, reply: string, answer: string | null, adversarialAnswer: string | null): LocomoResult {
+/** Context/recall diagnostics (the coordinator's own request, after the
+ * first dry run): gathered by replay.ts from the live turn's own
+ * recording-proxy capture and the database, passed in rather than
+ * computed here, since neither is this pure function's own job -
+ * spread straight into the result so a reader of one question's row
+ * never has to join two separate objects back together. */
+export interface RecallDiagnostics {
+  contextMessage: string | null;
+  recallHits: RecallHit[];
+  judgeWrittenRecords: JudgeWrittenRecord[];
+}
+
+export function scoreLocomo(conversationId: string, category: 1 | 2 | 3 | 4 | 5, reply: string, answer: string | null, adversarialAnswer: string | null, diagnostics: RecallDiagnostics): LocomoResult {
   if (category === 5) {
     const overlapWithTrap = adversarialAnswer ? tokenF1(reply, adversarialAnswer) : 0;
-    return { conversationId, category, reply, answer, adversarialAnswer, f1: 0, refusedAdversarialPremise: overlapWithTrap < ADVERSARIAL_REPEAT_THRESHOLD };
+    return { conversationId, category, reply, answer, adversarialAnswer, f1: 0, refusedAdversarialPremise: overlapWithTrap < ADVERSARIAL_REPEAT_THRESHOLD, ...diagnostics };
   }
-  return { conversationId, category, reply, answer, adversarialAnswer, f1: answer !== null ? tokenF1(reply, answer) : 0, refusedAdversarialPremise: null };
+  return { conversationId, category, reply, answer, adversarialAnswer, f1: answer !== null ? tokenF1(reply, answer) : 0, refusedAdversarialPremise: null, ...diagnostics };
 }
 
 export interface TypeTotal {

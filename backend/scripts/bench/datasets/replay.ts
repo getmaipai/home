@@ -31,7 +31,7 @@ import { loadLocomo } from "./locomo";
 import { absolutePath, registryEntry } from "./registry";
 import { SAMPLE_SEED } from "./sample";
 import { sessionToIngestRows, isLongMemEvalHouseholdMember, locomoHouseholdMemberSpeaker } from "./replayIngest";
-import { scoreLocomo, longMemEvalTotalsByType, locomoTotalsByCategory, type LongMemEvalResult, type LocomoResult } from "./replayScore";
+import { scoreLocomo, longMemEvalTotalsByType, locomoTotalsByCategory, computeRecallHits, type LongMemEvalResult, type LocomoResult, type JudgeWrittenRecord, type RecallDiagnostics } from "./replayScore";
 import type { DatasetConversation, DatasetSession, LongMemEvalQuestion, LocomoQuestion } from "./types";
 
 const upstream = process.env.MAIPAI_LLAMA_SERVER_URL;
@@ -58,8 +58,8 @@ const { __resetEmbedSupervisorForTests } = await import("@/lib/embedSupervisor")
 const { newPersonId, randomSuffix } = await import("@/lib/id");
 const { nextHlc } = await import("@/lib/hlc");
 const { sqlite, db } = await import("@/db");
-const { people, conversations, conversationTurns, episodes, episodeEmbeddings, pendingEpisodeEmbeddings, memoryRecords, memoryEmbeddings, pendingEmbeddings, relationships, entities } = await import("@/db/schema");
-const { eq } = await import("drizzle-orm");
+const { people, conversations, conversationTurns, episodes, episodeEmbeddings, pendingEpisodeEmbeddings, memoryRecords, memoryEmbeddings, pendingEmbeddings, relationships, entities, notificationDeliveries } = await import("@/db/schema");
+const { eq, or } = await import("drizzle-orm");
 
 // ==== CLI ====
 
@@ -141,6 +141,19 @@ function createReplayPerson(): string {
  * one, through setup.ts) already proven to hold its own fresh,
  * temp-root-scoped, otherwise-empty MAIPAI_DATA_DIR. */
 function resetReplayDatabase(): void {
+  // memory.updated (lib/notifications.ts's trigger(), fired whenever the
+  // judge writes a record) references the person as its own recipient -
+  // a dry run found this exact FK the first time this function ran live
+  // (`notification_deliveries.recipient_id`), silently caught and only
+  // logged in that version, which is why the whole sequence below is
+  // wrapped instead: a table this function still doesn't know about
+  // needs to be loud, not a line buried in a 500-question run's own
+  // console. A trailing "did any people rows survive?" check was tried
+  // first and dropped: SQLite runs with foreign_keys ON (db/index.ts),
+  // so an unfiltered `DELETE FROM people` with a still-live reference
+  // elsewhere throws right there, on that statement - a check placed
+  // after it can never run, since the delete itself always either
+  // clears the table or throws first.
   try {
     db.delete(relationships).run();
     db.delete(entities).run();
@@ -150,11 +163,12 @@ function resetReplayDatabase(): void {
     db.delete(episodeEmbeddings).run();
     db.delete(pendingEpisodeEmbeddings).run();
     db.delete(episodes).run();
+    db.delete(notificationDeliveries).run();
     db.delete(conversationTurns).run();
     db.delete(conversations).run();
     db.delete(people).run();
   } catch (err) {
-    console.error(`[replay] resetReplayDatabase left rows behind: ${(err as Error).message}`);
+    throw new Error(`resetReplayDatabase left rows behind - some table not cleared above still references a people row (SQLite foreign_keys is ON); find it and add its delete before trusting per-question isolation again: ${(err as Error).message}`);
   }
 }
 
@@ -162,6 +176,39 @@ async function personRow(id: string) {
   const row = db.select().from(people).where(eq(people.id, id)).get();
   if (!row) throw new Error(`replay person ${id} vanished mid-run`);
   return row;
+}
+
+/** The judge's own written records for this question's ingested history
+ * so far (person-scoped plus household-scope, conversationRunner.ts's
+ * own `recordsFor()` pattern mirrored here) - read after ingestion's
+ * own drainJudge() and before resetReplayDatabase() wipes the table, so
+ * a miss can be told apart from "never stored" versus "stored, not
+ * retrieved". */
+function judgeWrittenRecordsFor(actorId: string): JudgeWrittenRecord[] {
+  return db
+    .select({ text: memoryRecords.text, status: memoryRecords.status })
+    .from(memoryRecords)
+    .where(or(eq(memoryRecords.person, actorId), eq(memoryRecords.scope, "household")))
+    .all()
+    .filter((r) => r.text.length > 0);
+}
+
+/** The dataset's own evidence turns for one LongMemEval question: every
+ * turn across the haystack conversation's sessions flagged
+ * `isEvidence` (the dataset's own has_answer flag, never re-derived). */
+function longMemEvalEvidenceTurns(conv: DatasetConversation): { turnId: string | null; text: string }[] {
+  return conv.sessions.flatMap((s) => s.turns.filter((t) => t.isEvidence).map((t) => ({ turnId: t.turnId, text: t.text })));
+}
+
+/** The dataset's own evidence turns for one LoCoMo question, resolved
+ * from its own `evidenceTurnIds` (dataset-native ids like "D1:3") back
+ * to their text in the conversation that was actually ingested. An id
+ * the conversation carries no matching turn for (should not happen)
+ * keeps its id with empty text rather than being silently dropped. */
+function locomoEvidenceTurns(conv: DatasetConversation, evidenceTurnIds: readonly string[]): { turnId: string | null; text: string }[] {
+  const byId = new Map<string, string>();
+  for (const session of conv.sessions) for (const t of session.turns) if (t.turnId) byId.set(t.turnId, t.text);
+  return evidenceTurnIds.map((id) => ({ turnId: id, text: byId.get(id) ?? "" }));
 }
 
 // ==== ingestion ====
@@ -289,7 +336,12 @@ async function runLongMemEval(questions: readonly LongMemEvalQuestion[], convers
     // one bad question (a malformed date, a transient engine hiccup)
     // aborting main() before any earlier question's result was ever
     // written to disk. Scored incorrect with the error recorded, never
-    // silently dropped from the totals.
+    // silently dropped from the totals. Cleanup's own try/catch/finally
+    // is deliberately separate from this one: resetReplayDatabase() now
+    // throws on an incomplete wipe (a dry run found it silently
+    // swallowing one), and that must never masquerade as THIS
+    // question's own answer failing - a success already pushed to
+    // `results` stays pushed exactly once either way.
     try {
       const personId = createReplayPerson();
       try {
@@ -304,20 +356,29 @@ async function runLongMemEval(questions: readonly LongMemEvalQuestion[], convers
         // rather than a hard-truncated window with nothing older visible.
         await maybeRefreshConversationSummary(created.value.id);
         await drainJudge(q.questionId);
+        const judgeWrittenRecords = judgeWrittenRecordsFor(personId);
         const askAt = parseLongMemEvalDate(q.questionDate);
         if (askAt) __setPromptClockForBench(() => askAt);
+        proxy.reset();
         const reply = await askQuestion(actor, created.value.id, q.question);
+        await proxy.settled();
+        const contextMessage = proxy.requests.length ? proxy.requests.map((r) => r.systemText).join("\n") : null;
+        const recallHits = computeRecallHits(longMemEvalEvidenceTurns(conv), contextMessage);
         const verdict = await gradeLongMemEvalReply(q.question, q.answer, reply);
-        results.push({ questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, reply, grader: "4b", verdict });
-        console.log(`[replay-question] ${JSON.stringify({ questionId: q.questionId, type: q.questionType, isAbstention: q.isAbstention, verdict, reply })}`);
+        results.push({ questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, reply, grader: "4b", verdict, contextMessage, recallHits, judgeWrittenRecords });
+        console.log(`[replay-question] ${JSON.stringify({ questionId: q.questionId, type: q.questionType, isAbstention: q.isAbstention, verdict, reply, recallHits, judgeWrittenRecords: judgeWrittenRecords.map((r) => `${r.status}: ${r.text}`) })}`);
       } finally {
-        resetReplayDatabase();
         __setPromptClockForBench(null);
       }
     } catch (err) {
       const message = (err as Error).message;
       console.error(`[replay] question ${q.questionId} threw, scored incorrect: ${message}`);
-      results.push({ questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, reply: "", grader: "4b", verdict: "incorrect", error: message });
+      results.push({ questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, reply: "", grader: "4b", verdict: "incorrect", error: message, contextMessage: null, recallHits: [], judgeWrittenRecords: [] });
+    }
+    try {
+      resetReplayDatabase();
+    } catch (err) {
+      console.error(`[replay] resetReplayDatabase failed after question ${q.questionId}: ${(err as Error).message} - a later question's own isolation may be compromised`);
     }
   }
   return results;
@@ -331,6 +392,10 @@ async function runLocomo(conversations: readonly DatasetConversation[], question
     const householdSpeaker = locomoHouseholdMemberSpeaker(conv.sessions);
     if (!householdSpeaker) continue;
     const isHouseholdMember = (t: DatasetSession["turns"][number]) => t.speaker === householdSpeaker;
+    // Cleanup's own try/catch sits outside this one, after it, for the
+    // identical reason runLongMemEval() now keeps them apart:
+    // resetReplayDatabase() throwing must never re-push (or discard)
+    // a question this conversation's own inner loop already scored.
     try {
       const personId = createReplayPerson();
       try {
@@ -340,29 +405,46 @@ async function runLocomo(conversations: readonly DatasetConversation[], question
         for (const session of conv.sessions) await ingestSession(personId, created.value.id, session, parseLocomoDate(session.timestamp), isHouseholdMember);
         await maybeRefreshConversationSummary(created.value.id);
         await drainJudge(conv.id);
+        // Shared by every question over this conversation: they all
+        // read the same ingested history, judged once above.
+        const judgeWrittenRecords = judgeWrittenRecordsFor(personId);
         // Every question in this conversation shares the same ingested
         // history; caught per question so one bad question does not
         // lose the rest of this conversation's own results.
         for (const q of questions) {
           try {
+            proxy.reset();
             const reply = await askQuestion(actor, created.value.id, q.question);
-            const scored = scoreLocomo(conv.id, q.category, reply, q.answer, q.adversarialAnswer);
+            await proxy.settled();
+            const contextMessage = proxy.requests.length ? proxy.requests.map((r) => r.systemText).join("\n") : null;
+            const recallHits = computeRecallHits(locomoEvidenceTurns(conv, q.evidenceTurnIds), contextMessage);
+            const diagnostics: RecallDiagnostics = { contextMessage, recallHits, judgeWrittenRecords };
+            const scored = scoreLocomo(conv.id, q.category, reply, q.answer, q.adversarialAnswer, diagnostics);
             results.push(scored);
-            console.log(`[replay-question] ${JSON.stringify({ conversationId: conv.id, category: q.category, f1: scored.f1, refusedAdversarialPremise: scored.refusedAdversarialPremise, reply })}`);
+            console.log(`[replay-question] ${JSON.stringify({ conversationId: conv.id, category: q.category, f1: scored.f1, refusedAdversarialPremise: scored.refusedAdversarialPremise, reply, recallHits, judgeWrittenRecords: judgeWrittenRecords.map((r) => `${r.status}: ${r.text}`) })}`);
           } catch (err) {
             const message = (err as Error).message;
             console.error(`[replay] ${conv.id} category ${q.category} question threw: ${message}`);
-            results.push({ conversationId: conv.id, category: q.category, reply: "", answer: q.answer, adversarialAnswer: q.adversarialAnswer, f1: 0, refusedAdversarialPremise: null, error: message });
+            // judgeWrittenRecords is still known here (ingestion and the
+            // judge already ran; only this one question's own live turn
+            // threw) - reused rather than reported empty, so this row
+            // still reads "stored, the live turn errored" instead of
+            // falsely reading "nothing was ever stored".
+            results.push({ conversationId: conv.id, category: q.category, reply: "", answer: q.answer, adversarialAnswer: q.adversarialAnswer, f1: 0, refusedAdversarialPremise: null, error: message, contextMessage: null, recallHits: [], judgeWrittenRecords });
           }
         }
       } finally {
-        resetReplayDatabase();
         __setPromptClockForBench(null);
       }
     } catch (err) {
       const message = (err as Error).message;
       console.error(`[replay] ${conv.id} ingestion threw, its ${questions.length} question(s) skipped: ${message}`);
-      for (const q of questions) results.push({ conversationId: conv.id, category: q.category, reply: "", answer: q.answer, adversarialAnswer: q.adversarialAnswer, f1: 0, refusedAdversarialPremise: null, error: message });
+      for (const q of questions) results.push({ conversationId: conv.id, category: q.category, reply: "", answer: q.answer, adversarialAnswer: q.adversarialAnswer, f1: 0, refusedAdversarialPremise: null, error: message, contextMessage: null, recallHits: [], judgeWrittenRecords: [] });
+    }
+    try {
+      resetReplayDatabase();
+    } catch (err) {
+      console.error(`[replay] resetReplayDatabase failed after conversation ${conv.id}: ${(err as Error).message} - a later conversation's own isolation may be compromised`);
     }
   }
   return results;

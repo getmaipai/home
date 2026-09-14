@@ -2,7 +2,9 @@
 // engine, no live grader call, only the arithmetic and the reporting
 // rules.
 import { describe, expect, test } from "bun:test";
-import { tokenF1, scoreLocomo, longMemEvalTotalsByType, locomoTotalsByCategory, type LongMemEvalResult, type LocomoResult } from "../scripts/bench/datasets/replayScore";
+import { tokenF1, scoreLocomo, longMemEvalTotalsByType, locomoTotalsByCategory, computeRecallHits, type LongMemEvalResult, type LocomoResult, type RecallDiagnostics } from "../scripts/bench/datasets/replayScore";
+
+const NO_DIAGNOSTICS: RecallDiagnostics = { contextMessage: null, recallHits: [], judgeWrittenRecords: [] };
 
 describe("tokenF1", () => {
   test("an exact match scores 1", () => {
@@ -43,25 +45,60 @@ describe("tokenF1", () => {
 
 describe("scoreLocomo", () => {
   test("category 1-4 scores the reply's own F1 against the answer", () => {
-    const r = scoreLocomo("l1", 3, "Last summer", "Last summer", null);
+    const r = scoreLocomo("l1", 3, "Last summer", "Last summer", null, NO_DIAGNOSTICS);
     expect(r.f1).toBe(1);
     expect(r.refusedAdversarialPremise).toBeNull();
   });
 
   test("category 5 (adversarial): a reply that does not repeat the adversarial answer's own words is a refusal, correctly", () => {
-    const r = scoreLocomo("l1", 5, "I don't have anything in the notes about that.", null, "Yes, you mentioned Rome last spring.");
+    const r = scoreLocomo("l1", 5, "I don't have anything in the notes about that.", null, "Yes, you mentioned Rome last spring.", NO_DIAGNOSTICS);
     expect(r.refusedAdversarialPremise).toBe(true);
     expect(r.f1).toBe(0); // category 5 never scores F1 against a "right" answer
   });
 
   test("category 5: a reply substantially repeating the adversarial answer is not a refusal", () => {
-    const r = scoreLocomo("l1", 5, "Yes, you mentioned Rome last spring.", null, "Yes, you mentioned Rome last spring.");
+    const r = scoreLocomo("l1", 5, "Yes, you mentioned Rome last spring.", null, "Yes, you mentioned Rome last spring.", NO_DIAGNOSTICS);
     expect(r.refusedAdversarialPremise).toBe(false);
   });
 
   test("category 1-4 with no answer text scores 0, never throws", () => {
-    const r = scoreLocomo("l1", 4, "Some reply.", null, null);
+    const r = scoreLocomo("l1", 4, "Some reply.", null, null, NO_DIAGNOSTICS);
     expect(r.f1).toBe(0);
+  });
+});
+
+describe("computeRecallHits", () => {
+  test("an evidence turn whose own words substantially appear in the context is a hit", () => {
+    const hits = computeRecallHits([{ turnId: "t1", text: "The GPS system stopped working after the update." }], "Recall: the GPS system stopped working after the update, per the household's own notes.");
+    expect(hits).toEqual([{ turnId: "t1", text: "The GPS system stopped working after the update.", foundInContext: true }]);
+  });
+
+  test("an evidence turn whose words are absent from the context is a miss, never assumed from a record existing elsewhere", () => {
+    const hits = computeRecallHits([{ turnId: "t1", text: "The GPS system stopped working after the update." }], "Recall: the weather tomorrow looks sunny.");
+    expect(hits[0]!.foundInContext).toBe(false);
+  });
+
+  test("a null context message (no model call was made) is every evidence turn missed", () => {
+    const hits = computeRecallHits([{ turnId: "t1", text: "The GPS system stopped working." }], null);
+    expect(hits[0]!.foundInContext).toBe(false);
+  });
+
+  test("a paraphrased or partially-quoted context still counts as a hit above the threshold, never requiring an exact quote", () => {
+    // A memory line typically summarizes rather than quoting verbatim.
+    const hits = computeRecallHits([{ turnId: "t1", text: "the GPS system stopped working after the recent software update was installed" }], "Recall: GPS system stopped working after the update.");
+    expect(hits[0]!.foundInContext).toBe(true);
+  });
+
+  test("multiple evidence turns are each scored independently", () => {
+    const hits = computeRecallHits(
+      [
+        { turnId: "t1", text: "The GPS system stopped working." },
+        { turnId: "t2", text: "The dealership replaced the whole unit." },
+      ],
+      "Recall: the GPS system stopped working.",
+    );
+    expect(hits[0]!.foundInContext).toBe(true);
+    expect(hits[1]!.foundInContext).toBe(false);
   });
 });
 
@@ -73,6 +110,9 @@ describe("longMemEvalTotalsByType", () => {
     reply: "",
     grader: "4b",
     verdict: "correct",
+    contextMessage: null,
+    recallHits: [],
+    judgeWrittenRecords: [],
     ...over,
   });
 
@@ -94,7 +134,7 @@ describe("longMemEvalTotalsByType", () => {
 });
 
 describe("locomoTotalsByCategory", () => {
-  const mk = (over: Partial<LocomoResult>): LocomoResult => ({ conversationId: "l1", category: 1, reply: "", answer: null, adversarialAnswer: null, f1: 0, refusedAdversarialPremise: null, ...over });
+  const mk = (over: Partial<LocomoResult>): LocomoResult => ({ conversationId: "l1", category: 1, reply: "", answer: null, adversarialAnswer: null, f1: 0, refusedAdversarialPremise: null, contextMessage: null, recallHits: [], judgeWrittenRecords: [], ...over });
 
   test("mean F1 per category, categories in ascending order", () => {
     const totals = locomoTotalsByCategory([mk({ category: 3, f1: 1 }), mk({ category: 3, f1: 0 }), mk({ category: 2, f1: 0.5 })]);
