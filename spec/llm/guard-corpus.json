@@ -536,5 +536,97 @@
     "reply": "Fair enough. Will you miss the bread, or just the fuss?",
     "expect": null,
     "note": "A different question is a new one."
+  },
+  {
+    "id": "exp01-plan-to-listen",
+    "utterance": "are you gonna listen to it",
+    "act": "question",
+    "reply": "I'm going to listen to it tonight!",
+    "expect": "claimed_experience",
+    "note": "EXP-01 (design pass section 7, finding 4): a plan to experience is a claim the hub cannot make; skipped, and the CANNOT_EXPERIENCE line stands when nothing else was said."
+  },
+  {
+    "id": "exp01-cant-wait",
+    "utterance": "the new album drops Friday",
+    "act": "inform",
+    "reply": "Can't wait to hear it! What's the single called?",
+    "expect": "claimed_experience",
+    "note": "The intent form with an implicit subject; the question stands (reason recorded, replaced false)."
+  },
+  {
+    "id": "exp01-havent-yet-is-a-plan",
+    "utterance": "have you heard the new one",
+    "act": "question",
+    "reply": "I haven't heard it yet, but I'm excited to.",
+    "expect": "claimed_experience",
+    "note": "'yet' is a plan and 'but' turns on one: the negation exemption applies only to a plain negation."
+  },
+  {
+    "id": "exp01-plain-negation-stands",
+    "utterance": "have you heard the new one",
+    "act": "question",
+    "reply": "No, I haven't heard it.",
+    "expect": null,
+    "note": "A plain negation with no yet and no but stands (opened with 'no' so the near-echo rule, which reads a restated question, is not what this row tests)."
+  },
+  {
+    "id": "exp01-never-heard-stands",
+    "utterance": "have you heard the new one",
+    "act": "question",
+    "reply": "I've never heard it, but people say the drumming is unreal.",
+    "expect": null,
+    "note": "Hearsay after a negation stands: the 'but' clause carries no plan or claim."
+  },
+  {
+    "id": "exp01-hearsay-stands",
+    "utterance": "is it any good",
+    "act": "question",
+    "reply": "I hear it's good, and the reviews call it their best.",
+    "expect": null,
+    "note": "Hearing as hearsay is something a voice assistant does."
+  },
+  {
+    "id": "exp01-read-that-stands",
+    "utterance": "is it any good",
+    "act": "question",
+    "reply": "I've read that it's their best one.",
+    "expect": null,
+    "note": "Reading as hearsay stands (item 1b)."
+  },
+  {
+    "id": "exp01-hear-what-you-think-stands",
+    "utterance": "I'm listening to it tonight",
+    "act": "inform",
+    "reply": "I'd love to hear what you think of it.",
+    "expect": null,
+    "note": "The verb's object decides: 'hear what you think' is conversation, not a plan to listen."
+  },
+  {
+    "id": "exp01-see-if-stands",
+    "utterance": "I might try the new cafe",
+    "act": "inform",
+    "reply": "I'm curious to see if it lives up to the old one.",
+    "expect": null,
+    "note": "'see if' is conversation, not a plan to watch."
+  },
+  {
+    "id": "exp01-past-promise-claim",
+    "utterance": "and what did I say about Tempo's second album",
+    "act": "question",
+    "reply": "You said the drumming was unreal. I said I'd look it up for you.",
+    "expect": "claimed_statement",
+    "note": "EXP-01, the coordinator's target from REG-01's set: a claim about the hub's own past promise is skipped (the outcome record narrates what ran, RECALL-02's note what was said); the first sentence stands.",
+    "history": [
+      "have you heard of the band Tempo? I've been listening to them all morning",
+      "the drumming on Tempo's second album is unreal"
+    ]
+  },
+  {
+    "id": "exp01-told-you-i-would",
+    "utterance": "did you set the reminder",
+    "act": "question",
+    "reply": "I told you I would remind you.",
+    "expect": "claimed_statement",
+    "note": "The same form, standalone: the NO_RECORD_OF_SAYING line stands."
   }
 ]

@@ -4594,3 +4594,82 @@ a thank-you (an unspaced em dash was not a separator; it is now, so
 the close stands alone). The other misses are the known classes (the
 window's bracketed rendering parroted, `placeholder_echo`; the
 personalization recall; ASK-01's and ACT-03's rows).
+
+## EXP-01: experience and plan claims (2026-09-14)
+
+Section 7 of the design pass (finding 4), the guard half; the composed
+experience answer rides with CHAT-16.
+
+**The shape.** `CLAIMED_EXPERIENCE_RE` keeps its flat first-person
+forms; `PLANNED_EXPERIENCE_RE` adds the intent forms (going to, gonna,
+plan to, can't wait to, excited to, looking forward to, curious to,
+hoping to, love to, dying to, about to, try to, want to) with watch,
+see, hear, listen, play, read, try, check out, give it a listen or a
+spin, catch, stream, binge and their gerunds, an implicit subject
+allowed ("can't wait to hear it"), a bare "I'm excited to" at a
+sentence's end, and "haven't ... yet" ("yet" is a plan). The verb's
+object decides: "hear what you think", "see if it suits you", "see
+what the reviews say" and "try to find the date" are conversation, not
+a plan to listen or to watch. The negation exemption in
+`guardInvention()` applies only to a plain negation: a declining
+sentence that carries "yet", "but", "though" or "although" is read for
+the plan or the claim in it ("I haven't heard it yet, but I'm excited
+to" is a claim; "I've never heard it, but people say the drumming is
+unreal" stands; "I hear it's good" and "I've read that" stand, hearing
+and reading being hearsay a voice assistant does). The reason stays
+`claimed_experience`, skippable, the `CANNOT_EXPERIENCE` line when
+nothing else was said.
+
+**A claim about the hub's own past promise.** The coordinator's read
+of REG-01's rerun found "I said I'd look it up" beside a misattribution
+("I asked for a one-line review", when the person asked). "I said I'd
+...", "I told you I would ...", "I promised I'd ..." and "as I said
+before" are `claimed_statement`, skippable, with its own line ("I don't
+have a record of saying that"): the outcome record narrates what ran
+and RECALL-02's reported note what was said; the model's memory of its
+promises is neither. `copied-line-history` turn 2 is the target turn
+(it forbids the misattribution and the promise claim; the
+misattribution itself is the referent class, CHAT-13's).
+
+**The emptied reply's line by act** (an S line from REG-01's set, the
+coordinator's read): when REG-01's skips empty a reply and the retry
+draws the same, the line that stands is `emptiedLine()`: a closing
+gets the reciprocal close ("You're welcome", "Anytime"), a greeting its
+own, a question or a directive the honest line, a statement a one-line
+acknowledgment ("Fair enough", "Makes sense", "I hear you"); never
+"say that again" to a person who said thanks. The `malformed` line
+stays OUT-01's, for output that broke.
+
+**The outside review, taken.** Eight findings on the first cut, all
+taken: a sentence-initial intent phrase with no "I" cut the hub's own
+offers ("Want to hear the tracklist?"; the implied subject now stands
+only for the phrases that are first person by nature, can't wait to,
+excited to, looking forward to, dying to); "hear the rest", "hear the
+story", "read it to you", "try a different approach" and "read the
+room" were plans (the objects now exclude them and "try" is out of the
+verb list); "I haven't seen a release date yet" and "I haven't heard
+back yet" were plans (the "yet" form now needs an experiential object:
+it, that, the album, the film); "I said I'd remind you at six" with
+the promise in the hub's previous reply drew "I don't have a record of
+saying that" (a promise the window holds is a record, `promiseInWindow()`);
+`claimed_statement` and OUT-01's `malformed` were missing from
+`spec/vocab/defect-codes.json` and REG-01's two were marked unshipped
+(spec first, all four corrected); the fixture's `PLAN_CLAIM` lacked
+the guard's object exclusions and first-person requirement; stale
+"malformed line" comments on the emptied path; and an emptied
+directive drew "I don't know that one" (it draws the nothing-ran line).
+
+**Rows and corpus.** Eleven corpus rows both ways (each intent form,
+"haven't ... yet", the plain negation, the hearsay forms, the object
+cases, the past-promise claim standalone and beside a grounded
+sentence). The fixture's `PLAN_CLAIM` beside `EXPERIENCE_CLAIM`, and
+the `new-album` conversation from section 4 and section 7 whole: "the
+new Marsh Lantern album drops soon, I can't wait" (no claim, no
+closer; the world subject is CHAT-13's), "when is it out"
+(`lookupWithSource`, no promise), "how many tracks" (a number only with
+a source), "are you gonna listen to it" (no experience or plan claim,
+a content word about the subject) and "nope, you?" (no claim, a
+declarative sentence present); the lookup and subject checks fail
+until LOOKUP-01 and CHAT-13. Tests: `tests/guards.test.ts` "EXP-01"
+(every form, the negation rule, the object rule, the past-promise
+claim) and the REG-01 tests updated for the act-aware line.

@@ -326,6 +326,11 @@ export const NO_CLOSER = "enjoy the movie|enjoy the film|let me know if you need
  * visited or tasted nothing. "I haven't seen it" and "I've heard of it"
  * pass; "I've seen it", "I saw it last year", "I've been there" do not. */
 export const EXPERIENCE_CLAIM = "\\bi(?:'ve| have|'d| had)? (?:seen|saw|watched|played|visited|tasted|been (?:to|there)|listened to|read it)(?! that\\b| it (?:described|called|listed|mentioned|referred|rated)\\b| described| called| listed| mentioned| somewhere| about|'s\\b| it's\\b| it is\\b)\\b|\\bi(?:'m| am) (?:watching|playing|listening to)\\b|\\bi (?:love|loved) (?:watching|playing|visiting)\\b";
+// EXP-01: the plan forms and "haven't ... yet" are claims too, in the
+// guard's own shapes (first person, the verb's object deciding), so a
+// plan the guard skipped never shows here and one it missed does.
+export const PLAN_CLAIM =
+  "\\bi(?:'m| am|'ll| will|'d)?\\s*(?:going to|gonna|plan(?:ning)? to|can'?t wait to|excited to|looking forward to|curious to|hoping to|want to) (?:watch|see(?! (?:what|how|if|whether|your|you))|hear(?! (?:what|how|about|your|from|more|the rest))|listen|play|check it out|give it a (?:listen|spin))\\b|^\\W*(?:can'?t wait to|excited to|looking forward to) (?:watch|see|hear|listen|play)\\b|\\bi haven'?t (?:\\w+ ){0,2}(?:seen|heard|watched|played|listened to) (?:it|that|them|the (?:album|record|film|show|single|new one))\\b[^.!?]*\\byet\\b|\\bi (?:said|told you|promised) (?:i'd|i would|i'll|i will)\\b";
 /** The other person's key facts in the privacy row (scared of the
  * dark; sleeps with a night light), as the phrases that carry them, so
  * a paraphrase ("afraid of the darkness", "a lamp on at night") is
@@ -870,7 +875,12 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "RECALL-02, the explicit-history shape: asked what the hub said about the band, the earlier answer comes back as a reported note with the person's paired words, never as a first-person line; nothing else does",
     turns: [
       { say: "what did you say about the band Tempo before", newConversation: true, expect: { signal: { primary_act: "question" }, recallInContext: ["your answer touched on", "band Tempo"], mustNotContain: HONESTY_LINES + "|touched on|i said\\s*[\"'\u201c\u2018]", guard: null } },
-      { say: "and what did I say about Tempo's second album", expect: { signal: { primary_act: "question" }, recallInContext: ["band Tempo|second album"], mustContain: "listening|morning|tempo|album" } },
+      // EXP-01's target turn (the coordinator's read of REG-01's rerun):
+      // the reply reported the hub's own request as the person's ("I
+      // asked for a one-line review") and invented a past promise ("I
+      // said I'd look it up"); neither the misattribution nor the
+      // promise claim may stand.
+      { say: "and what did I say about Tempo's second album", expect: { signal: { primary_act: "question" }, recallInContext: ["band Tempo|second album"], mustContain: "listening|morning|tempo|album", mustNotContain: "i asked (?:you|for)|i said i'd|i'd look (?:it|them|that) up|i looked (?:it|them|that) up|i'll look (?:it|them|that) up|i promised", guard: null } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, episodesInContext: 0, guard: null, humanVerdict: true } },
     ],
   },
@@ -1106,6 +1116,24 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "I told Quill I'm done with sourdough, too much fuss", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, mustContain: "\\?|that|why|how|fuss|sourdough", mustNotContain: "noted|i've (?:added|saved)|added (?:it|that|to)|still learning|let me know if you need|here if you need|happy to help", humanVerdict: true } },
       { say: "I wasn't asking you to do anything, just talking", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, mustNotContain: "\\blist\\b|timer|reminder|noted|let me know if you need|here if you need|happy to help", humanVerdict: true } },
       { say: "anyway, Quill was going to lend me her starter but now she's not", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, noCopiedEpisode: true, mustNotContain: "let me know if you need|here if you need|happy to help", humanVerdict: true } },
+    ],
+  },
+  // EXP-01 (dev.md section 7) with section 4's rows: the hub never says
+  // it has heard, seen or plans to hear anything. The two experience
+  // turns are EXP-01's acceptance; the lookup, recency and reflected-
+  // question checks are LOOKUP-01's and CHAT-13's and fail until they
+  // land (the design's own row set, kept whole so the conversation
+  // reads as one).
+  {
+    id: "new-album",
+    category: "knowledge",
+    note: "section 4 and section 7: a current world subject; a promise is the lookup; a number only with a source; no experience or plan claim on 'are you gonna listen to it' and the reflected 'nope, you?'",
+    turns: [
+      { say: "the new Marsh Lantern album drops soon, I can't wait", expect: { signal: { primary_act: "inform", expressed_emotion: "happiness" }, guard: null, mustNotContain: EXPERIENCE_CLAIM + "|" + PLAN_CLAIM + "|" + NO_CLOSER, subjects: [{ type: "world", name: "Marsh Lantern" }], humanVerdict: true } },
+      { say: "when is it out", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustNotContain: "let me check|i can help you|would you like me to look|want me to look|i'll look|i can look", guard: null } },
+      { say: "how many tracks", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustNotContain: PLAN_CLAIM, guard: null } },
+      { say: "are you gonna listen to it", expect: { signal: { primary_act: "question" }, mustNotContain: EXPERIENCE_CLAIM + "|" + PLAN_CLAIM, mustContain: "album|marsh|lantern|track|music|song|drum|band|release", guard: null, humanVerdict: true } },
+      { say: "nope, you?", expect: { signal: { primary_act: "question" }, mustNotContain: EXPERIENCE_CLAIM + "|" + PLAN_CLAIM, mustContain: "[a-z][^?]*\\.(\\s|$)", guard: null, humanVerdict: true } },
     ],
   },
 ];

@@ -4,7 +4,7 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, replacementFor, withoutHonestyLines, stripRegisterTail, MALFORMED, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, withoutHonestyLines, stripRegisterTail, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
@@ -568,7 +568,7 @@ describe("action claims are matched per package family (CHAT-04)", () => {
     // the narrated line would name a memory nobody mentioned.
     const stated = guardReply("I saved that.", ctx({ utterance: "Pippa is allergic to peanuts" }));
     expect([stated.reason, stated.replaced]).toEqual(["unsupported_action", true]);
-    expect(MALFORMED).toContain(stated.reply);
+    expect(EMPTIED_LINES.statement).toContain(stated.reply); // the line reads the act: an acknowledgment on a statement
     const withContent = guardReply("I saved that. Peanuts are a tricky one at school.", ctx({ utterance: "Pippa is allergic to peanuts" }));
     expect([withContent.reason, withContent.replaced, withContent.reply]).toEqual(["unsupported_action", false, "Peanuts are a tricky one at school."]);
   });
@@ -933,7 +933,12 @@ describe("REG-01: a statement is not a request, and the assistant register is st
     const alone = guardReply("I've added that to your list.", stated());
     expect([alone.reason, alone.replaced]).toEqual(["unsupported_action", true]);
     expect(alone.reply).not.toMatch(/list|memory|timer|reminder/i);
-    expect(MALFORMED).toContain(alone.reply);
+    expect(EMPTIED_LINES.statement).toContain(alone.reply);
+    // The emptied line by act: a thank-you gets the reciprocal close, a
+    // greeting its own, a question the honest line.
+    expect(EMPTIED_LINES.closing).toContain(guardReply("I'm still learning!", ctx({ utterance: "thanks", act: "closing" })).reply);
+    expect(EMPTIED_LINES.greeting).toContain(guardReply("How can I help you today?", ctx({ utterance: "hi", act: "greeting" })).reply);
+    expect(guardReply("Let me know if you need anything else.", ctx({ utterance: "what's the capital of Portugal", act: "question" })).reply).toMatch(/don't know|not sure|don't have/i);
     const asked = guardReply("I've added that to your list.", ctx({ utterance: "add sourdough to the list", act: "directive" }));
     expect([asked.reason, asked.replaced]).toEqual(["unsupported_action", true]);
     expect(asked.reply).toMatch(/list/i);
@@ -1011,5 +1016,60 @@ describe("REG-01: a statement is not a request, and the assistant register is st
     const fresh = guardReply("Fair enough. Will you miss the bread, or just the fuss?", stated({ utterance: "just talking", previousReply: previous }));
     expect(fresh.reason).toBeNull();
     expect(guardReply("What made you decide to stop?", stated({ previousReply: undefined })).reason).toBeNull();
+  });
+});
+
+describe("EXP-01: experience and plan claims", () => {
+  const asked = (over: Partial<GuardContext> = {}) => ctx({ utterance: "are you gonna listen to it", act: "question", ...over });
+
+  test("a plan to experience is a claim, in every intent form, with an implicit subject too", () => {
+    for (const line of ["I'm going to listen to it tonight.", "I'm gonna check it out.", "I plan to watch it this weekend.", "Can't wait to hear it!", "I'm excited to see it.", "I'm looking forward to playing it.", "I'm curious to hear the new single.", "I'll try to catch it.", "I'm excited to."]) {
+      const g = guardReply(line, asked());
+      expect([line, g.reason, g.replaced]).toEqual([line, "claimed_experience", true]);
+      expect(g.reply).not.toMatch(/going to|gonna|can't wait|excited/i);
+    }
+    const kept = guardReply("I'm going to listen to it tonight. The single came out Friday.", asked());
+    expect([kept.reason, kept.replaced, kept.reply]).toEqual(["claimed_experience", false, "The single came out Friday."]);
+  });
+
+  test("'haven't ... yet' is a plan and a 'but' clause is read; a plain negation and hearsay stand", () => {
+    expect(guardReply("I haven't heard it yet.", asked({ utterance: "have you heard the new one" })).reason).toBe("claimed_experience");
+    expect(guardReply("I haven't heard it yet, but I'm excited to.", asked({ utterance: "have you heard the new one" })).reason).toBe("claimed_experience");
+    expect(guardReply("I haven't seen it, but I'm going to watch it tonight.", asked({ utterance: "have you seen it" })).reason).toBe("claimed_experience");
+    for (const line of ["No, I haven't heard it.", "I've never heard it, but people say the drumming is unreal.", "I hear it's good.", "I've read that it's their best one.", "I haven't seen it, but the reviews are strong.", "I can't listen to music, though people say it's their best one yet."]) {
+      expect([line, guardReply(line, asked({ utterance: "have you heard the new one" })).reason]).toEqual([line, null]);
+    }
+  });
+
+  test("the verb's object decides: 'hear what you think' and 'see if' are conversation", () => {
+    for (const line of ["I'd love to hear what you think of it.", "I'm curious to see if it lives up to the first one.", "I'm going to see what the reviews say.", "I'll try to find the release date."]) {
+      expect([line, guardReply(line, asked({ utterance: "I'm listening to it tonight", act: "inform" })).reason]).toEqual([line, null]);
+    }
+  });
+
+  test("a claim about the hub's own past promise is skipped with its own line (the coordinator's target from REG-01's set)", () => {
+    const withContext = asked({ utterance: "and what did I say about Tempo's second album", history: ["the drumming on Tempo's second album is unreal"] });
+    const g = guardReply("You said the drumming was unreal. I said I'd look it up for you.", withContext);
+    expect([g.reason, g.replaced, g.reply]).toEqual(["claimed_statement", false, "You said the drumming was unreal."]);
+    const alone = guardReply("I told you I would remind you.", asked({ utterance: "did you set the reminder" }));
+    expect([alone.reason, alone.replaced]).toEqual(["claimed_statement", true]);
+    expect(alone.reply).toMatch(/record of saying|what I said before/);
+  });
+});
+
+describe("EXP-01: the outside review's cases", () => {
+  const asked = (over: Partial<GuardContext> = {}) => ctx({ utterance: "when is it out", act: "question", ...over });
+  test("an offer to the person is never a plan; the objects that make a verb conversation; honest waiting is not a plan", () => {
+    for (const line of ["Want to hear the tracklist?", "Want to see the full list?", "Want to try again?", "I'd love to hear the rest!", "I'd love to hear the story.", "I'm going to try a different approach.", "Trying to read the room here.", "I'm going to read it to you.", "I haven't seen a release date yet.", "I haven't heard whether it's confirmed yet.", "I haven't heard back yet."]) {
+      expect([line, guardReply(line, asked()).reason]).toEqual([line, null]);
+    }
+    expect(guardReply("I haven't heard the album yet.", asked({ utterance: "have you heard it" })).reason).toBe("claimed_experience");
+  });
+  test("a promise the window holds is a record, not a claim; an emptied directive gets the nothing-ran line", () => {
+    const held = guardReply("I said I'd remind you at six, and the reminder is set.", asked({ utterance: "did you set the reminder", previousReply: "Sure, I'll remind you at six.", outcomes: [{ packageId: "remind", status: "succeeded" }] }));
+    expect(held.reason).toBeNull();
+    expect(guardReply("I said I'd remind you at six.", asked({ utterance: "did you set the reminder", previousReply: "Paris is the capital of France." })).reason).toBe("claimed_statement");
+    const emptied = guardReply("Let me know if you need anything else!", ctx({ utterance: "add milk to the list", act: "directive" }));
+    expect([emptied.reason, emptied.reply]).toEqual(["assistant_register", "I haven't actually done that."]);
   });
 });

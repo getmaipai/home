@@ -27,7 +27,7 @@ import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuot
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, stripRegisterTail, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, stripRegisterTail, emptiedLine, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
@@ -2940,7 +2940,7 @@ async function runTurnHoldingLease(
         // REG-01, rule 1: every sentence of a reply to a statement was
         // register or an action claim; one retry with the note (the
         // turn's second generation), its own reply guarded the same way;
-        // a second empty result keeps the malformed line already set.
+        // a second empty result keeps the act's own line already set.
         // The same fact the streaming path regenerates on: the guards
         // emptied the reply (never a narrated line, which stands).
         if (emptiedBySkips && prepared.timings.retries < 1) {
@@ -3316,7 +3316,8 @@ export async function* gateGuards(
   }
   if (skipped && !spokeAnything) {
     // REG-01, rule 1: nothing remained of a reply to a statement; one
-    // retry with the note, then the malformed line (OUT-01's bound).
+    // retry with the note, then the act's own line (OUT-01's bound on
+    // generations).
     if (isRegisterSkip(skipped.reason, liveCtx())) {
       const again = regenerate ? await regenerate() : null;
       let spoke = false;
@@ -3334,7 +3335,7 @@ export async function* gateGuards(
           if (spoke) return n.value ?? step.value;
         } catch (err) {
           // A regeneration that fails before any text takes the
-          // malformed line; after text, what was said stands.
+          // act's own line; after text, what was said stands.
           console.error(`[turn] the statement retry failed: ${(err as Error).message}`);
           if (spoke) return step.value;
         } finally {
@@ -3343,8 +3344,10 @@ export async function* gateGuards(
           await nested.return(undefined).catch(() => undefined);
         }
       }
-      onGuardHit?.("malformed", true);
-      yield `${replacementFor("malformed", personId)} `;
+      // The line by the turn's act (a close, a greeting, a question, a
+      // statement), never "say that again" to a thank-you.
+      onGuardHit?.(skipped.reason, true);
+      yield `${emptiedLine(liveCtx())} `;
       return step.value;
     }
     onGuardHit?.(skipped.reason, true);

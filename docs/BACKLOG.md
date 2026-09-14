@@ -1345,7 +1345,22 @@ invented for the roster's household, and added to
 
 <a id="exp-01"></a>
 
-- [ ] **EXP-01: Experience and plan claims** (S)
+- [x] **EXP-01: Experience and plan claims** (S)
+
+    Done 2026-09-14 (docs/dev/session-a.md "EXP-01"): the plan forms
+    (`PLANNED_EXPERIENCE_RE`: going to, gonna, plan to, can't wait to,
+    excited to, looking forward to, curious to, try to, want to, with
+    the verbs and their gerunds, an implicit subject allowed, the
+    verb's object deciding: "hear what you think" is conversation) and
+    "haven't ... yet" are `claimed_experience`; the negation exemption
+    only for a plain negation with no yet, but or though; a claim about
+    the hub's own past promise ("I said I'd look it up") is
+    `claimed_statement` with its own line. Eleven corpus rows both
+    ways; the fixture's `PLAN_CLAIM` beside `EXPERIENCE_CLAIM`, the
+    `new-album` conversation (its lookup and reflected-question rows
+    LOOKUP-01's and CHAT-13's), copied-line-history turn 2 as the
+    target turn. Also here, an S line from REG-01's set: the line that
+    stands when the register scrub empties a reply reads the act.
 
     Objective: the hub never says it has seen, heard, played or plans
     to watch anything. Files: `backend/src/lib/guards.ts`

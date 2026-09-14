@@ -3969,9 +3969,9 @@ describe("CHAT-04: acknowledgments pass, action claims need their outcome, opene
       expect(result.value.reply.text).toBe("I haven't saved that as a memory.");
     });
     // On a statement, the claim is skipped; the retry with the note gets
-    // the same claim from the stub, so the malformed line stands and the
+    // the same claim from the stub, so the act's own line stands and the
     // turn spent exactly two generations.
-    const { MALFORMED } = await import("@/lib/guards");
+    const { EMPTIED_LINES } = await import("@/lib/guards");
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     let generations = 0;
@@ -3986,7 +3986,7 @@ describe("CHAT-04: acknowledgments pass, action claims need their outcome, opene
       const result = await runTurn(actor, "chat", "Pippa is allergic to peanuts");
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(MALFORMED).toContain(result.value.reply.text);
+      expect(EMPTIED_LINES.statement).toContain(result.value.reply.text); // an acknowledgment, never "say that again" (the coordinator's read of REG-01's set)
       expect(result.value.reply.text).not.toMatch(/memory|saved|list/i);
       expect(generations).toBe(2);
     } finally {

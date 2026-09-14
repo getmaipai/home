@@ -12766,6 +12766,11 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- EXP-01, experience and plan claims: the plan forms and "haven't ...
+  yet" are claims the hub cannot make, the negation exemption only for
+  a plain negation, a claim about the hub's own past promise its own
+  reason; the `new-album` rows; the emptied reply's line by act:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-14).
 - REG-01, a statement is not a request and the assistant register is
   stripped: the three output-boundary rules in `lib/guards.ts` reading
   the signal's act (an action claim on a statement skipped, never

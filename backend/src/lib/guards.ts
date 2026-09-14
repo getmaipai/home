@@ -50,6 +50,11 @@ export type GuardReason =
    * sentence is dropped, wherever it sits, and the CANNOT_EXPERIENCE
    * line stands in only when nothing else does. */
   | "claimed_experience"
+  /** EXP-01: a claim about the hub's own past promise or statement ("I
+   * said I'd look it up"), which nothing on the turn grounds; skipped
+   * like an experience claim, with its own line when nothing else was
+   * said. */
+  | "claimed_statement"
   /** #92: a sentence that is nothing but a bracketed system note ("[Knowledge
    * could not answer.]"), the window's own description of an earlier
    * non-model turn, echoed back as if it were a reply. */
@@ -157,7 +162,8 @@ export interface Guarded {
   replaced: boolean;
   /** REG-01: true when every sentence was skipped as register, a
    * repeated question or a statement's action claim and `reply` is the
-   * malformed line: the engine's cue for its one retry with the note. */
+   * act's own line (emptiedLine()): the engine's cue for its one retry
+   * with the note. */
   emptied?: boolean;
 }
 
@@ -198,6 +204,17 @@ const CANNOT_EXPERIENCE = [
   "I can't actually watch or go anywhere myself.",
   "I don't get to watch things or go places, so I can't say from experience.",
 ];
+const NO_RECORD_OF_SAYING = ["I don't have a record of saying that.", "I can't find that in what I said before."];
+// REG-01 (the coordinator's read of its set): when the register scrub
+// empties a reply, the line that stands reads the turn's act. A
+// closing or a greeting gets the reciprocal move, a question the
+// honest line, a statement a one-line acknowledgment; never "say that
+// again" to a person who said thanks.
+export const EMPTIED_LINES: Record<"closing" | "greeting" | "statement", readonly string[]> = {
+  closing: ["You're welcome.", "Anytime.", "Glad to help."],
+  greeting: ["Hi there.", "Hello.", "Hey, good to hear from you."],
+  statement: ["Fair enough.", "Makes sense.", "I hear you."],
+};
 /** OUT-01: the line for a reply that broke, never "I don't know". */
 export const MALFORMED = [
   "Sorry, I lost my train of thought. Say that again?",
@@ -333,6 +350,46 @@ const CLAIMED_EXPERIENCE_RE =
   // hearsay framing the prompt invites, and reading is something the
   // hub genuinely does, the same argument the comment makes for hearing.
   /\bi(?:'m| am| was|'ve| have|'d| had)?(?: just| also| even| already| actually)? (?:watch(?:ing|ed)|see(?:ing|n)|saw|read(?!\s+(?:that|somewhere|about|online|it's|it is)\b)|play(?:ing|ed)|binge\w*|eat(?:ing)?|ate|drink(?:ing)?|drank|cook(?:ing|ed)|went|visit(?:ing|ed)|been to|waiting for|sleep(?:ing)?|slept|dream(?:ing|ed|t)|tried|tasted|bought|drove|driving)\b/i;
+// EXP-01 (design pass section 7, finding 4): a plan to experience is a
+// claim too ("I'm going to listen to it", "can't wait to see it",
+// "I haven't heard it yet": "yet" is a plan), and so is a claim about
+// the hub's own past promise ("I said I'd look it up"), which the
+// outcome record narrates, never the model's memory. Hearing and
+// reading as hearsay stand ("I hear it's good", "I've read that").
+// "hear what you think" and "see if it suits you" are conversation,
+// not a plan to listen or to watch: the verb's object decides.
+// The verbs, each with the objects that make it conversation rather
+// than an experience: "hear what you think", "hear the rest" (a story
+// the person is telling), "read it to you" (the hub reads aloud),
+// "see if it suits you". "try" is not here: "try a different approach"
+// is not tasting.
+const EXPERIENCE_VERBS = String.raw`(?:watch(?:ing)?(?! (?:what|how|for|out for))|see(?:ing)?(?! (?:what|how|if|whether|your|you|where|which|who))|hear(?:ing)?(?! (?:what|how|about|your|from|more|all|back|you|the rest|the story|that|this|it from))|listen(?:ing)?(?! (?:to what|to how|to you|for|to the rest))|play(?:ing)?(?! (?:it|that|them) (?:for|back|to you))|read(?:ing)?(?! (?:what|your|you|it to|that to|them to|this to|aloud|out|the room))|check(?:ing)?(?: it| that| them| this)? out|giv(?:e|ing) (?:it|that|them) a (?:listen|watch|go|spin)|catch(?:ing)?|stream(?:ing)?|binge(?:ing)?|bingeing)\b`;
+// A plan spoken as the hub's own: the first-person forms, and the
+// intent phrases that are first person by nature with the subject
+// implied ("can't wait to hear it"); "want to see the list?" is an
+// offer to the person, never a plan (a review).
+const PLANNED_EXPERIENCE_RE = new RegExp(
+  String.raw`\bi(?:'m| am|'ll| will|'d| would)?\s*(?:going to|gonna|plan(?:ning)? to|can'?t wait to|excited to|looking forward to|curious to|hoping to|love to|dying to|keen to|eager to|about to|try(?:ing)? to|want to|wanna)\s+` +
+    EXPERIENCE_VERBS +
+    String.raw`|^\W*(?:can'?t wait to|excited to|looking forward to|dying to)\s+` +
+    EXPERIENCE_VERBS +
+    // A bare "I'm excited to" at the end, its verb elided.
+    String.raw`|\bi(?:'m| am)?\s*(?:can'?t wait|excited to|looking forward to (?:it|that|this)|curious to)[.!]*\s*$` +
+    // "haven't ... yet" with an experiential object ("I haven't heard
+    // the album yet"); "I haven't seen a release date yet" and "I
+    // haven't heard back yet" are honest waiting, not plans (a review).
+    String.raw`|\bi haven'?t (?:\w+ ){0,2}(?:seen|heard|watched|played|read|listened to|caught) (?:it|that|them|this|any of it|the (?:album|record|film|movie|show|episode|series|book|game|single|track|new one|whole thing))\b[^.!?]*\byet\b`,
+  "i",
+);
+// A claim about the hub's own past promise or statement ("I said I'd
+// look it up", "I told you I would"): the outcome record narrates what
+// ran, and RECALL-02's reported note what was said; the model's memory
+// of its promises is neither.
+const CLAIMED_STATEMENT_RE = /\bi (?:said|told you|mentioned|promised|already said) (?:i'd|i would|i'll|i will|that i(?:'d| would|'ll| will)?|i (?:was|am) going to)\b|\b(?:as|like) i (?:said|mentioned|promised) (?:before|earlier|last time)\b/i;
+// A plain negation stands ("I haven't seen it", "I've never heard
+// it"); one that carries "yet" or turns on "but" or "though" is a plan
+// or a claim in the same breath and is read past the negation.
+const PLAIN_NEGATION_RE = /\b(?:yet|but|though|although)\b/i;
 
 // "Pippa is at soccer practice right now.", "You're at the office." - a
 // location for a person in THIS household, the one shape guards.py's own
@@ -557,6 +614,17 @@ function unclaimedWords(sentence: string, grounded: Set<string>): string[] {
   return [...tokenize(sentence)].filter((w) => !grounded.has(w) && !CLAIM_SAFE_WORDS.has(w));
 }
 
+/** The clause after "I said I'd" shares half its content words with
+ * the hub's own previous reply or the window: the promise was made. */
+function promiseInWindow(sentence: string, ctx: GuardContext): boolean {
+  const tail = sentence.replace(CLAIMED_STATEMENT_RE, " ");
+  const said = tokenize(tail);
+  if (said.size === 0) return false;
+  const window = tokenize([ctx.previousReply ?? "", ...(ctx.history ?? [])].join(" "));
+  const overlap = [...said].filter((w) => window.has(w)).length;
+  return overlap >= Math.max(1, Math.ceil(said.size / 2));
+}
+
 function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null {
   const grounded = groundedWords(ctx);
   const declines = DECLINE_RE.test(sentence);
@@ -569,9 +637,18 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
   // admitted not knowing something else.
   if (PERSON_TRAIT_RE.test(sentence) && unclaimedWords(sentence, grounded).length > 0) return "invention";
 
-  if (declines) return null; // an honest "I don't know" is never itself an invention, for everything else below
+  if (declines) {
+    // An honest "I don't know" is never itself an invention, for
+    // everything else below; a negation with "yet" or a "but" clause
+    // is read for the plan or the claim it carries (EXP-01).
+    if (PLAIN_NEGATION_RE.test(sentence) && (PLANNED_EXPERIENCE_RE.test(sentence) || CLAIMED_EXPERIENCE_RE.test(sentence))) return "claimed_experience";
+    return null;
+  }
 
-  if (CLAIMED_EXPERIENCE_RE.test(sentence)) return "claimed_experience";
+  // A promise the window actually holds ("I'll remind you at six" in
+  // the hub's previous reply) is a record, not a claim (a review).
+  if (CLAIMED_STATEMENT_RE.test(sentence) && !promiseInWindow(sentence, ctx)) return "claimed_statement";
+  if (CLAIMED_EXPERIENCE_RE.test(sentence) || PLANNED_EXPERIENCE_RE.test(sentence)) return "claimed_experience";
   if (guessesAboutHousehold(sentence, ctx, grounded)) return "invention";
 
   if (claimsUngroundedHouseholdLocation(sentence, ctx, grounded)) return "invention";
@@ -1284,7 +1361,7 @@ export function withoutHonestyLines(text: string): string {
 // Item 1b: a reason whose sentence is dropped wherever it sits, first
 // sentence included, and the rest of the reply goes on; the honest
 // line stands in only when nothing else was said.
-const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "assistant_register", "repeat_question"]);
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "repeat_question"]);
 
 /** REG-01: a statement (an inform, a commissive, a greeting, a closing
  * or a backchannel by the signal; a statement or first-person shape
@@ -1303,10 +1380,19 @@ function statementActionSkip(reason: GuardReason, ctx: GuardContext): boolean {
   return reason === "unsupported_action" && isStatementTurn(ctx) && (ctx.outcomes ?? []).length === 0 && !REQUEST_RE.test(ctx.utterance);
 }
 
+/** The line that stands when REG-01's skips emptied a reply, by the
+ * turn's act (the engine retries once with its note before this). */
+export function emptiedLine(ctx: Pick<GuardContext, "act" | "shape" | "utterance" | "personId">): string {
+  const shape = ctx.act ? null : shapeOf(ctx as GuardContext);
+  const act = ctx.act ?? (shape === "question" ? "question" : shape === "command" ? "directive" : "inform");
+  const bank = act === "closing" ? EMPTIED_LINES.closing : act === "greeting" ? EMPTIED_LINES.greeting : act === "question" ? DONT_KNOW : act === "directive" ? [NOTHING_RAN] : EMPTIED_LINES.statement;
+  return pickVariant(ctx.personId, `emptied:${act}`, bank);
+}
+
 /** REG-01's own skips: the register, a repeated question, a statement's
  * action claim. When one of these emptied the reply, no honest line
  * about an action or an experience fits (nothing was asked), so the
- * malformed line stands and the engine retries once with its note;
+ * act's own line stands and the engine retries once with its note;
  * `claimed_experience` keeps its own line and its own rule (item 1b). */
 export function isRegisterSkip(reason: GuardReason, ctx: GuardContext): boolean {
   return reason === "assistant_register" || reason === "repeat_question" || statementActionSkip(reason, ctx);
@@ -1341,6 +1427,7 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   example_parrot: DONT_KNOW,
   placeholder_echo: DONT_KNOW,
   claimed_experience: CANNOT_EXPERIENCE,
+  claimed_statement: NO_RECORD_OF_SAYING,
   malformed: MALFORMED,
   // REG-01: a reply that was only register or a repeated question has
   // nothing left; the engine retries once with its note first, and the
@@ -1448,10 +1535,10 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   if (skipped) {
     if (kept.length > 0) return { reply: kept.join(" "), reason: skipped.reason, replaced: false };
     // REG-01: nothing was asked, so no honest line about an action
-    // fits; the malformed line stands and the engine retries once with
-    // its note before accepting it. Item 1b's claimed_experience keeps
-    // its own line.
-    if (isRegisterSkip(skipped.reason, fullReplyCtx)) return { reply: replacementFor("malformed", ctx.personId), reason: skipped.reason, replaced: true, emptied: true };
+    // fits; the act's own line stands (emptiedLine()) and the engine
+    // retries once with its note before accepting it. Item 1b's
+    // claimed_experience keeps its own line.
+    if (isRegisterSkip(skipped.reason, fullReplyCtx)) return { reply: emptiedLine(fullReplyCtx), reason: skipped.reason, replaced: true, emptied: true };
     return { reply: replacementFor(skipped.reason, ctx.personId, { sentence: skipped.sentence, ctx: fullReplyCtx }), reason: skipped.reason, replaced: true };
   }
   if (tailCut) return { reply: kept.join(" "), reason: tailCut, replaced: false };
