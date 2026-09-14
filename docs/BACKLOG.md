@@ -6319,10 +6319,13 @@ on a spec tag that was never cut.
       from the bell's own "View history" link) - a client-side window
       over the real, genuinely unbounded `GET /api/notifications/history`
       (confirmed by reading `lib/notifications.ts`'s `listHistory()`: no
-      date filter or cap exists server-side), and "clear all" as a real
-      loop over the real per-item `POST /:id/dismiss` (no
-      `POST /api/notifications/clear-all` route exists to call instead).
-      Still open: quiet hours and the web-push opt-in (both need new
+      date filter or cap exists server-side). Lane 15 (2026-09-14):
+      `POST /api/notifications/dismiss` (`{ ids }` or `{ all: true }`,
+      one transaction, scoped to the signed-in person, returns the
+      count) backs the bell popover's own "Dismiss all", the history
+      page's "Clear all", and its new multi-select "Dismiss selected" -
+      the per-item `POST /:id/dismiss` route stays for a single
+      dismiss. Still open: quiet hours and the web-push opt-in (both need new
       settings keys in `backend/src/settings/notificationKeys.ts`, F's
       file per `docs/plans/wave-2.md:113`'s grouping - not built, and not
       E's file to add them to), `passive`-level digest batching, browser

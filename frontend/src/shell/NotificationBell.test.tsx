@@ -177,4 +177,65 @@ describe("NotificationBell", () => {
       restore();
     }
   });
+
+  // Lane 15 (Jesse's ask from live use): "Dismiss all" for the pending
+  // list here.
+  test("Dismiss all sends { all: true } and clears the whole pending list, without waiting for the next poll", async () => {
+    let sawBody: unknown;
+    let dismissedAll = false;
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/notifications/dismiss") && init?.method === "POST") {
+        sawBody = JSON.parse(String(init.body));
+        dismissedAll = true;
+        return Promise.resolve(new Response(JSON.stringify({ count: 2 }), { status: 200 }));
+      }
+      if (url.includes("/api/notifications")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify(dismissedAll ? [] : [notification("n1", "First"), notification("n2", "Second")]),
+            { status: 200 },
+          ),
+        );
+      }
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole, getByRole, getByText, queryByText } = renderBell();
+      fireEvent.click(await findByRole("button", { name: /Notifications \(2 pending\)/ }));
+      getByText("First");
+      getByText("Second");
+      fireEvent.click(getByRole("button", { name: "Dismiss all" }));
+      await waitFor(() => expect(queryByText("First")).toBeNull());
+      expect(queryByText("Second")).toBeNull();
+      expect(sawBody).toEqual({ all: true });
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("Dismiss all also invalidates NotificationsPage's own history cache", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/notifications/dismiss")) return Promise.resolve(new Response(JSON.stringify({ count: 1 }), { status: 200 }));
+      if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([notification("n1", "One")]), { status: 200 }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole, getByRole, queryClient } = renderBell();
+      const invalidateSpy = mock(queryClient.invalidateQueries.bind(queryClient));
+      queryClient.invalidateQueries = invalidateSpy;
+      fireEvent.click(await findByRole("button", { name: /Notifications/ }));
+      fireEvent.click(getByRole("button", { name: "Dismiss all" }));
+      await waitFor(() =>
+        expect(invalidateSpy.mock.calls.some((call) => (call[0] as { queryKey: string[] }).queryKey[0] === "notifications-history")).toBe(
+          true,
+        ),
+      );
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
 });

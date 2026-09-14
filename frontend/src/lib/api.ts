@@ -468,6 +468,12 @@ export const api = {
     request<NotificationDeliveryView>(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
   dismissNotification: (id: string) =>
     request<{ id: string }>(`/api/notifications/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+  // Lane 15: the bell popover's "Dismiss all", and the history page's
+  // own "Clear all"/"Dismiss selected" - one real route
+  // (POST /api/notifications/dismiss) instead of a client-side loop
+  // over dismissNotification() above, which stays for a single item.
+  dismissNotifications: (selector: { ids: string[] } | { all: true }) =>
+    request<{ count: number }>("/api/notifications/dismiss", { method: "POST", body: JSON.stringify(selector) }),
   // A 404 here means "the widgets route isn't built yet" (D's step 9,
   // not started), which reads identically to a household with no
   // widget-contributing packages installed - also true for a while

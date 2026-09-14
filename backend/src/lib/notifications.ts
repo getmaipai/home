@@ -27,7 +27,7 @@
 // core's are declared, and get its own settings-key toggle through its
 // manifest's `config[]` (already-spec'd, docs/SETTINGS.md), not by
 // editing this file.
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, inArray, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { notificationDeliveries, people } from "@/db/schema";
 import { newNotificationId } from "@/lib/id";
@@ -265,4 +265,43 @@ export function dismiss(actor: PersonRow, id: string): NotificationOpResult<{ id
   if (!found.ok) return found;
   db.update(notificationDeliveries).set({ dismissedAt: new Date().toISOString() }).where(eq(notificationDeliveries.id, id)).run();
   return { ok: true, value: { id } };
+}
+
+/** Lane 15: the bell popover's "Dismiss all", the history page's own
+ * "Clear all" and multi-select "Dismiss selected", all backed by this
+ * one route instead of history's own client-side loop over dismiss()
+ * (NotificationsPage.tsx's own former header explained why that loop
+ * was the honest choice when no batch route existed - this is that
+ * route). Always scoped to the actor's own notifications, the same
+ * "inherently personal, no admin-sees-all" posture every other function
+ * here already holds; an id in `ids` that belongs to someone else, or
+ * doesn't exist, is silently excluded rather than erroring the whole
+ * call, the same shape the batch memory-forget route already uses for
+ * a partial id list. Only ever touches rows still pending
+ * (`dismissedAt` null) - `all: true` dismisses "everything currently
+ * pending", not "every row in history", and an id already dismissed by
+ * an earlier call is excluded rather than re-stamped, so the returned
+ * count always means "how many actually changed just now". One
+ * transaction: every row's own dismissedAt is stamped together, so a
+ * reader who lists pending mid-call never sees a partially-cleared
+ * list. */
+export function dismissMany(actor: PersonRow, selector: { ids: string[] } | { all: true }): NotificationOpResult<{ count: number }, never> {
+  return db.transaction((tx) => {
+    // One UPDATE ... RETURNING, not a SELECT to find the rows followed
+    // by a second UPDATE against the id list it found - a review caught
+    // the two-query version doing an extra SQLite round trip (and
+    // re-serializing the id list back through JS) for no behavioral
+    // difference, inside a transaction already holding the write lock.
+    const where =
+      "all" in selector
+        ? and(eq(notificationDeliveries.recipientId, actor.id), isNull(notificationDeliveries.dismissedAt))
+        : and(eq(notificationDeliveries.recipientId, actor.id), inArray(notificationDeliveries.id, selector.ids), isNull(notificationDeliveries.dismissedAt));
+    const dismissed = tx
+      .update(notificationDeliveries)
+      .set({ dismissedAt: new Date().toISOString() })
+      .where(where)
+      .returning({ id: notificationDeliveries.id })
+      .all();
+    return { ok: true, value: { count: dismissed.length } };
+  });
 }

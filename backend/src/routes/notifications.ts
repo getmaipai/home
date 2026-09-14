@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { listPending, listHistory, markRead, dismiss } from "@/lib/notifications";
+import { listPending, listHistory, markRead, dismiss, dismissMany } from "@/lib/notifications";
 
 export const notificationsRoutes = apiRouter();
 
@@ -88,5 +88,45 @@ notificationsRoutes.openapi(dismissRoute, (c) => {
   if (!result.ok) {
     return result.status === 403 ? c.json({ error: result.error }, 403) : c.json({ error: result.error }, 404);
   }
+  return c.json(result.value, 200);
+});
+
+// Lane 15 (Jesse's ask from live use): the bell popover's "Dismiss all",
+// and the history page's own "Clear all"/"Dismiss selected" - one real
+// route instead of a client-side loop over the per-item route above,
+// which stays for a single dismiss. Additive: nothing existing changes
+// shape. Adults and children alike may call this (a person's own
+// notifications only, the same posture every route in this file
+// already holds - there is no household-wide or admin variant of
+// dismissing).
+const DismissManyBodySchema = z.union([
+  z.object({ ids: z.array(z.string()).min(1) }).strict(),
+  z.object({ all: z.literal(true) }).strict(),
+]);
+
+const dismissManyRoute = createRoute({
+  method: "post",
+  path: "/dismiss",
+  tags: ["Notifications"],
+  summary: "Dismiss several, or all pending, of the signed-in person's own notifications in one call",
+  middleware: [requireAuth] as const,
+  request: {
+    body: { content: { "application/json": { schema: DismissManyBodySchema } } },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ count: z.number() }) } }, description: "Dismissed - count of notifications actually changed (already-dismissed ids and ids not belonging to this person are excluded, not errored)." },
+    ...errorResponses({ 400: "Body must be { ids: string[] } (non-empty) or { all: true }", 401: "Not signed in", 500: "dismissMany() failed unexpectedly" }),
+  },
+});
+notificationsRoutes.openapi(dismissManyRoute, (c) => {
+  const result = dismissMany(c.get("person"), c.req.valid("json"));
+  // dismissMany() never actually returns ok: false today (its own S is
+  // `never`) - checked anyway, and a real structured 500 rather than an
+  // uncaught throw, so a future change that gives it a real error case
+  // (a row-count cap, a household-pause check) doesn't silently swap
+  // this one route's own error shape for Hono's bare default response -
+  // every sibling route in this file already returns a real
+  // {error: string} body on failure, never a thrown Error.
+  if (!result.ok) return c.json({ error: result.error }, 500);
   return c.json(result.value, 200);
 });

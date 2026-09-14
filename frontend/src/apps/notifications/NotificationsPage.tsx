@@ -4,6 +4,8 @@ import { Page } from "@/kit/primitives/Page";
 import { List } from "@/kit/primitives/List";
 import { AsyncState } from "@/kit/primitives/AsyncState";
 import { EmptyState } from "@/kit/primitives/EmptyState";
+import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
+import { Checkbox } from "@/kit/ui/checkbox";
 import { Badge } from "@/kit/ui/badge";
 import { Button } from "@/kit/ui/button";
 import { NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY } from "@/shell/NotificationBell";
@@ -21,13 +23,17 @@ function whenText(iso: string): string {
 // genuinely unbounded - every delivery ever made, no date filter, no cap
 // (confirmed by reading it, not assumed) - so the thirty days is a client-
 // side window over the real data, not a server capability this page
-// pretends exists. "Clear all" is the same shape: there is no
-// POST /api/notifications/clear-all, so it loops the real, real
-// POST /:id/dismiss once per still-pending row (a code review precedent
-// this session already used for a genuinely missing batch endpoint -
-// PeoplePage.tsx's own batch delete IS a real batch route, but where one
-// doesn't exist, looping the real single-item action is the honest
-// choice over inventing a fake batch response).
+// pretends exists.
+//
+// Lane 15 (Jesse's ask from live use): "Clear all" and the new "Dismiss
+// selected" both call the real POST /api/notifications/dismiss route now
+// (backend/src/lib/notifications.ts's dismissMany()) - one request, not
+// a client-side loop over the per-item dismiss route the way this page's
+// own "Clear all" used to work before that route existed. Both send
+// `{ ids }`, the exact set of pending ids this page's own 30-day window
+// shows, not `{ all: true }` - that flag would reach every pending row
+// in the person's whole history regardless of this page's own window,
+// silently widening what one click does past what's actually on screen.
 export function NotificationsPage() {
   const queryClient = useQueryClient();
   const query = useQuery<NotificationDeliveryView[]>({
@@ -36,6 +42,8 @@ export function NotificationsPage() {
   });
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   function invalidate() {
     // Both caches: dismissing here should also drop the row from the
@@ -47,6 +55,28 @@ export function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_HISTORY_QUERY_KEY }),
       queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }),
     ]);
+  }
+
+  function leaveSelectMode() {
+    setSelectMode(false);
+    setSelected(new Set());
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // `alreadyAllSelected` is computed by the caller from the current
+  // pendingIds, not re-derived here from `selected.size` - a review
+  // caught that comparison going stale the moment the pending set
+  // changes underneath it (a poll, the bell's own "Dismiss all").
+  function toggleSelectAll(pendingIds: string[], alreadyAllSelected: boolean) {
+    setSelected(alreadyAllSelected ? new Set() : new Set(pendingIds));
   }
 
   async function handleDismiss(id: string) {
@@ -62,13 +92,23 @@ export function NotificationsPage() {
     }
   }
 
-  async function handleClearAll(pending: NotificationDeliveryView[]) {
+  async function dismissMany(ids: string[]) {
     setBusy(true);
     setActionError(null);
     try {
-      const results = await Promise.allSettled(pending.map((n) => api.dismissNotification(n.id)));
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed > 0) setActionError(`${failed} of ${pending.length} could not be cleared.`);
+      const result = await api.dismissNotifications({ ids });
+      if (result.count < ids.length) {
+        setActionError(`${result.count} of ${ids.length} could be cleared - the rest were already gone.`);
+      }
+      leaveSelectMode();
+      await invalidate();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not clear those notifications.");
+      // A review caught this catch block leaving the on-screen list
+      // unrefetched on a failed call, unlike every other path here -
+      // the list can silently drift from server state (a partial
+      // failure, a race with the bell's own "Dismiss all") until an
+      // unrelated remount or the next poll.
       await invalidate();
     } finally {
       setBusy(false);
@@ -93,49 +133,103 @@ export function NotificationsPage() {
             const cutoff = Date.now() - THIRTY_DAYS_MS;
             const recent = all.filter((n) => new Date(n.createdAt).getTime() >= cutoff);
             const pending = recent.filter((n) => !n.dismissedAt);
+            const pendingIds = pending.map((n) => n.id);
+            // A review caught `selected` itself going stale the moment
+            // the pending set changes underneath it (a poll, the bell's
+            // own "Dismiss all", another tab) - re-derived from the
+            // CURRENT pendingIds every render instead of trusted as-is,
+            // so a row that's no longer pending can never still read as
+            // selected, inflate the BatchBar's own count, or get sent
+            // in a stale Dismiss-selected call.
+            const selectedPending = pendingIds.filter((id) => selected.has(id));
+            const allPendingSelected = pendingIds.length > 0 && selectedPending.length === pendingIds.length;
             if (recent.length === 0) {
               return <EmptyState icon="bell" text="Nothing in the last 30 days." />;
             }
             return (
               <>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-sm font-medium text-muted-foreground">Last 30 days</h2>
-                  {pending.length > 0 ? (
-                    <Button variant="ghost" onClick={() => handleClearAll(pending)} disabled={busy}>
-                      Clear all
-                    </Button>
-                  ) : null}
+                  {selectMode ? (
+                    // Never gated on pending.length - a review caught
+                    // the earlier `selectMode && pending.length > 0`
+                    // version leaving no way out of select mode at all
+                    // once the pending set hit 0 while still selected
+                    // (the bell's own "Dismiss all", another tab, or a
+                    // poll landing mid-selection): BatchBar's own "Done"
+                    // is the one exit, so it has to render for as long
+                    // as selectMode itself is true, regardless of
+                    // whether anything is left to act on.
+                    <BatchBar count={selectedPending.length} onExit={leaveSelectMode}>
+                      <Button variant="ghost" disabled={selectedPending.length === 0 || busy} onClick={() => dismissMany(selectedPending)}>
+                        Dismiss selected
+                      </Button>
+                    </BatchBar>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {pending.length > 0 ? <SelectModeToggle label="Select" onClick={() => setSelectMode(true)} /> : null}
+                      {pending.length > 0 ? (
+                        <Button variant="ghost" onClick={() => dismissMany(pendingIds)} disabled={busy}>
+                          Clear all
+                        </Button>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
+                {selectMode && pending.length > 0 ? (
+                  <div className="flex w-fit items-center gap-2 text-sm text-muted-foreground">
+                    <Checkbox
+                      checked={allPendingSelected ? true : selectedPending.length > 0 ? "indeterminate" : false}
+                      onCheckedChange={() => toggleSelectAll(pendingIds, allPendingSelected)}
+                      aria-label="Select all"
+                      id="notifications-select-all"
+                    />
+                    <label htmlFor="notifications-select-all">Select all</label>
+                  </div>
+                ) : null}
                 <List
                   items={recent}
                   getKey={(n) => n.id}
                   label="Notification history"
                   renderItem={(n) => (
-                    <div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        {n.dismissedAt ? (
-                          <Badge variant="secondary">Dismissed</Badge>
-                        ) : n.readAt ? (
-                          <Badge variant="outline">Read</Badge>
-                        ) : (
-                          <Badge>New</Badge>
-                        )}
-                        <span className="text-base">{n.text}</span>
+                    <div className="flex min-w-0 flex-1 items-start gap-3 py-1">
+                      {selectMode && !n.dismissedAt ? (
+                        <Checkbox
+                          checked={selected.has(n.id)}
+                          onCheckedChange={() => toggleSelected(n.id)}
+                          aria-label={`Select ${n.text}`}
+                          className="mt-1 shrink-0"
+                        />
+                      ) : null}
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          {n.dismissedAt ? (
+                            <Badge variant="secondary">Dismissed</Badge>
+                          ) : n.readAt ? (
+                            <Badge variant="outline">Read</Badge>
+                          ) : (
+                            <Badge>New</Badge>
+                          )}
+                          <span className="text-base">{n.text}</span>
+                        </div>
+                        <span className="text-sm text-muted-foreground">{whenText(n.createdAt)}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">{whenText(n.createdAt)}</span>
                     </div>
                   )}
-                  renderAction={(n) =>
-                    n.dismissedAt ? null : (
-                      <Button
-                        variant="ghost"
-                        aria-label={`Dismiss ${n.text}`}
-                        onClick={() => handleDismiss(n.id)}
-                        disabled={busy}
-                      >
-                        Dismiss
-                      </Button>
-                    )
+                  renderAction={
+                    selectMode
+                      ? undefined
+                      : (n) =>
+                          n.dismissedAt ? null : (
+                            <Button
+                              variant="ghost"
+                              aria-label={`Dismiss ${n.text}`}
+                              onClick={() => handleDismiss(n.id)}
+                              disabled={busy}
+                            >
+                              Dismiss
+                            </Button>
+                          )
                   }
                 />
               </>

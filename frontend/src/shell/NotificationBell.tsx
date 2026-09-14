@@ -75,6 +75,25 @@ export function NotificationBell() {
     }
   }, [query.data, push]);
 
+  // Shared by both dismiss mutations below (a review caught them
+  // duplicating this restore-on-error/invalidate-both-caches logic
+  // almost verbatim, the exact kind of drift this file's own header
+  // comment already warns about - a fix applied to only one copy would
+  // reintroduce the stale-row bug that comment describes, for whichever
+  // path didn't get it).
+  function restoreOnError(context: { previous: NotificationDeliveryView[] | undefined } | undefined) {
+    // A failed dismiss restores exactly what was there before, rather
+    // than corrupting local state with an optimistic removal the
+    // server never actually applied.
+    if (context?.previous) queryClient.setQueryData(QUERY_KEY, context.previous);
+  }
+  function invalidateBothCaches() {
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_HISTORY_QUERY_KEY }),
+    ]);
+  }
+
   // useMutation, not a bare optimistic `setQueryData` plus a hand-rolled
   // try/catch (a code review, 2026-09-05, found this the one write in
   // the migrated pages not using the mutation the others had already
@@ -92,17 +111,29 @@ export function NotificationBell() {
       queryClient.setQueryData<NotificationDeliveryView[]>(QUERY_KEY, (prev) => (prev ?? []).filter((n) => n.id !== id));
       return { previous };
     },
-    onError: (_err, _id, context) => {
-      // A failed dismiss restores exactly what was there before, rather
-      // than corrupting local state with an optimistic removal the
-      // server never actually applied.
-      if (context?.previous) queryClient.setQueryData(QUERY_KEY, context.previous);
+    onError: (_err, _id, context) => restoreOnError(context),
+    onSettled: invalidateBothCaches,
+  });
+
+  // Lane 15 (Jesse's ask from live use): "Dismiss all" for the pending
+  // list here - same optimistic-then-reconcile shape as the single
+  // dismiss above, `{ all: true }` since this popover only ever shows
+  // what's currently pending (no 30-day window the way the history page
+  // has), so "all" here already means exactly what's on screen. Open to
+  // every signed-in person, adults and children alike - a notification
+  // is inherently personal (getmaipai/.github/docs/NOTIFICATIONS.md),
+  // the same posture the single-dismiss route already holds; nothing
+  // here needs a role check.
+  const dismissAllMutation = useMutation({
+    mutationFn: () => api.dismissNotifications({ all: true }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const previous = queryClient.getQueryData<NotificationDeliveryView[]>(QUERY_KEY);
+      queryClient.setQueryData<NotificationDeliveryView[]>(QUERY_KEY, []);
+      return { previous };
     },
-    onSettled: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_HISTORY_QUERY_KEY }),
-      ]),
+    onError: (_err, _vars, context) => restoreOnError(context),
+    onSettled: invalidateBothCaches,
   });
 
   return (
@@ -133,6 +164,17 @@ export function NotificationBell() {
             <p className="px-2 py-3 text-base text-muted-foreground">Nothing pending.</p>
           ) : (
             <div className="flex flex-col divide-y divide-border">
+              <div className="flex items-center justify-end px-2 pb-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => dismissAllMutation.mutate()}
+                  disabled={dismissAllMutation.isPending}
+                  className="text-sm text-muted-foreground"
+                >
+                  {dismissAllMutation.isPending ? "Dismissing…" : "Dismiss all"}
+                </Button>
+              </div>
               {items.map((n) => (
                 <div key={n.id} className="flex items-start justify-between gap-2 py-2 px-2">
                   <p className="text-base">{n.text}</p>

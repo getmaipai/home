@@ -11,6 +11,7 @@ Tap the bell in the header. It shows your recent alerts, and you stay on the pag
 
 - Tap an alert to open what it's about.
 - Tap **Dismiss** to remove one from the list.
+- Tap **Dismiss all** in the bell to clear everything at once. On the history page, tap **Select** to pick several and dismiss them together.
 
 ## Get notified on Telegram
 

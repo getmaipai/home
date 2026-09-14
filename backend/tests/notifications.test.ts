@@ -4,7 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { trigger, listPending, listHistory, markRead, dismiss } from "@/lib/notifications";
+import { trigger, listPending, listHistory, markRead, dismiss, dismissMany } from "@/lib/notifications";
 import { runTurn } from "@/lib/turnEngine";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -301,6 +301,79 @@ describe("listPending / listHistory / markRead / dismiss", () => {
   });
 });
 
+// Lane 15: dismissMany() backs the bell popover's "Dismiss all" and the
+// history page's own "Clear all"/"Dismiss selected".
+describe("dismissMany", () => {
+  test("{ ids } dismisses exactly the given ids and returns their count", async () => {
+    const { row } = await owner();
+    await trigger("model.download_ready", { modelName: "Model A" });
+    await trigger("model.download_ready", { modelName: "Model B" });
+    await trigger("model.download_ready", { modelName: "Model C" });
+    const [a, b] = listPending(row);
+
+    const result = dismissMany(row, { ids: [a!.id, b!.id] });
+    expect(result).toEqual({ ok: true, value: { count: 2 } });
+    expect(listPending(row).length).toBe(1);
+    expect(listHistory(row).length).toBe(3);
+  });
+
+  test("another person's id in the list is ignored and not counted, and not dismissed", async () => {
+    const { client: ownerClient, row: ownerRow } = await owner();
+    const { row: adult } = await withRole(ownerClient, "Bramble", "adult");
+    // "adults" is household-wide: both get their own real row.
+    await trigger("model.download_ready", { modelName: "Test Model" });
+    const [ownerDelivery] = listPending(ownerRow);
+    const [adultDelivery] = listPending(adult);
+
+    const result = dismissMany(adult, { ids: [ownerDelivery!.id, adultDelivery!.id] });
+    expect(result).toEqual({ ok: true, value: { count: 1 } });
+    expect(listPending(ownerRow).length).toBe(1); // untouched
+    expect(listPending(adult).length).toBe(0);
+  });
+
+  test("a nonexistent id in the list is ignored and not counted, never a 404 for the whole call", async () => {
+    const { row } = await owner();
+    await trigger("model.download_ready", { modelName: "Test Model" });
+    const [delivery] = listPending(row);
+
+    const result = dismissMany(row, { ids: [delivery!.id, "notif-does-not-exist"] });
+    expect(result).toEqual({ ok: true, value: { count: 1 } });
+  });
+
+  test("an already-dismissed id passed again is not re-counted", async () => {
+    const { row } = await owner();
+    await trigger("model.download_ready", { modelName: "Test Model" });
+    const [delivery] = listPending(row);
+    dismiss(row, delivery!.id);
+
+    const result = dismissMany(row, { ids: [delivery!.id] });
+    expect(result).toEqual({ ok: true, value: { count: 0 } });
+  });
+
+  test("{ all: true } dismisses only what's currently pending, not the whole history", async () => {
+    const { row } = await owner();
+    await trigger("model.download_ready", { modelName: "Model A" });
+    await trigger("model.download_ready", { modelName: "Model B" });
+    const [first] = listPending(row);
+    dismiss(row, first!.id); // already dismissed before the bulk call
+
+    const result = dismissMany(row, { all: true });
+    expect(result).toEqual({ ok: true, value: { count: 1 } }); // only the still-pending one
+    expect(listPending(row).length).toBe(0);
+    expect(listHistory(row).length).toBe(2);
+  });
+
+  test("{ all: true } only ever touches this person's own rows, never another's", async () => {
+    const { client: ownerClient, row: ownerRow } = await owner();
+    const { row: adult } = await withRole(ownerClient, "Bramble", "adult");
+    await trigger("model.download_ready", { modelName: "Test Model" });
+
+    dismissMany(adult, { all: true });
+    expect(listPending(ownerRow).length).toBe(1); // the owner's own row is untouched
+    expect(listPending(adult).length).toBe(0);
+  });
+});
+
 describe("HTTP: /api/notifications", () => {
   test("requires auth", async () => {
     expect((await new TestClient().get("/api/notifications")).status).toBe(401);
@@ -323,5 +396,59 @@ describe("HTTP: /api/notifications", () => {
     expect(((await (await client.get("/api/notifications")).json()) as unknown[]).length).toBe(0);
     const history = (await (await client.get("/api/notifications/history")).json()) as unknown[];
     expect(history.length).toBe(1);
+  });
+
+  test("POST /dismiss requires auth", async () => {
+    expect((await new TestClient().post("/api/notifications/dismiss", { all: true })).status).toBe(401);
+  });
+
+  test("POST /dismiss with { ids } dismisses exactly those, over HTTP", async () => {
+    const { client } = await owner();
+    await trigger("model.download_ready", { modelName: "Model A" });
+    await trigger("model.download_ready", { modelName: "Model B" });
+    const pending = (await (await client.get("/api/notifications")).json()) as Array<{ id: string }>;
+
+    const res = await client.post("/api/notifications/dismiss", { ids: [pending[0]!.id] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ count: 1 });
+    expect(((await (await client.get("/api/notifications")).json()) as unknown[]).length).toBe(1);
+  });
+
+  test("POST /dismiss with { all: true } dismisses only pending, over HTTP", async () => {
+    const { client } = await owner();
+    await trigger("model.download_ready", { modelName: "Model A" });
+    await trigger("model.download_ready", { modelName: "Model B" });
+    const pending = (await (await client.get("/api/notifications")).json()) as Array<{ id: string }>;
+    await client.post(`/api/notifications/${pending[0]!.id}/dismiss`, {}); // one already dismissed
+
+    const res = await client.post("/api/notifications/dismiss", { all: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ count: 1 }); // only the still-pending one
+    expect(((await (await client.get("/api/notifications")).json()) as unknown[]).length).toBe(0);
+  });
+
+  test("POST /dismiss with an empty body is a 400, neither shape it accepts", async () => {
+    const { client } = await owner();
+    const res = await client.post("/api/notifications/dismiss", {});
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /dismiss with an empty ids array is a 400, not a silent no-op", async () => {
+    const { client } = await owner();
+    const res = await client.post("/api/notifications/dismiss", { ids: [] });
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /dismiss with another person's id in the list ignores it, over HTTP", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: adultClient, row: adult } = await withRole(ownerClient, "Bramble", "adult");
+    await trigger("model.download_ready", { modelName: "Test Model" }); // both get their own row
+    const ownerPending = (await (await ownerClient.get("/api/notifications")).json()) as Array<{ id: string }>;
+    const adultPending = (await (await adultClient.get("/api/notifications")).json()) as Array<{ id: string }>;
+
+    const res = await adultClient.post("/api/notifications/dismiss", { ids: [ownerPending[0]!.id, adultPending[0]!.id] });
+    expect(await res.json()).toEqual({ count: 1 });
+    expect(listPending(adult).length).toBe(0);
+    expect(((await (await ownerClient.get("/api/notifications")).json()) as unknown[]).length).toBe(1); // untouched
   });
 });
