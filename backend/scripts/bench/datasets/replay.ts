@@ -21,7 +21,8 @@
 // own time) and scored by the dataset's own rule.
 //
 // Usage: bun run backend/scripts/bench/datasets/replay.ts --dataset
-// longmemeval-oracle [--only id,id] [--seed N]
+// longmemeval-oracle|longmemeval-oracle-v0|longmemeval-sample|locomo
+// [--only id,id] [--seed N]
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
@@ -63,13 +64,13 @@ const { eq, or } = await import("drizzle-orm");
 
 // ==== CLI ====
 
-type DatasetName = "longmemeval-oracle" | "longmemeval-sample" | "locomo";
+type DatasetName = "longmemeval-oracle" | "longmemeval-oracle-v0" | "longmemeval-sample" | "locomo";
 
 function datasetFromArgv(argv: readonly string[]): DatasetName {
   const at = argv.indexOf("--dataset");
   const raw = at >= 0 ? argv[at + 1] : undefined;
-  if (raw === "longmemeval-oracle" || raw === "longmemeval-sample" || raw === "locomo") return raw;
-  console.error(`replay setup refused: --dataset wants longmemeval-oracle, longmemeval-sample or locomo; got "${raw ?? ""}"`);
+  if (raw === "longmemeval-oracle" || raw === "longmemeval-oracle-v0" || raw === "longmemeval-sample" || raw === "locomo") return raw;
+  console.error(`replay setup refused: --dataset wants longmemeval-oracle, longmemeval-oracle-v0, longmemeval-sample or locomo; got "${raw ?? ""}"`);
   process.exit(2);
 }
 function onlyFromArgv(argv: readonly string[]): Set<string> | null {
@@ -472,11 +473,22 @@ async function main() {
 
   const registryDataset = dataset === "locomo" ? "locomo" : "longmemeval-cleaned";
   const entry = registryEntry(registryDataset);
+  // Read once, reused below for the id filter too - a review caught this
+  // and the filter block each independently reading and parsing the same
+  // file, which risked the header's own seed and the filter's own
+  // entries silently disagreeing if the two sites ever drifted apart.
+  const oracleV0Manifest = dataset === "longmemeval-oracle-v0" ? (JSON.parse(readFileSync(join(import.meta.dir, "oracle-v0-manifest.json"), "utf-8")) as { seed: number; entries: { questionId: string }[] }) : null;
+  // The sample manifest's own selection seed (which 30 ids got picked),
+  // distinct from `benchSeed` above (the runtime model-sampling seed) -
+  // surfaced in the header, not just left inside the committed manifest
+  // file, so a reader of one run's own header can see both numbers a
+  // rerun needs without going to find the file.
   const header = {
     commit: await commitHash(),
     date: new Date().toISOString(),
     seed: benchSeed,
     dataset: { name: entry.name, version: entry.version, checksums: entry.files },
+    ...(oracleV0Manifest ? { sampleManifestSeed: oracleV0Manifest.seed } : {}),
     ...(only ? { partial: `--only ${[...only].join(",")}` } : {}),
   };
   console.log("\n## Run header\n\n```json");
@@ -487,14 +499,22 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
 
   let executed: number;
-  if (dataset === "longmemeval-oracle" || dataset === "longmemeval-sample") {
-    const path = dataset === "longmemeval-oracle" ? "longmemeval_oracle.json" : "longmemeval_s_cleaned.json";
+  if (dataset === "longmemeval-oracle" || dataset === "longmemeval-oracle-v0" || dataset === "longmemeval-sample") {
+    const path = dataset === "longmemeval-sample" ? "longmemeval_s_cleaned.json" : "longmemeval_oracle.json";
     const raw = JSON.parse(readFileSync(absolutePath(path), "utf-8")) as unknown[];
     const { conversations, questions } = loadLongMemEval(raw);
     let selected = questions;
     if (dataset === "longmemeval-sample") {
       const manifestPath = join(import.meta.dir, "sample-manifest.json");
       const manifestIds = new Set((JSON.parse(readFileSync(manifestPath, "utf-8")) as { questionId: string }[]).map((e) => e.questionId));
+      selected = questions.filter((q) => manifestIds.has(q.questionId));
+    }
+    // Baseline v0 (the coordinator, 2026-09-14): 5 per question type, 30
+    // total, drawn deterministically from the oracle set itself
+    // (generate-oracle-v0-manifest.ts) - the same manifest-filter shape
+    // the S-set sample uses just above, over a different committed file.
+    if (oracleV0Manifest) {
+      const manifestIds = new Set(oracleV0Manifest.entries.map((e) => e.questionId));
       selected = questions.filter((q) => manifestIds.has(q.questionId));
     }
     if (only) selected = selected.filter((q) => only.has(q.questionId));
