@@ -22,6 +22,7 @@
 // never rewritten by anything here, only the model's own words are ever
 // second-guessed.
 import { tokenize } from "@/lib/text";
+import { asksAboutEarlierTalk } from "@/lib/episodes";
 import { pickVariant } from "@/lib/replyVariation";
 import { utteranceShape, type UtteranceShape } from "@/lib/utteranceShape";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
@@ -67,18 +68,20 @@ export interface GuardContext {
    * model's own persona/rules prompt text (that's what the attractor and
    * recitation guards exist to catch it borrowing from instead). */
   sources?: readonly string[];
-  /** JOIN-01: verbatim lines from earlier conversations (both halves of
-   * each recalled turn) that ground a reply the same way `sources` do,
-   * but are NOT candidates for `unrelated_recall`: a recalled reply said
-   * back to "what did you suggest last week" is the answer, not a memory
-   * line said to the wrong question, and its words rarely share a stem
-   * with the question that asked for it (a code review on JOIN-01). */
+  /** JOIN-01: lines from earlier conversations (the person's side
+   * quoted; the hub's side, on a "what did you suggest" turn only, as the
+   * paired words and the answer's terms) that ground a reply the same
+   * way `sources` do. RECALL-02: candidates for `unrelated_recall` too,
+   * except on a turn that asks about earlier talk ("what did you suggest
+   * last week", "what did I tell you"), whose answer is a restatement by
+   * design and rarely shares a stem with the question (a code review on
+   * JOIN-01). */
   episodes?: readonly string[];
   /** CHAT-01: the other facts the prompt showed this turn (the profile
    * paragraph, the conversation summary, the roster line, the local
-   * time), so a reply that repeats one passes grounding. Like
-   * `episodes`, never an `unrelated_recall` candidate: only a memory
-   * line said to the wrong question is that. */
+   * time), so a reply that repeats one passes grounding. Never an
+   * `unrelated_recall` candidate: a memory line or a recalled episode
+   * said to the wrong question is that. */
   grounding?: readonly string[];
   /** CHAT-04: the turn's tool outcomes (CHAT-01's ToolExecutionOutcome,
    * package id and status), the only thing that can make "I've added
@@ -580,7 +583,17 @@ function guardUnrelatedRecall(sentence: string, ctx: GuardContext): GuardReason 
   if (said.size < 2) return null;
   const recent = (ctx.history ?? []).slice(-RECENT_TURNS_FOR_RECALL);
   const asked = [...tokenize([ctx.utterance, ...recent].join(" "))];
-  for (const line of ctx.sources ?? []) {
+  // RECALL-02: a recalled episode is a candidate too. A sentence that
+  // restates an earlier conversation's line (80 percent of its words)
+  // and shares nothing with what was just asked is the copied line this
+  // guard was always meant to cut; before, it read the memory bullets
+  // only and an episode copied verbatim was not a hit. The turns whose
+  // answer is a restatement by design, "what did you suggest last week"
+  // and "what did I tell you about my plan" (JOIN-01's review: their
+  // words rarely share a stem with the question), keep the exemption
+  // for episodes.
+  const episodeCandidates = asksAboutEarlierTalk(ctx.utterance) ? [] : (ctx.episodes ?? []);
+  for (const line of [...(ctx.sources ?? []), ...episodeCandidates]) {
     const have = tokenize(line);
     if (have.size === 0) continue;
     const overlap = [...said].filter((w) => have.has(w)).length;

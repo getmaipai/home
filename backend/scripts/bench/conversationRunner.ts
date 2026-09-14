@@ -9,9 +9,9 @@
 // drives the same functions against the stub, so the control flow
 // (abort, confirmation, credential, cross-person, scoring) is proven
 // offline before a live run.
-import { eq, and, or, isNull } from "drizzle-orm";
+import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { conversationTurns, memoryRecords, people, lists, entities, relationships } from "@/db/schema";
+import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
 import { runTurnStream, type TurnStreamResult } from "@/lib/turnEngine";
 import { createConversation, getPendingAsk } from "@/lib/conversationHistory";
 import { activeTurnCount } from "@/lib/turnActivity";
@@ -493,6 +493,12 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
         .where(isNull(entities.deletedAt))
         .all(),
       relationships: relationshipsOf(actor),
+      assistantEpisodes: db
+        .select({ text: episodesTable.text })
+        .from(episodesTable)
+        .where(and(eq(episodesTable.personId, actor.id), eq(episodesTable.speaker, "assistant"), ne(episodesTable.conversationId, conversationId)))
+        .all()
+        .map((r) => r.text),
     };
     if (driven.error) observed.reply = `[error: ${driven.error}]`;
     scores.push(scoreTurn(conv, i, turn, observed));

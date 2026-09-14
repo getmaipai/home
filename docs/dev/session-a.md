@@ -3827,3 +3827,113 @@ had the 8B invent a kind in one run ("the child who shares the
 house"), the unknown-name defect the design pass assigns to ASK-01
 (the ask, the false_familiarity guard); 3a's part is that the hub
 never asserted the guess as its own.
+
+## RECALL-02: episodes are evidence, never lines (2026-09-14)
+
+The design (dev.md, "The chat design pass", section 1) as built, in
+its five parts, and what the measurement changed.
+
+**The person's side; the hub's side reported, never quoted.**
+`recallEpisodes()` takes `sides`: the prompt (`prepareTurn()`) asks
+for `user` unless the utterance asks what the hub said, the "you"
+form of the recall package's own routing examples ("what did you say
+/ suggest / recommend / tell me", `asksWhatHubSaid()`), and then
+`both`. On a `both` query the turn is usually found by the person's
+words ("what did you suggest for the visitors" shares nothing with the
+recipe), so the hub's side of a found turn is what is shown, rendered
+as a reported note: `- Sep 6 (8 days ago), when Sage said "what should
+we cook for the visitors", your answer covered: try, mushroom,
+risotto, recipe, feeds, six, reheats, well`. The person's paired
+words in quotes (what caused the answer); the answer as the words it
+covered, in order, stopwords out, twelve at most, never a sentence in
+the hub's voice that a short turn would copy back. The person's own
+side stays quoted, cut at a word. The swap to the hub's side is the
+prompt's alone (`preferHubSide`); the conversations search reads both
+sides as before and returns the side that matched, verbatim, as its
+API promises. A credential on either side of a turn keeps the whole
+turn out (CHAT-03's read side, now over the pair, since the paired
+side reaches the prompt too). `episodeQuote()`, the turn context's
+evidence text for the guards, carries the same content the line does.
+
+**The lexical floor, before fusion.** A lexical candidate needs two
+content words in common with the query, counted over the candidate
+side and its paired side together (the turn is the unit: "did we
+decide on the trip" / "the coast in October" is one exchange about the
+trip to the coast), or one shared word and a vector cosine at or
+above the episode floor; a one-word query (the search's own lookup;
+the prompt never sends fewer than three content words) needs its one.
+Each half clears its own floor before reciprocal rank fusion, so a
+candidate that survives only one half is never ranked as if both
+agreed.
+
+**The floor, measured.** `scripts/bench/recall-floor.ts` gained
+episode rows: four earlier conversations (a band called Tempo, a
+training plan with Marsh, a recipe, a trip), six queries that share
+exactly one content word with one of them (the band's name inside a
+product's name, a person's name that is also a common word, a genre
+word, "coast", "visitors", "pace"), and five that share two or ask
+about the exchange. On this machine's embed engine (the pinned
+embedding model by URL, seed irrelevant to embeddings): the one-word
+rows' nearest episode sat at cosine p50 0.609, max 0.677, and with
+the episodic-record floor of 0.55 five of the six leaked the
+conversation they share a word with, through the vector half alone
+(the treadmill sentence against "listening to Tempo all morning" at
+0.670); the signal rows' right turn sat at 0.746 to 0.831. So
+`EPISODE_MIN_COSINE` is 0.72, between them (memory.ts's 0.55 for
+episodic records is a different store and stays), and with it the
+rows read 0 of 6 leaked and 5 of 5 recalled first. The bench gates
+its queries the way the prompt does (`episodeQueryEligible()`), so a
+passing signal row is a shape production sends. Two rows moved while
+measuring: "the trip to the coast in October" and "the weekend
+visitors" recalled nothing at cosine 0.87 and 0.90 because "in
+October" and "the weekend" are created_at windows (MEM-04's date
+phrases) and both turns were said this month; the rows now say "the
+coast trip we planned" and "the six visitors", and the finding (a date
+in the subject read as a date of saying) is the coordinator's to
+place.
+
+**The query is the subject, not the turn.** Until CHAT-13's resolved
+subject becomes the query: `episodeQueryEligible()` refuses a turn
+with fewer than three content words after stopwords ("good morning",
+"sounds good", "say that again") and a question about this
+conversation ("what were we talking about", "what did you mean",
+"where were we"); the window is their evidence. A two-content-word
+question ("when is my dentist appointment", "what is Rover's
+birthday") recalls nothing until then, the design's number kept as
+written and the cost named for the coordinator (the lexical floor
+already asks a two-word query for both words, so two would be the
+safe number if the design moves); JOIN-01's own test moved to "what
+day is my dentist appointment" against "my dentist appointment is on
+Thursday", three words and two shared, the floor with no vector to
+help.
+
+**Volume.** Three lines and 400 characters, from five and 600;
+`prepareTurn()` asks for three.
+
+**The guard reads episodes.** `guardUnrelatedRecall()` reads
+`ctx.episodes` beside `ctx.sources`: a reply sentence whose words
+overlap an episode line by 80 percent and share nothing with the
+utterance or the person's last two turns is the `unrelated_recall`
+cut. The turns whose answer is a restatement by design, "what did you
+suggest last week" and "what did I tell you about my plan"
+(`asksAboutEarlierTalk()`, the recall package's own routing examples
+on either side; JOIN-01's review: their words rarely share a stem
+with the question), keep the exemption for episodes.
+
+**Tests and the bench.** `tests/episodes.test.ts` (the shapes, the
+eligibility gate, the sides and the reported note, the lexical floor
+three ways, the volume), `tests/guards.test.ts` (the copied line cut,
+the person's own line kept, the restatement to the question that
+asked for it kept), the JOIN-01 turn-engine test as above. The bench:
+`episodesInContext` (the lines under the block's header, exact) and
+`noCopiedEpisode` (no reply sentence restates a sentence of an
+assistant-side episode from another conversation at 80 percent, the
+guard's own tokenizer and measure) in `conversationScore.ts`, the runner reading the person's assistant-side
+episodes from other conversations. Rows: `copied-line` (Tempo the
+band in one conversation; a standing desk, a Tempo treadmill and
+"what were we talking about" in a fresh one), `copied-line-history`
+(the explicit-history shape, the reported note with the person's
+paired words), `copied-line-name` (Marsh the person, the marsh trail,
+the coordinator's addition), and `noCopiedEpisode` on the opening
+turns of `household-subject-dog` and `household-subject-person`.
+Three seeded runs below.

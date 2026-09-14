@@ -197,6 +197,61 @@ export interface RecallEpisodesOptions {
    * review on JOIN-01). */
   excludeWholeConversation?: boolean;
   now?: Date;
+  /** RECALL-02: which side of a turn may be recalled. The prompt
+   * (prepareTurn) asks for the person's own side unless the utterance
+   * asks what the hub said (asksWhatHubSaid()): the hub's prose is
+   * output, not evidence, and a recalled first-person sentence was
+   * being copied into new replies; when it does enter, it is rendered
+   * as a reported note beside its paired user side, never as a line.
+   * The conversations search reads both sides, the default. */
+  sides?: "user" | "both";
+  /** RECALL-02, the prompt's "what did you say" turn: a turn found by
+   * the person's words ("what did you suggest for the six visitors"
+   * shares nothing with the recipe itself) is shown from the hub's
+   * side (the reported note carries the person's paired words). Never
+   * the conversations search's, which returns the side that matched,
+   * verbatim. */
+  preferHubSide?: boolean;
+}
+
+/** RECALL-02: the shapes that ask what the hub itself said: the "you"
+ * form of the recall package's own routing examples ("what did you
+ * say / suggest / recommend / tell me"). Only then may an assistant-
+ * side episode enter the prompt. */
+const ASKS_WHAT_HUB_SAID_RE = /\b(?:what|which)\s+(?:did|had|have)\s+you\s+(?:say|said|suggest(?:ed)?|recommend(?:ed)?|tell|told|mention(?:ed)?|advise[d]?|propose[d]?|think|reply|answer(?:ed)?)\b|\bwhat\s+was\s+your\s+(?:suggestion|recommendation|advice|answer|take|idea)\b|\b(?:remind me|tell me)\s+what\s+you\s+(?:said|suggested|recommended|told)\b|\bdid\s+you\s+(?:say|suggest|recommend|mention)\b|\byou\s+(?:said|suggested|recommended|mentioned)\s+(?:something|that)\b/i;
+export function asksWhatHubSaid(utterance: string): boolean {
+  return ASKS_WHAT_HUB_SAID_RE.test(utterance);
+}
+
+/** RECALL-02: a turn that asks about earlier talk on either side, the
+ * recall package's own routing examples ("what did I say / tell you",
+ * "do you remember what I said", "what did we decide") and the hub's
+ * shapes above: its answer is a restatement by design, so a restated
+ * episode is the answer there, not an unrelated recall. */
+const ASKS_ABOUT_EARLIER_TALK_RE = /\b(?:what|which)\s+(?:did|have|had)\s+(?:i|we)\s+(?:say|said|tell|told|mention(?:ed)?|decide[d]?|talk(?:ed)?|agree[d]?|ask(?:ed)?)\b|\bdo\s+you\s+remember\s+(?:what|when|if|that)?\s*(?:i|we)\b|\b(?:remind me|tell me)\s+what\s+(?:i|we)\s+(?:said|told|decided|mentioned)\b|\bwhat\s+(?:did|have)\s+(?:i|we)\s+(?:talk|talked)\s+about\b/i;
+export function asksAboutEarlierTalk(utterance: string): boolean {
+  return asksWhatHubSaid(utterance) || ASKS_ABOUT_EARLIER_TALK_RE.test(utterance);
+}
+
+/** RECALL-02: a turn about this conversation itself, whose evidence is
+ * the window already in the messages: recalls no episodes. */
+const ABOUT_THIS_CONVERSATION_RE = /\bwhat\s+(?:were|are)\s+we\s+(?:talking|discussing|saying)\b|\bwhat\s+(?:did|do)\s+you\s+mean\b|\bsay\s+that\s+again\b|\bcome\s+again\b|\bwhat\s+was\s+(?:i|that)\s+(?:saying|talking about)\b|\bwhere\s+were\s+we\b|\bwhat\s+were\s+you\s+saying\b/i;
+const MIN_CONTENT_WORDS = 3;
+
+/** RECALL-02: whether an utterance earns an episode lookup at all. Fewer
+ * than three content words (after stopwords) is a query with almost no
+ * content, whose nearest episode is noise; a question about this
+ * conversation is answered by the window. Until CHAT-13's resolved
+ * subject becomes the query, this is the gate. */
+export function episodeQueryEligible(utterance: string): boolean {
+  if (ABOUT_THIS_CONVERSATION_RE.test(utterance)) return false;
+  return contentTerms(utterance).length >= MIN_CONTENT_WORDS;
+}
+
+/** The content terms the lexical half searches for: the FTS tokenizer's
+ * own split, stopwords out, deduplicated. */
+export function contentTerms(text: string): string[] {
+  return [...new Set((text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []).flatMap((t) => t.split("'")))].filter((t) => t.length > 1 && !STOPWORDS.has(t));
 }
 
 const RRF_K = 60;
@@ -221,10 +276,15 @@ export function __vectorRowsScannedForTests(): number {
 export function __resetVectorRowsScannedForTests(): void {
   __vectorRowsScanned = 0;
 }
-/** The same floor memory.ts's recall() applies to episodic records: below
- * it a vector match is noise, and a query about something never said
- * must come back empty rather than with the nearest unrelated turn. */
-const EPISODE_MIN_COSINE = 0.55;
+/** Below it a vector match is noise, and a query about something never
+ * said must come back empty rather than with the nearest unrelated
+ * turn. RECALL-02 measured it on the recall-floor bench's episode rows
+ * (docs/dev/session-a.md): with memory.ts's episodic-record floor of
+ * 0.55, a sentence sharing one word with an earlier exchange ("a Tempo
+ * treadmill for the office" against "listening to Tempo all morning")
+ * sat at 0.59 to 0.68 and every one leaked; the exchanges a question
+ * was really about sat at 0.79 and up. 0.72 is between them. */
+export const EPISODE_MIN_COSINE = 0.72;
 const CANDIDATES_PER_SOURCE = 20;
 const WINDOW_TURNS_EXCLUDED = 4;
 const DAY_MS = 86_400_000;
@@ -285,10 +345,22 @@ export function ftsQueryFor(query: string): string | null {
   // Split on apostrophes rather than deleting them: the index's default
   // unicode61 tokenizer splits "Rover's" into "rover" and "s", so the
   // query must too or a possessive never matches its own subject.
-  const terms = [...new Set((query.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []).flatMap((t) => t.split("'")))]
-    .filter((t) => t.length > 1 && !STOPWORDS.has(t));
+  const terms = contentTerms(query);
   if (terms.length === 0) return null;
   return terms.map((t) => `"${t}"`).join(" OR ");
+}
+
+/** RECALL-02, the lexical floor: a lexical candidate needs two content
+ * words in common with the query, or one and a vector cosine at or
+ * above EPISODE_MIN_COSINE. Before it, one shared word (an adjective, a
+ * genre word, a band's name inside a product's name) admitted an
+ * episode from any conversation and rank fusion then ranked it as if it
+ * were relevant. Measured on scripts/bench/recall-floor.ts's episode
+ * rows (docs/dev/session-a.md, RECALL-02). */
+export const LEXICAL_MIN_SHARED_TERMS = 2;
+export function sharedContentTerms(queryTerms: readonly string[], text: string): number {
+  const have = new Set(contentTerms(text));
+  return queryTerms.filter((t) => have.has(t)).length;
 }
 
 interface CandidateRow {
@@ -345,6 +417,8 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   // branch; its episodes stay stored and are never recalled. Read at
   // query time, so an edit after the episode was recorded takes effect
   // on the next recall with nothing rewritten.
+  const sides = opts.sides ?? "both";
+  const queryTerms = contentTerms(query);
   const lexical: CandidateRow[] = [];
   const fts = ftsQueryFor(query);
   if (fts) {
@@ -358,6 +432,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
            AND (? IS NULL OR e.created_at >= ?) AND (? IS NULL OR e.created_at < ?)
            ${opts.includeSuperseded ? "" : "AND e.turn_id NOT IN (SELECT supersedes FROM conversation_turns WHERE supersedes IS NOT NULL)"}
            ${excluded.length ? `AND e.turn_id NOT IN (${placeholders})` : ""}
+           ${sides === "user" ? "AND e.speaker = 'user'" : ""}
          ORDER BY bm25(episodes_fts) LIMIT ?`,
       )
       .all(fts, actor.id, window?.start.toISOString() ?? null, window?.start.toISOString() ?? null, window?.end.toISOString() ?? null, window?.end.toISOString() ?? null, ...excluded, CANDIDATES_PER_SOURCE) as CandidateRow[];
@@ -397,13 +472,39 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
       .all();
     __vectorRowsScanned += rows.length;
     const scored = rows
-      .filter((r) => inWindow(r, window) && !excludedTurnIds.has(r.turnId))
+      .filter((r) => inWindow(r, window) && !excludedTurnIds.has(r.turnId) && (sides === "both" || r.speaker === "user"))
       .map((r) => ({ row: r as CandidateRow & { vector: Buffer }, cosine: cosineSimilarity(queryVector, bufferToVector(r.vector as Buffer)) }))
       .filter((s) => s.cosine >= EPISODE_MIN_COSINE)
       .sort((a, b) => b.cosine - a.cosine)
       .slice(0, CANDIDATES_PER_SOURCE);
     vector.push(...scored.map((s) => s.row));
   }
+
+  // RECALL-02: each half clears its own floor before fusion, so a
+  // candidate that survives only one half is never ranked as if both
+  // agreed. The vector half's floor is the cosine above; the lexical
+  // half's is two shared content words, or one when the vector half
+  // also admitted the row.
+  // A one-word query (the conversations search's own lookup; the
+  // prompt never sends fewer than three content words) can share at
+  // most one, and does. The turn is the unit: the shared words are
+  // counted over the candidate side and its paired side together, since
+  // "did we decide on the trip" / "the coast in October" is one exchange
+  // about the trip to the coast.
+  const needed = Math.min(LEXICAL_MIN_SHARED_TERMS, queryTerms.length);
+  const vectorIds = new Set(vector.map((r) => r.id));
+  const lexicalPairs = lexical.length
+    ? db
+        .select({ turnId: episodes.turnId, speaker: episodes.speaker, text: episodes.text })
+        .from(episodes)
+        .where(inArray(episodes.turnId, [...new Set(lexical.map((r) => r.turnId))]))
+        .all()
+    : [];
+  const lexicalSurvivors = lexical.filter((r) => {
+    const paired = lexicalPairs.find((p) => p.turnId === r.turnId && p.speaker !== r.speaker)?.text ?? "";
+    const shared = sharedContentTerms(queryTerms, `${r.text} ${paired}`);
+    return shared >= needed || (shared >= 1 && vectorIds.has(r.id));
+  });
 
   // Reciprocal rank fusion, then one match per turn (its best side).
   const fused = new Map<string, { row: CandidateRow; score: number }>();
@@ -413,7 +514,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
       const score = (prev?.score ?? 0) + 1 / (RRF_K + rank + 1);
       fused.set(row.id, { row, score });
     });
-  add(lexical);
+  add(lexicalSurvivors);
   add(vector);
 
   const byTurn = new Map<string, { row: CandidateRow; score: number }>();
@@ -423,28 +524,42 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   }
   // CHAT-03, the read side: an episode carrying a credential (recorded
   // before the policy existed; a new one is recorded redacted) is never
-  // recalled into a prompt, and never deleted here.
-  const top = [...byTurn.values()]
-    .filter((e) => !detectCredential(e.row.text).detected)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  // recalled into a prompt, and never deleted here. RECALL-02: the
+  // paired side reaches the prompt too (quoted beside the hub's note,
+  // or shown in its place), so the whole turn is checked.
+  const ranked = [...byTurn.values()].sort((a, b) => b.score - a.score);
+  const pairs = ranked.length
+    ? db
+        .select({ id: episodes.id, turnId: episodes.turnId, speaker: episodes.speaker, text: episodes.text })
+        .from(episodes)
+        .where(inArray(episodes.turnId, [...new Set(ranked.map((t) => t.row.turnId))]))
+        .all()
+    : [];
+  const top = ranked.filter((e) => !pairs.some((p) => p.turnId === e.row.turnId && detectCredential(p.text).detected)).slice(0, limit);
   if (top.length === 0) return [];
-
-  const pairs = db
-    .select({ turnId: episodes.turnId, speaker: episodes.speaker, text: episodes.text })
-    .from(episodes)
-    .where(inArray(episodes.turnId, top.map((t) => t.row.turnId)))
-    .all();
-  return top.map(({ row, score }) => ({
-    episode: { id: row.id, turnId: row.turnId, conversationId: row.conversationId, speaker: row.speaker, text: row.text, createdAt: row.createdAt },
-    pairedText: pairs.find((p) => p.turnId === row.turnId && p.speaker !== row.speaker)?.text ?? "",
-    score,
-  }));
+  return top.map(({ row, score }) => {
+    // RECALL-02: when both sides are wanted, the question asked what the
+    // hub said, and the turn was usually found by the person's words
+    // ("what did you suggest for the visitors" shares nothing with the
+    // recipe itself); the hub's side of that turn is the answer, its
+    // note carrying the person's paired words.
+    const hubSide = opts.preferHubSide && sides === "both" && row.speaker === "user" ? pairs.find((p) => p.turnId === row.turnId && p.speaker === "assistant") : undefined;
+    const shown = hubSide ? { ...row, id: hubSide.id, speaker: "assistant" as const, text: hubSide.text } : row;
+    return {
+      episode: { id: shown.id, turnId: shown.turnId, conversationId: shown.conversationId, speaker: shown.speaker, text: shown.text, createdAt: shown.createdAt },
+      pairedText: pairs.find((p) => p.turnId === shown.turnId && p.speaker !== shown.speaker)?.text ?? "",
+      score,
+    };
+  });
 }
 
-const PROMPT_BLOCK_MAX_CHARS = 600;
+/** RECALL-02: three lines and 400 characters (from five and 600): fewer
+ * lines, each earned. */
+export const PROMPT_BLOCK_MAX_LINES = 3;
+const PROMPT_BLOCK_MAX_CHARS = 400;
 const QUOTE_MAX_CHARS = 200;
-const EPISODES_HEADER = "From earlier conversations (what was said, not necessarily true):";
+const NOTE_TERMS_MAX = 12;
+export const EPISODES_HEADER = "From earlier conversations (what was said, not necessarily true):";
 
 function cutAtWord(text: string, max: number): string {
   if (text.length <= max) return text;
@@ -460,6 +575,7 @@ export function formatEpisodesForPrompt(matches: EpisodeMatch[], displayName: st
   if (matches.length === 0) return "";
   const lines = [EPISODES_HEADER];
   for (const m of matches) {
+    if (lines.length > PROMPT_BLOCK_MAX_LINES) break;
     const line = formatEpisodeLine(m, displayName, locale, now);
     if ([...lines, line].join("\n").length > PROMPT_BLOCK_MAX_CHARS) break;
     lines.push(line);
@@ -476,8 +592,20 @@ export function formatEpisodeLine(m: EpisodeMatch, displayName: string, locale: 
   const when = new Date(m.episode.createdAt);
   const days = Math.max(0, Math.floor((now.getTime() - when.getTime()) / DAY_MS));
   const ago = days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
-  const who = m.episode.speaker === "user" ? `${displayName} said` : "you replied";
-  return `- ${dateFmt.format(when)} (${ago}), ${who}: "${episodeQuote(m)}"`;
+  if (m.episode.speaker === "user") return `- ${dateFmt.format(when)} (${ago}), ${displayName} said: "${episodeQuote(m)}"`;
+  // RECALL-02: the hub's own side is reported, never quoted: the
+  // person's paired words in quotes (what caused the answer), and the
+  // answer as the words it covered, not a sentence in the hub's voice
+  // that a short turn would copy back.
+  const asked = m.pairedText ? `when ${displayName} said "${cutAtWord(m.pairedText, QUOTE_MAX_CHARS / 2)}", ` : "";
+  return `- ${dateFmt.format(when)} (${ago}), ${asked}your answer covered: ${answerTerms(m.episode.text)}`;
+}
+
+/** The words an answer covered, in their order, stopwords out, capped:
+ * evidence of what was said, not a line to say again. */
+export function answerTerms(text: string): string {
+  const terms = contentTerms(text).slice(0, NOTE_TERMS_MAX);
+  return terms.length > 0 ? terms.join(", ") : "(nothing of substance)";
 }
 
 // One formatter per locale (a code review: this ran per episode and now
@@ -493,7 +621,10 @@ function shortDateFormat(locale: string): Intl.DateTimeFormat {
   return fmt;
 }
 
-/** The quoted text the prompt shows for an episode. */
+/** The text the prompt shows for an episode, the guard's evidence: the
+ * person's side quoted as cut; the hub's side as the paired words and
+ * the answer's terms (RECALL-02), the same content the line carries. */
 export function episodeQuote(m: EpisodeMatch): string {
-  return cutAtWord(m.episode.text, QUOTE_MAX_CHARS);
+  if (m.episode.speaker === "user") return cutAtWord(m.episode.text, QUOTE_MAX_CHARS);
+  return `${m.pairedText ? cutAtWord(m.pairedText, QUOTE_MAX_CHARS / 2) + " " : ""}${answerTerms(m.episode.text)}`;
 }

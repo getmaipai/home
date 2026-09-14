@@ -14,6 +14,10 @@ import {
   VECTOR_SCAN_RECENT_EPISODES,
   __vectorRowsScannedForTests,
   __resetVectorRowsScannedForTests,
+  asksWhatHubSaid,
+  episodeQueryEligible,
+  contentTerms,
+  formatEpisodeLine,
 } from "@/lib/episodes";
 import { forget, vectorToBuffer } from "@/lib/memory";
 import { TestClient } from "./client";
@@ -544,11 +548,18 @@ describe("MEM-04 formatEpisodesForPrompt()", () => {
   test("labels each side, dates each line, and stays under the cap", async () => {
     const { actor } = await setupOwner();
     seedThreeWeeks(actor);
-    const matches = recallEpisodes(actor, "recipe dessert cilantro trip", undefined, { now: NOW, limit: 5 });
+    // RECALL-02: a bag of one word per turn clears no lexical floor; the
+    // query shares two words with the risotto turn and one plus its pair
+    // with the tart turn.
+    const matches = recallEpisodes(actor, "the mushroom risotto recipe for the picnic", undefined, { now: NOW, limit: 5 });
     const block = formatEpisodesForPrompt(matches, "Marlow", "en-US", NOW);
     expect(block.startsWith("From earlier conversations (what was said, not necessarily true):")).toBe(true);
-    expect(block).toMatch(/\(7 days ago\), you replied: "Try a mushroom risotto recipe/);
-    expect(block.length).toBeLessThanOrEqual(600);
+    // RECALL-02: the hub's side is reported (the person's paired words
+    // quoted, the answer as the words it covered), never "you replied".
+    expect(block).not.toContain("you replied");
+    expect(block).toMatch(/\(7 days ago\), when Marlow said ".*", your answer covered: .*risotto/);
+    expect(block.length).toBeLessThanOrEqual(400);
+    expect(block.split("\n").length).toBeLessThanOrEqual(4);
     expect(formatEpisodesForPrompt([], "Marlow", "en-US", NOW)).toBe("");
   });
 
@@ -556,10 +567,83 @@ describe("MEM-04 formatEpisodesForPrompt()", () => {
     const long = "word ".repeat(80).trim();
     const match = (i: number) => ({ episode: { id: `e${i}`, turnId: `t${i}`, conversationId: null, speaker: "user" as const, text: long, createdAt: daysAgo(3) }, pairedText: "", score: 1 });
     const block = formatEpisodesForPrompt([match(1), match(2), match(3), match(4)], "Marlow", "en-US", NOW);
-    expect(block.length).toBeLessThanOrEqual(600);
+    expect(block.length).toBeLessThanOrEqual(400);
     const firstLine = block.split("\n")[1]!;
     expect(firstLine).toContain('..."');
     expect(firstLine.length).toBeLessThan(260);
+  });
+});
+
+describe("RECALL-02: episodes are evidence, never lines", () => {
+  test("the hub's side enters only on a question about what the hub said, and then as a reported note, never a quoted line", async () => {
+    const { actor } = await setupOwner();
+    seedThreeWeeks(actor);
+    const userOnly = recallEpisodes(actor, "the mushroom risotto recipe for the visitors", undefined, { now: NOW, sides: "user" });
+    expect(userOnly.length).toBeGreaterThan(0);
+    expect(userOnly.every((m) => m.episode.speaker === "user")).toBe(true);
+    // The search's own reading keeps the side that matched, verbatim.
+    const search = recallEpisodes(actor, "what did you suggest we cook for the visitors", undefined, { now: NOW });
+    expect(search[0]!.episode.speaker).toBe("user");
+    expect(search[0]!.episode.text).toBe("what should we cook for the visitors");
+    const both = recallEpisodes(actor, "what did you suggest we cook for the visitors", undefined, { now: NOW, sides: "both", preferHubSide: true });
+    const reply = both.find((m) => m.episode.speaker === "assistant")!;
+    expect(reply).toBeDefined();
+    const line = formatEpisodeLine(reply, "Marlow", "en-US", NOW);
+    expect(line).not.toContain("you replied");
+    expect(line).toContain('when Marlow said "what should we cook for the visitors"');
+    expect(line).toContain("your answer covered: try, mushroom, risotto, recipe");
+    expect(line).not.toContain("Try a mushroom risotto recipe, it feeds six");
+  });
+
+  test("a credential on either side of a turn keeps the whole turn out of the prompt", async () => {
+    const { actor } = await setupOwner();
+    const conv = newConversation(actor);
+    say(actor, conv, 5, "the wifi password is hunter2hunter2 by the way", "Got it, I will remember the wifi password.", "t-wifi");
+    expect(recallEpisodes(actor, "what did you say about the wifi password", undefined, { now: NOW, sides: "both", preferHubSide: true })).toEqual([]);
+    expect(recallEpisodes(actor, "the wifi password we talked about", undefined, { now: NOW, sides: "user" })).toEqual([]);
+  });
+
+  test("the shapes that ask what the hub said, and the ones that do not", () => {
+    for (const q of ["what did you say about Tempo the other day", "what did you suggest for dinner", "remind me what you recommended", "what was your advice on the desk", "did you mention a deadline"]) {
+      expect(asksWhatHubSaid(q)).toBe(true);
+    }
+    for (const q of ["what did I say about the trip", "is a standing desk worth it", "Sage is getting a Tempo treadmill", "what were we talking about"]) {
+      expect(asksWhatHubSaid(q)).toBe(false);
+    }
+  });
+
+  test("a turn with fewer than three content words, or one about this conversation, earns no lookup", () => {
+    expect(episodeQueryEligible("what were we talking about")).toBe(false);
+    expect(episodeQueryEligible("say that again")).toBe(false);
+    expect(episodeQueryEligible("what did you mean")).toBe(false);
+    expect(episodeQueryEligible("good morning")).toBe(false);
+    expect(episodeQueryEligible("sounds good")).toBe(false);
+    expect(episodeQueryEligible("is a standing desk worth it")).toBe(true);
+    expect(episodeQueryEligible("what day is my dentist appointment")).toBe(true);
+    expect(contentTerms("Sage is getting a Tempo treadmill for the office")).toEqual(["sage", "getting", "tempo", "treadmill", "office"]);
+  });
+
+  test("the lexical floor: one shared word admits nothing, two admit the turn, one plus the vector floor admits it", async () => {
+    const { actor } = await setupOwner();
+    const band = newConversation(actor);
+    say(actor, band, 9, "I have been listening to Tempo all morning", "Tempo's second album is the one to start with, the drumming is unreal.", "t-band");
+    say(actor, band, 9, "any review of the new record", "Critics called it their tightest set, and the closing track is a standout.", "t-review");
+    // One shared word ("tempo"), no vector: nothing.
+    expect(recallEpisodes(actor, "Sage is getting a Tempo treadmill for the office", undefined, { now: NOW })).toEqual([]);
+    // Two shared words: the turn.
+    expect(recallEpisodes(actor, "the Tempo album from this morning", undefined, { now: NOW }).map((m) => m.episode.turnId)).toEqual(["t-band"]);
+    // One shared word and a vector at the floor: the turn.
+    const { sqlite } = await import("@/db");
+    const row = db.select({ id: episodes.id }).from(episodes).where(eq(episodes.turnId, "t-band")).all()[0]!;
+    sqlite.query("INSERT INTO episode_embeddings (episode_id, space, dims, vector, hlc) VALUES (?, 'test', 3, ?, 'test-hlc')").run(row.id, Buffer.from(new Float32Array([1, 0, 0]).buffer));
+    expect(recallEpisodes(actor, "Sage is getting a Tempo treadmill for the office", new Float32Array([1, 0, 0]), { now: NOW }).map((m) => m.episode.turnId)).toEqual(["t-band"]);
+  });
+
+  test("at most three lines and 400 characters", () => {
+    const match = (i: number) => ({ episode: { id: `e${i}`, turnId: `t${i}`, conversationId: null, speaker: "user" as const, text: `line number ${i} about a short thing`, createdAt: daysAgo(3) }, pairedText: "", score: 1 });
+    const block = formatEpisodesForPrompt([match(1), match(2), match(3), match(4), match(5)], "Marlow", "en-US", NOW);
+    expect(block.split("\n").length).toBe(4);
+    expect(block.length).toBeLessThanOrEqual(400);
   });
 });
 

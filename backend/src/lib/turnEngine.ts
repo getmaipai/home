@@ -21,7 +21,7 @@ import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { subjectLabel, subjectRosterFor } from "@/lib/subjects";
-import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, type EpisodeMatch } from "@/lib/episodes";
+import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, type EpisodeMatch } from "@/lib/episodes";
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
@@ -675,7 +675,7 @@ export function buildPromptParts(
   household: PersonRow[] = listActivePeople(),
   // JOIN-01: verbatim episodes from earlier conversations (MEM-04's
   // recallEpisodes()), rendered right after the memory block. Their
-  // block is capped at 600 characters by formatEpisodesForPrompt(), on
+  // block is capped at 400 characters by formatEpisodesForPrompt(), on
   // top of the memory section's own MAX_MEMORY_SECTION_CHARS.
   episodeMatches: EpisodeMatch[] = [],
   // CHAT-01: the turn's frozen clock and locale, so the context message
@@ -1847,7 +1847,13 @@ async function prepareTurn(
   // window's job, and the block's header says "earlier conversations".
   // A recalled assistant sentence is evidence of what MaiPai said, not
   // proof it was right; the header says that too.
-  const episodeMatches = recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true });
+  // RECALL-02: a turn with almost no content, or one about this
+  // conversation, recalls no episodes (the window is its evidence); the
+  // person's own side only, unless the question asks what the hub said,
+  // and then the hub's side comes as a reported note, never a line.
+  const episodeMatches = episodeQueryEligible(text)
+    ? recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
+    : [];
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own

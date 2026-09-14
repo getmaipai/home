@@ -320,6 +320,26 @@ describe("unrelated recall (bot-legacy's own test: eye exam answered from the de
     expect(asEpisode.reason).toBeNull();
   });
 
+  // RECALL-02: the copied line. A recalled episode from another
+  // conversation, restated to a turn that shares nothing with it, is the
+  // unrelated_recall cut; the "what did you suggest" turn above keeps its
+  // exemption because its answer is a restatement by design.
+  test("a reply that copies a recalled episode line to an unrelated turn is cut", () => {
+    const episodes = ['Sage said: "I have been listening to Tempo all morning"', "Tempo's second album is the one to start with, the drumming is unreal."];
+    const copied = guardReply("Tempo's second album is the one to start with, the drumming is unreal.", ctx({ utterance: "is a standing desk worth it", episodes }));
+    expect(copied.reason).toBe("unrelated_recall");
+    const own = guardReply("A standing desk helps if you switch often; try an hour at a time.", ctx({ utterance: "is a standing desk worth it", episodes }));
+    expect(own.reason).toBeNull();
+    // The same restatement to the question that asked for it stands,
+    // on either side: what the hub said, or what the person said.
+    const asked = guardReply("Tempo's second album is the one to start with, the drumming is unreal.", ctx({ utterance: "what did you say about Tempo the other day", episodes }));
+    expect(asked.reason).toBeNull();
+    const ownSide = guardReply("You said you want to run three miles every morning.", ctx({ utterance: "what did I tell you about my exercise plan", episodes: ['Sage said: "I want to run three miles every morning"'] }));
+    expect(ownSide.reason).toBeNull();
+    const ownUnasked = guardReply("You want to run three miles every morning.", ctx({ utterance: "is a standing desk worth it", episodes: ['Sage said: "I want to run three miles every morning"'] }));
+    expect(ownUnasked.reason).toBe("unrelated_recall");
+  });
+
   test("the identical line answering the RIGHT question stands", () => {
     const g = guardReply("The dentist is on Thursday at four.", ctx({ utterance: "when is the dentist", sources: SOURCES }));
     expect(g.reason).toBeNull();

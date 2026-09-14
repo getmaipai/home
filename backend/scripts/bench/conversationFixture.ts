@@ -112,6 +112,13 @@ export interface TurnExpectation {
   /** An entity of this kind and name exists in the registry after the
    * turn (step 3a of the program: the judge creates it). */
   entityExists?: { kind: string; name: string };
+  /** RECALL-02: exactly this many episode lines under the "From earlier
+   * conversations" header in the context message (0: no episode block). */
+  episodesInContext?: number;
+  /** RECALL-02: no sentence of the reply restates, at 80 percent word
+   * overlap, any assistant-side episode stored from another
+   * conversation (the copied line). */
+  noCopiedEpisode?: boolean;
   /** A live relationship of this type joins the speaker's own entity
    * and the named one after the turn, with this provenance: `stated`
    * when the speaker said it in their own sentence, `inferred` when the
@@ -482,7 +489,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "the dog Atlas (a roster name that is also a Titan): the subject is the dog, never the myth; his age and his habit live in the registry only",
     seedEntities: [{ kind: "pet", name: "Atlas", aliases: ["the dog"], description: "The family dog, a four-year-old mutt who loves rolling in mud." }],
     turns: [
-      { say: "Atlas got into the mud again this morning", expect: { guard: null, mustContain: "atlas|mud|dog|pup|he\\b|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "Atlas got into the mud again this morning", expect: { guard: null, noCopiedEpisode: true, mustContain: "atlas|mud|dog|pup|he\\b|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
       { say: "does he need a bath", expect: { mustContain: "bath|mud|yes|yeah|probably|sounds like|definitely|might", mustNotContain: HONESTY_LINES + "|titan|greek|mytholog" } },
       { say: "how old is Atlas", expect: { recallInContext: ["four-year-old|four years|4 years"], mustContain: "four|\\b4\\b", mustNotContain: "titan|greek|mytholog|sky|" + HONESTY_LINES } },
       { say: "what does he like doing", expect: { recallInContext: ["mud|roll"], mustContain: "mud|roll", mustNotContain: "titan|greek|mytholog|" + HONESTY_LINES } },
@@ -494,7 +501,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "a family member: the reaction is a friend's, the pronoun resolves to him, and his age and who he is to the owner come from the registry",
     seedEntities: [{ kind: "person", name: "Marlow", description: "Twelve years old, in seventh grade, bakes bread for every school fair.", relationshipFromOwner: "parent_of" }],
     turns: [
-      { say: "Marlow has been up since five baking bread for the school fair", expect: { guard: null, mustContain: "marlow|bread|bak|fair|five|early|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "Marlow has been up since five baking bread for the school fair", expect: { noCopiedEpisode: true,  guard: null, mustContain: "marlow|bread|bak|fair|five|early|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
       { say: "is he tired", expect: { mustContain: "tired|five|early|probably|bet|sounds|likely|exhaust|must be", mustNotContain: HONESTY_LINES } },
       { say: "how old is Marlow", expect: { recallInContext: ["twelve years|12 years|twelve-year-old"], mustContain: "twelve|\\b12\\b", mustNotContain: HONESTY_LINES } },
       { say: "who is Marlow to me", expect: { recallInContext: ["son|parent_of|parent of"], mustContain: "son|child|kid", mustNotContain: HONESTY_LINES } },
@@ -701,6 +708,39 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "Raven and I got the same manager this week, and she keeps borrowing my stapler", expect: { memoryWritten: [["raven", "stapler"]], entityExists: { kind: "person", name: "Raven" }, relationshipExists: { type: "colleague_of", name: "Raven", source: "inferred", confirmed: false }, guard: null } },
       { say: "who is Raven", newConversation: true, drainJudge: true, expect: { notInContext: ["coworker"], mustNotContain: "your (coworker|co-worker|colleague)|raven is (a|your) (coworker|co-worker|colleague)", guard: null } },
       { say: "who is Raven again", newConversation: true, confirmInferred: true, expect: { relationshipExists: { type: "colleague_of", name: "Raven", source: "inferred", confirmed: true }, recallInContext: ["your coworker"], mustContain: "coworker|co-worker|colleague|work", mustNotContain: HONESTY_LINES } },
+    ],
+  },
+  {
+    id: "copied-line",
+    category: "memory",
+    note: "RECALL-02 (findings 1, 9, 16): a band talked about in one conversation never leaks a line into a later one that shares only a word; the hub's own sentences are never rendered as dialogue, a short or meta turn recalls nothing",
+    turns: [
+      { say: "I've been listening to Tempo all morning", expect: { guard: null, humanVerdict: true } },
+      { say: "what do you make of their drumming", expect: { humanVerdict: true } },
+      { say: "give me your one-line review of their second album", expect: { humanVerdict: true } },
+      { say: "is a standing desk worth it", newConversation: true, expect: { noCopiedEpisode: true, notInContext: ["your answer covered"], mustNotContain: "tempo|album|drum|band", guard: null } },
+      { say: "Sage is getting a Tempo treadmill for the office", expect: { episodesInContext: 0, noCopiedEpisode: true, mustNotContain: "album|drum|band|song|track|record|listen", guard: null } },
+      { say: "what were we talking about", expect: { episodesInContext: 0, mustContain: "desk|treadmill", mustNotContain: "tempo|album|band|drum" } },
+    ],
+  },
+  {
+    id: "copied-line-history",
+    category: "memory",
+    note: "RECALL-02, the explicit-history shape: asked what the hub said about the band, the earlier answer comes back as a reported note with the person's paired words, never as a first-person line; nothing else does",
+    turns: [
+      { say: "what did you say about Tempo the other day", newConversation: true, expect: { recallInContext: ["your answer covered", "listening to Tempo all morning"], mustNotContain: HONESTY_LINES } },
+      { say: "and what did I say about Tempo's second album", expect: { recallInContext: ["listening to Tempo all morning|second album"], mustContain: "listening|morning|tempo|album" } },
+      { say: "thanks", expect: { episodesInContext: 0, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "copied-line-name",
+    category: "memory",
+    note: "RECALL-02, the shared word is a name that is also a common word (Marsh the person, the marsh trail): one word in common admits nothing from the training conversation",
+    turns: [
+      { say: "Marsh and I are training for the 10k in October", expect: { guard: null, humanVerdict: true } },
+      { say: "what pace should Marsh and I aim for", expect: { humanVerdict: true } },
+      { say: "is the marsh trail muddy after all this rain", newConversation: true, expect: { episodesInContext: 0, noCopiedEpisode: true, mustNotContain: "10k|training|october|pace|race|run", guard: null } },
     ],
   },
   {

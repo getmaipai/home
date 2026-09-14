@@ -12,7 +12,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { CONVERSATIONS, CREDENTIAL_LINE, type BenchConversation } from "../scripts/bench/conversationFixture";
-import { scoreTurn, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved } from "../scripts/bench/conversationScore";
+import { scoreTurn, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence } from "../scripts/bench/conversationScore";
 import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy, startFakeHomeAssistant, type RunDeps } from "../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
@@ -64,20 +64,21 @@ async function withStubBench<T>(
 }
 
 describe("the fixture", () => {
-  test("forty-eight conversations with stable, unique ids, three to six turns each, four hard rows, roster names only", () => {
+  test("fifty-one conversations with stable, unique ids, three to six turns each, four hard rows, roster names only", () => {
     // The baseline's twenty, item 1b's film conversation (#67), its four
     // other-kind siblings, three household subjects, the effect
     // standard's cancel and promise rows, seventeen for the
-    // competencies the checklist marks missing (written to fail), and
-    // step 3a's inferred-candidate row.
-    expect(CONVERSATIONS.length).toBe(48);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(48);
+    // competencies the checklist marks missing (written to fail), step
+    // 3a's inferred-candidate row, and RECALL-02's three copied-line
+    // conversations.
+    expect(CONVERSATIONS.length).toBe(51);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(51);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage"]).toContain(name);
     }
   });
 
@@ -124,6 +125,7 @@ describe("the rubric (conversationScore.ts)", () => {
     subject: null,
     entities: [],
     relationships: [],
+    assistantEpisodes: [],
     ...over,
   });
   const conv = byId("disclose-then-recall-later");
@@ -199,6 +201,7 @@ const observedFor = (over: Partial<TurnObserved> = {}): TurnObserved => ({
   subject: null,
   entities: [],
   relationships: [],
+  assistantEpisodes: [],
   ...over,
 });
 
@@ -467,6 +470,22 @@ describe("the runner against the stub (control-flow rows)", () => {
     const confirmedContext = "- Raven borrows the stapler (about Raven (your coworker); as of";
     expect(scoreTurn(raven, 2, raven.turns[2]!, observedFor({ reply: "Raven is your coworker.", contextMessage: confirmedContext, relationships: [{ ...inferred, confirmed: true }] })).pass).toBe(true);
     expect(scoreTurn(raven, 2, raven.turns[2]!, observedFor({ reply: "Raven is your coworker.", contextMessage: confirmedContext, relationships: [inferred] })).pass).toBe(false);
+  });
+
+  test("RECALL-02's checks: the episode line count under the block's header, and a reply sentence that restates an earlier reply", () => {
+    const context = "Context\n\nFrom earlier conversations (what was said, not necessarily true):\n- Sep 6 (8 days ago), Sage said: \"one\"\n- Sep 7 (7 days ago), Sage said: \"two\"\n\nRemember: you are MaiPai.";
+    expect(episodeLinesIn(context)).toBe(2);
+    expect(episodeLinesIn("Context\n\nNothing stored here bears on this message.")).toBe(0);
+    expect(episodeLinesIn(null)).toBe(0);
+    const earlier = ["Tempo's second album is the one to start with, the drumming is unreal."];
+    expect(copiedEpisodeSentence("Honestly, Tempo's second album is the one to start with, the drumming is unreal.", earlier)).not.toBeNull();
+    expect(copiedEpisodeSentence("A standing desk helps if you switch often; try an hour at a time.", earlier)).toBeNull();
+    expect(copiedEpisodeSentence("Unreal.", earlier)).toBeNull();
+    const row = byId("copied-line");
+    expect(scoreTurn(row, 3, row.turns[3]!, observedFor({ reply: "A standing desk helps if you switch often.", contextMessage: "Nothing stored here bears on this message.", assistantEpisodes: earlier })).pass).toBe(true);
+    expect(scoreTurn(row, 3, row.turns[3]!, observedFor({ reply: "Tempo's second album is the one to start with, the drumming is unreal.", contextMessage: "Nothing stored here bears on this message.", assistantEpisodes: earlier })).pass).toBe(false);
+    expect(scoreTurn(row, 4, row.turns[4]!, observedFor({ reply: "Nice, a treadmill for the office.", contextMessage: context, assistantEpisodes: earlier })).pass).toBe(false);
+    expect(scoreTurn(row, 4, row.turns[4]!, observedFor({ reply: "Nice, a treadmill for the office.", contextMessage: "Nothing stored here bears on this message.", assistantEpisodes: earlier })).pass).toBe(true);
   });
 
   test("backdating shifts the bench's own rows by whole days and keeps the ISO format", async () => {

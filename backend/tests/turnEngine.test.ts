@@ -2904,7 +2904,7 @@ describe("item 4a: a tool never runs on an argument the person did not say", () 
 // one's turn (which records its episodes), and the second conversation's
 // assembled messages are read off the request the stub receives.
 describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {
-  test("'my dentist is on Thursday' said in one conversation, never judged, answers 'when is my dentist appointment' in a new one", async () => {
+  test("'my dentist is on Thursday' said in one conversation, never judged, answers 'what day is my dentist appointment' in a new one", async () => {
     const { actor } = await owner();
     const { createConversation } = await import("@/lib/conversationHistory");
     // The judge is never run here: the episode, not an extracted fact,
@@ -2919,12 +2919,12 @@ describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {
         // nothing grounding "dentist" and "Thursday", and it stands only
         // because the recalled episode grounds both. "It's on Thursday."
         // would pass with no sources at all and prove nothing here.
-        return request.messages.at(-1)?.content === "when is my dentist appointment" ? "My guess is your dentist is Thursday." : "Okay, noted.";
+        return request.messages.at(-1)?.content === "what day is my dentist appointment" ? "My guess is your dentist is Thursday." : "Okay, noted.";
       },
     });
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
-      const first = await runTurn(actor, "chat", "my dentist is on Thursday");
+      const first = await runTurn(actor, "chat", "my dentist appointment is on Thursday");
       expect(first.ok).toBe(true);
       if (!first.ok) return;
       expect(first.value.source).toBe("model"); // not the remember pattern: nothing extracted, only the logged turn
@@ -2932,7 +2932,7 @@ describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {
       const second = createConversation(actor, { surface: "chat" });
       expect(second.ok).toBe(true);
       if (!second.ok) return;
-      const result = await runTurn(actor, "chat", "when is my dentist appointment", { conversationId: second.value.id });
+      const result = await runTurn(actor, "chat", "what day is my dentist appointment", { conversationId: second.value.id });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
@@ -2940,14 +2940,14 @@ describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {
       const context = messages.at(-2);
       expect(context?.role).toBe("system");
       expect(context?.content).toContain("From earlier conversations (what was said, not necessarily true):");
-      expect(context?.content).toMatch(/said: "my dentist is on Thursday"/);
+      expect(context?.content).toMatch(/said: "my dentist appointment is on Thursday"/);
       // The guards saw the episode: the household guess stands as-is,
       // where without it guardReply() returns "invention" (asserted below
       // against the same words, so the test cannot pass by accident).
       expect(result.value.reply.text).toBe("My guess is your dentist is Thursday.");
       expect(result.value.source).toBe("model");
-      expect(guardReply("My guess is your dentist is Thursday.", { utterance: "when is my dentist appointment", personId: actor.id }).reason).toBe("invention");
-      expect(guardReply("My guess is your dentist is Thursday.", { utterance: "when is my dentist appointment", personId: actor.id, episodes: ["my dentist is on Thursday"] }).reason).toBeNull();
+      expect(guardReply("My guess is your dentist is Thursday.", { utterance: "what day is my dentist appointment", personId: actor.id }).reason).toBe("invention");
+      expect(guardReply("My guess is your dentist is Thursday.", { utterance: "what day is my dentist appointment", personId: actor.id, episodes: ["my dentist is on Thursday"] }).reason).toBeNull();
     } finally {
       stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;

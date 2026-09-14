@@ -21,7 +21,11 @@ import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { remember, drainPendingEmbeddings, embedQueryForRecall, cosineSimilarity, bufferToVector } from "@/lib/memory";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
+import { logTurn, createConversation } from "@/lib/conversationHistory";
+import { embedPendingEpisodes, recallEpisodes, contentTerms, sharedContentTerms, episodeQueryEligible, LEXICAL_MIN_SHARED_TERMS } from "@/lib/episodes";
+import { episodes, episodeEmbeddings } from "@/db/schema";
 import type { PersonRow } from "@/types";
+import type { TurnValue } from "@/wire";
 
 const BENCH_SOURCE = "bench:recall-floor";
 
@@ -146,9 +150,51 @@ const INDIRECT_QUERIES: { query: string; answer: string }[] = [
   { query: "what time should we give the dog his pills", answer: "Rover is the family dog and gets his medicine at seven every evening" },
 ];
 
+// RECALL-02: the episode rows. Four earlier conversations (a band, a
+// training plan with Marsh, a recipe, a trip), then the queries that
+// share exactly one content word with one of them (the copied-line
+// shape: the band's name inside a product's name, a person's name that
+// is also a common word, a genre word) and the queries that share two
+// or ask about the exchange. Each query reports the shared-word count
+// and the vector cosine of the nearest episode, and whether
+// recallEpisodes() (the lexical floor plus the vector floor) returns
+// anything; the floors are right when the one-word rows return nothing
+// and the two-word and paraphrase rows return their turn. The vector
+// floor EPISODE_MIN_COSINE is set from this: above the one-word rows'
+// nearest cosine, below the signal rows' weakest.
+const EPISODE_CONVERSATIONS: { id: string; turns: [string, string][] }[] = [
+  { id: "band", turns: [["I have been listening to Tempo all morning", "Tempo's second album is the one to start with, the drumming is unreal."], ["what do you make of their drumming", "Tight and busy without getting in the way of the songs."]] },
+  { id: "training", turns: [["Marsh and I are training for the 10k in October", "Nice, eight weeks out is a good runway; three runs a week and one long one."], ["what pace should Marsh and I aim for", "Start easy, around a conversational pace, and add speed in the last three weeks."]] },
+  { id: "recipe", turns: [["what should we cook for the visitors on Saturday", "Try a mushroom risotto, it feeds six and reheats well."], ["and something for dessert", "Baked apples, they take twenty minutes."]] },
+  { id: "trip", turns: [["did we decide on the trip", "Yes, the coast on the first weekend of October."]] },
+];
+const EPISODE_NULL_QUERIES: { query: string; sharesWith: string }[] = [
+  { query: "Sage is getting a Tempo treadmill for the office", sharesWith: "band" },
+  { query: "is the marsh trail muddy after all this rain", sharesWith: "training" },
+  { query: "the drumming at the school concert was loud", sharesWith: "band" },
+  { query: "the coast guard closed the beach today", sharesWith: "trip" },
+  { query: "our visitors from the city arrive tonight", sharesWith: "recipe" },
+  { query: "what is a good pace for a walk with the dog", sharesWith: "training" },
+];
+const EPISODE_SIGNAL_QUERIES: { query: string; turn: string }[] = [
+  { query: "the Tempo album from this morning", turn: "band" },
+  { query: "our 10k training plan with Marsh", turn: "training" },
+  { query: "the mushroom risotto recipe for the visitors", turn: "recipe" },
+  // Not "the weekend visitors": a weekend phrase is a created_at window.
+  { query: "what did you suggest we cook for the six visitors", turn: "recipe" },
+  // Not "the trip in October": a month phrase is a created_at window
+  // (MEM-04's date windows), and the trip was said this month.
+  { query: "the coast trip we planned", turn: "trip" },
+];
+
 const testPersonId = newPersonId();
 
 function cleanup(): void {
+  sqlite.query("DELETE FROM episode_embeddings WHERE episode_id IN (SELECT id FROM episodes WHERE person_id = ?)").run(testPersonId);
+  sqlite.query("DELETE FROM pending_episode_embeddings WHERE episode_id IN (SELECT id FROM episodes WHERE person_id = ?)").run(testPersonId);
+  sqlite.query("DELETE FROM episodes WHERE person_id = ?").run(testPersonId);
+  sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(testPersonId);
+  sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(BENCH_SOURCE);
   sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(BENCH_SOURCE);
   sqlite.query("DELETE FROM memory_records WHERE source = ?").run(BENCH_SOURCE);
@@ -250,7 +296,81 @@ async function main(): Promise<{ executed: number; engine: string }> {
     console.log(`  ${f(cosine)}  "${query}" -> "${answer}"`);
   }
   console.log(`\n  indirect: weakest ${f(Math.min(...indirect))}, median ${f(pct(indirect, 0.5))}, strongest ${f(Math.max(...indirect))}`);
-  return { executed: UNRELATED_QUERIES.length + NAMED_NULL_QUERIES.length + RELATED_QUERIES.length + INDIRECT_QUERIES.length, engine: `embed url at ${process.env.MAIPAI_EMBED_URL}` };
+
+  // RECALL-02: the episode rows.
+  const SAFE: TurnValue["safety"] = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() };
+  const turnConversation = new Map<string, string>();
+  for (const conv of EPISODE_CONVERSATIONS) {
+    const created = createConversation(actor, { surface: "chat" });
+    if (!created.ok) throw new Error(`conversation: ${created.error}`);
+    conv.turns.forEach(([userText, replyText], i) => {
+      const turnId = `turn-floor-${conv.id}-${i}`;
+      logTurn(actor, "chat", userText, { reply: { text: replyText }, source: "model", safety: SAFE, conversation_id: created.value.id, turn_id: turnId });
+      turnConversation.set(turnId, conv.id);
+    });
+  }
+  for (let i = 0; i < 60; i++) {
+    await embedPendingEpisodes();
+    const embedded = db.select({ id: episodeEmbeddings.episodeId }).from(episodeEmbeddings).innerJoin(episodes, eq(episodes.id, episodeEmbeddings.episodeId)).where(eq(episodes.personId, testPersonId)).all().length;
+    const total = db.select({ id: episodes.id }).from(episodes).where(eq(episodes.personId, testPersonId)).all().length;
+    if (embedded >= total) break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  const episodeRows = db
+    .select({ id: episodes.id, turnId: episodes.turnId, speaker: episodes.speaker, text: episodes.text, vector: episodeEmbeddings.vector })
+    .from(episodes)
+    .innerJoin(episodeEmbeddings, eq(episodeEmbeddings.episodeId, episodes.id))
+    .where(eq(episodes.personId, testPersonId))
+    .all();
+  console.log(`\nEpisode rows (RECALL-02): ${episodeRows.length} embedded episodes from ${EPISODE_CONVERSATIONS.length} conversations; the lexical floor is ${LEXICAL_MIN_SHARED_TERMS} shared content words, or one plus a cosine at the episodic floor`);
+  const nearest = async (query: string, wanted?: string) => {
+    const q = await embedQueryForRecall(query);
+    if (!q) throw new Error(`could not embed "${query}"`);
+    const terms = contentTerms(query);
+    let best = { text: "", cosine: -1, shared: 0, conversation: "" };
+    let wantedCosine = -1;
+    let wantedShared = 0;
+    for (const r of episodeRows) {
+      const c = cosineSimilarity(q, bufferToVector(r.vector));
+      const pair = episodeRows.find((p) => p.turnId === r.turnId && p.speaker !== r.speaker)?.text ?? "";
+      const shared = sharedContentTerms(terms, `${r.text} ${pair}`);
+      if (c > best.cosine) best = { text: r.text, cosine: c, shared, conversation: turnConversation.get(r.turnId) ?? "" };
+      if (wanted && turnConversation.get(r.turnId) === wanted && c > wantedCosine) {
+        wantedCosine = c;
+        wantedShared = shared;
+      }
+    }
+    // The prompt's own gate first: a query production would never send
+    // recalls nothing, and a row that passes here must be one it sends.
+    if (!episodeQueryEligible(query)) throw new Error(`"${query}" would not earn a lookup in the prompt (fewer than three content words, or about this conversation)`);
+    const recalled = recallEpisodes(actor, query, q, { sides: "both" });
+    return { best, wantedCosine, wantedShared, recalled: recalled.map((m) => turnConversation.get(m.episode.turnId) ?? "?") };
+  };
+  console.log(`\n  One shared word (${EPISODE_NULL_QUERIES.length} queries): the nearest episode's cosine and shared words, and what recall returns\n`);
+  const oneWordCosines: number[] = [];
+  let oneWordLeaks = 0;
+  for (const { query, sharesWith } of EPISODE_NULL_QUERIES) {
+    const r = await nearest(query);
+    oneWordCosines.push(r.best.cosine);
+    if (r.recalled.includes(sharesWith)) oneWordLeaks++;
+    console.log(`  ${f(r.best.cosine)}  shared ${r.best.shared}  "${query}" -> nearest "${r.best.text}" [${r.best.conversation}]; recalled: ${r.recalled.join(", ") || "nothing"}`);
+  }
+  console.log(`\n  one-word null: nearest cosine p50 ${f(pct(oneWordCosines, 0.5))} max ${f(Math.max(...oneWordCosines))}; ${oneWordLeaks} of ${EPISODE_NULL_QUERIES.length} leaked the conversation they share a word with`);
+  console.log(`\n  Two shared words or a paraphrase (${EPISODE_SIGNAL_QUERIES.length} queries): the right turn's cosine, and whether recall returns it\n`);
+  let signalHits = 0;
+  const signalCosines: number[] = [];
+  for (const { query, turn } of EPISODE_SIGNAL_QUERIES) {
+    const r = await nearest(query, turn);
+    const hit = r.recalled[0] === turn;
+    if (hit) signalHits++;
+    signalCosines.push(r.wantedCosine);
+    console.log(`  ${f(r.wantedCosine)}  shared ${r.wantedShared}  "${query}" -> recalled first: ${r.recalled[0] ?? "nothing"} (wanted ${turn}) ${hit ? "ok" : "MISS"}`);
+  }
+  console.log(`\n  signal: ${signalHits} of ${EPISODE_SIGNAL_QUERIES.length} recalled first; weakest cosine ${f(Math.min(...signalCosines))}`);
+  return {
+    executed: UNRELATED_QUERIES.length + NAMED_NULL_QUERIES.length + RELATED_QUERIES.length + INDIRECT_QUERIES.length + EPISODE_NULL_QUERIES.length + EPISODE_SIGNAL_QUERIES.length,
+    engine: `embed url at ${process.env.MAIPAI_EMBED_URL}`,
+  };
 }
 
 let summary = { executed: 0, engine: "" };

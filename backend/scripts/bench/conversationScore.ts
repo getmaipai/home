@@ -7,6 +7,9 @@
 // scored by word matching: it prints the reply with a blank verdict
 // column for a person to fill, and the ranking lists those verdicts
 // apart from the scored failures.
+import { EPISODES_HEADER } from "@/lib/episodes";
+import { tokenize } from "@/lib/text";
+import { splitIntoSentences } from "@/lib/guards";
 import type { BenchConversation, BenchTurn, TurnExpectation } from "./conversationFixture";
 
 export interface TurnObserved {
@@ -69,6 +72,9 @@ export interface TurnObserved {
   /** The live relationships touching the speaker's own entity after
    * the turn: the other end's name, the provenance, whether confirmed. */
   relationships: readonly { type: string; name: string; source: string; confirmed: boolean }[];
+  /** RECALL-02: the assistant-side episodes stored for this person from
+   * other conversations, the lines a reply must never copy. */
+  assistantEpisodes: readonly string[];
 }
 
 export interface Check {
@@ -133,6 +139,8 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.minWords) parts.push(`at least ${e.minWords} words`);
   if (e.listLacks) parts.push(`list lacks ${e.listLacks.join(", ")}`);
   if (e.entityExists) parts.push(`entity ${e.entityExists.kind} ${e.entityExists.name}`);
+  if (e.episodesInContext !== undefined) parts.push(`${e.episodesInContext} episode line${e.episodesInContext === 1 ? "" : "s"}`);
+  if (e.noCopiedEpisode) parts.push("no copied episode line");
   if (e.relationshipExists) parts.push(`relationship ${e.relationshipExists.type} ${e.relationshipExists.name} ${e.relationshipExists.source}${e.relationshipExists.confirmed === undefined ? "" : e.relationshipExists.confirmed ? " confirmed" : " unconfirmed"}`);
   if (e.humanVerdict) parts.push("(reader's verdict)");
   return parts.join("; ");
@@ -267,6 +275,14 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     const hit = observed.entities.find((x) => x.kind === e.entityExists!.kind && x.name.toLowerCase() === e.entityExists!.name.toLowerCase());
     checks.push({ name: "entity", pass: hit !== undefined, detail: hit ? `${hit.kind} ${hit.name} exists` : `no ${e.entityExists.kind} named ${e.entityExists.name} (entities: ${observed.entities.map((x) => `${x.kind} ${x.name}`).join(", ") || "none"})` });
   }
+  if (e.episodesInContext !== undefined) {
+    const count = episodeLinesIn(observed.contextMessage);
+    checks.push({ name: "episode lines", pass: count === e.episodesInContext, detail: `${count} episode line${count === 1 ? "" : "s"} in the context (wanted ${e.episodesInContext})` });
+  }
+  if (e.noCopiedEpisode) {
+    const copied = copiedEpisodeSentence(reply, observed.assistantEpisodes);
+    checks.push({ name: "no copied line", pass: copied === null, detail: copied ? `restates an earlier reply: "${copied.slice(0, 80)}"` : "no earlier reply restated" });
+  }
   if (e.relationshipExists) {
     const want = e.relationshipExists;
     const edge = observed.relationships.find((r) => r.type === want.type && r.name.toLowerCase() === want.name.toLowerCase());
@@ -387,4 +403,32 @@ export function renderRanking(failures: readonly Failure[], limit = 5): string {
     .slice(0, limit)
     .map((f, i) => `${i + 1}. ${f.hard ? "HARD " : ""}${f.category}: ${f.conversationId} turn ${f.turnIndex + 1}, ${f.check.name} (${f.check.detail})`)
     .join("\n");
+}
+
+/** RECALL-02: the episode lines the context carries, counted under the
+ * block's own header (the lines that start with "- " until the next
+ * blank line). */
+export function episodeLinesIn(context: string | null): number {
+  if (!context) return 0;
+  const at = context.indexOf(EPISODES_HEADER);
+  if (at < 0) return 0;
+  const after = context.slice(at + EPISODES_HEADER.length).split("\n\n")[0] ?? "";
+  return after.split("\n").filter((l) => l.startsWith("- ")).length;
+}
+
+/** RECALL-02: the first reply sentence that restates a sentence of an
+ * earlier assistant-side episode at 80 percent word overlap, the
+ * guard's own measure (its tokenizer, stopwords out, sentence against
+ * sentence), or null. */
+export function copiedEpisodeSentence(reply: string, episodes: readonly string[]): string | null {
+  const earlier = episodes.flatMap((e) => splitIntoSentences(e).map(tokenize)).filter((p) => p.size >= 3);
+  for (const sentence of splitIntoSentences(reply || "")) {
+    const said = tokenize(sentence);
+    if (said.size < 3) continue;
+    for (const pool of earlier) {
+      const overlap = [...said].filter((w) => pool.has(w)).length;
+      if (overlap >= Math.max(3, Math.ceil(0.8 * said.size))) return sentence;
+    }
+  }
+  return null;
 }
