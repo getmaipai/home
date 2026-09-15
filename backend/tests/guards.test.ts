@@ -1159,6 +1159,12 @@ describe("EXP-02", () => {
     expect(g.reason).toBe("claimed_experience");
     expect(g.reply).toMatch(/can't actually watch|can't say from experience/i);
   });
+  test("a reflected experience question on a world subject gets the capability line", () => {
+    const g = guardReply("I didn't get a chance to watch it, but I heard it looks intense", ctx({ utterance: "what was yours", act: "question", subjects: current }));
+    expect(g.reply).toMatch(/can't actually watch|can't say from experience|don't get to watch/i);
+    expect(g.reply).not.toMatch(/I heard|didn't get a chance/i);
+    expect(guardReply("I didn't get a chance to watch it, but I heard it looks intense", ctx({ utterance: "what was yours", act: "question" })).reply).toBe("I didn't get a chance to watch it, but I heard it looks intense");
+  });
   test("an objection gets the emptied act line", () => {
     const g = guardReply("I've heard it's really intense.", ctx({ utterance: "you were meant to find it, not describe it", act: "inform", target: "hub", repair: "correction", subjects: current }));
     expect(g.reason).toBe("claimed_experience");

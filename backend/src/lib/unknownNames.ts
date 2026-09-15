@@ -269,10 +269,10 @@ function rosterShapeAround(text: string, name: string, knownInText: readonly str
 // A kind noun in front of a name says it is the world's ("the band
 // Tempo", "the film Cobra"): never a household unknown, whatever else
 // the sentence carries.
-const WORLD_KIND_RE = /(?<![\p{L}])(?:the|a|an|that|this)\s+(?:(?:new|latest|upcoming|next|old|classic|original|first)\s+)?(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon)\s+$/iu;
+const WORLD_KIND_RE = /(?<![\p{L}])(?:the|a|an|that|this)\s+(?:(?:new|latest|upcoming|next|old|classic|original|first)\s+)?(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon|trailer|teaser|episode|season|clip|soundtrack|sequel|remake)\s+$/iu;
 // The kind noun right after a titled name: "the new Marsh Lantern film",
 // "the film Marsh Lantern" (a kind noun in front).
-const KIND_NOUN_AFTER_RE = /^\s*(?:film|movie|show|series|game|album|song|track|book|novel|cartoon|podcast|band|restaurant|cafe)(?![\p{L}])/iu;
+const KIND_NOUN_AFTER_RE = /^\s*(?:film|movie|show|series|game|album|song|track|book|novel|cartoon|podcast|band|restaurant|cafe|trailer|teaser|episode|season|clip|soundtrack|sequel|remake)(?![\p{L}])/iu;
 function kindOf(noun: string): string {
   const n = noun.toLowerCase();
   if (n === "film" || n === "movie") return "film";
@@ -280,6 +280,10 @@ function kindOf(noun: string): string {
   if (n === "song" || n === "track") return "song";
   if (n === "book" || n === "novel") return "book";
   if (n === "cafe" || n === "restaurant") return "restaurant";
+  if (["trailer", "teaser", "clip"].includes(n)) return "trailer";
+  if (["episode", "season"].includes(n)) return "show";
+  if (n === "soundtrack") return "album";
+  if (["sequel", "remake"].includes(n)) return "film";
   return n;
 }
 /** CHAT-13: the recency a titled work carries, read from the words
@@ -293,6 +297,34 @@ function recencyOf(determinerPhrase: string): "current" | "dated" | "unknown" {
 }
 function worldFramed(text: string, at: number): boolean {
   return WORLD_KIND_RE.test(text.slice(0, at));
+}
+
+const LOWER_TITLE_STOP_WORDS = new Set(["a", "an", "and", "for", "in", "of", "on", "the", "to"]);
+const LOWER_TITLE_RE = /(?<![\p{L}])(?:the|a|an)\s+(?:(?:new|latest|upcoming|next|old|classic|original|first)\s+)?(?<title>[a-z]+(?:\s+[a-z]+)?)\s+(?<kind>trailer|teaser|episode|season|clip|soundtrack|sequel|remake|film|movie|show|series|game|album|song|track|book|novel|cartoon|podcast|band|restaurant|cafe)(?![\p{L}])/iu;
+const LOWER_TITLE_FOR_RE = /(?<![\p{L}])(?<kind>trailer|teaser|episode|season|clip|soundtrack|sequel|remake)\s+for\s+(?<title>[a-z]+)(?![\p{L}])/iu;
+function lowerTitleCandidates(text: string, existing: readonly Candidate[], known: ReadonlySet<string>): Candidate[] {
+  const out: Candidate[] = [];
+  for (const re of [LOWER_TITLE_RE, LOWER_TITLE_FOR_RE]) {
+    for (const match of text.matchAll(new RegExp(re.source, re.flags.replace("g", "") + "g"))) {
+      const title = match.groups?.title ?? "";
+      const kind = match.groups?.kind ?? "";
+      const words = title.split(/\s+/u);
+      if (!title || words.some((word) => LOWER_TITLE_STOP_WORDS.has(word.toLowerCase())) || ["new", "latest", "upcoming", "next", "old", "classic", "original", "first"].includes(title.toLowerCase()) || kind.toLowerCase() === title.toLowerCase()) continue;
+      const display = words.map((word) => `${word[0]!.toUpperCase()}${word.slice(1)}`).join(" ");
+      if (known.has(display.toLowerCase()) || existing.some((c) => c.name.toLowerCase() === display.toLowerCase())) continue;
+      const at = (match.index ?? 0) + match[0].indexOf(title);
+      out.push({ name: display, at, tokens: words.length, tags: new Set() });
+    }
+  }
+  return out;
+}
+function lowerTitleKindAt(text: string, at: number): { noun: string; phrase: string } | null {
+  const before = text.slice(0, at);
+  const after = text.slice(at);
+  const forMatch = /(?<kind>trailer|teaser|episode|season|clip|soundtrack|sequel|remake)\s+for\s*$/iu.exec(before);
+  if (forMatch) return { noun: forMatch.groups?.kind ?? "", phrase: before };
+  const afterMatch = /^\s*(?<kind>trailer|teaser|episode|season|clip|soundtrack|sequel|remake|film|movie|show|series|game|album|song|track|book|novel|cartoon|podcast|band|restaurant|cafe)\b/iu.exec(after);
+  return afterMatch ? { noun: afterMatch.groups?.kind ?? "", phrase: before } : null;
 }
 
 // ASK-02 (rule 2): a brand or a service is the world's, kind
@@ -479,6 +511,7 @@ export function resolveNames(text: string, signal: TurnSignal | undefined, known
   const frames = relationFramesIn(text);
   const pronouns = pronounFamiliesIn(text);
   const candidates = candidatesIn(text, new Set(knownLower.keys()), known.recent ?? [], new Set(frames.map((f) => f.name.toLowerCase())));
+  candidates.push(...lowerTitleCandidates(text, candidates, new Set(knownLower.keys())));
   // The signal's own named subjects (a relation phrase's name, a
   // report's source) join the tagger's, so "my sister Nadia says" is
   // never missed at the start of a sentence.
@@ -534,18 +567,21 @@ export function resolveNames(text: string, signal: TurnSignal | undefined, known
     // never asked about.
     const afterSlice = text.slice(c.at + c.name.length);
     const beforeSlice = text.slice(0, c.at);
-    if (!framedByRelation && (worldFramed(text, c.at) || KIND_NOUN_AFTER_RE.test(afterSlice))) {
+    const lowerTitleFrame = lowerTitleKindAt(text, c.at);
+    if (!framedByRelation && (worldFramed(text, c.at) || KIND_NOUN_AFTER_RE.test(afterSlice) || lowerTitleFrame)) {
       const after = KIND_NOUN_AFTER_RE.test(afterSlice);
       // The kind noun: the one right after the name (after-shape) or the
       // one in front of it (before-shape).
-      const kindNoun = after
+      const kindNoun = lowerTitleFrame
+        ? lowerTitleFrame.noun
+        : after
         ? (afterSlice.match(KIND_NOUN_AFTER_RE) ?? [""])[0]!.trim()
-        : (beforeSlice.match(/(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon)\s+$/iu) ?? [""])[0]!.trim();
+        : (beforeSlice.match(/(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon|trailer|teaser|episode|season|clip|soundtrack|sequel|remake)\s+$/iu) ?? [""])[0]!.trim();
       // The determiner-to-name slot where the recency word lives: for the
       // after-shape it is the words before the name ("the new Marsh
       // Lantern film" -> "the new"); for the before-shape it is the slot
       // before the kind noun ("the new Marsh Lantern" -> "the new").
-      const recencyPhrase = after ? beforeSlice : beforeSlice.replace(kindNoun, "").trim();
+      const recencyPhrase = lowerTitleFrame ? lowerTitleFrame.phrase : after ? beforeSlice : beforeSlice.replace(kindNoun, "").trim();
       const year = (recencyPhrase.match(/\b(?:19|20)\d{2}\b/) ?? [null])[0] ?? null;
       subjects.push({
         type: "world",

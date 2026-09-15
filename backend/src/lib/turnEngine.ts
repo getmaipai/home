@@ -1326,7 +1326,7 @@ function isReference(captured: string): boolean {
 }
 
 const REFERENCE_PACKAGES: ReadonlySet<string> = new Set(["media-lookup", "knowledge", "websearch"]);
-const MEDIA_KINDS: ReadonlySet<string> = new Set(["film", "show", "series", "album", "song", "book", "game", "band"]);
+const MEDIA_KINDS: ReadonlySet<string> = new Set(["film", "show", "series", "album", "song", "book", "game", "band", "trailer"]);
 
 export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[], roster: readonly string[] = [], onYield?: (y: LiteralYield) => void, stack?: readonly SubjectRef[]): RouteResult | null {
   // ACT-01's set: a polite request ("can you remember that Marlow's

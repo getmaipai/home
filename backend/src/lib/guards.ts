@@ -413,7 +413,7 @@ const CLAIMED_EXPERIENCE_RE =
 // is not tasting.
 const EXPERIENCE_VERBS = String.raw`(?:watch(?:ing)?(?! (?:what|how|for|out for))|see(?:ing)?(?! (?:what|how|if|whether|your|you|where|which|who))|hear(?:ing)?(?! (?:what|how|about|your|from|more|all|back|you|the rest|the story|that|this|it from))|listen(?:ing)?(?! (?:to what|to how|to you|for|to the rest))|play(?:ing)?(?! (?:it|that|them) (?:for|back|to you))|read(?:ing)?(?! (?:what|your|you|it to|that to|them to|this to|aloud|out|through|over|back|along|the room))|check(?:ing)?(?: it| that| them| this)? out|giv(?:e|ing) (?:it|that|them) a (?:listen|watch|go|spin)|catch(?:ing)?|stream(?:ing)?|binge(?:ing)?|bingeing)\b`;
 const LOOKUP_OBJECT_RE = /\b(?:to\s+(?:find|check|look up|search)|through\s+the\s+results|the\s+page|what\s+came\s+back|the\s+results)\b/i;
-const HEARSAY_EXPERIENCE_RE = /\b(?:i['’]?ve heard (?:it|the (?:film|album|show))?\s*(?:is|was|it['’]?s)\s+\w+|people say it['’]?s\s+\w+|it['’]?s supposed to be\s+\w+)\b/i;
+const HEARSAY_EXPERIENCE_RE = /\b(?:i['’]?(?:ve| have)? heard\b[^.!?]*(?:is|was|it['’]?s|looks?)\s+\w+|people say it['’]?s\s+\w+|it['’]?s supposed to be\s+\w+)\b/i;
 function currentWorldSubject(ctx: GuardContext): boolean { return (ctx.subjects ?? []).some((s) => s.type === "world" && s.recency === "current"); }
 const CONSUMPTION_EXPERIENCE_RE = /\bi(?:'m| am| was|'ve| have|'d| had)?(?: just| also| even| already| actually)? (?:eat(?:ing|en)?|ate|drink(?:ing)?|drank|cook(?:ing|ed)|went|visit(?:ing|ed)|been to|waiting for|tried|tasted|bought|drove|driving)\b/i;
 const EXPERIENCE_OBJECT_WORDS = /\b(?:food|pasta|pizza|soup|cake|coffee|tea|popcorn|restaurant|cafe|bar|place|park|museum|cinema|theater|film|movie|show|album|book|game|song)\b/i;
@@ -431,7 +431,7 @@ function hasExperienceObject(sentence: string, ctx: GuardContext): boolean {
 function experienceEvidence(ctx: GuardContext): boolean {
   return (ctx.outcomes ?? []).some((o) => o.status === "succeeded" && /review|rating/i.test(`${o.reason ?? ""} ${JSON.stringify((o as { args?: unknown }).args ?? {})}`));
 }
-function experienceTurn(ctx: GuardContext): boolean { return /\b(?:have you|did you|do you)\s+(?:seen|heard|watched|been|tried|eaten|been to)\b/i.test(ctx.utterance) || (/\b(?:seen|heard|watched|been|tried|eaten|been to)\b/i.test(ctx.utterance) && ctx.act === "question"); }
+function experienceTurn(ctx: GuardContext): boolean { return /\b(?:have you|did you|do you)\s+(?:seen|heard|watched|been|tried|eaten|been to)\b/i.test(ctx.utterance) || (/\b(?:seen|heard|watched|been|tried|eaten|been to)\b/i.test(ctx.utterance) && ctx.act === "question") || (ctx.subjects?.[0]?.type === "world" && /\b(?:what about you|what were your favorites|what was yours|did you like it)\b/i.test(ctx.utterance)); }
 function newExperienceForm(sentence: string, ctx: GuardContext): boolean {
   if (!currentWorldSubject(ctx)) return false;
   if (experienceEvidence(ctx)) return false;

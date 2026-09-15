@@ -45,6 +45,16 @@ describe("finding 24 first: a grounded first-person recall trips no guard", () =
 });
 
 describe("resolveNames(): the known set and the household frames", () => {
+  describe("finding 47: a lower-cased title with its kind noun", () => {
+    test("makes lower-cased titles world subjects, but not kind words or roster names", () => {
+      expect(resolve("new trailer for primetime just dropped").subjects).toEqual([expect.objectContaining({ kind: "trailer", display_name: "Primetime", recency: "current" })]);
+      expect(resolve("new trailer for primetime just dropped").unknown).toEqual([]);
+      expect(resolve("the new stranger tides trailer").subjects).toEqual([expect.objectContaining({ kind: "trailer", display_name: "Stranger Tides" })]);
+      expect(resolve("the new trailer").subjects).toEqual([]);
+      expect(resolve("the new Pippa trailer").subjects.filter((subject) => subject.type === "world")).toEqual([]);
+    });
+  });
+
   test("a roster name or a registry name is a household ref; the rest is unresolved", () => {
     const r = resolve("Marsh and I are training for the 10k in October");
     expect(r.subjects).toEqual([{ type: "household", entity_id: "ent-marshx", carried_question: null }]);

@@ -396,6 +396,16 @@ export const PRIVATE_FACT_CONFIRMED = "the dark\\b|darkness|night ?light|lamp\\b
 
 export const CONVERSATIONS: readonly BenchConversation[] = [
   {
+    id: "trailer-lowercase",
+    category: "knowledge",
+    note: "finding 47: a lower-cased title behind its kind noun is a world subject and reflected questions use the experience line",
+    turns: [
+      { say: "new trailer for primetime just dropped", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "world", name: "Primetime", kind: "trailer" }], guard: null, humanVerdict: true } },
+      { say: "what about you, what were your favorites", expect: { mustNotContain: "what was your|what were your|did you catch", guardAnyOf: ["claimed_experience", null], mustContain: "can't watch|haven't seen|can't see|not able to watch|don't watch", humanVerdict: true } },
+      { say: "what was yours", expect: { mustNotContain: "I heard|didn't get a chance|looks intense", humanVerdict: true } },
+    ],
+  },
+  {
     id: "disclose-then-recall-later",
     category: "memory",
     note: "a fact said in one conversation, asked in the next after the judge ran",
