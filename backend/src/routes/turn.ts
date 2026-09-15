@@ -279,7 +279,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     // A safety refusal or a plugin reply is already complete, deterministic
     // text - one "done" event, no artificial trickle for something with
     // nothing left to stream.
-    const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "done", value: result.value })]);
+    const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "signal", signal: result.signal }), ndjsonLine({ type: "done", value: result.value })]);
     return new Response(body, {
       headers: { "content-type": "application/x-ndjson" },
     });
@@ -289,6 +289,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     async start(controller) {
       try {
         controller.enqueue(ndjsonLine(turnMeta));
+        controller.enqueue(ndjsonLine({ type: "signal", signal: result.signal }));
         for await (const event of streamTurnEvents(result, actor.id)) {
           controller.enqueue(ndjsonLine(event));
         }

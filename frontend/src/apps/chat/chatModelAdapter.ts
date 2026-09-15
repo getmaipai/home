@@ -232,6 +232,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // otherwise.
             continue;
           }
+          if (event.type === "signal") continue;
           if (event.type === "delta") {
             deps.onReplyState?.("responding");
             raw += event.text;

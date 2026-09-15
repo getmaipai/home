@@ -4140,7 +4140,7 @@ export type StreamOutcome = SafetyResult | { resolved: TurnValue } | undefined;
 
 export type TurnStreamResult =
   | TurnFailure
-  | { ok: true; kind: "immediate"; value: TurnValue }
+  | { ok: true; kind: "immediate"; value: TurnValue; signal: TurnSignal }
   | {
       ok: true;
       kind: "stream";
@@ -4150,6 +4150,7 @@ export type TurnStreamResult =
        * ("turn_meta"), before any delta. */
       conversationId: string;
       turnId: string;
+      signal: TurnSignal;
       /** FAST-04: `Date.now()` at the top of runTurnStream(), before
        * prepareTurn() ran. streamTurnEvents() counts its 900 ms
        * spoken-cue timer from here, not from its own first `.next()`,
@@ -4683,7 +4684,7 @@ async function runTurnStreamHoldingLease(
     const value = finalizeReply(actor, prepared.value, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
     logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety });
-    return { ok: true, kind: "immediate", value };
+    return { ok: true, kind: "immediate", value, signal: prepared.signal };
   }
 
   // OUT-01: how many generations this turn has spent. peekAndHandle()'s
@@ -4974,6 +4975,7 @@ async function runTurnStreamHoldingLease(
       kind: "stream",
       conversationId: conversation.id,
       turnId: prepared.turnId,
+      signal: prepared.signal,
       startedAt,
       cueSuppressed: prepared.signal.target === "hub" && prepared.signal.repair !== "none",
       bannedPhrases: bannedPhrasesFor(conversation.id),

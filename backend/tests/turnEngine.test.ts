@@ -1,4 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -3604,12 +3605,14 @@ describe("POST /api/turn/stream", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/x-ndjson");
     const events = await readNdjson(res);
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(3);
     expect(events[0]?.type).toBe("turn_meta");
     expect(events[0]?.conversation_id).toBeTruthy();
     expect(events[0]?.turn_id).toBeTruthy();
-    expect(events[1]?.type).toBe("done");
-    const value = events[1]?.value as { source: string; reply: { text: string }; conversation_id: string; turn_id: string };
+    expect(events[1]?.type).toBe("signal");
+    expect((events[1] as { signal?: { primary_act?: string } }).signal?.primary_act).toBeTruthy();
+    expect(events[2]?.type).toBe("done");
+    const value = events[2]?.value as { source: string; reply: { text: string }; conversation_id: string; turn_id: string };
     expect(value.source).toBe("safety_refuse");
     // The contract: the same ids, whether read from turn_meta or from
     // done.value.
@@ -3820,6 +3823,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       kind: "stream",
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
+      signal: { primary_act: "inform" } as unknown as TurnSignal,
       startedAt: Date.now(),
       cueSuppressed: false,
       bannedPhrases: [],
@@ -3858,6 +3862,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       kind: "stream",
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
+      signal: { primary_act: "inform" } as unknown as TurnSignal,
       startedAt: Date.now(),
       cueSuppressed: false,
       bannedPhrases: [],
@@ -3888,6 +3893,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       kind: "stream",
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
+      signal: { primary_act: "inform" } as unknown as TurnSignal,
     startedAt: Date.now(),
     cueSuppressed: false,
       bannedPhrases: [],
@@ -4066,7 +4072,9 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
         const events = await readNdjson(res);
         const types = events.map((e) => e.type);
         expect(types[0]).toBe("turn_meta");
-        expect(types[1]).toBe("spoken_cue");
+        expect(types[1]).toBe("signal");
+        expect((events[1] as { signal?: { primary_act?: string } }).signal?.primary_act).toBeTruthy();
+        expect(types[2]).toBe("spoken_cue");
         expect(types.filter((t) => t === "spoken_cue")).toHaveLength(1);
         expect(types.indexOf("delta")).toBeGreaterThan(types.indexOf("spoken_cue"));
         expect(types.filter((t) => t === "delta").length).toBeGreaterThan(0);
@@ -4082,7 +4090,9 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
       const events = await readNdjson(res);
       expect(events.some((e) => e.type === "spoken_cue")).toBe(false);
       expect(events[0]?.type).toBe("turn_meta");
-      expect(events[1]?.type).toBe("delta");
+      expect(events[1]?.type).toBe("signal");
+      expect((events[1] as { signal?: { primary_act?: string } }).signal?.primary_act).toBeTruthy();
+      expect(events[2]?.type).toBe("delta");
     });
   });
 
@@ -4099,8 +4109,8 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
         const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, can you remember that for me" });
         expect(res.status).toBe(200);
         const events = await readNdjson(res);
-        expect(events.map((e) => e.type)).toEqual(["turn_meta", "status", "done"]);
-        const value = events[2]!.value as { source: string; plugin_id?: string; routing?: { tier: string }; reply: { text: string; speech?: string } };
+        expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "status", "done"]);
+        const value = events[3]!.value as { source: string; plugin_id?: string; routing?: { tier: string }; reply: { text: string; speech?: string } };
         expect(value.source).toBe("plugin");
         expect(value.plugin_id).toBe("remember");
         expect(value.routing?.tier).toBe("tool");
@@ -5088,9 +5098,9 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(seen.forced).toBe(1);
       const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "status", "done"]);
+      expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "status", "done"]);
       expect(seen.forced).toBe(2);
-      expect((events[2]!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
+      expect((events[3]!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
     });
   });
 
@@ -5189,9 +5199,9 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
       expect(res.status).toBe(200);
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "status", "done"]);
+      expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "status", "done"]);
       expect(seen.forced).toBe(1);
-      const value = events[2]!.value as { source: string; plugin_id?: string; reply: { text: string }; conversation_id: string; turn_id: string };
+      const value = events[3]!.value as { source: string; plugin_id?: string; reply: { text: string }; conversation_id: string; turn_id: string };
       expect(value.source).toBe("plugin");
       expect(value.plugin_id).toBe("websearch");
       expect(value.reply.text).toBe(SEARCH_ANSWER);
@@ -5208,7 +5218,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const res = await client.post("/api/turn/stream", { text: "how many tracks" });
       expect(res.status).toBe(200);
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "status", "done"]);
+      expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "status", "done"]);
       expect(seen.forced - before).toBe(1);
       expect(seen.queries.some((q) => /marsh lantern/i.test(q) && /tracks/i.test(q))).toBe(true);
       const value = events.find((e) => e.type === "done")!.value as { source: string; plugin_id?: string; reply: { text: string }; sources?: unknown[] };

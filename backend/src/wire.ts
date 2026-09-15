@@ -2,6 +2,7 @@ import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { conversationTurns, conversations } from "./db/schema";
 // hardware.ts has zero "@/"-aliased imports of its own, unlike backup.ts
 // and modelCatalog.ts below, so its types are re-exported directly
@@ -119,6 +120,8 @@ export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources">
 // cue in its history would start opening every reply with it.
 export type TurnStreamEvent =
   | { type: "turn_meta"; conversation_id: string; turn_id: string }
+  /** WIRE-01: immediately after turn_meta, before any status, spoken_cue or delta, on every turn, immediate ones included. */
+  | { type: "signal"; signal: TurnSignal }
   | { type: "delta"; text: string }
   /** CHAT-16: frontend chatTurnActivity.ts transient activity contract. */
   | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" }
