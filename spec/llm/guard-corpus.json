@@ -229,7 +229,7 @@
     "id": "claimed-experience-is-invention",
     "utterance": "have you been to Paris",
     "reply": "I have been to Paris myself.",
-    "expect": null,
+    "expect": "claimed_experience",
     "note": "Item 1b (#67): a first-person claim of having seen, eaten or been somewhere is its own reason now, replaced with the cannot-experience line (never the household's 'nobody's told me'), and only that sentence is dropped when the reply says more."
   },
   {

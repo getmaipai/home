@@ -413,12 +413,15 @@ const EXPERIENCE_VERBS = String.raw`(?:watch(?:ing)?(?! (?:what|how|for|out for)
 const LOOKUP_OBJECT_RE = /\b(?:to\s+(?:find|check|look up|search)|through\s+the\s+results|the\s+page|what\s+came\s+back|the\s+results)\b/i;
 const HEARSAY_EXPERIENCE_RE = /\b(?:i['’]?ve heard (?:it|the (?:film|album|show))?\s*(?:is|was|it['’]?s)\s+\w+|people say it['’]?s\s+\w+|it['’]?s supposed to be\s+\w+)\b/i;
 function currentWorldSubject(ctx: GuardContext): boolean { return (ctx.subjects ?? []).some((s) => s.type === "world" && s.recency === "current"); }
-const CONSUMPTION_EXPERIENCE_RE = /\bi(?:'m| am| was|'ve| have|'d| had)?(?: just| also| even| already| actually)? (?:eat(?:ing)?|ate|drink(?:ing)?|drank|cook(?:ing|ed)|went|visit(?:ing|ed)|been to|waiting for|tried|tasted|bought|drove|driving)\b/i;
+const CONSUMPTION_EXPERIENCE_RE = /\bi(?:'m| am| was|'ve| have|'d| had)?(?: just| also| even| already| actually)? (?:eat(?:ing|en)?|ate|drink(?:ing)?|drank|cook(?:ing|ed)|went|visit(?:ing|ed)|been to|waiting for|tried|tasted|bought|drove|driving)\b/i;
 const EXPERIENCE_OBJECT_WORDS = /\b(?:food|pasta|pizza|soup|cake|coffee|tea|popcorn|restaurant|cafe|bar|place|park|museum|cinema|theater|film|movie|show|album|book|game|song)\b/i;
 const EXPERIENCE_PRONOUN_OBJECT_KINDS = new Set(["film", "show", "album", "song", "book", "game", "place", "restaurant", "food"]);
 function hasExperienceObject(sentence: string, ctx: GuardContext): boolean {
   if (!CONSUMPTION_EXPERIENCE_RE.test(sentence)) return true;
+  if (experienceTurn(ctx)) return true;
   if (EXPERIENCE_OBJECT_WORDS.test(sentence)) return true;
+  const utterance = ctx.utterance.toLocaleLowerCase();
+  if (Array.from(sentence.matchAll(/\b[A-Z][\w'-]*(?:\s+[A-Z][\w'-]*)*/g)).some((match) => utterance.includes(match[0].toLocaleLowerCase()))) return true;
   const world = (ctx.subjects ?? []).find((s) => s.type === "world");
   if (world && (EXPERIENCE_PRONOUN_OBJECT_KINDS.has(world.kind ?? "") && /\b(?:it|that)\b/i.test(sentence) || ["place", "restaurant"].includes(world.kind ?? "") && /\bthere\b/i.test(sentence))) return true;
   return (ctx.subjects ?? []).some((s) => s.type === "world" && s.recency !== "unknown" && s.display_name && new RegExp(`\\b${s.display_name.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "i").test(sentence));
@@ -426,7 +429,7 @@ function hasExperienceObject(sentence: string, ctx: GuardContext): boolean {
 function experienceEvidence(ctx: GuardContext): boolean {
   return (ctx.outcomes ?? []).some((o) => o.status === "succeeded" && /review|rating/i.test(`${o.reason ?? ""} ${JSON.stringify((o as { args?: unknown }).args ?? {})}`));
 }
-function experienceTurn(ctx: GuardContext): boolean { return /\b(?:have you|did you|do you)\s+(?:seen|heard|watched|been)\b/i.test(ctx.utterance) || (/\b(?:seen|heard|watched|been)\b/i.test(ctx.utterance) && ctx.act === "question"); }
+function experienceTurn(ctx: GuardContext): boolean { return /\b(?:have you|did you|do you)\s+(?:seen|heard|watched|been|tried|eaten|been to)\b/i.test(ctx.utterance) || (/\b(?:seen|heard|watched|been|tried|eaten|been to)\b/i.test(ctx.utterance) && ctx.act === "question"); }
 function newExperienceForm(sentence: string, ctx: GuardContext): boolean {
   if (!currentWorldSubject(ctx)) return false;
   if (experienceEvidence(ctx)) return false;

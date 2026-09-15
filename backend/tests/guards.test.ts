@@ -199,8 +199,8 @@ describe("invention: a claim about the household still needs a source (FAST-05)"
     expect(guardReply("Your brother said he'd be late.", ctx({ utterance: "any news from my brother" })).reason).toBe("invention");
   });
 
-  test("a first-person experience without a live world subject is not claimed - 'I've been to Paris myself.'", () => {
-    expect(guardReply("I've been to Paris myself.", ctx({ utterance: "have you been to Paris" })).reason).toBeNull(); // EXP-02: no default subject and no hard-coded proper noun
+  test("a first-person experience is an invention - 'I've been to Paris myself.'", () => {
+    expect(guardReply("I've been to Paris myself.", ctx({ utterance: "have you been to Paris" })).reason).toBe("claimed_experience"); // item 1b: its own reason, the world's line, not the household's
   });
 });
 
