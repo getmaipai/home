@@ -425,6 +425,9 @@ function entityNameWords(entityText: string): Set<string> {
 export interface RecallOptions extends ListOptions {
   /** Withhold all sensitive records for a surface that cannot safely say them. */
   withholdSensitive?: boolean;
+  /** Household subject ids on the current turn's resolved subject stack;
+   * used to count withheld records even when their text misses a keyword. */
+  withheldSubjectIds?: readonly string[];
   /** Whether recall() bumps uses/last_used_at on the records it returns.
    * Defaults to true: the direct recall API and the `recall` package
    * (a result someone actually asked for and got back counts as
@@ -621,7 +624,13 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // Until AGE-01 chunk b adds the age-band predicate to canRead(), this is
   // the sensitive household subset withheld from a child/teen turn.
   const withheldForBand = opts.withholdSensitive
-    ? rows.filter((r) => r.scope === "household" && r.sensitive && !canRead(actor, r, roleOf, opts.selfOnly, false) && [...queryWords].some((word) => tokenize(r.text).has(word))).length
+    ? (() => {
+        const subjectIds = new Set(opts.withheldSubjectIds ?? []);
+        const subjectCount = rows.filter((r) => r.scope === "household" && r.sensitive && !canRead(actor, r, roleOf, opts.selfOnly, false) && r.subjectId !== null && subjectIds.has(r.subjectId)).length;
+        return subjectCount > 0
+          ? subjectCount
+          : rows.filter((r) => r.scope === "household" && r.sensitive && !canRead(actor, r, roleOf, opts.selfOnly, false) && [...queryWords].some((word) => tokenize(r.text).has(word))).length;
+      })()
     : 0;
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly, opts.withholdSensitive));
 

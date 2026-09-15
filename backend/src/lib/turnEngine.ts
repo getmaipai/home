@@ -2028,6 +2028,7 @@ export async function resolvePendingAsk(
       const adults = listActivePeople().filter((person) => person.role === "owner" || person.role === "admin");
       const adult = adults[0];
       if (adult) queueOpenQuestion({ person: adult.id, kind: "relay", text: `${actor.displayName} asked about ${pending.name ?? "that"}`, subjectId: pending.subjectId ?? null, source: turnId });
+      if (actor.id !== adult?.id) queueOpenQuestion({ person: actor.id, kind: "relay", text: `${actor.displayName} asked about ${pending.name ?? "that"}`, subjectId: pending.subjectId ?? null, source: turnId });
       protocol.answer = { kind: "confirm", answer: "affirmative" };
       return { reply: { text: "Okay, I'll let them know." }, source: "policy", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
     }
@@ -2792,8 +2793,8 @@ async function prepareTurn(
   // scoring runs whenever the embed backend is up; embedQueryForRecall()
   // degrades to undefined on any failure, which recall() already treats
   // as "fall back to keyword overlap" - no separate handling needed here.
-  const withholdSensitive = !sensitiveAllowed(surface, speakerEvidence, present, actor.id);
-  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive });
+  const withholdSensitive = !sensitiveAllowed(surface, speakerEvidence, present, actor.id) || ageBand === "child" || ageBand === "teen";
+  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive, withheldSubjectIds: subjects.filter((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household").map((subject) => subject.entity_id) });
   // JOIN-01: what was actually said in earlier conversations (MEM-03's
   // verbatim episodes, MEM-04's hybrid recall), beside the extracted
   // facts. This conversation is excluded whole: its turns are the
