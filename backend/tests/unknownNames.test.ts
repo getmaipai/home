@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import { SubjectRef as SubjectRefSchema } from "@maipai/spec/gen/ts/subject-ref.js";
 import { validateSubjectRef } from "@maipai/spec/records/ts/validate.js";
-import { parseWhoAnswer, relationFramesIn, replyAsksAbout, resolveNames, speakerStatedKind, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, candidateQuestion, relationPhraseFor, pronounFamiliesIn } from "@/lib/unknownNames";
+import { parseWhoAnswer, relationFramesIn, replyAsksAbout, resolveNames, speakerStatedKind, statedPronounFor, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, candidateQuestion, relationPhraseFor, pronounFamiliesIn } from "@/lib/unknownNames";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { guardReply, dontKnowYetLine, replacementFor } from "@/lib/guards";
 
@@ -58,6 +58,10 @@ describe("resolveNames(): the known set and the household frames", () => {
     expect(asks("Nadia just got back from her first marathon")).toEqual(["Nadia"]);
     expect(resolve("Nadia just got back from her first marathon").unknown[0]?.pronoun).toBe("she");
     expect(asks("Pippa and Clover are coming over")).toEqual(["Clover"]);
+    // A bare possessive is not a frame (the set: "Tempo's second album"
+    // asked about the band).
+    expect(asks("and what did I say about Tempo's second album")).toEqual([]);
+    expect(asks("Clover's tent is in the garage")).toEqual([]);
     expect(asks("Raven and I got the same manager this week, and she keeps borrowing my stapler")).toEqual(["Raven"]);
   });
 
@@ -111,6 +115,23 @@ describe("relationFramesIn() and speakerStatedKind(): the kind the person's own 
     // A place, an organization or a thing is stated by its name alone;
     // a two-word person name reads through its frame (a review).
     expect(speakerStatedKind("we went to Lakeview Park", "Lakeview Park", "place")).toBe(true);
+    // The two-turn household-frame rule (the set's pet row): the name in
+    // the previous turn, the kind noun with a pronoun in this one.
+    expect(speakerStatedKind("he's our rabbit", "juniper", "pet", "juniper chewed through the garden hose again")).toBe(true);
+    expect(speakerStatedKind("he's our rabbit", "juniper", "pet", "the weather was nice")).toBe(false);
+    expect(speakerStatedKind("my sister Nadia is visiting", "juniper", "pet", "juniper chewed through the garden hose again")).toBe(false);
+    expect(statedPronounFor("he's our rabbit", "juniper", "pet", "juniper chewed through the garden hose again")).toBe("he");
+    expect(statedPronounFor("he's our rabbit", "juniper", "pet")).toBeNull();
+    // The previous turn must name only the candidate (a review): two
+    // pets then "he's our rabbit" states neither.
+    expect(speakerStatedKind("he's our rabbit", "juniper", "pet", "juniper and Rover chewed through the hose")).toBe(false);
+    expect(speakerStatedKind("he's our rabbit", "juniper", "pet", "juniper and rover chewed through the hose")).toBe(false);
+    expect(speakerStatedKind("he's our rabbit", "rover", "pet", "juniper and rover chewed through the hose")).toBe(false);
+    // The answer shape itself, never a statement carrying a noun (a review).
+    expect(speakerStatedKind("my cousin is coming over Saturday", "juniper", "person", "juniper chewed through the garden hose again")).toBe(false);
+    // A place the model supplied is never stated by a turn that does
+    // not carry the name (a review).
+    expect(speakerStatedKind("we drove for an hour", "Lakeview Park", "place", "we went to Lakeview Park")).toBe(false);
     expect(speakerStatedKind("my coworker Quill Marsh likes seltzer", "Quill Marsh", "person")).toBe(true);
   });
 });
@@ -245,5 +266,12 @@ describe("the two guard shapes, both ways", () => {
     expect(guardReply("Quill is the child in the house, Bramble's sibling.", ctx)).toMatchObject({ reason: "invention", replaced: true });
     expect(guardReply("Quill is your coworker, the one who likes seltzer.", ctx).reason).toBeNull();
     expect(guardReply("Quill is a neighbor's dog.", { ...ctx, unknownNames: ["Quill"], roster: ["Sage"] })).toMatchObject({ reason: "invention" });
+    // A bare unresolved name too (the set: "who is Raven" answered "the
+    // child who shares the house").
+    expect(guardReply("Raven is the child who shares the house with Sage and Bramble.", { utterance: "who is Raven", act: "question", personId: "person-t", roster: ["Sage", "Bramble"], unresolvedNames: ["Raven"] })).toMatchObject({ reason: "invention" });
+    // A world answer about a bare name is not a household claim (a review).
+    for (const world of ["Snoopy is a dog in Peanuts.", "A Rottweiler is a dog breed.", "Socrates was a teacher in Athens."]) {
+      expect([world, guardReply(world, { utterance: "who is that", act: "question", personId: "person-t", roster: ["Sage"], unresolvedNames: ["Snoopy", "Rottweiler", "Socrates"] }).reason]).toEqual([world, null]);
+    }
   });
 });

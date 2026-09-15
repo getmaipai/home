@@ -56,14 +56,15 @@
 // round failure never does (it just defaults to ADD, matching legacy's
 // own catch block) - dedupe deciding "keep both" safely is never wrong
 // enough to burn a turn's whole budget over.
-import { eq, and, or, isNull, isNotNull, notInArray, ne, asc } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, notInArray, ne, asc, lt, desc } from "drizzle-orm";
 import { hasEligibleClause } from "@/lib/turnSignal";
 import { turnSignalOf } from "@/lib/conversationHistory";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { tokenize } from "@/lib/text";
 import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
 import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, saidAs, speakerNamed, speakerNamedAny, speakerStated, writeRelation } from "@/lib/subjects";
-import { candidateQuestion, relationPhraseFor, speakerStatedKind } from "@/lib/unknownNames";
+import { candidateQuestion, relationPhraseFor, speakerStatedKind, statedPronounFor, twoTurnStatedKind } from "@/lib/unknownNames";
+import { updateEntity } from "@/lib/entities";
 import { listOpenQuestions, openQuestionDeclined, queueOpenQuestion } from "@/lib/conversationHistory";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db } from "@/db";
@@ -649,9 +650,17 @@ function resolveSubject(speaker: PersonRow, fact: ExtractedFact, turn: Conversat
     // the model's kind guess, an inferred candidate with the open
     // question below, never rendered as knowledge until the person
     // answers.
-    const stated = speakerNamed(turn.userText, named.name) && speakerStatedKind(turn.userText, named.name, named.kind);
+    // The two-turn household-frame rule: the name may sit in the
+    // previous user turn and the kind noun with a pronoun in this one.
+    const previous = previousUserText(turn) ?? undefined;
+    const twoTurn = twoTurnStatedKind(turn.userText, named.name, named.kind, previous);
+    const stated = (speakerNamed(turn.userText, named.name) && speakerStatedKind(turn.userText, named.name, named.kind)) || twoTurn;
     const result = ensureSubjectEntity(speaker, named, stated);
     if (result.ok && result.value) {
+      if (result.status === 201 && twoTurn) {
+        const pronouns = statedPronounFor(turn.userText, named.name, named.kind, previous);
+        if (pronouns) updateEntity(speaker, result.value.id, { pronouns });
+      }
       // A name the person already declined to explain ("never mind" to
       // the engine's own ask) is not asked about again by the judge.
       if (result.status === 201 && result.value.source === "inferred" && !openQuestionDeclined(speaker.id, candidateQuestion("entity", result.value.name))) {
@@ -719,6 +728,19 @@ function writeFactRelation(speaker: PersonRow, fact: ExtractedFact, subject: Ent
       console.log(`[memoryJudge] an inferred relation is a candidate with an open question (turn ${turn.id})`);
     }
   }
+}
+
+/** The person's previous user turn in the same conversation, or null. */
+function previousUserText(turn: ConversationTurnRow): string | null {
+  if (!turn.conversationId) return null;
+  const row = db
+    .select({ userText: conversationTurns.userText })
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, turn.conversationId), eq(conversationTurns.personId, turn.personId), lt(conversationTurns.createdAt, turn.createdAt)))
+    .orderBy(desc(conversationTurns.createdAt))
+    .limit(1)
+    .get();
+  return row?.userText ?? null;
 }
 
 function memberNicknames(personId: string): string[] {

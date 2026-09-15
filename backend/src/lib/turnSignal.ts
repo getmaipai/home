@@ -368,15 +368,20 @@ export function fallbackSignal(text: string, ageBand: TurnSignal["age_band"], ag
 function protocolSignal(input: SignalInput, protocol: ProtocolAnswer): TurnSignal {
   const text = input.text;
   const emotion = clauseEmotion(text);
+  // ASK-01's second round: the answer to "Who's Clover?" ("my cousin,
+  // she teaches piano") is a statement about the household, an
+  // inform, so the judge extracts from it (a directive-only turn is
+  // skipped); the other kinds complete a parked directive as before.
+  const act: TurnSignal["primary_act"] = protocol.kind === "who" && protocol.answer === "value" ? "inform" : "directive";
   return {
-    primary_act: "directive",
+    primary_act: act,
     secondary_acts: [],
     expressed_emotion: emotion.emotion,
     emotion_intensity: emotion.intensity,
-    target: "hub",
+    target: act === "inform" ? "other" : "hub",
     repair: protocol.answer === "negative" ? "retraction" : "none",
     refers_to_prior: null,
-    clauses: [{ range: { start: 0, end: text.length }, act: "directive", stance: "asserted", subject: { kind: "world" }, emotion: emotion.emotion, emotion_intensity: emotion.intensity, confidence: 1 }],
+    clauses: [{ range: { start: 0, end: text.length }, act, stance: "asserted", subject: act === "inform" ? { kind: "household" } : { kind: "world" }, emotion: emotion.emotion, emotion_intensity: emotion.intensity, confidence: 1 }],
     act_confidence: 1,
     emotion_confidence: emotion.confidence,
     source: "protocol",

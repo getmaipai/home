@@ -197,6 +197,22 @@ describe("SAFETY-01: the conversation's crisis state, blocking path", () => {
     });
   });
 
+  test("an ephemeral widget query in a conversation in the crisis state still routes to its package (a review)", async () => {
+    const { actor } = await owner();
+    await withEngines("I'm here.", async () => {
+      const first = await runTurn(actor, "chat", "I wish I wasn't alive");
+      if (!first.ok) throw new Error(first.error);
+      const widget = await runTurnStream(actor, "chat", "what time is it", { conversationId: first.value.conversation_id, ephemeral: true });
+      expect(widget.ok).toBe(true);
+      if (!widget.ok || widget.kind !== "stream") return;
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(widget, actor.id)) events.push(event);
+      const done = events.find((e): e is Extract<TurnStreamEvent, { type: "done" }> => e.type === "done");
+      expect(done?.value.source).toBe("plugin");
+      expect(done?.value.plugin_id).toBe("almanac-time");
+    });
+  });
+
   test("isCrisisStop(): the stops, and what is not one", () => {
     for (const stop of ["stop", "Stop.", "please stop", "stop it", "enough", "leave me alone", "go away", "okay, stop"]) expect([stop, isCrisisStop(stop)]).toEqual([stop, true]);
     for (const other of ["stop by the store on the way", "can you stop the timer", "I can't stop thinking about it", "stop what"]) expect([other, isCrisisStop(other)]).toEqual([other, false]);

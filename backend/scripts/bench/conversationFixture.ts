@@ -927,14 +927,18 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "she ran it in just under four hours", expect: { signal: { primary_act: "inform" }, guardAnyOf: [null, "false_familiarity"], mustNotContain: "that's right|i remember|as you mentioned|you told me before|i've heard|i know nadia|i knew", pendingAsk: null } },
     ],
   },
+  // The bench household is one across every row: a name a row creates
+  // is known to every row after it, so each ASK-01 row asks about a
+  // name of its own (the first set: Clover and juniper were known by
+  // the time who-ask-declined and open-question-once ran).
   {
     id: "who-ask-declined",
     category: "etiquette",
-    note: "ASK-01 (the coherence review's row): 'never mind' to 'Who's Clover?' clears the ask with no entity and no second ask; the next turn about her asks nothing again",
+    note: "ASK-01 (the coherence review's row): 'never mind' to 'Who's Indigo?' clears the ask with no entity and no second ask; the next turn about her asks nothing again",
     turns: [
-      { say: "Clover borrowed our tent for the weekend", expect: { signal: { primary_act: "inform" }, pendingAsk: "who" } },
-      { say: "never mind", expect: { fixedLine: "Okay, no problem.", pendingAsk: null, entityAbsent: "Clover" } },
-      { say: "she brought it back today anyway", expect: { signal: { primary_act: "inform" }, pendingAsk: null, mustNotContain: "who's clover|who is clover|who's that", guardAnyOf: [null] } },
+      { say: "Indigo borrowed our tent for the weekend", expect: { signal: { primary_act: "inform" }, pendingAsk: "who" } },
+      { say: "never mind", expect: { fixedLine: "Okay, no problem.", pendingAsk: null, entityAbsent: "Indigo" } },
+      { say: "she brought it back today anyway", expect: { signal: { primary_act: "inform" }, pendingAsk: null, mustNotContain: "who's indigo|who is indigo|who's that", guardAnyOf: [null] } },
     ],
   },
   {
@@ -942,10 +946,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "memory",
     note: "ASK-01 part 4 (the coherence review's row): the judge's question about a candidate is asked once, at the end of the next reply on any conversation; 'not now' declines it for good, and nothing asks again",
     turns: [
-      { say: "juniper chewed through the garden hose again", expect: { signal: { primary_act: "inform" }, askedAbout: { name: "juniper", withinMs: 10000 } } },
-      { say: "I had a long day at work", newConversation: true, drainJudge: true, expect: { signal: { primary_act: "inform" }, openQuestion: { kind: "who", withinMs: 10000 }, mustContain: "juniper[^.!?]*\\?", pendingAsk: "who" } },
+      { say: "mopey chewed through the garden hose again", expect: { signal: { primary_act: "inform" }, askedAbout: { name: "mopey", withinMs: 10000 } } },
+      { say: "I had a long day at work", newConversation: true, drainJudge: true, expect: { signal: { primary_act: "inform" }, openQuestion: { kind: "who", withinMs: 10000 }, mustContain: "mopey[^.!?]*\\?", pendingAsk: "who" } },
       { say: "not now", expect: { fixedLine: "Okay, no problem.", pendingAsk: null, openQuestionStatus: { kind: "who", status: "declined" } } },
-      { say: "anyway, dinner was good", expect: { signal: { primary_act: "inform" }, mustNotContain: "juniper", pendingAsk: null } },
+      { say: "anyway, dinner was good", expect: { signal: { primary_act: "inform" }, mustNotContain: "mopey", pendingAsk: null } },
     ],
   },
   {

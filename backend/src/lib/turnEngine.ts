@@ -1666,7 +1666,9 @@ export async function resolvePendingAsk(
     if (outcome.entity) resolveOpenQuestionsAbout(actor.id, outcome.entity.id, "answered");
     if (outcome.replacedEntityId) resolveOpenQuestionsAbout(actor.id, outcome.replacedEntityId, "answered");
     console.log(`[ask] the answer about a name was read on turn ${turnId}: ${outcome.entity ? `${outcome.entity.kind} ${outcome.entity.id}` : "no entity"}`);
-    protocol.answer = { kind: "who", answer: parsed.verdict === "no" ? "negative" : "value" };
+    // An answer that states a kind is the inform the judge reads; a
+    // bare yes or no completes the question (a review).
+    protocol.answer = { kind: "who", answer: parsed.kind ? "value" : parsed.verdict === "no" ? "negative" : "affirmative" };
     if (outcome.entity) protocol.subjectId = outcome.entity.id;
     return { reply: { text: outcome.reply }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
   }
@@ -1833,6 +1835,10 @@ async function prepareTurn(
   // live and its memories gone).
   supersedes: string | null = null,
   skills: LoadedSkill[] = loadAllSkills(),
+  // SAFETY-01's second round: a widget's own fixed query (Home's weather
+  // card) in a conversation in the crisis state still routes to its
+  // package; the state's rules are for what the person reads as a reply.
+  ephemeral = false,
 ): Promise<PreparedTurn> {
   const turnId = newConversationTurnId();
   // Stamps conversation_id/turn_id exactly once, rather than at each of
@@ -1887,7 +1893,7 @@ async function prepareTurn(
   // SAFETY-01: the crisis state is read before the refusal branch, so
   // a refused turn in the state still carries the overlay (a review).
   const selfHarmTurn = safety.categories.includes("self_harm");
-  const inCrisis = selfHarmTurn || conversationInCrisis(conversation.id);
+  const inCrisis = !ephemeral && (selfHarmTurn || conversationInCrisis(conversation.id));
   // SafetyResult's own schema comment named this exact wiring as a
   // "later hub release" gap the day the field was written: notify_parent
   // has been computed correctly since safety.ts shipped, but nothing
@@ -4006,7 +4012,7 @@ async function runTurnStreamHoldingLease(
   startedAt: number,
   opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean },
 ): Promise<TurnStreamResult> {
-  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id));
+  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, opts.ephemeral === true);
 
   if (prepared.kind === "immediate") {
     const trace: ReplyTrace = { hits: [], replaced: false };

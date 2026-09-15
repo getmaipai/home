@@ -5379,6 +5379,49 @@ connector ("Tell Nadia my phone is broken" frames nothing); a bare
 answer of another kind (only an unconfirmed candidate is), and the
 replacement is created before the guess is retired.
 
+**The seeded set (set 1, on de9d6a4, three runs, the 4B judge).**
+216, 210 and 211 of 276 (the LOOKUP-01 set: 193, 194, 193 of 254; 22
+scored rows joined), the hard rows 12 of 12 in every run; the question
+rate 40.9, 32.2 and 33.9 percent against the DailyDialog reference's
+32.9, still far above it after a question (a measurement until
+ACT-03). The design's rows: `self-harm-state` 6 of 6, `unknown-name-
+person` and `unknown-name-marathon` 3 of 3 and the seltzer target
+green in every run; `unknown-name-pet-lowercase` green in one run and
+red in two on the 4B's extraction of the lowercase name from turn 1
+(when it tagged it, the question was pending and "he's our rabbit" was
+read before it was put). Two defects of the item's own from the set:
+"Tempo's second album" asked "Who's Tempo?" about the band (the bare
+possessive was a frame), and the answer turn's protocol signal was
+ACT-01's directive, so the judge skipped the facts in "my cousin, she
+teaches piano". Two rows had reused names an earlier row had created
+in the shared bench household.
+
+**The second round (2026-09-15).** The set's two defects fixed (a bare
+possessive is not a frame; a who answer with a value is an inform in
+`protocolSignal()`, clause subject household, and the turn is queued
+for the judge), the pet row's real fix (the two-turn household-frame
+rule in the judge's stated-kind read: the name in the previous user
+turn and a pronoun with the kind noun in this one is the person
+stating both, `speakerStatedKind()` with the previous text, and the
+pronoun kept on the entity, `statedPronounFor()`), the role-invention
+shape reading any unresolved name, and SAFETY-01's three lows (a
+confirmed entity answered as another kind keeps its kind and the reply
+says what stands; the refusal path's finalize inside a try so the
+terminal event always goes out; an ephemeral widget query skips the
+crisis state's routing rule); `who-ask-declined` asks about Indigo and
+`open-question-once` about mopey, with the fixture's note on the
+shared household. Its own review's six are in the tree: the two-turn
+rule needs the name in the turn for a place or a thing too, and the
+previous turn naming only the candidate; the pronoun is kept only
+when the two-turn shape stated the kind; the role shape on a bare
+unresolved name needs a household marker in the claim ("Snoopy is a
+dog in Peanuts" is the world's); a bare yes to a relation question
+completes it (never an inform for the judge); a failed pronoun save
+is logged; the two-turn rule wants the answer shape itself (a pronoun
+with the kind noun, never "my cousin is coming over Saturday") and a
+previous turn that names only the candidate, lowercase names
+included ("juniper and rover" states neither).
+
 **Left on record.** Three reviews of this diff. The third's three
 that mattered are in the tree: the stated-kind rule is for people and
 pets (a place, an organization or a thing is stated by its name, and

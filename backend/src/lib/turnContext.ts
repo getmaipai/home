@@ -264,6 +264,7 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     // ASK-01: the unknown names, the subjects' pronouns, and the
     // pronoun families the person used this turn and the last two.
     unknownNames: framedUnknownNames(ctx),
+    unresolvedNames: ctx.subjects.filter((s): s is Extract<SubjectRef, { type: "unresolved" }> => s.type === "unresolved").map((s) => s.surface_form),
     subjectPronouns: ctx.subjectPronouns,
     pronounsInPlay: [...pronounFamiliesIn([ctx.utterance, ...ctx.history.filter((m) => m.role === "user").slice(-2).map((m) => m.content)].join(" "))],
   };

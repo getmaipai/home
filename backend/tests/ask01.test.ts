@@ -498,6 +498,34 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     });
   });
 
+  test("the answer turn's signal is an inform, so the judge extracts from it (the set's pending-ask-who row); a confirmed entity of another kind keeps its kind and the reply says so (a review)", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds like a fun weekend.", async () => {
+      const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend");
+      if (!first.ok) throw new Error(first.error);
+      const answer = await runTurn(actor, "chat", "my cousin, she teaches piano", { conversationId: first.value.conversation_id });
+      if (!answer.ok) throw new Error(answer.error);
+      const { turnSignalOf } = await import("@/lib/conversationHistory");
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, answer.value.turn_id)).get()!;
+      expect(turnSignalOf(row)?.primary_act).toBe("inform");
+      expect(row.judgeStatus).toBeNull(); // queued for the judge, never skipped
+    });
+    const { updateEntity } = await import("@/lib/entities");
+    const confirmed = candidate(actor, "Rivet", "pet");
+    expect(updateEntity(actor, confirmed.id, { confirm: true }).ok).toBe(true);
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    queueOpenQuestion({ person: actor.id, conversationId: conv.value.id, kind: "who", text: "Who's Rivet?", subjectId: confirmed.id, source: "turn-judge" });
+    await withChat("Okay.", async () => {
+      const answer = await runTurn(actor, "chat", "he's my neighbor", { conversationId: conv.value.id });
+      if (!answer.ok) throw new Error(answer.error);
+      expect(answer.value.reply.text).toBe("Got it. I have Rivet down as a pet already, so I left that as it is.");
+      const rivet = entityNamed("Rivet")!;
+      expect(rivet).toMatchObject({ kind: "pet", pronouns: "he" });
+      expect(db.select().from(relationships).all().filter((e) => e.deletedAt === null && (e.fromId === rivet.id || e.toId === rivet.id))).toHaveLength(0);
+    });
+  });
+
   test("a declined engine ask is remembered: the judge's later candidate for the name queues no question (a review's race)", async () => {
     const { actor } = await owner();
     await withChat("Sounds like a fun weekend.", async () => {

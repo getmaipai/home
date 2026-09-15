@@ -204,12 +204,15 @@ function possessiveInClause(text: string, at: number, signal: TurnSignal | undef
   return /(?<![\p{L}])(?:my|our)(?![\p{L}])/iu.test(span);
 }
 
-/** "Clover and I", "me and Clover", "Pippa and Clover", "Clover's": the
- * shapes a household member's own name takes in family talk. */
+/** "Clover and I", "me and Clover", "Pippa and Clover": the shapes a
+ * household member's own name takes in family talk. A bare possessive
+ * is not one (the set: "Tempo's second album" asked "Who's Tempo?"
+ * about the band); the judge's open question catches a household
+ * possessive later. */
 function rosterShapeAround(text: string, name: string, knownInText: readonly string[]): boolean {
   const n = escapeRe(name);
   const withMe = `(?:i|me|we${knownInText.length > 0 ? `|${knownInText.map(escapeRe).join("|")}` : ""})`;
-  return new RegExp(`(?<![\\p{L}])${n}(?:'s|’s)(?![\\p{L}])|(?<![\\p{L}])${n}\\s+and\\s+${withMe}(?![\\p{L}])|(?<![\\p{L}])${withMe}\\s+and\\s+${n}(?![\\p{L}])`, "iu").test(text);
+  return new RegExp(`(?<![\\p{L}])${n}\\s+and\\s+${withMe}(?![\\p{L}])|(?<![\\p{L}])${withMe}\\s+and\\s+${n}(?![\\p{L}])`, "iu").test(text);
 }
 
 // A kind noun in front of a name says it is the world's ("the band
@@ -367,14 +370,47 @@ export function looksLikeWhoAnswer(text: string, name: string): boolean {
  * beside the name ("my coworker Quill", "the dog Rover", "Nadia's cat
  * Pip"). A name with no noun is the model's kind guess: an inferred
  * entity and an open question, never knowledge. */
-export function speakerStatedKind(userText: string, name: string, kind: EntityKind): boolean {
+export function speakerStatedKind(userText: string, name: string, kind: EntityKind, previousUserText?: string): boolean {
   // The guess the rule guards against is a person or a pet (the kinds
   // the guards treat as household subjects and the prompt labels); a
   // place, an organization or a thing the speaker named is stated by
   // the name alone, as before (a review: "we went to Lakeview Park"
   // must not queue "Who's Lakeview Park?").
-  if (kind !== "person" && kind !== "pet") return true;
-  return relationFramesIn(userText).some((f) => f.name.toLowerCase() === name.trim().toLowerCase() && f.kind === kind);
+  // A name the turn's own words carry (a review: the two-turn call
+  // must not state a place the model supplied).
+  if (kind !== "person" && kind !== "pet") return namePattern(name).test(userText);
+  if (relationFramesIn(userText).some((f) => f.name.toLowerCase() === name.trim().toLowerCase() && f.kind === kind)) return true;
+  return twoTurnStatedKind(userText, name, kind, previousUserText);
+}
+
+/** The household-frame rule across two turns (the set's pet row): the
+ * name in the previous user turn as its only name, and this turn a
+ * pronoun with the kind noun and no other name ("juniper chewed the
+ * hose" then "he's our rabbit") is the person stating both. */
+export function twoTurnStatedKind(userText: string, name: string, kind: EntityKind, previousUserText?: string): boolean {
+  if (!previousUserText || !namePattern(name).test(previousUserText)) return false;
+  const n = escapeRe(name.trim());
+  // Only the candidate in either turn: no other proper noun, and no
+  // other name joined to it ("juniper and rover chewed the hose" then
+  // "he's our rabbit" states neither, a review; lowercase names are no
+  // proper nouns to the tagger).
+  const only = (text: string) => candidatesIn(text).every((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+  const joined = new RegExp(`(?<![\\p{L}])${n}\\s+(?:and|&|or)\\s+[\\p{L}]|[\\p{L}]\\s+(?:and|&|or)\\s+${n}(?![\\p{L}])`, "iu");
+  if (!only(previousUserText) || !only(userText) || joined.test(previousUserText)) return false;
+  // The answer shape itself: a pronoun for the name with the kind noun
+  // ("he's our rabbit"), never a statement that happens to carry a
+  // noun ("my cousin is coming over Saturday", a review).
+  const answer = parseWhoAnswer(userText, name);
+  return answer !== null && answer !== "declined" && answer.kind === kind && answer.pronouns !== null && PRONOUN_ANSWER_RE.test(userText.trim().replace(/[\u2018\u2019]/g, "'"));
+}
+
+/** The pronoun the person used for the name in a bare kind statement
+ * ("he's our rabbit"), for the judge to keep on the entity it made from
+ * it; null when the turn is not that shape. */
+export function statedPronounFor(userText: string, name: string, kind: EntityKind, previousUserText?: string): "he" | "she" | "they" | null {
+  if (!twoTurnStatedKind(userText, name, kind, previousUserText)) return null;
+  const answer = parseWhoAnswer(userText, name);
+  return answer && answer !== "declined" ? answer.pronouns : null;
 }
 
 /** The engine's own question about a name: never a kind guess. */
@@ -550,7 +586,16 @@ export function applyWhoAnswer(speaker: PersonRow, pending: { name: string; subj
       replacedEntityId = candidate.id;
     }
   } else if (candidate && candidate.kind !== answer.kind) {
+    // A confirmed or stated entity is not a guess: it keeps its kind,
+    // takes the pronouns, and the reply says what stands rather than
+    // what was answered (a review); no edge the kind refuses is tried.
     entity = entityRowToEntity(candidate.id);
+    if (entity && answer.pronouns) {
+      const updated = updateEntity(speaker, entity.id, { pronouns: answer.pronouns });
+      if (updated.ok && updated.value) entity = updated.value;
+      else console.error(`[ask] pronouns for ${entity.id} not saved: ${updated.error}`);
+    }
+    return { entity, reply: entity ? `Got it. I have ${entity.name} down as a ${entity.kind} already, so I left that as it is.` : "Got it." };
   } else if (candidate) {
     entity = confirmCandidateEntity(speaker, candidate.id, null);
   } else {

@@ -104,7 +104,21 @@ not permission to expand scope.
 
 <a id="safety-01-followups"></a>
 
-- [ ] **SAFETY-01 and ASK-01 follow-ups, second round** (S)
+- [x] **SAFETY-01 and ASK-01 follow-ups, second round** (S)
+    Done 2026-09-15 (docs/dev/session-a.md "ASK-01", "The second
+    round"): the three lows of SAFETY-01's review and the set's reads:
+    a who answer with a value is an inform (the judge extracts from
+    the answer turn); a bare possessive is not a household frame; the
+    two-turn household-frame rule in the judge (the name in the
+    previous turn, the kind noun with a pronoun in this one, is stated
+    with its pronoun); the role-invention shape reads any unresolved
+    name; a confirmed entity answered as another kind keeps its kind
+    and the reply says so; finalize on the refusal path inside a try;
+    an ephemeral widget query skips the crisis state's routing rule;
+    who-ask-declined and open-question-once ask about names of their
+    own (the shared bench household). Set 1 of ASK-01 on de9d6a4:
+    216, 210, 211 of 276, the hard rows 12 of 12; the partial rerun
+    of the five rows after this commit.
 
     Objective: the three lows of SAFETY-01's review, one test each:
     an answer of another kind about a confirmed entity

@@ -143,6 +143,10 @@ export interface GuardContext {
    * previous turn's carried over), so a claim of prior knowledge about
    * one is `false_familiarity` and a role noun for one is an invention. */
   unknownNames?: readonly string[];
+  /** ASK-01's second round: every unresolved name on the turn, framed
+   * or bare, for the role shape (the set: "who is Raven" answered "the
+   * child who shares the house" on a bare name). */
+  unresolvedNames?: readonly string[];
   /** ASK-01: the pronoun family each subject of the turn takes ("he",
    * "she", "they"), from the entity's stored pronouns or the pronoun the
    * person used for the name this turn; the reply may not contradict it. */
@@ -668,12 +672,25 @@ function promiseInWindow(sentence: string, ctx: GuardContext): boolean {
 const ROLE_NOUNS =
   "child|kid|son|daughter|sibling|brother|sister|husband|wife|partner|spouse|parent|mother|father|mom|dad|grandma|grandpa|grandmother|grandfather|aunt|uncle|cousin|niece|nephew|roommate|neighbou?r|coworker|co-worker|colleague|boss|manager|teacher|coach|friend|classmate|teammate|babysitter|nanny|doctor|dentist|vet|dog|cat|rabbit|puppy|kitten|pet";
 const ROLE_CLAIM_RE = new RegExp(String.raw`(?:^|[^\p{L}])(he|she|\p{Lu}[\p{L}'-]+)(?:'s|’s|\s+is|\s+was)\s+(?:(?:your|my|our|the|a|an|one of your|\p{Lu}[\p{L}'-]+'s)\s+)?(?:(?:[a-z]+)\s+)?(${ROLE_NOUNS})(?![\p{L}])`, "giu");
+const HOUSEHOLD_MARK_RE = /\b(?:your|our)\b|\b(?:the|this|our|your) (?:house|home|household|family)\b|\bwho lives (?:here|with)\b|\bin the house\b/i;
+function householdMarked(sentence: string, ctx: GuardContext): boolean {
+  if (HOUSEHOLD_MARK_RE.test(sentence)) return true;
+  return (ctx.roster ?? []).some((name) => {
+    const first = name.trim().split(/\s+/)[0];
+    return first !== undefined && first.length > 1 && mentions(sentence, first);
+  });
+}
 function claimsUngroundedHouseholdRole(sentence: string, ctx: GuardContext, grounded: Set<string>): boolean {
   for (const m of sentence.matchAll(ROLE_CLAIM_RE)) {
     const subject = m[1]!;
     const role = m[2]!.toLowerCase();
-    const unknown = (ctx.unknownNames ?? []).some((n) => n.toLowerCase() === subject.toLowerCase());
-    if (!unknown && !isHouseholdSubject(subject, ctx)) continue;
+    const framedUnknown = (ctx.unknownNames ?? []).some((n) => n.toLowerCase() === subject.toLowerCase());
+    // A bare unresolved name ("who is Raven", "who is Snoopy") is a
+    // household subject only when the claim itself is the household's
+    // ("the child who shares the house", "your coworker", "Bramble's
+    // sibling"); "Snoopy is a dog in Peanuts" is the world's (a review).
+    const bareUnknown = (ctx.unresolvedNames ?? []).some((n) => n.toLowerCase() === subject.toLowerCase()) && householdMarked(sentence, ctx);
+    if (!framedUnknown && !bareUnknown && !isHouseholdSubject(subject, ctx)) continue;
     if ([...tokenize(role)].every((w) => grounded.has(w))) continue;
     return true;
   }

@@ -5,7 +5,7 @@ import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Su
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
-import type { TurnStreamEvent } from "@/wire";
+import type { TurnStreamEvent, TurnValue } from "@/wire";
 import type { AppEnv } from "@/types";
 
 export const turnRoutes = new Hono<AppEnv>();
@@ -167,7 +167,15 @@ export async function* streamTurnEvents(
     // client on the error event, the one terminal event this path
     // sends; finalize() below computes them, so it runs first for a
     // refusal (it never writes to the stream itself).
-    const refused = safetyRefusal ? result.finalize(fullText.trim(), safetyRefusal.safety) : undefined;
+    let refused: TurnValue | undefined;
+    if (safetyRefusal) {
+      try {
+        refused = result.finalize(fullText.trim(), safetyRefusal.safety);
+      } catch (finalizeErr) {
+        // The terminal event goes out whatever finalize did (a review).
+        console.error("[turn/stream] finalize failed on a refusal:", finalizeErr);
+      }
+    }
     if (safetyRefusal) yield { type: "error", error: safetyRefusal.message, code: "safety_refused", ...(refused?.crisis_resources ? { crisis_resources: refused.crisis_resources } : {}) };
     else if (err instanceof StreamUnavailable) yield { type: "error", error: err.message, code: err.code };
     else yield { type: "error", error: (err as Error).message };
