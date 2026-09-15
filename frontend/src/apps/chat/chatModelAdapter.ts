@@ -1,11 +1,10 @@
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult } from "@assistant-ui/react";
-import { api, readTurnStream, ApiError, type TurnStreamEvent } from "@/lib/api";
+import { api, readTurnStream, ApiError } from "@/lib/api";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import type { TurnWithSources } from "@/apps/chat/chatCitations";
-import type { TurnStatusEvent } from "@/apps/chat/chatTurnActivity";
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -222,8 +221,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // header): `status` isn't a real TurnStreamEvent member on the wire
         // yet, the same "cast the whole event, not just a field" shape
         // `TurnWithSources` uses for `sources` on `TurnValue` below.
-        for await (const rawEvent of readTurnStream(response)) {
-          const event = rawEvent as TurnStreamEvent | TurnStatusEvent;
+        for await (const event of readTurnStream(response)) {
           if (event.type === "turn_meta") {
             // The contract's first line on every turn (routes/turn.ts).
             // Not consumed yet (chatActionBar.tsx's "Remember this" still

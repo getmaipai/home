@@ -48,6 +48,7 @@ import { people, conversationTurns, memoryRecords, episodes } from "@/db/schema"
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
+import { StatusChannel } from "@/lib/statusChannel";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, turnSubjectsOf } from "@/lib/conversationHistory";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { PersonRow } from "@/types";
@@ -3791,6 +3792,7 @@ describe("per-person turn rate limiting (Session C step 0, wave-2.md)", () => {
 });
 
 describe("routes/turn.ts streamTurnEvents()", () => {
+  function closedStatus(): StatusChannel { const channel = new StatusChannel(); channel.close(); return channel; }
   // A code review (2026-09-04) found the route's catch block emitted an
   // "error" event but never called result.finalize() - the partial reply
   // a household member had already seen and heard stream in was never
@@ -3821,6 +3823,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       startedAt: Date.now(),
       cueSuppressed: false,
       bannedPhrases: [],
+      status: closedStatus(),
       tokens: failingTokens(),
       finalize: (replyText: string) => {
         finalizeCalls.push(replyText);
@@ -3858,6 +3861,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       startedAt: Date.now(),
       cueSuppressed: false,
       bannedPhrases: [],
+      status: closedStatus(),
       tokens: failingTokens(),
       finalize: (replyText: string) => {
         finalizeCalls.push(replyText);
@@ -3886,7 +3890,8 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       turnId: "turn-testfixture",
     startedAt: Date.now(),
     cueSuppressed: false,
-    bannedPhrases: [],
+      bannedPhrases: [],
+      status: closedStatus(),
       tokens,
       finalize: (replyText: string) => ({
         reply: { text: replyText },
@@ -4094,8 +4099,8 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
         const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, can you remember that for me" });
         expect(res.status).toBe(200);
         const events = await readNdjson(res);
-        expect(events.map((e) => e.type)).toEqual(["turn_meta", "done"]);
-        const value = events[1]!.value as { source: string; plugin_id?: string; routing?: { tier: string }; reply: { text: string; speech?: string } };
+        expect(events.map((e) => e.type)).toEqual(["turn_meta", "status", "done"]);
+        const value = events[2]!.value as { source: string; plugin_id?: string; routing?: { tier: string }; reply: { text: string; speech?: string } };
         expect(value.source).toBe("plugin");
         expect(value.plugin_id).toBe("remember");
         expect(value.routing?.tier).toBe("tool");
@@ -5070,9 +5075,9 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(seen.forced).toBe(1);
       const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "done"]);
+      expect(events.map((e) => e.type)).toEqual(["turn_meta", "status", "done"]);
       expect(seen.forced).toBe(2);
-      expect((events[1]!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
+      expect((events[2]!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
     });
   });
 
@@ -5171,9 +5176,9 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
       expect(res.status).toBe(200);
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "done"]);
+      expect(events.map((e) => e.type)).toEqual(["turn_meta", "status", "done"]);
       expect(seen.forced).toBe(1);
-      const value = events[1]!.value as { source: string; plugin_id?: string; reply: { text: string }; conversation_id: string; turn_id: string };
+      const value = events[2]!.value as { source: string; plugin_id?: string; reply: { text: string }; conversation_id: string; turn_id: string };
       expect(value.source).toBe("plugin");
       expect(value.plugin_id).toBe("websearch");
       expect(value.reply.text).toBe(SEARCH_ANSWER);

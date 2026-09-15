@@ -19,7 +19,7 @@ export async function runFixedTurn(text: string): Promise<string> {
   const response = await api.streamTurn(text, undefined, { ephemeral: true });
   for await (const event of readTurnStream(response)) {
     if (event.type === "done") return stripThinking(event.value.reply.text);
-    if (event.type === "turn_meta" || event.type === "delta" || event.type === "spoken_cue") continue;
+    if (event.type === "turn_meta" || event.type === "delta" || event.type === "spoken_cue" || event.type === "status") continue;
     throw new Error(event.error || "Something went wrong.");
   }
   throw new Error("The connection ended before MaiPai finished replying.");

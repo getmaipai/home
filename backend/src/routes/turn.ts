@@ -105,18 +105,25 @@ export async function* streamTurnEvents(
     // Only one `.next()` call is ever made for the first step - racing a
     // timer against it means racing which one gets AWAITED first, never
     // calling `.next()` a second time (which would skip a real token).
+    const waitStatus = () => result.status.next().then((event) => event ?? new Promise<never>(() => {}));
+    let pendingStatus = waitStatus();
     const firstStep = iterator.next();
     const timer = delay(remainingDelayMs);
-    const race = await Promise.race([firstStep, timer.promise]);
+    const race = await Promise.race([firstStep, pendingStatus, timer.promise]);
     timer.cancel();
+    if (race !== "timeout" && "type" in race && race.type === "status") { yield race; pendingStatus = waitStatus(); }
     if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: cue }; }
-    let current = race === "timeout" ? await firstStep : race;
+    let current = race === "timeout" || ("type" in race && race.type === "status") ? await firstStep : race;
 
-    while (!current.done) {
+    while (current !== null && !("type" in current) && !current.done) {
       fullText += current.value;
       yield { type: "delta", text: current.value };
-      current = await iterator.next();
+      const nextToken = iterator.next();
+      const next = await Promise.race([nextToken, pendingStatus]);
+      if ("type" in next && next.type === "status") { yield next; pendingStatus = waitStatus(); current = await nextToken; }
+      else current = next === null ? await nextToken : next;
     }
+    while (true) { const status = await result.status.next(); if (!status) break; yield status; }
     // `current.value` here is the generator's own RETURN value (step 9),
     // not a yielded delta: a StreamOutcome (turnEngine.ts). Either the
     // most recently flagged, non-refuse SafetyResult gateOutputSafety()
@@ -128,7 +135,7 @@ export async function* streamTurnEvents(
     // all. finalize() returns that TurnValue as-is, so this is still
     // exactly one "done" line either way, and the resolved case simply
     // has no "delta" lines before it.
-    const value = result.finalize(fullText.trim(), current.value);
+    const value = result.finalize(fullText.trim(), (current as IteratorReturnResult<import("@/lib/turnEngine").StreamOutcome>).value);
     yield { type: "done", value };
   } catch (err) {
     // This catch had no server-side log at all (a live incident,

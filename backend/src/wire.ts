@@ -120,6 +120,8 @@ export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources">
 export type TurnStreamEvent =
   | { type: "turn_meta"; conversation_id: string; turn_id: string }
   | { type: "delta"; text: string }
+  /** CHAT-16: frontend chatTurnActivity.ts transient activity contract. */
+  | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" }
   | { type: "spoken_cue"; text: string }
   | { type: "done"; value: TurnValue }
   // `code` (step 9, session-a-intelligence.md: "emit error with the

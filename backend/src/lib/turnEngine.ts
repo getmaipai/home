@@ -43,6 +43,7 @@ import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor } from "@/lib/replyConstraints";
 import { promptNow } from "@/lib/benchSampling";
+import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
@@ -4157,6 +4158,7 @@ export type TurnStreamResult =
        * logged turn and its `crisis_resources` instead of being silently
        * dropped once the notification fires. */
       tokens: AsyncGenerator<string, StreamOutcome, void>;
+      status: StatusChannel;
       /** Builds the final TurnValue once the caller has drained `tokens`
        * to completion and knows the full reply text - also logs the turn
        * (conversationHistory.ts), the same "log once the real reply is
@@ -4710,6 +4712,7 @@ async function runTurnStreamHoldingLease(
   // then-all-failed retry case all build their own `TurnStreamResult`
   // through this one closure rather than three copies of the same
   // gateGuards()/finalize() wiring.
+  const status = new StatusChannel();
   const buildStreamResult = (tokens: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>): TurnStreamResult => {
     // Fix A4: collected by gateGuards()'s own onGuardHit callback as the
     // stream runs, read back once finalize() builds the log line below -
@@ -4735,6 +4738,7 @@ async function runTurnStreamHoldingLease(
       try {
         return yield* inner;
       } finally {
+        status.close();
         lease.release();
       }
     }
@@ -4840,6 +4844,7 @@ async function runTurnStreamHoldingLease(
         }
         generations++;
         prepared.timings.retries = generations - 1;
+        status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
         const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, read, opts.thinking);
         if (resolved) return { resolved: finalizeReply(actor, resolved, resolvedTrace) };
         console.log(`[turn] a ${shape}'s lookup for turn ${modelTurn.turnId} ran and found nothing; the honest line stands`);
@@ -4963,6 +4968,7 @@ async function runTurnStreamHoldingLease(
       startedAt,
       cueSuppressed: prepared.signal.target === "hub" && prepared.signal.repair !== "none",
       bannedPhrases: bannedPhrasesFor(conversation.id),
+      status,
       tokens: holdLease(
         appendAskStage(
         sentenceCaseStream(
@@ -4997,6 +5003,7 @@ async function runTurnStreamHoldingLease(
         ),
       ),
       finalize: (replyText: string, outcome?: StreamOutcome): TurnValue => {
+        status.close();
         if (finalized) return finalized;
         // ACT-01: the boundary's own cost on the streaming path (the
         // guards ran inline as the text flowed); retries are the extra
@@ -5147,6 +5154,7 @@ async function runTurnStreamHoldingLease(
   if (modelTurn.turnContext.intent.deliverable) {
     const deliverable = modelTurn.turnContext.intent.deliverable;
     async function* deliverableStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
+      status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
       const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverable, modelTurn.turnContext.subjects, text));
       if (resolved?.sources?.length) return { resolved: composeDeliverable(resolved, deliverable, modelTurn.turnContext.ageBand) };
       yield `${LOOKUP_FAILED_LINE} `;
@@ -5177,6 +5185,7 @@ async function runTurnStreamHoldingLease(
     if (first.done) {
       const rawCalls = first.value ?? [];
       if (rawCalls.length > 0) {
+        status.emit({ type: "status", text: "On it.", stage: "tool" });
         const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes, text);
         if (resolved) {
           // The package answered. Handed back whole, past both gates;
