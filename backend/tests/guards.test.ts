@@ -1007,7 +1007,7 @@ describe("REG-01: a statement is not a request, and the assistant register is st
     expect(guardReply("Noted.", stated()).reason).toBe("assistant_register");
     // Item 1b's claimed_experience keeps its own line on a statement (a review).
     const seen = guardReply("I've seen it a few times!", ctx({ utterance: "we watched Finding Nemo tonight", act: "inform" }));
-    expect([seen.reason, seen.replaced, seen.emptied]).toEqual(["claimed_experience", true, undefined]);
+    expect([seen.reason, seen.replaced, seen.emptied]).toEqual(["claimed_experience", true, true]);
     expect(MALFORMED).not.toContain(seen.reply);
     expect(guardReply("I've noted that.", stated()).emptied).toBe(true);
   });

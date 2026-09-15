@@ -26,6 +26,7 @@ import { asksAboutEarlierTalk } from "@/lib/recallShapes";
 import { pickVariant } from "@/lib/replyVariation";
 import { utteranceShape, type UtteranceShape } from "@/lib/utteranceShape";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
+import type { SubjectRef } from "@/lib/unknownNames";
 
 export type GuardReason =
   | "invention"
@@ -192,6 +193,8 @@ export interface GuardContext {
    * one sentence at a time, not something a lookahead could fix without
    * delaying speech. */
   replyHasQuestion?: boolean;
+  /** CHAT-13 subject stack, including world recency for experience claims. */
+  subjects?: readonly SubjectRef[];
 }
 
 export interface Guarded {
@@ -405,6 +408,18 @@ const CLAIMED_EXPERIENCE_RE =
 // "see if it suits you". "try" is not here: "try a different approach"
 // is not tasting.
 const EXPERIENCE_VERBS = String.raw`(?:watch(?:ing)?(?! (?:what|how|for|out for))|see(?:ing)?(?! (?:what|how|if|whether|your|you|where|which|who))|hear(?:ing)?(?! (?:what|how|about|your|from|more|all|back|you|the rest|the story|that|this|it from))|listen(?:ing)?(?! (?:to what|to how|to you|for|to the rest))|play(?:ing)?(?! (?:it|that|them) (?:for|back|to you))|read(?:ing)?(?! (?:what|your|you|it to|that to|them to|this to|aloud|out|through|over|back|along|the room))|check(?:ing)?(?: it| that| them| this)? out|giv(?:e|ing) (?:it|that|them) a (?:listen|watch|go|spin)|catch(?:ing)?|stream(?:ing)?|binge(?:ing)?|bingeing)\b`;
+const LOOKUP_OBJECT_RE = /\b(?:to\s+(?:find|check|look up|search)|through\s+the\s+results|the\s+page|what\s+came\s+back|the\s+results)\b/i;
+const CURRENT_WORLD_RE = /\b(?:current|new|latest|today|tonight|this week|this month)\b/i;
+const HEARSAY_EXPERIENCE_RE = /\b(?:i['’]?ve heard (?:it|the (?:film|album|show)) (?:is|was)\s+\w+|people say it['’]?s\s+\w+|it['’]?s supposed to be\s+\w+)\b/i;
+function currentWorldSubject(ctx: GuardContext): boolean { return (ctx.subjects ?? []).some((s) => s.type === "world" && s.recency === "current"); }
+function experienceTurn(ctx: GuardContext): boolean { return /\b(?:have you|did you|do you)\s+(?:seen|heard|watched|been)\b/i.test(ctx.utterance) || (/\b(?:seen|heard|watched|been)\b/i.test(ctx.utterance) && ctx.act === "question"); }
+function newExperienceForm(sentence: string, ctx: GuardContext): boolean {
+  if (!currentWorldSubject(ctx)) return false;
+  if (/\bcan['’]?t wait(?: for\s+[^.!?]+)?\b/i.test(sentence)) return true;
+  if (/\bi['’]?m (?:so |as |just as )?excited(?: as you)?(?: too)?\b/i.test(sentence) || /\bi['’]?m excited too\b/i.test(sentence)) return true;
+  if (HEARSAY_EXPERIENCE_RE.test(sentence) && !(ctx.outcomes ?? []).some((o) => /review|rating/i.test(`${o.packageId} ${o.reason ?? ""}`))) return true;
+  return false;
+}
 // A plan spoken as the hub's own: the first-person forms, and the
 // intent phrases that are first person by nature with the subject
 // implied ("can't wait to hear it"); "want to see the list?" is an
@@ -787,6 +802,13 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
   const grounded = groundedWords(ctx);
   const declines = DECLINE_RE.test(sentence);
 
+  // EXP-02: lookup activity is not lived experience, even when it uses one
+  // of the broad consumption verbs.
+  if (LOOKUP_OBJECT_RE.test(sentence)) {
+    // Let the ordinary lookup/capability guards continue; this guard must
+    // not turn "I tried to find it" into an experience claim.
+  } else if (newExperienceForm(sentence, ctx)) return "claimed_experience";
+
   // Fired EVEN BEHIND a decline (guards.py's own comment on why, verbatim
   // in spirit): "I don't know his name, but I know he's a good boy" - the
   // decline about the NAME doesn't excuse inventing the TRAIT in the same
@@ -806,7 +828,7 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
   // A promise the window actually holds ("I'll remind you at six" in
   // the hub's previous reply) is a record, not a claim (a review).
   if (CLAIMED_STATEMENT_RE.test(sentence) && !promiseInWindow(sentence, ctx)) return "claimed_statement";
-  if (CLAIMED_EXPERIENCE_RE.test(sentence) || PLANNED_EXPERIENCE_RE.test(sentence)) return "claimed_experience";
+  if (!LOOKUP_OBJECT_RE.test(sentence) && (CLAIMED_EXPERIENCE_RE.test(sentence) || PLANNED_EXPERIENCE_RE.test(sentence))) return "claimed_experience";
   if (guessesAboutHousehold(sentence, ctx, grounded)) return "invention";
 
   if (claimsUngroundedHouseholdLocation(sentence, ctx, grounded)) return "invention";
@@ -1838,7 +1860,7 @@ export function emptiedLine(ctx: Pick<GuardContext, "act" | "shape" | "utterance
  * act's own line stands and the engine retries once with its note;
  * `claimed_experience` keeps its own line and its own rule (item 1b). */
 export function isRegisterSkip(reason: GuardReason, ctx: GuardContext): boolean {
-  return reason === "assistant_register" || reason === "repeat_question" || statementActionSkip(reason, ctx);
+  return reason === "assistant_register" || reason === "repeat_question" || (reason === "claimed_experience" && !experienceTurn(ctx)) || statementActionSkip(reason, ctx);
 }
 
 /** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
@@ -1907,6 +1929,7 @@ export function replacementFor(reason: GuardReason, personId: string, flagged?: 
     if (name) return dontKnowYetLine(name);
   }
   if (reason === "placeholder_echo" && flagged && shapeOf(flagged.ctx) !== "question") return honest(personId, reason, ACKNOWLEDGE);
+  if (reason === "claimed_experience" && flagged && !experienceTurn(flagged.ctx)) return emptiedLine({ ...flagged.ctx, personId });
   return honest(personId, reason, REPLACEMENT_FOR[reason]);
 }
 

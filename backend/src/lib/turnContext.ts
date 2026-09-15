@@ -277,6 +277,7 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     unresolvedNames: ctx.subjects.filter((s): s is Extract<SubjectRef, { type: "unresolved" }> => s.type === "unresolved").map((s) => s.surface_form),
     subjectPronouns: ctx.subjectPronouns,
     pronounsInPlay: [...pronounFamiliesIn([ctx.utterance, ...ctx.history.filter((m) => m.role === "user").slice(-2).map((m) => m.content)].join(" "))],
+    subjects: ctx.subjects,
   };
 }
 
