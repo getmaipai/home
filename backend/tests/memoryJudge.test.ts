@@ -843,6 +843,56 @@ describe("MEM-06: a fact is grounded in the speaker's words", () => {
   });
 });
 
+describe("MEM-06 (c): a fact cites the eligible clause it came from", () => {
+  test("a fact grounded in an eligible clause is kept with that clause; ineligible, ungrounded, and subject-mismatched facts are dropped", async () => {
+    const { citeClause, turnDateFor } = await import("@/lib/memoryJudge");
+    const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
+    const fact = (text: string, subject: { name: string; kind: "person" } | null = null) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject, relation: null });
+    const userText = "add milk to the list, and Pippa has soccer practice on Tuesdays";
+    const signal = {
+      primary_act: "inform" as const,
+      secondary_acts: [] as ("inform" | "question" | "directive" | "commissive" | "greeting" | "closing" | "backchannel")[],
+      expressed_emotion: "happiness" as const,
+      emotion_intensity: "high" as const,
+      target: "self" as const,
+      repair: "none" as const,
+      refers_to_prior: null,
+      clauses: [
+        { range: { start: 0, end: 20 }, act: "directive" as const, stance: "asserted" as const, subject: { kind: "speaker" as const }, emotion: "happiness" as const, emotion_intensity: "high" as const, confidence: 0.9 },
+        { range: { start: 26, end: 64 }, act: "inform" as const, stance: "asserted" as const, subject: { kind: "household" as const }, emotion: "happiness" as const, emotion_intensity: "high" as const, confidence: 0.9 },
+      ],
+      act_confidence: 0.9,
+      emotion_confidence: 0.9,
+      source: "rule" as const,
+      classifier_id: null,
+      age_band: "adult" as const,
+      age_band_basis: "identified_profile" as const,
+    };
+    // A fact grounded in clause 2 (inform/asserted/household) is kept and cites it.
+    const kept = citeClause([fact("Pippa has soccer practice on Tuesdays", { name: "Pippa", kind: "person" })], signal, userText, "Sage", date);
+    expect(kept.kept.length).toBe(1);
+    expect(kept.dropped.length).toBe(0);
+    expect(kept.kept[0]!.clause?.act).toBe("inform");
+    // A fact with no eligible clause sharing content is dropped as ineligible_act.
+    const ineligible = citeClause([fact("Sage wants milk")], signal, userText, "Sage", date);
+    expect(ineligible.dropped.length).toBe(1);
+    expect(ineligible.dropped[0]!.reason).toBe("ineligible_act");
+    // A fact with a proper noun not in the cited clause is dropped as unknown_grounding.
+    const unknown = citeClause([fact("Pippa has swimming on Thursdays", { name: "Pippa", kind: "person" })], signal, userText, "Sage", date);
+    expect(unknown.dropped.length).toBe(1);
+    expect(unknown.dropped[0]!.reason).toBe("unknown_grounding");
+    // A fact whose subject kind disagrees with the clause's subject is dropped as subject_mismatch.
+    const mismatch = citeClause([fact("Sage has soccer on Tuesdays")], signal, userText, "Sage", date);
+    expect(mismatch.dropped.length).toBe(1);
+    expect(mismatch.dropped[0]!.reason).toBe("subject_mismatch");
+    // A signal with no clauses keeps every fact with clause null.
+    const noClauses = citeClause([fact("Pippa has soccer practice on Tuesdays", { name: "Pippa", kind: "person" })], { ...signal, clauses: [] }, userText, "Sage", date);
+    expect(noClauses.kept.length).toBe(1);
+    expect(noClauses.kept[0]!.clause).toBeNull();
+    expect(noClauses.dropped.length).toBe(0);
+  });
+});
+
 describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
   // The real construction path: logTurn() with the signal prepareTurn()
   // computes and the status judgeStatusAtInsert() decides, for any
@@ -875,7 +925,7 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
     const results = await withScriptedJudge(
       (_schemaName, request) => {
         const userText = request.messages[request.messages.length - 1]!.content;
-        if (userText.includes("that brand")) return { facts: [{ text: "Marlow prefers the oat milk brand on the list", category: "preference", scope: "person", importance: 0.6 }] };
+        if (userText.includes("that brand")) return { facts: [{ text: "I prefer that brand", category: "preference", scope: "person", importance: 0.6 }] };
         return { facts: [] };
       },
       async () => [await runJudgeBatch(), await runJudgeBatch()],

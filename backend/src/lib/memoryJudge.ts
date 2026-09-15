@@ -57,7 +57,9 @@
 // own catch block) - dedupe deciding "keep both" safely is never wrong
 // enough to burn a turn's whole budget over.
 import { eq, and, or, isNull, isNotNull, notInArray, ne, asc, lt, desc } from "drizzle-orm";
-import { hasEligibleClause } from "@/lib/turnSignal";
+import { hasEligibleClause, isEligibleClause } from "@/lib/turnSignal";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import type { SignalClause } from "@/lib/turnSignal";
 import { turnSignalOf } from "@/lib/conversationHistory";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { tokenize } from "@/lib/text";
@@ -580,6 +582,71 @@ export function rejectPassing(
   return { kept, dropped };
 }
 
+/** MEM-06 (c): ground each extracted fact in the eligible clause it came
+ * from. For every fact, find the eligible clause (inform/commissive with
+ * stance asserted or reported) whose text shares the most content words
+ * with the fact (after the skip set: speaker name, pronouns, calendar
+ * words, stopwords). Drop `ineligible_act` if no eligible clause or the
+ * best clause shares zero content words; `unknown_grounding` if proper
+ * nouns or numbers (except the turn date's year) are not all in the cited
+ * clause's text; `subject_mismatch` if the fact's subject names a
+ * household member or third party but the clause's subject kind is
+ * `speaker`, or vice versa (`subject: null` = the speaker). When the
+ * signal is missing or has no clauses, keep every fact with `clause: null`. */
+export function citeClause(
+  facts: ExtractedFact[],
+  signal: TurnSignal | null,
+  userText: string,
+  speakerName: string,
+  turnDate: string,
+): {
+  kept: { fact: ExtractedFact; clause: SignalClause | null }[];
+  dropped: { fact: ExtractedFact; reason: "ineligible_act" | "unknown_grounding" | "subject_mismatch" }[];
+} {
+  if (!signal || signal.clauses.length === 0) {
+    return { kept: facts.map((fact) => ({ fact, clause: null })), dropped: [] };
+  }
+  const skip = new Set([...contentWords(speakerName), ...contentWords(turnDate), ...PRONOUNS, ...CALENDAR]);
+  const year = turnDate.match(/(\d{4})/)?.[1] ?? null;
+  const eligible = signal.clauses.filter(isEligibleClause);
+  const kept: { fact: ExtractedFact; clause: SignalClause | null }[] = [];
+  const dropped: { fact: ExtractedFact; reason: "ineligible_act" | "unknown_grounding" | "subject_mismatch" }[] = [];
+  for (const fact of facts) {
+    const words = contentWords(fact.text);
+    const content = [...words].filter((w) => !skip.has(w));
+    let best: { clause: SignalClause; shared: number } | null = null;
+    for (const clause of eligible) {
+      const clauseText = userText.slice(clause.range.start, clause.range.end);
+      const clauseWords = contentWords(clauseText);
+      const shared = content.filter((w) => clauseWords.has(w)).length;
+      if (!best || shared > best.shared) best = { clause, shared };
+    }
+    if (!best || best.shared === 0) {
+      dropped.push({ fact, reason: "ineligible_act" });
+      continue;
+    }
+    const clauseText = userText.slice(best.clause.range.start, best.clause.range.end);
+    const clauseLower = clauseText.toLowerCase();
+    const properNouns = [...fact.text.matchAll(/\b[A-Z][a-z]+\b/g)].map((m) => m[0]!.toLowerCase()).filter((w) => !skip.has(w));
+    const numbers = [...fact.text.matchAll(/\d+/g)].map((m) => m[0]!).filter((n) => n !== year);
+    const allPresent =
+      properNouns.every((w) => clauseLower.includes(w)) &&
+      numbers.every((n) => clauseLower.includes(n));
+    if (!allPresent) {
+      dropped.push({ fact, reason: "unknown_grounding" });
+      continue;
+    }
+    const factIsThirdParty = fact.subject !== null && fact.subject.name.toLowerCase() !== speakerName.toLowerCase();
+    const clauseIsSpeaker = best.clause.subject?.kind === "speaker" || best.clause.subject === null;
+    if (factIsThirdParty !== !clauseIsSpeaker) {
+      dropped.push({ fact, reason: "subject_mismatch" });
+      continue;
+    }
+    kept.push({ fact, clause: best.clause });
+  }
+  return { kept, dropped };
+}
+
 // MEM-06 (b): a fact about the turn's WORLD subject - a lookup's title
 // ("the 2026 World Cup"), a world subject on the stack ("Mars") - is the
 // world's, not the speaker's: the prompt's own "do not extract: trivia or
@@ -969,7 +1036,12 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // is the world's unless it is the speaker's own preference or plan.
   const { kept: worldKept, dropped: worldDropped } = rejectWorld(ungroundedKept, worldTitlesFor(turn));
   const { kept: facts, dropped: passingDropped } = rejectPassing(worldKept);
-  const dropped = [...echoDropped, ...ungroundedDropped, ...worldDropped, ...passingDropped];
+  // MEM-06 (c): ground each surviving fact in the eligible clause it came
+  // from; a fact whose best eligible clause shares no content, whose
+  // proper nouns or numbers are absent from the cited clause, or whose
+  // subject kind disagrees with the clause's subject, is dropped.
+  const { kept: cited, dropped: citeDropped } = citeClause(facts, signal, turn.userText, speakerName, turnDateFor(turn.createdAt));
+  const dropped = [...echoDropped, ...ungroundedDropped, ...worldDropped, ...passingDropped, ...citeDropped];
   if (dropped.length > 0) {
     const counts: Record<string, number> = {};
     for (const d of dropped) counts[d.reason] = (counts[d.reason] ?? 0) + 1;
@@ -991,7 +1063,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // chatMemoryChip.tsx has something to link to (/memory?ids=...) rather
   // than just a rendered summary.
   const writtenIds: string[] = [];
-  for (const fact of facts) {
+  for (const { fact } of cited) {
     const notAName = subjectNotAName(speaker, fact);
     if (notAName) {
       console.log(`[memoryJudge] turn ${turn.id}: dropped a fact whose subject "${notAName.toLowerCase()}" is a pronoun or a relation word, not a name`);
