@@ -244,10 +244,11 @@ describe("llmSupervisor: an engine that dies out from under it", () => {
 
   test("a deliberate stop is never reported as a death", async () => {
     const pid = await spawnFakeEngine();
-    stopChatBackend();
-    // Long enough for the killed process's exit to be observed if it were
-    // going to be mistaken for one.
-    await new Promise((r) => setTimeout(r, 500));
+    // Await the stop: stop() sets deliberate=true synchronously before
+    // calling proc.kill(), and awaits proc.exited, so by the time it
+    // resolves the exit handler has fired and (seeing deliberate=true)
+    // did not report a death. No fixed sleep needed.
+    await stopChatBackend();
     expect(getEngineStatus().kind).toBe("stopped");
     expect(listIssues().some((i) => i.source === "chat-engine" && i.key === "died")).toBe(false);
     expect(pid).toBeGreaterThan(0);
