@@ -5238,6 +5238,63 @@ describe("CHAT-13 chunk C2: the last succeeded lookup is a stack source", () => 
     });
   });
 
+  test("a lookup naming a roster member does not create a world subject", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds good.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const { logTurn } = await import("@/lib/conversationHistory");
+      logTurn(actor, "chat", "when is Pippa's album out", { reply: { text: "I don't know." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-roster-lookup" }, { outcomes: [{ ...LOOKUP_OUTCOME[0]!, args: { expression: "Pippa album out" } }] });
+      const next = await runTurn(actor, "chat", "sounds good", { conversationId: conv.value.id });
+      expect(next.ok).toBe(true);
+      if (next.ok) expect(subjectsOfTurn(next.value.turn_id)).toEqual([]);
+    });
+  });
+
+  test("a world subject on both recent turns decays when not re-mentioned", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds good.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const { logTurn } = await import("@/lib/conversationHistory");
+      const subject = { type: "world" as const, kind: "topic" as const, display_name: "Marsh Lantern", year: null, stable_key: null, recency: "unknown" as const, source_kind: "web" as const, carried_question: null };
+      logTurn(actor, "chat", "Marsh Lantern", { reply: { text: "Okay." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-world-a" }, { subjects: [subject] });
+      logTurn(actor, "chat", "the album", { reply: { text: "Okay." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-world-b" }, { subjects: [subject] });
+      const next = await runTurn(actor, "chat", "the weather is fine", { conversationId: conv.value.id });
+      expect(next.ok).toBe(true);
+      if (next.ok) expect(subjectsOfTurn(next.value.turn_id)).toEqual([]);
+    });
+  });
+
+  test("a world subject re-supplied by this turn's lookup stays", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds good.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const { logTurn } = await import("@/lib/conversationHistory");
+      const subject = { type: "world" as const, kind: "topic" as const, display_name: "Marsh Lantern", year: null, stable_key: null, recency: "unknown" as const, source_kind: "web" as const, carried_question: null };
+      logTurn(actor, "chat", "the album", { reply: { text: "Okay." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-world-c" }, { subjects: [subject] });
+      logTurn(actor, "chat", "when is Marsh Lantern out", { reply: { text: "September 22." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-world-d" }, { outcomes: LOOKUP_OUTCOME, subjects: [subject] });
+      const next = await runTurn(actor, "chat", "sounds good", { conversationId: conv.value.id });
+      expect(next.ok).toBe(true);
+      if (next.ok) expect(subjectsOfTurn(next.value.turn_id)).toEqual([subject]);
+    });
+  });
+
+  test("an almanac-routed turn carries the previous world subject", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds good.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const { logTurn } = await import("@/lib/conversationHistory");
+      const subject = { type: "world" as const, kind: "topic" as const, display_name: "Marsh Lantern", year: null, stable_key: null, recency: "unknown" as const, source_kind: "web" as const, carried_question: null };
+      logTurn(actor, "chat", "Marsh Lantern", { reply: { text: "Okay." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-almanac-source" }, { subjects: [subject] });
+      const next = await runTurn(actor, "chat", "what day is today", { conversationId: conv.value.id });
+      expect(next.ok).toBe(true);
+      if (next.ok) expect(subjectsOfTurn(next.value.turn_id)).toEqual([subject]);
+    });
+  });
+
       test("a succeeded lookup older than two turns is not a stack source", async () => {
         const { actor } = await owner();
         await withLookupStub({ draft: "The date is September 22." }, async () => {

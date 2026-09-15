@@ -1447,4 +1447,14 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "what's it rated", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } },
     ],
   },
+  {
+    id: "comment-not-definition",
+    category: "knowledge",
+    note: "CHAT-13 chunk E: a short content-word reaction on a live world subject is a backchannel, not a definition",
+    turns: [
+      { say: "what's the horse called in the old Clover and Quill cartoon", expect: { signal: { primary_act: "question" }, subjects: [{ type: "world", name: "Clover and Quill", kind: "show" }], guard: null, humanVerdict: true } },
+      { say: "she was in that show for years, wasn't she", expect: { signal: { primary_act: "question" }, guard: null, humanVerdict: true } },
+      { say: "wild", expect: { signal: { primary_act: "backchannel" }, toolRan: null, mustNotContain: "irony is|definition|means when", maxWords: 25, humanVerdict: true } },
+    ],
+  },
 ];
