@@ -19,6 +19,8 @@ import { eq, and, inArray } from "drizzle-orm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
 import type { PersonRow } from "@/types";
+import type { ToolExecutionOutcome } from "@/lib/turnContext";
+import type { SubjectRef } from "@/lib/unknownNames";
 
 beforeEach(() => {
   resetDb();
@@ -53,7 +55,7 @@ const SAFE: TurnValue["safety"] = {
  * hand-rolled row - judgeTurn() only cares about the persisted shape,
  * not how the reply was generated, so there's no need to run a real
  * generation through runTurn() for every test case here. */
-function makeTurn(actor: PersonRow, userText: string, replyText: string) {
+function makeTurn(actor: PersonRow, userText: string, replyText: string, opts: { outcomes?: readonly ToolExecutionOutcome[]; subjects?: readonly SubjectRef[] } = {}) {
   const conv = resolveOrCreateConversation(actor, "chat");
   if (!conv.ok) throw new Error("setup failed");
   const turnId = `turn-${Math.random().toString(36).slice(2, 12)}`;
@@ -63,7 +65,7 @@ function makeTurn(actor: PersonRow, userText: string, replyText: string) {
     safety: SAFE,
     conversation_id: conv.value.id,
     turn_id: turnId,
-  });
+  }, { outcomes: opts.outcomes, subjects: opts.subjects });
   return db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
 }
 
@@ -1474,5 +1476,99 @@ describe("#88: the judge and an edited turn", () => {
     const after = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).get()!;
     expect(after.status).toBe("archived"); // retired, never deleted
     expect(recall(actor, "anchovies", { selfOnly: true, bumpUsage: false }).some((m) => m.record.text.includes("dislikes"))).toBe(false);
+  });
+});
+
+describe("MEM-06 (b): a passing state and a world fact are not written", () => {
+  const NO_RECORD = async (turn: ReturnType<typeof makeTurn>) => {
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all();
+    expect(rows.length).toBe(0);
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!.judgeStatus).toBe("done");
+  };
+
+  test("a passing state - a conversational verb - is dropped, a real state stands", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I'm wondering about the weather today", "It looks like rain.");
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow was wondering about the weather", category: "state", scope: "person", importance: 0.5 }] }),
+      () => judgeTurn(turn),
+    );
+    await NO_RECORD(turn);
+    const real = makeTurn(actor, "I'm stressed about a deadline", "Ok, get to it.");
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow was stressed about a deadline", category: "state", scope: "person", importance: 0.5 }] }),
+      () => judgeTurn(real),
+    );
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.source, real.id)).all();
+    expect(rows.length).toBe(1);
+    expect(rows[0]!.text).toBe("Marlow was stressed about a deadline");
+  });
+
+  test("a fact about the turn's world subject is dropped; the speaker's own preference or plan about it stands", async () => {
+    const { actor } = await owner();
+    // A lookup on the turn (a world subject via its outcome's title): a bare
+    // fact about the world goes, a preference about it stands.
+    const dune = makeTurn(
+      actor,
+      "What's in the latest Dune film?",
+      "Paul tries to stop the butler.",
+      { outcomes: [{ callId: "c1", packageId: "lookup", status: "succeeded", source: { title: "Dune: Part Two" } }] },
+    );
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Dune: Part Two is a film", category: "thing", scope: "household", importance: 0.3, subject: { name: "Dune: Part Two", kind: "thing" } }] }),
+      () => judgeTurn(dune),
+    );
+    await NO_RECORD(dune);
+    const pref = makeTurn(
+      actor,
+      "I want to see Dune: Part Two",
+      "Sounds good.",
+      { outcomes: [{ callId: "c1", packageId: "lookup", status: "succeeded", source: { title: "Dune: Part Two" } }] },
+    );
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow wants to see Dune: Part Two", category: "preference", scope: "person", importance: 0.6 }] }),
+      () => judgeTurn(pref),
+    );
+    const prefRows = db.select().from(memoryRecords).where(eq(memoryRecords.source, pref.id)).all();
+    expect(prefRows.length).toBe(1);
+    expect(prefRows[0]!.text).toBe("Marlow wants to see Dune: Part Two");
+
+    // A world subject on the stack (a SubjectRef of type "world"): the same
+    // drop/keep split.
+    const mars = makeTurn(
+      actor,
+      "Is there a volcano on Mars?",
+      "Yes, there is.",
+      { subjects: [{ type: "world", kind: "place", display_name: "Mars", year: null, source_kind: "web", stable_key: null, recency: "unknown", carried_question: null }] },
+    );
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Mars has a volcano", category: "thing", scope: "household", importance: 0.3, subject: { name: "Mars", kind: "place" } }] }),
+      () => judgeTurn(mars),
+    );
+    await NO_RECORD(mars);
+    const plan = makeTurn(
+      actor,
+      "I'm planning a Mars trip next year",
+      "Bold.",
+      { subjects: [{ type: "world", kind: "place", display_name: "Mars", year: null, source_kind: "web", stable_key: null, recency: "unknown", carried_question: null }] },
+    );
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow is going to Mars next year", category: "event", scope: "person", importance: 0.6 }] }),
+      () => judgeTurn(plan),
+    );
+    const planRows = db.select().from(memoryRecords).where(eq(memoryRecords.source, plan.id)).all();
+    expect(planRows.length).toBe(1);
+    expect(planRows[0]!.text).toBe("Marlow is going to Mars next year");
+  });
+
+  test("a malformed outcomes or subjects value does not throw", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I'm wondering about the weather", "Rain.");
+    // Hand-edit the row to a malformed value: worldTitlesFor must not throw.
+    db.update(conversationTurns).set({ outcomes: "{not json", subjects: "also bad" }).where(eq(conversationTurns.id, turn.id)).run();
+    const bad = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+    await expect(judgeTurn(bad)).resolves.toBeTruthy();
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all();
+    expect(rows.length).toBe(0);
   });
 });

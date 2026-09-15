@@ -65,7 +65,8 @@ import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
 import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, saidAs, speakerNamed, speakerNamedAny, speakerStated, writeRelation } from "@/lib/subjects";
 import { candidateQuestion, relationPhraseFor, speakerStatedKind, statedPronounFor, twoTurnStatedKind } from "@/lib/unknownNames";
 import { updateEntity } from "@/lib/entities";
-import { listOpenQuestions, openQuestionDeclined, queueOpenQuestion } from "@/lib/conversationHistory";
+import { listOpenQuestions, openQuestionDeclined, queueOpenQuestion, turnSubjectsOf } from "@/lib/conversationHistory";
+import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
@@ -533,6 +534,122 @@ export function rejectUngrounded(
   return { kept, dropped };
 }
 
+// MEM-06 (b): a state whose main verb is conversational - "was wondering
+// about", "planning to", "asking" - is a passing thing the person is
+// doing right now, not a durable state of them. The stem is matched so
+// the -ing, -s and -ed forms all fold to it ("wondering"/"wonders"/
+// "wondered"); "was stressed about" keeps its stem and stands.
+const CONVERSATIONAL_VERBS = [
+  "asking",
+  "saying",
+  "wondering",
+  "looking for",
+  "planning",
+  "telling",
+  "chatting",
+  "talking",
+  "thinking about",
+  "hoping",
+  "guessing",
+  "joking",
+];
+
+/** MEM-06 (b): drop a `state` fact whose main verb is one of the
+ * conversational stems - the person is doing a passing thing, not in a
+ * durable state. "Sage was stressed about a deadline" (stem "stressed",
+ * not in the list) stands; "Sage was wondering about the weather"
+ * (stem "wondering") goes. Each drop is counted on the same log line as
+ * the other rejections. */
+export function rejectPassing(
+  facts: ExtractedFact[],
+): { kept: ExtractedFact[]; dropped: { fact: ExtractedFact; reason: "passing" }[] } {
+  const kept: ExtractedFact[] = [];
+  const dropped: { fact: ExtractedFact; reason: "passing" }[] = [];
+  for (const fact of facts) {
+    if (fact.category !== "state") {
+      kept.push(fact);
+      continue;
+    }
+    const text = fact.text.toLowerCase();
+    if (CONVERSATIONAL_VERBS.some((verb) => text.includes(verb))) {
+      dropped.push({ fact, reason: "passing" });
+      continue;
+    }
+    kept.push(fact);
+  }
+  return { kept, dropped };
+}
+
+// MEM-06 (b): a fact about the turn's WORLD subject - a lookup's title
+// ("the 2026 World Cup"), a world subject on the stack ("Mars") - is the
+// world's, not the speaker's: the prompt's own "do not extract: trivia or
+// facts about the world that reveal nothing about the speaker" rule,
+// enforced on the output side. The speaker's OWN preference or plan about
+// it stands: a preference category, or a first-person preference/plan
+// marker in the text ("likes", "loves", "favourite", "wants to see",
+// "is going to", "plans to").
+const WORLD_PREFERENCE_MARKERS = ["likes", "loves", "favourite", "wants to see", "is going to", "plans to"];
+
+/** MEM-06 (b): the turn's world titles - each retained outcome's
+ * `source.title` and each world subject on the stack's `display_name` -
+ * in the lowercase, case-insensitive form `rejectWorld()` matches
+ * against. Never throws on a malformed value: a hand-edited row is not a
+ * reason to lose a turn, the same discipline `outcomesForConversation()`
+ * already takes. */
+export function worldTitlesFor(turn: Pick<ConversationTurnRow, "outcomes" | "subjects">): string[] {
+  const titles: string[] = [];
+  let outcomes: ToolExecutionOutcome[] = [];
+  if (turn.outcomes) {
+    try {
+      const parsed = JSON.parse(turn.outcomes) as unknown;
+      if (Array.isArray(parsed)) outcomes = parsed as ToolExecutionOutcome[];
+    } catch {
+      outcomes = [];
+    }
+  }
+  for (const o of outcomes) {
+    const title = o.source?.title;
+    if (typeof title === "string" && title.trim()) titles.push(title.trim().toLowerCase());
+  }
+  for (const s of turnSubjectsOf(turn)) {
+    if (s.type === "world" && s.display_name && s.display_name.trim()) titles.push(s.display_name.trim().toLowerCase());
+  }
+  return titles;
+}
+
+/** MEM-06 (b): drop a fact about the turn's world subject unless it is the
+ * speaker's own preference or plan about it - a `preference` category, or
+ * a first-person preference/plan marker in the text. A bare "Mars has a
+ * volcano" (subject "Mars", no preference) goes; "Marlow wants to see
+ * Dune" (the film's title on the stack, a plan marker) stands. Each drop
+ * is counted on the same log line as the other rejections. */
+export function rejectWorld(
+  facts: ExtractedFact[],
+  worldTitles: string[],
+): { kept: ExtractedFact[]; dropped: { fact: ExtractedFact; reason: "world" }[] } {
+  const kept: ExtractedFact[] = [];
+  const dropped: { fact: ExtractedFact; reason: "world" }[] = [];
+  for (const fact of facts) {
+    const text = fact.text.toLowerCase();
+    const subject = fact.subject?.name?.toLowerCase() ?? "";
+    const aboutWorld =
+      worldTitles.some((t) => (subject && subject.includes(t)) || text.includes(t));
+    if (!aboutWorld) {
+      kept.push(fact);
+      continue;
+    }
+    const speakerOwn =
+      fact.category === "preference" ||
+      WORLD_PREFERENCE_MARKERS.some((m) => text.includes(m));
+    if (speakerOwn) {
+      kept.push(fact);
+      continue;
+    }
+    dropped.push({ fact, reason: "world" });
+  }
+  return { kept, dropped };
+}
+
 /** Phase 1: one grammar-constrained chat call, or null on any failure
  * (network, malformed JSON, an empty/non-object response) - null is what
  * counts against the poison guard; an empty array is a real, valid
@@ -845,8 +962,14 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // chunk). Counted per drop, so a run's log says how often the model
   // echoed its instructions or wrote what the person never said.
   const { kept: echoed, dropped: echoDropped } = rejectPromptEchoes(extracted, speakerName, turnDateFor(turn.createdAt), `${turn.userText}\n${turn.replyText}`);
-  const { kept: facts, dropped: ungroundedDropped } = rejectUngrounded(echoed, speakerName, turnDateFor(turn.createdAt), turn.userText, null);
-  const dropped = [...echoDropped, ...ungroundedDropped];
+  const { kept: ungroundedKept, dropped: ungroundedDropped } = rejectUngrounded(echoed, speakerName, turnDateFor(turn.createdAt), turn.userText, null);
+  // MEM-06 (b): a passing state and a world-subject fact are not written -
+  // a state whose verb is conversational is passing, a fact about the
+  // turn's world subject (a lookup's title, a world subject on the stack)
+  // is the world's unless it is the speaker's own preference or plan.
+  const { kept: worldKept, dropped: worldDropped } = rejectWorld(ungroundedKept, worldTitlesFor(turn));
+  const { kept: facts, dropped: passingDropped } = rejectPassing(worldKept);
+  const dropped = [...echoDropped, ...ungroundedDropped, ...worldDropped, ...passingDropped];
   if (dropped.length > 0) {
     const counts: Record<string, number> = {};
     for (const d of dropped) counts[d.reason] = (counts[d.reason] ?? 0) + 1;
