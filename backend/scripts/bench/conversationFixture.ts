@@ -233,7 +233,11 @@ export interface TurnExpectation {
    * household variant carries only an `entity_id`, not a name, and
    * nothing here mints a fourth field name for one concept).
    * `rejected` checks a correction's own rejected-subject flag. */
-  subjects?: readonly { type: "household" | "world" | "unresolved"; name: string; rejected?: boolean }[];
+  subjects?: readonly { type: "household" | "world" | "unresolved"; name: string; rejected?: boolean; kind?: string }[];
+  /** ASK-02: no entry of this type (and name, when given) is on the
+   * stack after the turn: an oath, a typo or a capitalized ordinary
+   * word is not a name; a hub-introduced name is never unresolved. */
+  subjectsAbsent?: readonly { type: "household" | "world" | "unresolved"; name?: string }[];
   /** ASK-01 part 4 / AGE-01's `defer` / CRED-01: an OpenQuestion of this
    * kind reaches status `asked` for the person within the wait, the
    * same wait pattern `delivered` already uses. */
@@ -1131,6 +1135,41 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "what's the new Marsh Lantern film actually about", seedReply: "Let me check that for you.", expect: { signal: { primary_act: "question" }, toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "marsh lantern" } }, mustNotContain: "can't actually do that|not able to do that|not something i can do|let me check", lookupWithSource: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
       { say: "who's in it", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
+    ],
+  },
+  // ASK-02 (dev.md section 16 part 7): the resolver's world edge. An
+  // oath, a capitalized ordinary word and a brand are never asked
+  // about; a name the hub's own lookup introduced is a world subject,
+  // never asked back; a name confirmed as a public figure is a lookup
+  // at once, on the turn that raised it.
+  {
+    id: "not-a-name",
+    category: "etiquette",
+    note: "ASK-02 (rule 1, rule 2): an oath in its slot, a brand before a model number, and a capitalized ordinary word are not names; nothing is asked and no unresolved subject stands for them",
+    turns: [
+      { say: "Lord, that took ages", expect: { signal: { primary_act: "inform" }, subjectsAbsent: [{ type: "unresolved" }], pendingAsk: null, mustNotContain: "who's lord|who is lord", humanVerdict: true } },
+      { say: "wow, the Cosmo 7 card is a beast", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "unresolved", name: "Cosmo 7", kind: "organization" }], pendingAsk: null, mustNotContain: "who's cosmo|who is cosmo|who's the cosmo", humanVerdict: true } },
+      { say: "that Answer was wrong", expect: { subjectsAbsent: [{ type: "unresolved" }], pendingAsk: null, mustNotContain: "who's answer|who is answer", humanVerdict: true } },
+    ],
+  },
+  {
+    id: "hub-named-it",
+    category: "knowledge",
+    note: "ASK-02 (rule 3; finding 44): the search's cast row names Serena Vale; asked who she is, the hub never asks back about a name it introduced, and the answer comes from a lookup or the retained result",
+    turns: [
+      { say: "who's in the new Marsh Lantern film", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustContain: "serena|vale", guard: null } },
+      { say: "who's Serena Vale", expect: { signal: { primary_act: "question" }, pendingAsk: null, subjects: [{ type: "world", name: "Serena Vale" }], subjectsAbsent: [{ type: "unresolved" }], mustContain: "actress|keeper|lighthouse|film|plays|stars", mustNotContain: "who's serena|do you mean|someone you know|public figure", guard: null } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "public-figure",
+    category: "knowledge",
+    note: "ASK-02 (rule 4; finding 33): a bare name in a statement is unresolved with no engine ask; the model's own 'someone you know or a public figure?' is bound as the ask, and the answer that makes her a public figure runs the raising turn as a lookup on her at once",
+    turns: [
+      { say: "sounds like they worked out what happened to Serena", seedReply: "Serena? Is that someone you know or a public figure?", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "unresolved", name: "Serena" }], pendingAsk: "who", mustNotContain: "who's serena", humanVerdict: true } },
+      { say: "the actress, Serena Vale", expect: { pendingAsk: null, subjects: [{ type: "world", name: "Serena Vale" }], entityAbsent: "Serena Vale", toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "serena vale" } }, lookupWithSource: true, mustContain: "actress|keeper|lighthouse|film|award", mustNotContain: "are you saying|what are you thinking|let me know|got it, serena" } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
   {

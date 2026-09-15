@@ -1682,6 +1682,41 @@ invented for the roster's household, and added to
     tests/unknownNames.test.ts tests/ask01.test.ts`. Out of scope:
     CHAT-13's subject stack. Exit: `bash scripts/check.sh`.
 
+<a id="ask-02"></a>
+
+- [x] **ASK-02: Candidate hygiene, brands and services, hub-introduced names, the confirmed public figure** (S)
+    Done 2026-09-15 (docs/dev/session-a.md "ASK-02"; dev.md section 16
+    part 7, item 7 of its list; findings 33 and 44): the resolver's
+    world edge in `backend/src/lib/unknownNames.ts`. Rule 1, hygiene
+    (`notAName()`): an edge dash trimmed, an oath in its slot
+    ("Lord, that took ages"), a token the tagger also reads as an
+    expression, an adjective, an adverb or a verb, a capitalized word
+    that was an ordinary word in the last three turns or sits after a
+    determiner ("that Answer was wrong"), and a typo one edit from a
+    predicate word in a predicate's slot ("Wong, that's not it");
+    the tagger's lexicon is the word list, nothing on the network.
+    Rule 2: a brand or a service (the tagger's organization tag, a
+    model number or a product noun after the name) is unresolved with
+    `candidate_kinds: [organization]`, no frame, no ask. Rule 3: a
+    name the hub introduced (its last two replies, a retained
+    outcome's result text; a name the person said first stays theirs)
+    is a `world` subject with that provenance, never unresolved,
+    never asked back (`KnownNames.hubNames`, `namesIn()`). Rule 4:
+    the `who` answer parser reads the world kinds ("the actress,
+    Serena Vale", "a public figure", "she's famous", a full name to a
+    first-name ask) into `WhoAnswer.world`; the answer creates no
+    entity, retires a candidate of the name, puts a `world` subject of
+    that kind on the turn, and runs the turn that raised the name
+    (`PendingAsk.carriedQuestion`) as a websearch `via: forced` with
+    the engine's query (`worldAnswerQuery()`), so the reply is the
+    answer; the model's own identity question about a bare unresolved
+    name ("someone you know or a public figure?") binds as the ask
+    (`replyAsksIdentityOf()`). The `[turn]` line's subjects carry the
+    world kind or the hinted kinds. Bench: not-a-name, hub-named-it,
+    public-figure (the fake search's film cast row names Serena Vale),
+    `subjectsAbsent` and a subject `kind` as expectation kinds. Tests:
+    `backend/tests/ask02.test.ts`. Exit: `bash scripts/check.sh`.
+
 <a id="lookup-02"></a>
 
 - [x] **LOOKUP-02: The hedge is a promise, the offer binds its question, the forced lookup is a ladder** (S-M)

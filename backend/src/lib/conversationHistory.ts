@@ -490,6 +490,10 @@ export interface PendingAsk {
   hintedKinds?: string[];
   subjectId?: string | null;
   openQuestionId?: string;
+  /** ASK-02 (rule 4): the person's own turn that raised the name (a
+   * question or a statement), so an answer that makes the name the
+   * world's runs it as a lookup at once. */
+  carriedQuestion?: string;
   /** Only set for kind:"ask" (a recipe result's own `ask.expects` hint,
    * spec/schemas/result.schema.json) - free text, not a structured
    * matcher; turnEngine.ts's own consumption is documented at its call

@@ -100,7 +100,7 @@ export interface TurnObserved {
    * turn; null on a streamed chat turn or before ACT-03 exists. */
   moves?: readonly Move[] | null;
   /** CHAT-13/step 3a: the SubjectRef stack after the turn. */
-  subjects?: readonly { type: "household" | "world" | "unresolved"; name: string; rejected: boolean }[];
+  subjects?: readonly { type: "household" | "world" | "unresolved"; name: string; rejected: boolean; kind?: string }[];
   /** ASK-01 part 4/AGE-01/CRED-01: the person's own OpenQuestions, read
    * after the same wait `delivered` uses. */
   openQuestions?: readonly { kind: string; status: string; text?: string }[];
@@ -206,7 +206,8 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.signal) parts.push(`signal ${[e.signal.primary_act, e.signal.expressed_emotion, e.signal.emotion_intensity, e.signal.clauseStance ? `clauses ${e.signal.clauseStance.join(",")}` : undefined].filter(Boolean).join("/")}`);
   if (e.plan) parts.push(`plan required ${e.plan.requiredMoves?.join("+") ?? "-"}, forbidden ${e.plan.forbiddenMoves?.join("+") ?? "-"}${e.plan.maxSentences !== undefined ? `, at most ${e.plan.maxSentences} sentences` : ""}${e.plan.maxWords !== undefined ? `, at most ${e.plan.maxWords} words` : ""}`);
   if (e.moves) parts.push(`moves ${e.moves.join("+")}`);
-  if (e.subjects) parts.push(`subjects ${e.subjects.map((s) => `${s.type}:${s.name}${s.rejected === undefined ? "" : s.rejected ? " rejected" : " not rejected"}`).join(", ")}`);
+  if (e.subjects) parts.push(`subjects ${e.subjects.map((s) => `${s.type}:${s.name}${s.kind ? ` (${s.kind})` : ""}${s.rejected === undefined ? "" : s.rejected ? " rejected" : " not rejected"}`).join(", ")}`);
+  if (e.subjectsAbsent) parts.push(`no ${e.subjectsAbsent.map((s) => `${s.type}${s.name ? `:${s.name}` : ""}`).join(", ")} subject`);
   if (e.openQuestion) parts.push(`open question ${e.openQuestion.kind} within ${e.openQuestion.withinMs} ms`);
   if (e.memoryRows) parts.push(`memory rows ${e.memoryRows.map((r) => [r.textKeywords.join("+"), r.category, r.subject, r.status, r.disclosure].filter((x) => x !== undefined).join("/")).join(", ")}`);
   if (e.outcomeArgs) parts.push(`outcome ${e.outcomeArgs.packageId} args ${JSON.stringify(e.outcomeArgs.args)}${e.outcomeArgs.via ? ` via ${e.outcomeArgs.via}` : ""}${e.outcomeArgs.rejected ? `, rejected ${JSON.stringify(e.outcomeArgs.rejected)}` : ""}`);
@@ -454,8 +455,15 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     const got = observed.subjects ?? [];
     for (const want of e.subjects) {
       const hit = got.find((s) => s.type === want.type && s.name.toLowerCase() === want.name.toLowerCase());
-      const pass = hit !== undefined && (want.rejected === undefined || hit.rejected === want.rejected);
-      checks.push({ name: "subject", pass, detail: hit ? `${hit.type}:${hit.name}${hit.rejected ? " rejected" : ""}` : `no ${want.type} subject named ${want.name} (stack: ${got.map((s) => `${s.type}:${s.name}`).join(", ") || "empty"})` });
+      const pass = hit !== undefined && (want.rejected === undefined || hit.rejected === want.rejected) && (want.kind === undefined || (hit.kind ?? "").split("/").includes(want.kind));
+      checks.push({ name: "subject", pass, detail: hit ? `${hit.type}:${hit.name}${hit.kind ? ` (${hit.kind})` : ""}${hit.rejected ? " rejected" : ""}` : `no ${want.type} subject named ${want.name} (stack: ${got.map((s) => `${s.type}:${s.name}`).join(", ") || "empty"})` });
+    }
+  }
+  if (e.subjectsAbsent) {
+    const got = observed.subjects ?? [];
+    for (const want of e.subjectsAbsent) {
+      const hit = got.find((s) => s.type === want.type && (want.name === undefined || s.name.toLowerCase() === want.name.toLowerCase()));
+      checks.push({ name: "no subject", pass: hit === undefined, detail: hit ? `${hit.type}:${hit.name} on the stack` : `no ${want.type}${want.name ? ` ${want.name}` : ""} subject` });
     }
   }
   if (e.openQuestion) {

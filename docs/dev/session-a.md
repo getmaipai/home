@@ -5694,3 +5694,170 @@ answering rung and the absence of cannot-do, not which rung failed
 first; the unit test covers that with the stub. The deliverable's own
 rendering (a link, a picture, a video on the chat surface) is
 CHAT-16's.
+
+## ASK-02: the resolver's world edge (2026-09-15)
+
+Section 16 part 7 of the design record, item 7 of its ordered list,
+findings 33 and 44. ASK-01's candidate read took every proper noun the
+tagger marked and every sentence-initial capitalized noun, trimmed the
+edges with a class that kept a dash, and filtered against a fixed
+list, so an oath ("Jesus -"), a typo ("Wong"), a brand ahead of a
+model number, a video service and a name the hub's own reply had
+produced all became unresolved subjects at 0.4, carried for turns and,
+once, asked back about a name the hub itself had said; and a person
+who answered that the name was a public figure got the name repeated
+back, since the parser read household kinds only and no lookup ran.
+
+**Rule 1, candidate hygiene** (`notAName()` in `lib/unknownNames.ts`,
+read for a single token the household does not know). The edge class
+loses the dash (an internal hyphen stands, and the tagger's own split
+of "Mary-Jane" is joined back with its hyphen). An oath is a name only
+outside the oath's slot: "Lord, that took ages" and "oh God, not
+again" are the oath, "Lord is coming over" is somebody (`OATHS`,
+`inOathSlot()`); the interjections the tagger leaves as nouns join
+`NOT_A_NAME`, the ones it tags `Expression` never reach it. A token
+the tagger also reads as an expression, an adjective, an adverb or a
+verb is not a name unless the lexicon knows it as a first name. A
+capitalized token the lexicon knows as an ordinary word (never as a
+name) is that word when it was lowercase in the last three turns or
+the utterance itself, or when it follows an article or a demonstrative
+("that Answer was wrong") with no model number or product noun after
+it (rule 2's case); a possessive never reads it that way ("my Daisy
+has a cough", "our Max is sick" introduce a pet or a child; the
+review), and a word the lexicon does not know is a name however it
+was typed a turn ago ("is nova coming tonight" then "Nova is coming
+over"). A typo is a token the lexicon does not know (or knows as a
+surname only, "Wong"), not a first name, one edit from a predicate
+word (an adjective, an adverb, an expression: never a noun or a verb)
+by a dropped letter, an extra letter or a swapped pair (never a
+substitution, where names collide with words: "Clover" and "closer",
+"Marsh" and "harsh"), in the interjection's slot alone (sentence-
+initial before punctuation, "Wong, that's not it"), when the sentence
+still reads with a verb once the token is out; a copula's complement
+("his name is Rover", "this is Clover", "that's Wong") introduces a
+name and is never the slot. A name a relation frame names ("Rover, our new puppy, is
+adorable", "Jesus, my cousin, is visiting") is never read by the
+rules, the oath's slot included: the comma slot is the appositive
+introduction's too (the second review). The tagger's lexicon is the
+word list, read through `nlp.model()`; nothing here needs the
+network. The stated limit: an unknown name in the vocative slot whose letters are
+a predicate word plus or minus one ("Atlas, can you come here" said
+to an Atlas the hub has never heard of: "alas") reads as the word; a
+household name is known and never read by the rules, and a person
+addresses the hub, not a stranger, so the slot is the oath's and the
+typo's in practice.
+
+**Rule 2, brands and services.** A candidate the tagger tags
+`Organization`, or one followed by a model number or a product noun
+("the Cosmo 7 card", "my Asus laptop", `PRODUCT_NOUN_RE`), is an
+unresolved reference with `candidate_kinds: [organization]`, no
+household frame whatever the clause carries ("my Asus laptop" asks
+nothing), and no ask; the world-kind nouns before a name gain brand,
+maker, model, card, phone, console, service, site and app. The
+`[turn]` line's subject entries carry the kind now (the world kind, or
+the hinted kinds joined), so a set can read it.
+
+**Rule 3, a name the hub introduced.** `prepareTurn()` collects the
+proper nouns of the hub's last two replies in the window and of every
+succeeded retained outcome's result text (`namesIn()`, the household's
+names out) as `KnownNames.hubNames`, each with its provenance (`reply`
+or the package id) and the source kind the package implies. A name
+the person said first in the window stays theirs whatever the hub
+echoed or asked back ("Who's Clover?" introduces nothing, a test); a
+longer name the hub's lookup resolved theirs to ("Serena Vale" for
+their "Serena") is the hub's; a reply's sentence-initial plain noun
+("Traffic looks clear tonight") is no name the hub gave (the tagger's
+proper nouns only for the hub's text, the full read for the person's);
+and a relation frame on the person's own turn wins over a hub name
+("my brother Vincent" after the cast row named Vincent Marlow is the
+brother, the review). A candidate that matches a hub name
+whole, or as the first name of one the tagger read as a person
+("Serena" to "Serena Vale"; never "Nova" to "Nova Scotia" from an
+earlier weather result, `HubName.person`), resolves to a `world` subject with `display_name`
+the hub's full name, kind `mention`, and that source kind, never an
+unresolved one: it is never in the unknown set, so the engine never
+asks, the familiarity guard never reads it, and the outcome text that
+introduced it is already in the guards' sources (`package_result`
+lines). "Who's Serena Vale" after the search named her is a world
+question answered from the retained result or a fresh lookup.
+
+**Rule 4, the confirmed public figure.** `parseWhoAnswer()` reads the
+world kinds before the household phrase (`worldAnswer()`): a kind noun
+where an answer puts it ("the actress, Serena Vale", "a public
+figure", "the band from the festival"), a mark ("she's famous", "in
+the news", "nobody I know"), or a full name given to a first-name ask
+("Serena Vale" for "Serena"), into `WhoAnswer.world` with the kind and
+the full name; a household relation noun in the answer wins ("my
+cousin, she's an actress" is the cousin), and a job an ordinary friend
+has ("she's a chef") is not read as the world's. A household relation noun anywhere in the answer wins first
+(the people and pets nouns and the relationship phrases with any
+determiner, "Serena Vale, a friend from work"; a kind noun for an
+organization, "the band", is the world's as the design lists it; a
+whereabouts phrase, "she lives next door", "from school", "at work",
+is the household's too, `LOCALITY_RE`), so a private person's full
+name with anything of the household beside it is never searched; the
+bare full name alone is the design's public figure. The marks read
+"on that show" and "in that film" as well. The pending-ask
+branch of `resolvePendingAsk()` then creates no entity, retires a
+candidate of the name (its open questions answered), puts a `world`
+subject of the answered kind on the turn (`protocol.subject`), and,
+when the ask carries the turn that raised the name
+(`PendingAsk.carriedQuestion`, set by the engine's own ask and by the
+model's bound question, never by a judge's open question) and the
+search is installed for the speaker's role and the turn is not in
+the crisis state (this turn's own self-harm signal or the
+conversation's, `opts.inCrisis` from `prepareTurn()`), runs the websearch on it at once, `via:
+forced`, with the engine's query (`worldAnswerQuery()`: the full name
+and the raising turn's own words with its lead and fillers out when it
+was a question, the full name and the statement's wh-phrase otherwise
+when it says more than the wh-word and a copula, "Serena Vale what
+happened"; the name goes with its possessive, and "Who is Serena?"
+searches the full name alone); the reply is the search's answer, or the
+honest line when the search failed, or "Got it, Serena Vale." when
+nothing was carried. The model's own identity question about a bare
+unresolved name ("Serena? Is that someone you know or a public
+figure?", `replyAsksIdentityOf()`: the identity shapes only, read
+across two adjacent sentences, never a which-question or an offer
+about a world subject) is bound as a `who` ask with the raising turn
+carried, so the binding is symmetric with the engine's own; the engine
+appends nothing of its own for a bare name, as ASK-01 left it.
+
+**The bench.** `not-a-name` (an oath, the Cosmo 7 card as an
+organization, a capitalized ordinary word: no unresolved subject, no
+ask), `hub-named-it` (the fake search's film cast row names Serena
+Vale; "who's Serena Vale" is a world subject, no ask, answered from a
+lookup or the retained result) and `public-figure` (a bare name in a
+statement, the model's seeded question bound, "the actress, Serena
+Vale" runs the websearch on her `via: forced` with no entity);
+`subjectsAbsent` and a subject's `kind` as expectation kinds. The fake
+SearXNG answers a film query about Marsh Lantern with the cast row and
+a query about Serena Vale with her own facts. Tests:
+`tests/ask02.test.ts` (each rule's cases, the parser, the identity
+question, the query, and the two flows against the stub with a fake
+SearXNG, plus the acknowledgment with nothing carried).
+
+**Left on record.** The third review's one is in the tree: the
+frame pattern "Name, my noun" also matches an oath before a clause
+("God, my dad is going to be so mad"), so a frame's name is exempt
+from the oath rule only when the appositive is closed by a comma or
+ends the text within three words and is a noun phrase with no verb
+("Jesus, my cousin, is visiting"; "Jesus, my cousin"; never "God, my
+dad is mad", the fourth review). The second review's five are in the tree (the
+frame's name exempt from hygiene, the person-only part match, the
+whereabouts phrases, the show and film marks). The first review's
+nine: the eight that mattered are in the tree (the copula slot out of the typo rule and substitutions out
+of its neighbours; possessives out of the determiner rule; the
+lowercase check gated on the lexicon; the household phrase first in
+the world answer with any determiner; the relation frame ahead of the
+hub name; the proper nouns only in `namesIn()` for the hub's text;
+the crisis gate on the turn's own reading; the query's dangling
+wh-lead and possessive), the ninth this record. The typo rule's
+vocative limit above stays a limit. Rule 3
+reads the window's last two hub replies and the conversation's last
+ten outcome rows, never an earlier conversation's; CHAT-13's stack
+carries a world subject further. A hub-introduced name is kind
+`mention` until a typed source gives it a kind (CHAT-13). The judge's
+own open question about a name the hub introduced is still possible
+when the judge infers a household entity from the person's turn; the
+answer path retires such a candidate when the person says the name is
+the world's.

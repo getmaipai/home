@@ -21,7 +21,8 @@ import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameById, registryNamesFor, subjectLabel, subjectRosterFor } from "@/lib/subjects";
-import { applyWhoAnswer, candidateByName, framedName, parseWhoAnswer, replyAsksAbout, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
+import { deleteEntity } from "@/lib/entities";
+import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type HubName, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
@@ -59,6 +60,7 @@ import {
   resolveOpenQuestionsAbout,
   expireOpenQuestion,
   queueOpenQuestion,
+  outcomesForConversation,
   type PendingAsk,
   type OpenQuestionRow,
 } from "@/lib/conversationHistory";
@@ -176,7 +178,8 @@ interface TurnLogRecord {
 }
 
 function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape): void {
-  const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form }));
+  // ASK-02: the world kind, or the kinds an unresolved name hinted.
+  const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form, ...(s.type === "world" ? { kind: s.kind } : s.type === "unresolved" && s.candidate_kinds.length > 0 ? { kind: s.candidate_kinds.join("/") } : {}) }));
   const record: TurnLogRecord = {
     turn_id: value.turn_id,
     conversation_id: value.conversation_id,
@@ -1608,6 +1611,31 @@ export function lookupQueryFor(input: { subjects: readonly SubjectRef[]; sentenc
   return field.length > 0 ? field : null;
 }
 
+/** ASK-02 (rule 4): the query a confirmed world name runs. The full
+ * name and the carried turn's own words (its lead and fillers out, the
+ * name out) through LOOKUP-02's builder when the turn was a question;
+ * for a statement, the name and the wh-phrase the statement carried
+ * ("what happened to"), else the name alone. */
+export function worldAnswerQuery(subject: Extract<SubjectRef, { type: "world" }>, carried: string, askedName: string): string {
+  // The name goes with its possessive ("Serena's new film" leaves "new film").
+  const whole = (name: string) => new RegExp(`(?<![\\p{L}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[\u2019']s)?(?![\\p{L}])`, "giu");
+  const lead = carried.replace(whole(subject.display_name), " ").replace(whole(askedName), " ").replace(/\s+/g, " ").trim();
+  const questionShaped = /\?\s*$/.test(lead) || /^(?:what|which|how|when|where|who|why|is|are|does|do|did|can|could|would|will|should)\b/i.test(lead);
+  if (questionShaped) {
+    const q = stripLead(lead.replace(/[?.!]+$/g, "").replace(/(?<=\p{L})[\u2019']\s*(?:re|s|m|ve|ll|d)\b/giu, ""))
+      .replace(LOOKUP_FIELD_FILLER_RE, " ")
+      .replace(/[^\p{L}\p{N}'\s-]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (q.length > 0) return `${subject.display_name} ${q}`;
+  }
+  // The statement's wh-phrase, when it says more than the wh-word and
+  // a copula ("what happened", never "who is").
+  const wh = /\b((?:what|who|where|when|why|how)\b[^.!?,]{0,40}?)\s+(?:to|with|about|for|of)?\s*$/iu.exec(carried.replace(new RegExp(`(?<![\\p{L}])${askedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}])[\\s\\S]*$`, "iu"), ""));
+  const phrase = wh?.[1]?.trim().replace(/^(?:what|who|where|when|why|how)\b\s*(?:is|was|are|were|'s|\u2019s|did|does|do)?\s*/iu, "").trim() ?? "";
+  return wh && phrase.length > 0 ? `${subject.display_name} ${wh[1]!.trim()}` : subject.display_name;
+}
+
 // LOOKUP-02 (rule 4): the consent vocabulary's imperative forms, for a
 // pending lookup only: after a promise or an offer went out, "go on
 // then", "well find it", "just search it", "that's twice now, go on
@@ -1719,8 +1747,12 @@ export async function resolvePendingAsk(
   // protocol layer of the signal; left unset when the turn was neither
   // a yes nor a no (the re-ask) or fell through to routing.
   // ASK-01: the entity a `who` answer created or confirmed, for the
-  // turn's subject.
-  protocol: { answer?: ProtocolAnswer; subjectId?: string } = {},
+  // turn's subject; ASK-02: the world subject a `who` answer named.
+  protocol: { answer?: ProtocolAnswer; subjectId?: string; subject?: SubjectRef } = {},
+  // ASK-02: the turn's own crisis reading (this turn's self-harm signal
+  // or the conversation's state), so a world answer never runs a
+  // search on a turn the crisis rules own (a review).
+  opts: { inCrisis?: boolean } = {},
 ): Promise<TurnValue | null> {
   const pending = getPendingAsk(conversation.id);
   if (!pending) return null;
@@ -1763,6 +1795,38 @@ export async function resolvePendingAsk(
     if (parsed === null) {
       if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "declined");
       return null;
+    }
+    // ASK-02 (rule 4): the name is the world's. No household entity
+    // (a candidate of the name is retired as a wrong guess), a world
+    // subject of the answered kind on the turn, and the question or
+    // statement that raised the name runs as a lookup on it at once,
+    // so the reply is the answer and not the name said back.
+    if (parsed.world) {
+      if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "answered");
+      const twin = name ? candidateByName(actor, name) : null;
+      if (twin) {
+        resolveOpenQuestionsAbout(actor.id, twin.id, "answered");
+        deleteEntity(actor, twin.id);
+      }
+      const subject: SubjectRef = { type: "world", kind: parsed.world.kind, display_name: parsed.world.name, year: null, source_kind: null, stable_key: null, recency: "unknown", carried_question: pending.carriedQuestion ?? null };
+      protocol.subject = subject;
+      protocol.answer = { kind: "who", answer: "value" };
+      console.log(`[ask] the answer about a name made it the world's on turn ${turnId} (${parsed.world.kind})`);
+      const searchable = loaded.some(({ id, manifest }) => id === "websearch" && manifest.kind === "plugin" && meetsMinRole(actor.role, manifest.min_role)) && !(opts.inCrisis ?? conversationInCrisis(conversation.id));
+      if (pending.carriedQuestion && searchable) {
+        const expression = worldAnswerQuery(subject, pending.carriedQuestion, name);
+        const result = await runPlugin("websearch", actor, { expression }, turnId);
+        outcomes.push(
+          outcomeOf(
+            result.ok
+              ? { callId: `${turnId}:who`, packageId: "websearch", status: "succeeded", args: { expression }, via: "forced", result: result.value }
+              : { callId: `${turnId}:who`, packageId: "websearch", status: "failed", args: { expression }, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
+          ),
+        );
+        if (result.ok) return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+        return { reply: { text: `Got it, ${subject.display_name}. ${LOOKUP_FAILED_LINE}` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+      }
+      return { reply: { text: `Got it, ${subject.display_name}.` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
     }
     const outcome = applyWhoAnswer(actor, { name, subjectId: pending.subjectId ?? null }, parsed, turnId);
     if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "answered");
@@ -2062,13 +2126,13 @@ async function prepareTurn(
   // replaced reply asked; the replaced exchange's pending ask is dropped
   // rather than bound to the edited text.
   if (supersedes) setPendingAsk(conversation.id, null);
-  const protocol: { answer?: ProtocolAnswer; subjectId?: string } = {};
-  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources, directOutcomes, protocol);
+  const protocol: { answer?: ProtocolAnswer; subjectId?: string; subject?: SubjectRef } = {};
+  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources, directOutcomes, protocol, { inCrisis });
   // ACT-01: the protocol layer wins when the state machine read the
   // answer; the re-ask ("Yes or no?") keeps the rule signal, since the
   // person said something else.
   if (protocol.answer && pendingAskValue) signal = classifyTurnSignal({ text, protocol: protocol.answer, ageBand });
-  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId, outcomes: directOutcomes, signal, timings, ...(protocol.subjectId ? { subjects: [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] } : {}) };
+  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId, outcomes: directOutcomes, signal, timings, ...(protocol.subjectId ? { subjects: [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] } : protocol.subject ? { subjects: [protocol.subject] } : {}) };
 
   // ASK-01 part 4: a question the judge queued but has not asked yet
   // ("Who's Juniper?", pending) can be answered before it is put: "he's
@@ -2380,16 +2444,42 @@ async function prepareTurn(
   // section; the ask is appended to the reply by the caller.
   const subjectsStart = performance.now();
   const registry = registryNamesFor(actor);
+  // ASK-02 (rule 3): the names the hub itself introduced, from its last
+  // two replies in the window and the conversation's retained
+  // outcomes' result text, are the world's with that provenance; the
+  // last three turns' text feeds the common-word check (rule 1).
+  // A name the person said first is theirs, whatever the hub echoed
+  // or asked back ("Who's Clover?" introduces nothing); a longer name
+  // the hub's lookup resolved it to ("Serena Vale" for their "Serena")
+  // is the hub's.
+  const knownForHub = [...rosterNames, ...registry.map((r) => r.name)];
+  const personSaid = new Set(window.messages.filter((m) => m.role === "user").flatMap((m) => namesIn(m.content, knownForHub)).map((n) => n.toLowerCase()));
+  const saidByPerson = (n: string) => personSaid.has(n.toLowerCase());
+  const hubNames: HubName[] = [];
+  for (const m of window.messages.filter((m) => m.role === "assistant").slice(-2)) {
+    for (const n of properNounsIn(m.content, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: "reply", sourceKind: null, person: n.person });
+  }
+  for (const row of outcomesForConversation(conversation.id, 10)) {
+    for (const o of row.outcomes) {
+      const replyText = o.status === "succeeded" ? (o.result?.reply?.text ?? "") : "";
+      if (!replyText) continue;
+      const sourceKind = o.packageId === "websearch" ? "web" : o.packageId === "weather" ? "weather" : o.packageId === "knowledge" ? "wikipedia" : "package";
+      for (const n of properNounsIn(replyText, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: o.packageId, sourceKind, person: n.person });
+    }
+  }
+  const recent = window.messages.filter((m) => m.role === "user").slice(-3).map((m) => m.content);
   const resolved = resolveNames(
     text,
     signal,
     {
-      names: [...rosterNames, ...registry.map((r) => r.name)],
+      names: knownForHub,
       resolveEntity: (name) => {
         const member = household.find((p) => p.displayName.trim().toLowerCase() === name.toLowerCase() || (p.nickname ?? "").trim().toLowerCase() === name.toLowerCase());
         if (member) return ensurePersonEntity(member).value?.id ?? null;
         return registry.find((r) => r.name.toLowerCase() === name.toLowerCase())?.id ?? null;
       },
+      hubNames,
+      recent,
     },
     turnId,
   );
@@ -3166,12 +3256,29 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
       append: asked ? "" : ` ${whoQuestion(name)}`,
       commitIf: (delivered) => {
         if (!replyAsksAbout(visibleText(delivered), name)) return;
-        setPendingAsk(conversationId, { kind: "who", prompt: whoQuestion(name), packageId: "engine", args: { name }, name });
+        setPendingAsk(conversationId, { kind: "who", prompt: whoQuestion(name), packageId: "engine", args: { name }, name, carriedQuestion: utterance });
         console.log(`[ask] turn ${prepared.turnId} asks about an unknown name (${asked ? "the model's own question" : "appended"})`);
       },
     };
   }
   if (getPendingAsk(conversationId)) return NO_ASK;
+  // ASK-02 (rule 4): the model's own question about a bare unresolved
+  // name ("Serena, someone you know or a public figure?") is bound as
+  // the ask, so the answer is read by the parser and a public figure
+  // becomes a lookup; the engine appends nothing of its own here (a
+  // bare name with no frame is never the engine's question).
+  const bareAsked = prepared.turnContext.subjects.find((s): s is Extract<SubjectRef, { type: "unresolved" }> => s.type === "unresolved" && s.candidate_kinds.length === 0 && replyAsksIdentityOf(visible, s.surface_form));
+  if (bareAsked) {
+    const name = bareAsked.surface_form;
+    return {
+      append: "",
+      commitIf: (delivered) => {
+        if (!replyAsksIdentityOf(visibleText(delivered), name)) return;
+        setPendingAsk(conversationId, { kind: "who", prompt: whoQuestion(name), packageId: "engine", args: { name }, name, carriedQuestion: utterance });
+        console.log(`[ask] turn ${prepared.turnId} binds the model's own question about a bare name`);
+      },
+    };
+  }
   // An offer in the reply binds the lookup instead (notePendingLookup
   // runs after this): the open question waits for the next reply.
   const lookupIds = prepared.lookupTools.map((t) => t.id);

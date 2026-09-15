@@ -161,12 +161,21 @@ export function startFakeSearxng(): FakeSearxng {
       // The fixture's own world subject gets real canned facts; every
       // other query gets a result that says nothing, so the rows that
       // check a real fact fail as they did with no search at all.
-      const results = /marsh lantern/i.test(q)
-        ? [
-            { title: "Marsh Lantern: the new album (release details)", url: `https://example.com/${slug}`, content: "The new Marsh Lantern album is out on September 22 with 12 tracks; the first single is already out and a spring tour is announced." },
-            { title: "Marsh Lantern album reviews", url: `https://example.com/${slug}/reviews`, content: "Reviews call it their strongest record in years; the drumming on the second track stands out." },
-          ]
-        : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
+      // ASK-02: the film's cast row names Serena Vale (the hub-named
+      // subject), and a query about her answers with her own facts.
+      const results = /serena vale/i.test(q)
+        ? [{ title: "Serena Vale (actress)", url: `https://example.com/${slug}`, content: "Serena Vale is an actress; she plays the lighthouse keeper in the new Marsh Lantern film and won a stage award last year." }]
+        : /marsh lantern/i.test(q) && /film|movie|cast|stars?|about|who/i.test(q)
+          ? [
+              { title: "Marsh Lantern (film): cast and plot", url: `https://example.com/${slug}`, content: "The new Marsh Lantern film follows a lighthouse keeper on a rock through one winter; it stars Serena Vale as the keeper and Vincent Marlow as her brother, and it is out in October." },
+              { title: "Marsh Lantern film reviews", url: `https://example.com/${slug}/reviews`, content: "Reviews call it slow and beautiful; Serena Vale's performance carries it." },
+            ]
+          : /marsh lantern/i.test(q)
+            ? [
+                { title: "Marsh Lantern: the new album (release details)", url: `https://example.com/${slug}`, content: "The new Marsh Lantern album is out on September 22 with 12 tracks; the first single is already out and a spring tour is announced." },
+                { title: "Marsh Lantern album reviews", url: `https://example.com/${slug}/reviews`, content: "Reviews call it their strongest record in years; the drumming on the second track stands out." },
+              ]
+            : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
       return Response.json({ query: q, results });
     },
   });
