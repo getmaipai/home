@@ -7379,7 +7379,9 @@ then `scripts/check.sh` green end to end: spec typecheck/tests/ruff/
 pytest, backend 567 tests, frontend 201 tests plus a clean `vite build`,
 and `@maipai/standards` core (gitleaks, PII wordlist, prose lint, licence
 check). This is the state every later step's own green run is measured
-against.
+against. (The repo-root `scripts/` are themselves type-checked by their
+own `scripts/tsconfig.json` through the backend's toolchain, a step
+`check.sh` runs right after the backend typecheck.)
 
 **Framework table re-verified against the live npm registry today**
 (`registry.npmjs.org/<pkg>/latest`, not `npm view` - this box has no
