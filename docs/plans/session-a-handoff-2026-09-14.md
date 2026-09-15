@@ -1,5 +1,108 @@
 # Session A handoff (2026-09-14, evening)
 
+## 2026-09-15, early morning: where this lane stands
+
+Written by the Session A that took the note below over at `1d2c8ba`,
+before it stops (the subscription at 75 percent with four days to the
+reset). Everything below the older sections still holds where this
+section does not say otherwise.
+
+**Landed tonight, all on `main` and pushed**, each gated in a
+throwaway worktree and reviewed: ASK-01 `2c6a9b9`, SAFETY-01
+`86cd942`, the ASK-01 follow-ups `de9d6a4`, the second round
+`27e4f2b`, LOOKUP-02 `2c3eaee`, its set follow-ups `41a9078`, ASK-02
+`bc738b5`, and the full set's follow-ups `739cf66`. ENGINE-HOST-01's follow-up was
+dropped by the coordinator (no external engine in use); the LAN
+address was never given and nothing of it is anywhere.
+
+**The numbers.** The full set on `bc738b5` (the whole 86 rows, three
+seeded runs, the 8B chat engine, the 4B judge on 8790): 240, 237 and
+239 of 302 scored turns, the hard rows 12 of 12 in every run, the
+question rate 27.6, 29.2 and 28.8 percent (after a non-question turn
+33.9, 37.8, 35.6; after a question 19.1, 17.6, 19.8) against the
+reference's 32.9, 42.8 and 16.3. LOOKUP-02 and ASK-02 were accepted
+on it. The set's reads are in the follow-up commit and recorded in
+`docs/dev/session-a.md` "ASK-02", "The full set"; the earlier sets in
+their own items' sections.
+
+**The queue, in order, from here.** Items 2 to 7 of section 16's
+ordered list (`docs/dev.md`, the table under "Items and sizes" at the
+end of section 16) are done or in other lanes; what is left for this
+lane:
+
+1. **REP-01** (section 16 part 3: `repeat_sentence` skippable and
+   `repeat_reply` at the boundary on both paths reading the previous
+   two hub replies, the retry note, `self_assertion` on the objection,
+   the rows `said-that-already` and `same-line-twice`; the plan half
+   rides with ACT-03). Read the part in full first; the exemptions are
+   by construction (the crisis overlay, a re-asked confirmation or
+   ask, a package's deterministic answer, a one-word acknowledgment).
+   Its own commit, review, "gate?", then a set only on the
+   coordinator's "set".
+2. **CHAT-13 as amended** (item 10 of the list), in chunks: the local
+   coder session (C) is doing CHAT-13 in chunks with the coordinator's
+   prompts, in its own worktrees (`../home-c12` on `c/chat13-a`,
+   `../home-c13` on `c/chat13-b` tonight). You are the reviewer on
+   call: when the coordinator says so, review C's chunk (the
+   `code-review` skill, medium, against C's worktree path or branch,
+   never the main checkout; read the path and branch the review
+   reports before acting on a finding) before its gate, and send the
+   findings to the coordinator, never to C directly. Nothing else
+   until Saturday or Jesse's word.
+3. **REG-02** (section 16 part 5, closers, wishes and tag questions)
+   is parked in `../home-c11` on `c/reg-02` at `27e4f2b` with
+   uncommitted work in `backend/src/lib/guards.ts`,
+   `backend/tests/guards.test.ts`, `spec/llm/guard-corpus.json`,
+   `spec/vocab/defect-codes.json` and the fixture; the coordinator
+   says two of its older tests are broken and that finishing it is
+   yours: rebase its branch on `main` first (LOOKUP-02 and ASK-02
+   touched `guards.ts` and the fixture), run `bun test
+   tests/guards.test.ts` there, fix, gate, land. A worktree you did not
+   create is flagged, never removed; this one is C's to remove once
+   its branch is merged and deleted.
+4. **EXP-02** (section 16 part 8, the experience verbs by object,
+   three forms, the replacement rule) is yours too, after REG-02.
+
+**The protocol, tonight's additions.** The gate worktrees are
+`../home-gate-a<N>` (a11 was the last); the gate is
+`scratchpad/gate-in.sh <worktree> > gate-aN.log` with `exit=` at the
+end, monitored, the worktree removed the moment it ends; a patch that
+changes after a review is re-reviewed and re-gated (the fourth ASK-02
+gate was the one that counted). Sets: the judge on 8790 started for
+the set (`judge-4b-8790.sh`, pid in `judge-8790.pid`) and killed
+after; three runs detached with `nohup` (`run-bench-4b-3x.sh <item>
+[setN]` for the full 86, `run-bench-rows-3x.sh <label> <rows>` for a
+partial), the done file watched, `set-report.py $S <label> a b c` for
+the pass counts and the failing rows, `diffsets.py` for the per-turn
+diff against the previous full set, the question-rate block read off
+each log's tail; every failing row classified (the item's own, a
+fixture premise, pre-existing, variance) in the "set ended" report,
+then the coordinator's read before anything is fixed. The harness
+kills a foreground bench for memory: always `nohup ... &`. The
+three-gate rule yields to a privacy or data defect: a review finding
+that a household name could reach the web or an entity could be
+lost is fixed before the commit, whatever the count.
+
+**Decisions from tonight's sets that live in no doc yet.** A bare
+unresolved name in a question is CHAT-13's world subject (ASK-01's
+design, restated on the LOOKUP-02 set). The empty-result reply shape
+(the websearch recipe's summary of nothing reaching the person, "The
+search results do not provide...") stays CHAT-13's ladder and
+CHAT-16's `search_voice`. "I'll remember that you're excited" on a
+question turn is a promise nobody keeps (recorded on CHAT-13's
+backlog item). A number word beside a hedge is a checkable value, so
+a clarifying "I think there are two things you could mean" reads as a
+hedged fact (the exposure digits had). The typo rule's vocative limit
+and the generic "they" limit are in `docs/dev/session-a.md`.
+
+**Logs and scripts** of this session sit in the scratchpad named in
+the older section below under the same names, plus
+`bench-ask02-set1-seed-{a,b,c}.log` (the full set), `bench-lookup02-
+set1-seed-{a,b,c}.log`, `bench-round2-rerun-seed-{a,b,c}.log`, the
+gate logs `gate-a1.log` to `gate-a11.log`, and the commit messages
+`commit-*.txt`. Nothing household-specific is in any of them.
+
+
 For the fresh Session A that picks up the backend lane from the
 coordinator (`getmaipai-39`, Fable). Everything on `main` is readable
 there; this note holds only what a fresh session cannot read from
