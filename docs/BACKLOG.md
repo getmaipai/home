@@ -2354,6 +2354,17 @@ invented for the roster's household, and added to
     tests/turnSignal.test.ts tests/turnSignalAssets.test.ts`, `bash
     scripts/check.sh`.
 
+    Training half landed 2026-09-14 (`backend/scripts/train/
+    turn-signal-heads.ts` and its tests): the finding is the heads do
+    not ship. Act and emotion both miss the stated 5-point margin on
+    DailyDialog's human labels (act -4.4, emotion neutral-vs-not
+    -10.1); stance has no independent human-labeled validation yet
+    (waits on `data-scratch/eval/turn-signal-review-sheet.md`). Full
+    numbers in dev.md, "Session B, lane 16." No artifact to wire;
+    `turnSignal.ts` and `turnSignalAssets.ts` remain untouched. The
+    item stays open on the measured alternative (a MiniLM-class
+    encoder, section 12) as the next design question.
+
 <a id="act-03"></a>
 
 - [ ] **ACT-03: The reply plan, from the signal to the composer's permitted moves** (M, rides with CHAT-16)

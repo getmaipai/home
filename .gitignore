@@ -9,6 +9,12 @@ node_modules/
 # data/ itself, just per-worktree instead of shared.
 data/
 data-*/
+# A worktree may symlink data-scratch/ to a sibling checkout's copy
+# rather than duplicating it (ACT-02, lane 16: reusing already-
+# downloaded public datasets across worktrees) - `data-*/` alone does
+# not match a symlink (only a real directory), so the symlink itself
+# needs its own line.
+data-scratch
 
 # Backups (2.5): encrypted, but still real household data end to end;
 # same "never in git, ever" rule as data/.
@@ -57,3 +63,9 @@ spec/schemas.resolved/
 # here instead so it can never overwrite them.
 docs/assets/screens/webkit/
 docs/assets/webkit/
+
+# ACT-02: backend/scripts/train/turn-signal-heads.ts's own output - the
+# trained weight artifacts (never a tracked file; they ship as a catalog
+# model package instead, docs/dev.md section 12) and its staging report,
+# folded into docs/dev.md by hand rather than committed as a second copy.
+backend/scripts/train/out/
