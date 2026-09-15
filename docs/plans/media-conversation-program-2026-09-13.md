@@ -541,6 +541,43 @@ redesigned.
     answers), and a reply that only contradicts the objection is cut
     (finding 29's guard, with the objection in the retry note).
 
+47. A lowercase title with an untyped kind noun is no subject, so the
+    experience and hearsay rules never fire (the owner's chat of
+    2026-09-15 evening, on a build from the night before). "new trailer
+    for <a show, lower-cased>" put nothing on the stack: "trailer" is
+    not in the resolver's kind nouns and a lower-cased title is no
+    proper-noun candidate, so the reflected question got a question
+    back, "what was yours" got "I didn't get a chance to watch it, but
+    I heard the new trailer looks really intense", and EXP-02's hearsay
+    rule (a current subject required) stayed silent. Class: the kind
+    nouns gain trailer, teaser, episode, season and clip; a lower-cased
+    word that sits in a title frame ("the new <x> trailer", "the <x>
+    movie") is a title candidate with its display name capitalized;
+    a reflected experience question with any world subject on the
+    stack, typed or not, takes the experience line. Row: `trailer-
+    lowercase` (the utterance as the owner typed it, the reflected
+    question, the hearsay turn).
+48. "What's it about" answered from the weights with a plot. The
+    invented synopsis came with an offer to look up more; the objection
+    "you made that up, research it" then ran the search on the words
+    "trailer plot", and the recipe's summary said the results "do not
+    provide specific information" and asked for "more details" while
+    the person saw results on the page. Three causes: a synopsis ask is
+    not an exact field in the lookup decision (part 1 rule 1's list
+    names a name, a number, a date, a price, a cast, a specification, a
+    policy, not "what's it about"); the search's private summary step
+    writes prose the composer will replace (K2: a result with rows is
+    composed from the rows, and "the results do not provide" is never
+    written when rows exist); and the objection's search should carry
+    the subject and the field, not the previous reply's words. Class:
+    `exactFieldOf()` gains the synopsis ("what's it about", "what
+    happens in", "the plot", "the premise"); K2's decision table; the
+    objection rule of part 3 (a model answer becomes a lookup on the
+    subject and the field). Row: `synopsis-lookup` ("what's it about"
+    after a current title: `lookupWithSource`, `mustNotContain` the
+    hedge and offer families; "you made that up, research it": a
+    forced outcome whose query names the title and "plot|about").
+
 What worked, for the record: every forced or explicit search answered
 right (a release date, a cast, an OS release, a cartoon's sidekick,
 a used price); the almanac answered time and date; a correction was
