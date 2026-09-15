@@ -494,9 +494,9 @@ export function rejectPromptEchoes(
  * fact the model built from the hub's reply, a lookup result or a guess
  * is dropped as ungrounded. Against the speaker's words (the user's
  * text, plus the assistant's line when they confirmed it), a fact stands
- * when at least one of its content words (after the same skip set as
+ * when at least half of its content words (after the same skip set as
  * the echo filter: the speaker's name, the date words, pronouns,
- * calendar words) appears in them, and every proper noun (a capitalized
+ * calendar words) appear in them, and every proper noun (a capitalized
  * word not at a sentence start and not the speaker's name) and every
  * number in it appears too. A fact with no content words at all is
  * ungrounded. Each drop is counted on the same log line as the echo
@@ -515,9 +515,10 @@ export function rejectUngrounded(
   for (const fact of facts) {
     const words = contentWords(fact.text);
     const content = [...words].filter((w) => !skip.has(w));
+    const shared = content.filter((w) => said.has(w)).length;
     const grounded =
       content.length > 0 &&
-      content.some((w) => said.has(w)) &&
+      shared >= Math.ceil(content.length / 2) &&
       [...fact.text.matchAll(/\b[A-Z][a-z]+\b/g)].every((m) => {
         const w = contentWords(m[0]!);
         return w.size === 1 && (skip.has([...w][0]!) || said.has([...w][0]!));

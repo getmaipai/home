@@ -827,7 +827,12 @@ describe("MEM-06: a fact is grounded in the speaker's words", () => {
     const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
     const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
     expect(rejectUngrounded([fact("Sage was in Ohio visiting his parents")], "Sage", date, "we drove out to see my parents in Ohio").kept.length).toBe(1);
-    expect(rejectUngrounded([fact("Sage's wedding is in October 2026")], "Sage", date, "our wedding is in October").kept.length).toBe(1);
+    expect(rejectUngrounded([fact("Sage is getting married in October 2026")], "Sage", date, "we're getting married in October").kept.length).toBe(1);
+    // The half threshold decides: one shared content word of five drops the
+    // fact (Rover, a proper noun, is still grounded), while the speaker's
+    // own words sharing half the content keep it.
+    expect(rejectUngrounded([fact("Sage adopted a rescue dog called Rover last week")], "Sage", date, "Rover is our dog").dropped.length).toBe(1);
+    expect(rejectUngrounded([fact("Sage adopted a rescue dog called Rover last week")], "Sage", date, "we adopted a rescue dog, Rover, last week").kept.length).toBe(1);
     expect(rejectUngrounded([fact("Sage's favourite film is Marsh Lantern")], "Sage", date, "I liked the film").dropped.length).toBe(1);
     expect(rejectUngrounded([fact("Sage's favourite film is Marsh Lantern")], "Sage", date, "I liked the film").dropped[0]!.reason).toBe("ungrounded");
     expect(rejectUngrounded([fact("Sage owes 400 dollars")], "Sage", date, "I owe some money").dropped.length).toBe(1);
