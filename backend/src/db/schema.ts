@@ -812,6 +812,20 @@ export const openQuestions = sqliteTable("open_questions", {
   hlc: text("hlc").notNull(),
 });
 
+// CONS-01: a reply constraint applies to one conversation until it is
+// cleared. The engine writes these from the deterministic parser and later
+// readers use the kind-specific values to shape and guard a reply.
+export const replyConstraints = sqliteTable("reply_constraints", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull(),
+  person: text("person").references(() => people.id),
+  kind: text("kind").notNull(),
+  value: text("value").notNull(),
+  setAt: text("set_at").notNull(),
+  setByTurn: text("set_by_turn"),
+  hlc: text("hlc").notNull(),
+}, (table) => [index("reply_constraints_conversation_idx").on(table.conversationId)]);
+
 // Mirrors spec/schemas/relationship.schema.json. evidence is JSON text,
 // same reason entities.aliases is.
 export const relationships = sqliteTable("relationships", {
