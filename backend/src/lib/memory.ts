@@ -46,10 +46,11 @@ export type MemoryOpResult<T> =
 // AGE-01 (b): a child or a teen reads a household record by its audience.
 // The "teen exception" - an adult writing a key whose audience is set to
 // child so the teen never sees it - is NOT built.
-function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>, selfOnly = false, withholdSensitive = false): boolean {
+function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>, selfOnly = false, withholdSensitive = false, anonymous = false): boolean {
   if (withholdSensitive && record.sensitive) return false;
   if (record.scope === "self") return false;
   if (record.scope === "person") {
+    if (anonymous) return false;
     if (!record.person) return false;
     if (selfOnly) return record.person === actor.id;
     return canAccessPerson(actor, record.person, roleOf);
@@ -425,6 +426,7 @@ function entityNameWords(entityText: string): Set<string> {
 export interface RecallOptions extends ListOptions {
   /** Withhold all sensitive records for a surface that cannot safely say them. */
   withholdSensitive?: boolean;
+  anonymous?: boolean;
   /** Household subject ids on the current turn's resolved subject stack;
    * used to count withheld records even when their text misses a keyword. */
   withheldSubjectIds?: readonly string[];
@@ -632,7 +634,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
           : rows.filter((r) => r.scope === "household" && r.sensitive && !canRead(actor, r, roleOf, opts.selfOnly, false) && [...queryWords].some((word) => tokenize(r.text).has(word))).length;
       })()
     : 0;
-  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly, opts.withholdSensitive));
+  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly, opts.withholdSensitive, opts.anonymous));
 
   const matchedEntityNameWords: Set<string>[] = rows
     .filter((r) => r.recordKind === "entity")

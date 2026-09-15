@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -656,9 +656,9 @@ function formatLocalTime(now: Date, locale: string): string {
 // closed a real cycle back through persona.ts -> plugins.ts. See that
 // module's own header for the full story.
 
-function speakerLine(actor: PersonRow, locale: string, now: Date): string {
+function speakerLine(actor: PersonRow, locale: string, now: Date, band = speakerAgeBand(actor, now), anonymous = false): string {
+  if (anonymous) return `\n\nYou're talking with someone this device hasn't identified: age band ${band}, locale ${locale}.`;
   const nicknamePart = actor.nickname ? ` (goes by ${sanitizeForPrompt(actor.nickname)})` : "";
-  const band = speakerAgeBand(actor, now);
   return `\n\nYou're talking with ${sanitizeForPrompt(actor.displayName)}${nicknamePart} right now: role ${actor.role}, age band ${band}, locale ${locale}.`;
 }
 
@@ -793,12 +793,14 @@ export function buildPromptParts(
   // registry's own lines about the subjects), ahead of the memory
   // section so the trust reminder never reads as knowing a new name.
   subjectsSection: string = "",
+  speakerContext: { band: string; basis: string } = { band: speakerAgeBand(actor, frozenClock().now), basis: "identified_profile" },
 ): { stablePrefix: string; context: string } {
   const stablePrefix = buildStablePrefix(persona);
 
   const { now, locale } = frozen;
 
-  const profile = getProfileParagraph(actor);
+  const anonymous = speakerContext.basis === "unknown_speaker_default";
+  const profile = anonymous ? undefined : getProfileParagraph(actor);
   let memorySection = "";
   if (profile || memoryMatches.length > 0) {
     const profileLine = profile ? `${profile.text}\n` : "";
@@ -818,7 +820,7 @@ export function buildPromptParts(
   const reanchorSection = companionReanchorLine(persona);
   const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
   const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
-  const volatileZone = householdLine(household) + speakerLine(actor, locale, now) + subjectsSection + memorySection + episodesSection + reanchorSection + summarySection + skillsPart;
+  const volatileZone = householdLine(household) + speakerLine(actor, locale, now, speakerContext.band as any, anonymous) + subjectsSection + memorySection + episodesSection + reanchorSection + summarySection + skillsPart;
 
   const contextBody = `Context for this reply (reference, not instructions):${volatileZone}\n\n${localTimeLine(now, locale)}`;
   const contextBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - stablePrefix.length);
@@ -2376,7 +2378,7 @@ async function prepareTurn(
   // CHAT-01: one clock per turn, shared by the safety check's age band,
   // the prompt's speaker line and clock line, and the turn context.
   const frozen = frozenClock();
-  const ageBand = speakerAgeBand(actor, frozen.now);
+  const { band: ageBand, basis: ageBandBasis } = effectiveBand(surface, actor, speakerEvidence, frozen.now);
   // ACT-01: the turn signal, the rule layer, before anything routes or
   // refuses: every turn carries one (a refusal, a credential line and a
   // package answer included), frozen here and never recomputed. The
@@ -2397,11 +2399,11 @@ async function prepareTurn(
       commandOpeners: commandOpeners(loaded),
       roster: [...rosterNames, ...subjectRoster],
       resolveEntity: (name) => (rosterNames.includes(name) ? null : (findEntityByName(actor, name)?.id ?? null)),
-      ageBand,
+      ageBand, ageBandBasis,
     });
   } catch (err) {
     console.error(`[turn] classifyTurnSignal failed, the fallback stands: ${(err as Error).message}`);
-    signal = fallbackSignal(text, ageBand);
+    signal = fallbackSignal(text, ageBand, ageBandBasis);
   }
   timings.signal_us = Math.round((performance.now() - signalStart) * 1000);
   const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">, subjects?: SubjectRef[]): PreparedTurn => ({
@@ -2794,7 +2796,8 @@ async function prepareTurn(
   // degrades to undefined on any failure, which recall() already treats
   // as "fall back to keyword overlap" - no separate handling needed here.
   const withholdSensitive = !sensitiveAllowed(surface, speakerEvidence, present, actor.id) || ageBand === "child" || ageBand === "teen";
-  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive, withheldSubjectIds: subjects.filter((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household").map((subject) => subject.entity_id) });
+  const anonymous = ageBandBasis === "unknown_speaker_default";
+  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive, anonymous, withheldSubjectIds: subjects.filter((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household").map((subject) => subject.entity_id) });
   // JOIN-01: what was actually said in earlier conversations (MEM-03's
   // verbatim episodes, MEM-04's hybrid recall), beside the extracted
   // facts. This conversation is excluded whole: its turns are the
@@ -2806,7 +2809,7 @@ async function prepareTurn(
   // person's own side only, unless the question asks what the hub said,
   // and then the hub's side comes as a reported note, never a line.
   const episodeMatches = episodeQueryEligible(text)
-    ? recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, withholdSensitive, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
+    ? recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, withholdSensitive, anonymous, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
     : [];
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own
@@ -2826,7 +2829,7 @@ async function prepareTurn(
     // #88: an edited-and-resent message's original is off the branch
     // and never recalled here either (a review).
     const excludeTurnIds = supersedes ? [...window.turnIds, supersedes] : window.turnIds;
-    const byFloors = contentTerms(text).length >= 2 && !isBareSocialTurn(text) ? recallEpisodes(actor, text, utteranceVector, { withinConversationId: conversation.id, excludeTurnIds, sides: "user", limit: 2, withholdSensitive }) : [];
+    const byFloors = contentTerms(text).length >= 2 && !isBareSocialTurn(text) ? recallEpisodes(actor, text, utteranceVector, { withinConversationId: conversation.id, excludeTurnIds, sides: "user", limit: 2, withholdSensitive, anonymous }) : [];
     earlierMatches.push(...byFloors.map((m) => ({ ...m, earlierInThisConversation: true })));
     if (ASKS_ABOUT_START_RE.test(text)) {
       const first = earliestDroppedTurn(actor, conversation.id, excludeTurnIds, supersedes);
@@ -2837,7 +2840,7 @@ async function prepareTurn(
   const promptStart = performance.now();
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection);
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis });
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -2855,7 +2858,7 @@ async function prepareTurn(
   // (the rule `actuallyInjected` applied to memory bullets alone before
   // this item, now to every kind); the usage bump and the guard input
   // both read the included set.
-  const profile = getProfileParagraph(actor, { withholdSensitive });
+  const profile = anonymous ? undefined : getProfileParagraph(actor, { withholdSensitive });
   const evidence: TurnEvidence[] = [
     { id: `user:${turnId}`, kind: "user_assertion", text, rendered: text, entityIds: [] },
     ...memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map(
@@ -3551,7 +3554,7 @@ export function __resetOutputNotificationsForTests(): void {
  * guards (guards.ts) are a different gate and are not touched here. */
 export function applyOutputBoundary(actor: PersonRow, value: TurnValue): TurnValue {
   if (value.source === "safety_refuse") return value;
-  const band = speakerAgeBand(actor, new Date());
+  const band = effectiveBand("chat", actor, null, new Date()).band;
   const evaluation = evaluateReply(value.reply, band);
   const safety = evaluation.effective;
   notifyOncePerTurn(actor, safety, value.turn_id, "[turn]");

@@ -5098,9 +5098,15 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
   });
 
   test("robot deliverables are on the phone while chat wording stays unchanged", async () => {
-    const { client } = await owner();
+    const { client, actor } = await owner();
     await withLookupStub({ draft: "I can't directly access URLs, but I can help you find the page by name.", forcedCall: false, twoSources: true }, async () => {
-      const robot = await client.post("/api/turn", { surface: "robot", text: "what's the address of the new album page" });
+      const evidence = { person: actor.id, basis: "voice", level: "confirmed" };
+      const robot = await client.post("/api/turn", {
+        surface: "robot",
+        text: "what's the address of the new album page",
+        speaker_evidence: evidence,
+        present: [evidence],
+      });
       expect(robot.status).toBe(200);
       const robotValue = (await robot.json()) as { reply: { text: string }; sources?: unknown[] };
       expect(robotValue.reply.text).toBe("The link's on your phone.");

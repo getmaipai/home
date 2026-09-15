@@ -190,6 +190,7 @@ export interface EpisodeMatch {
 export interface RecallEpisodesOptions {
   /** Withhold episodes whose source turn contains a sensitive record. */
   withholdSensitive?: boolean;
+  anonymous?: boolean;
   limit?: number;
   /** The conversation currently in progress: its newest four turns are
    * already in the model's window, so they are never recalled here too. */
@@ -419,7 +420,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
       : []),
   ]);
   const within = opts.withinConversationId;
-  const sensitiveTurnIds = opts.withholdSensitive ? new Set(sqlite.query("SELECT DISTINCT source AS id FROM memory_records WHERE sensitive = 1 AND source IS NOT NULL").all().map((r) => (r as { id: string }).id)) : new Set<string>();
+  const sensitiveTurnIds = (opts.withholdSensitive || opts.anonymous) ? new Set(sqlite.query(`SELECT DISTINCT source AS id FROM memory_records WHERE ${opts.anonymous ? "scope = 'person' OR sensitive = 1" : "sensitive = 1"} AND source IS NOT NULL`).all().map((r) => (r as { id: string }).id)) : new Set<string>();
 
   // Lexical: BM25 over the person's own rows (bm25() is lower-is-better).
   // The date window and the excluded turns are part of the SQL, so a

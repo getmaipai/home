@@ -24,6 +24,13 @@ import { bannedPhrasesFor } from "@/lib/replyConstraints";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { nextHlc } from "@/lib/hlc";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
+import type { PersonRow } from "@/types";
+import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+
+export function effectiveBand(surface: Surface, actor: PersonRow, speakerEvidence: SpeakerEvidence | null | undefined, now: Date): { band: AgeBand; basis: "identified_profile" | "unknown_speaker_default" } {
+  const unknownRobot = surface === "robot" && (!speakerEvidence || speakerEvidence.level === "unknown" || speakerEvidence.person !== actor.id);
+  return unknownRobot ? { band: "child", basis: "unknown_speaker_default" } : { band: speakerAgeBand(actor, now), basis: "identified_profile" };
+}
 
 /** Section 6: sensitive records are allowed on the robot only when the
  * body confirms the speaker and confirms that the speaker is alone. An
