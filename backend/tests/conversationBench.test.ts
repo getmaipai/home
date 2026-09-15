@@ -102,7 +102,7 @@ describe("the fixture", () => {
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern", "Sunday", "Tuesday", "Clover", "Indigo", "Cosmo", "Rivet", "Mopey", "Lord", "Answer", "Serena", "Vale"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern", "Bay", "Sunday", "Tuesday", "Clover", "Indigo", "Cosmo", "Rivet", "Mopey", "Lord", "Answer", "Serena", "Vale"]).toContain(name);
     }
   });
 
