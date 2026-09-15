@@ -160,6 +160,51 @@ describe("AGE-01: a child's question an adult's record would answer is deferred"
   });
 });
 
+describe("AGE-02: a worrying conversation notifies the adults", () => {
+  async function ownerWithChild() {
+    const { client: ownerClient, actor: ownerRow } = await owner();
+    const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = db.select().from(people).where(eq(people.id, ((await created.json()) as { id: string }).id)).get()!;
+    return { ownerRow, child };
+  }
+
+  async function settledNotifications(row: PersonRow) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return listPending(row).filter((n) => n.typeId === "child.worrying_conversation");
+  }
+
+  test("a fighting turn notifies the owner without leaking the conversation", async () => {
+    const { ownerRow, child } = await ownerWithChild();
+    const result = await withChat("I hear you. Please tell a grown-up if you need help.", () => runTurn(child, "chat", "why are mommy and daddy always fighting"));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const pending = await settledNotifications(ownerRow);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.typeId).toBe("child.worrying_conversation");
+    expect(pending[0]!.text).toContain(child.displayName);
+    expect(pending[0]!.text).not.toMatch(/fighting|mommy|daddy/i);
+    expect(pending[0]!.text).not.toContain("I hear you");
+    expect(result.value.reply.text.split(/[.!?]/).filter(Boolean).at(-1)).toMatch(/grown-up|mention/i);
+  });
+
+  test("a goldfish turn creates no worrying notification", async () => {
+    const { ownerRow, child } = await ownerWithChild();
+    await withChat("That sounds really sad.", () => runTurn(child, "chat", "I'm sad my goldfish died"));
+    expect(await settledNotifications(ownerRow)).toHaveLength(0);
+  });
+
+  test("the same cue on a second turn creates a second notification", async () => {
+    const { ownerRow, child } = await ownerWithChild();
+    await withChat("Please tell a grown-up.", async () => {
+      const first = await runTurn(child, "chat", "why are mommy and daddy always fighting");
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      await runTurn(child, "chat", "why are mommy and daddy always fighting", { conversationId: first.value.conversation_id });
+    });
+    expect(await settledNotifications(ownerRow)).toHaveLength(2);
+  });
+});
+
 const subjectsOfTurn = (turnId: string) => turnSubjectsOf(db.select({ subjects: conversationTurns.subjects }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
 
 describe("lib/turnEngine.ts runTurn()", () => {

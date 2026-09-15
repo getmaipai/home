@@ -5,12 +5,44 @@
 import { describe, expect, test } from "bun:test";
 import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, exactFieldOf, lookupDecision, sensitiveAllowed, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
+import { worryingConversation } from "@/lib/turnContext";
 
 // ACT-01: the intent and the guards' shape read the frozen signal; the
 // tests classify the utterance the way prepareTurn() does, with the
 // bundled command openers a test needs.
 const openers = new Set(["set", "explain", "give", "walk", "tell"]);
 const signalFor = (text: string) => classifyTurnSignal({ text, commandOpeners: openers, ageBand: "adult" });
+
+describe("AGE-02: worryingConversation()", () => {
+  const childSubject = (utterance: string, role = "child") => [{ type: "unresolved" as const, surface_form: utterance, candidate_kinds: [], provenance: "turn", confidence: 1, carried_question: null, role, utterance }];
+  const safe = { notify_parent: false };
+
+  test("recognizes a child's fighting cue", () => {
+    const signal = classifyTurnSignal({ text: "why are mommy and daddy always fighting", commandOpeners: openers, ageBand: "child" });
+    expect(worryingConversation(signal, childSubject("why are mommy and daddy always fighting"), safe)).toBe(true);
+  });
+
+  test("does not treat ordinary child sadness as worrying", () => {
+    const signal = classifyTurnSignal({ text: "I'm sad my goldfish died", commandOpeners: openers, ageBand: "child" });
+    expect(worryingConversation(signal, childSubject("I'm sad my goldfish died"), safe)).toBe(false);
+  });
+
+  test("does not treat an adult's fighting sentence as worrying", () => {
+    const signal = classifyTurnSignal({ text: "why are mommy and daddy always fighting", commandOpeners: openers, ageBand: "adult" });
+    expect(worryingConversation(signal, childSubject("why are mommy and daddy always fighting", "adult"), safe)).toBe(false);
+  });
+
+  test("recognizes high-intensity sadness aimed at the owner", () => {
+    const signal = classifyTurnSignal({ text: "I'm very sad at Sage", commandOpeners: openers, ageBand: "child" });
+    const aimed = { ...signal, target: "other" as const, emotion_intensity: "high" as const, expressed_emotion: "sadness" as const };
+    expect(worryingConversation(aimed, [{ ...childSubject("I'm very sad at Sage")[0]!, type: "unresolved" as const, provenance: "turn" }], safe)).toBe(true);
+  });
+
+  test("safety notify_parent is sufficient by itself", () => {
+    const signal = classifyTurnSignal({ text: "hello", commandOpeners: openers, ageBand: "adult" });
+    expect(worryingConversation(signal, [], { notify_parent: true })).toBe(true);
+  });
+});
 
 test("sensitiveAllowed(): the robot requires a confirmed speaker who is confirmed alone", () => {
   const owner = "person-1";
