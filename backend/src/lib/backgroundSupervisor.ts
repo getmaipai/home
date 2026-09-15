@@ -23,6 +23,7 @@ import { backgroundModelPath, ensureBackgroundModel } from "@/lib/backgroundAsse
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
+import type { ChatMessage } from "@maipai/spec/llm/ts/types.js";
 import { seedFields } from "@/lib/benchSampling";
 
 export type BackgroundBackendKind = "url" | "spawned" | "stub";
@@ -208,7 +209,7 @@ export function __resetBackgroundSupervisorForTests(): void {
 }
 
 export async function completeBackground(
-  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+  messages: ChatMessage[],
   opts?: {
     temperature?: number;
     max_tokens?: number;
