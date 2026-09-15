@@ -3642,6 +3642,100 @@ describe("POST /api/turn/stream", () => {
     expect(value.source).toBe("model");
   });
 
+  describe("WIRE-01: cancel", () => {
+    async function firstTurnId(res: Response): Promise<string> {
+      const reader = res.body!.getReader();
+      const next = await reader.read();
+      const event = JSON.parse(new TextDecoder().decode(next.value).trim()) as { type: string; turn_id?: string };
+      expect(event.type).toBe("turn_meta");
+      expect(event.turn_id).toBeTruthy();
+      return event.turn_id!;
+    }
+
+    async function slowStub() {
+      __resetLlmSupervisorForTests();
+      const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      const stub = startStubLlmServer(0, { scriptedChatReply: async () => { await gate; return "A delayed answer."; } });
+      process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+      return { stub, release, cleanup: () => { stub.stop(); delete process.env.MAIPAI_LLAMA_SERVER_URL; __resetLlmSupervisorForTests(); } };
+    }
+
+    test("cancels an in-flight stream and aborts the upstream request", async () => {
+      const { client } = await owner();
+      let releaseModel: () => void = () => {};
+      const modelGate = new Promise<void>((resolve) => { releaseModel = resolve; });
+      __resetLlmSupervisorForTests();
+      const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+      const stub = startStubLlmServer(0, { scriptedChatReply: async () => { await modelGate; return "A delayed answer."; } });
+      process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+      try {
+        const streamResponse = await client.post("/api/turn/stream", { text: "wait for me" });
+        expect(streamResponse.status).toBe(200);
+        const reader = streamResponse.body!.getReader();
+        const first = await reader.read();
+        const firstEvent = JSON.parse(new TextDecoder().decode(first.value).trim()) as { type: string; turn_id?: string };
+        expect(firstEvent.type).toBe("turn_meta");
+        expect(firstEvent.turn_id).toBeTruthy();
+        const cancelResponse = await client.post(`/api/turn/${firstEvent.turn_id}/cancel`, {});
+        expect(cancelResponse.status).toBe(200);
+        expect(await cancelResponse.json()).toEqual({ cancelled: true });
+        releaseModel();
+        const events = await readNdjson(new Response(new ReadableStream({
+          async start(controller) {
+            for (;;) {
+              const next = await reader.read();
+              if (next.done) break;
+              controller.enqueue(next.value);
+            }
+            controller.close();
+          },
+        })));
+        expect(events.at(-1)).toMatchObject({ type: "error", code: "turn_cancelled" });
+        const deadline = Date.now() + 5_000;
+        while (stub.aborted() === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
+        stub.stop();
+        expect(stub.aborted()).toBeGreaterThan(0);
+      } finally {
+        releaseModel();
+        stub.stop();
+        delete process.env.MAIPAI_LLAMA_SERVER_URL;
+        __resetLlmSupervisorForTests();
+      }
+    }, 10_000);
+
+    test("a second cancel of the same turn answers false", async () => {
+      const { client } = await owner();
+      const slow = await slowStub();
+      try {
+        const first = await client.post("/api/turn/stream", { text: "cancel twice" });
+        const turnId = await firstTurnId(first);
+        expect(await (await client.post(`/api/turn/${turnId}/cancel`, {})).json()).toEqual({ cancelled: true });
+        expect(await (await client.post(`/api/turn/${turnId}/cancel`, {})).json()).toEqual({ cancelled: false });
+      } finally { slow.release(); slow.cleanup(); }
+    });
+
+    test("a turn owned by another person cannot be cancelled", async () => {
+      const { client } = await owner();
+      const created = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+      const child = (await created.json()) as { id: string };
+      const childClient = new TestClient();
+      await childClient.post("/api/auth/select", { personId: child.id });
+      const slow = await slowStub();
+      try {
+        const stream = await childClient.post("/api/turn/stream", { text: "this is mine" });
+        const turnId = await firstTurnId(stream);
+        expect((await client.post(`/api/turn/${turnId}/cancel`, {})).status).toBe(403);
+      } finally { slow.release(); slow.cleanup(); }
+    });
+
+    test("an unknown turn cannot be cancelled", async () => {
+      const { client } = await owner();
+      expect((await client.post("/api/turn/not-a-real-turn/cancel", {})).status).toBe(404);
+    });
+  });
+
   test("400s for an unimplemented surface with a code the caller can branch on", async () => {
     const { client } = await owner();
     const res = await client.post("/api/turn/stream", { surface: "tv", text: "hi" });

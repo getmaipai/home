@@ -14,6 +14,7 @@ import type { ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, E
 export interface StubLlmServerHandle {
   url: string;
   stop: () => void;
+  aborted: () => number;
 }
 
 const STUB_PREFIX = "[stub model: no real model loaded, this is a canned reply]";
@@ -213,6 +214,8 @@ export interface StubLlmServerOptions {
 /** port 0 lets the OS assign a free port, avoiding a fixed-port clash
  * when tests and a dev server both start a stub. */
 export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): StubLlmServerHandle {
+  let abortedRequests = 0;
+  let activeRequests = 0;
   const server = Bun.serve({
     port,
     fetch: async (req) => {
@@ -224,6 +227,9 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
         return Response.json({ data: [{ id: "stub-chat", object: "model" }] });
       }
       if (url.pathname === "/v1/chat/completions" && req.method === "POST") {
+        activeRequests += 1;
+        abortedRequests += 1;
+        req.signal.addEventListener("abort", () => { abortedRequests += 1; }, { once: true });
         const body = (await req.json().catch(() => null)) as ChatCompletionRequest | null;
         if (!body || !Array.isArray(body.messages)) {
           return Response.json({ error: "messages is required" }, { status: 400 });
@@ -243,6 +249,8 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
           });
         }
         const scripted = await opts.scriptedChatReply?.(body);
+        if (req.signal.aborted) abortedRequests += 1;
+        activeRequests -= 1;
         const scriptedContent = scripted !== undefined ? (typeof scripted === "string" ? scripted : JSON.stringify(scripted)) : undefined;
         if (body.stream) {
           return new Response(streamChatCompletion(body, scriptedContent), {
@@ -271,6 +279,7 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
   });
   return {
     url: `http://127.0.0.1:${server.port}`,
-    stop: () => server.stop(true),
+    stop: () => { if (activeRequests > 0) abortedRequests += activeRequests; server.stop(true); },
+    aborted: () => abortedRequests,
   };
 }

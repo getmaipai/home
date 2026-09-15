@@ -11,7 +11,7 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId } from "@/lib/conversationHistory";
 
 export const turnRoutes = apiRouter();
-const inFlightTurns = new Map<string, AbortController>();
+const inFlightTurns = new Map<string, { controller: AbortController; ownerId: string; cancelled: boolean }>();
 
 const cancelTurnRoute = createRoute({
   method: "post", path: "/{turn_id}/cancel", tags: ["Turns"],
@@ -26,12 +26,16 @@ const cancelTurnRoute = createRoute({
 });
 
 turnRoutes.openapi(cancelTurnRoute, (c) => {
-  const owner = turnOwnerId(c.req.valid("param").turn_id);
+  const flight = inFlightTurns.get(c.req.valid("param").turn_id);
+  const owner = flight?.ownerId ?? turnOwnerId(c.req.valid("param").turn_id);
   if (owner === null) return c.json({ error: "Turn not found" }, 404);
   if (owner !== c.get("person").id) return c.json({ error: "Cannot cancel another person's turn" }, 403);
-  const controller = inFlightTurns.get(c.req.valid("param").turn_id);
-  if (controller) controller.abort();
-  return c.json({ cancelled: Boolean(controller) }, 200);
+  const wasInFlight = Boolean(flight && !flight.cancelled);
+  if (flight && !flight.cancelled) {
+    flight.controller.abort();
+    flight.cancelled = true;
+  }
+  return c.json({ cancelled: wasInFlight }, 200);
 });
 
 const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "turn_rate_limited" } as const;
@@ -320,7 +324,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
       try {
         controller.enqueue(ndjsonLine(turnMeta));
         controller.enqueue(ndjsonLine({ type: "signal", signal: result.signal }));
-        inFlightTurns.set(result.turnId, abortController);
+        inFlightTurns.set(result.turnId, { controller: abortController, ownerId: actor.id, cancelled: false });
         for await (const event of streamTurnEvents(result, actor.id, THINKING_CUE_DELAY_MS, abortController.signal)) {
           controller.enqueue(ndjsonLine(event));
         }
