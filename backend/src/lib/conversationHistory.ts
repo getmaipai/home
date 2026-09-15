@@ -522,7 +522,7 @@ export interface PendingAsk {
    * parser (lib/unknownNames.ts), a cancel clears it, an unreadable
    * answer clears it and falls through to the model. `packageId` is
    * the engine's own marker on this kind, never a package. */
-  kind: "confirm" | "ask" | "lookup" | "who";
+  kind: "confirm" | "ask" | "lookup" | "who" | "relay";
   prompt: string;
   packageId: string;
   args: Record<string, unknown>;

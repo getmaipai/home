@@ -2022,6 +2022,22 @@ export async function resolvePendingAsk(
     return { reply: { text: outcome.reply }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
   }
 
+  if (pending.kind === "relay") {
+    setPendingAsk(conversation.id, null);
+    if (AFFIRMATIVE_RE.test(text.trim())) {
+      const adults = listActivePeople().filter((person) => person.role === "owner" || person.role === "admin");
+      const adult = adults[0];
+      if (adult) queueOpenQuestion({ person: adult.id, kind: "relay", text: `${actor.displayName} asked about ${pending.name ?? "that"}`, subjectId: pending.subjectId ?? null, source: turnId });
+      protocol.answer = { kind: "confirm", answer: "affirmative" };
+      return { reply: { text: "Okay, I'll let them know." }, source: "policy", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    }
+    if (NEGATIVE_RE.test(text.trim())) {
+      protocol.answer = { kind: "confirm", answer: "negative" };
+      return { reply: { text: "Okay." }, source: "policy", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    }
+    return null;
+  }
+
   if (pending.kind === "confirm") {
     if (AFFIRMATIVE_RE.test(text.trim())) {
       // Consumed once, bound to the exact package and arguments the
@@ -2889,6 +2905,16 @@ async function prepareTurn(
     subjectsCarried: carried.length > 0,
     subjectPronouns,
   };
+  const householdSubject = householdSubjectTurn(text, turnContext);
+  const deferredSubject = turnContext.subjects.find((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household");
+  const deferredSubjectName = deferredSubject ? registryNameById(deferredSubject.entity_id) : null;
+  const mayDefer = (ageBand === "child" || ageBand === "teen") && shapeOf(signal, text) === "question" && householdSubject && memoryMatches.withheldForBand > 0 && deferredSubjectName !== null && deferredSubject !== undefined && !memoryMatches.some((match) => match.record.subject_id === deferredSubject.entity_id);
+  if (mayDefer && deferredSubject) {
+    const line = "That's one for your mom or dad to talk with you about. Want me to let them know?";
+    console.log(`[turn] deferred subject=${deferredSubjectName}`);
+    setPendingAsk(conversation.id, { kind: "relay", prompt: line, packageId: "relay", args: {}, name: deferredSubjectName, subjectId: deferredSubject.entity_id });
+    return immediate({ reply: { text: line }, source: "policy", safety, crisis_resources: crisisResources }, [deferredSubject]);
+  }
   if (shapeOf(signal, text) === "question" && !householdSubjectTurn(text, turnContext)) {
     const decided = lookupDecision(text, subjects, turnContext.roster);
     const namesSubject = subjects.some((s) => s.type === "world" || s.type === "unresolved") && subjects.some((s) => {

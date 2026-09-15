@@ -49,7 +49,7 @@ export interface TurnObserved {
   records: readonly { text: string; status: string }[];
   /** The conversation's pending ask after the turn. `who` and `lookup`
    * are the coherence review's question 5 widening. */
-  pendingAsk: "confirm" | "ask" | "who" | "lookup" | null;
+  pendingAsk: "confirm" | "ask" | "who" | "lookup" | "relay" | null;
   /** The item texts the household's lists gained since the
    * conversation started. */
   listItems: readonly string[];

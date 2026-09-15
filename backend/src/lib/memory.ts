@@ -395,6 +395,8 @@ export interface RecallMatch {
   score: number;
 }
 
+export type RecallResult = RecallMatch[] & { withheldForBand: number };
+
 // "Entity-first recall then scored vectors" (4.4), real as of step 5:
 // entity-first (does the query mention a known entity's name? if so,
 // records mentioning that entity are boosted, and bypass the cosine
@@ -597,7 +599,7 @@ function activeStatusScopePersonWhere(opts: ListOptions) {
   return and(...conditions);
 }
 
-export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}): RecallMatch[] {
+export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}): RecallResult {
   const roleOf = rolesById();
   let rows = db.select().from(memoryRecords).where(activeStatusScopePersonWhere(opts)).all();
   // Never the profile paragraph: turnEngine.ts's buildSystemPrompt()
@@ -615,9 +617,13 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // household forgets it from the Memory page as before).
   rows = rows.filter((r) => !detectCredential(r.text).detected);
   if (opts.excludeSource) rows = rows.filter((r) => r.source !== opts.excludeSource);
-  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly, opts.withholdSensitive));
-
   const queryWords = tokenize(query);
+  // Until AGE-01 chunk b adds the age-band predicate to canRead(), this is
+  // the sensitive household subset withheld from a child/teen turn.
+  const withheldForBand = opts.withholdSensitive
+    ? rows.filter((r) => r.scope === "household" && r.sensitive && !canRead(actor, r, roleOf, opts.selfOnly, false) && [...queryWords].some((word) => tokenize(r.text).has(word))).length
+    : 0;
+  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly, opts.withholdSensitive));
 
   const matchedEntityNameWords: Set<string>[] = rows
     .filter((r) => r.recordKind === "entity")
@@ -714,7 +720,8 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // the prompt instead of every one of these top 20 candidates.
   if (opts.bumpUsage !== false) bumpMatchUsage(top);
 
-  return top;
+  Object.defineProperty(top, "withheldForBand", { value: withheldForBand, enumerable: true });
+  return top as RecallResult;
 }
 
 /** Exported for turnEngine.ts's turn-scoped call: bumps usage only on the
