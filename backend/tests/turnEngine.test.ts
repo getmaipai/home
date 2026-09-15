@@ -5313,14 +5313,19 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       // The promise the hub cannot keep is dropped; the rest stands.
       expect(result.value.reply.text).toBe("Dogs can get sick for a lot of reasons.");
       expect(getPendingAsk(conv.value.id)).toBeNull();
-      const res = await client.post("/api/turn/stream", { text: "why does Rover keep getting sick", conversation_id: conv.value.id });
+      // The streaming path in a conversation of its own (REP-01 would read
+      // the same sentence again in this one as a repeat).
+      const { createConversation } = await import("@/lib/conversationHistory");
+      const streamConv = createConversation(actor, { surface: "chat" });
+      if (!streamConv.ok || !streamConv.value) throw new Error("no conversation");
+      const res = await client.post("/api/turn/stream", { text: "why does Rover keep getting sick", conversation_id: streamConv.value.id });
       const events = await readNdjson(res);
       expect(seen.forced).toBe(0);
       const value = events.find((e) => e.type === "done")!.value as { source: string; plugin_id?: string; reply: { text: string } };
       expect(value.source).toBe("model");
       expect(value.plugin_id).toBeUndefined();
       expect(value.reply.text).toBe("Dogs can get sick for a lot of reasons.");
-      expect(getPendingAsk(conv.value.id)).toBeNull();
+      expect(getPendingAsk(streamConv.value.id)).toBeNull();
     });
     // A promise that was the whole draft takes the question's emptied line.
     // (the DONT_KNOW bank, rotated per person by emptiedLine()).

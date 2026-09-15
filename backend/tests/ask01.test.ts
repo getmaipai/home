@@ -64,6 +64,12 @@ async function withChat<T>(reply: string | ((request: ChatCompletionRequest) => 
   }
 }
 
+// REP-01: a stub that said the same line on the previous turn would be
+// read as a repeat, so a scripted reply varies after its first use.
+const varied = (base: string): ((request: ChatCompletionRequest) => string) => {
+  let n = 0;
+  return () => (n++ === 0 ? base : "That's a new one on me, tell me more.");
+};
 const contextOf = (request: ChatCompletionRequest) => request.messages.filter((m) => m.role === "system").map((m) => (typeof m.content === "string" ? m.content : "")).join("\n");
 const entityNamed = (name: string) => db.select().from(entities).where(and(eq(entities.name, name), isNull(entities.deletedAt))).get();
 const subjectsOfTurn = (turnId: string) => turnSubjectsOf(db.select({ subjects: conversationTurns.subjects }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
@@ -142,7 +148,7 @@ describe("the engine's ask about a name it has never heard", () => {
 describe("the answer to the ask", () => {
   test("a relative: a local person entity, a stated relative_of, pronouns she, the piano line in the description, the ask gone; the next turn's pronoun keeps the subject and the context carries the line", async () => {
     const { actor } = await owner();
-    await withChat("Sounds like a fun weekend.", async (seen) => {
+    await withChat(varied("Sounds like a fun weekend."), async (seen) => {
       const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend");
       if (!first.ok) throw new Error(first.error);
       const conversationId = first.value.conversation_id;
@@ -168,7 +174,7 @@ describe("the answer to the ask", () => {
       const context = contextOf(seen.requests[1]!);
       expect(context).toContain("Clover (your relative), she: cousin, she teaches piano");
       expect(context).not.toContain("never heard before");
-      expect(third.value.reply.text).toBe("Sounds like a fun weekend.");
+      expect(third.value.reply.text).toBe("That's a new one on me, tell me more.");
       expect(getPendingAsk(conversationId)).toBeNull();
     });
   });
@@ -213,7 +219,7 @@ describe("the answer to the ask", () => {
 
   test("'never mind' also declines the judge's twin question about the candidate, so nothing asks again (a review)", async () => {
     const { actor } = await owner();
-    await withChat("Sounds like a fun weekend.", async () => {
+    await withChat(varied("Sounds like a fun weekend."), async () => {
       const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend");
       if (!first.ok) throw new Error(first.error);
       const conversationId = first.value.conversation_id;
@@ -226,7 +232,7 @@ describe("the answer to the ask", () => {
       expect(listOpenQuestions(actor.id).map((q) => q.status)).toEqual(["declined", "declined"]);
       const next = await runTurn(actor, "chat", "she brought it back today anyway", { conversationId });
       if (!next.ok) throw new Error(next.error);
-      expect(next.value.reply.text).toBe("Sounds like a fun weekend.");
+      expect(next.value.reply.text).toBe("That's a new one on me, tell me more.");
     });
   });
 
@@ -248,7 +254,7 @@ describe("the answer to the ask", () => {
 
   test("'never mind' clears the ask with no entity and no second ask (who-ask-declined)", async () => {
     const { actor } = await owner();
-    await withChat("Sounds like a fun weekend.", async (seen) => {
+    await withChat(varied("Sounds like a fun weekend."), async (seen) => {
       const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend");
       if (!first.ok) throw new Error(first.error);
       const conversationId = first.value.conversation_id;
@@ -259,7 +265,7 @@ describe("the answer to the ask", () => {
       expect(entityNamed("Clover")).toBeUndefined();
       const next = await runTurn(actor, "chat", "she brought it back today anyway", { conversationId });
       if (!next.ok) throw new Error(next.error);
-      expect(next.value.reply.text).toBe("Sounds like a fun weekend.");
+      expect(next.value.reply.text).toBe("That's a new one on me, tell me more.");
       expect(getPendingAsk(conversationId)).toBeNull();
       expect(seen.requests).toHaveLength(2);
     });
@@ -319,7 +325,7 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     const { actor } = await owner();
     const juniper = candidate(actor, "juniper", "pet");
     queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Juniper?", subjectId: juniper.id, source: "turn-judge" });
-    await withChat("Warm and sunny.", async () => {
+    await withChat(varied("Warm and sunny."), async () => {
       const first = await runTurn(actor, "chat", "what's the weather like");
       if (!first.ok) throw new Error(first.error);
       expect(first.value.reply.text).toBe("Warm and sunny. Who's Juniper?");
@@ -329,7 +335,7 @@ describe("the judge's open question: a candidate is never knowledge", () => {
       expect(listOpenQuestions(actor.id)[0]).toMatchObject({ status: "declined" });
       const later = await runTurn(actor, "chat", "and tomorrow", { conversationId: first.value.conversation_id });
       if (!later.ok) throw new Error(later.error);
-      expect(later.value.reply.text).toBe("Warm and sunny.");
+      expect(later.value.reply.text).toBe("That's a new one on me, tell me more.");
       expect(entityNamed("juniper")).toMatchObject({ source: "inferred" });
     });
   });
@@ -356,7 +362,7 @@ describe("the judge's open question: a candidate is never knowledge", () => {
 
   test("the engine's own ask, answered after the judge made its candidate: the candidate is the entity (confirmed or replaced), and the judge's question is answered too, never asked again (a review)", async () => {
     const { actor } = await owner();
-    await withChat("Sounds like a fun weekend.", async () => {
+    await withChat(varied("Sounds like a fun weekend."), async () => {
       const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend");
       if (!first.ok) throw new Error(first.error);
       // The judge, between the ask and the answer: a person guessed.
@@ -371,7 +377,7 @@ describe("the judge's open question: a candidate is never knowledge", () => {
       expect(listOpenQuestions(actor.id).map((q) => q.status)).toEqual(["answered"]);
       const next = await runTurn(actor, "chat", "what should I get her as a thank-you", { conversationId: first.value.conversation_id });
       if (!next.ok) throw new Error(next.error);
-      expect(next.value.reply.text).toBe("Sounds like a fun weekend.");
+      expect(next.value.reply.text).toBe("That's a new one on me, tell me more.");
     });
     // The same kind: the candidate is confirmed in place.
     await withChat("Sounds like a fun weekend.", async () => {
@@ -411,7 +417,8 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     const older = queueOpenQuestion({ person: actor.id, kind: "who", text: "Is Clover your partner?", subjectId: edge.value.id, source: "turn-judge" });
     const juniper = candidate(actor, "juniper", "pet");
     const newer = queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Juniper?", subjectId: juniper.id, source: "turn-judge" });
-    await withChat("Third time this week.", async () => {
+    let n = 0;
+    await withChat(() => ["Third time this week.", "Clear skies tonight.", "Dinner sounds lovely."][n++]!, async () => {
       const first = await runTurn(actor, "chat", "juniper chewed through the garden hose again");
       if (!first.ok) throw new Error(first.error);
       expect(first.value.reply.text).toBe("Third time this week. Who's Juniper?");
@@ -422,12 +429,12 @@ describe("the judge's open question: a candidate is never knowledge", () => {
       // Clover is not in play: the relationship question holds.
       const later = await runTurn(actor, "chat", "what's the weather like", { conversationId: first.value.conversation_id });
       if (!later.ok) throw new Error(later.error);
-      expect(later.value.reply.text).toBe("Third time this week.");
+      expect(later.value.reply.text).toBe("Clear skies tonight.");
       expect(listOpenQuestions(actor.id).find((q) => q.id === older.id)).toMatchObject({ status: "pending" });
       // Named again, it is put.
       const named = await runTurn(actor, "chat", "Clover is coming for dinner", { conversationId: first.value.conversation_id });
       if (!named.ok) throw new Error(named.error);
-      expect(named.value.reply.text).toBe("Third time this week. Is Clover your partner?");
+      expect(named.value.reply.text).toBe("Dinner sounds lovely. Is Clover your partner?");
     });
   });
 

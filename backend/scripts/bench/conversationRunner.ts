@@ -571,6 +571,9 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
   // for every turn of this conversation and is unpinned afterwards.
   if (conv.clock) __setPromptClockForBench(() => new Date(conv.clock!));
   try {
+  // REP-01: the hub's last delivered reply per conversation, for the
+  // "not the same reply again" read.
+  const previousReplies: Record<string, string> = {};
   for (let i = 0; i < conv.turns.length; i++) {
     const turn = conv.turns[i]!;
     const speaker: Speaker = turn.as ?? "owner";
@@ -647,6 +650,10 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       pendingAsk: getPendingAsk(conversationId)?.kind ?? null,
       pendingAskName: getPendingAsk(conversationId)?.name ?? null,
       lookupShape: line?.lookup_shape ?? null,
+      // REP-01: the turn's extra generations (the retry), and the reply
+      // this conversation delivered before it.
+      retries: line?.timings?.retries ?? null,
+      previousReply: previousReplies[conversationId] ?? null,
       // ASK-01: the person's own open questions, read after the judge
       // drained (a candidate's question is the judge's).
       openQuestions: listOpenQuestions(actor.id).map((q) => ({ kind: q.kind, status: q.status, text: q.text })),
@@ -677,6 +684,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
         .all()
         .map((r) => r.text),
     };
+    previousReplies[conversationId] = observed.reply;
     if (driven.error) observed.reply = `[error: ${driven.error}]`;
     scores.push(scoreTurn(conv, i, turn, observed));
   }

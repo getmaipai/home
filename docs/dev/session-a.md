@@ -5915,3 +5915,118 @@ own open question about a name the hub introduced is still possible
 when the judge infers a household entity from the person's turn; the
 answer path retires such a candidate when the person says the name is
 the world's.
+
+## REP-01: a cross-turn repetition guard, and the objection (2026-09-16)
+
+Section 16 part 3, item 4 of the ordered list, findings 29 and 46. The
+evening of 2026-09-14 sent a hedge four times, a cast list four times,
+a date five times and a search summary twice, because
+`repeat_question` compared a reply with the previous reply's question
+sentences and nothing compared a reply with the previous reply;
+bot-legacy's structural rule (the same reply text twice in a row is
+the chat-loop line) was recorded in `guards.ts` and never ported. And
+an objection ("you're not following me") met an 8B doing what an 8B
+does when contradicted: it re-asserted.
+
+**The read** (`lib/guards.ts`, both paths). The context carries the
+hub's previous two replies in the conversation
+(`GuardContext.previousReplies`, `turnContext.ts` reads them off the
+window, newest first). `repeat_sentence`, skippable: a reply sentence
+whose normal form (`normalizeForRepeat()`: lowercased, punctuation and
+whitespace collapsed; a closer is nothing, the register family owns
+it, and so is a sentence of two words or fewer, the one-word
+acknowledgment) equals a sentence's in either previous reply is
+skipped wherever it sits; on the stream `gateGuards()` reads it per
+sentence at the guards' own point, so a repeated opening never reaches
+the wire. `repeat_reply`, the whole-reply case (`isRepeatReply()`):
+the reply's content words and a previous reply's overlap by 80 percent
+or more of the larger set (a narrowed follow-up that answers one of
+three things asked is not the same reply, the review) and it carries
+no number and no proper noun the previous one lacked (a capitalized
+word past each sentence's first; "It" is none); and a reply the
+sentence read emptied is this case too. A repeat the person asked for
+("say that again", "sorry, what?", "come again", `repeatRequested()`)
+is the one time the same reply is right, and neither shape reads it
+(the `say-that-again` voice-repair row; the review). It
+takes REG-01's retry: the chat-loop line stands in (`emptiedLine()`
+with the reason), marked emptied, the engine regenerates once within
+the turn's two generations with `REPEAT_RETRY_NOTE` ("You already said
+that and the person heard it; say something new, or do what they
+asked"), and a retry that repeats too leaves the line. On the stream
+the end-of-reply whole-reply case is recorded on the row (the text is
+out); the per-sentence read is what keeps the repeat off the wire, and
+`same-line-twice` is caught there. Codex's unfinished guard-half diff
+(`data-scratch/c/rep-01a-unfinished.patch`) was the starting point;
+the shapes were redone (the emptied line is the chat-loop line, not a
+malformed one; the whole-reply case reads the numbers and proper nouns
+by set difference; the self-assertion reads the subject's content
+words, not a token count).
+
+**The objection** (rule 3, the guard half). An objection is the
+signal's target hub with a correction (a retraction aimed at the hub
+objects to nothing), or the objection shapes
+(`OBJECTION_RE`: "you already said that", "same answer again",
+"you're repeating yourself", "you're not following", "not what I
+asked", "stop that", "that's the second time"). On one, a first-person
+sentence about the hub's own understanding (`SELF_ASSERTION_RE`: "I do
+get it", "I'm not repeating myself", "I did answer") with no content
+word beyond the assertion itself is `self_assertion` (the answer is
+content whether or not anything grounds it, "I hear you, it's a
+Friday", "it's at 4"; the hub's own earlier replies ground nothing, so
+a grounded read would cut the answer, the review): skipped, a tail on the register family (a register
+skip, so an emptied reply takes the retry), and the retry note carries
+the objection (`repeatRetryNote()`: the person's words and "do not say
+that you understand; address what they asked"). "I do get it, the
+dentist is Friday now" says something and stands. The remedy by
+objection type (a recomputation shown with its inputs, a model answer
+turned lookup, a lookup re-asked with the objection as the field, a
+register objection as a standing constraint) is the plan half,
+`repeat: forbidden` on ACT-03's plan, not here.
+
+**The exemptions, by construction.** The guards read the model's text
+only: the crisis overlay's line (source policy), a confirmation or an
+ask re-asked (source confirm, or the engine's own appended question
+after the guards) and a package's deterministic answer to the same
+literal question (source plugin) never pass through `guardReply()` or
+`gateGuards()`; a one-word acknowledgment is the two-word floor. A
+scripted stub that says the same line on consecutive turns is a repeat
+by construction, so seven engine tests (ASK-01's, LOOKUP-01's
+household stand-down) vary the line or take a fresh conversation for
+their second path.
+
+**The bench.** `said-that-already` (the previous reply seeded so the
+repeat is verbatim by construction, since a live lookup's summary is
+never the same twice: the same sentence again never reaches the row,
+the retry answers the weekday, "I do get it" on "you're not following
+me" is cut and the retry carries the objection) and `same-line-twice`
+(two consecutive turns seeded with the same sentence: the second is
+never delivered as-is, one retry, the guard array carries
+`repeat_reply`); `retries` (off the `[turn]` line's timings),
+`distinctFromPrevious` (under 80 percent of content words in the
+previous reply and not the same sentence) and `guardHits` (the turn's
+guard array) as expectation kinds. Tests: `tests/rep01.test.ts` (the
+shapes; the blocking and streaming retries, the note, the chat-loop
+line when the retry repeats; the objection; the exemptions), the
+corpus rows `rep01-*`. Not yet run in a set (budget mode; the
+coordinator's "set").
+
+**Left on record.** The first review's six: five in the tree (the
+requested repeat, the answer as content, the overlap over the larger
+set, the correction-only objection, "It" no proper noun) and the
+sixth a test (the end-of-stream record has one now). The second
+review's four, all in the tree: a repeat skipped with only an opener
+kept ("Sure thing") is the whole-reply case, whatever reason the
+opener was skipped for, on both paths (every skipped reason is read,
+not the first); a clause span the chunker hands over from a long
+previous sentence (past 90 characters it flushes at a clause boundary)
+is the repeat when it is that sentence's own prefix, suffix or inner
+clause, so a cast list twice never streams; the number read in the
+self-assertion never carries a global regex's lastIndex across turns. The 80 percent
+overlap reads content words after `tokenize()`'s stopword drop, so a
+short reply with one changed content word ("Sounds like a fun
+weekend, still") is still the same reply; a new number or a new
+proper noun is what makes it new. A
+repeat of a reply from three turns back is not read (two replies is
+the design's window). The end-of-stream whole-reply case cannot unsay
+what streamed; its record is the finding for a hold, if one is ever
+wanted.

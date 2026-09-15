@@ -28,6 +28,8 @@ interface CorpusRow {
    * rule, and the hub's previous reply for the repeated-question rule. */
   act?: GuardContext["act"];
   previousReply?: string;
+  /** REP-01: the hub's previous two replies, for the repeat shapes. */
+  previousReplies?: string[];
   /** ASK-01: the turn's unknown names, the subjects' pronouns and the
    * pronoun families in play, for the two new shapes. */
   unknownNames?: string[];
@@ -52,7 +54,7 @@ interface CorpusRow {
 const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "spec", "llm", "guard-corpus.json"), "utf-8"));
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
-  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };
+  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, previousReplies: row.previousReplies, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };
 }
 
 async function* sentenceStream(reply: string): AsyncGenerator<string, undefined, void> {

@@ -31,7 +31,7 @@ import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, splitIntoSentences, lookupShapeOf, lookupAnswered, readLookupDraft, LOOKUP_READ_MAX_CHARS, LOOKUP_FAILED_LINES, bannedPhraseRetryNote, type LookupRead, type LookupShape, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, normalizeForRepeat, splitIntoSentences, lookupShapeOf, lookupAnswered, readLookupDraft, LOOKUP_READ_MAX_CHARS, LOOKUP_FAILED_LINES, bannedPhraseRetryNote, repeatRetryNote, isRepeatReason, isRepeatReply, type LookupRead, type LookupShape, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
@@ -4135,7 +4135,10 @@ async function runTurnHoldingLease(
         if (emptiedBySkips && prepared.timings.retries < 1) {
           prepared.timings.retries++;
           const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => rawText.toLowerCase().includes(p.toLowerCase())) : null;
-          const again = await complete("chat", [...prepared.messages, { role: "system", content: retryPhrase ? bannedPhraseRetryNote(retryPhrase) : STATEMENT_RETRY_NOTE }], { thinking: false });
+          // REP-01: a repeat or a self-assertion emptied it: the note says
+          // so, and carries the objection when there was one.
+          const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : STATEMENT_RETRY_NOTE;
+          const again = await complete("chat", [...prepared.messages, { role: "system", content: note }], { thinking: false });
           generationDone = Date.now();
           if (again.ok) {
             const before = guardHits.length;
@@ -4485,6 +4488,13 @@ export async function* gateGuards(
   let spokeAnything = false;
   let skipped: { reason: GuardReason; sentence: string } | null = null;
   let justSkipped = false;
+  // REP-01: what was spoken, for the whole-reply read at the end; every
+  // skipped reason, so a register opener ahead of a repeated fact does
+  // not hide the repeat; whether anything spoken said something (a
+  // two-word opener alone answers nothing; a review).
+  let spoken = "";
+  const skippedReasons = new Set<GuardReason>();
+  let spokeContent = false;
   const liveCtx = (): GuardContext => ({ ...(typeof ctx === "function" ? ctx() : ctx), personId });
   while (!step.done) {
     // REG-01, rule 2: a register tail on a spoken span is cut before the
@@ -4511,6 +4521,7 @@ export async function* gateGuards(
       // streams on; if nothing else is ever spoken, the honest line
       // stands in at the end (guardReply()'s own rule).
       skipped ??= { reason, sentence: trimmed };
+      skippedReasons.add(reason);
       onGuardHit?.(reason, false);
       step = await iterator.next();
       continue;
@@ -4533,14 +4544,24 @@ export async function* gateGuards(
     // is not something spoken: an all-skipped reply still ends in the
     // honest line, not in "\n\n" (the review of #99's fix).
     if (trimmed) spokeAnything = true;
+    if (trimmed && normalizeForRepeat(trimmed) !== null) spokeContent = true;
+    spoken += rawSpan;
     yield rawSpan;
     step = await iterator.next();
   }
-  if (skipped && !spokeAnything) {
+  // REP-01, the whole-reply case at the end of a stream: the text is
+  // out, so the hit is the record (the row carries repeat_reply); the
+  // per-sentence read above is what keeps a repeated opening off the
+  // wire.
+  if (spokeContent && isRepeatReply(spoken, liveCtx())) onGuardHit?.("repeat_reply", false);
+  // A repeat skipped with only an opener spoken ("Sure thing!") answered
+  // nothing: the retry runs after it, as for an emptied reply.
+  const repeatEmptied = skippedReasons.has("repeat_sentence") && !spokeContent;
+  if (skipped && (!spokeAnything || repeatEmptied)) {
     // REG-01, rule 1: nothing remained of a reply to a statement; one
     // retry with the note, then the act's own line (OUT-01's bound on
     // generations).
-    if (isRegisterSkip(skipped.reason, liveCtx())) {
+    if (isRegisterSkip(skipped.reason, liveCtx()) || repeatEmptied) {
       const again = regenerate ? await regenerate() : null;
       let spoke = false;
       if (again) {
@@ -4567,9 +4588,12 @@ export async function* gateGuards(
         }
       }
       // The line by the turn's act (a close, a greeting, a question, a
-      // statement), never "say that again" to a thank-you.
-      onGuardHit?.(skipped.reason, true);
-      yield `${emptiedLine(liveCtx())} `;
+      // statement), never "say that again" to a thank-you; a reply the
+      // repeat read emptied is the whole-reply case and says the
+      // chat-loop line (REP-01).
+      const emptiedReason: GuardReason = skippedReasons.has("repeat_sentence") ? "repeat_reply" : skipped.reason;
+      onGuardHit?.(emptiedReason, true);
+      yield `${emptiedLine(liveCtx(), emptiedReason)} `;
       return step.value;
     }
     onGuardHit?.(skipped.reason, true);
@@ -5057,7 +5081,8 @@ async function runTurnStreamHoldingLease(
               if (generations >= 2) return null;
               generations++;
               const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => modelMessages.some((m) => m.content.toLowerCase().includes(p.toLowerCase()))) : null;
-              const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: retryPhrase ? bannedPhraseRetryNote(retryPhrase) : STATEMENT_RETRY_NOTE }], { thinking: false }, opts.signal);
+              const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : STATEMENT_RETRY_NOTE;
+              const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: note }], { thinking: false }, opts.signal);
               if (!again.ok) return null;
               return gateOutputSafety(holdOpening(again.tokens, false), actor, prepared.turnId);
             },

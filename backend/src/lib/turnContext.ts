@@ -365,6 +365,8 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     target: ctx.signal.target,
     repair: ctx.signal.repair,
     previousReply: [...ctx.history].reverse().find((m) => m.role === "assistant")?.content,
+    // REP-01: the previous two replies, newest first, for the repeat shapes.
+    previousReplies: ctx.history.filter((m) => m.role === "assistant").slice(-2).reverse().map((m) => m.content),
     // ASK-01: the unknown names, the subjects' pronouns, and the
     // pronoun families the person used this turn and the last two.
     // LOOKUP-02: a request the turn's lookup tools serve (a world

@@ -9,7 +9,7 @@
 // apart from the scored failures.
 import { tokenize } from "@/lib/text";
 import { assessReply } from "@/lib/wellFormed";
-import { splitIntoSentences, isCloserSentence } from "@/lib/guards";
+import { splitIntoSentences, isCloserSentence, normalizeForRepeat } from "@/lib/guards";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { BenchConversation, BenchTurn, TurnExpectation, Move } from "./conversationFixture";
@@ -78,6 +78,10 @@ export interface TurnObserved {
   pendingAskName?: string | null;
   /** LOOKUP-02: the shape the `[turn]` line says the draft confessed. */
   lookupShape?: string | null;
+  /** REP-01: the turn's retries off the `[turn]` line, and the reply the
+   * conversation delivered before this one. */
+  retries?: number | null;
+  previousReply?: string | null;
   /** The live relationships touching the speaker's own entity after
    * the turn: the other end's name, the provenance, whether confirmed. */
   relationships: readonly { type: string; name: string; source: string; confirmed: boolean }[];
@@ -194,12 +198,15 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.entityExists) parts.push(`entity ${e.entityExists.kind} ${e.entityExists.name}${e.entityExists.source ? ` ${e.entityExists.source}` : ""}${e.entityExists.pronouns ? ` ${e.entityExists.pronouns}` : ""}`);
   if (e.entityAbsent) parts.push(`no entity ${e.entityAbsent}`);
   if (e.guardAnyOf) parts.push(`guard one of ${e.guardAnyOf.map((g) => g ?? "none").join("/")}`);
+  if (e.guardHits) parts.push(`guard array carries ${e.guardHits.join(", ")}`);
   if (e.askedAbout) parts.push(`asked about ${e.askedAbout.name}`);
   if (e.pronounsAgree) parts.push(`pronouns agree with ${e.pronounsAgree.name}`);
   if (e.groundedNames) parts.push("every name grounded");
   if (e.openQuestionStatus) parts.push(`open question ${e.openQuestionStatus.kind} ${e.openQuestionStatus.status}`);
   if (e.outcomeArgsMatch) parts.push(`${e.outcomeArgsMatch.packageId}${e.outcomeArgsMatch.via ? ` via ${e.outcomeArgsMatch.via}` : ""} args ~ ${Object.entries(e.outcomeArgsMatch.args).map(([k, v]) => `${k}:/${v}/`).join(", ")}`);
   if (e.lookupShape) parts.push(`lookup shape ${e.lookupShape}`);
+  if (e.retries !== undefined) parts.push(`${e.retries} retr${e.retries === 1 ? "y" : "ies"}`);
+  if (e.distinctFromPrevious) parts.push("not the previous reply again");
   if (e.episodesInContext !== undefined) parts.push(`${e.episodesInContext} episode line${e.episodesInContext === 1 ? "" : "s"}`);
   if (e.noCopiedEpisode) parts.push("no copied episode line");
   if (e.relationshipExists) parts.push(`relationship ${e.relationshipExists.type} ${e.relationshipExists.name} ${e.relationshipExists.source}${e.relationshipExists.confirmed === undefined ? "" : e.relationshipExists.confirmed ? " confirmed" : " unconfirmed"}`);
@@ -362,6 +369,11 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     const hit = observed.entities.find((x) => x.name.toLowerCase() === e.entityAbsent!.toLowerCase());
     checks.push({ name: "no entity", pass: hit === undefined, detail: hit ? `${hit.kind} ${hit.name} exists` : `no entity named ${e.entityAbsent}` });
   }
+  if (e.guardHits) {
+    const got = observed.guardHits ?? [];
+    const missing = e.guardHits.filter((g) => !got.includes(g));
+    checks.push({ name: "guard array", pass: missing.length === 0, detail: missing.length === 0 ? `carries ${e.guardHits.join(", ")}` : `missing ${missing.join(", ")} (array: ${got.join(", ") || "empty"})` });
+  }
   if (e.guardAnyOf) {
     const got = observed.guardReplaced;
     checks.push({ name: "guard", pass: e.guardAnyOf.includes(got), detail: got ? `replaced by ${got}` : "not replaced" });
@@ -396,6 +408,19 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   }
   if (e.lookupShape) {
     checks.push({ name: "lookup shape", pass: observed.lookupShape === e.lookupShape, detail: observed.lookupShape ? `shape ${observed.lookupShape}` : "no shape on the turn line" });
+  }
+  if (e.retries !== undefined) {
+    checks.push({ name: "retries", pass: observed.retries === e.retries, detail: observed.retries === null || observed.retries === undefined ? "no retries on the turn line" : `${observed.retries} retries` });
+  }
+  if (e.distinctFromPrevious) {
+    // REP-01: the delivered reply shares under 80 percent of its content
+    // words with the previous reply and is not the same sentence again.
+    const previous = observed.previousReply ?? "";
+    const words = tokenize(observed.reply);
+    const old = tokenize(previous);
+    const overlap = words.size === 0 ? 0 : [...words].filter((w) => old.has(w)).length / words.size;
+    const same = normalizeForRepeat(observed.reply) !== null && normalizeForRepeat(observed.reply) === normalizeForRepeat(previous);
+    checks.push({ name: "distinct from previous", pass: previous.length > 0 && overlap < 0.8 && !same, detail: previous.length === 0 ? "no previous reply" : `${Math.round(overlap * 100)}% of its content words in the previous reply${same ? ", the same sentence" : ""}` });
   }
   if (e.openQuestionStatus) {
     const hit = (observed.openQuestions ?? []).find((q) => q.kind === e.openQuestionStatus!.kind && q.status === e.openQuestionStatus!.status);

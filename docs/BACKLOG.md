@@ -1747,6 +1747,41 @@ invented for the roster's household, and added to
     tests/unknownNames.test.ts tests/ask01.test.ts`. Out of scope:
     CHAT-13's subject stack. Exit: `bash scripts/check.sh`.
 
+<a id="rep-01"></a>
+
+- [x] **REP-01: A cross-turn repetition guard, and the objection** (S)
+    Done 2026-09-16 (docs/dev/session-a.md "REP-01"; dev.md section
+    16 part 3, item 4 of its list; findings 29 and 46): one
+    deterministic read at the boundary on both paths over the hub's
+    previous two replies (`GuardContext.previousReplies`, off the
+    window). `repeat_sentence`, skippable: a sentence equal after
+    normalization (`normalizeForRepeat()`: case, punctuation and
+    whitespace collapsed; a closer is nothing, so is a sentence of two
+    words or fewer) to one in either previous reply is skipped
+    wherever it sits, on the stream per sentence at the guards' point.
+    `repeat_reply`, the whole-reply case (`isRepeatReply()`: content
+    words overlapping a previous reply's by 80 percent or more with no
+    new proper noun or number, or every sentence a repeat): the
+    chat-loop line stands in, marked emptied, and the engine retries
+    once with `REPEAT_RETRY_NOTE` (REG-01's retry, the turn's second
+    generation); a retry that repeats too leaves the line; on the
+    stream the end-of-reply case is recorded on the row. On an
+    objection (target hub with a repair, or `OBJECTION_RE`'s shapes)
+    a bare assertion of understanding is `self_assertion`, skipped, a
+    tail on the register family; the retry note carries the objection
+    (`repeatRetryNote()`). The exemptions are by construction: the
+    guards read the model's text only (a fixed line the engine
+    repeats, a package's deterministic answer and a re-asked
+    confirmation or ask never pass through them), and two words are
+    never a repeat. The plan half (`repeat: forbidden`, the remedy by
+    objection type) rides with ACT-03. The ids join
+    `spec/vocab/defect-codes.json`. Bench: `said-that-already`,
+    `same-line-twice`, with `retries`, `distinctFromPrevious` and
+    `guardHits` as expectation kinds; seven engine tests that scripted
+    the same line on consecutive turns vary it now. Tests:
+    `backend/tests/rep01.test.ts`, the corpus rows. Exit: `bash
+    scripts/check.sh`.
+
 <a id="ask-02"></a>
 
 - [x] **ASK-02: Candidate hygiene, brands and services, hub-introduced names, the confirmed public figure** (S)
