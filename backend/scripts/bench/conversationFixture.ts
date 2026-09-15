@@ -1443,7 +1443,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     turns: [
       { say: "the new Marsh Lantern film is the one I'm counting down to", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "world", name: "Marsh Lantern", kind: "film" }], guard: null, humanVerdict: true } },
       { say: "when is it out", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } },
-      { say: "what is the movie about", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } }, // "who's in the film" returns once chunk D's manifest kind field lands
+      { say: "who's in the film", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } },
       { say: "what's it rated", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } },
     ],
   },

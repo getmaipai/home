@@ -1319,6 +1319,7 @@ function isReference(captured: string): boolean {
 }
 
 const REFERENCE_PACKAGES: ReadonlySet<string> = new Set(["media-lookup", "knowledge", "websearch"]);
+const MEDIA_KINDS: ReadonlySet<string> = new Set(["film", "show", "series", "album", "song", "book", "game", "band"]);
 
 export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[], roster: readonly string[] = [], onYield?: (y: LiteralYield) => void, stack?: readonly SubjectRef[]): RouteResult | null {
   // ACT-01's set: a polite request ("can you remember that Marlow's
@@ -2590,11 +2591,13 @@ async function prepareTurn(
   let literalYielded: LiteralYield | null = null;
   // SAFETY-01: in the crisis state nothing routes to a package; the
   // embed still runs for recall.
-  let { winner: routed, ranked }: RouteResult = inCrisis ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
+  const shortComment = !inCrisis && isShortCommentOnLiveSubject(text, subjects);
+  if (shortComment) signal = asBackchannelOnLiveSubject(signal);
+  let { winner: routed, ranked }: RouteResult = inCrisis || shortComment ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
   // ACT-01: a literal-pattern win is a directive by construction, frozen
   // on the signal before the package runs.
   if (routed?.viaPattern) signal = freezeDirective(signal);
-  if (!routed && !inCrisis) {
+  if (!routed && !inCrisis && !shortComment) {
     utteranceVector = await embedUtterance(text);
     ({ winner: routed, ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
   }

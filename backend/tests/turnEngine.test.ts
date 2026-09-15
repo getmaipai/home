@@ -4404,6 +4404,9 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
     const r1 = routeLiteral("what's the runtime of the movie", actor, loaded, [], undefined, worldStack);
     expect(r1?.winner?.id).toBe("media-lookup");
     expect(r1?.winner?.args).toEqual({ title: "Marsh Lantern" });
+    const mediaPreferred = routeLiteral("who's in the movie", actor, loaded, [], undefined, worldStack);
+    expect(mediaPreferred?.winner?.id).toBe("media-lookup");
+    expect(mediaPreferred?.winner?.args).toEqual({ title: "Marsh Lantern" });
     // "it" is a pronoun -> reference -> resolves.
     const r2 = routeLiteral("what's the runtime of it", actor, loaded, [], undefined, worldStack);
     expect(r2?.winner?.id).toBe("media-lookup");
