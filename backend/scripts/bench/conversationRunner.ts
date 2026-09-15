@@ -459,6 +459,24 @@ function seedEntities(conv: BenchConversation, owner: PersonRow): void {
   }
 }
 
+function seedRecords(conv: BenchConversation, owner: PersonRow): void {
+  for (const record of conv.seedRecords ?? []) {
+    const subject = record.subject ? findEntityByName(owner, record.subject)?.id : undefined;
+    const seeded = remember(owner, {
+      text: record.text,
+      category: record.category,
+      tier: "durable",
+      scope: record.scope,
+      subject_id: subject,
+      source: `bench:${conv.id}`,
+      importance: 0.9,
+      child_disclosure: record.disclosure ?? undefined,
+      sensitive: record.sensitive ?? false,
+    });
+    if (!seeded.ok) throw new Error(`seeding ${conv.id}: ${seeded.error}`);
+  }
+}
+
 /** The live relationships touching the person's own entity, the other
  * end named, for the relationship rows (step 3a). */
 function relationshipsOf(actor: PersonRow): { type: string; name: string; source: string; confirmed: boolean }[] {
@@ -528,6 +546,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     if (!seeded.ok) throw new Error(`seeding ${conv.id}: ${seeded.error}`);
   }
   seedEntities(conv, deps.people.owner);
+  seedRecords(conv, deps.people.owner);
   // Every conversation starts with empty lists: the household's one
   // shopping list is shared, and the live run found "the second one"
   // pointing at an item a conversation twenty rows earlier had added.

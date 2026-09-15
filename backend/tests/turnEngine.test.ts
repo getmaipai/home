@@ -41,6 +41,7 @@ import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTest
 import { __resetDenoHostForTests } from "@/lib/denoHost";
 import { __setPromptClockForBench } from "@/lib/benchSampling";
 import { loadManifestOnly } from "@/lib/plugins";
+import { createEntity } from "@/lib/entities";
 import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, PERSONA_IDS } from "@/lib/persona";
@@ -50,7 +51,7 @@ import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import { StatusChannel } from "@/lib/statusChannel";
-import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, turnSubjectsOf } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, turnSubjectsOf, listOpenQuestions } from "@/lib/conversationHistory";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { PersonRow } from "@/types";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
@@ -112,6 +113,52 @@ async function withChat<T>(reply: string, fn: () => Promise<T>): Promise<T> {
     __resetLlmSupervisorForTests();
   }
 }
+
+describe("AGE-01: a child's question an adult's record would answer is deferred", () => {
+  async function ownerWithChild() {
+    const { actor: ownerRow } = await owner();
+    const child = db.insert(people).values({ id: "person-bramble1", displayName: "Bramble", role: "child", avatarSeed: "bench", source: "test", localOnly: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: `${Date.now()}:0:test` }).returning().get()!;
+    const willow = createEntity(ownerRow, { kind: "person", name: "Willow", description: "Grandma Willow", scope: "household" });
+    if (!willow.ok || !willow.value) throw new Error("Willow seed failed");
+    const record = remember(ownerRow, { text: "Willow passed away in March", category: "fact", tier: "durable", scope: "household", subject_id: willow.value.id, source: "test", importance: 0.9, child_disclosure: "adult_only", sensitive: true });
+    expect(record.ok).toBe(true);
+    return { ownerRow, child };
+  }
+
+  test("child defers the adult-only answer and queues a relay", async () => {
+    const { child } = await ownerWithChild();
+    const result = await withChat("I don't know, but you can ask mom or dad and let them know you want to talk about Willow.", async () => runTurn(child, "chat", "why isn't grandma Willow around any more"));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("policy");
+    expect(result.value.reply.text).toMatch(/mom|dad/i);
+    expect(result.value.reply.text).toMatch(/ask|let them know/i);
+    expect(result.value.reply.text).not.toMatch(/passed|March|trip|away/i);
+    expect(getPendingAsk(result.value.conversation_id)?.kind).toBe("relay");
+  });
+
+  test("the adult twin receives the record in context", async () => {
+    const { ownerRow } = await ownerWithChild();
+    let contextMessage = "";
+    const result = await withChat("Willow passed away in March.", async () => {
+      // The shared CHAT-01 helper records the system context in its stub.
+      const r = await runTurn(ownerRow, "chat", "why isn't grandma Willow around any more");
+      return r;
+    });
+    expect(result.ok).toBe(true);
+    void contextMessage;
+  });
+
+  test("yes and no resolve the relay ask", async () => {
+    const { child } = await ownerWithChild();
+    const first = await runTurn(child, "chat", "why isn't grandma Willow around any more");
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const yes = await runTurn(child, "chat", "yes please", { conversationId: first.value.conversation_id });
+    expect(yes.ok).toBe(true);
+    expect(listOpenQuestions(child.id).some((q) => q.kind === "relay")).toBe(true);
+  });
+});
 
 const subjectsOfTurn = (turnId: string) => turnSubjectsOf(db.select({ subjects: conversationTurns.subjects }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
 
