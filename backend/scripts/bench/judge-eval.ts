@@ -104,6 +104,15 @@ async function main(): Promise<{ executed: number; engine: string }> {
   seedTurn(actor, conv.value.id, "I actually just started a new job, I'm a teacher now", "Congratulations on the new job!", 0, "new job", [["teacher"]]);
   // An abstention turn: nothing to extract, so any extraction is a false positive.
   seedTurn(actor, conv.value.id, "what's the weather like today", "I don't have live weather access yet.", 0, "abstention", []);
+  // MEM-06: one seeded turn per rule the judge must not write for.
+  seedTurn(actor, conv.value.id, "how was your day", "Your sister Pippa called about the dentist on Thursday.", 0, "ungrounded reply text", []);
+  seedTurn(actor, conv.value.id, "when is the Marsh Lantern film out", "It's out on October 3.", 0, "ungrounded lookup", []);
+  seedTurn(actor, conv.value.id, "I'm wondering whether it'll rain tomorrow", "Could be.", 0, "passing state", []);
+  seedTurn(actor, conv.value.id, "the Marsh Lantern film has a runtime of two hours", "Long one.", 0, "world fact", []);
+  seedTurn(actor, conv.value.id, "I love the Marsh Lantern film, it's my favourite", "Good pick.", 0, "own preference about a title", [["marsh", "lantern"]]);
+  seedTurn(actor, conv.value.id, "Pippa says her dentist moved to Thursdays", "Noted.", 0, "reported clause", [["pippa", "dentist", "thursday"]]);
+  seedTurn(actor, conv.value.id, "I'll call the dentist tomorrow", "Okay.", 0, "commissive", [["dentist"]]);
+  seedTurn(actor, conv.value.id, "add oat milk to the shopping list", "Added.", 0, "directive only", []);
 
   console.log(`Background engine (judge): ${getBackgroundBackendKind()}`);
   // The setup's default MAIPAI_BACKGROUND_URL is a closed port; this
@@ -120,7 +129,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const startTime = Date.now();
   const batchResult = await runJudgeBatch();
   const elapsedMs = Date.now() - startTime;
-  const secondsPerTurn = elapsedMs / 1000 / 3; // 3 turns in the bench
+  const secondsPerTurn = elapsedMs / 1000 / seeded.length;
 
   console.log(
     `Judge batch: processed=${batchResult.processed} factsWritten=${batchResult.factsWritten} elapsed=${(elapsedMs / 1000).toFixed(2)}s (${secondsPerTurn.toFixed(3)}s/turn)`,
