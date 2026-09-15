@@ -29,6 +29,13 @@ export interface RecordedRequest {
 export interface RecordingProxy {
   url: string;
   requests: RecordedRequest[];
+  /** LOOKUP-02: the next ordinary completion (never a forced one under
+   * `tool_choice: required`, which still goes to the engine so the
+   * real model picks the rung) answers with this text in the engine's
+   * own wire shape, so a fixture's `seedReply` is a draft that goes
+   * through the reply boundary like any model reply (the read, the
+   * forced lookup, the guards), never a reply pasted past it. */
+  scriptNextReply(text: string): void;
   reset(): void;
   /** Resolves once every teed reply has been read to its end. */
   settled(): Promise<void>;
@@ -68,6 +75,7 @@ export function extractModelText(raw: string): string {
 export function startRecordingProxy(upstream: string): RecordingProxy {
   const requests: RecordedRequest[] = [];
   const pending = new Set<Promise<void>>();
+  let scripted: string | null = null;
   const base = upstream.replace(/\/$/, "");
   const server = Bun.serve({
     port: 0,
@@ -79,9 +87,11 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
       // completions in flight (a background summary beside the turn's
       // own) each keep their own reply text (a review).
       let recorded: RecordedRequest | undefined;
+      let parsedBody: { messages?: { role: string; content: string }[]; tools?: { function?: { name: string } }[]; tool_choice?: string; stream?: boolean; model?: string } | undefined;
       if (body && url.pathname.endsWith("/chat/completions")) {
         try {
-          const parsed = JSON.parse(body) as { messages?: { role: string; content: string }[]; tools?: { function?: { name: string } }[] };
+          const parsed = JSON.parse(body) as NonNullable<typeof parsedBody>;
+          parsedBody = parsed;
           recorded = {
             systemText: (parsed.messages ?? []).filter((m) => m.role === "system").map((m) => m.content).join("\n"),
             tools: (parsed.tools ?? []).map((t) => t.function?.name ?? "?"),
@@ -97,6 +107,34 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
         } catch {
           // a body that is not JSON is forwarded as is
         }
+      }
+      // The scripted draft (seedReply): the engine's own wire shape,
+      // streamed or not as the request asked, recorded like a reply.
+      // The turn's own completion, never a post-turn summary refresh or
+      // a judge call (those carry no live user turn last; a review).
+      const isTurn = (parsedBody?.messages ?? []).length > 0 && parsedBody!.messages![parsedBody!.messages!.length - 1]!.role === "user";
+      if (recorded && scripted !== null && parsedBody && parsedBody.tool_choice !== "required" && isTurn) {
+        const text = scripted;
+        scripted = null;
+        recorded.responseText = text;
+        recorded.completed = true;
+        const id = `seed-${Date.now()}`;
+        const model = parsedBody.model ?? "seed";
+        if (parsedBody.stream) {
+          const encoder = new TextEncoder();
+          const line = (choice: unknown) => encoder.encode(`data: ${JSON.stringify({ id, model, choices: [choice] })}\n\n`);
+          const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(line({ index: 0, delta: { role: "assistant" }, finish_reason: null }));
+              text.split(" ").forEach((word, i) => controller.enqueue(line({ index: 0, delta: { content: i === 0 ? word : ` ${word}` }, finish_reason: null })));
+              controller.enqueue(line({ index: 0, delta: {}, finish_reason: "stop" }));
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+            },
+          });
+          return new Response(stream, { headers: { "content-type": "text/event-stream" } });
+        }
+        return Response.json({ id, model, choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
       }
       const headers = new Headers(req.headers);
       headers.delete("host");
@@ -162,6 +200,9 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
   return {
     url: `http://127.0.0.1:${server.port}`,
     requests,
+    scriptNextReply: (text) => {
+      scripted = text;
+    },
     reset: () => void requests.splice(0),
     settled: async () => void (await Promise.race([Promise.all([...pending]), new Promise<void>((resolve) => setTimeout(resolve, 5_000))])),
     stop: () => server.stop(true),

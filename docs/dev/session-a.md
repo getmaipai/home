@@ -5537,3 +5537,101 @@ resources); `chatModelAdapter.test.ts` for the client; the safety
 corpus in `spec/tests/ts/safety.test.ts`. The bench row
 `self-harm-state` is the design's, in `conversationFixture.ts`. The
 overlay's text is unchanged, so the user pages are.
+
+## LOOKUP-02: the hedge is a promise, the offer binds its question, the forced lookup is a ladder (2026-09-15)
+
+Section 16 of the design record, parts 1 (rules 2 to 4), 2 and 4 (rule
+4), item 3 of its list. Four verbatim copies of "I can't open pages
+myself, but I can help you find it. Let me look it up for you." went
+out on the evening of 2026-09-14 because LOOKUP-01 read the first
+sentence only, and a one-word acceptance of "want me to look up the
+price?" searched the product's name and answered with a description,
+because the bound offer ran the utterance that produced it.
+
+**The read.** `readLookupDraft()` in `lib/guards.ts`, one definition
+for both paths, over the draft's first two real sentences or
+`LOOKUP_READ_MAX_CHARS` (160): a denial of a deliverable
+(`falseCapabilityShape()`, "I can't open pages / share links / show
+you a picture", on a turn the search serves) is cut first, so the
+promise behind it is read; then a promise, or, on a world question
+with no lookup outcome, a hedged fact (`hedgedFactShape()`: a hedge
+marker beside a number, a date or a proper noun); an offer ends the
+read, since an offer asks permission and binds the next consent word
+rather than running unasked. The promise family gains the
+hedge-plus-promise shape ("I can't X, but I can look that up") and the
+help verbs ("help you find", "try to find", "see what I can find");
+the offer family gains "I can help you find" and "I can look into
+that". The stream's hold (`LOOKUP_HOLD_MAX_CHARS`) widened from 72 to
+the read's bound and two complete sentences. The `[turn]` line records
+the shape (`lookup_shape`: promise, offer, hedged_fact, denial).
+
+**The query is the engine's.** `lookupQueryFor()` in `lib/turnEngine.ts`
+builds the lookup's question from the turn's subject (the stack's
+world or unresolved reference; a model number stays with its name,
+"Rivet 3") and the field the offer names after its lookup verb, with
+the frame words out ("Rivet 3 going for used"); a hedged fact or a
+denial names no field, so the person's own question is the query
+(the current turn when it is a question, else the latest earlier
+turn about the subject), with the connectives and auxiliaries out
+("pins Cosmo 7 card", "maker support page for Cosmo 7 card"); a
+currency marker rides along ("new Rivet OS come out today"); an
+objection, an acknowledgment or a one-word turn is never the query.
+A pending lookup binds that question (`notePendingLookup()` takes the
+expression), and the consent vocabulary for a pending lookup gains the
+imperative forms (`lookupConsent()`: "go on then", "well find it",
+"just search it", "that's twice now, go on and do it").
+
+**The ladder.** `runForcedLookup()`, one definition for both paths: the
+completion under `tool_choice: required` picks the rung from the
+lookup family the router ranked (the typed source, `knowledge`, when
+the question matched it) plus the always-offer search; the search
+call's expression is the engine's query, never the model's; every
+outcome carries `via: forced`; when the rung fails or finds nothing,
+the search runs next with the same query before anything reaches the
+guards, the failed rung kept in the outcomes; the reply is the
+answering rung's or the lookup family's honest line. A request the
+lookup tools serve (`GuardContext.lookupServed`: a question or a
+find-me with the search offered and no household frame) is answerable,
+so `guardCapabilityClaim()` returns null there and the failed-lookup
+line stands, never cannot-do; `false_capability` is skipped wherever
+it sits on such a turn.
+
+**The bench.** `seedReply` is now the model's next draft through the
+recording proxy (`scriptNextReply()`: the next ordinary completion
+answers with the text in the engine's wire shape, a forced one still
+reaches the engine), so a seeded hedge or denial meets the boundary
+like any draft; the stub bench without a proxy pastes it as before.
+Six rows: `hedged-promise`, `offer-binds-the-question`,
+`offer-binds-go-on-then`, `objection-reruns`, `hedged-draft`,
+`ladder-falls-through` (the search from the fake SearXNG; the typed
+source's not-found on a fictional title is the real encyclopedia's),
+with `outcomeArgsMatch` (a package's outcome whose arguments match a
+regex each) and `lookupShape` as expectation kinds; `open-question-
+once` seeds its candidate and question (`seedEntities` with `source:
+inferred` and `openQuestion`), so the row tests the asking without the
+4B in the loop. Tests: `tests/lookup02.test.ts` (the shapes, the read,
+the builder, the consent, the guards, and the flows on both paths
+against the stub with a fake SearXNG); LOOKUP-01's tests updated to
+the ladder and the built query.
+
+**The review's read, in the tree.** The consent forms for a pending
+lookup are the whole utterance with a lead-in, as the plain yes is,
+so "no wait, search for the Rivet 4 instead" is a new turn; a model
+number joins a name only when the household does not know it ("I told
+Nadia 3 times" keeps Nadia); the typed source is a rung only when the
+router ranked it above its floor (`ranked` holds every package); a
+request with an action verb ("send the plumber a message asking
+what's wrong") is never lookup-served; the offer's field is the query
+even with no subject on the stack ("weather tomorrow"); the proxy's
+scripted draft answers the turn's own completion only, never a
+post-turn summary refresh.
+
+**Left on record.** Part 1's rule 1, the claim-type decision before
+generation, is CHAT-13's as the section says; until it lands, a world
+question the model answers plainly with no hedge is still the model's.
+The typed source's rung has no bench fixture (the `knowledge` package
+calls the encyclopedia itself), so `ladder-falls-through` checks the
+answering rung and the absence of cannot-do, not which rung failed
+first; the unit test covers that with the stub. The deliverable's own
+rendering (a link, a picture, a video on the chat surface) is
+CHAT-16's.

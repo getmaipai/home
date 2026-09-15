@@ -234,7 +234,7 @@ interface Candidate {
  * "Clover borrowed" from "Dinner is"; the frames below can). Multi-word
  * spans stay whole ("Marsh Lantern" is one name, never the roster's
  * Marsh). */
-function candidatesIn(text: string): Candidate[] {
+function candidatesIn(text: string, known: ReadonlySet<string> = new Set()): Candidate[] {
   const doc = nlp(text);
   const terms = doc.terms().json({ offset: true }) as Array<{ terms: Array<{ tags: string[] }>; offset: { start: number; length: number } }>;
   const sentenceStarts = new Set((doc.sentences().json({ offset: true }) as Array<{ offset: { start: number } }>).map((s) => s.offset.start));
@@ -249,6 +249,13 @@ function candidatesIn(text: string): Candidate[] {
     const raw = text.slice(term.offset.start, term.offset.start + term.offset.length);
     const word = raw.replace(/[^\p{L}\p{N}'’-]+$/u, "").replace(/^[^\p{L}\p{N}]+/u, "");
     const capitalized = /^\p{Lu}/u.test(word);
+    // A model number after a name is the name's ("Rivet 3", "Cosmo 7"),
+    // LOOKUP-02's subjects; never after a name the household knows ("I
+    // told Nadia 3 times", a review).
+    if (open && /^\d+[a-z]?$/i.test(word) && !known.has(open.name.toLowerCase()) && !/[,.;:!?]/.test(text.slice(open.at, term.offset.start))) {
+      open = { name: `${open.name} ${word}`, at: open.at, tokens: open.tokens + 1 };
+      continue;
+    }
     const proper = tags.has("ProperNoun") && capitalized && !tags.has("Date") && !tags.has("Pronoun");
     const initialNoun = !proper && capitalized && sentenceStarts.has(term.offset.start) && tags.has("Noun") && !tags.has("Pronoun") && !tags.has("Date") && !tags.has("Possessive");
     const bare = word.replace(/(?:'s|’s)$/u, "");
@@ -277,7 +284,7 @@ export function resolveNames(text: string, signal: TurnSignal | undefined, known
   const knownLower = new Map(known.names.filter((n) => n.trim().length > 1).map((n) => [n.trim().toLowerCase(), n.trim()]));
   const frames = relationFramesIn(text);
   const pronouns = pronounFamiliesIn(text);
-  const candidates = candidatesIn(text);
+  const candidates = candidatesIn(text, new Set(knownLower.keys()));
   // The signal's own named subjects (a relation phrase's name, a
   // report's source) join the tagger's, so "my sister Nadia says" is
   // never missed at the start of a sentence.

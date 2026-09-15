@@ -164,6 +164,14 @@ export interface TurnExpectation {
   /** ASK-01: an OpenQuestion of this kind for the person has this
    * status after the turn ("declined" after "not now"). */
   openQuestionStatus?: { kind: OpenQuestion["kind"]; status: OpenQuestion["status"] };
+  /** LOOKUP-02: an outcome of this package (and path) ran this turn
+   * with each named argument matching its regex, so a row can check
+   * the engine's built query names the subject and the field without
+   * pinning its exact words. */
+  outcomeArgsMatch?: { packageId: string; via?: string; args: Readonly<Record<string, string>> };
+  /** LOOKUP-02: the shape the draft confessed, off the `[turn]` line
+   * (a promise, an offer, a hedged fact, a denial). */
+  lookupShape?: "promise" | "offer" | "hedged_fact" | "denial";
   /** RECALL-02: exactly this many episode lines under the "From earlier
    * conversations" header in the context message (0: no episode block). */
   episodesInContext?: number;
@@ -273,6 +281,12 @@ export interface BenchEntity {
   description: string;
   /** A relationship from the owner's own entity to this one ("parent_of"). */
   relationshipFromOwner?: string;
+  /** ASK-01: seeded as the judge's own candidate (an unconfirmed
+   * inferred entity in the owner's scope) rather than a household
+   * record, with its open question queued for the owner, so a row can
+   * test the asking without the 4B judge in the loop. */
+  source?: "inferred";
+  openQuestion?: string;
 }
 
 export interface BenchTurn {
@@ -944,10 +958,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
   {
     id: "open-question-once",
     category: "memory",
-    note: "ASK-01 part 4 (the coherence review's row): the judge's question about a candidate is asked once, at the end of the next reply on any conversation; 'not now' declines it for good, and nothing asks again",
+    note: "ASK-01 part 4 (the coherence review's row): the judge's question about a candidate (seeded as the judge would leave it, since the 4B tags a lowercase name one run in four) is asked once, at the end of the next reply on any conversation; 'not now' declines it for good, and nothing asks again",
+    seedEntities: [{ kind: "pet", name: "mopey", description: "", source: "inferred", openQuestion: "Who's Mopey?" }],
     turns: [
-      { say: "mopey chewed through the garden hose again", expect: { signal: { primary_act: "inform" }, askedAbout: { name: "mopey", withinMs: 10000 } } },
-      { say: "I had a long day at work", newConversation: true, drainJudge: true, expect: { signal: { primary_act: "inform" }, openQuestion: { kind: "who", withinMs: 10000 }, mustContain: "mopey[^.!?]*\\?", pendingAsk: "who" } },
+      { say: "I had a long day at work", expect: { signal: { primary_act: "inform" }, openQuestion: { kind: "who", withinMs: 10000 }, mustContain: "mopey[^.!?]*\\?", pendingAsk: "who" } },
       { say: "not now", expect: { fixedLine: "Okay, no problem.", pendingAsk: null, openQuestionStatus: { kind: "who", status: "declined" } } },
       { say: "anyway, dinner was good", expect: { signal: { primary_act: "inform" }, mustNotContain: "mopey", pendingAsk: null } },
     ],
@@ -1053,6 +1067,70 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "what's a good scary movie for tonight", as: "child", expect: { signal: { primary_act: "question" }, guard: null, evidenceDisposition: [{ evidenceId: "search-1", disposition: "withheld", reason: "content_ceiling" }] } },
       { say: "can you remind dad I asked", as: "child", expect: { signal: { primary_act: "directive" }, notificationBody: { notification: "relay.due", withinMs: 10_000, mustNotContain: "scary|horror" } } },
       { say: "okay thanks", as: "child", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  // LOOKUP-02 (dev.md section 16 parts 1 and 2): the seeded reply is
+  // the model's next draft through the recording proxy, so it meets the
+  // reply boundary like any draft (the read, the forced lookup as a
+  // ladder, the guards); the search is the bench's fake SearXNG.
+  {
+    id: "hedged-promise",
+    category: "knowledge",
+    note: "LOOKUP-02 (findings 28, 27's denial half): a denial of a deliverable ahead of a promise is cut and the promise behind it is read; the forced lookup runs with the engine's own query (the card and 'support'), via forced, and the seeded sentences never reach the row",
+    turns: [
+      { say: "where's the maker's support page for the Cosmo 7 card", seedReply: "I can't open pages myself, but I can help you find it. Let me look it up for you.", expect: { signal: { primary_act: "question" }, mustNotContain: "let me look|i can help you find|can't open", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*support|support.*cosmo 7" } }, lookupWithSource: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "anything on the warranty there", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "offer-binds-the-question",
+    category: "knowledge",
+    note: "LOOKUP-02 (finding 37): a pending lookup binds the offered question, never the turn: the search runs on the card and 'used' or 'price', never the previous utterance verbatim",
+    turns: [
+      { say: "the old one's a Rivet 3 with 8 gigs", seedReply: "Those hold their value. Want me to look up what they're going for used?", expect: { signal: { primary_act: "inform" }, pendingAsk: "lookup" } },
+      { say: "sure", expect: { toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "ask", args: { expression: "^(?!.*with 8 gigs).*rivet 3.*(?:used|price|going)" } }, lookupWithSource: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "offer-binds-go-on-then",
+    category: "knowledge",
+    note: "LOOKUP-02 (rule 4): the imperative consent ('go on then') after an offer runs the bound question like a yes",
+    turns: [
+      { say: "the old one's a Rivet 3 with 8 gigs", seedReply: "Those hold their value. Want me to look up what they're going for used?", expect: { signal: { primary_act: "inform" }, pendingAsk: "lookup" } },
+      { say: "go on then", expect: { toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "ask", args: { expression: "^(?!.*with 8 gigs).*rivet 3.*(?:used|price|going)" } }, lookupWithSource: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "objection-reruns",
+    category: "knowledge",
+    note: "LOOKUP-02 (findings 28, 46): a late promise past the read went out and bound the question; the objection with a command re-runs the bound question, never the objection's own words, and the promise is not said again",
+    turns: [
+      { say: "where's the maker's support page for the Cosmo 7 card", seedReply: "The Cosmo 7 is a solid card. Most people like it for the price. Let me look it up for you.", expect: { signal: { primary_act: "question" }, pendingAsk: "lookup" } },
+      { say: "that's twice now, go on and do it", expect: { toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "ask", args: { expression: "^(?!.*twice).*cosmo 7.*support|^(?!.*twice).*support.*cosmo 7" } }, mustNotContain: "let me look it up" } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "hedged-draft",
+    category: "knowledge",
+    note: "LOOKUP-02 (finding 31's hedge half): a hedge beside a checkable value on a world question is the other confession; the draft is not sent, the forced lookup runs on the subject and the field, and the turn line says hedged_fact",
+    turns: [
+      { say: "how many pins is the Cosmo 7 card", seedReply: "It usually takes a 12-pin connector, but check the manual to be sure.", expect: { signal: { primary_act: "question" }, mustNotContain: "usually|check the manual", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*pins|pins.*cosmo 7" } }, lookupShape: "hedged_fact" } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "is that a lot", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "ladder-falls-through",
+    category: "knowledge",
+    note: "LOOKUP-02 (finding 39): the forced lookup is a ladder; whichever rung the model picks first, the search answers when it can, the reply is the answering rung's, and a failed lookup is never a capability claim",
+    turns: [
+      { say: "what's the new Marsh Lantern film actually about", seedReply: "Let me check that for you.", expect: { signal: { primary_act: "question" }, toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "marsh lantern" } }, mustNotContain: "can't actually do that|not able to do that|not something i can do|let me check", lookupWithSource: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "who's in it", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
     ],
   },
   {

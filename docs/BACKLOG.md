@@ -1676,6 +1676,33 @@ invented for the roster's household, and added to
     tests/unknownNames.test.ts tests/ask01.test.ts`. Out of scope:
     CHAT-13's subject stack. Exit: `bash scripts/check.sh`.
 
+<a id="lookup-02"></a>
+
+- [x] **LOOKUP-02: The hedge is a promise, the offer binds its question, the forced lookup is a ladder** (S-M)
+    Done 2026-09-15 (docs/dev/session-a.md "LOOKUP-02"; dev.md section
+    16 parts 1, 2 and 4, item 3 of its list): the read over the draft's
+    first two sentences or 160 characters on both paths (the stream's
+    hold widened); a denial of a deliverable (`false_capability`, the
+    id in `spec/vocab/defect-codes.json`) is cut first and the promise
+    behind it read; the hedge-plus-promise and help shapes join the
+    promise and offer families; a hedge beside a checkable value on a
+    world question is the other confession (`hedged_fact` on the
+    `[turn]` line); an offer binds and never forces; the engine writes
+    the lookup's query from the turn's subjects and the confessing
+    sentence (`lookupQueryFor()`), never from the person's words; a
+    pending lookup binds that question; the imperative consent forms
+    run it; the forced lookup is a ladder (`runForcedLookup()`: the
+    model's rung under `tool_choice: required`, then the search with
+    the same query, the failed rung kept, `via: forced` on its
+    outcomes); `capability_claim` is off a request the lookup tools
+    serve. Bench: hedged-promise, offer-binds-the-question and its
+    go-on-then variant, objection-reruns, hedged-draft,
+    ladder-falls-through, with `seedReply` now a real draft through the
+    recording proxy and the `outcomeArgsMatch` and `lookupShape`
+    expectation kinds; open-question-once seeds its candidate. Tests:
+    `backend/tests/lookup02.test.ts`, the corpus rows. Part 1's rule 1
+    (the claim-type decision before generation) is CHAT-13's.
+
 <a id="lookup-01"></a>
 
 - [x] **LOOKUP-01: A promise is the lookup, an offer is a pending ask** (S-M)

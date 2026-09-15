@@ -82,6 +82,10 @@ describe("resolveNames(): the known set and the household frames", () => {
     expect(lantern.subjects).toEqual([{ type: "unresolved", surface_form: "Marsh Lantern", candidate_kinds: [], provenance: "turn-t", confidence: 0.4, carried_question: null }]);
     expect(asks("Dinner is at six")).toEqual([]);
     expect(asks("Dinner is at Grandma's, she said six")).toEqual([]);
+    // A model number stays with a name the household does not know
+    // ("Rivet 3"); a roster name keeps its own shape (a review).
+    expect(unresolved("the old one is a Rivet 3 with 8 gigs")).toEqual(["Rivet 3"]);
+    expect(resolve("I told Marsh 3 times to clean up").subjects).toEqual([{ type: "household", entity_id: "ent-marshx", carried_question: null }]);
     expect(relationFramesIn("Tell Nadia my phone is broken")).toEqual([]);
     expect(relationFramesIn("Remind Clover our dog needs walking")).toEqual([]);
     // A question about a public figure carries a pronoun too and is

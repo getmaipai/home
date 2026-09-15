@@ -4580,7 +4580,9 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(seen.forced).toBe(1);
-      expect(seen.queries).toEqual(["when the new album is out"]);
+      // LOOKUP-02: the engine's query, never the model's (the stub
+      // proposed "when the new album is out"; the built one ran).
+      expect(seen.queries).toEqual(["new album out"]);
       expect(result.value.source).toBe("plugin");
       expect(result.value.plugin_id).toBe("websearch");
       expect(result.value.reply.text).toBe(SEARCH_ANSWER);
@@ -4676,7 +4678,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     });
   });
 
-  test("runTurn(): a promise whose forced lookup produced no call keeps the rest of the draft, or the honest line when the promise was the whole reply", async () => {
+  test("runTurn(): a promise whose forced completion produced no call runs the search rung with the engine's query (LOOKUP-02's ladder); with no search either, the rest of the draft or the honest line", async () => {
     const { actor } = await owner();
     const { LOOKUP_FAILED_LINE } = await import("@/lib/turnEngine");
     await withLookupStub({ draft: "Let me look that up. It's the band you played last week, right?", forcedCall: false }, async (seen) => {
@@ -4684,10 +4686,22 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(seen.forced).toBe(1);
+      // The ladder: the model named no rung, the search ran with the
+      // engine's own query, and its outcome says so.
+      expect(seen.queries).toEqual(["new album out"]);
+      expect(result.value.source).toBe("plugin");
+      expect(result.value.reply.text).toBe(SEARCH_ANSWER);
+      expect(retained(result.value.turn_id)?.map((o) => [o.packageId, o.status, o.via])).toEqual([["websearch", "succeeded", "forced"]]);
+    });
+    await withLookupStub({ draft: "Let me look that up. It's the band you played last week, right?", forcedCall: false, searxng: false }, async (seen) => {
+      const result = await runTurn(actor, "chat", "when is the new album out");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.forced).toBe(1);
       expect(result.value.source).toBe("model");
       expect(result.value.reply.text).toBe("It's the band you played last week, right?");
     });
-    await withLookupStub({ draft: "Let me look that up.", forcedCall: false }, async () => {
+    await withLookupStub({ draft: "Let me look that up.", forcedCall: false, searxng: false }, async () => {
       const result = await runTurn(actor, "chat", "when is the new album out");
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -4746,10 +4760,10 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     });
   });
 
-  test("the stream: a promise whose forced lookup produced no call streams the honest line, never the promise", async () => {
+  test("the stream: a promise whose lookup answered nothing on any rung streams the honest line, never the promise", async () => {
     const { client } = await owner();
     const { LOOKUP_FAILED_LINE } = await import("@/lib/turnEngine");
-    await withLookupStub({ draft: "Let me look that up for you.", forcedCall: false }, async (seen) => {
+    await withLookupStub({ draft: "Let me look that up for you.", forcedCall: false, searxng: false }, async (seen) => {
       const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
       const events = await readNdjson(res);
       expect(seen.forced).toBe(1);
@@ -4770,7 +4784,8 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const value = events.find((e) => e.type === "done")!.value as { source: string; reply: { text: string }; conversation_id: string };
       expect(value.source).toBe("model");
       expect(value.reply.text).toBe("I don't have a date for that one. Want me to look it up?");
-      expect(getPendingAsk(value.conversation_id)).toMatchObject({ kind: "lookup", packageId: "websearch", args: { expression: "when is the new album out" } });
+      // LOOKUP-02: the bound question, never the turn's own words.
+      expect(getPendingAsk(value.conversation_id)).toMatchObject({ kind: "lookup", packageId: "websearch", args: { expression: "new album out" } });
     });
   });
 
@@ -4811,9 +4826,9 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(consented.value.source).toBe("plugin");
       expect(consented.value.plugin_id).toBe("websearch");
       expect(consented.value.reply.text).toBe(SEARCH_ANSWER);
-      expect(seen.queries).toEqual(["when is the new album out"]);
+      expect(seen.queries).toEqual(["new album out"]);
       expect(seen.forced).toBe(0);
-      expect(retained(consented.value.turn_id)?.map((o) => [o.packageId, o.status, o.via, o.args])).toEqual([["websearch", "succeeded", "ask", { expression: "when is the new album out" }]]);
+      expect(retained(consented.value.turn_id)?.map((o) => [o.packageId, o.status, o.via, o.args])).toEqual([["websearch", "succeeded", "ask", { expression: "new album out" }]]);
       expect(getPendingAsk(conv.value.id)).toBeNull();
       // The consent word carries the protocol signal, not a bare directive.
       const row = db.select({ signal: conversationTurns.signal }).from(conversationTurns).where(eq(conversationTurns.id, consented.value.turn_id)).get();

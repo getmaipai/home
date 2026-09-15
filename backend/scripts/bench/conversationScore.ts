@@ -76,6 +76,8 @@ export interface TurnObserved {
   /** ASK-01: the name the conversation's pending ask is about, when
    * it is a `who`. */
   pendingAskName?: string | null;
+  /** LOOKUP-02: the shape the `[turn]` line says the draft confessed. */
+  lookupShape?: string | null;
   /** The live relationships touching the speaker's own entity after
    * the turn: the other end's name, the provenance, whether confirmed. */
   relationships: readonly { type: string; name: string; source: string; confirmed: boolean }[];
@@ -196,6 +198,8 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.pronounsAgree) parts.push(`pronouns agree with ${e.pronounsAgree.name}`);
   if (e.groundedNames) parts.push("every name grounded");
   if (e.openQuestionStatus) parts.push(`open question ${e.openQuestionStatus.kind} ${e.openQuestionStatus.status}`);
+  if (e.outcomeArgsMatch) parts.push(`${e.outcomeArgsMatch.packageId}${e.outcomeArgsMatch.via ? ` via ${e.outcomeArgsMatch.via}` : ""} args ~ ${Object.entries(e.outcomeArgsMatch.args).map(([k, v]) => `${k}:/${v}/`).join(", ")}`);
+  if (e.lookupShape) parts.push(`lookup shape ${e.lookupShape}`);
   if (e.episodesInContext !== undefined) parts.push(`${e.episodesInContext} episode line${e.episodesInContext === 1 ? "" : "s"}`);
   if (e.noCopiedEpisode) parts.push("no copied episode line");
   if (e.relationshipExists) parts.push(`relationship ${e.relationshipExists.type} ${e.relationshipExists.name} ${e.relationshipExists.source}${e.relationshipExists.confirmed === undefined ? "" : e.relationshipExists.confirmed ? " confirmed" : " unconfirmed"}`);
@@ -376,6 +380,15 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
       .map((m) => m[1]!)
       .filter((n) => !known.includes(n.toLowerCase()));
     checks.push({ name: "names grounded", pass: names.length === 0, detail: names.length === 0 ? "every name is in the utterance, the history or the context" : `ungrounded: ${[...new Set(names)].join(", ")}` });
+  }
+  if (e.outcomeArgsMatch) {
+    const want = e.outcomeArgsMatch;
+    const candidates = (observed.outcomes ?? []).filter((o) => o.packageId === want.packageId && (want.via === undefined || o.via === want.via));
+    const hit = candidates.find((o) => Object.entries(want.args).every(([k, v]) => typeof o.args[k] === "string" && new RegExp(v, "i").test(o.args[k] as string)));
+    checks.push({ name: "outcome args match", pass: hit !== undefined, detail: hit ? `${hit.packageId} args ${JSON.stringify(hit.args)}${hit.via ? ` via ${hit.via}` : ""}` : `no ${want.packageId}${want.via ? ` via ${want.via}` : ""} outcome matching (observed: ${observed.outcomes?.map((o) => `${o.packageId}${o.via ? `/${o.via}` : ""} ${JSON.stringify(o.args)}`).join("; ") || "none"})` });
+  }
+  if (e.lookupShape) {
+    checks.push({ name: "lookup shape", pass: observed.lookupShape === e.lookupShape, detail: observed.lookupShape ? `shape ${observed.lookupShape}` : "no shape on the turn line" });
   }
   if (e.openQuestionStatus) {
     const hit = (observed.openQuestions ?? []).find((q) => q.kind === e.openQuestionStatus!.kind && q.status === e.openQuestionStatus!.status);

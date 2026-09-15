@@ -83,8 +83,9 @@ export interface ToolExecutionOutcome {
   args?: Record<string, unknown>;
   /** Which path produced it: the model's tool call, the deterministic
    * floor (a pattern or a fuzzy match), an answered confirmation or
-   * ask, or a household command. */
-  via?: "tool_call" | "pattern" | "confirm" | "ask" | "command";
+   * ask, a household command, or LOOKUP-02's forced lookup (the
+   * engine's choice, never the model's, so a log can tell them apart). */
+  via?: "tool_call" | "pattern" | "confirm" | "ask" | "command" | "forced";
   /** When the outcome was resolved (ISO 8601), the fetched time a
    * citation shows. */
   at?: string;
@@ -263,9 +264,37 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     previousReply: [...ctx.history].reverse().find((m) => m.role === "assistant")?.content,
     // ASK-01: the unknown names, the subjects' pronouns, and the
     // pronoun families the person used this turn and the last two.
+    // LOOKUP-02: a request the turn's lookup tools serve (a world
+    // question with the search offered and no household frame) is
+    // answerable, so a failed answer is the failed-lookup line, never
+    // cannot-do.
+    lookupServed: ctx.offeredToolIds.includes("websearch") && !householdFrame(ctx) && lookupRequest(ctx),
     unknownNames: framedUnknownNames(ctx),
     unresolvedNames: ctx.subjects.filter((s): s is Extract<SubjectRef, { type: "unresolved" }> => s.type === "unresolved").map((s) => s.surface_form),
     subjectPronouns: ctx.subjectPronouns,
     pronounsInPlay: [...pronounFamiliesIn([ctx.utterance, ...ctx.history.filter((m) => m.role === "user").slice(-2).map((m) => m.content)].join(" "))],
   };
+}
+
+/** LOOKUP-02: a request the search can serve: a question, or a "find
+ * me", "get me", "look up", "show me" about the world; never an action
+ * request ("text Nadia", "add eggs"), which stays the capability
+ * guard's. */
+const LOOKUP_REQUEST_RE = /\b(?:find|look up|look for|search|show me|pull up|get me|fetch|link|what(?:'s| is| are| was| were)|who(?:'s| is| was)|where(?:'s| is)|when(?:'s| is| does| did)|how (?:much|many|long|old|far)|which)\b/i;
+const ACTION_REQUEST_RE = /\b(?:text|message|call|email|send|remind|add|set|turn (?:on|off)|lock|unlock|play|order|book|schedule|cancel|delete|remove)\b/i;
+function lookupRequest(ctx: TurnContext): boolean {
+  // An action request stays the capability guard's even when it
+  // carries a question inside ("send the plumber a message asking
+  // what's wrong", a review).
+  if (ACTION_REQUEST_RE.test(ctx.utterance)) return false;
+  return shapeOf(ctx.signal, ctx.utterance) === "question" || LOOKUP_REQUEST_RE.test(ctx.utterance);
+}
+
+/** LOOKUP-02: whether the utterance is about the household (a roster
+ * or registry name, or a first-person possessive with no world
+ * subject), the same reading asksAboutHousehold() gives the lookup
+ * paths; a world question is anything else. */
+function householdFrame(ctx: TurnContext): boolean {
+  const roster = ctx.roster.filter((n) => n.length > 1);
+  return roster.some((name) => new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(ctx.utterance)) || ctx.subjects.some((s) => s.type === "household");
 }

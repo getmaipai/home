@@ -12,8 +12,10 @@
 import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
-import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, notePendingLookup, type TurnStreamResult } from "@/lib/turnEngine";
-import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation, listOpenQuestions } from "@/lib/conversationHistory";
+import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, notePendingLookup, type TurnStreamResult, lookupQueryFor } from "@/lib/turnEngine";
+import { resolveNames } from "@/lib/unknownNames";
+import { lookupShapeOf } from "@/lib/guards";
+import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation, listOpenQuestions, queueOpenQuestion } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety } from "@/lib/safety";
@@ -47,6 +49,8 @@ interface TurnLine {
    * `subject` (CHAT-13's stack grows from it). */
   subject?: string;
   subjects?: { type: "household" | "world" | "unresolved"; name: string }[];
+  /** LOOKUP-02: the shape the draft confessed. */
+  lookup_shape?: string;
   /** ACT-01: the frozen signal's headline and the per-stage timings. */
   signal?: { act: string; secondary: string[]; emotion: string; intensity: string; target: string; repair: string; source: string };
   timings?: TurnTimings;
@@ -310,7 +314,12 @@ function seedTurn(actor: PersonRow, say: string, reply: string, conversationId: 
   const safety = evaluateSafety(say, speakerAgeBand(actor, new Date()));
   const value: TurnValue = { reply: { text: reply }, source: "model", safety, conversation_id: conversationId, turn_id: turnId };
   logTurn(actor, "chat", say, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
-  notePendingLookup(conversationId, reply, say, []);
+  // LOOKUP-02: the bound question is the engine's, built from the
+  // turn's subjects and the offer, as on the live path.
+  const subjects = resolveNames(say, signal, { names: [], resolveEntity: () => null }, turnId).subjects;
+  const offered = reply.split(/(?<=[.!?])\s+/).find((sentence) => lookupShapeOf(sentence) !== null);
+  const expression = offered ? lookupQueryFor({ subjects, sentence: offered, utterance: say, history: [], roster: [], shape: lookupShapeOf(offered) ?? undefined }) : null;
+  notePendingLookup(conversationId, reply, say, [], undefined, expression);
   return { value, text: reply, timings: { firstDeltaMs: 0, firstSentenceMs: 0, totalMs: 0 }, error: null, interrupted: false };
 }
 
@@ -390,9 +399,14 @@ const seededEntityIds = new Set<string>();
 function seedEntities(conv: BenchConversation, owner: PersonRow): void {
   if (!conv.seedEntities?.length) return;
   for (const e of conv.seedEntities) {
-    const created = createEntity(owner, { kind: e.kind, name: e.name, aliases: [...(e.aliases ?? [])], description: e.description, scope: "household" });
+    // ASK-01: a candidate is the judge's own shape (inferred, the
+    // owner's scope, unconfirmed), with its question queued.
+    const created = e.source === "inferred"
+      ? createEntity(owner, { kind: e.kind, name: e.name, aliases: [...(e.aliases ?? [])], description: e.description || null, scope: "person", person: owner.id, source: "inferred" })
+      : createEntity(owner, { kind: e.kind, name: e.name, aliases: [...(e.aliases ?? [])], description: e.description, scope: "household" });
     if (!created.ok || !created.value) throw new Error(`seeding entity ${e.name} for ${conv.id}: ${created.ok ? "no value" : created.error}`);
     seededEntityIds.add(created.value.id);
+    if (e.openQuestion) queueOpenQuestion({ person: owner.id, kind: "who", text: e.openQuestion, subjectId: created.value.id, source: `bench:${conv.id}` });
     if (e.relationshipFromOwner) {
       let self = db.select({ id: entities.id }).from(entities).where(and(eq(entities.accountPersonId, owner.id), isNull(entities.deletedAt))).get();
       if (!self) {
@@ -515,7 +529,12 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const beforeRoutes = new Set(deps.log.routes.keys());
     const jobsBefore = jobsNow(actor);
     const deliveriesBefore = new Set(listPending(actor).map((n) => n.id));
-    const driven = turn.seedReply !== undefined ? seedTurn(actor, turn.say, turn.seedReply, conversationId) : await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt });
+    // LOOKUP-02: with the recording proxy in front of the engine, a
+    // seeded reply is the model's next draft and goes through the reply
+    // boundary (the read, the forced lookup, the guards); without one
+    // (the stub tests) it is pasted as before.
+    if (turn.seedReply !== undefined && deps.proxy) deps.proxy.scriptNextReply(turn.seedReply);
+    const driven = turn.seedReply !== undefined && !deps.proxy ? seedTurn(actor, turn.say, turn.seedReply, conversationId) : await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt });
     await deps.proxy?.settled(); // the teed reply text lands a tick after the client's read
     // An interrupted turn logs no [turn] line today (nothing is
     // finalized for a reply nobody read); its id is on the [route] line.
@@ -564,6 +583,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       memoryRowDetails: memoryRowDetailsFor(actor),
       pendingAsk: getPendingAsk(conversationId)?.kind ?? null,
       pendingAskName: getPendingAsk(conversationId)?.name ?? null,
+      lookupShape: line?.lookup_shape ?? null,
       // ASK-01: the person's own open questions, read after the judge
       // drained (a candidate's question is the judge's).
       openQuestions: listOpenQuestions(actor.id).map((q) => ({ kind: q.kind, status: q.status, text: q.text })),

@@ -90,15 +90,17 @@ describe("the fixture", () => {
     // recall-past-the-window (fourteen turns by design: the window has to
     // drop turn 1), LOOKUP-01's offer-binding, ASK-01's five (the
     // design note's three, who-ask-declined, open-question-once), and
-    // SAFETY-01's self-harm-state.
-    expect(CONVERSATIONS.length).toBe(77);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(77);
+    // SAFETY-01's self-harm-state, and LOOKUP-02's six (hedged-promise,
+    // offer-binds-the-question and its go-on-then variant,
+    // objection-reruns, hedged-draft, ladder-falls-through).
+    expect(CONVERSATIONS.length).toBe(83);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(83);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern", "Sunday", "Tuesday", "Clover", "Indigo"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern", "Sunday", "Tuesday", "Clover", "Indigo", "Cosmo", "Rivet", "Mopey"]).toContain(name);
     }
   });
 
