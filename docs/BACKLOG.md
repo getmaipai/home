@@ -587,7 +587,13 @@ not permission to expand scope.
     detector's, read from `TurnContext.subjects`; `TurnIntent.kind` is
     derived from the signal and the stack by one function and
     `subjectEntityIds` is deleted; CHAT-12 stays deferred behind the
-    volatile-zone ordering.
+    volatile-zone ordering. **From LOOKUP-02's set (2026-09-15):** a
+    promise to remember on a question turn ("I'll remember that you're
+    excited" answering "when is it out", `new-album` turns 2 and 3) is
+    the commissive form of the memory family's claim, which reads
+    "I've saved" as the claim and cuts the future tense on a statement
+    turn only (EXP-01's rule), so on a question turn it stands; the
+    ladder cuts it beside the plain denial it pads.
 
 <a id="chat-14"></a>
 
@@ -1701,7 +1707,12 @@ invented for the roster's household, and added to
     recording proxy and the `outcomeArgsMatch` and `lookupShape`
     expectation kinds; open-question-once seeds its candidate. Tests:
     `backend/tests/lookup02.test.ts`, the corpus rows. Part 1's rule 1
-    (the claim-type decision before generation) is CHAT-13's.
+    (the claim-type decision before generation) is CHAT-13's. Set 1 on
+    2c3eaee: 38, 38, 38 of 47 over thirteen rows, the item's six green
+    every run; its three reads fixed after (a number word is a
+    checkable value; offer-binding reads the built query;
+    act-register-requests seeds Rover as the registered pet, a seed
+    confirming an earlier row's candidate of the same name).
 
 <a id="lookup-01"></a>
 

@@ -634,6 +634,36 @@ describe("the runner against the stub (control-flow rows)", () => {
     });
   }, 30_000);
 
+  test("act-register-requests seeds Rover as the registered pet; a seed whose name an earlier row's judge left as a candidate confirms that row instead of doubling it", async () => {
+    // The worried turn's draft promises a lookup, LOOKUP-02's set shape:
+    // with Rover on the roster the ladder stands down and no tool runs.
+    const lastUser = (request: ChatCompletionRequest) => [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    await withStubBench({ reply: (request) => (/getting sick/.test(String(lastUser(request))) ? "Let me look that up for you. Poor Rover." : "Poor Rover, that sounds worrying.") }, async (deps) => {
+      const { createEntity } = await import("@/lib/entities");
+      const { queueOpenQuestion, listOpenQuestions } = await import("@/lib/conversationHistory");
+      const { sqlite } = await import("@/db");
+      // An earlier row's judge: Rover inferred, unconfirmed, his question queued.
+      const candidate = createEntity(deps.people.owner, { kind: "pet", name: "Rover", scope: "person", person: deps.people.owner.id, source: "inferred" });
+      expect(candidate.ok).toBe(true);
+      queueOpenQuestion({ person: deps.people.owner.id, kind: "who", text: "Who's Rover?", subjectId: candidate.value!.id, source: "test" });
+      const { scores } = await runConversation(byId("act-register-requests"), deps);
+      const rovers = sqlite.query("SELECT id, source, confirmed_by_person_id FROM entities WHERE name = 'Rover' AND deleted_at IS NULL").all() as { id: string; source: string; confirmed_by_person_id: string | null }[];
+      expect(rovers).toHaveLength(1);
+      expect(rovers[0]!.id).toBe(candidate.value!.id);
+      expect(rovers[0]!.source).toBe("local");
+      expect(rovers[0]!.confirmed_by_person_id).toBe(deps.people.owner.id);
+      expect(listOpenQuestions(deps.people.owner.id).filter((q) => q.status === "pending" || q.status === "asked")).toHaveLength(0);
+      // The worried question reads the dog as the household's: the
+      // promise is dropped, nothing is looked up, the rest stands.
+      const sick = scores.find((s) => s.say === "why does Rover keep getting sick")!;
+      expect((sick.observed.subjects ?? []).map((x) => [x.type, x.name])).toContainEqual(["household", "Rover"]);
+      expect(sick.observed.source).toBe("model");
+      expect(sick.observed.reply).toMatch(/Poor Rover/);
+      expect(sick.observed.reply).not.toMatch(/look that up|worrying/i); // the scripted draft, its promise dropped
+      expect(sick.checks.find((c) => c.name === "tool")?.pass).toBe(true);
+    });
+  }, 30_000);
+
   test("the rubric's effect checks: no active record may carry the old fact, a lookup needs a source URL, a delivery needs the notification", () => {
     const correction = byId("correction-then-recall");
     const turn = correction.turns[2]!;

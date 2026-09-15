@@ -910,9 +910,11 @@ const LOOKUP_OFFER_RE = new RegExp(String.raw`\b(?:(?:do you )?want me to|would 
 // other confession: the model answered anyway, unsure. A marker plus a
 // value (a number, a date, a proper noun past the first word, a model
 // name) on a world question with no succeeded lookup is an invalid
-// draft, read the same way as a promise.
+// draft, read the same way as a promise. A number word is a number
+// (LOOKUP-02's set: "I think it's seven tracks" went out unread);
+// "one" stays out, a pronoun as often as a count ("the one", "one of").
 const HEDGE_MARK_RE = /\b(?:typically|usually|generally|often|i think|i believe|probably|around|roughly|approximately|if i remember|as far as i (?:know|remember|recall)|but (?:do )?check|i(?:'d)? recommend (?:checking|verifying)|you(?:'ll| will| may| might)? want to (?:verify|double[- ]check|check)|double[- ]check|i'?m not (?:entirely |completely |100% )?(?:sure|certain)|not (?:entirely |completely )?sure)\b/i;
-const CHECKABLE_VALUE_RE = /\b\d[\d.,]*\b|(?<=\S\s)\p{Lu}[\p{L}\p{N}-]+|\b(?:january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/u;
+const CHECKABLE_VALUE_RE = /\b\d[\d.,]*\b|(?<=\S\s)\p{Lu}[\p{L}\p{N}-]+|\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|dozen)\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/u;
 export function hedgedFactShape(sentence: string): boolean {
   return HEDGE_MARK_RE.test(sentence) && CHECKABLE_VALUE_RE.test(sentence);
 }

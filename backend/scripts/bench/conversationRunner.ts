@@ -15,7 +15,7 @@ import { conversationTurns, memoryRecords, people, lists, entities, relationship
 import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, notePendingLookup, type TurnStreamResult, lookupQueryFor } from "@/lib/turnEngine";
 import { resolveNames } from "@/lib/unknownNames";
 import { lookupShapeOf } from "@/lib/guards";
-import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation, listOpenQuestions, queueOpenQuestion } from "@/lib/conversationHistory";
+import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation, listOpenQuestions, queueOpenQuestion, resolveOpenQuestionsAbout } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety } from "@/lib/safety";
@@ -25,7 +25,8 @@ import { remember } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { createEntity } from "@/lib/entities";
+import { createEntity, updateEntity } from "@/lib/entities";
+import { findEntityByName } from "@/lib/subjects";
 import { createRelationship, updateRelationship } from "@/lib/relationships";
 import { listJobs, runDueJobs } from "@/lib/scheduler";
 import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
@@ -401,12 +402,33 @@ function seedEntities(conv: BenchConversation, owner: PersonRow): void {
   for (const e of conv.seedEntities) {
     // ASK-01: a candidate is the judge's own shape (inferred, the
     // owner's scope, unconfirmed), with its question queued.
-    const created = e.source === "inferred"
-      ? createEntity(owner, { kind: e.kind, name: e.name, aliases: [...(e.aliases ?? [])], description: e.description || null, scope: "person", person: owner.id, source: "inferred" })
-      : createEntity(owner, { kind: e.kind, name: e.name, aliases: [...(e.aliases ?? [])], description: e.description, scope: "household" });
-    if (!created.ok || !created.value) throw new Error(`seeding entity ${e.name} for ${conv.id}: ${created.ok ? "no value" : created.error}`);
-    seededEntityIds.add(created.value.id);
-    if (e.openQuestion) queueOpenQuestion({ person: owner.id, kind: "who", text: e.openQuestion, subjectId: created.value.id, source: `bench:${conv.id}` });
+    // The bench household is one across every row: a registered seed
+    // whose name an earlier row's judge already put in the registry as a
+    // candidate (act-register-requests' Rover in a full run) confirms
+    // that row instead of standing a second entity beside it, and its
+    // open question is answered.
+    // The seed's own description and aliases go on that row (the
+    // household-subject rows' facts live in the registry, never in the
+    // transcript), and its relationship below; a hit of another kind is
+    // a premise clash the run reports rather than a twin it makes.
+    const existing = e.source === "inferred" ? null : findEntityByName(owner, e.name);
+    let entityId: string;
+    if (existing) {
+      if (existing.kind !== e.kind) throw new Error(`seeding entity ${e.name} for ${conv.id}: the registry already has ${e.name} as a ${existing.kind}, the row wants a ${e.kind}`);
+      const candidate = existing.source === "inferred" && !existing.confirmed_by_person_id;
+      const merged = updateEntity(owner, existing.id, { ...(candidate ? { confirm: true } : {}), description: e.description, aliases: Array.from(new Set([...existing.aliases, ...(e.aliases ?? [])])) });
+      if (!merged.ok) throw new Error(`merging the seeded entity ${e.name} for ${conv.id}: ${merged.error}`);
+      if (candidate) resolveOpenQuestionsAbout(owner.id, existing.id, "answered");
+      entityId = existing.id;
+    } else {
+      const created = e.source === "inferred"
+        ? createEntity(owner, { kind: e.kind, name: e.name, aliases: [...(e.aliases ?? [])], description: e.description || null, scope: "person", person: owner.id, source: "inferred" })
+        : createEntity(owner, { kind: e.kind, name: e.name, aliases: [...(e.aliases ?? [])], description: e.description, scope: "household" });
+      if (!created.ok || !created.value) throw new Error(`seeding entity ${e.name} for ${conv.id}: ${created.ok ? "no value" : created.error}`);
+      seededEntityIds.add(created.value.id);
+      entityId = created.value.id;
+      if (e.openQuestion) queueOpenQuestion({ person: owner.id, kind: "who", text: e.openQuestion, subjectId: created.value.id, source: `bench:${conv.id}` });
+    }
     if (e.relationshipFromOwner) {
       let self = db.select({ id: entities.id }).from(entities).where(and(eq(entities.accountPersonId, owner.id), isNull(entities.deletedAt))).get();
       if (!self) {
@@ -415,7 +437,7 @@ function seedEntities(conv: BenchConversation, owner: PersonRow): void {
         self = { id: made.value.id };
         seededEntityIds.add(self.id);
       }
-      const rel = createRelationship(owner, { type: e.relationshipFromOwner, from_id: self.id, to_id: created.value.id, scope: "household" });
+      const rel = createRelationship(owner, { type: e.relationshipFromOwner, from_id: self.id, to_id: entityId, scope: "household" });
       if (!rel.ok) throw new Error(`seeding the relationship ${e.relationshipFromOwner} for ${conv.id}: ${rel.error}`);
     }
   }

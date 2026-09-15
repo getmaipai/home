@@ -5626,6 +5626,65 @@ even with no subject on the stack ("weather tomorrow"); the proxy's
 scripted draft answers the turn's own completion only, never a
 post-turn summary refresh.
 
+**The seeded set** (2026-09-15, on 2c3eaee; the 8B chat engine, the
+4B judge started for the set and stopped after it, three runs of the
+thirteen rows the coordinator named, logs
+`bench-lookup02-set1-seed-{a,b,c}.log`). 38, 38 and 38 of 47 scored
+turns; the item's six rows green in every run, `copied-line` and
+`statement-not-request` too. Three of the item's own from the read,
+fixed in the same follow-up commit: `new-album` turn 3, "I think it's
+seven tracks" went out unread in two runs because the checkable value
+read digits, dates and proper nouns and not a number word (the number
+words two to twenty, the tens, hundred, thousand, million and dozen
+join `CHECKABLE_VALUE_RE`; "one" stays out, a pronoun as often as a
+count); `offer-binding` turn 2 ran the websearch via ask with the
+built query "new Marsh Lantern album out" and a source while the row
+still expected the whole question as the expression (the row reads
+the built query now); `act-register-requests` turn 5, "why does Rover
+keep getting sick", drew a promise from the 8B and the ladder ran the
+websearch on the dog with the plugin's empty summary as the reply. In
+that partial run no row registers Rover, so he is an unresolved name
+and `asksAboutHousehold()` does not stand the lookup down; the
+two-sentence read now catches the promise the first-sentence read
+missed (ASK-01's full set passed the turn with the promise as an
+unread third sentence). A judge-inferred Rover is a candidate under
+ASK-01 and out of the roster until the person answers, so a full run
+fails the same way once the draft promises early. The row's premise
+is the family's dog (LOOKUP-01's follow-up test has Rover a registered
+pet), so the row seeds him as one; a seed whose name an earlier row's
+judge already put in the registry is merged onto that row instead of
+doubled (`seedEntities()` in the runner: a candidate is confirmed and
+its open question answered, the seed's description and aliases go on,
+its relationship is made against it, and a hit of another kind is a
+premise clash the run reports; the review's read, since a full run's
+judge files Marlow from "remember that Marlow's birthday is in June"
+before `household-subject-person` seeds him with his age and the
+`parent_of` edge). The row's test scripts a promising draft on the
+worried turn and checks the promise dropped with no tool. The read's
+own trade-off, recorded: a bare number word beside a hedge on a world
+question is now a checkable value, so a clarifying draft ("I think
+there are two things you could mean") reads as a hedged fact, the
+same exposure digits already had. The design point stands as ASK-01 left it: a bare
+unresolved name in a question is CHAT-13's world subject, and the
+lookup ran on it as designed. Pre-existing, failing the same way in
+ASK-01's set: `new-album` turn 1 (the row expects a world subject;
+the resolver hands a bare proper noun an unresolved ref at 0.4 until
+CHAT-13), `new-album` turn 2 (a plain denial with the websearch
+offered and not called, no shape for the read: CHAT-13's ladder),
+`pending-ask-lookup` (CHAT-13's row) and `copied-line-history` turn 2
+(EXP-01's target turn, the 8B's placeholder echo cut). Variance:
+`copied-line-history` turn 1 (the 8B reported the earlier
+conversation's offer as its own promise and `claimed_statement` cut
+it, rightly) and `new-album` turn 5 once. The full set of LOOKUP-01's
+and LOOKUP-02's rows runs after ASK-02. One follow-up from the read,
+the coordinator's: "I'll remember that you're excited" on a question
+turn (`new-album` turns 2 and 3) is a promise to remember that nothing
+keeps, the commissive form of the memory family's claim; the family
+reads "I've saved" as the claim, "remembered" as an acknowledgment,
+and cuts the future tense on a statement turn only (EXP-01's rule),
+so on a question turn it stands. Recorded on CHAT-13's item (the
+ladder cuts it beside the denial), not fixed here.
+
 **Left on record.** Part 1's rule 1, the claim-type decision before
 generation, is CHAT-13's as the section says; until it lands, a world
 question the model answers plainly with no hedge is still the model's.

@@ -1152,10 +1152,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
   {
     id: "offer-binding",
     category: "knowledge",
-    note: "section 4: an offer is a pending ask; 'do it' runs the websearch bound to the question, via ask, with a source",
+    note: "section 4: an offer is a pending ask; 'do it' runs the websearch bound to the question (LOOKUP-02's built query, the frame words out), via ask, with a source",
     turns: [
       { say: "when is the new Marsh Lantern album out", seedReply: "I don't have a date for that one. Want me to look it up?", expect: { signal: { primary_act: "question" }, pendingAsk: "lookup", guard: null } },
-      { say: "do it", expect: { signal: { primary_act: "directive" }, pendingAsk: null, lookupWithSource: true, outcomeArgs: { packageId: "websearch", args: { expression: "when is the new Marsh Lantern album out" }, via: "ask" }, mustContain: "september|22|twelve|12", mustNotContain: HONESTY_LINES } },
+      { say: "do it", expect: { signal: { primary_act: "directive" }, pendingAsk: null, lookupWithSource: true, outcomeArgs: { packageId: "websearch", args: { expression: "new Marsh Lantern album out" }, via: "ask" }, mustContain: "september|22|twelve|12", mustNotContain: HONESTY_LINES } },
       // The set's read (2026-09-14): the count sits in the previous
       // turn's own lookup result, still in the window; answering from it
       // is right (a person would not search again), so the row accepts a
@@ -1229,6 +1229,15 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     id: "act-register-requests",
     category: "etiquette",
     note: "section 12 part 4: a directive with a secondary question, anger at the hub, a correction, a worried question, good news",
+    // LOOKUP-02's set: the worried question is about the family's dog,
+    // and the lookup stands down for a household subject only when Rover
+    // is on the roster (a judge-inferred Rover is a candidate under
+    // ASK-01, out of the roster until the person answers; a bare
+    // unresolved name in a question is CHAT-13's world subject and the
+    // 8B's promise ran the websearch on him). The row seeds him as the
+    // registered pet its premise names; an earlier row's candidate of
+    // the same name is confirmed instead of doubled.
+    seedEntities: [{ kind: "pet", name: "Rover", aliases: ["the dog"], description: "The family dog." }],
     turns: [
       { say: "add oat milk to the list, and when is Pippa's appointment", expect: { signal: { primary_act: "directive" }, toolsRan: ["list-add"], listHas: ["oat milk"], mustContain: "oat milk|added|list", guard: null } },
       { say: "you added the wrong item", expect: { signal: { primary_act: "inform", expressed_emotion: "anger" }, mustNotContain: "i've removed|i removed|taken it off|fixed it|" + NO_CLOSER, guard: null, humanVerdict: true } },

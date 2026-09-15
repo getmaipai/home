@@ -116,6 +116,10 @@ describe("the shapes and the read", () => {
     expect(hedgedFactShape("It usually takes a 12-pin connector, but check the manual to be sure.")).toBe(true);
     expect(hedgedFactShape("Returns are typically accepted within 30 days.")).toBe(true);
     expect(hedgedFactShape("I think it was directed by Serena Vale.")).toBe(true);
+    // The set's read: a number word is a number; "one" is not.
+    expect(hedgedFactShape("I think it's seven tracks.")).toBe(true);
+    expect(hedgedFactShape("It's probably around twelve songs, but check.")).toBe(true);
+    expect(hedgedFactShape("I think that's the one you mean.")).toBe(false);
     expect(hedgedFactShape("It takes a 12-pin connector.")).toBe(false);
     expect(hedgedFactShape("I'm not sure, honestly.")).toBe(false);
   });
