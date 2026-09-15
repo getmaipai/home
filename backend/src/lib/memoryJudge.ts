@@ -90,6 +90,7 @@ import {
 import { isOwnerOrAdmin } from "@/lib/access";
 import { trigger } from "@/lib/notifications";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
+import { defaultChildDisclosure } from "@/lib/childDisclosure";
 import { nextHlc } from "@/lib/hlc";
 import { turnActiveWithin, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import type { ConversationTurnRow } from "@/wire";
@@ -1299,6 +1300,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         person: fact.scope === "person" ? speaker.id : undefined,
         source: turn.id,
         importance: fact.importance,
+        child_disclosure: defaultChildDisclosure(fact.text, { sensitive: false, scope: fact.scope }),
         valid_from: fact.valid_from,
         valid_to: fact.valid_to,
         subject_id: subject?.id ?? null,

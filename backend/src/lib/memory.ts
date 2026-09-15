@@ -107,6 +107,7 @@ export interface RememberInput {
   importance: number;
   pinned?: boolean;
   sensitive?: boolean;
+  child_disclosure?: "child_ok" | "teen_ok" | "adult_only";
   embedding_space?: string | null;
   /** When the fact became/stopped being true (step 6, session-a-
    * intelligence.md: "trips and states stored as dated `state` with
@@ -171,6 +172,9 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     importance: input.importance,
     pinned: input.pinned ?? false,
     sensitive: input.sensitive ?? false,
+    child_disclosure: input.child_disclosure ?? "child_ok",
+    child_disclosure_set_by: null,
+    child_disclosure_set_at: null,
     uses: 0,
     created_at: now,
     last_used_at: now,
@@ -206,6 +210,9 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
       importance: parsed.data.importance,
       pinned: parsed.data.pinned,
       sensitive: parsed.data.sensitive,
+      childDisclosure: parsed.data.child_disclosure ?? "child_ok",
+      childDisclosureSetBy: parsed.data.child_disclosure_set_by,
+      childDisclosureSetAt: parsed.data.child_disclosure_set_at,
       uses: parsed.data.uses,
       createdAt: parsed.data.created_at,
       lastUsedAt: parsed.data.last_used_at,

@@ -15,7 +15,7 @@ interface EntityKindNouns {
   kinds: Array<{ kind: string; nouns: string[] }>;
 }
 interface LifeEvents {
-  classes: Array<{ id: string; life_event: boolean; adult_to_tell: boolean; description: string }>;
+  classes: Array<{ id: string; life_event: boolean; adult_to_tell: boolean; cues?: string[]; description: string }>;
 }
 interface DefectCodes {
   guard_reasons: Array<{ id: string; shipped: boolean; description: string }>;
@@ -55,6 +55,12 @@ describe("vocab/life-events.json", () => {
       ids.add(c.id);
       expect(c.life_event || c.adult_to_tell, `${c.id} carries neither flag`).toBe(true);
       expect(c.description.length).toBeGreaterThan(0);
+      if (c.adult_to_tell) {
+        expect(c.cues?.length, `${c.id} needs cues`).toBeGreaterThan(0);
+        for (const cue of c.cues ?? []) expect(cue).toBe(cue.toLowerCase());
+      } else {
+        expect(c.cues, `${c.id} must not carry cues`).toBeUndefined();
+      }
     }
   });
 

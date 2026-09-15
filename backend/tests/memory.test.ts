@@ -48,6 +48,16 @@ async function ownerAndChildRows(): Promise<{ ownerRow: PersonRow; childId: stri
 }
 
 describe("POST /api/memory (remember)", () => {
+  test("remember defaults child disclosure and accepts adult-only override", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const ordinary = remember(ownerRow, { text: "we got a puppy", category: "thing", tier: "durable", scope: "household", source: "test", importance: 0.5 });
+    const adult = remember(ownerRow, { text: "private fact", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5, child_disclosure: "adult_only" });
+    expect(ordinary.ok && ordinary.value.child_disclosure).toBe("child_ok");
+    expect(adult.ok && adult.value.child_disclosure).toBe("adult_only");
+    expect(ordinary.ok && ordinary.value.child_disclosure_set_by).toBeNull();
+    expect(ordinary.ok && ordinary.value.child_disclosure_set_at).toBeNull();
+  });
+
   test("requires auth", async () => {
     const res = await new TestClient().post("/api/memory", {});
     expect(res.status).toBe(401);
