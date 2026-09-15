@@ -672,6 +672,25 @@ not permission to expand scope.
 
 - [ ] **CHAT-16: Compose contextual package answers through one shared path** (M)
 
+    Progress 2026-09-15 (dev.md section 16 part 4, the amendments, landed
+    ahead of the composer core): the search host returns its rows, the
+    websearch recipe carries them, the outcome types them as `Source`
+    records, `TurnValue.sources` rides the wire additively and is
+    persisted on the turn row (migration 0039), and the chat surface's
+    `SourcesCard` reads the real field (dca1173, 4642371); a link, a
+    picture or a video ask is a deliverable on the intent, a
+    back-reference re-sends the last lookup's sources with no new
+    search, otherwise the ladder runs with the deliverable query and the
+    reply is one line that says the link is below, a child hears that a
+    grown-up can open it and gets no chip (fcbb315, 68b570c, 85e3848);
+    a denied deliverable takes the same path (chunk c). Bench:
+    `link-is-the-answer`, `link-child-band`, `false-capability-cut`.
+    Open, the core below: the composer itself (the decision table, the
+    native tool-result messages, the two-completion budget, the
+    requested shape on a plugin reply, the `status` events), which
+    needs its own chunking pass before a coder takes it. The voice line
+    of part 4 rule 5 waits for a voice surface.
+
     Depends on: CHAT-02, CHAT-12, CHAT-15. Files:
     `spec/llm/ts/types.ts`, `client.ts`, native client tests,
     `backend/src/lib/llm.ts`, `turnEngine.ts`, `turnContext.ts`,
@@ -1831,14 +1850,21 @@ invented for the roster's household, and added to
     `cue-banned`; `list-shape-on-lookup` waits for CHAT-16's composer.
     Tests: replyConstraints.test.ts, guards.test.ts "CONS-01", the
     corpus row, two stream tests.
-- [x] **ALM-01 (a): the almanac compute module** (S)
-    Done 2026-09-15 (dbf42dd; dev.md section 16 part 6):
+- [x] **ALM-01: Derived date and time questions as a compute over the almanac** (S-M)
+    Done 2026-09-15 (dbf42dd the module; 9d4652c, d69335f the engine;
+    7162ed9 the connective prefix, 041d856 the bench clock and the
+    `derived-dates` row, both on the next stack; dev.md section 16 part
+    6, rule 1):
     `lib/almanacCompute.ts` parses the relative-term grammar, answers
     from a given clock with fixed plain templates and the inputs
     recorded, and annotates a date's relation to today for the
-    composer; 18 tests on a pinned Monday clock. Chunk B (the compute
-    intent before routing on both paths, the carried term, the rows
-    with a per-row bench clock) is in progress.
+    composer; 18 tests on a pinned Monday clock. The rule layer reads
+    the relative term in the shared prepare path before routing and
+    answers from the turn's clock with a typed `almanac-compute`
+    outcome carrying the inputs; a follow-up reads the carried term;
+    the bare almanac questions still route to their packages, behind a
+    leading connective too. Rule 2 (every date in a composed answer
+    annotated) rides with the composer core.
 - [x] **LOOKUP-01: A promise is the lookup, an offer is a pending ask** (S-M)
     Done 2026-09-14 (docs/dev/session-a.md "LOOKUP-01"): the promise
     and offer shapes in `lib/guards.ts` (`lookupShapeOf()`, one
