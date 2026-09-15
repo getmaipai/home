@@ -657,6 +657,91 @@ export function citeClause(
 // "is going to", "plans to").
 const WORLD_PREFERENCE_MARKERS = ["likes", "loves", "favourite", "wants to see", "is going to", "plans to"];
 
+// MEM-06 (d): the categories a commissive clause may write - a goal, a
+// project or a dated event. Any other category on a commissive clause is
+// dropped with reason "commissive_shape".
+const COMMISSIVE_SHAPE: readonly Category[] = ["goal", "project", "event"];
+const MS_24H = 24 * 60 * 60 * 1000;
+const MS_7D = 7 * 24 * 60 * 60 * 1000;
+
+/** MEM-06 (d): the clause contract's second half - what a kept fact
+ * becomes once it cites its clause (chunk C's `citeClause()` returns the
+ * pairs). A `reported` clause yields a record about the third party only,
+ * capped at importance 0.4, with the source named in the text
+ * ("according to Pippa, ..." prefix when the text does not already name
+ * the speaker's source); a `commissive` clause yields only a `goal`,
+ * `project` or dated `event` (any other category is dropped with reason
+ * "commissive_shape"); a clause with `emotion_intensity` "moderate"
+ * about the speaker or a named subject yields a `state` at importance
+ * 0.3 with `valid_to` 24 hours after the turn, a "high" one at 0.5 with
+ * seven days, an explicit `valid_to` on the fact always winning, and
+ * "none" or "low" yields no state from the emotion (a `state` fact whose
+ * only ground is the clause's emotion is dropped with reason
+ * "invalid_emotion_category" when the intensity is none or low). One
+ * utterance may split into an event and a state, so two facts citing the
+ * same clause are both allowed. A pair with `clause: null` passes
+ * through unchanged. */
+export function shapeByClause(
+  pairs: { fact: ExtractedFact; clause: SignalClause | null }[],
+  turnCreatedAt: string,
+): {
+  kept: ExtractedFact[];
+  dropped: { fact: ExtractedFact; reason: "commissive_shape" | "invalid_emotion_category" }[];
+} {
+  const kept: ExtractedFact[] = [];
+  const dropped: { fact: ExtractedFact; reason: "commissive_shape" | "invalid_emotion_category" }[] = [];
+  for (const { fact: fact0, clause } of pairs) {
+    let fact: ExtractedFact = fact0;
+    if (clause === null) {
+      kept.push(fact);
+      continue;
+    }
+    if (clause.stance === "reported") {
+      const speakerName =
+        fact.subject === null || fact.subject.name.toLowerCase() === "" ? "" : fact.subject.name;
+      const name = speakerName || "the speaker";
+      const lower = fact.text.toLowerCase();
+      const named =
+        (fact.subject !== null && lower.includes(fact.subject.name.toLowerCase())) ||
+        lower.includes(`according to ${name.toLowerCase()}`);
+      if (!named) {
+        fact = { ...fact, text: `According to ${name}, ${fact.text}` };
+      }
+      if (fact.importance > 0.4) fact = { ...fact, importance: 0.4 };
+      kept.push(fact);
+      continue;
+    }
+    if (clause.act === "commissive") {
+      if (!COMMISSIVE_SHAPE.includes(fact.category)) {
+        dropped.push({ fact, reason: "commissive_shape" });
+        continue;
+      }
+      kept.push(fact);
+      continue;
+    }
+    const intensity = clause.emotion_intensity;
+    if (intensity === "moderate" || intensity === "high") {
+      if (fact.category === "state" && fact.valid_to === null) {
+        const base = new Date(turnCreatedAt).getTime();
+        const bound = intensity === "moderate" ? base + MS_24H : base + MS_7D;
+        fact = {
+          ...fact,
+          importance: intensity === "moderate" ? 0.3 : 0.5,
+          valid_to: new Date(bound).toISOString(),
+        };
+      }
+      kept.push(fact);
+      continue;
+    }
+    if (fact.category === "state") {
+      dropped.push({ fact, reason: "invalid_emotion_category" });
+      continue;
+    }
+    kept.push(fact);
+  }
+  return { kept, dropped };
+}
+
 /** MEM-06 (b): the turn's world titles - each retained outcome's
  * `source.title` and each world subject on the stack's `display_name` -
  * in the lowercase, case-insensitive form `rejectWorld()` matches
@@ -1041,7 +1126,13 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // proper nouns or numbers are absent from the cited clause, or whose
   // subject kind disagrees with the clause's subject, is dropped.
   const { kept: cited, dropped: citeDropped } = citeClause(facts, signal, turn.userText, speakerName, turnDateFor(turn.createdAt));
-  const dropped = [...echoDropped, ...ungroundedDropped, ...worldDropped, ...passingDropped, ...citeDropped];
+  // MEM-06 (d): the clause shapes the record - a reported clause writes
+  // about the third party only, capped at 0.4 with the source named; a
+  // commissive clause writes a goal, a project or a dated event and
+  // nothing else; a moderate or high emotion writes a bounded state,
+  // none or low writes no state; an explicit valid_to always wins.
+  const { kept: shaped, dropped: shapeDropped } = shapeByClause(cited, turn.createdAt);
+  const dropped = [...echoDropped, ...ungroundedDropped, ...worldDropped, ...passingDropped, ...citeDropped, ...shapeDropped];
   if (dropped.length > 0) {
     const counts: Record<string, number> = {};
     for (const d of dropped) counts[d.reason] = (counts[d.reason] ?? 0) + 1;
@@ -1063,7 +1154,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // chatMemoryChip.tsx has something to link to (/memory?ids=...) rather
   // than just a rendered summary.
   const writtenIds: string[] = [];
-  for (const { fact } of cited) {
+  for (const fact of shaped) {
     const notAName = subjectNotAName(speaker, fact);
     if (notAName) {
       console.log(`[memoryJudge] turn ${turn.id}: dropped a fact whose subject "${notAName.toLowerCase()}" is a pronoun or a relation word, not a name`);

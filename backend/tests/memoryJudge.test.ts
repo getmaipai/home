@@ -893,6 +893,72 @@ describe("MEM-06 (c): a fact cites the eligible clause it came from", () => {
   });
 });
 
+describe("MEM-06: the clause shapes the record", () => {
+  test("a reported clause names the source and caps importance; a commissive clause keeps only a goal, a project or a dated event; a moderate or high emotion bounds a state, none or low writes no state; an explicit valid_to wins", async () => {
+    const { shapeByClause, turnDateFor } = await import("@/lib/memoryJudge");
+    const turnCreatedAt = new Date(2026, 8, 13, 12).toISOString();
+    const date = turnDateFor(turnCreatedAt);
+    const fact = (text: string, subject: { name: string; kind: "person" } | null = null, category: "fact" | "state" | "goal" | "event" = "fact", importance = 0.5, valid_to: string | null = null) => ({ text, category, scope: "person" as const, importance, valid_from: null, valid_to, subject, relation: null });
+    const clause = (partial: Partial<{ act: "inform" | "commissive"; stance: "asserted" | "reported"; subject: { kind: "speaker" } | { kind: "household" } | { kind: "world" }; emotion: "happiness"; emotion_intensity: "none" | "low" | "moderate" | "high" }>) => ({
+      range: { start: 0, end: 50 },
+      act: partial.act ?? ("inform" as const),
+      stance: partial.stance ?? ("asserted" as const),
+      subject: partial.subject ?? ({ kind: "household" as const }),
+      emotion: partial.emotion ?? ("happiness" as const),
+      emotion_intensity: partial.emotion_intensity ?? ("none" as const),
+      confidence: 0.9,
+    });
+    // A reported clause yields a record about the third party, capped at 0.4, the source named.
+    const reported = shapeByClause([{ fact: fact("the dentist moved to Thursday", { name: "Pippa", kind: "person" }), clause: clause({ act: "inform", stance: "reported", subject: { kind: "household" } }) }], turnCreatedAt);
+    expect(reported.kept.length).toBe(1);
+    expect(reported.kept[0]!.importance).toBeLessThanOrEqual(0.4);
+    expect(reported.kept[0]!.text.toLowerCase()).toContain("pippa");
+    const reportedNamed = shapeByClause([{ fact: fact("According to Pippa, the dentist moved to Thursday", { name: "Pippa", kind: "person" }), clause: clause({ act: "inform", stance: "reported", subject: { kind: "household" } }) }], turnCreatedAt);
+    expect(reportedNamed.kept[0]!.text.toLowerCase().startsWith("according to pippa,")).toBe(true);
+    // A commissive clause keeps a goal and drops a plain fact.
+    const commissive = shapeByClause([
+      { fact: fact("call the dentist tomorrow", null, "goal"), clause: clause({ act: "commissive", stance: "asserted", subject: { kind: "speaker" } }) },
+      { fact: fact("call the dentist tomorrow", null), clause: clause({ act: "commissive", stance: "asserted", subject: { kind: "speaker" } }) },
+    ], turnCreatedAt);
+    expect(commissive.kept.length).toBe(1);
+    expect(commissive.kept[0]!.category).toBe("goal");
+    expect(commissive.dropped.length).toBe(1);
+    expect(commissive.dropped[0]!.reason).toBe("commissive_shape");
+    // A moderate emotion about the speaker bounds a state at 0.3, 24 h out.
+    const moderate = shapeByClause([{ fact: fact("Sage is happy about the trip", null, "state"), clause: clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" }, emotion_intensity: "moderate" }) }], turnCreatedAt);
+    expect(moderate.kept.length).toBe(1);
+    expect(moderate.kept[0]!.importance).toBe(0.3);
+    expect(Math.abs(Date.parse(moderate.kept[0]!.valid_to!) - (Date.parse(turnCreatedAt) + 24 * 3600 * 1000))).toBeLessThan(60 * 1000);
+    // A high emotion bounds a state at 0.5, seven days out.
+    const high = shapeByClause([{ fact: fact("Sage is excited about the trip", null, "state"), clause: clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" }, emotion_intensity: "high" }) }], turnCreatedAt);
+    expect(high.kept.length).toBe(1);
+    expect(high.kept[0]!.importance).toBe(0.5);
+    expect(Math.abs(Date.parse(high.kept[0]!.valid_to!) - (Date.parse(turnCreatedAt) + 7 * 24 * 3600 * 1000))).toBeLessThan(60 * 1000);
+    // A state on a low clause with no other ground is dropped.
+    const low = shapeByClause([{ fact: fact("Sage is okay about the trip", null, "state"), clause: clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" }, emotion_intensity: "low" }) }], turnCreatedAt);
+    expect(low.dropped.length).toBe(1);
+    expect(low.dropped[0]!.reason).toBe("invalid_emotion_category");
+    // An explicit valid_to on the fact always wins.
+    const explicit = shapeByClause([{ fact: fact("Sage is excited about the trip", null, "state", 0.5, new Date(Date.parse(turnCreatedAt) + 3600 * 1000).toISOString()), clause: clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" }, emotion_intensity: "high" }) }], turnCreatedAt);
+    expect(explicit.kept.length).toBe(1);
+    expect(explicit.kept[0]!.valid_to).toBe(new Date(Date.parse(turnCreatedAt) + 3600 * 1000).toISOString());
+    // A pair with clause null passes through unchanged.
+    const noClause = shapeByClause([{ fact: fact("Pippa has soccer practice on Tuesdays", { name: "Pippa", kind: "person" }), clause: null }], turnCreatedAt);
+    expect(noClause.kept.length).toBe(1);
+    expect(noClause.kept[0]!.importance).toBe(0.5);
+    expect(noClause.dropped.length).toBe(0);
+    // Two facts citing the same clause are both allowed (an event and a state).
+    const split = shapeByClause([
+      { fact: fact("Sage is happy about the trip", null, "state"), clause: clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" }, emotion_intensity: "moderate" }) },
+      { fact: fact("the trip is on Saturday", null, "event"), clause: clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" }, emotion_intensity: "moderate" }) },
+    ], turnCreatedAt);
+    expect(split.kept.length).toBe(2);
+    expect(split.dropped.length).toBe(0);
+    // turnDateFor is exercised so the helper's import stays live.
+    expect(date).toContain("2026");
+  });
+});
+
 describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
   // The real construction path: logTurn() with the signal prepareTurn()
   // computes and the status judgeStatusAtInsert() decides, for any
