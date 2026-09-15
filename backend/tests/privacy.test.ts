@@ -88,6 +88,18 @@ describe("the hub's own connections", () => {
     expect(byId.get("platform:text-embedding-model")?.destination).toContain("huggingface.co");
   });
 
+  // #112: the background memory helper's model download was missing from
+  // this table, and the embedding row still described a retired keyword
+  // scorer instead of the embedder memory recall now uses.
+  test("the memory helper's model download is listed, and the embedding row reflects current use", () => {
+    const byId = new Map(platformConnections().map((r) => [r.id, r]));
+    const background = byId.get("platform:background-model");
+    expect(background).toBeDefined();
+    expect(background?.destination).toContain("huggingface.co");
+    expect(background?.when).toContain("memory helper");
+    expect(byId.get("platform:text-embedding-model")?.when).not.toContain("Nothing in MaiPai");
+  });
+
   // A code review (2026-09-06, Session C step 5) found the STT feature's
   // two model downloads (Silero VAD, the Moonshine archive) missing from
   // this page - the same "if it is not on this list, it does not

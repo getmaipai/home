@@ -14,6 +14,7 @@
 import { CATALOG } from "@/lib/modelCatalog";
 import { ENGINE_BINARIES } from "@/lib/engineCatalog";
 import { EMBED_MODEL_URL } from "@/lib/embedAssets";
+import { BACKGROUND_MODEL_URL, BACKGROUND_MODEL_SMALL_URL } from "@/lib/backgroundAssets";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
 import { SILERO_VAD_ASSET, MOONSHINE_ARCHIVE } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
@@ -118,14 +119,19 @@ export function platformConnections(): PrivacyConnection[] {
       when: "when someone picks a voice, to fetch that one voice's sample",
       what: "the name of the chosen voice file, and your home's internet address. No recording of anyone in the house.",
     }),
-    // Real, but nothing in MaiPai reaches it today: memory recall uses a
-    // deterministic keyword and entity scorer (memory.ts), not an
-    // embedder. The row stays because the download path exists in the
-    // code and an honest table lists what CAN happen; the wording is
-    // what stops it implying a search feature that is not there. Another
-    // code-review catch, same pass.
+    // Memory recall uses this embedder (memory.ts: embed() on every
+    // remember() and recall query), so the row reflects current use,
+    // not the retired keyword scorer. #112.
     row("platform:text-embedding-model", hostsOf([EMBED_MODEL_URL]), {
-      when: "only if something asks the hub to turn text into numbers for searching. Nothing in MaiPai does this today.",
+      when: "when the hub needs the small text-to-numbers model that memory recall uses to find related memories; downloaded once",
+      what: DOWNLOAD_CARRIES,
+    }),
+    // #112: the background memory helper's own model download was missing
+    // from this table - the page told families "if it is not on this
+    // list, it does not happen" while the helper downloads ~2.5 GB on
+    // first use.
+    row("platform:background-model", hostsOf([BACKGROUND_MODEL_URL, BACKGROUND_MODEL_SMALL_URL]), {
+      when: "the first time the hub needs its memory helper, the small model that decides what to remember and writes conversation summaries",
       what: DOWNLOAD_CARRIES,
     }),
     // Home Assistant doesn't get a row here (it's the household's own LAN
