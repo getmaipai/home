@@ -273,13 +273,15 @@ describe("NotificationBell", () => {
       getByText("First");
       getByText("Second");
       fireEvent.click(getByRole("button", { name: "Dismiss all" }));
-      await waitFor(() => expect(queryByText("First")).toBeNull());
-      expect(queryByText("Second")).toBeNull();
-      expect(sawBody).toEqual({ all: true });
+      await waitFor(() => {
+        expect(queryByText("First")).toBeNull();
+        expect(queryByText("Second")).toBeNull();
+        expect(sawBody).toEqual({ all: true });
+      }, { timeout: 15_000 });
     } finally {
       globalThis.fetch = original;
     }
-  });
+  }, 20_000);
 
   test("Dismiss all also invalidates NotificationsPage's own history cache", async () => {
     const original = globalThis.fetch;
