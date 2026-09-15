@@ -38,6 +38,7 @@ interface CorpusRow {
   target?: GuardContext["target"];
   repair?: GuardContext["repair"];
   subjects?: GuardContext["subjects"];
+  bannedPhrases?: string[];
   expect: GuardReason | null;
   /** True only for a row that depends on the whole-reply lookahead
    * guardReply() has and gateGuards() (the streaming path) genuinely
@@ -51,7 +52,7 @@ interface CorpusRow {
 const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "spec", "llm", "guard-corpus.json"), "utf-8"));
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
-  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects };
+  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };
 }
 
 async function* sentenceStream(reply: string): AsyncGenerator<string, undefined, void> {

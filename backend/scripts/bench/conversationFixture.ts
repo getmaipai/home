@@ -1308,7 +1308,18 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     turns: [
       { say: "fingers crossed the new card sorts the stutter", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|fingers crossed|hope it works out|you'?ll love", guard: null, humanVerdict: true } },
       { say: "should be here Thursday", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|fingers crossed|hope it works out|you'?ll love", guard: "assistant_register", humanVerdict: true } },
-      { say: "worth selling the old one if it does", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|(got it|ok|okay|alright|right|cool|sounds? good|make sense|makes sense)\\?", toolRan: null, humanVerdict: true } },
+      { say: "stop saying good luck", expect: { signal: { primary_act: "directive" }, mustNotContain: "good luck", minWords: 4, humanVerdict: true } },
+      { say: "worth selling the old one if it does", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|\\b(got it|okay|sound good|make sense|right)\\?\\s*$", toolRan: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "cue-banned",
+    category: "etiquette",
+    note: "CONS-01: a banned cue leaves the rotation for the conversation",
+    turns: [
+      { say: "what's the capital of Portugal", expect: { signal: { primary_act: "question" }, guard: null, humanVerdict: true } },
+      { say: "don't say one sec again", expect: { signal: { primary_act: "directive" }, mustNotContain: "^one sec\\.?$", humanVerdict: true } },
+      { say: "and of France", expect: { signal: { primary_act: "question" }, mustNotContain: "^one sec\\.?$", humanVerdict: true } },
     ],
   },
   {

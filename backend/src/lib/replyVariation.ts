@@ -125,8 +125,15 @@ export const THINKING_CUE_VARIANTS: readonly string[] = [
 /** A rotated thinking cue for this person - reuses `pickVariant` under
  * its own dedicated key so it never shares state with any reply-text
  * rotation above. */
-export function pickThinkingCue(personId: string): string {
-  return pickVariant(personId, "thinking_cue", THINKING_CUE_VARIANTS);
+const _lastThinkingCues = new Map<string, string>();
+export function __resetThinkingCuesForTests(): void { _lastThinkingCues.clear(); }
+export function pickThinkingCue(personId: string, banned: readonly string[] = []): string | null {
+  const pool = THINKING_CUE_VARIANTS.filter((cue) => !banned.some((phrase) => cue.toLowerCase().includes(phrase.toLowerCase())));
+  const available = pool.filter((cue) => cue !== _lastThinkingCues.get(personId));
+  if (available.length === 0) return null;
+  const cue = pickVariant(personId, "thinking_cue", available);
+  _lastThinkingCues.set(personId, cue);
+  return cue;
 }
 
 // Maps a still-exact match of one of the OTHER known constant reply

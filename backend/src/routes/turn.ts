@@ -109,7 +109,7 @@ export async function* streamTurnEvents(
     const timer = delay(remainingDelayMs);
     const race = await Promise.race([firstStep, timer.promise]);
     timer.cancel();
-    if (race === "timeout") yield { type: "spoken_cue", text: pickThinkingCue(actorId) };
+    if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: cue }; }
     let current = race === "timeout" ? await firstStep : race;
 
     while (!current.done) {

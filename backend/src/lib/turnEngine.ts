@@ -31,7 +31,7 @@ import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, splitIntoSentences, lookupShapeOf, lookupAnswered, readLookupDraft, LOOKUP_READ_MAX_CHARS, LOOKUP_FAILED_LINES, type LookupRead, type LookupShape, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, splitIntoSentences, lookupShapeOf, lookupAnswered, readLookupDraft, LOOKUP_READ_MAX_CHARS, LOOKUP_FAILED_LINES, bannedPhraseRetryNote, type LookupRead, type LookupShape, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
@@ -41,6 +41,7 @@ import { asBackchannelOnLiveSubject, classifyTurnSignal, fallbackSignal, freezeD
 export const STATEMENT_RETRY_NOTE = "Nothing was asked; respond to what they said.";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
+import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor } from "@/lib/replyConstraints";
 import { promptNow } from "@/lib/benchSampling";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
@@ -2587,6 +2588,8 @@ async function prepareTurn(
   // not at the recall stage below (whose other use of it is only
   // `summaryLine` for the prompt).
   const window = buildConversationWindow(conversation, { supersedes });
+  const replyConstraint = parseReplyConstraint(text, window.messages.filter((m) => m.role === "assistant").slice(-2).map((m) => m.content));
+  if (replyConstraint) { setReplyConstraint({ conversationId: conversation.id, person: actor.id, ...replyConstraint, setByTurn: turnId }); console.log(`[turn] constraint: ${replyConstraint.kind} ${replyConstraint.value}`); }
   const subjectsStart = performance.now();
   const { subjects, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
   timings.subjects_ms = Math.round(performance.now() - subjectsStart);
@@ -4014,7 +4017,8 @@ async function runTurnHoldingLease(
         // emptied the reply (never a narrated line, which stands).
         if (emptiedBySkips && prepared.timings.retries < 1) {
           prepared.timings.retries++;
-          const again = await complete("chat", [...prepared.messages, { role: "system", content: STATEMENT_RETRY_NOTE }], { thinking: false });
+          const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => rawText.toLowerCase().includes(p.toLowerCase())) : null;
+          const again = await complete("chat", [...prepared.messages, { role: "system", content: retryPhrase ? bannedPhraseRetryNote(retryPhrase) : STATEMENT_RETRY_NOTE }], { thinking: false });
           generationDone = Date.now();
           if (again.ok) {
             const before = guardHits.length;
@@ -4082,6 +4086,8 @@ export type TurnStreamResult =
        * so the cue means "900 ms since the utterance arrived with
        * nothing said yet", whatever routing and prefill cost. */
       startedAt: number;
+      cueSuppressed: boolean;
+      bannedPhrases: string[];
       /** The generator's own return value (step 9), read from the final
        * `iterator.next()` result once `done` is true on a NORMAL
        * completion (never reached on a thrown StreamSafetyRefusal, which
@@ -4895,6 +4901,8 @@ async function runTurnStreamHoldingLease(
       conversationId: conversation.id,
       turnId: prepared.turnId,
       startedAt,
+      cueSuppressed: prepared.signal.target === "hub" && prepared.signal.repair !== "none",
+      bannedPhrases: bannedPhrasesFor(conversation.id),
       tokens: holdLease(
         appendAskStage(
         sentenceCaseStream(
@@ -4919,7 +4927,8 @@ async function runTurnStreamHoldingLease(
             async () => {
               if (generations >= 2) return null;
               generations++;
-              const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: STATEMENT_RETRY_NOTE }], { thinking: false }, opts.signal);
+              const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => modelMessages.some((m) => m.content.toLowerCase().includes(p.toLowerCase()))) : null;
+              const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: retryPhrase ? bannedPhraseRetryNote(retryPhrase) : STATEMENT_RETRY_NOTE }], { thinking: false }, opts.signal);
               if (!again.ok) return null;
               return gateOutputSafety(holdOpening(again.tokens, false), actor, prepared.turnId);
             },

@@ -800,4 +800,5 @@
   ,{"id":"exp02-hearsay-review","utterance":"tell me about the film","reply":"I've heard it's intense.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"current","carried_question":null}],"outcomes":[{"packageId":"websearch","status":"succeeded","args":{"rating":"best"}}],"expect":null}
   ,{"id":"exp02-lookup-infinitive","utterance":"did you find the page","reply":"I tried to find it but nothing came up.","act":"question","expect":null}
   ,{"id":"exp02-consumption-object","utterance":"how's the new Bramble Street cafe","reply":"I ate there last Tuesday.","act":"inform","subjects":[{"type":"world","kind":"restaurant","display_name":"Bramble Street cafe","year":null,"source_kind":null,"stable_key":null,"recency":"current","carried_question":null}],"expect":"claimed_experience"}
+  ,{"id":"cons01-banned-phrase-cut","utterance":"when does it ship","reply":"Good luck with it! It ships Thursday.","bannedPhrases":["good luck"],"expect":"banned_phrase"}
 ]

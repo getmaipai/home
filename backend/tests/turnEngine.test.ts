@@ -3730,6 +3730,8 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
       startedAt: Date.now(),
+      cueSuppressed: false,
+      bannedPhrases: [],
       tokens: failingTokens(),
       finalize: (replyText: string) => {
         finalizeCalls.push(replyText);
@@ -3765,6 +3767,8 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
       startedAt: Date.now(),
+      cueSuppressed: false,
+      bannedPhrases: [],
       tokens: failingTokens(),
       finalize: (replyText: string) => {
         finalizeCalls.push(replyText);
@@ -3791,7 +3795,9 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       kind: "stream",
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
-      startedAt: Date.now(),
+    startedAt: Date.now(),
+    cueSuppressed: false,
+    bannedPhrases: [],
       tokens,
       finalize: (replyText: string) => ({
         reply: { text: replyText },

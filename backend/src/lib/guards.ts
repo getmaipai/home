@@ -96,10 +96,12 @@ export type GuardReason =
    * pages, pictures, images or videos, on a turn whose lookup tools
    * include the search. Skipped wherever it sits; the engine's read
    * takes the lookup path as if the sentence were a promise. */
-  | "false_capability";
+  | "false_capability"
+  | "banned_phrase";
 
 export interface GuardContext {
   utterance: string;
+  bannedPhrases?: readonly string[];
   /** The conversation's own prior turns this session (user text only,
    * oldest first) - "like I said" is only ever true against these, never
    * a DIFFERENT conversation (session-c-brain-and-voice.md's own "never
@@ -1846,7 +1848,7 @@ export function bankLineNote(sentence: string): string | null {
 // LOOKUP-02: the deliverable denial is dropped wherever it sits (the
 // engine already ran the lookup or is about to); the honest line stands
 // in only when the denial was the whole reply.
-const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "repeat_question", "pronoun_mismatch", "false_capability"]);
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "repeat_question", "pronoun_mismatch", "false_capability", "banned_phrase"]);
 
 /** REG-01: a statement (an inform, a commissive, a greeting, a closing
  * or a backchannel by the signal; a statement or first-person shape
@@ -1880,7 +1882,7 @@ export function emptiedLine(ctx: Pick<GuardContext, "act" | "shape" | "utterance
  * act's own line stands and the engine retries once with its note;
  * `claimed_experience` keeps its own line and its own rule (item 1b). */
 export function isRegisterSkip(reason: GuardReason, ctx: GuardContext): boolean {
-  return reason === "assistant_register" || reason === "repeat_question" || (reason === "claimed_experience" && !experienceTurn(ctx)) || statementActionSkip(reason, ctx);
+  return reason === "assistant_register" || reason === "repeat_question" || reason === "banned_phrase" || (reason === "claimed_experience" && !experienceTurn(ctx)) || statementActionSkip(reason, ctx);
 }
 
 /** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
@@ -1927,7 +1929,14 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   // LOOKUP-02: a denial that was the whole reply, with the lookup not
   // having answered, is the lookup family's own line.
   false_capability: LOOKUP_FAILED_LINES,
+  banned_phrase: MALFORMED,
 };
+
+export function bannedPhraseRetryNote(phrase: string): string { return `Never say "${phrase}". Answer without it.`; }
+
+function containsBannedPhrase(sentence: string, phrases: readonly string[]): boolean {
+  return phrases.some((phrase) => new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(sentence));
+}
 
 /** ASK-01: the replacement for a false-familiarity sentence is the ask
  * about the name it claimed to know. Never a bank line: the question
@@ -1980,6 +1989,7 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
   if (!s) return null;
   return (
     guardPlaceholderEcho(s) ??
+    (containsBannedPhrase(s, ctx.bannedPhrases ?? []) ? "banned_phrase" : null) ??
     guardAssistantRegister(s, ctx, isFirstSentence) ??
     guardRepeatQuestion(s, ctx) ??
     guardUnsupportedAction(s, ctx) ??

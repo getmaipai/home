@@ -20,6 +20,7 @@ import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpret
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { shapeOf } from "@/lib/turnSignal";
 import { pronounFamiliesIn, type SubjectRef } from "@/lib/unknownNames";
+import { bannedPhrasesFor } from "@/lib/replyConstraints";
 
 /** The record's kinds, plus `episode`: JOIN-01's recalled turns postdate
  * the record, ground a reply the way a memory line does, and are held
@@ -280,6 +281,7 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     subjectPronouns: ctx.subjectPronouns,
     pronounsInPlay: [...pronounFamiliesIn([ctx.utterance, ...ctx.history.filter((m) => m.role === "user").slice(-2).map((m) => m.content)].join(" "))],
     subjects: ctx.subjects,
+    bannedPhrases: bannedPhrasesFor(ctx.conversationId),
   };
 }
 
