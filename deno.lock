@@ -36,6 +36,7 @@
             "npm:ajv@^8.20.0",
             "npm:bonjour-service@^1.4.4",
             "npm:chrono-node@^2.10.1",
+            "npm:compromise@^14.17.0",
             "npm:drizzle-kit@~0.31.6",
             "npm:drizzle-orm@~0.44.6",
             "npm:hono@^4.10.7",

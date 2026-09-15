@@ -70,6 +70,7 @@ const createRoute_ = createRoute({
             scope: SCOPE.optional(),
             person: z.string().nullable().optional(),
             sensitive: z.boolean().optional(),
+            pronouns: z.string().max(100).nullable().optional(),
           }),
         },
       },
@@ -111,6 +112,7 @@ const patchRoute = createRoute({
               description: z.string().nullable().optional(),
               parent_id: z.string().nullable().optional(),
               sensitive: z.boolean().optional(),
+              pronouns: z.string().max(100).nullable().optional(),
               confirm: z.literal(true).optional(),
             })
             .strict(),

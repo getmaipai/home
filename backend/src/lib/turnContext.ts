@@ -19,6 +19,7 @@ import type { GuardContext } from "@/lib/guards";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { shapeOf } from "@/lib/turnSignal";
+import { pronounFamiliesIn, type SubjectRef } from "@/lib/unknownNames";
 
 /** The record's kinds, plus `episode`: JOIN-01's recalled turns postdate
  * the record, ground a reply the way a memory line does, and are held
@@ -167,6 +168,27 @@ export interface TurnContext {
    * router's and the guards' `UtteranceShape` is a projection of it
    * (turnSignal.ts's shapeOf()), so no consumer reads a second shape. */
   signal: TurnSignal;
+  /** ASK-01 (SPEC-01's SubjectRef): what the turn is about, resolved
+   * before the model runs by unknownNames.ts's resolver: a household
+   * ref per name the hub knows (the entity), an unresolved ref per name
+   * it does not, the previous turn's carried when this one names
+   * nobody. An unresolved ref at confidence 0.8 was framed as household
+   * by the person's own words (the engine asks); 0.4 is a bare proper
+   * noun (no ask). CHAT-13's stack grows from here. */
+  subjects: SubjectRef[];
+  /** ASK-01: the pronoun family each subject takes, from the entity's
+   * stored pronouns or the pronoun the person used for the name this
+   * turn, for the guards' pronoun check. */
+  subjectPronouns: { name: string; pronouns: string }[];
+}
+
+/** ASK-01: the household-framed unknown names on the turn, for the
+ * context line, the ask and the guards: the unresolved refs the
+ * resolver marked framed (confidence 0.8) with no noun settling their
+ * kind ("my friend Nadia" is not unknown to the guards either; the
+ * guards' and the context line's notion of unknown is one, a review). */
+export function framedUnknownNames(ctx: { subjects: readonly SubjectRef[] }): string[] {
+  return ctx.subjects.filter((s): s is Extract<SubjectRef, { type: "unresolved" }> => s.type === "unresolved" && s.confidence >= 0.8 && s.candidate_kinds.length === 0).map((s) => s.surface_form);
 }
 
 /** ACT-01: per-stage timings for the `[turn]` line and the bench
@@ -239,5 +261,10 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     // reply for the repeated-question check.
     act: ctx.signal.primary_act,
     previousReply: [...ctx.history].reverse().find((m) => m.role === "assistant")?.content,
+    // ASK-01: the unknown names, the subjects' pronouns, and the
+    // pronoun families the person used this turn and the last two.
+    unknownNames: framedUnknownNames(ctx),
+    subjectPronouns: ctx.subjectPronouns,
+    pronounsInPlay: [...pronounFamiliesIn([ctx.utterance, ...ctx.history.filter((m) => m.role === "user").slice(-2).map((m) => m.content)].join(" "))],
   };
 }

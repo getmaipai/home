@@ -3,7 +3,7 @@
 // own rules; tests/turnEngine.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
-import { guardContextFrom, intentFor, markIncluded, includedEvidence, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 
 // ACT-01: the intent and the guards' shape read the frozen signal; the
@@ -33,6 +33,8 @@ function context(overrides: Partial<TurnContext> = {}): TurnContext {
     locale: "en-US",
     roster: ["Sage", "Pippa"],
     signal: signalFor("where is Pippa"),
+    subjects: [],
+    subjectPronouns: [],
     ...overrides,
   };
 }
@@ -116,5 +118,19 @@ describe("intentFor(): the provisional intent", () => {
     expect(intentFor("walk me through it step by step", signalFor("walk me through it step by step")).explicitDetailedAnswer).toBe(true);
     expect(intentFor("tell me about photosynthesis", signalFor("tell me about photosynthesis")).explicitDetailedAnswer).toBe(false);
     expect(intentFor("what are the details of the plan", signalFor("what are the details of the plan")).explicitDetailedAnswer).toBe(false);
+  });
+});
+
+describe("ASK-01: the guards' unknown names are the context line's", () => {
+  test("a framed name with no noun is unknown; a kind-stated or bare one is not", () => {
+    const refs = [
+      { type: "unresolved" as const, surface_form: "Clover", candidate_kinds: [], provenance: "t", confidence: 0.8, carried_question: null },
+      { type: "unresolved" as const, surface_form: "Nadia", candidate_kinds: ["person" as const], provenance: "t", confidence: 0.8, carried_question: null },
+      { type: "unresolved" as const, surface_form: "Cobra", candidate_kinds: [], provenance: "t", confidence: 0.4, carried_question: null },
+      { type: "household" as const, entity_id: "ent-abcdef", carried_question: null },
+    ];
+    expect(framedUnknownNames({ subjects: refs })).toEqual(["Clover"]);
+    expect(guardContextFrom(context({ subjects: refs, subjectPronouns: [{ name: "Clover", pronouns: "she" }], utterance: "Clover borrowed our tent and she loved it" })).unknownNames).toEqual(["Clover"]);
+    expect(guardContextFrom(context({ subjects: refs, utterance: "Clover borrowed our tent and she loved it" })).pronounsInPlay).toEqual(["she"]);
   });
 });

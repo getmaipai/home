@@ -36,8 +36,8 @@ import { redactCredentials, CREDENTIAL_REDACTION } from "@/lib/memoryContentPoli
 import { withoutHonestyLines } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
 import { db, sqlite } from "@/db";
-import { conversationTurns, conversations, people, memoryRecords, commands } from "@/db/schema";
-import { newConversationTurnId, newConversationId } from "@/lib/id";
+import { conversationTurns, conversations, people, memoryRecords, commands, openQuestions, relationships } from "@/db/schema";
+import { newConversationTurnId, newConversationId, newOpenQuestionId } from "@/lib/id";
 import { canAccessPerson } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
@@ -63,6 +63,8 @@ export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 // here since this is where callers already look for it.
 import type { ConversationTurnRow } from "@/wire";
 import { TurnSignal as TurnSignalSchema, type TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import { SubjectRef as SubjectRefSchema } from "@maipai/spec/gen/ts/subject-ref.js";
+import type { SubjectRef } from "@/lib/unknownNames";
 export type { ConversationTurnRow } from "@/wire";
 
 export type ConversationOpResult<T> =
@@ -178,7 +180,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; judgeStatus?: "skipped" | null } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -247,6 +249,8 @@ export function logTurn(
     // dropped with the rest of the words (a review: "my wifi password
     // Sunshine" named a subject).
     signal: opts.signal ? JSON.stringify(value.source === "policy" ? withoutNames(opts.signal) : opts.signal) : null,
+    // ASK-01: the turn's SubjectRefs; a credential turn keeps none.
+    subjects: opts.subjects && opts.subjects.length > 0 && value.source !== "policy" ? JSON.stringify(opts.subjects) : null,
     hlc: nextHlc(),
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
@@ -275,6 +279,34 @@ export function turnSignalOf(row: Pick<ConversationTurnRow, "signal">): TurnSign
   } catch {
     return null;
   }
+}
+
+/** ASK-01: the SubjectRefs off a turn row, each parsed through the
+ * generated schema; an empty list for a row without any or one that
+ * fails the shape. */
+export function turnSubjectsOf(row: Pick<ConversationTurnRow, "subjects">): SubjectRef[] {
+  if (!row.subjects) return [];
+  try {
+    const parsed = JSON.parse(row.subjects) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((s) => SubjectRefSchema.safeParse(s).success) as SubjectRef[];
+  } catch {
+    return [];
+  }
+}
+
+/** ASK-01: the subjects of the conversation's latest turn, for the
+ * carry (a turn that names nobody keeps talking about what the last
+ * one did). */
+export function lastTurnSubjects(conversationId: string): SubjectRef[] {
+  const row = db
+    .select({ subjects: conversationTurns.subjects })
+    .from(conversationTurns)
+    .where(eq(conversationTurns.conversationId, conversationId))
+    .orderBy(desc(conversationTurns.createdAt))
+    .limit(1)
+    .get();
+  return row ? turnSubjectsOf(row) : [];
 }
 
 // ==== Conversations: the thread record (step 3) ====
@@ -422,11 +454,25 @@ export interface PendingAsk {
   /** LOOKUP-01: `lookup` is an offer or a late promise in the hub's own
    * reply ("want me to look it up?"), bound to the query; a consent word
    * runs the websearch, a refusal clears it, anything else falls
-   * through to routing. */
-  kind: "confirm" | "ask" | "lookup";
+   * through to routing.
+   * ASK-01: `who` is the engine's own question about a name it has
+   * never heard ("Who's Clover?"), or an OpenQuestion asked at the end
+   * of a reply; the next utterance is read by the deterministic answer
+   * parser (lib/unknownNames.ts), a cancel clears it, an unreadable
+   * answer clears it and falls through to the model. `packageId` is
+   * the engine's own marker on this kind, never a package. */
+  kind: "confirm" | "ask" | "lookup" | "who";
   prompt: string;
   packageId: string;
   args: Record<string, unknown>;
+  /** Only for kind:"who": the name asked about, as the person said it,
+   * the kinds a relation noun hinted, the candidate entity or
+   * relationship the question is about (an OpenQuestion's subject),
+   * and the OpenQuestion the ask carries, when one does. */
+  name?: string;
+  hintedKinds?: string[];
+  subjectId?: string | null;
+  openQuestionId?: string;
   /** Only set for kind:"ask" (a recipe result's own `ask.expects` hint,
    * spec/schemas/result.schema.json) - free text, not a structured
    * matcher; turnEngine.ts's own consumption is documented at its call
@@ -459,6 +505,107 @@ export function setPendingAsk(conversationId: string, ask: PendingAsk | null): v
   db.update(conversations)
     .set({ pendingAsk: ask ? JSON.stringify(ask) : null, updatedAt: new Date().toISOString(), hlc: nextHlc() })
     .where(eq(conversations.id, conversationId))
+    .run();
+}
+
+// ==== ASK-01: open questions (spec/schemas/open-question.schema.json) ====
+//
+// The other ask slot: a question the hub wants to ask one person, not
+// necessarily now and not on the conversation that raised it. The
+// judge queues one when it would otherwise create an inferred entity
+// or relationship (a candidate, never knowledge, until the person
+// answers); AGE-01's relay and CRED-01's clarification take the same
+// path. Keyed by person: the pending one is asked once, at the end of
+// that person's next reply on any conversation (turnEngine.ts appends
+// it after the last delta), becomes a `who` pending ask on that
+// conversation, and is answered, declined or expired from there. Never
+// re-asked: "not now" declines it for good.
+
+export interface OpenQuestionRow {
+  id: string;
+  person: string;
+  conversationId: string | null;
+  kind: "who" | "clarify_fact" | "relay";
+  text: string;
+  subjectId: string | null;
+  status: "pending" | "asked" | "answered" | "declined" | "expired";
+  source: string;
+  createdAt: string;
+  askedAt: string | null;
+  resolvedAt: string | null;
+  hlc: string;
+}
+
+/** Queues a question for the person. One open (pending or asked)
+ * question per subject at a time: a second judge pass over the same
+ * candidate does not queue a twin. Returns the queued or existing row. */
+export function queueOpenQuestion(input: { person: string; conversationId?: string | null; kind: OpenQuestionRow["kind"]; text: string; subjectId?: string | null; source: string }): OpenQuestionRow {
+  if (input.subjectId) {
+    const twin = db
+      .select()
+      .from(openQuestions)
+      .where(and(eq(openQuestions.person, input.person), eq(openQuestions.subjectId, input.subjectId), inArray(openQuestions.status, ["pending", "asked"])))
+      .get();
+    if (twin) return twin as OpenQuestionRow;
+  }
+  const row: OpenQuestionRow = {
+    id: newOpenQuestionId(),
+    person: input.person,
+    conversationId: input.conversationId ?? null,
+    kind: input.kind,
+    text: input.text,
+    subjectId: input.subjectId ?? null,
+    status: "pending",
+    source: input.source,
+    createdAt: new Date().toISOString(),
+    askedAt: null,
+    resolvedAt: null,
+    hlc: nextHlc(),
+  };
+  db.insert(openQuestions).values(row).run();
+  return row;
+}
+
+/** The person's oldest pending question, or null. */
+export function nextOpenQuestionFor(personId: string): OpenQuestionRow | null {
+  const row = db.select().from(openQuestions).where(and(eq(openQuestions.person, personId), eq(openQuestions.status, "pending"))).orderBy(openQuestions.createdAt).get();
+  return (row as OpenQuestionRow | undefined) ?? null;
+}
+
+/** Every question of the person's, newest first (the bench and the
+ * tests read it; no route yet). */
+export function listOpenQuestions(personId: string): OpenQuestionRow[] {
+  return db.select().from(openQuestions).where(eq(openQuestions.person, personId)).orderBy(desc(openQuestions.createdAt)).all() as OpenQuestionRow[];
+}
+
+/** The question was appended to a reply: asked once, now. */
+export function markOpenQuestionAsked(id: string): void {
+  const now = new Date().toISOString();
+  db.update(openQuestions).set({ status: "asked", askedAt: now, hlc: nextHlc() }).where(eq(openQuestions.id, id)).run();
+}
+
+/** The person responded: with an answer the parser read (`answered`),
+ * or with anything else ("not now", a new subject: `declined`). Either
+ * way it is never asked again. */
+export function resolveOpenQuestion(id: string, status: "answered" | "declined"): void {
+  const now = new Date().toISOString();
+  db.update(openQuestions).set({ status, resolvedAt: now, hlc: nextHlc() }).where(and(eq(openQuestions.id, id), inArray(openQuestions.status, ["pending", "asked"]))).run();
+}
+
+/** Every open question of the person's about this entity (its own,
+ * or a relationship of it) is resolved: the answer to one is the
+ * answer to all. */
+export function resolveOpenQuestionsAbout(personId: string, entityId: string, status: "answered" | "declined"): void {
+  const edgeIds = db
+    .select({ id: relationships.id })
+    .from(relationships)
+    .where(or(eq(relationships.fromId, entityId), eq(relationships.toId, entityId)))
+    .all()
+    .map((r) => r.id);
+  const now = new Date().toISOString();
+  db.update(openQuestions)
+    .set({ status, resolvedAt: now, hlc: nextHlc() })
+    .where(and(eq(openQuestions.person, personId), inArray(openQuestions.status, ["pending", "asked"]), inArray(openQuestions.subjectId, [entityId, ...edgeIds])))
     .run();
 }
 

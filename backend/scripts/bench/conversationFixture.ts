@@ -138,8 +138,32 @@ export interface TurnExpectation {
    * turn (G3, an item taken off). */
   listLacks?: readonly string[];
   /** An entity of this kind and name exists in the registry after the
-   * turn (step 3a of the program: the judge creates it). */
-  entityExists?: { kind: string; name: string };
+   * turn (step 3a of the program: the judge creates it). ASK-01 reads
+   * its provenance, its pronouns and a phrase of its description too
+   * (the answer parser's effects), each only when the row names it. */
+  entityExists?: { kind: string; name: string; source?: "hub" | "local" | "imported" | "inferred"; pronouns?: string; descriptionContains?: string };
+  /** ASK-01: no live entity of this name exists after the turn (the
+   * ask declined: no entity from a cancel). */
+  entityAbsent?: string;
+  /** ASK-01: the guard that replaced the reply is one of these (null
+   * for "none did"): a row that accepts either an honest reply or the
+   * familiarity cut's own ask. */
+  guardAnyOf?: readonly (string | null)[];
+  /** ASK-01: within the wait, the hub has asked or queued a question
+   * about the name: the conversation's pending ask is `who` for it, or
+   * an OpenQuestion (pending or asked) names it. The judge is drained
+   * first, the same way memory rows are read. */
+  askedAbout?: { name: string; withinMs: number };
+  /** ASK-01: every he/she pronoun in the reply agrees with the named
+   * entity's stored pronouns, read from the registry after the turn. */
+  pronounsAgree?: { name: string };
+  /** ASK-01: every proper noun in the reply is in the utterance, the
+   * conversation's earlier user turns, or the context message the
+   * model saw (the guard context's grounding). */
+  groundedNames?: boolean;
+  /** ASK-01: an OpenQuestion of this kind for the person has this
+   * status after the turn ("declined" after "not now"). */
+  openQuestionStatus?: { kind: OpenQuestion["kind"]; status: OpenQuestion["status"] };
   /** RECALL-02: exactly this many episode lines under the "From earlier
    * conversations" header in the context message (0: no episode block). */
   episodesInContext?: number;
@@ -650,7 +674,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "Marlow has been up since five baking bread for the school fair", expect: { signal: { primary_act: "inform" }, noCopiedEpisode: true,  guard: null, mustContain: "marlow|bread|bak|fair|five|early|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
       { say: "is he tired", expect: { signal: { primary_act: "question" }, mustContain: "tired|five|early|probably|bet|sounds|likely|exhaust|must be", mustNotContain: HONESTY_LINES } },
       { say: "how old is Marlow", expect: { signal: { primary_act: "question" }, recallInContext: ["twelve years|12 years|twelve-year-old"], mustContain: "twelve|\\b12\\b", mustNotContain: HONESTY_LINES } },
-      { say: "who is Marlow to me", expect: { signal: { primary_act: "question" }, recallInContext: ["son|parent_of|parent of"], mustContain: "son|child|kid", mustNotContain: HONESTY_LINES } },
+      { say: "who is Marlow to me", expect: { signal: { primary_act: "question" }, recallInContext: ["son|parent_of|parent of|your child"], mustContain: "son|child|kid", mustNotContain: HONESTY_LINES } },
     ],
   },
   {
@@ -854,6 +878,61 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "Raven and I got the same manager this week, and she keeps borrowing my stapler", expect: { signal: { primary_act: "inform" }, memoryWritten: [["raven", "stapler"]], entityExists: { kind: "person", name: "Raven" }, relationshipExists: { type: "colleague_of", name: "Raven", source: "inferred", confirmed: false }, guard: null } },
       { say: "who is Raven", newConversation: true, drainJudge: true, expect: { signal: { primary_act: "question" }, notInContext: ["coworker"], mustNotContain: "your (coworker|co-worker|colleague)|raven is (a|your) (coworker|co-worker|colleague)", guard: null } },
       { say: "who is Raven again", newConversation: true, confirmInferred: true, expect: { signal: { primary_act: "question" }, relationshipExists: { type: "colleague_of", name: "Raven", source: "inferred", confirmed: true }, recallInContext: ["your coworker"], mustContain: "coworker|co-worker|colleague|work", mustNotContain: HONESTY_LINES } },
+    ],
+  },
+  // ASK-01 (dev.md "The chat design pass" section 3): the unknown-name
+  // rule's five conversations. Every expectation is an effect: the
+  // turn's subjects, the context line, the pending ask, the entity the
+  // answer created and its provenance, the open question's status.
+  {
+    id: "unknown-name-person",
+    category: "memory",
+    note: "ASK-01 (findings 10, 15): a name the hub has never heard is asked about, never assumed; the answer creates the person as stated (kind, relation, pronouns, the piano line), and the next turn's pronoun keeps her as the subject with the line in context",
+    turns: [
+      { say: "Clover borrowed our tent for the weekend", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "unresolved", name: "Clover" }], recallInContext: ["never heard before: Clover"], guardAnyOf: [null, "false_familiarity"], mustNotContain: "that's right|i remember|as you mentioned|you told me|you mentioned|i know clover|i've heard", pendingAsk: "who" } },
+      { say: "my cousin Clover, she teaches piano", expect: { entityExists: { kind: "person", name: "Clover", source: "local", pronouns: "she", descriptionContains: "teaches piano" }, relationshipExists: { type: "relative_of", name: "Clover", source: "stated" }, pendingAsk: null } },
+      { say: "what should I get her as a thank-you", expect: { signal: { primary_act: "question" }, subjects: [{ type: "household", name: "Clover" }], recallInContext: ["teaches piano"], guardAnyOf: [null], mustNotContain: HONESTY_LINES + "|who's clover|who is clover" } },
+    ],
+  },
+  {
+    id: "unknown-name-pet-lowercase",
+    category: "memory",
+    note: "ASK-01 (findings 11, 14): a lowercase name with no frame is not detected at turn time; no role is put on it, the judge's open question (or the pending ask) names it within the wait, the answer makes the pet with its pronouns, and the reply about him never says she",
+    turns: [
+      { say: "juniper chewed through the garden hose again", expect: { signal: { primary_act: "inform" }, mustNotContain: "neighbou?r|coworker|co-worker|colleague|\\bkid\\b|teacher|friend of yours", askedAbout: { name: "juniper", withinMs: 10000 } } },
+      { say: "he's our rabbit", expect: { entityExists: { kind: "pet", name: "juniper", source: "local", pronouns: "he" }, pendingAsk: null } },
+      { say: "should he be outside in this heat", expect: { signal: { primary_act: "question" }, pronounsAgree: { name: "juniper" }, mustNotContain: HONESTY_LINES } },
+    ],
+  },
+  {
+    id: "unknown-name-marathon",
+    category: "honesty",
+    note: "ASK-01 (finding 10, the marathon): no claim of prior knowledge about a name the hub has never heard; the ask is a question sentence naming her; asked how it would know, the reply claims nothing and every name in it is the person's own",
+    turns: [
+      { say: "Nadia just got back from her first marathon", expect: { signal: { primary_act: "inform" }, guardAnyOf: [null, "false_familiarity"], mustNotContain: "that's right|i remember|as you mentioned|you told me|you mentioned|i know nadia|i've heard|of course", mustContain: "nadia[^.!?]*\\?", pendingAsk: "who" } },
+      { say: "wait, how would you know that?", expect: { signal: { primary_act: "question" }, mustNotContain: "that's right|i remember|as you mentioned|you told me before|i've heard|i know nadia|i knew", groundedNames: true } },
+      { say: "she ran it in just under four hours", expect: { signal: { primary_act: "inform" }, guardAnyOf: [null, "false_familiarity"], mustNotContain: "that's right|i remember|as you mentioned|you told me before|i've heard|i know nadia|i knew", pendingAsk: null } },
+    ],
+  },
+  {
+    id: "who-ask-declined",
+    category: "etiquette",
+    note: "ASK-01 (the coherence review's row): 'never mind' to 'Who's Clover?' clears the ask with no entity and no second ask; the next turn about her asks nothing again",
+    turns: [
+      { say: "Clover borrowed our tent for the weekend", expect: { signal: { primary_act: "inform" }, pendingAsk: "who" } },
+      { say: "never mind", expect: { fixedLine: "Okay, no problem.", pendingAsk: null, entityAbsent: "Clover" } },
+      { say: "she brought it back today anyway", expect: { signal: { primary_act: "inform" }, pendingAsk: null, mustNotContain: "who's clover|who is clover|who's that", guardAnyOf: [null] } },
+    ],
+  },
+  {
+    id: "open-question-once",
+    category: "memory",
+    note: "ASK-01 part 4 (the coherence review's row): the judge's question about a candidate is asked once, at the end of the next reply on any conversation; 'not now' declines it for good, and nothing asks again",
+    turns: [
+      { say: "juniper chewed through the garden hose again", expect: { signal: { primary_act: "inform" }, askedAbout: { name: "juniper", withinMs: 10000 } } },
+      { say: "I had a long day at work", newConversation: true, drainJudge: true, expect: { signal: { primary_act: "inform" }, openQuestion: { kind: "who", withinMs: 10000 }, mustContain: "juniper[^.!?]*\\?", pendingAsk: "who" } },
+      { say: "not now", expect: { fixedLine: "Okay, no problem.", pendingAsk: null, openQuestionStatus: { kind: "who", status: "declined" } } },
+      { say: "anyway, dinner was good", expect: { signal: { primary_act: "inform" }, mustNotContain: "juniper", pendingAsk: null } },
     ],
   },
   {

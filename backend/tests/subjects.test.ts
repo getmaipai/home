@@ -7,7 +7,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
-import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, logTurn, listOpenQuestions } from "@/lib/conversationHistory";
 import { judgeTurn } from "@/lib/memoryJudge";
 import { recall, archiveByProvenance, forgetByIds, forget, supersede } from "@/lib/memory";
 import { buildPromptParts } from "@/lib/turnEngine";
@@ -424,8 +424,11 @@ describe("the review's cases", () => {
     const edge = db.select().from(relationships).all()[0]!;
     expect(edge.source).toBe("inferred");
     expect(edge.confidence).toBe(0.5);
-    // The entity is local (the speaker named Raven); only the relation is the model's.
-    expect(db.select().from(entities).where(eq(entities.name, "Raven")).get()!.source).toBe("local");
+    // ASK-01 (step 3a's amendment): the speaker named Raven but not
+    // what Raven is; the kind is the model's, so the entity is a
+    // candidate too, with the open question queued for the speaker.
+    expect(db.select().from(entities).where(eq(entities.name, "Raven")).get()!.source).toBe("inferred");
+    expect(listOpenQuestions(actor.id).map((q) => [q.kind, q.text, q.status])).toEqual([["who", "Who's Raven?", "pending"]]);
   });
 
   test("a directed relation written from the subject's side is stored from the speaker's, through the inverse", async () => {
@@ -498,13 +501,19 @@ describe("recall and the prompt know whose fact it is", () => {
     const { client, actor } = await owner();
     await judgeWith(actor, "lunch with Quill again", [{ ...QUILL_FACT, relation: { type: "colleague_of", name: "Quill", stated: false } }]);
     const quill = db.select().from(entities).where(eq(entities.name, "Quill")).get()!;
-    expect(subjectLabel(actor, quill.id)).toBe("Quill");
+    // ASK-01: the entity's kind is the model's guess too (no kind noun
+    // beside the name), so the candidate gets no label at all until
+    // the confirm; the relation's own question is covered by the
+    // entity's ("Who's Quill?" states both).
+    expect(subjectLabel(actor, quill.id)).toBeNull();
+    expect(listOpenQuestions(actor.id).map((q) => q.text)).toEqual(["Who's Quill?"]);
     const parts = buildPromptParts(actor, "what does Quill drink", recall(actor, "what does Quill drink"));
     expect(parts.context).not.toContain("coworker");
 
     const edge = db.select().from(relationships).all().find((e) => e.toId === quill.id)!;
     const res = await client.request(`/api/relationships/${edge.id}`, { method: "PATCH", body: { confirm: true } });
     expect(res.status).toBe(200);
+    // The confirmed edge vouches for the entity at its far end.
     expect(subjectLabel(actor, quill.id)).toBe("Quill (your coworker)");
     // Confirmed, not rewritten: how it was learned stays on the record.
     for (const e of db.select().from(relationships).all()) {

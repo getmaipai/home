@@ -63,6 +63,8 @@ import { detectCredential } from "@/lib/memoryContentPolicy";
 import { tokenize } from "@/lib/text";
 import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
 import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, saidAs, speakerNamed, speakerNamedAny, speakerStated, writeRelation } from "@/lib/subjects";
+import { candidateQuestion, relationPhraseFor, speakerStatedKind } from "@/lib/unknownNames";
+import { listOpenQuestions, queueOpenQuestion } from "@/lib/conversationHistory";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
@@ -641,9 +643,21 @@ function subjectNotAName(speaker: PersonRow, fact: ExtractedFact): string | null
 function resolveSubject(speaker: PersonRow, fact: ExtractedFact, turn: ConversationTurnRow): Entity | null {
   const named = fact.subject ?? (fact.relation ? { name: fact.relation.name, kind: kindForRelation(fact.relation.type, fact.category) } : null);
   if (named) {
-    const stated = speakerNamed(turn.userText, named.name);
+    // ASK-01 (step 3a's amendment): `local` needs the speaker's words
+    // to carry the name AND its kind (a kind noun beside it, "my
+    // coworker Quill"); a name alone ("juniper chewed the hose") is
+    // the model's kind guess, an inferred candidate with the open
+    // question below, never rendered as knowledge until the person
+    // answers.
+    const stated = speakerNamed(turn.userText, named.name) && speakerStatedKind(turn.userText, named.name, named.kind);
     const result = ensureSubjectEntity(speaker, named, stated);
-    if (result.ok && result.value) return result.value;
+    if (result.ok && result.value) {
+      if (result.status === 201 && result.value.source === "inferred") {
+        queueOpenQuestion({ person: speaker.id, conversationId: turn.conversationId, kind: "who", text: candidateQuestion("entity", result.value.name), subjectId: result.value.id, source: turn.id });
+        console.log(`[memoryJudge] an inferred entity is a candidate with an open question (turn ${turn.id})`);
+      }
+      return result.value;
+    }
     console.error(`[memoryJudge] subject failed for turn ${turn.id}: ${result.error}`);
     return null;
   }
@@ -686,7 +700,23 @@ function writeFactRelation(speaker: PersonRow, fact: ExtractedFact, subject: Ent
   // relation.
   const relation = { ...slot, type, stated: slot.stated && speakerNamedAny(turn.userText, names) && speakerStated(turn.userText, type, names) };
   const result = writeRelation(speaker, relation, other, turn.id, fact.importance);
-  if (!result.ok) console.error(`[memoryJudge] relation ${relation.type} failed for turn ${turn.id}: ${result.error}`);
+  if (!result.ok) {
+    console.error(`[memoryJudge] relation ${relation.type} failed for turn ${turn.id}: ${result.error}`);
+    return;
+  }
+  // ASK-01 part 4: a relation the model worked out is a candidate and
+  // an open question ("Is Raven your coworker?"), asked once at the end
+  // of the person's next reply; the answer confirms or replaces it.
+  // An entity whose own question is already queued ("Who's Raven?")
+  // covers the relation: its answer states both.
+  if (result.status === 201 && result.value?.source === "inferred") {
+    const phrase = relationPhraseFor(type);
+    const entityQuestion = listOpenQuestions(speaker.id).find((q) => q.subjectId === other.id && (q.status === "pending" || q.status === "asked"));
+    if (phrase && !entityQuestion) {
+      queueOpenQuestion({ person: speaker.id, conversationId: turn.conversationId, kind: "who", text: candidateQuestion("relationship", other.name, phrase), subjectId: result.value.id, source: turn.id });
+      console.log(`[memoryJudge] an inferred relation is a candidate with an open question (turn ${turn.id})`);
+    }
+  }
 }
 
 function memberNicknames(personId: string): string[] {

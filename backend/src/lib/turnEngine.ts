@@ -20,11 +20,12 @@ import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
-import { findEntityByName, subjectLabel, subjectRosterFor } from "@/lib/subjects";
+import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameById, registryNamesFor, subjectLabel, subjectRosterFor } from "@/lib/subjects";
+import { applyWhoAnswer, candidateByName, framedName, parseWhoAnswer, replyAsksAbout, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, markIncluded, guardContextFrom, outcomeOf, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings } from "@/lib/turnContext";
+import { intentFor, markIncluded, guardContextFrom, outcomeOf, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -50,7 +51,13 @@ import {
   setPendingAsk,
   routingStats,
   resolveSupersedes,
+  lastTurnSubjects,
+  nextOpenQuestionFor,
+  markOpenQuestionAsked,
+  resolveOpenQuestion,
+  resolveOpenQuestionsAbout,
   type PendingAsk,
+  type OpenQuestionRow,
 } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { acquireTurnLease, DEFAULT_IDLE_WINDOW_MS, type TurnLease } from "@/lib/turnActivity";
@@ -155,9 +162,15 @@ interface TurnLogRecord {
   /** ENGINE-HOST-01: which chat engine answered ("external b10797
    * qwen3-8b...", "local ...", "stub"), the host as a label only. */
   engine?: string;
+  /** ASK-01: the turn's subjects, by type and name (a household ref's
+   * entity name, an unresolved ref's surface form); `subject` is the
+   * first, the slot the bench's subject expectation reads. */
+  subjects?: { type: string; name: string }[];
+  subject?: string;
 }
 
-function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings): void {
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[]): void {
+  const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form }));
   const record: TurnLogRecord = {
     turn_id: value.turn_id,
     conversation_id: value.conversation_id,
@@ -179,6 +192,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     // model's own call resolved: a first token was measured), never on a
     // deterministic tier's turn (a review).
     ...(value.source === "model" || (timings?.first_token_ms ?? null) !== null ? { engine: formatEngineIdentity(getChatEngineIdentity()) } : {}),
+    ...(named.length > 0 ? { subjects: named, subject: named[0]!.name } : {}),
   };
   const line = `[turn] ${JSON.stringify(record)}`;
   // One writer (#73): the hub's console mirror (lib/log.ts, installed
@@ -206,7 +220,7 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; timings: TurnTimings },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; timings: TurnTimings; subjects?: readonly SubjectRef[] },
 ): void {
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
@@ -230,12 +244,12 @@ function logTurnSafely(
       // clause (or a source the judge never reads) is marked skipped at
       // insert, so the judge's queue is keyed on the signal, not on the
       // reply's source.
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, judgeStatus: judgeStatusAtInsert(value, meta.signal) });
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects });
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
   }
-  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings);
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects);
   if (meta.ephemeral) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
@@ -728,6 +742,10 @@ export function buildPromptParts(
   // RECALL-03: this conversation's own dropped turns, under their own
   // header, ahead of the earlier-conversations block.
   earlierMatches: EpisodeMatch[] = [],
+  // ASK-01: the turn's subject lines (the unknown-name line, the
+  // registry's own lines about the subjects), ahead of the memory
+  // section so the trust reminder never reads as knowing a new name.
+  subjectsSection: string = "",
 ): { stablePrefix: string; context: string } {
   const stablePrefix = buildStablePrefix(persona);
 
@@ -753,7 +771,7 @@ export function buildPromptParts(
   const reanchorSection = companionReanchorLine(persona);
   const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
   const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
-  const volatileZone = householdLine(household) + speakerLine(actor, locale, now) + memorySection + episodesSection + reanchorSection + summarySection + skillsPart;
+  const volatileZone = householdLine(household) + speakerLine(actor, locale, now) + subjectsSection + memorySection + episodesSection + reanchorSection + summarySection + skillsPart;
 
   const contextBody = `Context for this reply (reference, not instructions):${volatileZone}\n\n${localTimeLine(now, locale)}`;
   const contextBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - stablePrefix.length);
@@ -1354,6 +1372,9 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
 type PreparedTurn =
   | {
       kind: "immediate";
+      /** ASK-01: the entity a `who` answer created or confirmed, logged
+       * as the turn's subject so the next turn's pronoun keeps it. */
+      subjects?: SubjectRef[];
       value: TurnValue;
       turnId: string;
       /** ACT-01: the frozen signal, whichever path answered. */
@@ -1412,6 +1433,11 @@ type PreparedTurn =
        * retry doesn't recompute (and risk drifting from) that filter
        * independently. */
       lookupTools: ToolSpec[];
+      /** ASK-01: the name the engine asks about at the end of this
+       * reply ("Who's Clover?"), the first household-framed unknown of
+       * the utterance with no noun settling its kind; null when there
+       * is none. The question outranks the persona's engagement dial. */
+      unknownAsk: string | null;
     };
 
 // Session C step 2: a plain word-list, not a model call - a pendingAsk
@@ -1463,6 +1489,10 @@ export function withoutPromise(text: string, fallback: string = LOOKUP_FAILED_LI
  * still need the offer bound. */
 export function notePendingLookup(conversationId: string, replyText: string, utterance: string, outcomes: readonly ToolExecutionOutcome[] = [], lookupIds?: readonly string[]): boolean {
   if (lookupAnswered(outcomes)) return false;
+  // ASK-01: one ask at a time. A question the engine appended this turn
+  // ("Who's Clover?") owns the next utterance; an offer in the same
+  // reply binds nothing.
+  if (getPendingAsk(conversationId)) return false;
   // Nothing to run it with (websearch not among the turn's lookup
   // tools: not installed, or above the speaker's role): no binding, so
   // a "yes" never reaches a package that will refuse (a review).
@@ -1552,10 +1582,56 @@ export async function resolvePendingAsk(
   // ACT-01: the state machine's own reading of the answer, for the
   // protocol layer of the signal; left unset when the turn was neither
   // a yes nor a no (the re-ask) or fell through to routing.
-  protocol: { answer?: ProtocolAnswer } = {},
+  // ASK-01: the entity a `who` answer created or confirmed, for the
+  // turn's subject.
+  protocol: { answer?: ProtocolAnswer; subjectId?: string } = {},
 ): Promise<TurnValue | null> {
   const pending = getPendingAsk(conversation.id);
   if (!pending) return null;
+
+  // ASK-01: the engine's own question about a name ("Who's Clover?"),
+  // or an open question asked at the end of the last reply. The answer
+  // is read by the deterministic parser, never by a model: the kind
+  // from the noun vocabulary, the relation from the relationship
+  // vocabulary's phrases, the pronoun from the answer's own; a cancel
+  // clears it with no entity and no second ask; anything the parser
+  // cannot read clears it and falls through to the model (the judge's
+  // own extraction still runs on the turn).
+  if (pending.kind === "who") {
+    setPendingAsk(conversation.id, null);
+    const name = pending.name ?? "";
+    // A command in place of an answer ("turn on the office lights")
+    // routes as itself, the ask branch's own rule (a review).
+    const opener = text.trim().replace(COURTESY_PREFIX, "").split(/\s+/)[0]?.toLowerCase().replace(/[^a-z']/g, "") ?? "";
+    if (routeLiteral(text, actor, loaded)?.winner || commandOpeners(loaded).has(opener)) {
+      if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "declined");
+      return null;
+    }
+    const parsed = parseWhoAnswer(text, name, { relationAsked: pending.subjectId?.startsWith("rel-") === true });
+    if (parsed === "declined") {
+      if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "declined");
+      // The judge's twin question about the same candidate goes with
+      // it: a cancel is never asked again (a review).
+      const twin = name ? candidateByName(actor, name) : null;
+      if (twin) resolveOpenQuestionsAbout(actor.id, twin.id, "declined");
+      protocol.answer = { kind: "who", answer: "negative" };
+      return { reply: { text: "Okay, no problem." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    }
+    if (parsed === null) {
+      if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "declined");
+      return null;
+    }
+    const outcome = applyWhoAnswer(actor, { name, subjectId: pending.subjectId ?? null }, parsed, turnId);
+    if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "answered");
+    // The judge's own question about the same entity (queued while the
+    // engine's ask stood) is answered by this too, never asked again.
+    if (outcome.entity) resolveOpenQuestionsAbout(actor.id, outcome.entity.id, "answered");
+    if (outcome.replacedEntityId) resolveOpenQuestionsAbout(actor.id, outcome.replacedEntityId, "answered");
+    console.log(`[ask] the answer about a name was read on turn ${turnId}: ${outcome.entity ? `${outcome.entity.kind} ${outcome.entity.id}` : "no entity"}`);
+    protocol.answer = { kind: "who", answer: parsed.verdict === "no" ? "negative" : "value" };
+    if (outcome.entity) protocol.subjectId = outcome.entity.id;
+    return { reply: { text: outcome.reply }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+  }
 
   if (pending.kind === "confirm") {
     if (AFFIRMATIVE_RE.test(text.trim())) {
@@ -1760,13 +1836,14 @@ async function prepareTurn(
     signal = fallbackSignal(text, ageBand);
   }
   timings.signal_us = Math.round((performance.now() - signalStart) * 1000);
-  const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">): PreparedTurn => ({
+  const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">, subjects?: SubjectRef[]): PreparedTurn => ({
     kind: "immediate",
     value: { ...value, conversation_id: conversation.id, turn_id: turnId },
     turnId,
     outcomes: directOutcomes,
     signal,
     timings,
+    ...(subjects && subjects.length > 0 ? { subjects } : {}),
   });
   const safety = evaluateSafety(text, ageBand);
   // SafetyResult's own schema comment named this exact wiring as a
@@ -1810,13 +1887,36 @@ async function prepareTurn(
   // replaced reply asked; the replaced exchange's pending ask is dropped
   // rather than bound to the edited text.
   if (supersedes) setPendingAsk(conversation.id, null);
-  const protocol: { answer?: ProtocolAnswer } = {};
+  const protocol: { answer?: ProtocolAnswer; subjectId?: string } = {};
   const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources, directOutcomes, protocol);
   // ACT-01: the protocol layer wins when the state machine read the
   // answer; the re-ask ("Yes or no?") keeps the rule signal, since the
   // person said something else.
   if (protocol.answer && pendingAskValue) signal = classifyTurnSignal({ text, protocol: protocol.answer, ageBand });
-  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId, outcomes: directOutcomes, signal, timings };
+  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId, outcomes: directOutcomes, signal, timings, ...(protocol.subjectId ? { subjects: [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] } : {}) };
+
+  // ASK-01 part 4: a question the judge queued but has not asked yet
+  // ("Who's Juniper?", pending) can be answered before it is put: "he's
+  // our rabbit" right after "juniper chewed through the garden hose" is
+  // that answer, and a person who volunteers it should not be asked
+  // again at the end of the reply. Only a bare answer shape that names
+  // nobody else (looksLikeWhoAnswer); a statement about another name
+  // is its own turn.
+  const openPending = nextOpenQuestionFor(actor.id);
+  if (openPending && openPending.kind === "who" && openPending.subjectId) {
+    const about = openQuestionName(openPending);
+    if (about && looksLikeWhoAnswer(text, about)) {
+      const parsed = parseWhoAnswer(text, about);
+      if (parsed && parsed !== "declined" && parsed.kind) {
+        const outcome = applyWhoAnswer(actor, { name: about, subjectId: openPending.subjectId }, parsed, turnId);
+        markOpenQuestionAsked(openPending.id);
+        resolveOpenQuestion(openPending.id, "answered");
+        console.log(`[ask] an open question was answered before it was asked on turn ${turnId}: ${outcome.entity ? `${outcome.entity.kind} ${outcome.entity.id}` : "no entity"}`);
+        signal = classifyTurnSignal({ text, protocol: { kind: "who", answer: "value" }, ageBand });
+        return immediate({ reply: { text: outcome.reply }, source: "confirm", safety, crisis_resources: crisisResources }, outcome.entity ? [{ type: "household", entity_id: outcome.entity.id, carried_question: null }] : undefined);
+      }
+    }
+  }
 
   // Item 4b: "forget that" / "forget what I told you about X" is the
   // engine's own command (lib/forgetCommand.ts), answered here before
@@ -2085,7 +2185,35 @@ async function prepareTurn(
   const promptStart = performance.now();
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches);
+  // ASK-01: the names in the utterance, resolved before the model runs
+  // (lib/unknownNames.ts): the household's and the registry's are
+  // household refs, the rest unresolved. A turn that names nobody
+  // carries the previous turn's subjects ("should he be outside in
+  // this heat" is still about the rabbit), and the carried ones never
+  // re-ask. The unknown line goes in the context ahead of the memory
+  // section; the ask is appended to the reply by the caller.
+  const subjectsStart = performance.now();
+  const registry = registryNamesFor(actor);
+  const resolved = resolveNames(
+    text,
+    signal,
+    {
+      names: [...rosterNames, ...registry.map((r) => r.name)],
+      resolveEntity: (name) => {
+        const member = household.find((p) => p.displayName.trim().toLowerCase() === name.toLowerCase() || (p.nickname ?? "").trim().toLowerCase() === name.toLowerCase());
+        if (member) return ensurePersonEntity(member).value?.id ?? null;
+        return registry.find((r) => r.name.toLowerCase() === name.toLowerCase())?.id ?? null;
+      },
+    },
+    turnId,
+  );
+  const carried = resolved.subjects.length === 0 && !supersedes ? lastTurnSubjects(conversation.id).slice(0, 2) : [];
+  const subjects: SubjectRef[] = [...resolved.subjects, ...carried];
+  const unknownAsk = resolved.unknown.find((u) => u.ask)?.name ?? null;
+  const subjectPronouns = subjectPronounsFor(actor, subjects, resolved.unknown);
+  const subjectsSection = subjectsSectionFor(actor, subjects);
+  timings.subjects_ms = Math.round(performance.now() - subjectsStart);
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -2144,6 +2272,8 @@ async function prepareTurn(
     // pattern yield.
     roster: [...rosterNames, ...subjectRoster],
     signal,
+    subjects,
+    subjectPronouns,
   };
   markIncluded(turnContext, promptParts.context);
   const includedMemoryIds = new Set(turnContext.includedEvidenceIds);
@@ -2222,8 +2352,60 @@ async function prepareTurn(
   // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
   // seen on both paths.
   timings.prompt_ms = Math.round(performance.now() - promptStart);
-  return { kind: "model", messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, timings };
+  return { kind: "model", messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, timings, unknownAsk };
 }
+
+/** ASK-01: the name an open question is about, from its subject (an
+ * entity, or the far end of a relationship from the speaker). */
+function openQuestionName(question: OpenQuestionRow): string | null {
+  return framedName(question.subjectId, question.person);
+}
+
+/** ASK-01: the pronoun family each subject takes: an entity's stored
+ * pronouns, or the pronoun the person used for an unknown name this
+ * turn ("Nadia ... her marathon"). */
+function subjectPronounsFor(actor: PersonRow, subjects: readonly SubjectRef[], unknown: readonly UnknownName[]): { name: string; pronouns: string }[] {
+  const out: { name: string; pronouns: string }[] = [];
+  for (const ref of subjects) {
+    if (ref.type !== "household") continue;
+    const entity = entityForSpeaker(actor, ref.entity_id);
+    if (entity?.pronouns) out.push({ name: entity.name, pronouns: entity.pronouns });
+  }
+  for (const u of unknown) if (u.pronoun) out.push({ name: u.name, pronouns: u.pronoun });
+  return out;
+}
+
+/** ASK-01: the context's own lines about the turn's subjects, ahead of
+ * the memory section: the unknown line for names the hub has never
+ * heard, and one line per registry subject with what the registry
+ * holds (its kind, its relation to the speaker when stated, its
+ * pronouns), so a pronoun-only turn keeps its subject. Never a
+ * candidate's guessed kind (subjectLabel() hides it). */
+function subjectsSectionFor(actor: PersonRow, subjects: readonly SubjectRef[]): string {
+  const lines: string[] = [];
+  // The names framed as household with no noun settling them, this
+  // turn's and the carried ones: still unknown until an answer.
+  const unknownLine = unknownNamesLine(framedUnknownNames({ subjects }));
+  if (unknownLine) lines.push(unknownLine);
+  const about: string[] = [];
+  for (const ref of subjects) {
+    if (ref.type !== "household") continue;
+    const entity = entityForSpeaker(actor, ref.entity_id);
+    if (!entity || entity.account_person_id || (entity.source === "inferred" && !entity.confirmed_by_person_id)) continue;
+    // A sensitive entity is the household's adults' to see (memory.ts's
+    // canRead rule for a sensitive record): nothing of it reaches
+    // another speaker's prompt (a review).
+    if (entity.sensitive && !(actor.role === "owner" || actor.role === "admin")) continue;
+    const label = subjectLabel(actor, entity.id) ?? entity.name;
+    const kind = label.includes("(") ? label : `${label} (${entity.kind === "person" ? "someone the household knows" : `a ${entity.kind}`})`;
+    const pronouns = entity.pronouns ? `, ${entity.pronouns}` : "";
+    const description = entity.description ? `: ${sanitizeForPrompt(entity.description)}` : "";
+    about.push(`${kind}${pronouns}${description}`);
+  }
+  if (about.length > 0) lines.push(`About: ${about.join("; ")}.`);
+  return lines.length > 0 ? `\n\n${lines.join("\n")}` : "";
+}
+
 
 // This floor's own gate now lives in prepareTurn() (Fix E moved the
 // tool-offering decision there, ahead of the single completion call that
@@ -2745,6 +2927,70 @@ export function enforceWellFormedForTests(actor: PersonRow, value: TurnValue, tr
   return enforceWellFormed(actor, value, trace);
 }
 
+/** ASK-01: what the engine appends to a model reply, decided once the
+ * reply's text is known (the blocking path before finalizeReply(), the
+ * streaming path after the last delta and before `done`): the engine's
+ * own question about the utterance's unknown name unless the model
+ * already asked it, else the person's next open question when nothing
+ * else asks this turn (no `who` ask, no offer that would bind a lookup,
+ * no pending ask a package set). The question outranks the persona's
+ * engagement dial and the acknowledgment bank: it is a correctness
+ * action, appended whatever the companion says about follow-ups. The
+ * pending ask it sets is what the next utterance answers. Returns the
+ * text to append (with its leading space) or an empty string. Nothing
+ * is set on an ephemeral turn. */
+interface AppendedAsk {
+  /** The text to append (with its leading space), or empty when the
+   * model's own question already asks it or nothing asks this turn. */
+  append: string;
+  /** Persists the ask (the pending ask, the open question's status)
+   * once the question is known to have reached the person: the
+   * delivered text carries it. A malformed replacement or a refusal
+   * that lost the question commits nothing, so no ask stands that the
+   * person never heard (a review). */
+  commitIf: (deliveredText: string) => void;
+}
+
+const NO_ASK: AppendedAsk = { append: "", commitIf: () => {} };
+
+function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: PersonRow, conversationId: string, replyText: string, utterance: string, ephemeral: boolean): AppendedAsk {
+  if (ephemeral) return NO_ASK;
+  const visible = visibleText(replyText);
+  if (prepared.unknownAsk) {
+    const name = prepared.unknownAsk;
+    const asked = replyAsksAbout(visible, name);
+    return {
+      append: asked ? "" : ` ${whoQuestion(name)}`,
+      commitIf: (delivered) => {
+        if (!replyAsksAbout(visibleText(delivered), name)) return;
+        setPendingAsk(conversationId, { kind: "who", prompt: whoQuestion(name), packageId: "engine", args: { name }, name });
+        console.log(`[ask] turn ${prepared.turnId} asks about an unknown name (${asked ? "the model's own question" : "appended"})`);
+      },
+    };
+  }
+  if (getPendingAsk(conversationId)) return NO_ASK;
+  // An offer in the reply binds the lookup instead (notePendingLookup
+  // runs after this): the open question waits for the next reply.
+  const lookupIds = prepared.lookupTools.map((t) => t.id);
+  const offers = lookupIds.includes("websearch") && !lookupAnswered(prepared.turnContext.outcomes) && !asksAboutHousehold(utterance, prepared.turnContext.roster) && splitIntoSentences(visible).some((sentence) => lookupShapeOf(sentence) !== null);
+  if (offers) return NO_ASK;
+  const question = nextOpenQuestionFor(actor.id);
+  if (!question) return NO_ASK;
+  const name = openQuestionName(question);
+  // The model's own question about the name counts as the ask.
+  const asked = name !== null && replyAsksAbout(visible, name);
+  return {
+    append: asked ? "" : ` ${question.text}`,
+    commitIf: (delivered) => {
+      const carried = asked ? name !== null && replyAsksAbout(visibleText(delivered), name) : delivered.includes(question.text);
+      if (!carried) return;
+      markOpenQuestionAsked(question.id);
+      setPendingAsk(conversationId, { kind: "who", prompt: question.text, packageId: "engine", args: { name: name ?? "" }, name: name ?? "", subjectId: question.subjectId, openQuestionId: question.id });
+      console.log(`[ask] turn ${prepared.turnId} asks the open question ${question.id} (${question.kind}${asked ? ", the model's own question" : ""})`);
+    },
+  };
+}
+
 function finalizeReply(actor: PersonRow, rawValue: TurnValue, trace?: ReplyTrace): TurnValue {
   const value = enforceWellFormed(actor, applyOutputBoundary(actor, rawValue), trace);
   const { text, speech } = value.reply;
@@ -3118,12 +3364,19 @@ async function runTurnHoldingLease(
   }
 
   const trace: ReplyTrace = { hits: guardHits, replaced: guardReplaced };
+  // ASK-01: the engine's question about an unknown name, or the
+  // person's open question, at the end of the reply.
+  const ask = prepared.kind === "model" && value.source === "model" ? appendedAsk(prepared, actor, conversation.id, value.reply.text, text, false) : NO_ASK;
+  if (ask.append) value = { ...value, reply: { ...value.reply, text: `${value.reply.text.trimEnd()}${ask.append}` } };
   value = finalizeReply(actor, value, trace);
+  // Committed only when the delivered text still carries the question
+  // (the boundary can replace the whole reply).
+  if (value.source === "model") ask.commitIf(value.reply.text);
   // LOOKUP-01: an offer or a late promise in the reply that went out
   // binds the next consent word to the lookup.
   if (prepared.kind === "model" && value.source === "model" && !asksAboutHousehold(text, prepared.turnContext.roster)) notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects });
   return { ok: true, value };
 }
 
@@ -3672,7 +3925,7 @@ async function runTurnStreamHoldingLease(
     const trace: ReplyTrace = { hits: [], replaced: false };
     const value = finalizeReply(actor, prepared.value, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.subjects });
     return { ok: true, kind: "immediate", value };
   }
 
@@ -3936,6 +4189,29 @@ async function runTurnStreamHoldingLease(
       yield `${replacementFor("malformed", actor.id)} `;
       return outcome;
     }
+    // ASK-01: the engine's own ask site on a streamed reply: after the
+    // last delta and before `done`, the question goes out as one more
+    // delta, so finalize()'s replyText carries it and the row stores
+    // what the person heard. A stream that ends in a tool resolution
+    // (no deltas) or a safety refusal appends nothing.
+    async function* appendAskStage(inner: AsyncGenerator<string, StreamOutcome, void>): AsyncGenerator<string, StreamOutcome, void> {
+      let spoken = "";
+      let step = await inner.next();
+      while (!step.done) {
+        spoken += step.value;
+        yield step.value;
+        step = await inner.next();
+      }
+      const outcome = step.value;
+      if (outcome && "resolved" in outcome) return outcome;
+      if (outcome?.action === "refuse") return outcome;
+      const ask = appendedAsk(modelTurn, actor, conversation.id, spoken, text, opts.ephemeral === true);
+      if (ask.append) yield ask.append;
+      // On the wire now: the delivered text is what was spoken plus
+      // the question.
+      ask.commitIf(`${spoken}${ask.append}`);
+      return outcome;
+    }
     return {
       ok: true,
       kind: "stream",
@@ -3943,6 +4219,7 @@ async function runTurnStreamHoldingLease(
       turnId: prepared.turnId,
       startedAt,
       tokens: holdLease(
+        appendAskStage(
         sentenceCaseStream(
           gateGuards(
             gateOutputSafety(guardFirstStep(holdForLookup(holdOpening(tokens, true))), actor, prepared.turnId),
@@ -3971,6 +4248,7 @@ async function runTurnStreamHoldingLease(
             },
           ),
         ),
+        ),
       ),
       finalize: (replyText: string, outcome?: StreamOutcome): TurnValue => {
         if (finalized) return finalized;
@@ -3991,7 +4269,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -4069,7 +4347,7 @@ async function runTurnStreamHoldingLease(
         // wire binds the next consent word to the lookup.
         if (value.source === "model" && !opts.ephemeral && !asksAboutHousehold(text, prepared.turnContext.roster)) notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects });
         return value;
       },
     };

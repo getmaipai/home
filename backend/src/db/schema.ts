@@ -379,6 +379,13 @@ export const conversationTurns = sqliteTable(
     // recomputed, the judge's queue key and REVIEW-01's record of what
     // the engine believed. Null on every row written before ACT-01.
     signal: text("signal"),
+    // ASK-01: the turn's SubjectRef list (spec/schemas/subject-ref.
+    // schema.json as JSON): the names the turn resolved and the ones it
+    // could not, read back by the next turn so a pronoun-only turn
+    // ("should he be outside in this heat") keeps its subject, and by
+    // CHAT-13's stack. Null on rows written before ASK-01 and on a
+    // turn that named nothing.
+    subjects: text("subjects"),
     // Session C step 1: null for every non-plugin turn (a command, the
     // model, a safety refusal). "pattern"/"embedding"/"keyword" for a
     // plugin turn - which tier of route()'s decision actually fired it,
@@ -757,9 +764,37 @@ export const entities = sqliteTable("entities", {
   scope: text("scope").notNull().default("household"), // "household" | "person"
   person: text("person").references(() => people.id),
   sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
+  // ASK-01: how to refer to the entity, in the household's own words
+  // ("she/her"), set from the person's answer or their own usage.
+  pronouns: text("pronouns"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   deletedAt: text("deleted_at"),
+  hlc: text("hlc").notNull(),
+});
+
+// ASK-01: mirrors spec/schemas/open-question.schema.json. A question
+// the hub wants to ask one person, not necessarily now and not
+// necessarily on the conversation that raised it (the judge's own
+// question about an unconfirmed inference, AGE-01's relay, CRED-01's
+// clarification). Keyed by person: asked once at the end of that
+// person's next reply on any conversation, then answered, declined or
+// expired. The pending ask (conversations.pending_ask) is the other
+// slot: consumed by the very next utterance on one conversation.
+export const openQuestions = sqliteTable("open_questions", {
+  id: text("id").primaryKey(),
+  person: text("person")
+    .notNull()
+    .references(() => people.id),
+  conversationId: text("conversation_id"),
+  kind: text("kind").notNull(), // "who" | "clarify_fact" | "relay"
+  text: text("text").notNull(),
+  subjectId: text("subject_id"),
+  status: text("status").notNull().default("pending"), // "pending" | "asked" | "answered" | "declined" | "expired"
+  source: text("source").notNull(),
+  createdAt: text("created_at").notNull(),
+  askedAt: text("asked_at"),
+  resolvedAt: text("resolved_at"),
   hlc: text("hlc").notNull(),
 });
 

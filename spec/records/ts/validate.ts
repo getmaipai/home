@@ -54,8 +54,21 @@ interface GrantVocab {
   actions: Array<{ id: string; parameterized: boolean; description: string }>;
 }
 
+/** vocab/entity-kind-nouns.json: the nouns a person answers "Who's
+ * Quill?" with ("my coworker", "our rabbit"), each mapped to one of
+ * entity.schema.json's kinds (SPEC-01, ASK-01's answer parser). */
+export interface EntityKindNouns {
+  kind: "person" | "pet" | "place" | "organization" | "thing";
+  nouns: string[];
+}
+
+interface EntityKindVocab {
+  kinds: EntityKindNouns[];
+}
+
 let relVocab: RelationshipVocab | null = null;
 let grantVocab: GrantVocab | null = null;
+let kindNounVocab: EntityKindVocab | null = null;
 
 export function relationshipTypes(): RelationshipType[] {
   relVocab ??= JSON.parse(readFileSync(join(VOCAB_DIR, "relationship-types.json"), "utf-8")) as RelationshipVocab;
@@ -64,6 +77,18 @@ export function relationshipTypes(): RelationshipType[] {
 
 export function relationshipType(id: string): RelationshipType | undefined {
   return relationshipTypes().find((t) => t.id === id);
+}
+
+export function entityKindNouns(): EntityKindNouns[] {
+  kindNounVocab ??= JSON.parse(readFileSync(join(VOCAB_DIR, "entity-kind-nouns.json"), "utf-8")) as EntityKindVocab;
+  return kindNounVocab.kinds;
+}
+
+/** The kind a noun hints, or undefined when the vocabulary has no
+ * entry for it (the kind is then left unset, never invented). */
+export function kindForNoun(noun: string): EntityKindNouns["kind"] | undefined {
+  const wanted = noun.trim().toLowerCase();
+  return entityKindNouns().find((k) => k.nouns.includes(wanted))?.kind;
 }
 
 export function grantActions(): GrantVocab["actions"] {

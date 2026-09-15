@@ -73,7 +73,19 @@ export type GuardReason =
   | "assistant_register"
   /** REG-01 (section 4): a reply sentence that is the hub's previous
    * reply's question said back, skipped. */
-  | "repeat_question";
+  | "repeat_question"
+  /** ASK-01 (dev.md section 3, part 5): a sentence that claims prior
+   * knowledge ("that's right", "I remember", "as you mentioned") of a
+   * name the turn resolved to nobody (`unknownNames`), with no memory
+   * or entity evidence naming it. Cuttable; the replacement is the ask
+   * itself ("I don't know Nadia yet, who's that?"), so the fix is the
+   * replacement. */
+  | "false_familiarity"
+  /** ASK-01: a reply pronoun that contradicts the subject's stored
+   * pronouns, or the pronoun the person used for the name on this
+   * turn or the last two (`subjectPronouns`, `pronounsInPlay`).
+   * Skipped wherever it sits. */
+  | "pronoun_mismatch";
 
 export interface GuardContext {
   utterance: string;
@@ -126,6 +138,18 @@ export interface GuardContext {
   /** The active persona's own few-shot voice lines (persona.ts's
    * `Persona.examples`) - borrowed for TONE, never handed back verbatim. */
   personaExamples?: readonly string[];
+  /** ASK-01: the names in this turn the hub resolved to nobody and the
+   * person framed as household (the resolver's unknowns, and the
+   * previous turn's carried over), so a claim of prior knowledge about
+   * one is `false_familiarity` and a role noun for one is an invention. */
+  unknownNames?: readonly string[];
+  /** ASK-01: the pronoun family each subject of the turn takes ("he",
+   * "she", "they"), from the entity's stored pronouns or the pronoun the
+   * person used for the name this turn; the reply may not contradict it. */
+  subjectPronouns?: readonly { name: string; pronouns: string }[];
+  /** ASK-01: the pronoun families the person used in the utterance and
+   * the last two turns; a family in play is never a mismatch. */
+  pronounsInPlay?: readonly string[];
   /** FAST-05: the household's own people (display names and nicknames),
    * so a location claim can tell a household subject ("Pippa is at
    * soccer practice", which needs a source) from the world ("Paris is
@@ -632,6 +656,97 @@ function promiseInWindow(sentence: string, ctx: GuardContext): boolean {
   return overlap >= Math.max(1, Math.ceil(said.size / 2));
 }
 
+// ASK-01 (the coworker-likes-seltzer target row: "who is Quill" answered
+// "the child in the house, Bramble's sibling" with the coworker label in
+// the context): a household relation or role put on a name with nothing
+// behind it. The shape: a household subject (a roster name, an unknown
+// name, he/she) joined by "is" to a role noun (the kind vocabulary's
+// person nouns, the relationship vocabulary's said_as nouns, the family
+// words), the noun ungrounded by any line the prompt showed. "Quill is
+// your coworker" with the coworker label in the context passes; "Quill
+// is the child in the house" with nothing about a child does not.
+const ROLE_NOUNS =
+  "child|kid|son|daughter|sibling|brother|sister|husband|wife|partner|spouse|parent|mother|father|mom|dad|grandma|grandpa|grandmother|grandfather|aunt|uncle|cousin|niece|nephew|roommate|neighbou?r|coworker|co-worker|colleague|boss|manager|teacher|coach|friend|classmate|teammate|babysitter|nanny|doctor|dentist|vet|dog|cat|rabbit|puppy|kitten|pet";
+const ROLE_CLAIM_RE = new RegExp(String.raw`(?:^|[^\p{L}])(he|she|\p{Lu}[\p{L}'-]+)(?:'s|’s|\s+is|\s+was)\s+(?:(?:your|my|our|the|a|an|one of your|\p{Lu}[\p{L}'-]+'s)\s+)?(?:(?:[a-z]+)\s+)?(${ROLE_NOUNS})(?![\p{L}])`, "giu");
+function claimsUngroundedHouseholdRole(sentence: string, ctx: GuardContext, grounded: Set<string>): boolean {
+  for (const m of sentence.matchAll(ROLE_CLAIM_RE)) {
+    const subject = m[1]!;
+    const role = m[2]!.toLowerCase();
+    const unknown = (ctx.unknownNames ?? []).some((n) => n.toLowerCase() === subject.toLowerCase());
+    if (!unknown && !isHouseholdSubject(subject, ctx)) continue;
+    if ([...tokenize(role)].every((w) => grounded.has(w))) continue;
+    return true;
+  }
+  return false;
+}
+
+// ASK-01 part 5: a claim of prior knowledge about a name the turn
+// resolved to nobody. The phrases are the shapes the 8B produced on the
+// bench ("that's right, Nadia ran her marathon", "as you mentioned",
+// "I remember Clover"); a decline in the same sentence ("I don't know
+// Nadia") is honesty, never familiarity.
+const FAMILIARITY_RE =
+  /\b(?:that'?s right|you'?re right|i remember|i recall|i know (?!that (?:you|it|this|feeling|one))|as you (?:mentioned|said|told me)|like you (?:said|mentioned)|you (?:mentioned|told me about|said) (?:earlier|before|last|the other day|a while)|i'?ve heard (?:about|of|so much about)|i heard about|i know all about|of course|good old|our (?:friend|pal|buddy))\b/i;
+const NOT_FAMILIAR_RE = /\b(?:don'?t know|do not know|haven'?t heard|have not heard|never heard|not sure who|not sure what|don'?t think (?:i|we)'?ve met|who'?s that|who is that|haven'?t met)\b/i;
+/** Whole-word, case-insensitive, letter lookarounds (no ASCII word
+ * boundary between "é" and an apostrophe). */
+function mentions(text: string, name: string): boolean {
+  return new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(text);
+}
+function guardFalseFamiliarity(sentence: string, ctx: GuardContext): GuardReason | null {
+  const unknown = ctx.unknownNames ?? [];
+  if (unknown.length === 0) return null;
+  if (NOT_FAMILIAR_RE.test(sentence) || !FAMILIARITY_RE.test(sentence)) return null;
+  const named = unknown.find((n) => mentions(sentence, n));
+  if (!named) return null;
+  // Evidence naming it (a memory line, an episode, a grounding line)
+  // means the hub does know the name: nothing false about it.
+  const evidence = [...(ctx.sources ?? []), ...(ctx.episodes ?? []), ...(ctx.grounding ?? [])];
+  const namedInEvidence = evidence.some((line) => mentions(line, named));
+  return namedInEvidence ? null : "false_familiarity";
+}
+/** The name a false-familiarity sentence claimed to know, for the
+ * replacement (the ask itself). */
+function unknownNamedIn(sentence: string, ctx: GuardContext): string | null {
+  return (ctx.unknownNames ?? []).find((n) => mentions(sentence, n)) ?? null;
+}
+
+// ASK-01 part 5: a reply pronoun from a family the subject does not
+// take and the person has not used. "he" and "she" only: "they" is
+// also the plural, and "it" a thing. Read only where the subject is
+// the one possible referent: a sentence or an utterance that names
+// another person (a roster name, a proper noun, a relation noun like
+// "my sister") can be talking about them.
+const PRONOUN_FAMILY_RE = /(?<![\p{L}])(he|him|his|himself|she|her|hers|herself)(?![\p{L}])/giu;
+const OTHER_REFERENT_RE = /\b(?:sister|brother|mom|mum|mother|dad|father|wife|husband|aunt|uncle|grandma|grandpa|grandmother|grandfather|daughter|son|niece|nephew|cousin|girlfriend|boyfriend|partner|friend|coworker|co-worker|colleague|neighbou?r|teacher|boss|manager|doctor|dentist|vet|nurse|coach|babysitter|nanny|roommate|landlord|kid|child|baby)\b/i;
+function guardPronounMismatch(sentence: string, ctx: GuardContext): GuardReason | null {
+  const subjects = ctx.subjectPronouns ?? [];
+  if (subjects.length === 0) return null;
+  const allowed = new Set<string>([...subjects.map((s) => s.pronouns.split("/")[0]!.toLowerCase()), ...(ctx.pronounsInPlay ?? []).map((p) => p.toLowerCase())]);
+  // A subject whose pronouns are "they" or unknown constrains nothing
+  // about he/she in the reply beyond what is in play.
+  const constrained = subjects.some((s) => /^(?:he|she)\b/i.test(s.pronouns));
+  if (!constrained) return null;
+  if (OTHER_REFERENT_RE.test(sentence) || OTHER_REFERENT_RE.test(ctx.utterance)) return null;
+  // A capitalized word past the sentence's first is a name, and so is
+  // the first word when the roster knows it ("Bruno mentioned he saw
+  // her", a review); a name that is not the subject's is another
+  // referent.
+  const subjectNames = new Set(subjects.map((s) => s.name.toLowerCase()));
+  const rosterNames = new Set((ctx.roster ?? []).map((r) => r.trim().toLowerCase().split(/\s+/)[0]!));
+  // A household member named in the utterance beside the subject is a
+  // referent too, with pronouns the registry does not store ("Rover
+  // chased Pippa": "she" is Pippa's; a review).
+  if ([...rosterNames].some((r) => !subjectNames.has(r) && mentions(ctx.utterance, r))) return null;
+  const otherName = [...sentence.matchAll(/(?<![\p{L}])(\p{Lu}[\p{L}'-]+)(?![\p{L}])/gu)].some((m) => (m.index !== 0 || rosterNames.has(m[1]!.toLowerCase())) && !subjectNames.has(m[1]!.toLowerCase()));
+  if (otherName) return null;
+  for (const m of sentence.matchAll(PRONOUN_FAMILY_RE)) {
+    const family = /^(?:he|him|his|himself)$/i.test(m[1]!) ? "he" : "she";
+    if (!allowed.has(family)) return "pronoun_mismatch";
+  }
+  return null;
+}
+
 function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null {
   const grounded = groundedWords(ctx);
   const declines = DECLINE_RE.test(sentence);
@@ -660,6 +775,7 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
 
   if (claimsUngroundedHouseholdLocation(sentence, ctx, grounded)) return "invention";
   if (claimsUngroundedHouseholdActivity(sentence, ctx)) return "invention";
+  if (claimsUngroundedHouseholdRole(sentence, ctx, grounded)) return "invention";
 
   if (attributesToAPerson(sentence)) {
     // The name/relation word and the speech verb itself are never the
@@ -672,7 +788,10 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
     // "me", "you" and "us" are the attribution's own frame ("You told
     // me the album comes out at midnight": RECALL-03's set cut the
     // recalled fact for the "me").
-    const scaffold = new Set(["said", "says", "told", "mentioned", "that", "your", "brother", "sister", "mother", "mom", "father", "dad", "me", "you", "us", "earlier", "before"]);
+    // ASK-01's finding 24: the connectives a restatement joins the
+    // fact's own parts with ("plus a Thursday lab") are frame too, not
+    // the claim's content.
+    const scaffold = new Set(["said", "says", "told", "mentioned", "that", "your", "brother", "sister", "mother", "mom", "father", "dad", "me", "you", "us", "earlier", "before", "plus", "then", "also", "along", "both", "either", "it's", "its"]);
     if (unclaimedWords(sentence, grounded).some((w) => !scaffold.has(w))) return "invention";
   }
 
@@ -1412,7 +1531,7 @@ function guardPlaceholderEcho(sentence: string): GuardReason | null {
 // honest reply's earlier sentences standing (bot-legacy's own
 // `_CUTTABLE`: the sentence was padding, not the answer). Everything
 // else replaces the whole reply - the sentence WAS the reply's thesis.
-const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_recall", "placeholder_echo"]);
+const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_recall", "placeholder_echo", "false_familiarity"]);
 // Item 1b (#67): the honesty vocabulary ("nobody's told me", "I don't
 // know that one"), which the model must never read back as its own
 // words. conversationHistory.ts strips these lines from a guard-replaced
@@ -1451,7 +1570,7 @@ export function withoutHonestyLines(text: string): string {
 // Item 1b: a reason whose sentence is dropped wherever it sits, first
 // sentence included, and the rest of the reply goes on; the honest
 // line stands in only when nothing else was said.
-const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "repeat_question"]);
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "repeat_question", "pronoun_mismatch"]);
 
 /** REG-01: a statement (an inform, a commissive, a greeting, a closing
  * or a backchannel by the signal; a statement or first-person shape
@@ -1524,7 +1643,18 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   // malformed line is what stands when that fails too (OUT-01's bound).
   assistant_register: MALFORMED,
   repeat_question: MALFORMED,
+  // ASK-01: the ask itself stands in (replacementFor() names the name);
+  // a pronoun slip that emptied the reply is an output break.
+  false_familiarity: DONT_KNOW,
+  pronoun_mismatch: MALFORMED,
 };
+
+/** ASK-01: the replacement for a false-familiarity sentence is the ask
+ * about the name it claimed to know. Never a bank line: the question
+ * is the honest thing to say, and it is also the fix. */
+export function dontKnowYetLine(name: string): string {
+  return `I don't know ${name} yet, who's that?`;
+}
 
 /** The honest line a guard hit replaces text with, for a given reason -
  * exported so the streaming path (turnEngine.ts's `gateGuards`) can
@@ -1534,6 +1664,10 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
  * family and the turn's outcomes (CHAT-04) when both are given. */
 export function replacementFor(reason: GuardReason, personId: string, flagged?: { sentence: string; ctx: GuardContext }): string {
   if (reason === "unsupported_action" && flagged) return unsupportedActionLine(flagged.sentence, { ...flagged.ctx, personId });
+  if (reason === "false_familiarity" && flagged) {
+    const name = unknownNamedIn(flagged.sentence, flagged.ctx);
+    if (name) return dontKnowYetLine(name);
+  }
   if (reason === "placeholder_echo" && flagged && shapeOf(flagged.ctx) !== "question") return honest(personId, reason, ACKNOWLEDGE);
   return honest(personId, reason, REPLACEMENT_FOR[reason]);
 }
@@ -1572,6 +1706,8 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
     guardLikeISaid(s, ctx) ??
     guardExampleParrot(s, ctx) ??
     (isFirstSentence ? guardNearEcho(s, ctx) : null) ??
+    guardFalseFamiliarity(s, ctx) ??
+    guardPronounMismatch(s, ctx) ??
     guardUnrelatedRecall(s, ctx) ??
     guardInvention(s, ctx)
   );

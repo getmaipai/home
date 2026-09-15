@@ -101,6 +101,11 @@ export function newRelationshipId(): string {
   return `rel-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/open-question.schema.json's `^oq-[a-z0-9]{6,}$`. */
+export function newOpenQuestionId(): string {
+  return `oq-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/grant.schema.json's `^grant-[a-z0-9]{6,}$`. */
 export function newGrantId(): string {
   return `grant-${randomSuffix(10)}`;

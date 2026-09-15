@@ -39,6 +39,7 @@ import {
   totpSecrets,
   relationships,
   entities,
+  openQuestions,
   grants,
   approvals,
   routingEmbeddings,
@@ -88,6 +89,7 @@ export function resetDb(): void {
   assertDisposableTestDataDir();
   db.delete(approvals).run();
   db.delete(grants).run();
+  db.delete(openQuestions).run(); // ASK-01: references people
   db.delete(relationships).run();
   db.delete(entities).run();
   db.delete(receivedBackups).run();

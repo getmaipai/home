@@ -88,15 +88,16 @@ describe("the fixture", () => {
     // ACT-01's seven (three act-register, three act-memory, the curator's),
     // REG-01's statement-not-request, EXP-01's new-album, and RECALL-03's
     // recall-past-the-window (fourteen turns by design: the window has to
-    // drop turn 1), and LOOKUP-01's offer-binding.
-    expect(CONVERSATIONS.length).toBe(71);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(71);
+    // drop turn 1), LOOKUP-01's offer-binding, and ASK-01's five (the
+    // design note's three, who-ask-declined, open-question-once).
+    expect(CONVERSATIONS.length).toBe(76);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(76);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern", "Sunday", "Tuesday"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern", "Sunday", "Tuesday", "Clover"]).toContain(name);
     }
   });
 
@@ -607,21 +608,26 @@ describe("the runner against the stub (control-flow rows)", () => {
     });
   }, 20_000);
 
-  test("household-subject-* (B4): the fact is seeded in the entity registry, never said, and the row fails until a turn reads the registry", async () => {
+  test("household-subject-* (B4): the fact is seeded in the entity registry, never said, and ASK-01's subject line reads the registry into the turn", async () => {
     await withStubBench({ reply: () => "He's a good dog." }, async (deps) => {
       const { scores } = await runConversation(byId("household-subject-dog"), deps);
       const { sqlite } = await import("@/db");
       const atlas = sqlite.query("SELECT description FROM entities WHERE name = 'Atlas' AND deleted_at IS NULL").get() as { description: string } | null;
       expect(atlas?.description).toContain("four");
       expect(scores.every((s) => !/four/.test(s.say))).toBe(true); // the fact is in the registry, never in the transcript
-      expect(scores[0]?.observed.entities).toContainEqual({ kind: "pet", name: "Atlas" }); // the registry reading the step 3a row uses
+      expect(scores[0]?.observed.entities.map((e) => [e.kind, e.name])).toContainEqual(["pet", "Atlas"]); // the registry reading the step 3a row uses
+      // ASK-01: the registry's own line about the subject ("Atlas
+      // (yours): The family dog, a four-year-old mutt...") is in the
+      // context; the reply check is the model's, still failing on the stub.
       const age = scores.find((s) => s.say === "how old is Atlas")!;
-      expect(age.checks.find((c) => c.name === "recall in context")?.pass).toBe(false);
-      expect(age.pass).toBe(false);
+      expect(age.checks.find((c) => c.name === "recall in context")?.pass).toBe(true);
+      expect(age.checks.find((c) => c.name === "reply has")?.pass).toBe(false);
       const person = await runConversation(byId("household-subject-person"), deps);
       const rel = sqlite.query("SELECT type FROM relationships WHERE type = 'parent_of' AND deleted_at IS NULL").get() as { type: string } | null;
       expect(rel?.type).toBe("parent_of");
-      expect(person.scores.find((s) => s.say === "who is Marlow to me")?.pass).toBe(false);
+      const who = person.scores.find((s) => s.say === "who is Marlow to me")!;
+      expect(who.checks.find((c) => c.name === "recall in context")?.pass).toBe(true);
+      expect(who.pass).toBe(false);
     });
   }, 30_000);
 

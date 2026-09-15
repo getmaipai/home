@@ -38,6 +38,7 @@ export function toEntity(row: EntityRow): EntityT {
     scope: row.scope,
     person: row.person,
     sensitive: row.sensitive,
+    pronouns: row.pronouns,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
     deleted_at: row.deletedAt,
@@ -61,6 +62,7 @@ function toRow(entity: EntityT) {
     scope: entity.scope,
     person: entity.person,
     sensitive: entity.sensitive,
+    pronouns: entity.pronouns ?? null,
     createdAt: entity.created_at,
     updatedAt: entity.updated_at,
     deletedAt: entity.deleted_at,
@@ -80,6 +82,9 @@ export interface EntityCreate {
   scope?: "household" | "person";
   person?: string | null;
   sensitive?: boolean;
+  /** ASK-01: how to refer to the entity ("she/her"), in the household's
+   * own words; set from the person's answer to "Who's Clover?". */
+  pronouns?: string | null;
 }
 
 /** A person-scoped entity is visible only to the person it belongs to
@@ -130,6 +135,7 @@ export function createEntity(actor: { id: string }, input: EntityCreate): OpResu
     scope: input.scope ?? "household",
     person: input.scope === "person" ? (input.person ?? actor.id) : null,
     sensitive: input.sensitive ?? false,
+    pronouns: input.pronouns ?? null,
     created_at: now,
     updated_at: now,
     deleted_at: null,
@@ -159,6 +165,8 @@ export interface EntityEdit {
   description?: string | null;
   parent_id?: string | null;
   sensitive?: boolean;
+  /** ASK-01: the entity's pronouns, from the person's own words. */
+  pronouns?: string | null;
   /** Step 3a's confirm transition: an `inferred` entity becomes `local`
    * with the actor as its confirmer, now. Only a household adult; only
    * forward; nothing else about the record moves. */
@@ -201,6 +209,7 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
     description: edit.description !== undefined ? edit.description : target.description,
     parent_id: edit.parent_id !== undefined ? edit.parent_id : target.parent_id,
     sensitive: edit.sensitive ?? target.sensitive,
+    pronouns: edit.pronouns !== undefined ? edit.pronouns : target.pronouns,
     ...(confirmed ?? {}),
     updated_at: new Date().toISOString(),
     hlc: nextHlc(),

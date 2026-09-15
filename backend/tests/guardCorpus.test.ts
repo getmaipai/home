@@ -28,6 +28,11 @@ interface CorpusRow {
    * rule, and the hub's previous reply for the repeated-question rule. */
   act?: GuardContext["act"];
   previousReply?: string;
+  /** ASK-01: the turn's unknown names, the subjects' pronouns and the
+   * pronoun families in play, for the two new shapes. */
+  unknownNames?: string[];
+  subjectPronouns?: { name: string; pronouns: string }[];
+  pronounsInPlay?: string[];
   expect: GuardReason | null;
   /** True only for a row that depends on the whole-reply lookahead
    * guardReply() has and gateGuards() (the streaming path) genuinely
@@ -41,7 +46,7 @@ interface CorpusRow {
 const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "spec", "llm", "guard-corpus.json"), "utf-8"));
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
-  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply };
+  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay };
 }
 
 async function* sentenceStream(reply: string): AsyncGenerator<string, undefined, void> {

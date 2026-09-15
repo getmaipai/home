@@ -124,6 +124,7 @@ const RELATION_PHRASES: Record<string, string> = {
   ward_of: "your guardian",
   friend_of: "your friend",
   colleague_of: "your coworker",
+  relative_of: "your relative",
   owns: "yours",
   cares_for: "someone you look after",
   lives_at: "your home",
@@ -290,8 +291,29 @@ export function findEntityNamedIn(speaker: { id: string }, text: string): Entity
  * candidate for the open question (ASK-01), never knowledge. The
  * design pass's amendment to step 3a: not rendered to the model, not a
  * known name for the guards, not an identity recall reads by. */
-function isCandidate(row: { source: string; confirmedByPersonId: string | null }): boolean {
-  return row.source === "inferred" && row.confirmedByPersonId === null;
+function isCandidate(row: { id: string; source: string; confirmedByPersonId: string | null }, vouched: ReadonlySet<string> = vouchedEntityIds()): boolean {
+  return row.source === "inferred" && row.confirmedByPersonId === null && !vouched.has(row.id);
+}
+
+/** ASK-01: the entities a stated or confirmed live relationship
+ * touches. An inferred entity at the far end of an edge the person
+ * stated or an adult confirmed is vouched for by that edge (the
+ * confirm names it as the coworker), so it is no longer a candidate
+ * even before its own confirm transition runs. */
+function vouchedEntityIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const r of db
+    .select({ fromId: relationships.fromId, toId: relationships.toId, source: relationships.source, confirmedByPersonId: relationships.confirmedByPersonId, validTo: relationships.validTo })
+    .from(relationships)
+    .where(isNull(relationships.deletedAt))
+    .all()) {
+    if (r.validTo !== null) continue;
+    if (r.source === "stated" || r.confirmedByPersonId !== null) {
+      ids.add(r.fromId);
+      ids.add(r.toId);
+    }
+  }
+  return ids;
 }
 
 /** Names the guards may treat as known subjects beside the household
@@ -303,13 +325,43 @@ function isCandidate(row: { source: string; confirmedByPersonId: string | null }
  * kind is the model's guess, and the guards treat the name as one of
  * unknown kind until the person answers. */
 export function subjectRosterFor(speaker: { id: string }): string[] {
+  const vouched = vouchedEntityIds();
   return db
-    .select({ name: entities.name, aliases: entities.aliases, kind: entities.kind, scope: entities.scope, person: entities.person, source: entities.source, confirmedByPersonId: entities.confirmedByPersonId })
+    .select({ id: entities.id, name: entities.name, aliases: entities.aliases, kind: entities.kind, scope: entities.scope, person: entities.person, source: entities.source, confirmedByPersonId: entities.confirmedByPersonId })
     .from(entities)
     .where(isNull(entities.deletedAt))
     .all()
-    .filter((e) => (e.scope === "household" || e.person === speaker.id) && (e.kind === "person" || e.kind === "pet") && !isCandidate(e))
+    .filter((e) => (e.scope === "household" || e.person === speaker.id) && (e.kind === "person" || e.kind === "pet") && !isCandidate(e, vouched))
     .flatMap((e) => [e.name, ...(JSON.parse(e.aliases) as string[])]);
+}
+
+/** ASK-01: every name and alias the speaker's registry knows (their
+ * own and the household's, every kind), with the entity it belongs to,
+ * for the turn's name resolver. A candidate (an unconfirmed inferred
+ * entity) stays out, as it does for the guards' roster: its name is
+ * still unknown-kind until the person answers. */
+export function registryNamesFor(speaker: { id: string }): { name: string; id: string; kind: string }[] {
+  const vouched = vouchedEntityIds();
+  return db
+    .select({ id: entities.id, name: entities.name, aliases: entities.aliases, kind: entities.kind, scope: entities.scope, person: entities.person, source: entities.source, confirmedByPersonId: entities.confirmedByPersonId })
+    .from(entities)
+    .where(isNull(entities.deletedAt))
+    .all()
+    .filter((e) => (e.scope === "household" || e.person === speaker.id) && !isCandidate(e, vouched))
+    .flatMap((e) => [e.name, ...(JSON.parse(e.aliases) as string[])].map((name) => ({ name, id: e.id, kind: e.kind })));
+}
+
+/** ASK-01: an entity's name by id, for a log line; null when gone. */
+export function registryNameById(id: string): string | null {
+  return db.select({ name: entities.name }).from(entities).where(and(eq(entities.id, id), isNull(entities.deletedAt))).get()?.name ?? null;
+}
+
+/** ASK-01: an entity by id, when the speaker may see it (the
+ * household's or their own); null otherwise. */
+export function entityForSpeaker(speaker: { id: string }, id: string): Entity | null {
+  const row = db.select().from(entities).where(and(eq(entities.id, id), isNull(entities.deletedAt))).get();
+  if (!row || !(row.scope === "household" || row.person === speaker.id)) return null;
+  return toEntity(row);
 }
 
 /** How the chat prompt says whose fact a memory is: the subject's name,
@@ -339,7 +391,7 @@ export function subjectLabel(speaker: { id: string; role: string }, subjectId: s
       (r.scope === "household" || r.person === speaker.id) &&
       ((r.from_id === self.id && r.to_id === row.id) || (r.from_id === row.id && r.to_id === self.id && isSymmetric(r.type))),
   );
-  if (!edge || isCandidate({ source: edge.source, confirmedByPersonId: edge.confirmed_by_person_id })) return row.name;
+  if (!edge || (edge.source === "inferred" && edge.confirmed_by_person_id === null)) return row.name;
   return `${row.name} (${RELATION_PHRASES[edge.type]!})`;
 }
 

@@ -369,6 +369,8 @@ export function erasePersonData(personId: string): ErasureCounts {
   }
   relationshipRows += sqlite.query("DELETE FROM relationships WHERE person = ?").run(personId).changes;
   const entityRows = sqlite.query("DELETE FROM entities WHERE person = ?").run(personId).changes;
+  // ASK-01: the questions queued for the person go with them.
+  sqlite.query("DELETE FROM open_questions WHERE person = ?").run(personId);
   const grantRows = sqlite.query("DELETE FROM grants WHERE person = ?").run(personId).changes;
   const approvalRows = sqlite.query("DELETE FROM approvals WHERE person_id = ?").run(personId).changes;
   // Session-cache invalidation (resolveSession's 10-second in-memory

@@ -13,7 +13,7 @@ import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
 import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, notePendingLookup, type TurnStreamResult } from "@/lib/turnEngine";
-import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation } from "@/lib/conversationHistory";
+import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation, listOpenQuestions } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety } from "@/lib/safety";
@@ -43,8 +43,10 @@ interface TurnLine {
   plugin_id?: string;
   source?: string;
   safety_action?: string;
-  /** The subject tracker's resolved subject, once one writes it (CHAT-13). */
+  /** ASK-01: the turn's subjects by type and name, and the first as
+   * `subject` (CHAT-13's stack grows from it). */
   subject?: string;
+  subjects?: { type: "household" | "world" | "unresolved"; name: string }[];
   /** ACT-01: the frozen signal's headline and the per-stage timings. */
   signal?: { act: string; secondary: string[]; emotion: string; intensity: string; target: string; repair: string; source: string };
   timings?: TurnTimings;
@@ -525,7 +527,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const requests = deps.proxy?.requests ?? [];
     // A row that reads memory (written, or nothing written) is read
     // after the judge has had its turn, so the judge's own rows count.
-    if (turn.expect.memoryWritten || turn.expect.storesNothing || turn.expect.recordActive || turn.expect.recordRetired || turn.expect.entityExists || turn.expect.relationshipExists || turn.expect.memoryRows) await deps.drainJudge();
+    if (turn.expect.memoryWritten || turn.expect.storesNothing || turn.expect.recordActive || turn.expect.recordRetired || turn.expect.entityExists || turn.expect.entityAbsent || turn.expect.relationshipExists || turn.expect.memoryRows || turn.expect.askedAbout || turn.expect.openQuestion || turn.expect.openQuestionStatus) await deps.drainJudge();
     // The jobs this turn scheduled, read before the delivery wait: a
     // promise row sees its own job pending, then the scheduler's own
     // delivery of it.
@@ -561,6 +563,10 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       signal: row ? turnSignalOf(row) : null,
       memoryRowDetails: memoryRowDetailsFor(actor),
       pendingAsk: getPendingAsk(conversationId)?.kind ?? null,
+      pendingAskName: getPendingAsk(conversationId)?.name ?? null,
+      // ASK-01: the person's own open questions, read after the judge
+      // drained (a candidate's question is the judge's).
+      openQuestions: listOpenQuestions(actor.id).map((q) => ({ kind: q.kind, status: q.status, text: q.text })),
       listItems: since(listItemsAtStart, listItemsNow()),
       jobs,
       homeCalls: homeCallsSince(),
@@ -569,8 +575,9 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       reconciledRow: row !== undefined && row.replyText.trim().length > 0,
       deliveries,
       subject: line?.subject ?? null,
+      subjects: line?.subjects?.map((s) => ({ ...s, rejected: false })),
       entities: db
-        .select({ kind: entities.kind, name: entities.name })
+        .select({ kind: entities.kind, name: entities.name, source: entities.source, pronouns: entities.pronouns, description: entities.description })
         .from(entities)
         .where(isNull(entities.deletedAt))
         .all(),
@@ -620,6 +627,7 @@ function cleanupBenchPeopleStrict(peopleRows: BenchPeople): void {
     sqlite.query("DELETE FROM relationships WHERE person = ? OR from_id IN (SELECT id FROM entities WHERE person = ? OR account_person_id = ?) OR to_id IN (SELECT id FROM entities WHERE person = ? OR account_person_id = ?)").run(person.id, person.id, person.id, person.id, person.id);
     sqlite.query("DELETE FROM entities WHERE person = ? OR account_person_id = ?").run(person.id, person.id);
     sqlite.query("DELETE FROM lists WHERE person = ?").run(person.id); // list-add's own rows
+    sqlite.query("DELETE FROM open_questions WHERE person = ?").run(person.id); // ASK-01
     sqlite.query("DELETE FROM notification_deliveries WHERE recipient_id = ?").run(person.id);
     sqlite.query("DELETE FROM scheduled_jobs WHERE person_id = ?").run(person.id);
     sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);

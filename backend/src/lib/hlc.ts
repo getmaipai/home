@@ -78,6 +78,7 @@ export const HLC_BEARING_TABLES = [
   "grants",
   "routing_embeddings",
   "lists",
+  "open_questions",
 ] as const;
 
 /** Seeds from every hlc already on disk, across every table that stamps

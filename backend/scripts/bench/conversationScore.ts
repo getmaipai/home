@@ -70,8 +70,12 @@ export interface TurnObserved {
   deliveries: readonly string[];
   /** The subject the `[turn]` line names, once a tracker writes one. */
   subject: string | null;
-  /** The registry's entities after the turn (kind and name). */
-  entities: readonly { kind: string; name: string }[];
+  /** The registry's entities after the turn (kind and name; ASK-01
+   * adds the provenance, the pronouns and the description). */
+  entities: readonly { kind: string; name: string; source?: string; pronouns?: string | null; description?: string | null }[];
+  /** ASK-01: the name the conversation's pending ask is about, when
+   * it is a `who`. */
+  pendingAskName?: string | null;
   /** The live relationships touching the speaker's own entity after
    * the turn: the other end's name, the provenance, whether confirmed. */
   relationships: readonly { type: string; name: string; source: string; confirmed: boolean }[];
@@ -97,7 +101,7 @@ export interface TurnObserved {
   subjects?: readonly { type: "household" | "world" | "unresolved"; name: string; rejected: boolean }[];
   /** ASK-01 part 4/AGE-01/CRED-01: the person's own OpenQuestions, read
    * after the same wait `delivered` uses. */
-  openQuestions?: readonly { kind: string; status: string }[];
+  openQuestions?: readonly { kind: string; status: string; text?: string }[];
   /** MEM-06/CUR-01: the richer memory-row detail `memoryRows` checks
    * against (`records` above stays the plain text-and-status pair the
    * older `recordActive`/`recordRetired` checks use). */
@@ -185,7 +189,13 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.maxWords) parts.push(`at most ${e.maxWords} words`);
   if (e.minWords) parts.push(`at least ${e.minWords} words`);
   if (e.listLacks) parts.push(`list lacks ${e.listLacks.join(", ")}`);
-  if (e.entityExists) parts.push(`entity ${e.entityExists.kind} ${e.entityExists.name}`);
+  if (e.entityExists) parts.push(`entity ${e.entityExists.kind} ${e.entityExists.name}${e.entityExists.source ? ` ${e.entityExists.source}` : ""}${e.entityExists.pronouns ? ` ${e.entityExists.pronouns}` : ""}`);
+  if (e.entityAbsent) parts.push(`no entity ${e.entityAbsent}`);
+  if (e.guardAnyOf) parts.push(`guard one of ${e.guardAnyOf.map((g) => g ?? "none").join("/")}`);
+  if (e.askedAbout) parts.push(`asked about ${e.askedAbout.name}`);
+  if (e.pronounsAgree) parts.push(`pronouns agree with ${e.pronounsAgree.name}`);
+  if (e.groundedNames) parts.push("every name grounded");
+  if (e.openQuestionStatus) parts.push(`open question ${e.openQuestionStatus.kind} ${e.openQuestionStatus.status}`);
   if (e.episodesInContext !== undefined) parts.push(`${e.episodesInContext} episode line${e.episodesInContext === 1 ? "" : "s"}`);
   if (e.noCopiedEpisode) parts.push("no copied episode line");
   if (e.relationshipExists) parts.push(`relationship ${e.relationshipExists.type} ${e.relationshipExists.name} ${e.relationshipExists.source}${e.relationshipExists.confirmed === undefined ? "" : e.relationshipExists.confirmed ? " confirmed" : " unconfirmed"}`);
@@ -328,8 +338,48 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     checks.push({ name: "list lacks", pass: present.length === 0, detail: present.length === 0 ? "absent" : `still on the list: ${present.join(", ")}` });
   }
   if (e.entityExists) {
-    const hit = observed.entities.find((x) => x.kind === e.entityExists!.kind && x.name.toLowerCase() === e.entityExists!.name.toLowerCase());
-    checks.push({ name: "entity", pass: hit !== undefined, detail: hit ? `${hit.kind} ${hit.name} exists` : `no ${e.entityExists.kind} named ${e.entityExists.name} (entities: ${observed.entities.map((x) => `${x.kind} ${x.name}`).join(", ") || "none"})` });
+    const want = e.entityExists;
+    const hit = observed.entities.find((x) => x.kind === want.kind && x.name.toLowerCase() === want.name.toLowerCase());
+    const provenance = hit !== undefined && (want.source === undefined || hit.source === want.source);
+    const pronouns = hit !== undefined && (want.pronouns === undefined || (hit.pronouns ?? "").toLowerCase().startsWith(want.pronouns.toLowerCase()));
+    const description = hit !== undefined && (want.descriptionContains === undefined || (hit.description ?? "").toLowerCase().includes(want.descriptionContains.toLowerCase()));
+    const pass = hit !== undefined && provenance && pronouns && description;
+    const detail = hit ? `${hit.kind} ${hit.name} exists${hit.source ? ` (${hit.source}${hit.pronouns ? `, ${hit.pronouns}` : ""}${hit.description ? `: ${hit.description}` : ""})` : ""}` : `no ${want.kind} named ${want.name} (entities: ${observed.entities.map((x) => `${x.kind} ${x.name}`).join(", ") || "none"})`;
+    checks.push({ name: "entity", pass, detail });
+  }
+  if (e.entityAbsent) {
+    const hit = observed.entities.find((x) => x.name.toLowerCase() === e.entityAbsent!.toLowerCase());
+    checks.push({ name: "no entity", pass: hit === undefined, detail: hit ? `${hit.kind} ${hit.name} exists` : `no entity named ${e.entityAbsent}` });
+  }
+  if (e.guardAnyOf) {
+    const got = observed.guardReplaced;
+    checks.push({ name: "guard", pass: e.guardAnyOf.includes(got), detail: got ? `replaced by ${got}` : "not replaced" });
+  }
+  if (e.askedAbout) {
+    const name = e.askedAbout.name.toLowerCase();
+    const pending = observed.pendingAsk === "who" && (observed.pendingAskName ?? "").toLowerCase() === name;
+    const queued = (observed.openQuestions ?? []).find((q) => (q.status === "pending" || q.status === "asked") && (q.text ?? "").toLowerCase().includes(name));
+    checks.push({ name: "asked about", pass: pending || queued !== undefined, detail: pending ? `pending who ${observed.pendingAskName}` : queued ? `open question ${queued.status}: ${queued.text}` : `nothing asks about ${e.askedAbout.name} (pending ${observed.pendingAsk ?? "none"}; open questions: ${observed.openQuestions?.map((q) => `${q.kind}:${q.status}`).join(", ") || "none"})` });
+  }
+  if (e.pronounsAgree) {
+    const entity = observed.entities.find((x) => x.name.toLowerCase() === e.pronounsAgree!.name.toLowerCase());
+    const stored = (entity?.pronouns ?? "").split("/")[0]?.toLowerCase() ?? "";
+    const families = [...reply.matchAll(/(?<![\p{L}])(he|him|his|himself|she|her|hers|herself)(?![\p{L}])/giu)].map((m) => (/^(?:he|him|his|himself)$/i.test(m[1]!) ? "he" : "she"));
+    const wrong = stored === "he" || stored === "she" ? families.filter((f) => f !== stored) : [];
+    checks.push({ name: "pronouns agree", pass: entity !== undefined && stored.length > 0 && wrong.length === 0, detail: !entity ? `no entity named ${e.pronounsAgree.name}` : !stored ? `${entity.name} has no pronouns stored` : wrong.length === 0 ? `every pronoun is ${stored}` : `reply uses ${[...new Set(wrong)].join("/")} for ${entity.name} (${stored})` });
+  }
+  if (e.groundedNames) {
+    const earlier = conversation.turns.slice(0, turnIndex + 1).map((t) => t.say);
+    const known = [...earlier, context].join("\n").toLowerCase();
+    const names = [...reply.matchAll(/(?<![\p{L}])(\p{Lu}[\p{L}'-]+)(?![\p{L}])/gu)]
+      .filter((m) => m.index !== 0 && !/[.!?]\s*$/.test(reply.slice(0, m.index).trimEnd()) && m[1] !== "I")
+      .map((m) => m[1]!)
+      .filter((n) => !known.includes(n.toLowerCase()));
+    checks.push({ name: "names grounded", pass: names.length === 0, detail: names.length === 0 ? "every name is in the utterance, the history or the context" : `ungrounded: ${[...new Set(names)].join(", ")}` });
+  }
+  if (e.openQuestionStatus) {
+    const hit = (observed.openQuestions ?? []).find((q) => q.kind === e.openQuestionStatus!.kind && q.status === e.openQuestionStatus!.status);
+    checks.push({ name: "open question status", pass: hit !== undefined, detail: hit ? `${hit.kind} ${hit.status}` : `no ${e.openQuestionStatus.kind} question with status ${e.openQuestionStatus.status} (observed: ${observed.openQuestions?.map((q) => `${q.kind}:${q.status}`).join(", ") || "none"})` });
   }
   if (e.episodesInContext !== undefined) {
     const count = episodeLinesIn(observed.contextMessage);

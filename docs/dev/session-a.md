@@ -5180,3 +5180,215 @@ client's own error text ("could not reach http://...", spec/llm/ts/
 client.ts) still carries the address into the hub's local log and the
 503's error string; a spec change to label it is a small item of its
 own.
+
+Verified against the fake engines and the stub; no external engine is
+in use as of the evening of 2026-09-14 (the second machine is the
+local coding host only, the hub's engines run on the dev Mac), and the
+live identity line is taken the day one exists.
+
+## ASK-01: the unknown-name rule, ask and never assume (2026-09-14)
+
+The design pass's section 3 (findings 10, 11, 14, 15), as amended by
+the coherence review (question 2) and SPEC-01's shapes. Before this
+the turn had no notion of a name it did not know: `rosterNames` and
+the registry were the known set, its complement existed nowhere, and
+the prompt's trust reminder rewarded knowing, so the 8B obliged
+("that's right, Nadia ran her marathon"); step 3a then created the
+entity a few seconds after the reply that needed it, with the model's
+guessed kind, and a pronoun the model picked.
+
+**The resolver, before the model runs.** `lib/unknownNames.ts`:
+`resolveNames(text, signal, known, provenance)`. The candidates are
+the proper nouns the `compromise` tagger finds (a maintained MIT
+dependency through bun, the org's prebuilt rule, never a copied word
+list), a sentence-initial capitalized word it leaves as a plain noun
+(it cannot tell "Clover borrowed" from "Dinner is"; the frames can),
+and the signal's own named clause subjects. A candidate on the roster
+or in the speaker's registry (`registryNamesFor()`, every kind, minus
+a candidate entity) is a household SubjectRef with its entity id (a
+member's person entity made on first need); the rest are unresolved
+SubjectRefs. The household frame decides the ask: a relation noun
+beside the name ("my cousin Clover", `relationFramesIn()`, three
+passes so "my sister Nadia's dog Rover" reads both), "my" or "our" in
+the name's own clause (the signal's ranges), a personal pronoun for
+it in the same turn with no known name the pronoun could be ("Nadia
+... her marathon"; "they" does not frame, a band is they), or the
+roster's own shape ("Clover and I", "Pippa and Clover", "Clover's").
+A framed name with no noun settling its kind is the engine's ask; a
+noun settles the kind (candidate_kinds, no ask: the judge writes it
+stated); a bare proper noun, a name behind a world kind noun ("the
+band Tempo", "the Dune film"), a multi-word proper noun, a roster name
+inside a longer one ("Marsh Lantern"), and a lowercase name are
+unresolved with no ask. The frame lives on the ref as its confidence
+(0.8 framed, 0.4 bare), the one field the spec shape has for it. A
+turn that names nobody carries the previous turn's subjects (the
+row's `subjects` column, SPEC-01's shape, `lastTurnSubjects()`), so
+"should he be outside in this heat" is still about the rabbit and
+"wait, how would you know that?" still carries the unknown line; a
+carried name never re-asks.
+
+**The context and the ask.** `subjectsSectionFor()` puts two kinds of
+line ahead of the memory section: "Names in this message you have
+never heard before: Clover. You don't know who or what Clover is:
+don't guess, and don't claim to remember." for the framed unknowns
+(this turn's and the carried), and "About: Juniper (yours), he:
+rabbit" for the registry's subjects (the entity's label through
+`subjectLabel()`, its pronouns, its description), which is the first
+turn-time read of the registry (B4's rows now find their fact in the
+context). The ask is the engine's, decided once the reply's text is
+known (`appendedAsk()`): "Who's Clover?" is appended unless the reply
+already asks a question sentence naming the name, and the
+conversation's pending ask becomes `who` bound to the name either
+way. On the blocking path it is appended before `finalizeReply()`; on
+the streaming path `appendAskStage()` yields it as one more delta
+after the last and before `done`, so the row stores what the person
+heard. It outranks the persona's engagement dial (the brief persona
+says no follow-up question; this is a correctness action, not a
+follow-up) and the acknowledgment bank (a statement's "Fair enough."
+gets the question after it). One ask at a time: a `who` ask this turn
+means an offer in the same reply binds no lookup
+(`notePendingLookup()` yields to a standing ask).
+
+**The answer, one deterministic parser.** `resolvePendingAsk()` takes
+the `who` kind first: `parseWhoAnswer()` reads the kind from the
+noun vocabulary (`spec/vocab/entity-kind-nouns.json`, read through
+the spec's `kindForNoun()`), the relation from the relationship
+vocabulary's own `said_as` phrases ("my cousin" is `relative_of`, "our
+rabbit" is `owns`; "a friend from work" and "the neighbor's dog" state
+a kind and no relation of the speaker's), the pronoun from the
+answer's own, and the rest as the description ("cousin, she teaches
+piano"; the name itself never). `applyWhoAnswer()` goes through step
+3a's paths and adds no transition of its own: `ensureSubjectEntity()`
+with stated (`local`), `writeRelation()` with stated, `updateEntity()`
+for the pronouns and the description, `promoteToStated()` on a
+candidate edge the person says yes to, the confirm transition on a
+candidate entity; a candidate of the wrong kind is replaced by one of
+the stated kind, its records re-pointed and its edges that no longer
+fit removed, so no ghost of the guess stays. The reply is one line
+naming what was learned ("Got it, Clover is your cousin."). A cancel
+("never mind", "not now", "nobody") clears the ask with no entity and
+no second ask; an answer the parser cannot read (a question of their
+own, a new subject) clears it and falls through to the model, and the
+judge's own extraction still runs on the turn.
+
+**Step 3a's amendment: an inference is a candidate, never knowledge.**
+`local` now needs the speaker's words to carry the name and its kind
+(`speakerStatedKind()`: a kind noun beside the name); a name alone is
+the model's kind guess, an `inferred` entity. When the judge creates
+one, or an inferred relationship, it queues an OpenQuestion
+(`spec/schemas/open-question.schema.json`, the `open_questions` table,
+`queueOpenQuestion()` and its kin in `lib/conversationHistory.ts`):
+"Who's Juniper?" for an entity, "Is Raven your coworker?" for a
+relation whose entity has no question of its own (the entity's answer
+states both). Keyed by person, asked once at the end of the person's
+next reply on any conversation (the same `appendedAsk()`, when no
+other ask stands this turn), it becomes a `who` pending ask on that
+conversation, and is answered, or declined for good on "not now".
+A bare answer shape about the candidate ("he's our rabbit", "she is
+my sister", or nothing but "my cousin") before the question is put is
+read as the answer (`looksLikeWhoAnswer()`), so a person who
+volunteers it is never asked; the shape is narrow on purpose (the
+review's rows: "my sister is visiting tomorrow" and "my dog is sick"
+are their own turns, never the answer to a question nobody asked). A
+bare "no" to "Is Raven your coworker?" is the answer (the guess goes),
+where to "Who's Clover?" it is a cancel. The engine's own ask carries
+no subject; when the judge has made its candidate for the name by
+the time the person answers, that candidate is the entity the answer
+confirms or replaces, and every open question about it is answered
+with it. Until the answer, a candidate
+gets no label (`subjectLabel()`, already so), is not a known name for
+the guards or the resolver, and its pronouns are unset; a candidate at
+the far end of an edge the person stated or an adult confirmed is
+vouched for by that edge (`vouchedEntityIds()`) and renders again,
+which is how step 3a's confirm control keeps its row green.
+
+**Two guard shapes, and a third in the invention family.**
+`false_familiarity` (cuttable): a claim of prior knowledge ("that's
+right", "I remember", "as you mentioned", "I've heard about") in a
+sentence naming an unknown name, with no memory, episode or grounding
+line naming it; the replacement is the ask itself
+(`dontKnowYetLine()`, "I don't know Nadia yet, who's that?"), which
+is also the fix, and the engine appends no second question after it.
+`pronoun_mismatch` (skippable): a he or she in a reply sentence
+against the subject's stored pronouns or the pronoun the person used
+this turn or the last two, read only where the subject is the one
+possible referent (no other name, no relation noun in the sentence or
+the utterance). The seltzer target row ("who is Quill" answered "the
+child in the house, Bramble's sibling" with the coworker label in the
+context) is a household role put on a name with nothing behind it,
+`claimsUngroundedHouseholdRole()` in the invention family: a household
+or unknown subject joined by "is" to a role noun the prompt showed
+nothing for. Finding 24's check came first: a grounded first-person
+recall with the fact in context ("what did I say my class schedule
+was", four restatements) trips no guard; the one it did ("plus a
+Thursday lab") was the attribution shape counting a connective as
+content, fixed in the scaffold set.
+
+**The rows.** Five conversations join the bench:
+`unknown-name-person`, `unknown-name-pet-lowercase`,
+`unknown-name-marathon` (the design note's three, every expectation
+an effect: the turn's subjects off the `[turn]` line, the context
+line, the pending ask, the entity's provenance and pronouns and
+description, the relation's provenance, the open question's status,
+every he/she in a reply against the entity's pronouns, every name in a
+reply grounded in the utterance, the history or the context),
+`who-ask-declined` and `open-question-once`. New expectation kinds
+for them: `entityExists` with `source`, `pronouns` and
+`descriptionContains`; `entityAbsent`; `guardAnyOf`; `askedAbout`
+(the pending `who` or a queued question names it, after the judge
+drains); `pronounsAgree`; `groundedNames`; `openQuestionStatus`; the
+runner reads `subjects` and `pendingAskName` and the person's open
+questions. `coworker-likes-seltzer` turn 4 is the role-invention
+target. The seeded set runs when the coordinator says set.
+
+**Also landed.** `entities.pronouns` (SPEC-01's field, its first
+writer; `POST` and `PATCH /api/entities` accept it),
+`conversation_turns.subjects`, the `open_questions` table (schema
+version 34, migration 0035), `TurnContext.subjects` and
+`subjectPronouns`, `GuardContext.unknownNames`, `subjectPronouns`
+and `pronounsInPlay`, `PendingAsk.kind` `who` with `name`,
+`hintedKinds`, `subjectId` and `openQuestionId`, `relative_of` in
+the prompt's relation phrases ("your relative"), `subjects` and
+`subject` on the `[turn]` line, `timings.subjects_ms` filled, the
+two guard reasons in `spec/vocab/defect-codes.json` (shipped), nine
+guard corpus rows, the spec's `entityKindNouns()` and
+`kindForNoun()`. Tests: `tests/unknownNames.test.ts` (the parts,
+finding 24 first), `tests/ask01.test.ts` (the flows through
+`runTurn()` and the stream against the stub), the step 3a tests
+updated for the amendment (a name alone is a candidate with the
+question queued).
+
+**Left on record.** Three reviews of this diff. The third's three
+that mattered are in the tree: the stated-kind rule is for people and
+pets (a place, an organization or a thing is stated by its name, and
+a two-word person name reads through its frame), the pronoun frame
+counts only on a statement clause (a question about a public figure
+carries a pronoun too), and the name itself may lead the answer
+("Nadia is my sister"); its six lows join the follow-up item. The
+second's five
+that mattered are in the tree: a command in place of the answer
+routes as itself and the parser reads the noun phrase only where an
+answer puts it (first, or after a pronoun and its copula); the
+model's own question counts as the ask only when it asks who or what
+the name is; a cancel declines the judge's twin question about the
+candidate too; a household member named beside the subject is a
+pronoun referent with none stored; a sensitive entity's line reaches
+an owner's or admin's prompt only (memory.ts's canRead rule). Its
+five lows are the backlog's "ASK-01 follow-ups: the resolver's
+edges". The first's six, all in the tree: the ask is committed only once the delivered text carries
+the question (a malformed replacement or a refusal commits nothing);
+the guards' and the context line's notion of unknown is one
+(`framedUnknownNames()`: framed, no noun); a sentence opening with a
+roster name has another referent for the pronoun check. One
+pre-existing narrowness noted for the invention family, not this
+item's: the attribution shape reads a question tail after "you said"
+as the quote's content ("You said Nadia just got back from her
+marathon, how did it go?" is cut for "go"). The design's hinted question ("Is Juniper a
+person or a pet?") is not built: a noun that hints a kind settles it,
+and a frame with no noun asks the plain question, so there was no
+case for it. `they` never frames a name (a band, a company, a crowd)
+and is never a mismatch. The bare proper noun with no frame is
+CHAT-13's world subject (the resolver hands it an unresolved ref at
+0.4). "My dog chewed the hose" with no name is a frame with nothing
+to ask about (the judge's subject rules own it). The `[turn]` line
+carries the subjects' names, as CHAT-13's slot on it already planned.

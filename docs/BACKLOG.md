@@ -1495,7 +1495,24 @@ invented for the roster's household, and added to
 
 <a id="ask-01"></a>
 
-- [ ] **ASK-01: The unknown-name rule (ask, never assume)** (M; spec S first)
+- [x] **ASK-01: The unknown-name rule (ask, never assume)** (M; spec S first)
+    Done 2026-09-14 (docs/dev/session-a.md "ASK-01"): the resolver in
+    `lib/unknownNames.ts` (the `compromise` tagger's candidates, the
+    household frames, SPEC-01's SubjectRefs on the turn and the row,
+    the carry for a pronoun-only turn); the unknown line and the
+    registry's subject line ahead of the memory section; the engine's
+    own ask appended on both paths (after the last delta on a stream),
+    deduped against the model's question, outranking the engagement
+    dial; the deterministic answer parser through step 3a's paths
+    (kind from the noun vocabulary, relation from `said_as`, pronouns,
+    description), a cancel, an unreadable answer falling through; step
+    3a's amendment (a name alone is a candidate) with the judge's
+    OpenQuestion (`open_questions`, asked once at the end of the next
+    reply, answered before it is put, or declined for good);
+    `false_familiarity` (replaced by the ask), `pronoun_mismatch`, and
+    the role-invention shape for the seltzer row; `entities.pronouns`
+    written; five bench conversations and their expectation kinds.
+    The seeded set is the coordinator's next "set".
 
     Objective: a name the hub has never heard is asked about, never
     assumed, and the answer creates the entity as stated; an inference
@@ -1559,6 +1576,39 @@ invented for the roster's household, and added to
     both ways). Out of scope: CHAT-13's subject stack (it reuses this
     resolver). Exit: the spec round-trip tests, the named backend tests,
     `bash scripts/check.sh`.
+
+<a id="ask-01-followups"></a>
+
+- [ ] **ASK-01 follow-ups: the resolver's edges** (S)
+
+    Objective: the five low findings of ASK-01's second review, each a
+    small change in `backend/src/lib/unknownNames.ts` or
+    `backend/src/lib/turnEngine.ts` with a test in
+    `backend/tests/unknownNames.test.ts` or `tests/ask01.test.ts`:
+    the third relation pattern matches across a verb object ("Tell
+    Nadia my phone is broken" frames Nadia as a thing; bound the
+    pattern to the name's own clause); the pre-asked answer path reads
+    the person's oldest pending question from any conversation, never
+    expiring (scope it to the conversation that raised it or the last
+    day, and expire the rest per the spec's `expired` status); the
+    kind-mismatch replace in `applyWhoAnswer()` acts on whatever the
+    subject id points at (limit it to an unconfirmed candidate, as
+    `candidateByName()` already does); an open question whose subject
+    is gone is still asked and binds an empty name (expire it
+    instead); `ensureFreshEntity()` soft-deletes the candidate before
+    the create, so a failed create strands its records (create first,
+    then retire); a bare "sure" or "right" to "Who's X?" is read as a
+    yes with nothing learned (treat a verdict with no candidate edge
+    as unreadable); the About line is in the prompt but not in the
+    turn's evidence, so the role-invention shape can cut "Quill is a
+    generous coworker" with the label only in that line (add the line
+    as grounding evidence); the volunteered answer binds the oldest
+    pending question rather than one whose subject was in the last
+    turn's subjects; `PRONOUN_ANSWER_RE` takes "and" as the noun in
+    "he's our rabbit and he bites"; a possessive name ("Grandma's") is
+    filtered after the strip, not before. Acceptance: one test per line, `bun test
+    tests/unknownNames.test.ts tests/ask01.test.ts`. Out of scope:
+    CHAT-13's subject stack. Exit: `bash scripts/check.sh`.
 
 <a id="lookup-01"></a>
 

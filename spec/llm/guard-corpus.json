@@ -628,5 +628,92 @@
     "reply": "I told you I would remind you.",
     "expect": "claimed_statement",
     "note": "The same form, standalone: the NO_RECORD_OF_SAYING line stands."
+  },
+  {
+    "id": "ask01-false-familiarity-marathon",
+    "utterance": "Nadia just got back from her first marathon",
+    "act": "inform",
+    "reply": "That's right, Nadia ran her marathon last spring and did great.",
+    "unknownNames": ["Nadia"],
+    "expect": "false_familiarity",
+    "note": "ASK-01 part 5: a claim of prior knowledge about a name the turn resolved to nobody; the replacement is the ask itself."
+  },
+  {
+    "id": "ask01-familiarity-with-evidence-stands",
+    "utterance": "Nadia just got back from her first marathon",
+    "act": "inform",
+    "reply": "As you mentioned, Nadia has been training for months.",
+    "sources": ["Nadia (your cousin) is training for a marathon"],
+    "unknownNames": ["Nadia"],
+    "expect": null,
+    "note": "ASK-01: evidence naming the name means the hub does know it; nothing false about the claim."
+  },
+  {
+    "id": "ask01-honest-dont-know-yet-stands",
+    "utterance": "Clover borrowed our tent for the weekend",
+    "act": "inform",
+    "reply": "I don't know Clover yet, who's that?",
+    "unknownNames": ["Clover"],
+    "expect": null,
+    "note": "ASK-01: the ask is the honest line, never a familiarity claim."
+  },
+  {
+    "id": "ask01-i-remember-unknown-name",
+    "utterance": "Clover borrowed our tent for the weekend",
+    "act": "inform",
+    "reply": "I remember Clover, she's always borrowing things.",
+    "unknownNames": ["Clover"],
+    "expect": "false_familiarity",
+    "note": "ASK-01: 'I remember' about a name nothing on the turn grounds."
+  },
+  {
+    "id": "ask01-pronoun-mismatch",
+    "utterance": "should he be outside in this heat",
+    "act": "question",
+    "reply": "She should stay in the shade with plenty of water. Rabbits overheat fast.",
+    "subjectPronouns": [{ "name": "Juniper", "pronouns": "he" }],
+    "pronounsInPlay": ["he"],
+    "expect": "pronoun_mismatch",
+    "note": "ASK-01 part 5: the subject takes he; a reply sentence using she for it is skipped and the rest stands."
+  },
+  {
+    "id": "ask01-pronoun-agrees",
+    "utterance": "should he be outside in this heat",
+    "act": "question",
+    "reply": "He should stay in the shade with plenty of water.",
+    "subjectPronouns": [{ "name": "Juniper", "pronouns": "he" }],
+    "pronounsInPlay": ["he"],
+    "expect": null,
+    "note": "ASK-01: the subject's own pronoun is never a mismatch."
+  },
+  {
+    "id": "ask01-pronoun-for-another-person-stands",
+    "utterance": "my sister says he needs a vet",
+    "act": "inform",
+    "reply": "She's probably right, he should see a vet soon.",
+    "subjectPronouns": [{ "name": "Juniper", "pronouns": "he" }],
+    "pronounsInPlay": ["he"],
+    "expect": null,
+    "note": "ASK-01: a relation noun in the utterance (the sister) is another referent for she; the pronoun check reads only a sentence with one possible referent."
+  },
+  {
+    "id": "ask01-role-invention-seltzer",
+    "utterance": "who is Quill",
+    "act": "question",
+    "reply": "Quill is the child in the house, Bramble's sibling.",
+    "roster": ["Sage", "Bramble", "Quill"],
+    "sources": ["Quill (your coworker) likes seltzer"],
+    "expect": "invention",
+    "note": "ASK-01 (OUT-01's set, coworker-likes-seltzer turn 4): a household role put on a name with nothing behind it, the coworker label in the context; an invention, cut."
+  },
+  {
+    "id": "ask01-role-grounded-stands",
+    "utterance": "who is Quill",
+    "act": "question",
+    "reply": "Quill is your coworker, the one who likes seltzer.",
+    "roster": ["Sage", "Bramble", "Quill"],
+    "sources": ["Quill (your coworker) likes seltzer"],
+    "expect": null,
+    "note": "ASK-01: the role the context carries is grounded."
   }
 ]
