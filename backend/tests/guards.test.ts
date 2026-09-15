@@ -4,7 +4,7 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, replacementFor, withoutHonestyLines, withoutBankLines, bankLineNote, allReplacementLines, stripRegisterTail, dropConjunctionLead, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, withoutHonestyLines, withoutBankLines, bankLineNote, allReplacementLines, stripRegisterTail, dropConjunctionLead, ACTION_FAMILIES, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
@@ -1152,12 +1152,24 @@ describe("WINDOW-01: bankLineNote() maps bank lines to typed notes", () => {
     expect(bankLineNote("I'm not able to give medication amounts - check with a pharmacist or the label.")).toBe("[Medication amounts were not given.]");
     expect(bankLineNote("I can't advise on doses - a pharmacist or doctor is the safe call there.")).toBe("[Medication amounts were not given.]");
   });
+  test("every action family's none, failed, and pending lines map to its own note", () => {
+    for (const family of ACTION_FAMILIES) {
+      for (const line of [family.none, family.failed, family.pending]) {
+        if (line === undefined) continue;
+        const note = bankLineNote(line);
+        expect(note).toBe(family.note);
+      }
+    }
+  });
   test("honesty lines, acknowledgments, and other bank lines return null", () => {
     expect(bankLineNote("I don't know, sorry.")).toBeNull();
     expect(bankLineNote("I don't have that one yet.")).toBeNull();
-    expect(bankLineNote("Okay.")).toBe("[Acknowledged.]");
-    expect(bankLineNote("Noted.")).toBe("[Acknowledged.]");
-    expect(bankLineNote("I haven't actually done that.")).toBe("[Nothing was done.]");
+    expect(bankLineNote("Okay.")).toBeNull();
+    expect(bankLineNote("Noted.")).toBeNull();
+    expect(bankLineNote("You're welcome.")).toBeNull();
+    expect(bankLineNote("I haven't actually done that.")).toBeNull();
+    expect(bankLineNote("I can't actually watch or go anywhere myself.")).toBeNull();
+    expect(bankLineNote("Sorry, I lost my train of thought. Say that again?")).toBeNull();
     expect(bankLineNote("That's waiting on your confirmation.")).toBe("[Waiting on your confirmation.]");
   });
 });

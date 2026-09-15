@@ -1290,6 +1290,11 @@ interface ActionFamily {
   none: string;
   failed: string;
   pending?: string;
+  /** WINDOW-01: the fact this family's lines carry, in nobody's voice;
+   * every other bank line is dropped with no note. The map is built from
+   * the families themselves, so a wording change can't silently lose a
+   * note. */
+  note: string;
 }
 const WAITING = "That's waiting on your confirmation.";
 const I_DID = "\\bi(?:'ve| have)?\\s+(?:just\\s+)?";
@@ -1305,7 +1310,7 @@ function claimFamily(family: Omit<ActionFamily, "claim" | "chained"> & { body: s
   const { body, ...rest } = family;
   return { ...rest, claim: new RegExp(body.replaceAll("{DID}", I_DID), "i"), chained: new RegExp(body.replaceAll("{DID}", AND_DID), "i") };
 }
-const ACTION_FAMILIES: readonly ActionFamily[] = [
+export const ACTION_FAMILIES: readonly ActionFamily[] = [
   claimFamily({
     name: "save",
     // "saved", "stored", "logged", "written down" claim a write. "Noted"
@@ -1320,6 +1325,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     none: "I haven't saved that as a memory.",
     failed: "That didn't get saved.",
     pending: "That save is waiting on your confirmation.",
+    note: "[No memory was saved.]",
   }),
   claimFamily({
     name: "list",
@@ -1331,6 +1337,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     packages: ["list-add"],
     none: "I haven't added anything to your list.",
     failed: "Adding that to your list didn't work.",
+    note: "[Nothing was added to the list.]",
   }),
   claimFamily({
     name: "timer",
@@ -1339,6 +1346,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     packages: ["timer"],
     none: "I haven't set a timer.",
     failed: "The timer didn't get set.",
+    note: "[No timer was set.]",
   }),
   claimFamily({
     name: "reminder",
@@ -1349,6 +1357,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     packages: ["remind"],
     none: "I haven't set a reminder.",
     failed: "The reminder didn't get set.",
+    note: "[No reminder was set.]",
   }),
   claimFamily({
     name: "lights",
@@ -1362,6 +1371,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     packages: ["lights-on", "lights-off"],
     none: "I haven't changed the lights.",
     failed: "The lights didn't change.",
+    note: "[The lights were not changed.]",
   }),
   claimFamily({
     name: "lock",
@@ -1371,6 +1381,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     packages: ["lock-doors"],
     none: "I haven't locked or unlocked anything.",
     failed: "The lock didn't respond.",
+    note: "[No lock action was taken.]",
   }),
   claimFamily({
     // Item 4b: "forget that" is the engine's own command
@@ -1394,6 +1405,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     packages: ["forget"],
     none: "I haven't forgotten anything. Say \"forget that\" and I will.",
     failed: "That didn't get forgotten.",
+    note: "[Nothing was forgotten.]",
   }),
   claimFamily({
     name: "lookup",
@@ -1407,6 +1419,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     packages: ["websearch", "knowledge"],
     none: "I didn't look that up.",
     failed: "That lookup didn't work.",
+    note: "[Nothing was looked up.]",
   }),
   claimFamily({
     name: "impossible",
@@ -1420,6 +1433,7 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     packages: [],
     none: "I can't send messages, make calls, or order anything from here.",
     failed: "I can't send messages, make calls, or order anything from here.",
+    note: "[No messages were sent, no calls made, nothing ordered.]",
   }),
 ];
 
@@ -1692,54 +1706,28 @@ export function withoutBankLines(text: string): string {
     .trim();
 }
 // WINDOW-01: the typed note a bank line becomes in nobody's voice. A bank
-// line that carried a fact the next turn needs is preserved as a note;
+// line that carries a fact the next turn needs is preserved as a note;
 // every other bank line is just dropped (null).
-const BANK_LINE_NOTES: Record<string, string> = {
-  "I haven't saved that as a memory.": "[No memory was saved.]",
-  "That didn't get saved.": "[No memory was saved.]",
-  "That save is waiting on your confirmation.": "[The save is waiting on your confirmation.]",
-  "I haven't added anything to your list.": "[Nothing was added to the list.]",
-  "Adding that to your list didn't work.": "[Nothing was added to the list.]",
-  "I haven't set a timer.": "[No timer was set.]",
-  "The timer didn't get set.": "[No timer was set.]",
-  "I haven't set a reminder.": "[No reminder was set.]",
-  "The reminder didn't get set.": "[No reminder was set.]",
-  "I haven't changed the lights.": "[The lights were not changed.]",
-  "The lights didn't change.": "[The lights were not changed.]",
-  "I haven't locked or unlocked anything.": "[No lock action was taken.]",
-  "The lock didn't respond.": "[No lock action was taken.]",
-  "I haven't forgotten anything. Say \"forget that\" and I will.": "[Nothing was forgotten.]",
-  "That didn't get forgotten.": "[Nothing was forgotten.]",
-  "I didn't look that up.": "[Nothing was looked up.]",
-  "That lookup didn't work.": "[Nothing was looked up.]",
-  "I can't send messages, make calls, or order anything from here.": "[No messages were sent, no calls made, nothing ordered.]",
-  "I can't actually watch or go anywhere myself.": "[No experience was gained.]",
-  "I don't get to watch things or go places, so I can't say from experience.": "[No experience was gained.]",
-  "I don't have a record of saying that.": "[No record of saying that.]",
-  "I can't find that in what I said before.": "[No record of saying that.]",
-  "Okay.": "[Acknowledged.]",
-  "Got it.": "[Acknowledged.]",
-  "Noted.": "[Acknowledged.]",
-  "I can't actually do that from a chat like this.": "[The action could not be taken from here.]",
-  "I'm not able to do that yet, sorry.": "[The action could not be taken from here.]",
-  "That's not something I can do right now.": "[The action could not be taken from here.]",
-  "Sorry, I lost my train of thought. Say that again?": "[The reply was lost.]",
-  "I fumbled that one. Ask me again?": "[The reply was lost.]",
-  "Lost the thread there, sorry. One more time?": "[The reply was lost.]",
-  "That's waiting on your confirmation.": "[Waiting on your confirmation.]",
-  "I haven't actually done that.": "[Nothing was done.]",
-  "I'm not able to give medication amounts - check with a pharmacist or the label.": "[Medication amounts were not given.]",
-  "I can't advise on doses - a pharmacist or doctor is the safe call there.": "[Medication amounts were not given.]",
-  "You're welcome.": "[Acknowledged.]",
-  "Anytime.": "[Acknowledged.]",
-  "Glad to help.": "[Acknowledged.]",
-  "Hi there.": "[Acknowledged.]",
-  "Hello.": "[Acknowledged.]",
-  "Hey, good to hear from you.": "[Acknowledged.]",
-  "Fair enough.": "[Acknowledged.]",
-  "Makes sense.": "[Acknowledged.]",
-  "I hear you.": "[Acknowledged.]",
-};
+//
+// The note lives on the action family whose line it is, and the map is
+// built from ACTION_FAMILIES at load, so rewording a family's line or note
+// can't silently lose or mismatch a note. The only hand-written entries
+// are the two lines that are no family's line but still carry a fact: the
+// medication caution and the waiting line.
+const BANK_LINE_NOTES: Record<string, string> = (() => {
+  const notes: Record<string, string> = {};
+  for (const family of ACTION_FAMILIES) {
+    notes[family.none] = family.note;
+    notes[family.failed] = family.note;
+    if (family.pending) notes[family.pending] = family.note;
+  }
+  notes["I'm not able to give medication amounts - check with a pharmacist or the label."] =
+    "[Medication amounts were not given.]";
+  notes["I can't advise on doses - a pharmacist or doctor is the safe call there."] =
+    "[Medication amounts were not given.]";
+  notes[WAITING] = "[Waiting on your confirmation.]";
+  return notes;
+})();
 export function bankLineNote(sentence: string): string | null {
   return BANK_LINE_NOTES[sentence.trim()] ?? null;
 }
