@@ -1128,6 +1128,101 @@ describe("POST /api/memory/maintenance/run", () => {
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
     expect(row.status).toBe("active");
   });
+
+  test("a record past its valid_to is archived with provenance intact", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/memory", {
+      text: "the dentist appointment that already happened",
+      category: "event",
+      tier: "observation",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+    });
+    const record = (await created.json()) as MemoryRecord;
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    db.update(memoryRecords).set({ validTo: yesterday }).where(eq(memoryRecords.id, record.id)).run();
+    const before = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
+
+    await owner.post("/api/memory/maintenance/run", {});
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
+    expect(row.status).toBe("archived");
+    expect(row.expiredAt).not.toBeNull();
+    expect(row.source).toBe(before.source);
+    expect(row.person).toBe(before.person);
+    expect(row.text).toBe(before.text);
+  });
+
+  test("a record whose valid_to is tomorrow stays active", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/memory", {
+      text: "a future dentist appointment",
+      category: "event",
+      tier: "observation",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+    });
+    const record = (await created.json()) as MemoryRecord;
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    db.update(memoryRecords).set({ validTo: tomorrow }).where(eq(memoryRecords.id, record.id)).run();
+
+    await owner.post("/api/memory/maintenance/run", {});
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
+    expect(row.status).toBe("active");
+  });
+
+  test("a record with a bare-date valid_to today stays active until tomorrow", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/memory", {
+      text: "the dentist on Thursday",
+      category: "event",
+      tier: "observation",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+    });
+    const record = (await created.json()) as MemoryRecord;
+    // local midnight: the instant in local time whose date string is "today";
+    // it is always in the past, and its date string is local today.
+    const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z").toISOString().slice(0, 10);
+    db.update(memoryRecords).set({ validTo: today }).where(eq(memoryRecords.id, record.id)).run();
+
+    await owner.post("/api/memory/maintenance/run", {});
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
+    expect(row.status).toBe("active");
+    // The same bare-date rule on the other side: local yesterday's day
+    // has ended, so it is archived.
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    db.update(memoryRecords).set({ validTo: yesterday }).where(eq(memoryRecords.id, record.id)).run();
+    await owner.post("/api/memory/maintenance/run", {});
+    const row2 = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
+    expect(row2.status).toBe("archived");
+  });
+
+  test("a pinned record past its valid_to is archived", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/memory", {
+      text: "a pinned appointment that already happened",
+      category: "event",
+      tier: "observation",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+      pinned: true,
+    });
+    const record = (await created.json()) as MemoryRecord;
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    db.update(memoryRecords).set({ validTo: yesterday }).where(eq(memoryRecords.id, record.id)).run();
+
+    await owner.post("/api/memory/maintenance/run", {});
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
+    expect(row.status).toBe("archived");
+  });
 });
 
 describe("recall() selfOnly (step 2 privacy fix)", () => {

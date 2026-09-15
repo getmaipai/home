@@ -1233,6 +1233,29 @@ export function runMaintenance(): { archived: number } {
     }
   }
 
+  // A record's own end date: past `valid_to` it is archived with
+  // `expired_at` and nothing else changed (provenance intact). A pin
+  // keeps a record from decay, not from its own end date, so pinned
+  // records are archived here too. A bare date (no time part) ends at
+  // the end of its day in local time, not its start: compare its local
+  // date string against the local day that is strictly before today.
+  const localNowMs = now.getTime() - now.getTimezoneOffset() * 60_000;
+  const lastFullLocalDay = new Date(localNowMs - 86_400_000).toISOString().slice(0, 10);
+  const expiredByValidTo = db
+    .select({ id: memoryRecords.id, validTo: memoryRecords.validTo })
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.status, "active"), isNotNull(memoryRecords.validTo)))
+    .all()
+    .filter((r) =>
+      r.validTo!.length === 10
+        ? r.validTo! <= lastFullLocalDay
+        : r.validTo! < nowIso,
+    );
+  for (const row of expiredByValidTo) {
+    db.update(memoryRecords).set({ status: "archived", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
+    archived++;
+  }
+
   // "state" memories (an ongoing situation, e.g. "stressed about a
   // deadline") expire hard after a week regardless of tier or score: the
   // future judge's promise that states auto-expire lives here, ported
