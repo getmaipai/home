@@ -3679,6 +3679,16 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
   return resolved;
 }
 
+function composeDeliverable(
+  resolved: TurnValue,
+  deliverable: "link" | "picture" | "video",
+  ageBand: string,
+): TurnValue {
+  const child = ageBand === "child";
+  const line = child ? "A grown-up can open that for you; ask them." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
+  return { ...resolved, reply: { text: line }, ...(child ? { sources: [] } : {}) };
+}
+
 function finalizeReply(actor: PersonRow, rawValue: TurnValue, trace?: ReplyTrace): TurnValue {
   const value = enforceWellFormed(actor, applyOutputBoundary(actor, rawValue), trace);
   const { text, speech } = value.reply;
@@ -3788,9 +3798,7 @@ async function runTurnHoldingLease(
     const sources = resolved?.sources ?? [];
     if (!sources.length) value = resolved ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
     else {
-      const child = prepared.turnContext.ageBand === "child";
-      const line = child ? "A grown-up can open that for you; ask them." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
-      value = { ...resolved!, reply: { text: line }, ...(child ? { sources: [] } : {}) };
+      value = composeDeliverable(resolved!, deliverable, prepared.turnContext.ageBand);
     }
   } else {
     // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
@@ -5108,6 +5116,17 @@ async function runTurnStreamHoldingLease(
   // TurnValue (StreamOutcome's `{ resolved }`), not as an "immediate"
   // result, because the decision is only known after the peek.
   //
+  if (modelTurn.turnContext.intent.deliverable) {
+    const deliverable = modelTurn.turnContext.intent.deliverable;
+    async function* deliverableStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
+      const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverable, modelTurn.turnContext.subjects, text));
+      if (resolved?.sources?.length) return { resolved: composeDeliverable(resolved, deliverable, modelTurn.turnContext.ageBand) };
+      yield `${LOOKUP_FAILED_LINE} `;
+      return undefined;
+    }
+    return buildStreamResult(deliverableStream());
+  }
+
   // TS does not carry `prepared`'s narrowing (kind: "model") or
   // `startResult`'s (ok: true) into a nested generator's body, hence
   // the two casts.
