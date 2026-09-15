@@ -793,7 +793,12 @@ not permission to expand scope.
     `child-goldfish`'s adult twin and a rating question asked by the
     child and by the owner on the film row, three seeded runs.
 
-- [ ] **Engine emits `status` events at lookup start (CHAT-16)** (S) -
+- [x] **Engine emits `status` events at lookup start (CHAT-16)** (S) -
+      Done 2026-09-15 (e4cf3b5): the stream result carries a status
+      channel the engine emits into ("Checking that for you." before the
+      forced lookup, "On it." before a tool call on the stream); the
+      route races it against the next token so the line reaches the
+      surface while the model is silent. The original note follows.
       the visible "what MaiPai is doing" line during a turn is built and
       ready on the frontend (lane 11 item 1, docs/dev/session-b.md): the
       transient activity line, a `status` event's own text (`stage:
@@ -841,7 +846,19 @@ not permission to expand scope.
 
 <a id="surface-01"></a>
 
-- [ ] **SURFACE-01: The robot surface** (M)
+- [x] **SURFACE-01: The robot surface** (M)
+
+    Done 2026-09-15 in three slices: `robot` is an implemented surface
+    with a spoken form for every reply (the first sentence, no URL
+    read aloud) and "it's on your phone" for a deliverable (b1d1c75);
+    `speaker_evidence` and `present` are on the spec, accepted on the
+    robot surface, persisted on the turn row (3de9ef7, migration 0040);
+    a sensitive record enters the context on the robot only when the
+    body's evidence names the speaker as confirmed and the present
+    list is that one person, a second person at any level or no list
+    withholding it, chat unchanged (565dc35). The unknown speaker's
+    anonymous context and the who-is-speaking ask are COMP-06's. The
+    original note follows.
 
     Filed by the robot's design pass (bot `docs/dev.md`, "named hub
     items"). Objective: `robot` admitted to `IMPLEMENTED_SURFACES`
@@ -865,7 +882,15 @@ not permission to expand scope.
 
 <a id="wire-01"></a>
 
-- [ ] **WIRE-01: The signal and the plan on the wire** (S-M)
+- [x] **WIRE-01: The signal and the plan on the wire** (S-M)
+
+    Done 2026-09-15 for the signal and the cancel (f60b7df: the frozen
+    signal rides the stream as its own event right after `turn_meta`
+    on every turn; 76931ef, 248812f: `POST /api/turn/{turn_id}/cancel`
+    aborts the in-flight completion for real, the stream ends with
+    `turn_cancelled` and the partial turn is logged as a disconnect is;
+    the turn routes joined the OpenAPI router on the way). The `plan`
+    event waits for ACT-03, as the item says. The original note follows.
 
     Filed by the robot's design pass (bot `docs/dev.md`, "named hub
     items"; section 5 is the consumer's contract). Objective: the robot
@@ -1963,7 +1988,24 @@ invented for the roster's household, and added to
 
 <a id="mem-06"></a>
 
-- [ ] **MEM-06: The judge grounds every fact in the speaker's words** (S-M)
+- [x] **MEM-06: The judge grounds every fact in the speaker's words** (S-M)
+
+    Done 2026-09-15 in five chunks (7bdb484 through 253ef69 on main):
+    a fact shares half its content words and every proper noun and
+    number with the speaker's words or a confirmed assistant line, or
+    is `ungrounded`; a state with a conversational verb is `passing`; a
+    fact about the turn's world subject is `world` unless it is the
+    speaker's own preference or plan; every kept fact cites one
+    eligible clause of the frozen signal, grounded in it, its subject
+    matching (`ineligible_act`, `unknown_grounding`,
+    `subject_mismatch`); a quoted, hypothetical or joking clause writes
+    nothing and says why; a reported clause writes about the third
+    party at most 0.4 with the source named, a commissive a goal, a
+    project or a dated event, a moderate or high emotion a bounded
+    state. Eight judge-eval rows; the step-3a subject tests now have
+    the speaker say the names (a name the model invents is never
+    written). A sentence-initial capital is not a proper noun. The
+    original note follows.
 
     Objective: no reply text, lookup result, passing state or model
     inference becomes a memory. Files: `backend/src/lib/memoryJudge.ts`
