@@ -1740,5 +1740,69 @@ describe("MEM-06: a quoted, hypothetical or joking clause writes nothing", () =>
     const asserted = citeClause([fact("Sage is moving to Lisbon in September")], signal(clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" } })), "I'm moving to Lisbon in September", "Sage", date);
     expect(asserted.kept.length).toBe(1);
     expect(asserted.dropped.length).toBe(0);
+
+describe("CUR-01: an exact re-assertion is not a second record", () => {
+  const FACT = { text: "The kettle is on the stove", category: "fact" as const, scope: "household" as const, importance: 0.5 };
+
+  test("the same fact judged twice leaves one record with its uses bumped", async () => {
+    const { actor } = await owner();
+    const t1 = makeTurn(actor, "the kettle is on the stove", "Got it.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: FACT.text, category: FACT.category, scope: FACT.scope, importance: FACT.importance }] } : undefined),
+      () => judgeTurn(t1),
+    );
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all().length).toBe(1);
+    const t2 = makeTurn(actor, "the kettle is on the stove, just confirming", "Right.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: FACT.text, category: FACT.category, scope: FACT.scope, importance: FACT.importance }] } : undefined),
+      () => judgeTurn(t2),
+    );
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+    expect(rows.length).toBe(1);
+    expect(rows[0]!.uses).toBe(1);
+  });
+
+  test("a state re-asserted with a later valid_to extends that record's boundary", async () => {
+    const { actor } = await owner();
+    const t1 = makeTurn(actor, "we are off-grid until Saturday", "Understood.");
+    await withScriptedJudge(
+      (schemaName) =>
+        schemaName === "memory_extraction"
+          ? { facts: [{ text: "The household is off-grid", category: "state" as const, scope: "household" as const, importance: 0.5, valid_to: "2026-09-19T00:00:00.000Z" }] }
+          : undefined,
+      () => judgeTurn(t1),
+    );
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all().length).toBe(1);
+    const t2 = makeTurn(actor, "still off-grid, now until Monday", "Noted.");
+    await withScriptedJudge(
+      (schemaName) =>
+        schemaName === "memory_extraction"
+          ? { facts: [{ text: "The household is off-grid", category: "state" as const, scope: "household" as const, importance: 0.5, valid_to: "2026-09-21T00:00:00.000Z" }] }
+          : undefined,
+      () => judgeTurn(t2),
+    );
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+    expect(rows.length).toBe(1);
+    expect(rows[0]!.validTo).toBe("2026-09-21T00:00:00.000Z");
+  });
+
+  test("the same text about a different person is a separate record", async () => {
+    const { client, actor } = await owner();
+    const t1 = makeTurn(actor, "the kettle is on my stove", "Got it.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: "The kettle is on the stove", category: "fact" as const, scope: "person" as const, importance: 0.5 }] } : undefined),
+      () => judgeTurn(t1),
+    );
+    const childRes = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await childRes.json()) as { id: string };
+    const childActor = db.select().from(people).where(eq(people.id, child.id)).get()!;
+    const t2 = makeTurn(childActor, "the kettle is on my stove", "Got it.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: "The kettle is on the stove", category: "fact" as const, scope: "person" as const, importance: 0.5 }] } : undefined),
+      () => judgeTurn(t2),
+    );
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+    expect(rows.length).toBe(2);
+    expect(rows.map((r) => r.person).sort()).toEqual([actor.id, child.id].sort());
   });
 });

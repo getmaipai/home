@@ -94,7 +94,7 @@ import { defaultChildDisclosure } from "@/lib/childDisclosure";
 import { nextHlc } from "@/lib/hlc";
 import { turnActiveWithin, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import type { ConversationTurnRow } from "@/wire";
-import type { PersonRow } from "@/types";
+import type { PersonRow, MemoryRecordRow } from "@/types";
 
 const MAX_JUDGE_ATTEMPTS = 3;
 const MAX_FACTS_PER_TURN = 12;
@@ -165,6 +165,25 @@ function categoryToTier(category: Category): "durable" | "episodic" {
 export function categoryToRecordKind(category: Category): "memory" | "entity" {
   const entityShaped: Category[] = ["person", "place", "thing"];
   return entityShaped.includes(category) ? "entity" : "memory";
+}
+
+// CUR-01, the memory curator's first rule: before the embed/dedupe
+// pipeline runs on a fact, look for an active record that is this exact
+// same statement - same scope, same person (when person-scoped), same
+// record kind, same verbatim text. The vector pass below is semantic
+// (near-duplicate); this one is the EXACT duplicate the curator merges
+// with provenance kept, so the store never holds two identical active
+// rows for the same statement. remember() stores fact.text verbatim,
+// so the comparison is verbatim too. Returns the matching row or null.
+function exactActiveMatch(speaker: PersonRow, fact: ExtractedFact): MemoryRecordRow | null {
+  const conditions = [
+    eq(memoryRecords.status, "active"),
+    eq(memoryRecords.scope, fact.scope),
+    eq(memoryRecords.recordKind, categoryToRecordKind(fact.category)),
+    eq(memoryRecords.text, fact.text),
+  ];
+  if (fact.scope === "person") conditions.push(eq(memoryRecords.person, speaker.id));
+  return db.select().from(memoryRecords).where(and(...conditions)).get() ?? null;
 }
 
 /** The vocabulary's relationship types the model may name in a fact's
@@ -1170,6 +1189,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   if (isSkippedTurn(turn.id)) return { ok: true, factsWritten: 0 };
 
   let written = 0;
+  let reassertCount = 0;
   const writtenTexts: string[] = [];
   // getmaipai/home#64: real ids for the memory.updated delivery below, so
   // chatMemoryChip.tsx has something to link to (/memory?ids=...) rather
@@ -1204,6 +1224,33 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     // before it is embedded, compared or written (remember() would
     // refuse it too; this keeps the value out of the embed request).
     if (detectCredential(fact.text).detected) continue;
+    // CUR-01: an exact re-assertion is merged with the existing active
+    // record, never written a second time. A state extends its own
+    // valid_to to the later boundary; every other category just bumps
+    // uses/lastUsedAt on the record it repeats (no fresh hlc - a usage
+    // bump is not a content change, the same rule bumpMatchUsage()
+    // follows). The re-assertion is counted on the turn's drop line
+    // beside MEM-06's own reasons.
+    const reassert = exactActiveMatch(speaker, fact);
+    if (reassert) {
+      if (fact.category === "state") {
+        const newValidTo =
+          fact.valid_to && (!reassert.validTo || fact.valid_to > reassert.validTo) ? fact.valid_to : reassert.validTo;
+        db.update(memoryRecords)
+          .set({ validTo: newValidTo, lastUsedAt: new Date().toISOString(), uses: reassert.uses + 1, hlc: nextHlc() })
+          .where(eq(memoryRecords.id, reassert.id))
+          .run();
+        console.log(`[memoryJudge] turn ${turn.id}: re-asserted state ${reassert.id}`);
+      } else {
+        db.update(memoryRecords)
+          .set({ lastUsedAt: new Date().toISOString(), uses: reassert.uses + 1 })
+          .where(eq(memoryRecords.id, reassert.id))
+          .run();
+        console.log(`[memoryJudge] turn ${turn.id}: duplicate of ${reassert.id}`);
+      }
+      reassertCount++;
+      continue;
+    }
     const embedded = await embed([fact.text]);
     const vector = embedded.ok ? new Float32Array(embedded.value.vectors[0]!) : undefined;
     const candidates = vector
@@ -1328,6 +1375,9 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     if (!recordWritten && subject) retireOrphanSubjects([{ subjectId: subject.id }]);
   }
 
+  if (reassertCount > 0) {
+    console.log(`[memoryJudge] turn ${turn.id}: re-asserted ${reassertCount} existing record(s), nothing written`);
+  }
   markDone(turn.id);
 
   if (written > 0) {
