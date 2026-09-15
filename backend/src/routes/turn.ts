@@ -163,7 +163,12 @@ export async function* streamTurnEvents(
     // after turn_meta is out, so it carries the same code on the error
     // event instead.
     const safetyRefusal = err instanceof StreamSafetyRefusal ? err : undefined;
-    if (safetyRefusal) yield { type: "error", error: safetyRefusal.message, code: "safety_refused" };
+    // SAFETY-01 (#85): a streamed refusal's crisis resources reach the
+    // client on the error event, the one terminal event this path
+    // sends; finalize() below computes them, so it runs first for a
+    // refusal (it never writes to the stream itself).
+    const refused = safetyRefusal ? result.finalize(fullText.trim(), safetyRefusal.safety) : undefined;
+    if (safetyRefusal) yield { type: "error", error: safetyRefusal.message, code: "safety_refused", ...(refused?.crisis_resources ? { crisis_resources: refused.crisis_resources } : {}) };
     else if (err instanceof StreamUnavailable) yield { type: "error", error: err.message, code: err.code };
     else yield { type: "error", error: (err as Error).message };
     // Still finalize (and so still log) whatever text actually streamed
@@ -182,7 +187,7 @@ export async function* streamTurnEvents(
     // Trimmed at the edges (#99's review): a paragraph break beside a
     // sentence the guards skipped would otherwise open or close the
     // stored reply with a bare blank line the blocking path never has.
-    if (fullText.trim() || safetyRefusal) result.finalize(fullText.trim(), safetyRefusal?.safety);
+    if (fullText.trim() && !safetyRefusal) result.finalize(fullText.trim());
   }
 }
 

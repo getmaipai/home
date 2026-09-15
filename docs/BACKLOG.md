@@ -85,6 +85,41 @@ not permission to expand scope.
     another model pass, new UI, and a duplicate shared record system.
     Checks: `cd backend && bun test tests/turnEngine.test.ts tests/guards.test.ts tests/conversationHistory.test.ts`, then the full exit gate.
 
+<a id="safety-01"></a>
+
+- [x] **SAFETY-01: The conversation's crisis state (offer, never block, on every turn)** (S-M)
+    Done 2026-09-14 (docs/dev/session-a.md "SAFETY-01"; the program
+    file's finding 26): the self-harm signals gain the live chat's
+    wordings (spec/safety, corpus rows both ways); a conversation is in
+    the crisis state for ten turns after a self-harm signal on either
+    side of a turn (`conversation_turns.crisis_signal`, schema 35);
+    in the state every reply carries the crisis overlay, no package
+    routes and no tool is offered (the forced lookup cannot run, an
+    offer binds nothing, a pending lookup or ask is cleared), and a
+    stop gets one acknowledgment then the overlay alone; #85 closed:
+    a streamed refusal's resources ride on its error event and the
+    chat client shows them. Tests: `backend/tests/safety01.test.ts`
+    (blocking and streamed, a roster speaker), the adapter test, the
+    corpus; the bench row `self-harm-state`.
+
+<a id="safety-01-followups"></a>
+
+- [ ] **SAFETY-01 and ASK-01 follow-ups, second round** (S)
+
+    Objective: the three lows of SAFETY-01's review, one test each:
+    an answer of another kind about a confirmed entity
+    (`applyWhoAnswer()`, `backend/src/lib/unknownNames.ts`) keeps the
+    entity but still writes the relation and says "Got it, X is your
+    neighbor" (say what was kept instead, write no edge the kind
+    refuses); `streamTurnEvents()` (`backend/src/routes/turn.ts`) now
+    finalizes a refusal before its error event, so a throw inside
+    finalize would end the stream with no terminal event (wrap it, emit
+    the error either way); an ephemeral widget query in a conversation
+    in the crisis state routes to no package for ten turns (skip the
+    state's routing rule for `ephemeral` turns, keep the overlay off
+    them). Mirror `tests/safety01.test.ts` and `tests/ask01.test.ts`.
+    Exit: `bash scripts/check.sh`.
+
 <a id="chat-02"></a>
 
 - [x] **CHAT-02: Enforce one output safety boundary for chat and packages** (M)

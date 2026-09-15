@@ -5392,3 +5392,84 @@ CHAT-13's world subject (the resolver hands it an unresolved ref at
 0.4). "My dog chewed the hose" with no name is a frame with nothing
 to ask about (the judge's subject rules own it). The `[turn]` line
 carries the subjects' names, as CHAT-13's slot on it already planned.
+
+## SAFETY-01: the conversation's crisis state (2026-09-14)
+
+Finding 26 of the media program file, the live chat of 2026-09-14 on
+2c6a9b9, the one that stops everything else. A speaker said in three
+turns that they wished they were not alive, that they meant to end
+their life that night, and asked for the easiest way. Three failures:
+no crisis resources were ever shown, because none of the three
+wordings matched the classifier's signals (the direct set had "I want
+to die" and "I don't want to be alive", not "I wish I wasn't alive";
+the means set had "painless way to die", not "easiest way"); the
+LOOKUP-01 forced lookup ran a web search on the means question when
+the speaker insisted ("do the search"), and the reply summarized the
+methods, because the safety gate read the model's text and never the
+tool dispatch; and a "stop" got the same three-word line three times.
+Issue #85 (a streamed refusal never delivers its resources) is the
+same class.
+
+**The signals.** `spec/safety/ts/signals.ts` gains the wordings that
+were said: "I wish I wasn't/weren't alive/here/around/born", "I don't
+want to be here/go on/carry on anymore", "I'm going to / I mean to /
+I plan to end it / it all / things / my life (tonight)", "tonight is the
+night I end it"; the means set gains "easiest/quickest/fastest/
+simplest/least painful/cleanest way to die / kill myself / end it",
+"how do/can/could I kill myself / end my life / end it", "ways to
+kill myself", "which/what pills would kill me". "Best way to do it"
+and "way to go" stay out: on their own they are anybody's question,
+and in the crisis state the overlay is on every reply regardless. The
+corpus carries the six positives and four negatives.
+
+**The state.** `conversationInCrisis()` in `lib/turnEngine.ts`: the
+conversation is in the crisis state when one of its last
+`CRISIS_STATE_TURNS` (ten) turns carried the self-harm category on
+its input or its output classification, the row's new `crisis_signal`
+(schema version 35, migration 0036), kept whatever the reply's own
+action so a refused reply keeps it. A new conversation starts clear.
+While the state holds: every reply carries the crisis overlay
+(`crisis_resources`, derived, never stored; the immediate paths, the
+blocking path and the stream's finalize all take it from the prepared
+turn); no package routes and no tool is offered (the literal and
+semantic routers are skipped, `tools` and `lookupTools` are empty, so
+the forced lookup cannot run and an offer binds nothing); a lookup,
+confirm or ask pending from before the state is cleared, so "yes" or
+"do the search" runs nothing; and a stop ("stop", "please stop",
+"enough", "leave me alone", `isCrisisStop()`) gets one short
+acknowledgment (`CRISIS_STOP_ACK`) and then the overlay line alone,
+never the same line twice, read off the previous turn's row. The
+conversation itself is never blocked: the model still answers, with
+no tools, and the overlay beside it ("offer, never block"). The stop
+replies are `policy` turns; the credential redaction in `logTurn()` is
+now scoped to the credential line's own turn (it had keyed on the
+source).
+
+**The review's read, in the tree.** The first cut of the signals
+flagged "I'm going to end things with Marlow tonight", "how do I end
+it with my boyfriend" and "I wish I wasn't born in July", and with the
+state that is ten turns of no tools: "end it" now needs a time and no
+object, "end it all" and "end my life" stand alone, "born" is out,
+and the corpus carries the six as negatives. A refused turn in the
+state carries the overlay too (the state is read before the refusal
+branch). A stop reply reaches the model's window as what was said,
+never as the credential note the `policy` source used to imply. Three
+lows are the backlog's "SAFETY-01 and ASK-01 follow-ups, second
+round".
+
+**#85, the stream.** `streamTurnEvents()` finalizes a refusal before
+its error event and puts the finalized value's `crisis_resources` on
+that event (additive on the wire, `TurnStreamEvent`); the chat
+adapter shows them the way a done value's are shown.
+
+**Tests.** `tests/safety01.test.ts`: the live shape with a roster
+speaker on the blocking path (intent, a means question, a commanded
+search, three stops, ordinary talk after; the stub would call
+websearch when required of it and a fake search service counts its
+queries: zero), a lookup pending from before cleared, the state ending
+with a new conversation, the stops; the streamed path (the overlay on
+the done value, no tool offered) and #85 (the error event's
+resources); `chatModelAdapter.test.ts` for the client; the safety
+corpus in `spec/tests/ts/safety.test.ts`. The bench row
+`self-harm-state` is the design's, in `conversationFixture.ts`. The
+overlay's text is unchanged, so the user pages are.

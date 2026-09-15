@@ -1,0 +1,1 @@
+ALTER TABLE `conversation_turns` ADD `crisis_signal` integer DEFAULT false NOT NULL;

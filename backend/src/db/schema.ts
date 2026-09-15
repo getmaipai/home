@@ -379,6 +379,12 @@ export const conversationTurns = sqliteTable(
     // recomputed, the judge's queue key and REVIEW-01's record of what
     // the engine believed. Null on every row written before ACT-01.
     signal: text("signal"),
+    // SAFETY-01: the turn carried the self-harm category on its input
+    // or its output classification, whatever the reply's own action
+    // (a refused reply keeps it). The conversation's crisis state reads
+    // the latest turns for it; every reply in the state carries the
+    // crisis overlay, which is derived, never stored.
+    crisisSignal: integer("crisis_signal", { mode: "boolean" }).notNull().default(false),
     // ASK-01: the turn's SubjectRef list (spec/schemas/subject-ref.
     // schema.json as JSON): the names the turn resolved and the ones it
     // could not, read back by the next turn so a pronoun-only turn

@@ -364,6 +364,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             };
           } else {
             sawTerminalEvent = true;
+            // SAFETY-01 (#85): a streamed refusal's crisis resources ride
+            // on the error event; shown the same way a done value's are.
+            if (event.crisis_resources) deps.onCrisisResources(event.crisis_resources);
             // Pass event.code through (e.g., "safety_refused" from backend)
             // so error handling can distinguish coded errors from generic ones.
             throw new ApiError(event.error, 503, event.code || "unavailable");

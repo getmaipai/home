@@ -10,6 +10,7 @@ import { judgeTurn, runJudgeBatch, runConsolidation, judgeQueueStats } from "@/l
 import { runTurn, judgeStatusAtInsert } from "@/lib/turnEngine";
 import { remember, recall, supersede, archiveByProvenance, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
+import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { acquireTurnLease, __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { embed } from "@/lib/llm";
 import { db } from "@/db";
@@ -884,7 +885,9 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
 
   test("a policy row keeps no named subject: the one text the signal carries goes with the redacted words", async () => {
     const { actor } = await owner();
-    const row = makeSignalledTurn(actor, "my coworker Quill uses the password hunter2", "Keep passwords in Credentials.", "policy");
+    // SAFETY-01: `policy` is also the crisis stop rule's source; the
+    // credential turn is the one answered with the credential line.
+    const row = makeSignalledTurn(actor, "my coworker Quill uses the password hunter2", CREDENTIAL_SAFE_MESSAGE, "policy");
     expect(row.userText).not.toContain("hunter2");
     expect(turnSignalOf(row)?.clauses.every((c) => c.subject.kind !== "named")).toBe(true);
     expect(JSON.stringify(turnSignalOf(row))).not.toContain("Quill");

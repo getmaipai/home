@@ -88,10 +88,11 @@ describe("the fixture", () => {
     // ACT-01's seven (three act-register, three act-memory, the curator's),
     // REG-01's statement-not-request, EXP-01's new-album, and RECALL-03's
     // recall-past-the-window (fourteen turns by design: the window has to
-    // drop turn 1), LOOKUP-01's offer-binding, and ASK-01's five (the
-    // design note's three, who-ask-declined, open-question-once).
-    expect(CONVERSATIONS.length).toBe(76);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(76);
+    // drop turn 1), LOOKUP-01's offer-binding, ASK-01's five (the
+    // design note's three, who-ask-declined, open-question-once), and
+    // SAFETY-01's self-harm-state.
+    expect(CONVERSATIONS.length).toBe(77);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(77);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);

@@ -87,6 +87,16 @@ const SELF_HARM_DIRECT = [
   /\bi\s+want\s+to\s+die\b/,
   /\bi\s+don'?t\s+want\s+to\s+(?:be\s+alive|live\s+anymore|exist\s+anymore|wake\s+up)\b/,
   /\bi'?m\s+(?:done|finished)\s+with\s+life\b/,
+  // SAFETY-01 (the live chat of 2026-09-14, finding 26): the wordings
+  // that were said and never matched.
+  // "end it with him", "end things at work", "end it early" and "born
+  // in July" are anybody's words (a review): "end it" needs a time and
+  // no object, "end it all" and "end my life" stand alone.
+  /\bi\s+(?:wish|wished)\s+i\s+(?:wasn'?t|weren'?t|was\s+not|were\s+not)\s+(?:alive|here\s+anymore|around\s+anymore)\b/,
+  /\bi\s+don'?t\s+want\s+to\s+(?:be\s+here|go\s+on|carry\s+on|keep\s+going)\s+anymore\b/,
+  /\bi\s*(?:'m| am)?\s*(?:going|mean|meaning|intend|intending|plan|planning)\s+to\s+end\s+(?:it\s+all|my\s+life)\b/,
+  /\bi\s*(?:'m| am)?\s*(?:going|mean|meaning|intend|intending|plan|planning)\s+to\s+end\s+it\s+(?:tonight|today|now|this\s+week)\s*(?:[.!?]|$)/,
+  /\b(?:tonight|today)\s+(?:is|'s)\s+the\s+night\s+i\s+end\s+(?:it|my\s+life)\b/,
 ];
 
 const SELF_HARM_MEANS_SEEKING = [
@@ -94,6 +104,14 @@ const SELF_HARM_MEANS_SEEKING = [
   /\bpainless\s+way(?:s)?\s+to\s+die\b/,
   /\bhow\s+to\s+(?:kill\s+myself|end\s+my\s+life|commit\s+suicide)\b/,
   /\bbest\s+method\s+to\s+kill\s+myself\b/,
+  // SAFETY-01: the means question as it was actually asked.
+  // "best way to do it" and "way to go" stay out: on their own they
+  // are anybody's question, and in the crisis state the overlay is on
+  // every reply regardless.
+  /\b(?:easiest|quickest|fastest|simplest|least\s+painful|most\s+painless|cleanest)\s+way(?:s)?\s+to\s+(?:die|kill\s+myself|end\s+(?:it\s+all|my\s+life))\b/,
+  /\bhow\s+(?:do|can|could|would|should)\s+i\s+(?:kill\s+myself|end\s+my\s+life|end\s+it\s+all)\b/,
+  /\bways?\s+to\s+(?:kill\s+myself|end\s+my\s+life|end\s+it\s+all)\b/,
+  /\b(?:what|which)\s+(?:pills|drugs|medications?)\s+(?:would|could|will|can)\s+(?:kill|end)\s+(?:me|my\s+life)\b/,
 ];
 
 const SELF_HARM_PASSIVE = [

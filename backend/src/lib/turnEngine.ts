@@ -49,6 +49,7 @@ import {
   maybeRefreshConversationSummary,
   getPendingAsk,
   setPendingAsk,
+  recentTurnSafety,
   routingStats,
   resolveSupersedes,
   lastTurnSubjects,
@@ -220,7 +221,7 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; timings: TurnTimings; subjects?: readonly SubjectRef[] },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult },
 ): void {
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
@@ -244,7 +245,10 @@ function logTurnSafely(
       // clause (or a source the judge never reads) is marked skipped at
       // insert, so the judge's queue is keyed on the signal, not on the
       // reply's source.
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects });
+      // SAFETY-01: the self-harm category on the utterance or on the
+      // reply marks the row, whatever the reply's own action.
+      const crisisSignal = (meta.inputSafety !== undefined && carriesCrisisSignal(meta.inputSafety)) || carriesCrisisSignal(value.safety);
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal });
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
@@ -336,6 +340,31 @@ function deriveCrisisResources(safety: SafetyResult): string | undefined {
   // allow_with_resources action, so a refused reply that also mentioned
   // self-harm keeps its resources ("offer, never block").
   return carriesCrisisSignal(safety) ? CRISIS_RESOURCES_TEXT : undefined;
+}
+
+/** SAFETY-01 (finding 26, the live chat of 2026-09-14): how many of the
+ * conversation's latest turns a self-harm signal keeps the conversation
+ * in the crisis state for. While the state holds, every reply carries
+ * the crisis overlay, no lookup and no package dispatches, and a "stop"
+ * gets one short acknowledgment and then the overlay alone. */
+export const CRISIS_STATE_TURNS = 10;
+/** The conversation is in the crisis state when one of its last
+ * CRISIS_STATE_TURNS turns carried the self-harm category on its input
+ * or its output (the row's crisis_signal, kept whatever the reply's
+ * own action: a refused reply keeps it). A new conversation starts
+ * clear. */
+export function conversationInCrisis(conversationId: string): boolean {
+  return recentTurnSafety(conversationId, CRISIS_STATE_TURNS).some((t) => t.crisisSignal);
+}
+/** The crisis line the overlay shows; exported for the tests and the
+ * stop rule's reply. */
+export const CRISIS_LINE = CRISIS_RESOURCES_TEXT;
+/** SAFETY-01: the one short acknowledgment a "stop" gets in the crisis
+ * state; a repeat gets the overlay alone, never this line again. */
+export const CRISIS_STOP_ACK = "Okay, I'll stop. I'm here whenever you want to talk.";
+const CRISIS_STOP_RE = /^(?:(?:please|just|ok(?:ay)?|no)[,\s]+)*(?:stop(?: it| that| talking| this)?|enough|that'?s enough|leave me alone|go away|shut up|quit it|be quiet|drop it|i said stop|stop saying that)\s*[.!]*$/i;
+export function isCrisisStop(text: string): boolean {
+  return CRISIS_STOP_RE.test(text.trim());
 }
 
 // Step 4: "identity and companion" are the first thing in the stable
@@ -1846,6 +1875,10 @@ async function prepareTurn(
     ...(subjects && subjects.length > 0 ? { subjects } : {}),
   });
   const safety = evaluateSafety(text, ageBand);
+  // SAFETY-01: the crisis state is read before the refusal branch, so
+  // a refused turn in the state still carries the overlay (a review).
+  const selfHarmTurn = safety.categories.includes("self_harm");
+  const inCrisis = selfHarmTurn || conversationInCrisis(conversation.id);
   // SafetyResult's own schema comment named this exact wiring as a
   // "later hub release" gap the day the field was written: notify_parent
   // has been computed correctly since safety.ts shipped, but nothing
@@ -1863,9 +1896,31 @@ async function prepareTurn(
     // now-deleted REFUSAL_TEXT constant here, which looked editable but
     // silently wasn't). Any placeholder works; this one just reads
     // sensibly in a debugger or log before finalizeReply runs.
-    return immediate({ reply: { text: "I can't help with that." }, source: "safety_refuse", safety });
+    return immediate({ reply: { text: "I can't help with that." }, source: "safety_refuse", safety, crisis_resources: deriveCrisisResources(safety) ?? (inCrisis ? CRISIS_RESOURCES_TEXT : undefined) });
   }
-  const crisisResources = deriveCrisisResources(safety);
+  // SAFETY-01 (finding 26): the crisis state of the conversation. A
+  // self-harm signal on this turn, or on one of the conversation's
+  // recent turns, keeps the overlay on every reply, dispatches no
+  // lookup and no package (a "do the search" after a means question
+  // ran the web lookup and summarized the methods: the safety gate had
+  // read the model's text and never the tool call), clears a lookup
+  // already pending, and answers a "stop" once, then with the overlay
+  // alone. The conversation itself is never blocked ("offer, never
+  // block"): the model still answers, without tools.
+  const crisisResources = deriveCrisisResources(safety) ?? (inCrisis ? CRISIS_RESOURCES_TEXT : undefined);
+  if (inCrisis) {
+    const standing = getPendingAsk(conversation.id);
+    if (standing?.kind === "lookup" || standing?.kind === "confirm" || standing?.kind === "ask") {
+      setPendingAsk(conversation.id, null);
+      console.log(`[safety] a pending ${standing.kind} was cleared on turn ${turnId}: the conversation is in the crisis state`);
+    }
+    if (isCrisisStop(text)) {
+      const previous = recentTurnSafety(conversation.id, 1)[0];
+      const repeat = previous?.source === "policy" && (previous.replyText === CRISIS_STOP_ACK || previous.replyText === CRISIS_LINE);
+      console.log(`[safety] a stop in the crisis state on turn ${turnId}: ${repeat ? "the overlay alone" : "one acknowledgment"}`);
+      return immediate({ reply: { text: repeat ? CRISIS_LINE : CRISIS_STOP_ACK }, source: "policy", safety, crisis_resources: crisisResources });
+    }
+  }
 
   // CHAT-03 (docs/dev/session-a.md): a credential said in chat stops
   // here, before the lease engages, before routing's embed, before the
@@ -2006,13 +2061,19 @@ async function prepareTurn(
   // household name; the same list feeds the prompt and the guards below.
   const routingStart = performance.now();
   let literalYielded: LiteralYield | null = null;
-  let { winner: routed, ranked }: RouteResult = routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y)) ?? { winner: null, ranked: [] };
+  // SAFETY-01: in the crisis state nothing routes to a package; the
+  // embed still runs for recall.
+  let { winner: routed, ranked }: RouteResult = inCrisis ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y)) ?? { winner: null, ranked: [] });
   // ACT-01: a literal-pattern win is a directive by construction, frozen
   // on the signal before the package runs.
   if (routed?.viaPattern) signal = freezeDirective(signal);
-  if (!routed) {
+  if (!routed && !inCrisis) {
     utteranceVector = await embedUtterance(text);
     ({ winner: routed, ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
+  }
+  if (inCrisis) {
+    utteranceVector = await embedUtterance(text);
+    console.log(`[safety] turn ${turnId} in the crisis state: no package routed, no tool offered`);
   }
   // A real trigger phrase always wins outright (see RoutedPlugin's own
   // comment on why `viaPattern`, not `score === 1`, is the real signal).
@@ -2300,7 +2361,7 @@ async function prepareTurn(
   // comment below is the history of the always-offer set, kept because
   // its reasoning (the offer costs prompt tokens, not a round trip; the
   // model's own judgment is the gate) is what ROUTE-01 generalized.
-  const tools = selectOfferedTools(ranked, shape, ordinaryToolIdsForInstalled(loaded));
+  const tools = inCrisis ? [] : selectOfferedTools(ranked, shape, ordinaryToolIdsForInstalled(loaded));
   logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), outscoredBySkill, literalYielded, tier0Miss?.packageId ?? null);
   // manifest.routing.always_offer (spec/schemas/manifest.schema.json,
   // Fix E's own addition - a code review, 2026-09-07, found the first
@@ -2344,7 +2405,7 @@ async function prepareTurn(
   // candidate this turn regardless of whether it also happened to clear
   // the ordinary Tier 2 floor, and needs that as its own field rather
   // than re-filtering `ranked` a second time at the call site.
-  const lookupTools: ToolSpec[] = ranked.filter((r) => r.manifest.routing?.always_offer).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
+  const lookupTools: ToolSpec[] = inCrisis ? [] : ranked.filter((r) => r.manifest.routing?.always_offer).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
 
   turnContext.offeredToolIds = tools.map((t) => t.id);
   // CHAT-01: the guards' context is derived from the included evidence
@@ -3376,7 +3437,7 @@ async function runTurnHoldingLease(
   // binds the next consent word to the lookup.
   if (prepared.kind === "model" && value.source === "model" && !asksAboutHousehold(text, prepared.turnContext.roster)) notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety });
   return { ok: true, value };
 }
 
@@ -3925,7 +3986,7 @@ async function runTurnStreamHoldingLease(
     const trace: ReplyTrace = { hits: [], replaced: false };
     const value = finalizeReply(actor, prepared.value, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.subjects });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety });
     return { ok: true, kind: "immediate", value };
   }
 
@@ -4269,7 +4330,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -4347,7 +4408,7 @@ async function runTurnStreamHoldingLease(
         // wire binds the next consent word to the lookup.
         if (value.source === "model" && !opts.ephemeral && !asksAboutHousehold(text, prepared.turnContext.roster)) notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety });
         return value;
       },
     };

@@ -32,7 +32,7 @@
 // summarizeBeforeDelete()'s own comment for exactly what that means
 // when no real model is running yet.
 import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc } from "drizzle-orm";
-import { redactCredentials, CREDENTIAL_REDACTION } from "@/lib/memoryContentPolicy";
+import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { withoutHonestyLines } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
 import { db, sqlite } from "@/db";
@@ -180,7 +180,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -190,7 +190,10 @@ export function logTurn(
   // A `policy` turn (the engine answered a pasted credential with the
   // fixed line) keeps only the marker: the person was pasting secrets,
   // and a second, unlabeled one would survive a span redaction.
-  const userText = value.source === "policy" ? CREDENTIAL_REDACTION : redactCredentials(rawUserText);
+  // SAFETY-01: `policy` is also the crisis stop rule's source; only the
+  // credential line's turn keeps the marker alone.
+  const credentialTurn = value.source === "policy" && value.reply.text === CREDENTIAL_SAFE_MESSAGE;
+  const userText = credentialTurn ? CREDENTIAL_REDACTION : redactCredentials(rawUserText);
   // Built and returned directly from the caller's own values, not
   // re-selected after the insert: a review (2026-09-04) pointed out every
   // field is already known here, the same "don't round-trip the database
@@ -248,9 +251,11 @@ export function logTurn(
     // subject; on a policy turn (a credential in the utterance) it is
     // dropped with the rest of the words (a review: "my wifi password
     // Sunshine" named a subject).
-    signal: opts.signal ? JSON.stringify(value.source === "policy" ? withoutNames(opts.signal) : opts.signal) : null,
+    signal: opts.signal ? JSON.stringify(credentialTurn ? withoutNames(opts.signal) : opts.signal) : null,
+    // SAFETY-01: the self-harm category on either side of the turn.
+    crisisSignal: opts.crisisSignal ?? false,
     // ASK-01: the turn's SubjectRefs; a credential turn keeps none.
-    subjects: opts.subjects && opts.subjects.length > 0 && value.source !== "policy" ? JSON.stringify(opts.subjects) : null,
+    subjects: opts.subjects && opts.subjects.length > 0 && !credentialTurn ? JSON.stringify(opts.subjects) : null,
     hlc: nextHlc(),
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
@@ -279,6 +284,18 @@ export function turnSignalOf(row: Pick<ConversationTurnRow, "signal">): TurnSign
   } catch {
     return null;
   }
+}
+
+/** SAFETY-01: the safety action, source and reply of the conversation's
+ * latest turns, newest first, for the crisis state and the stop rule. */
+export function recentTurnSafety(conversationId: string, limit: number): { safetyAction: string; source: string; replyText: string; crisisSignal: boolean }[] {
+  return db
+    .select({ safetyAction: conversationTurns.safetyAction, source: conversationTurns.source, replyText: conversationTurns.replyText, crisisSignal: conversationTurns.crisisSignal })
+    .from(conversationTurns)
+    .where(eq(conversationTurns.conversationId, conversationId))
+    .orderBy(desc(conversationTurns.createdAt))
+    .limit(limit)
+    .all();
 }
 
 /** ASK-01: the SubjectRefs off a turn row, each parsed through the
@@ -1002,6 +1019,9 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
     case "policy":
       // CHAT-03: the row's own user text is already redacted; the note
       // tells the model what happened without repeating anything.
+      // SAFETY-01: the crisis stop rule's replies share the source; the
+      // note says what was said (a review).
+      if (t.replyText !== CREDENTIAL_SAFE_MESSAGE) return `[MaiPai said: "${redactCredentials(t.replyText)}"]`;
       return "[The household was reminded to keep passwords and keys in Credentials, not in chat.]";
     default:
       return "[A household action ran.]";

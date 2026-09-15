@@ -52,11 +52,11 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   };
 }
 
-async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
+async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, onCrisisResources: (text: string) => void = () => {}): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
   const adapter = createChatModelAdapter({
     consumeThinking: () => false,
     consumeSupersedes: () => undefined,
-    onCrisisResources: () => {},
+    onCrisisResources,
     turnSchedulerRef: { current: null },
   });
   const options = { messages, runConfig: {}, abortSignal, context: {}, unstable_getMessage: () => messages[messages.length - 1]! } as unknown as ChatModelRunOptions;
@@ -584,6 +584,22 @@ describe("createChatModelAdapter errors", () => {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe("That response violated our safety policy");
       expect((error as Error).message).not.toMatch(/check Household/);
+    } finally {
+      env.restore();
+    }
+  });
+
+  // SAFETY-01 (#85): a streamed refusal's crisis resources ride on the
+  // error event, the one terminal event it sends, and are shown the
+  // same way a done value's are.
+  test("a safety_refused error carrying crisis_resources shows them", async () => {
+    const line = "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "That response violated our safety policy", code: "safety_refused", crisis_resources: line }]));
+    const shown: string[] = [];
+    try {
+      const { error } = await collect([fakeUserMessage("hi")], new AbortController().signal, (text) => shown.push(text));
+      expect(error).toBeInstanceOf(Error);
+      expect(shown).toEqual([line]);
     } finally {
       env.restore();
     }

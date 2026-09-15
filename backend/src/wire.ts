@@ -125,7 +125,10 @@ export type TurnStreamEvent =
   // safety cut sets it, "safety_refused"), omitted for the generic
   // mid-stream engine failure that already used this event before this
   // step - existing clients reading only `error` see no change.
-  | { type: "error"; error: string; code?: string };
+  // SAFETY-01 (#85): a streamed safety refusal carries its crisis
+  // resources here, since this is the one terminal event it sends
+  // (additive; a client reading only `error` sees no change).
+  | { type: "error"; error: string; code?: string; crisis_resources?: string };
 
 export interface ResolvedSetting {
   key: string;
