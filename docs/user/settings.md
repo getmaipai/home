@@ -24,6 +24,7 @@ Switch to the **Me** tab for your own personal preferences:
 - **My notifications**: how you're notified. This includes linking your own Telegram chat.
 - **Voices**: browse and pick a speaking voice, or clone your own.
 - **PIN / password**: change how you sign in.
+- **Your name**: change the name MaiPai calls you. It shows on your messages everywhere.
 - **Commands**: teach MaiPai a phrase of your own. For example, "when I say movie night, dim the lights."
 - **Devices & sessions**: see what's signed in as you. Sign out anything you don't recognize.
 

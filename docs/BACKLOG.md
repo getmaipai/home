@@ -5344,7 +5344,7 @@ approvals are still real, unstarted work for a future session.
       question above ("may a parent see a relationship inferred from
       their teen's conversation") but for browsing rather than
       inference specifically.
-- [ ] **A self-service way to change your own display name** (S) - a
+- [x] **A self-service way to change your own display name** (S) - a
       real, deliberate regression from the 2026-09-06 People/Users split:
       the old PeoplePage.tsx let anyone edit their own row (`canManagePerson`
       allows `actorId === target.id` regardless of role), which was the
@@ -5354,8 +5354,10 @@ approvals are still real, unstarted work for a future session.
       renaming themselves at all today. Needs its own home (Settings ->
       Me is the obvious candidate, alongside Appearance/Personality/
       Voice) since `display_name` is a `Person` field, not a settings-
-      registry key, so it doesn't fit `SettingsRenderer`'s generic
-      schema without its own small hand-built section.
+       registry key, so it doesn't fit `SettingsRenderer`'s generic
+       schema without its own small hand-built section. Done 2026-09-15:
+       a Your name section in Settings, Me scope (`DisplayNameSection.tsx`),
+       any role, through the existing self-edit rule.
 
 ## Settings
 

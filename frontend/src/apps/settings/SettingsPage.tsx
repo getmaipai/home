@@ -9,6 +9,7 @@ import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
 import { cn, FOCUS_RING } from "@/kit/utils";
 import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
+import { DisplayNameSection } from "@/apps/settings/DisplayNameSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
@@ -62,6 +63,7 @@ const PERSON_TREE: TreeEntry[] = [
   { id: "voices-page-link", label: "Voices", to: "/settings/voices", group: "Make it yours", icon: "volume-2", description: "Find a voice you enjoy listening to." },
   { id: "commands-page-link", label: "Commands", to: "/settings/commands", group: "Make it yours", icon: "sparkles", description: "Create shortcuts for everyday requests." },
   { id: "devices-page-link", label: "Devices & sessions", to: "/settings/devices", group: "Account", icon: "shield-check", description: "See where you’re signed in." },
+  { id: "section-display-name", label: "Your name", group: "Account", icon: "user" },
   { id: "section-change-secret", label: "PIN / password", group: "Account", icon: "lock" },
 ];
 
@@ -389,6 +391,9 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
                 <>
                   <SettingsRenderer scope="person" scopeValue={`person:${person.id}`} filter={search} />
                   <ExtraSections hidden={!!search.trim()}>
+                    <div id="section-display-name">
+                      <DisplayNameSection person={person} onChanged={onPersonChange} />
+                    </div>
                     <div id="section-change-secret">
                       <ChangeSecretSection person={person} onChanged={onPersonChange} />
                     </div>
