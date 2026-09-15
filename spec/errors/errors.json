@@ -89,5 +89,12 @@
     "spoken_fallback": "Let's slow down for a second before the next one.",
     "ui_message": "Give it a moment before sending another message.",
     "retriable": true
+  },
+  {
+    "code": "turn_cancelled",
+    "message": "The caller cancelled the in-flight turn completion.",
+    "spoken_fallback": "I stopped that reply.",
+    "ui_message": "This reply was cancelled.",
+    "retriable": false
   }
 ]

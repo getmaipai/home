@@ -67,6 +67,10 @@ import { SubjectRef as SubjectRefSchema } from "@maipai/spec/gen/ts/subject-ref.
 import type { SubjectRef } from "@/lib/unknownNames";
 export type { ConversationTurnRow } from "@/wire";
 
+export function turnOwnerId(turnId: string): string | null {
+  return db.select({ personId: conversationTurns.personId }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()?.personId ?? null;
+}
+
 export type ConversationOpResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 403 | 404; error: string };

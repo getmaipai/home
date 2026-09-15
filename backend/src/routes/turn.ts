@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
@@ -7,8 +7,32 @@ import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import type { AppEnv } from "@/types";
+import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { turnOwnerId } from "@/lib/conversationHistory";
 
-export const turnRoutes = new Hono<AppEnv>();
+export const turnRoutes = apiRouter();
+const inFlightTurns = new Map<string, AbortController>();
+
+const cancelTurnRoute = createRoute({
+  method: "post", path: "/{turn_id}/cancel", tags: ["Turns"],
+  summary: "Cancel an in-flight turn",
+  description: "Aborts an in-flight completion for a turn owned by the caller.",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("turn_id") },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ cancelled: z.boolean() }) } }, description: "Whether the turn was in flight and cancelled." },
+    ...errorResponses({ 401: "Not signed in", 403: "The turn belongs to another person", 404: "Unknown turn" }),
+  },
+});
+
+turnRoutes.openapi(cancelTurnRoute, (c) => {
+  const owner = turnOwnerId(c.req.valid("param").turn_id);
+  if (owner === null) return c.json({ error: "Turn not found" }, 404);
+  if (owner !== c.get("person").id) return c.json({ error: "Cannot cancel another person's turn" }, 403);
+  const controller = inFlightTurns.get(c.req.valid("param").turn_id);
+  if (controller) controller.abort();
+  return c.json({ cancelled: Boolean(controller) }, 200);
+});
 
 const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "turn_rate_limited" } as const;
 
@@ -93,6 +117,7 @@ export async function* streamTurnEvents(
   result: Extract<TurnStreamResult, { ok: true; kind: "stream" }>,
   actorId: string,
   cueDelayMs = THINKING_CUE_DELAY_MS,
+  signal?: AbortSignal,
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   try {
@@ -169,6 +194,11 @@ export async function* streamTurnEvents(
     // still waited for the first token before returning; it now happens
     // after turn_meta is out, so it carries the same code on the error
     // event instead.
+    if (signal?.aborted) {
+      result.finalize(fullText.trim());
+      yield { type: "error", error: "cancelled", code: "turn_cancelled" };
+      return;
+    }
     const safetyRefusal = err instanceof StreamSafetyRefusal ? err : undefined;
     // SAFETY-01 (#85): a streamed refusal's crisis resources reach the
     // client on the error event, the one terminal event this path
@@ -290,10 +320,12 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
       try {
         controller.enqueue(ndjsonLine(turnMeta));
         controller.enqueue(ndjsonLine({ type: "signal", signal: result.signal }));
-        for await (const event of streamTurnEvents(result, actor.id)) {
+        inFlightTurns.set(result.turnId, abortController);
+        for await (const event of streamTurnEvents(result, actor.id, THINKING_CUE_DELAY_MS, abortController.signal)) {
           controller.enqueue(ndjsonLine(event));
         }
       } finally {
+        inFlightTurns.delete(result.turnId);
         controller.close();
       }
     },
