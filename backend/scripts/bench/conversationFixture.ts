@@ -1457,4 +1457,19 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "wild", expect: { signal: { primary_act: "backchannel" }, toolRan: null, mustNotContain: "irony is|definition|means when", maxWords: 25, humanVerdict: true } },
     ],
   },
+  // CHAT-13 (chunk C2, dev.md section 16 part 5 rule 4): a carried world
+  // reference lives two turns unless re-mentioned, a lookup turn
+  // re-supplies the carry, and a package turn keeps the carry; by the
+  // fourth turn the cartoon is gone from the stack.
+  {
+    id: "carry-decays",
+    category: "knowledge",
+    note: "CHAT-13 chunk C2: a carried world reference lives two turns unless re-mentioned; a package turn keeps the carry, and by the fourth turn the cartoon is gone from the stack",
+    turns: [
+      { say: "what's the horse called in the old Clover and Quill cartoon", expect: { signal: { primary_act: "question" }, toolRan: "websearch", subjects: [{ type: "world", name: "Clover and Quill" }], humanVerdict: true } },
+      { say: "what time is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", subjects: [{ type: "world", name: "Clover and Quill" }], humanVerdict: true } },
+      { say: "and set a timer for ten minutes", expect: { signal: { primary_act: "inform" }, toolRan: "timer", subjects: [{ type: "world", name: "Clover and Quill" }], humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, subjectsAbsent: [{ type: "world", name: "Clover and Quill" }], humanVerdict: true } },
+    ],
+  },
 ];

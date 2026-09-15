@@ -95,8 +95,8 @@ describe("the fixture", () => {
     // objection-reruns, hedged-draft, ladder-falls-through), and
     // ASK-02's three (not-a-name, hub-named-it, public-figure), and
     // CHAT-13 chunk B's subject-before-pattern.
-    expect(CONVERSATIONS.length).toBe(88);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(88);
+    expect(CONVERSATIONS.length).toBe(89);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(89);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
