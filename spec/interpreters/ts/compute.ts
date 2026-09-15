@@ -57,8 +57,20 @@ export function normalizeSpokenMath(text: string): string {
   // Only replace "over" when it's between digits or parentheses
   result = result.replace(/(?<=[\d)])\s+over\s+(?=[\d(])/gi, "/");
 
-  // 4. The letter "x" as multiplication sign
+  // 4. The letter "x" as multiplication sign. #107: the rule's own lookbehind
+  // fired inside a hex literal ("0x10" became "0*10"), so every hex literal
+  // is swapped for a placeholder no other rule touches before the rule runs
+  // and restored afterwards - the placeholder survives rule 4 untouched
+  // ("0x10" reaches the evaluator unchanged) while "12 x 12", "3x4",
+  // "12 x12" and "12x 12" still become multiplications.
+  const hexLiterals = result.match(/\b0[xX][0-9a-fA-F]+\b/g) ?? [];
+  for (let i = 0; i < hexLiterals.length; i++) {
+    result = result.replace(hexLiterals[i], `@HEX${i}@`);
+  }
   result = result.replace(/(?<=\d)\s*x\s*(?=\d)/g, "*");
+  for (let i = 0; i < hexLiterals.length; i++) {
+    result = result.replace(`@HEX${i}@`, hexLiterals[i]);
+  }
 
   // 5. Squared and cubed
   result = result.replace(/(\d+(?:\.\d+)?|\([^)]+\))\s+squared/gi, "$1^2");

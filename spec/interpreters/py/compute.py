@@ -16,23 +16,22 @@ from simpleeval import simple_eval
 
 _ureg = UnitRegistry()
 
-# A quantity is a leading numeric literal (or a nested plain arithmetic
-# expression, kept simple as a single number here since a package's own
-# recipe.json is the only author of these expressions) plus a unit name;
-# `to` splits it from the target unit. pint's own string parser
-# (`Quantity(str)`) refuses this ambiguously for offset units like
-# fahrenheit/celsius (`OffsetUnitCalculusError`), so the value and unit
-# are parsed apart here and passed to `Quantity(value, unit)` instead,
-# which every unit (offset or not) accepts.
+# A quantity is a leading plain arithmetic expression plus a unit name;
+# `to` splits it from the target unit. #108: the numeric half is a small
+# arithmetic expression (digits, decimals, spaces, parentheses, + - * / **
+# only - the same character set simpleeval's own restricted grammar
+# accepts for plain arithmetic), not a bare number, so "50 percent of 2
+# miles to km" normalized to "(50/100)*2 miles to km" converts instead of
+# raising; anything else keeps the existing error. The expression is
+# evaluated with simple_eval, the same restricted evaluator the plain
+# arithmetic path below already uses - no bare `eval`. pint's own string
+# parser (`Quantity(str)`) refuses the split value+unit form anyway, and
+# refuses it ambiguously for offset units like fahrenheit/celsius
+# (`OffsetUnitCalculusError`), so the value and unit are parsed apart here
+# and passed to `Quantity(value, unit)` instead, which every unit (offset
+# or not) accepts.
 _CONVERT_RE = re.compile(r"^(.+?)\s+to\s+([a-zA-Z][a-zA-Z_ ]*)$")
-# The numeric half accepts scientific notation ("1e3") in addition to a
-# plain decimal - mathjs's own expression grammar (compute.ts's side)
-# already does on any number literal, and a code review (2026-09-06)
-# caught this regex silently rejecting it as "not a recognized quantity"
-# instead of converting.
-_QUANTITY_RE = re.compile(
-    r"^(-?[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)\s*([a-zA-Z][a-zA-Z_ ]*)$"
-)
+_QUANTITY_RE = re.compile(r"^([0-9.() \t+-/*]+)\s+([a-zA-Z][a-zA-Z_ ]*)$")
 
 # 6 significant digits, matching compute.ts's own DISPLAY_PRECISION -
 # unit conversion routinely produces a long repeating decimal
@@ -66,8 +65,18 @@ def normalize_spoken_math(text: str) -> str:
     # Only replace "over" when it's between digits or parentheses
     result = re.sub(r"(?<=[\d)])\s+over\s+(?=[\d(])", "/", result, flags=re.IGNORECASE)
 
-    # 4. The letter "x" as multiplication sign
+    # 4. The letter "x" as multiplication sign. #107: the rule's own
+    # lookbehind fired inside a hex literal ("0x10" became "0*10"), so every
+    # hex literal is swapped for a placeholder no other rule touches before
+    # the rule runs and restored afterwards - the placeholder survives rule
+    # 4 untouched ("0x10" reaches the evaluator unchanged) while "12 x 12",
+    # "3x4", "12 x12" and "12x 12" still become multiplications.
+    hex_literals = re.findall(r"\b0[xX][0-9a-fA-F]+\b", result)
+    for i, literal in enumerate(hex_literals):
+        result = result.replace(literal, f"@HEX{i}@")
     result = re.sub(r"(?<=\d)\s*x\s*(?=\d)", "*", result)
+    for i, literal in enumerate(hex_literals):
+        result = result.replace(f"@HEX{i}@", literal)
 
     # 5. Squared and cubed
     result = re.sub(
@@ -122,7 +131,21 @@ def evaluate_expression(raw_expression: str) -> str:
             raise ComputeError(
                 f'"{expression}" failed to evaluate: not a recognized "<number> <unit>" quantity'
             )
-        value, unit = quantity_match.group(1), quantity_match.group(2).strip()
+        # #108: the quantity half is a small arithmetic expression, not a
+        # bare number - evaluate it with simple_eval, the same restricted
+        # evaluator the plain arithmetic path below already uses (never a
+        # bare `eval`), and hand pint the resulting number.
+        try:
+            value = simple_eval(quantity_match.group(1))
+        except Exception as err:  # simpleeval raises several distinct error types; all mean "not a valid expression"
+            raise ComputeError(
+                f'"{expression}" failed to evaluate: not a valid quantity expression'
+            ) from err
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ComputeError(
+                f'"{expression}" failed to evaluate: not a valid quantity expression'
+            )
+        unit = quantity_match.group(2).strip()
         try:
             converted = _ureg.Quantity(float(value), unit).to(target_unit)
         except Exception as err:  # pint raises several distinct error types; all mean "not a valid conversion"

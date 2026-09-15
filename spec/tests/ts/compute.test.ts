@@ -8,6 +8,8 @@ describe("normalizeSpokenMath", () => {
     expect(normalizeSpokenMath("100 divided by 4")).toBe("100 / 4");
     expect(normalizeSpokenMath("12 x 12")).toBe("12*12");
     expect(normalizeSpokenMath("3x4")).toBe("3*4");
+    expect(normalizeSpokenMath("12 x12")).toBe("12*12");
+    expect(normalizeSpokenMath("12x 12")).toBe("12*12");
     expect(normalizeSpokenMath("5 squared")).toBe("5^2");
     expect(normalizeSpokenMath("20 percent of 50")).toBe("(20/100)*50");
     expect(normalizeSpokenMath("(2 + 3) * 4")).toBe("(2 + 3) * 4");
@@ -39,5 +41,11 @@ describe("evaluateExpression", () => {
 
   test("throws ComputeError for invalid expressions", () => {
     expect(() => evaluateExpression("12 times")).toThrow(/Unexpected end of expression/);
+  });
+
+  test("keeps hex literals untouched and evaluates them (#107)", () => {
+    expect(normalizeSpokenMath("0x10")).toBe("0x10");
+    expect(evaluateExpression("0x10")).toBe("16");
+    expect(evaluateExpression("0xff plus 1")).toBe("256");
   });
 });
