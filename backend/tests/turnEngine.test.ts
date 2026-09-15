@@ -1257,7 +1257,7 @@ describe("lib/turnEngine.ts runTurnStream() output-safety gate (step 9)", () => 
       return undefined;
     }
     const delivered: string[] = [];
-    for await (const chunk of gateGuards(gateOutputSafety(twoClaims(), childRow), { utterance: "did you ever go camping" }, childRow.id)) delivered.push(chunk);
+    for await (const chunk of gateGuards(gateOutputSafety(twoClaims(), childRow), { utterance: "did you ever go camping", subjects: [{ type: "world", kind: "film", display_name: "the film", year: null, source_kind: null, stable_key: null, recency: "current", carried_question: null }] }, childRow.id)) delivered.push(chunk);
     const text = delivered.join("");
     expect(text.trim()).not.toBe("");
     expect(text).not.toMatch(/watched|popcorn/);
@@ -4960,7 +4960,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       if (!result.ok) return;
       expect(seen.forced).toBe(1);
       expect(result.value.source).toBe("model");
-      expect(result.value.reply.text).toBe("It's the band you played last week, right?");
+      expect(result.value.reply.text).toBe("It's the band you played last week.");
     });
     await withLookupStub({ draft: "Let me look that up.", forcedCall: false, searxng: false }, async () => {
       const result = await runTurn(actor, "chat", "when is the new album out");

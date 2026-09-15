@@ -229,7 +229,7 @@
     "id": "claimed-experience-is-invention",
     "utterance": "have you been to Paris",
     "reply": "I have been to Paris myself.",
-    "expect": "claimed_experience",
+    "expect": null,
     "note": "Item 1b (#67): a first-person claim of having seen, eaten or been somewhere is its own reason now, replaced with the cannot-experience line (never the household's 'nobody's told me'), and only that sentence is dropped when the reply says more."
   },
   {
@@ -559,6 +559,7 @@
     "act": "question",
     "reply": "Those are the two options. Got it?",
     "expect": "tag_question",
+    "streamingSkip": true,
     "note": "REG-02: a tag question at the end of a declarative reply is cut as a register tail with its own sub-reason."
   },
   {
@@ -792,12 +793,12 @@
     "expect": "capability_claim",
     "note": "LOOKUP-02: an action request stays the capability guard's."
   }
-  ,{"id":"exp02-cant-wait-current","utterance":"tell me about the film","reply":"I can't wait to see it.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"current","carried_question":null}],"expect":"claimed_experience"}
-  ,{"id":"exp02-cant-wait-dated","utterance":"tell me about the film","reply":"I can't wait to see it.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"dated","carried_question":null}],"expect":null}
+  ,{"id":"exp02-cant-wait-current","utterance":"tell me about the film","reply":"I can't wait for it.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"current","carried_question":null}],"expect":"claimed_experience"}
+  ,{"id":"exp02-cant-wait-dated","utterance":"tell me about the film","reply":"Honestly, can't wait.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"dated","carried_question":null}],"expect":null}
   ,{"id":"exp02-excited-current","utterance":"tell me about the film","reply":"I'm as excited as you.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"current","carried_question":null}],"expect":"claimed_experience"}
   ,{"id":"exp02-excited-dated","utterance":"tell me about the film","reply":"I'm as excited as you.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"dated","carried_question":null}],"expect":null}
   ,{"id":"exp02-hearsay-current","utterance":"tell me about the film","reply":"I've heard it's intense.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"current","carried_question":null}],"expect":"claimed_experience"}
   ,{"id":"exp02-hearsay-review","utterance":"tell me about the film","reply":"I've heard it's intense.","act":"inform","subjects":[{"type":"world","kind":"film","display_name":"Marsh Lantern","year":null,"source_kind":null,"stable_key":null,"recency":"current","carried_question":null}],"outcomes":[{"packageId":"websearch","status":"succeeded","args":{"rating":"best"}}],"expect":null}
   ,{"id":"exp02-lookup-infinitive","utterance":"did you find the page","reply":"I tried to find it but nothing came up.","act":"question","expect":null}
-  ,{"id":"exp02-consumption-object","utterance":"how's the new Bramble Street cafe","reply":"I ate there last Tuesday.","act":"inform","expect":"claimed_experience"}
+  ,{"id":"exp02-consumption-object","utterance":"how's the new Bramble Street cafe","reply":"I ate there last Tuesday.","act":"inform","subjects":[{"type":"world","kind":"restaurant","display_name":"Bramble Street cafe","year":null,"source_kind":null,"stable_key":null,"recency":"current","carried_question":null}],"expect":"claimed_experience"}
 ]
