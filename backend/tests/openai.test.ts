@@ -222,7 +222,7 @@ describe("POST /v1/chat/completions", () => {
     const res = await client.request("/v1/chat/completions", {
       method: "POST",
       body: { messages: [{ role: "user", content: "hi" }] },
-      headers: { authorization: `Bearer ${token}`, "x-maipai-surface": "robot" },
+      headers: { authorization: `Bearer ${token}`, "x-maipai-surface": "tv" },
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: { code: string } };
