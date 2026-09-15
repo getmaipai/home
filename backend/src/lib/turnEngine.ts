@@ -22,7 +22,7 @@ import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameById, registryNamesFor, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { deleteEntity } from "@/lib/entities";
-import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type HubName, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
+import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type HubName, type ResolvedNames, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
@@ -64,6 +64,7 @@ import {
   outcomesForConversation,
   type PendingAsk,
   type OpenQuestionRow,
+  type ConversationWindow,
 } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { acquireTurnLease, DEFAULT_IDLE_WINDOW_MS, type TurnLease } from "@/lib/turnActivity";
@@ -2048,6 +2049,90 @@ export async function resolvePendingAsk(
  * conversation_turns row under that SAME id, not a second freshly-minted
  * one) - one id names both "the turn that happened" and "the provenance
  * of anything it wrote to memory". */
+// CHAT-13 chunk A: the subject stack as its own function so it can run
+// before routing (chunk B); no behavior change.
+function resolveTurnSubjects(input: {
+  actor: PersonRow;
+  text: string;
+  signal: TurnSignal;
+  household: PersonRow[];
+  rosterNames: readonly string[];
+  window: ConversationWindow;
+  conversationId: string;
+  supersedes: string | null;
+  turnId: string;
+}): {
+  subjects: SubjectRef[];
+  resolved: ResolvedNames;
+  unknownAsk: string | null;
+  subjectPronouns: ReturnType<typeof subjectPronounsFor>;
+  subjectsSection: ReturnType<typeof subjectsSectionFor>["section"];
+  aboutEntries: ReturnType<typeof subjectsSectionFor>["about"];
+  carried: SubjectRef[];
+} {
+  const { actor, text, signal, household, rosterNames, window, conversationId, supersedes, turnId } = input;
+  // ASK-01: the names in the utterance, resolved before the model runs
+  // (lib/unknownNames.ts): the household's and the registry's are
+  // household refs, the rest unresolved. A turn that names nobody
+  // carries the previous turn's subjects ("should he be outside in
+  // this heat" is still about the rabbit), and the carried ones never
+  // re-ask. The unknown line goes in the context ahead of the memory
+  // section; the ask is appended to the reply by the caller.
+  const registry = registryNamesFor(actor);
+  // ASK-02 (rule 3): the names the hub itself introduced, from its last
+  // two replies in the window and the conversation's retained
+  // outcomes' result text, are the world's with that provenance; the
+  // last three turns' text feeds the common-word check (rule 1).
+  // A name the person said first is theirs, whatever the hub echoed
+  // or asked back ("Who's Clover?" introduces nothing); a longer name
+  // the hub's lookup resolved it to ("Serena Vale" for their "Serena")
+  // is the hub's.
+  const knownForHub = [...rosterNames, ...registry.map((r) => r.name)];
+  const personSaid = new Set(window.messages.filter((m) => m.role === "user").flatMap((m) => namesIn(m.content, knownForHub)).map((n) => n.toLowerCase()));
+  const saidByPerson = (n: string) => personSaid.has(n.toLowerCase());
+  const hubNames: HubName[] = [];
+  for (const m of window.messages.filter((m) => m.role === "assistant").slice(-2)) {
+    for (const n of properNounsIn(m.content, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: "reply", sourceKind: null, person: n.person });
+  }
+  for (const row of outcomesForConversation(conversationId, 10)) {
+    for (const o of row.outcomes) {
+      const replyText = o.status === "succeeded" ? (o.result?.reply?.text ?? "") : "";
+      if (!replyText) continue;
+      const sourceKind = o.packageId === "websearch" ? "web" : o.packageId === "weather" ? "weather" : o.packageId === "knowledge" ? "wikipedia" : "package";
+      for (const n of properNounsIn(replyText, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: o.packageId, sourceKind, person: n.person });
+    }
+  }
+  const recent = window.messages.filter((m) => m.role === "user").slice(-3).map((m) => m.content);
+  const resolved = resolveNames(
+    text,
+    signal,
+    {
+      names: knownForHub,
+      resolveEntity: (name) => {
+        const member = household.find((p) => p.displayName.trim().toLowerCase() === name.toLowerCase() || (p.nickname ?? "").trim().toLowerCase() === name.toLowerCase());
+        if (member) return ensurePersonEntity(member).value?.id ?? null;
+        return registry.find((r) => r.name.toLowerCase() === name.toLowerCase())?.id ?? null;
+      },
+      hubNames,
+      recent,
+    },
+    turnId,
+  );
+  const carried = resolved.subjects.length === 0 && !supersedes ? lastTurnSubjects(conversationId).slice(0, 2) : [];
+  // One entry per household entity (a name and its alias both resolve
+  // to the one row; LOOKUP-02's set showed the dishwasher twice).
+  const seenEntities = new Set<string>();
+  const subjects: SubjectRef[] = [...resolved.subjects, ...carried].filter((s) => {
+    if (s.type !== "household") return true;
+    if (seenEntities.has(s.entity_id)) return false;
+    seenEntities.add(s.entity_id);
+    return true;
+  });
+  const unknownAsk = resolved.unknown.find((u) => u.ask)?.name ?? null;
+  const subjectPronouns = subjectPronounsFor(actor, subjects, resolved.unknown);
+  const { section: subjectsSection, about: aboutEntries } = subjectsSectionFor(actor, subjects);
+  return { subjects, resolved, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried };
+}
 async function prepareTurn(
   actor: PersonRow,
   surface: Surface,
@@ -2501,67 +2586,8 @@ async function prepareTurn(
   const promptStart = performance.now();
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
-  // ASK-01: the names in the utterance, resolved before the model runs
-  // (lib/unknownNames.ts): the household's and the registry's are
-  // household refs, the rest unresolved. A turn that names nobody
-  // carries the previous turn's subjects ("should he be outside in
-  // this heat" is still about the rabbit), and the carried ones never
-  // re-ask. The unknown line goes in the context ahead of the memory
-  // section; the ask is appended to the reply by the caller.
   const subjectsStart = performance.now();
-  const registry = registryNamesFor(actor);
-  // ASK-02 (rule 3): the names the hub itself introduced, from its last
-  // two replies in the window and the conversation's retained
-  // outcomes' result text, are the world's with that provenance; the
-  // last three turns' text feeds the common-word check (rule 1).
-  // A name the person said first is theirs, whatever the hub echoed
-  // or asked back ("Who's Clover?" introduces nothing); a longer name
-  // the hub's lookup resolved it to ("Serena Vale" for their "Serena")
-  // is the hub's.
-  const knownForHub = [...rosterNames, ...registry.map((r) => r.name)];
-  const personSaid = new Set(window.messages.filter((m) => m.role === "user").flatMap((m) => namesIn(m.content, knownForHub)).map((n) => n.toLowerCase()));
-  const saidByPerson = (n: string) => personSaid.has(n.toLowerCase());
-  const hubNames: HubName[] = [];
-  for (const m of window.messages.filter((m) => m.role === "assistant").slice(-2)) {
-    for (const n of properNounsIn(m.content, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: "reply", sourceKind: null, person: n.person });
-  }
-  for (const row of outcomesForConversation(conversation.id, 10)) {
-    for (const o of row.outcomes) {
-      const replyText = o.status === "succeeded" ? (o.result?.reply?.text ?? "") : "";
-      if (!replyText) continue;
-      const sourceKind = o.packageId === "websearch" ? "web" : o.packageId === "weather" ? "weather" : o.packageId === "knowledge" ? "wikipedia" : "package";
-      for (const n of properNounsIn(replyText, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: o.packageId, sourceKind, person: n.person });
-    }
-  }
-  const recent = window.messages.filter((m) => m.role === "user").slice(-3).map((m) => m.content);
-  const resolved = resolveNames(
-    text,
-    signal,
-    {
-      names: knownForHub,
-      resolveEntity: (name) => {
-        const member = household.find((p) => p.displayName.trim().toLowerCase() === name.toLowerCase() || (p.nickname ?? "").trim().toLowerCase() === name.toLowerCase());
-        if (member) return ensurePersonEntity(member).value?.id ?? null;
-        return registry.find((r) => r.name.toLowerCase() === name.toLowerCase())?.id ?? null;
-      },
-      hubNames,
-      recent,
-    },
-    turnId,
-  );
-  const carried = resolved.subjects.length === 0 && !supersedes ? lastTurnSubjects(conversation.id).slice(0, 2) : [];
-  // One entry per household entity (a name and its alias both resolve
-  // to the one row; LOOKUP-02's set showed the dishwasher twice).
-  const seenEntities = new Set<string>();
-  const subjects: SubjectRef[] = [...resolved.subjects, ...carried].filter((s) => {
-    if (s.type !== "household") return true;
-    if (seenEntities.has(s.entity_id)) return false;
-    seenEntities.add(s.entity_id);
-    return true;
-  });
-  const unknownAsk = resolved.unknown.find((u) => u.ask)?.name ?? null;
-  const subjectPronouns = subjectPronounsFor(actor, subjects, resolved.unknown);
-  const { section: subjectsSection, about: aboutEntries } = subjectsSectionFor(actor, subjects);
+  const { subjects, resolved, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
   timings.subjects_ms = Math.round(performance.now() - subjectsStart);
   const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
