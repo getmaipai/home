@@ -345,6 +345,11 @@ export interface BenchConversation {
    * example row (`seeded-household-record`) fails today for that
    * reason, not because wiring it needs a new engine capability. */
   seedRecords?: readonly BenchSeedRecord[];
+  /** A local date-time (ISO) the runner pins the engine's prompt
+   * clock to for every turn of this conversation, so a row can test
+   * clock-derived answers (day of week, time, derived dates) without
+   * depending on when the bench happens to run. */
+  clock?: string;
   turns: readonly BenchTurn[];
 }
 
@@ -1536,6 +1541,23 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "what time is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", subjects: [{ type: "world", name: "Lantern Bay" }], humanVerdict: true } },
       { say: "and set a timer for ten minutes", expect: { signal: { primary_act: "inform" }, toolRan: "timer", subjects: [{ type: "world", name: "Lantern Bay" }], humanVerdict: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, subjectsAbsent: [{ type: "world", name: "Lantern Bay" }], humanVerdict: true } },
+    ],
+  },
+  // ALM-01 (dev.md section 16 part 6): the prompt clock is pinned to a
+  // Monday at 10:43 pm, and the almanac package derives the day of
+  // week and the date from that local time.
+  {
+    id: "derived-dates",
+    category: "knowledge",
+    clock: "2026-09-14T22:43:00",
+    note: "ALM-01: the engine's prompt clock is pinned to a Monday at 10:43 pm; almanac-time and almanac-compute derive the day of week and the date from it.",
+    turns: [
+      { say: "what time is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", mustContain: "10:43", humanVerdict: true } },
+      { say: "what day is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", mustContain: "Monday", humanVerdict: true } },
+      { say: "what's the date today", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", mustContain: "September 14", humanVerdict: true } },
+      { say: "when is the next Friday", expect: { signal: { primary_act: "question" }, toolRan: "almanac-compute", mustContain: "September 18", humanVerdict: true } },
+      { say: "how many days until Friday", expect: { signal: { primary_act: "question" }, toolRan: "almanac-compute", mustContain: "4", humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, humanVerdict: true } },
     ],
   },
 ];

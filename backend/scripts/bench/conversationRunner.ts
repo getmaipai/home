@@ -36,6 +36,7 @@ import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
 import type { BenchConversation, Speaker } from "./conversationFixture";
 import { scoreTurn, type TurnObserved, type TurnScore } from "./conversationScore";
+import { __setPromptClockForBench } from "@/lib/benchSampling";
 import type { TurnTimings } from "@/lib/turnContext";
 
 // ==== The [turn] / [route] log capture ====
@@ -546,6 +547,11 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     for (const [service, count] of Object.entries(now)) delta[service] = count - (homeCallsAtStart[service] ?? 0);
     return delta;
   };
+  // A row may pin the engine's prompt clock (dev.md section 16 part 6):
+  // the clock is local, so promptNow() returns the row's local date-time
+  // for every turn of this conversation and is unpinned afterwards.
+  if (conv.clock) __setPromptClockForBench(() => new Date(conv.clock!));
+  try {
   for (let i = 0; i < conv.turns.length; i++) {
     const turn = conv.turns[i]!;
     const speaker: Speaker = turn.as ?? "owner";
@@ -653,6 +659,9 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     };
     if (driven.error) observed.reply = `[error: ${driven.error}]`;
     scores.push(scoreTurn(conv, i, turn, observed));
+  }
+  } finally {
+    if (conv.clock) __setPromptClockForBench(null);
   }
   return { scores, turnIds };
 }

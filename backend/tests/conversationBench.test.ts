@@ -95,8 +95,8 @@ describe("the fixture", () => {
     // objection-reruns, hedged-draft, ladder-falls-through), and
     // ASK-02's three (not-a-name, hub-named-it, public-figure), and
     // CHAT-13 chunk B's subject-before-pattern.
-    expect(CONVERSATIONS.length).toBe(95);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(95);
+    expect(CONVERSATIONS.length).toBe(96);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(96);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(c.id === "link-is-the-answer" ? 1 : 3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
@@ -104,6 +104,14 @@ describe("the fixture", () => {
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
       expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern", "Bay", "Sunday", "Tuesday", "Clover", "Indigo", "Cosmo", "Rivet", "Mopey", "Lord", "Answer", "Serena", "Vale"]).toContain(name);
     }
+  });
+
+  test("ALM-01: the derived-dates row pins its clock to a Monday at 10:43 pm", () => {
+    const row = byId("derived-dates");
+    const d = new Date(row.clock!);
+    expect(d.getDay()).toBe(1);
+    expect(d.getHours()).toBe(22);
+    expect(d.getMinutes()).toBe(43);
   });
 
   test("RECALL-03: the recall-past-the-window fillers spend the window before turn 1 (the first seeded set's fillers did not)", async () => {
