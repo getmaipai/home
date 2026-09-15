@@ -326,6 +326,21 @@ export function lastTurnSubjects(conversationId: string): SubjectRef[] {
   return row ? turnSubjectsOf(row) : [];
 }
 
+/** CHAT-13 (chunk C): the subjects of the conversation's last two turns,
+ * newest first, for the carried-unresolved decay (dev.md section 16
+ * part 5 rule 4): a carried `unresolved` entry drops when it appears on
+ * both stacks and the utterance does not re-mention it. */
+export function lastTwoTurnsSubjects(conversationId: string): SubjectRef[][] {
+  const rows = db
+    .select({ subjects: conversationTurns.subjects })
+    .from(conversationTurns)
+    .where(eq(conversationTurns.conversationId, conversationId))
+    .orderBy(desc(conversationTurns.createdAt))
+    .limit(2)
+    .all();
+  return rows.map((r) => turnSubjectsOf(r));
+}
+
 // ==== Conversations: the thread record (step 3) ====
 //
 // One open conversation per (person, surface) at a time in practice:

@@ -42,7 +42,7 @@ import { people, conversationTurns, memoryRecords, episodes } from "@/db/schema"
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
-import { resolveOrCreateConversation, getPendingAsk, setPendingAsk } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, turnSubjectsOf } from "@/lib/conversationHistory";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { PersonRow } from "@/types";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
@@ -89,6 +89,22 @@ async function owner() {
   const actor = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
   return { client, actor };
 }
+
+async function withChat<T>(reply: string, fn: () => Promise<T>): Promise<T> {
+  __resetLlmSupervisorForTests();
+  const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+  const stub = startStubLlmServer(0, { scriptedChatReply: () => reply });
+  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+  try {
+    return await fn();
+  } finally {
+    stub.stop();
+    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    __resetLlmSupervisorForTests();
+  }
+}
+
+const subjectsOfTurn = (turnId: string) => turnSubjectsOf(db.select({ subjects: conversationTurns.subjects }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
 
 describe("lib/turnEngine.ts runTurn()", () => {
   test("safety refuse: a harmful request never reaches plugin routing or the model", async () => {
@@ -4913,6 +4929,104 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(consented.value.source).toBe("plugin_error");
       expect(consented.value.reply.text).toBe(LOOKUP_FAILED_LINE);
       expect(retained(consented.value.turn_id)?.map((o) => [o.packageId, o.status, o.via])).toEqual([["websearch", "failed", "ask"]]);
+    });
+  });
+});
+
+describe("CHAT-13 chunk C1: a carried unresolved reference decays after two turns", () => {
+  test("an unresolved ref carried from the previous turn drops on the next turn when the utterance does not re-mention it", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds like a fun weekend.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend", { conversationId: conv.value.id });
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      expect(subjectsOfTurn(first.value.turn_id)).toEqual([{ type: "unresolved", surface_form: "Clover", candidate_kinds: [], provenance: first.value.turn_id, confidence: 0.8, carried_question: null }]);
+      // Turn two: no name in the utterance; the carry keeps Clover (unresolved, on one turn only).
+      const second = await runTurn(actor, "chat", "should I bring it back tomorrow", { conversationId: conv.value.id });
+      expect(second.ok).toBe(true);
+      if (!second.ok) return;
+      expect(subjectsOfTurn(second.value.turn_id)).toEqual([{ type: "unresolved", surface_form: "Clover", candidate_kinds: [], provenance: first.value.turn_id, confidence: 0.8, carried_question: null }]);
+      // Turn three: Clover is now on both the newest and the older turn, and the
+      // utterance does not re-mention it: it decays.
+      const third = await runTurn(actor, "chat", "the weather looks fine", { conversationId: conv.value.id });
+      expect(third.ok).toBe(true);
+      if (!third.ok) return;
+      expect(subjectsOfTurn(third.value.turn_id)).toEqual([]);
+    });
+  });
+
+  test("the same unresolved ref re-mentioned in the utterance does not decay", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds like a fun weekend.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend", { conversationId: conv.value.id });
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const second = await runTurn(actor, "chat", "should I bring it back tomorrow", { conversationId: conv.value.id });
+      expect(second.ok).toBe(true);
+      if (!second.ok) return;
+      // Turn three re-mentions Clover: it stays carried.
+      const third = await runTurn(actor, "chat", "I think Clover will bring it back", { conversationId: conv.value.id });
+      expect(third.ok).toBe(true);
+      if (!third.ok) return;
+      // Clover is named in this turn, so it resolves fresh; the turn's own
+      // subject is Clover (unresolved, fresh).
+      expect(subjectsOfTurn(third.value.turn_id).some((s) => s.type === "unresolved" && s.surface_form === "Clover")).toBe(true);
+    });
+  });
+
+  test("an unresolved ref that is only on the newest turn is always carried", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds like a fun weekend.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend", { conversationId: conv.value.id });
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      // Turn two: no name; Clover carried (on one turn only).
+      const second = await runTurn(actor, "chat", "should I bring it back tomorrow", { conversationId: conv.value.id });
+      expect(second.ok).toBe(true);
+      if (!second.ok) return;
+      expect(subjectsOfTurn(second.value.turn_id)).toEqual([{ type: "unresolved", surface_form: "Clover", candidate_kinds: [], provenance: first.value.turn_id, confidence: 0.8, carried_question: null }]);
+      // Turn three: no name; Clover now on both turns, not re-mentioned: decays.
+      const third = await runTurn(actor, "chat", "the weather looks fine", { conversationId: conv.value.id });
+      expect(third.ok).toBe(true);
+      if (!third.ok) return;
+      expect(subjectsOfTurn(third.value.turn_id)).toEqual([]);
+      // Turn four: no name, no carry: empty.
+      const fourth = await runTurn(actor, "chat", "nothing else to say", { conversationId: conv.value.id });
+      expect(fourth.ok).toBe(true);
+      if (!fourth.ok) return;
+      expect(subjectsOfTurn(fourth.value.turn_id)).toEqual([]);
+    });
+  });
+
+  test("a household subject carried across two turns is unaffected by the decay rule", async () => {
+    const { actor } = await owner();
+    const { ensureSubjectEntity } = await import("@/lib/subjects");
+    const rover = ensureSubjectEntity(actor, { name: "Rover", kind: "pet" }, true);
+    if (!rover.ok) throw new Error(rover.error);
+    const roverId = rover.value!.id;
+    await withChat("He seems to be doing better.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const first = await runTurn(actor, "chat", "Rover's been feeling a little off", { conversationId: conv.value.id });
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      expect(subjectsOfTurn(first.value.turn_id)).toEqual([{ type: "household", entity_id: roverId, carried_question: null }]);
+      // Turn two: no name; Rover carried.
+      const second = await runTurn(actor, "chat", "should I take him to the vet tomorrow", { conversationId: conv.value.id });
+      expect(second.ok).toBe(true);
+      if (!second.ok) return;
+      expect(subjectsOfTurn(second.value.turn_id)).toEqual([{ type: "household", entity_id: roverId, carried_question: null }]);
+      // Turn three: no name; Rover is a household ref, not unresolved: still carried.
+      const third = await runTurn(actor, "chat", "the weather is fine for a walk", { conversationId: conv.value.id });
+      expect(third.ok).toBe(true);
+      if (!third.ok) return;
+      expect(subjectsOfTurn(third.value.turn_id)).toEqual([{ type: "household", entity_id: roverId, carried_question: null }]);
     });
   });
 });

@@ -54,6 +54,7 @@ import {
   routingStats,
   resolveSupersedes,
   lastTurnSubjects,
+  lastTwoTurnsSubjects,
   nextOpenQuestionFor,
   pendingOpenQuestionsFor,
   markOpenQuestionAsked,
@@ -2146,7 +2147,22 @@ function resolveTurnSubjects(input: {
     },
     turnId,
   );
-  const carried = resolved.subjects.length === 0 && !supersedes ? lastTurnSubjects(conversationId).slice(0, 2) : [];
+  // CHAT-13 chunk C1: a carried unresolved reference only lives two turns
+  // unless the utterance re-mentions it (dev.md section 16 part 5, rule
+  // 4; household and world carry unchanged).
+  let carried: SubjectRef[] = [];
+  if (resolved.subjects.length === 0 && !supersedes) {
+    const lastTwo = lastTwoTurnsSubjects(conversationId);
+    const newest = lastTwo[0] ?? [];
+    const older = lastTwo[1] ?? [];
+    const lowerText = text.toLowerCase();
+    carried = newest.filter((s) => {
+      if (s.type !== "unresolved") return true;
+      const sf = s.surface_form.toLowerCase();
+      const onOlder = older.some((o) => o.type === "unresolved" && o.surface_form.toLowerCase() === sf);
+      return !onOlder || lowerText.includes(sf);
+    });
+  }
   // One entry per household entity (a name and its alias both resolve
   // to the one row; LOOKUP-02's set showed the dishwasher twice).
   const seenEntities = new Set<string>();
