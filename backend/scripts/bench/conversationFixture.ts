@@ -1227,6 +1227,42 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "who's in it", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
     ],
   },
+  // The set of 2026-09-15 on d4fbf6e, the three reads of Session A's
+  // lane: a child's asserted state the owner has no record of is an
+  // invention (cross-person-recall#2's own words, a roster household);
+  // a remark about a name is not the answer to who they are; the
+  // persona's own example line said back on a statement is the parrot,
+  // read before the action family.
+  {
+    id: "child-state-invented",
+    category: "memory",
+    note: "the set's read: 'he's been asleep in the dark since we got here' asserts a state of a child the owner has no record of; the household activity shape reads a state after 'is' or 'has been' as it reads a progressive, and the honest line stands in",
+    turns: [
+      { say: "does Bramble sleep with a light on", seedReply: "Nope, he's been asleep in the dark since we got here.", expect: { signal: { primary_act: "question" }, guardAnyOf: ["invention"], mustNotContain: "asleep|in the dark|since we got here" } },
+      { say: "ok, does he nap after school", seedReply: "He's been napping every afternoon this week.", expect: { guardAnyOf: ["invention"], mustNotContain: "napping every afternoon" } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "remark-not-an-answer",
+    category: "memory",
+    note: "the set's read: the model's own 'someone you know or a public figure?' is bound as the ask; a remark about the name with a tag question is no answer, so nothing is learned, no entity is made and no world subject stands; the turn is the model's",
+    turns: [
+      { say: "Nova keeps texting me about that show", seedReply: "Nova? Someone you know or a public figure?", expect: { signal: { primary_act: "inform" }, pendingAsk: "who", subjects: [{ type: "unresolved", name: "Nova" }] } },
+      { say: "she was on that show for years, wasn't she", expect: { pendingAsk: null, entityAbsent: "Nova", subjectsAbsent: [{ type: "world", name: "Nova" }], mustNotContain: "got it, nova", humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "example-line-not-an-answer",
+    category: "etiquette",
+    note: "the set's read: the persona's own example line said back on a plain statement it does not fit is the parrot (example_parrot, read before the action family); the retry carries its note and the reply answers the statement. The default persona's examples claim no action or result now, so the seeded line is one of its tone lines.",
+    turns: [
+      { say: "Pippa has soccer practice on Tuesdays", seedReply: "Sounds like a long day, put your feet up.", expect: { signal: { primary_act: "inform" }, guardHits: ["example_parrot"], retries: 1, toolRan: null, mustNotContain: "put your feet up|added to the list", humanVerdict: true } },
+      { say: "what day does she have it", expect: { signal: { primary_act: "question" }, mustContain: "tuesday", guard: null } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
   // REP-01 (dev.md section 16 part 3): the cross-turn repetition guard
   // and the objection. The previous reply is seeded so the repeat is
   // verbatim by construction (a live lookup's summary is never the same

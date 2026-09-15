@@ -6101,3 +6101,90 @@ lines) are never a repeat now, the exemption by construction the
 design named, in REP-01's own commit. The pair and the full suite run
 green.
 
+
+## The set's three reads (2026-09-16)
+
+The set on d4fbf6e (238, 237, 243 of 313) left three findings for
+this lane, each with its regression row now.
+
+**A child's asserted state.** `cross-person-recall#2` answered "does
+Bramble sleep with a light on" with "Nope, he's been asleep in the
+dark since we got here": the child's record never reached the owner's
+context (that check passed), and the model asserted a state of a child
+the owner has no record of. The household activity shape
+(`claimsUngroundedHouseholdActivity()`) read progressives only ("he's
+sleeping"); it reads a state after "is", "has been" or "'s been" now
+(asleep, awake, in bed, napping, home, at school, at work, sick,
+`HOUSEHOLD_STATES`), grounded by the state's own synonyms (a line
+about the subject with "went to bed" grounds "asleep", "got back"
+grounds "home"; `STATE_SYNONYMS`, the state's own words only, since an
+everyday word like "up" or "back" grounds a state it has nothing to
+do with) rather than a verb's inflections, and never by a question
+("does Bramble sleep with a light on" carries no fact about his
+sleep): the asserting clauses of the utterance and of the person's
+earlier turns alone ground a state (`assertedPartOf()`: a comma
+fragment led by a request or a question word is dropped, the first by
+a copula too, the rest kept in order so an appositive stays whole;
+"please dim the lights, Bramble's asleep" still grounds "he's
+asleep", "does Bramble sleep with a light on" a turn ago grounds
+nothing, a vocative or an interjection ahead of the question, "Sage,
+is Bramble asleep?", leaves it a question, and a roster name that is
+also a modal, "Will is asleep", is no request lead), so the claim is
+an invention and the honest line stands. Not "out" or "away" (idioms, and the world's "out on
+tour"), not a feeling (an empathetic "sounds like he's upset" is a
+reply a person wants), "sick of" is an idiom, and a hedged claim, a state or an activity
+alike ("she's probably napping", "she's probably sleeping", "he's
+asleep, I'd guess"), is an inference, never a claim, the hedge read in
+the claim's own clause before or after it (the reviews). A pronoun with no roster
+name in play stays the world's. Rows: `child-state-invented` (a roster
+household, Sage asking about Bramble); the corpus rows
+`set-child-state-invented` and `-grounded`.
+
+**A remark is not the answer.** `comment-not-definition#2` said "Got
+it, Clover" to "she was in that show for years, wasn't she": ASK-02's
+world mark ("in that show") fired on a remark. A mark alone counts in
+an answer's shape only (`worldAnswer()`: no question in it, no tag
+question, with or without the comma a voice transcript drops, and no
+question led by an interrogative without its mark, "isn't she
+famous"; no length cap, which sent an honest longer answer down the
+old path; and the same reading gates the kind-noun and full-name
+paths, so "she was an actress on that show for years, wasn't she"
+learns nothing either; the sentence that carries the answer is what
+is read, so "an actress. Do you know her?" still answers, and an echo
+of the name with a question mark, "Nova Reyes? the actress from that
+show", leads nothing and gives the full name, the reviews). The row `remark-not-an-answer`: the model's own "someone you
+know or a public figure?" bound, the remark leaves nothing learned, no
+entity and no world subject, and the turn is the model's.
+
+**The persona's example line said back.** `pronoun-follow-up#1` and
+`household-location#2` drew "Got it, added to the list." on a plain
+statement; the prompt read (a one-row run through the recording proxy)
+found it in the system prompt itself: the default persona's own
+few-shot voice line, said back verbatim, which the action family read
+first as a false list claim (three cuts, then a bank line), and whose
+retry with the statement note drew "I'll make sure to keep that in
+mind", cut the same way. The parrot read (`guardExampleParrot()`)
+comes before the action family on a statement turn now (after a
+request the action family keeps the first read: a parrot that is also
+a false completion is the claim, the review), is a register-family
+skip (the line is an example of the voice, never an answer), and the
+retry carries its own note (`EXAMPLE_PARROT_RETRY_NOTE`: the examples show
+how you sound, never what to say). Rows: `example-line-not-an-answer`,
+the corpus row `set-example-parrot-before-action`. Tests:
+`tests/setReads.test.ts`. The coordinator's call on the record, made
+the same day: a voice example that claims an action the model has not
+taken is a prompt line teaching a lie (the platform's own rule, a
+prompt standing in for a technique loses to the prebuilt answer), so
+the default persona's example set drops every line that claims an
+action or a result ("It's 68 and clear right now", "I'll remind you
+again tonight", "Got it, added to the list.", "The timer's done.") and
+keeps tone on a plain reply ("Yep, that works, see you at six then.",
+"Sounds like a long day, put your feet up.", "Fair point, I'd go with
+the second one and keep it simple.", "Nice, tell me how it goes on
+Saturday."); the parrot read stays as the guard for any persona a
+household writes, and reads a line of four content words or more (a
+short tone line, "Yep, that works.", is a reply a model produces on
+its own; the review). The `default` package is not provenance-pinned (the
+bundled hash covers catalog packages), so the manifest edit is the
+repo's own; a test reads the manifest and refuses an example the
+action family would cut.

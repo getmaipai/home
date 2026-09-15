@@ -860,11 +860,32 @@ function worldAnswer(plain: string, name?: string): { kind: string; name: string
   const householdNouns = [...relationNouns().entries()].filter(([, info]) => info.type !== null || info.kind === "person" || info.kind === "pet").map(([noun]) => noun);
   const household = new RegExp(`(?<![\\p{L}])(?:my|our|one of my|one of our|a|an|the)\\s+(?:[a-z-]+\\s+)?(?:${householdNouns.map(escapeRe).join("|")})(?![\\p{L}])`, "iu").test(plain) || LOCALITY_RE.test(plain);
   if (household) return null;
+  // The sentence that carries the answer is what is read ("an actress.
+  // Do you know her?" answers first; "Nova? the actress from that show"
+  // echoes the name and answers; a review).
+  // An echo of the name with a question mark leads nothing ("Nova?",
+  // "Nova Reyes?", "nova?" in a transcript): the answer follows it.
+  const echo = name ? new RegExp(`^\\W*${escapeRe(name)}(?:\\s+\\p{L}[\\p{L}'-]*){0,2}\\?\\s*`, "iu") : /^\W*\p{Lu}[\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*)?\?\s*/u;
+  const echoed = echo.exec(plain)?.[0] ?? "";
+  const body = plain.slice(echoed.length);
+  const sentences = body.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter((x) => x.length > 0);
+  const answerSentence = sentences.find((x) => WORLD_KIND_NOUN_RE.test(x) || WORLD_MARK_RE.test(x) || (name !== undefined && namePattern(name).test(x))) ?? sentences[0] ?? body;
+  const answerShaped = !/\?/.test(answerSentence) && !/,?\s*(?:wasn'?t|isn'?t|didn'?t|doesn'?t|right)\s*(?:he|she|they|it)?\s*[.!]?$/i.test(answerSentence) && !/^\W*(?:isn'?t|aren'?t|wasn'?t|is|are|was|were|does|doesn'?t|did|didn'?t|who|what|which|when|where|why|how)\b/i.test(answerSentence);
+  if (!answerShaped) return null;
   // The noun sits where an answer puts it (first, or after a lead-in
   // and a pronoun with its copula), as the household parser's does.
-  const nounMatch = WORLD_KIND_NOUN_RE.exec(plain);
-  const noun = nounMatch && ANSWER_LEAD_FULL_RE.test(plain.slice(0, nounMatch.index)) ? nounMatch[1]!.toLowerCase() : null;
-  const marked = WORLD_MARK_RE.test(plain);
+  const nounMatch = WORLD_KIND_NOUN_RE.exec(body);
+  const noun = nounMatch && ANSWER_LEAD_FULL_RE.test(body.slice(0, nounMatch.index)) ? nounMatch[1]!.toLowerCase() : null;
+  // A mark alone ("famous", "on that show") counts in an answer's shape
+  // only: a statement with no question and no tag question in it (a
+  // length cap sent an honest longer answer down the old path; a
+  // review). "She was in that show for years, wasn't she" is a remark
+  // about the person, not the answer to who they are (the set of
+  // 2026-09-15, comment-not-definition#2 said "Got it, Clover" to it).
+  // Every path: a remark with a tag question ("she was an actress on
+  // that show for years, wasn't she") and a question without its mark
+  // ("isn't she famous") are no answer, whatever they name (a review).
+  const marked = WORLD_MARK_RE.test(body);
   // The full name the answer gives: a proper-noun span that contains
   // the asked name and is longer than it.
   const spans = name ? candidatesIn(plain).filter((c) => c.tokens > 1 && namePattern(name).test(c.name)) : [];

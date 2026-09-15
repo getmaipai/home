@@ -584,8 +584,36 @@ function claimsUngroundedHouseholdLocation(sentence: string, ctx: GuardContext, 
 // utterance grounded "watching".
 const ACTIVITY_VERBS =
   "watching|playing|eating|drinking|sleeping|napping|resting|cooking|baking|reading|writing|studying|working|driving|running|jogging|swimming|practicing|practising|training|exercising|visiting|shopping|cleaning|painting|drawing|listening|walking|hiking|biking|cycling|skating|skiing|dancing|singing|gaming|streaming|gardening|fishing|camping|building|coding|travelling|traveling|flying|sitting|waiting|staying|hanging out|having (?:dinner|lunch|breakfast|a snack|a nap)|doing (?:homework|chores|the dishes|laundry)";
+// The set of 2026-09-15 (cross-person-recall#2): "he's been asleep in
+// the dark since we got here" asserted a child's state the owner has no
+// record of, and the shape read progressives only. A state after "is"
+// or "has been" (asleep, awake, in bed, out, away, home, at school,
+// sick, upset, tired) is the same claim about the same household
+// subject, grounded the same way.
+// Not "out" or "away" (idioms and the world's "out on tour"), and not a
+// feeling (upset, tired: an empathetic inference a person wants, a
+// review); a hedged one ("sounds like he's upset", "she's probably
+// tired") is never a claim.
+const HOUSEHOLD_STATES = "asleep|awake|in bed|napping|home|at school|at work|at practice|sick(?!\\s+(?:of|and tired))|ill|unwell|poorly";
+// The state's own words only: an everyday word ("up", "cold", "back")
+// grounds a state it has nothing to do with (a review).
+const STATE_SYNONYMS: Record<string, readonly string[]> = {
+  asleep: ["asleep", "sleep", "sleeping", "bed", "nap", "napping", "dozed", "dozing"],
+  awake: ["awake", "woke", "wake", "waking"],
+  "in bed": ["bed", "asleep", "sleeping", "lying"],
+  napping: ["nap", "napping", "asleep", "sleeping", "dozing"],
+  home: ["home", "returned", "house"],
+  "at school": ["school", "class", "classes"],
+  "at work": ["work", "office", "shift"],
+  "at practice": ["practice", "training", "rehearsal"],
+  sick: ["sick", "ill", "unwell", "poorly", "fever", "flu", "vomiting", "nauseous"],
+  ill: ["ill", "sick", "unwell", "poorly", "fever", "flu"],
+  unwell: ["unwell", "sick", "ill", "poorly", "fever"],
+  poorly: ["poorly", "sick", "ill", "unwell"],
+};
+const HEDGED_STATE_RE = /\b(?:sounds like|seems like|seems|maybe|might be|could be|probably|i'?d guess|i think|i guess|perhaps|i'?d say|i suppose)\b/i;
 const ACTIVITY_CLAIM_RE = new RegExp(
-  String.raw`(?:^|[^\p{L}])(?:(if|when|whenever|while|unless|once|whether|as long as)\s+)?(he|she|they|you|your\s+(?:brother|sister|mom|mother|dad|father|son|daughter|kids?|wife|husband|partner|friend|grandma|grandpa|family|dog|cat)|\p{L}[\p{L}'-]+)(?:'s|'re|\s+(?:is|are))\s+((?:also|even|still|currently|probably|busy)\s+)?(${ACTIVITY_VERBS})\b([^.!?;,]*)`,
+  String.raw`(?:^|[^\p{L}])(?:(if|when|whenever|while|unless|once|whether|as long as)\s+)?(he|she|they|you|your\s+(?:brother|sister|mom|mother|dad|father|son|daughter|kids?|wife|husband|partner|friend|grandma|grandpa|family|dog|cat)|\p{L}[\p{L}'-]+)(?:'s|'re|'ve|\s+(?:is|are|has|have))(?:\s+been)?\s+((?:also|even|still|currently|probably|busy)\s+)?(${ACTIVITY_VERBS}|${HOUSEHOLD_STATES})\b([^.!?;,]*)`,
   "giu",
 );
 const RIGHT_NOW_RE = /\b(?:right now|at the moment|currently|as we speak|too|as well|tonight|today|still|also)\b/i;
@@ -629,16 +657,80 @@ function namesIn(text: string, ctx: GuardContext): string[] {
     .filter((first) => first && new RegExp(`(?<!\\p{L})${first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\p{L})`, "iu").test(text));
 }
 
+/** The asserting part of an utterance: its clauses that are neither a
+ * question nor a request ("Bramble's asleep, can you dim the lights"
+ * asserts the first; "does Bramble sleep with a light on" asserts
+ * nothing). */
+// A request or a question lead: lowercase, or the sentence-initial
+// capital of a question word (never "Will", "Set" or "Play" as a roster
+// name; a review); a copula ("is", "are") leads only the utterance's
+// first fragment ("is Bramble asleep"), never a later one ("Bramble,
+// the little one, is asleep already"; a review).
+const REQUEST_LEAD_RE = /^\s*(?:[cC]an|[cC]ould|[wW]ould|[sS]hould|will|[dD]o|[dD]oes|[dD]id|[hH]as|[hH]ave|[wW]hat|[wW]hen|[wW]here|[wW]ho|[wW]hy|[hH]ow|[wW]hich|[pP]lease|[tT]ell me|[lL]et me know|[rR]emind me|set|add|turn|play|[iI]sn'?t|[aA]ren'?t|[dD]oesn'?t|[dD]idn'?t|[hH]asn'?t)\b/;
+const COPULA_LEAD_RE = /^\s*(?:[iI]s|[aA]re|[wW]as|[wW]ere)\b/;
+// A vocative or an interjection ahead of the question ("Sage, is
+// Bramble asleep?", "hey, is Bramble asleep"): a fragment of one or two
+// words with no verb, so the copula-led fragment after it is still the
+// question (a review).
+const VERBLESS_LEAD_RE = /^\s*(?:\p{L}[\p{L}'-]*)(?:\s+\p{L}[\p{L}'-]*)?\s*$/u;
+function assertedPartOf(utterance: string): string {
+  // Sentences, then comma fragments; a fragment led by a request or a
+  // question word is dropped (the first fragment by a copula too), the
+  // rest kept in order, so an appositive stays whole and "please dim the
+  // lights, Bramble's asleep" asserts the second (the reviews).
+  const kept: string[] = [];
+  for (const sentence of utterance.split(/(?<=[.!?;])\s+/)) {
+    const fragments = sentence.split(/,\s*|\s+(?:so|and|but)\s+(?=(?:can|could|would|will|should|do|does|did|what|when|where|who|why|how|which|please)\b)/i).map((f) => f.trim().replace(/\?+\s*$/, "")).filter((f) => f.length > 0);
+    const questionWhole = /\?\s*$/.test(sentence.trim());
+    const asserting = fragments.filter((f, i) => {
+      if (REQUEST_LEAD_RE.test(f)) return false;
+      // A copula leads a question when it is the first fragment, or when
+      // everything before it is verbless (a name, "hey"), or when the
+      // sentence is a question and the copula sits mid-fragment after a
+      // bare name ("Sage is Bramble asleep?", the transcript with no comma).
+      if (COPULA_LEAD_RE.test(f) && fragments.slice(0, i).every((g) => VERBLESS_LEAD_RE.test(g))) return false;
+      if (questionWhole && i === 0 && /^\s*\p{L}[\p{L}'-]*\s+(?:is|are|was|were|does|did|has|have|can|could|will|would|should)\b/iu.test(f)) return false;
+      return true;
+    });
+    if (asserting.length > 0) kept.push(asserting.join(", "));
+  }
+  return kept.join(". ");
+}
+
 /** True when some clause of `sentence` gives a household subject an
  * activity no line about that subject supports. */
 function claimsUngroundedHouseholdActivity(sentence: string, ctx: GuardContext): boolean {
   const recent = [ctx.utterance, ...(ctx.history ?? []).slice(-RECENT_TURNS_FOR_RECALL)].join(" ");
-  const lines = [ctx.utterance, ...(ctx.history ?? []), ...(ctx.sources ?? []), ...(ctx.episodes ?? []), ...(ctx.grounding ?? [])];
+  // A question grounds nothing ("does Bramble sleep with a light on"
+  // carries no fact about his sleep; a review of the state read), but
+  // the asserted part of a mixed turn does ("Bramble's asleep, can you
+  // dim the lights"; a review): the utterance's own asserting clauses
+  // are the grounding line.
+  const asserted = assertedPartOf(ctx.utterance);
+  // The person's earlier turns are read the same way: an earlier
+  // question grounds nothing either (a review).
+  const lines = [...(asserted ? [asserted] : []), ...(ctx.history ?? []).map(assertedPartOf).filter((l) => l.length > 0), ...(ctx.sources ?? []), ...(ctx.episodes ?? []), ...(ctx.grounding ?? [])];
   for (const m of sentence.matchAll(ACTIVITY_CLAIM_RE)) {
     if (m[1]) continue; // "if you're driving": advice, not a claim
     const subject = m[2]!.toLowerCase();
     const clause = m[5] ?? "";
-    const forms = inflectionsOf(m[4]!);
+    const state = STATE_SYNONYMS[m[4]!.toLowerCase()];
+    // A hedged claim, a state or an activity alike ("she's probably
+    // napping", "she's probably sleeping", "he's asleep, I'd guess"), is
+    // an inference, never a claim: the hedge read in the claim's own
+    // clause, before or after it (the reviews).
+    const before = sentence.slice(0, m.index ?? 0);
+    const lastBoundary = (text: string): number => {
+      let at = -1;
+      for (const b of text.matchAll(/[;,]|\b(?:and|but)\b/g)) at = b.index ?? at;
+      return at;
+    };
+    const clauseStart = lastBoundary(before);
+    const after = sentence.slice((m.index ?? 0) + m[0].length);
+    const clauseEnd = after.search(/[;]|\b(?:and|but|so|because|since)\b/);
+    const ownClause = before.slice(clauseStart < 0 ? 0 : clauseStart) + " " + m[0] + " " + (clauseEnd < 0 ? after : after.slice(0, clauseEnd));
+    if (HEDGED_STATE_RE.test(ownClause)) continue;
+    const forms = state ? new Set(state) : inflectionsOf(m[4]!);
     const objectWords = objectWordsOf(clause);
     let name: string | null = null;
     if (subject === "you" || subject.startsWith("your ")) {
@@ -1231,6 +1323,9 @@ export const REPEAT_RETRY_NOTE = "You already said that and the person heard it;
 export function repeatRetryNote(ctx: Pick<GuardContext, "utterance" | "target" | "repair">): string {
   return isObjectionTurn(ctx) ? `${REPEAT_RETRY_NOTE} They said: "${ctx.utterance.trim()}". Do not say that you understand; address what they asked.` : REPEAT_RETRY_NOTE;
 }
+/** The note the retry carries after the persona's own example line was
+ * said back: the examples show the voice, never the answer. */
+export const EXAMPLE_PARROT_RETRY_NOTE = "The example lines in your instructions show how you sound, never what to say; they are not answers. Respond to what the person actually said.";
 export function isRepeatReason(reason: GuardReason | null | undefined): boolean {
   return reason === "repeat_sentence" || reason === "repeat_reply" || reason === "self_assertion";
 }
@@ -1869,6 +1964,10 @@ function normalizeForCompare(text: string): string {
 
 function guardExampleParrot(sentence: string, ctx: GuardContext): GuardReason | null {
   if (!ctx.personaExamples || ctx.personaExamples.length === 0) return null;
+  // A short line ("Yep, that works.") is a reply a model produces on
+  // its own; the parrot is a distinctive line, four content words or
+  // more, said back whole (a review).
+  if (tokenize(sentence).size < 4) return null;
   const normalized = normalizeForCompare(sentence);
   if (!normalized) return null;
   return ctx.personaExamples.some((ex) => normalizeForCompare(ex) === normalized) ? "example_parrot" : null;
@@ -2002,7 +2101,7 @@ export function bankLineNote(sentence: string): string | null {
 // LOOKUP-02: the deliverable denial is dropped wherever it sits (the
 // engine already ran the lookup or is about to); the honest line stands
 // in only when the denial was the whole reply.
-const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "repeat_question", "pronoun_mismatch", "false_capability", "banned_phrase", "repeat_sentence", "self_assertion"]);
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "repeat_question", "pronoun_mismatch", "false_capability", "banned_phrase", "repeat_sentence", "self_assertion", "example_parrot"]);
 
 /** REG-01: a statement (an inform, a commissive, a greeting, a closing
  * or a backchannel by the signal; a statement or first-person shape
@@ -2039,7 +2138,7 @@ export function emptiedLine(ctx: Pick<GuardContext, "act" | "shape" | "utterance
  * act's own line stands and the engine retries once with its note;
  * `claimed_experience` keeps its own line and its own rule (item 1b). */
 export function isRegisterSkip(reason: GuardReason, ctx: GuardContext): boolean {
-  return reason === "assistant_register" || reason === "repeat_question" || reason === "banned_phrase" || reason === "repeat_sentence" || reason === "self_assertion" || (reason === "claimed_experience" && !experienceTurn(ctx)) || statementActionSkip(reason, ctx);
+  return reason === "assistant_register" || reason === "repeat_question" || reason === "banned_phrase" || reason === "repeat_sentence" || reason === "self_assertion" || reason === "example_parrot" || (reason === "claimed_experience" && !experienceTurn(ctx)) || statementActionSkip(reason, ctx);
 }
 
 /** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
@@ -2153,6 +2252,16 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
     guardAssistantRegister(s, ctx, isFirstSentence) ??
     guardSelfAssertion(s, ctx) ??
     guardRepeatQuestion(s, ctx) ??
+    // The set of 2026-09-15 (pronoun-follow-up#1, household-location#2):
+    // "Got it, added to the list." on a plain statement was the persona's
+    // own example line said back, and the action family read it first as
+    // a false list claim (three cuts, then a bank line). On a statement
+    // the parrot read comes first: the line is an example of the voice,
+    // never an answer, and the retry says so. After a request the action
+    // family keeps the first read (a parrot that is also a false
+    // completion, "The timer's done." with no timer run, is the claim;
+    // a review).
+    (isStatementTurn(ctx) ? guardExampleParrot(s, ctx) : null) ??
     guardUnsupportedAction(s, ctx) ??
     guardFalseCapability(s, ctx) ??
     guardCapabilityClaim(s, ctx) ??

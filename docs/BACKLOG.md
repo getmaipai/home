@@ -1791,6 +1791,22 @@ invented for the roster's household, and added to
     `backend/tests/rep01.test.ts`, the corpus rows. Exit: `bash
     scripts/check.sh`.
 
+<a id="set-reads-0915"></a>
+
+- [x] **The set's three reads: a child's asserted state, a remark is not the answer, the example line said back** (S)
+    Done 2026-09-16 (docs/dev/session-a.md "The set's three reads"):
+    the household activity shape reads a state after "is" or "has
+    been" ("he's been asleep in the dark") as it reads a progressive,
+    so a child's state the owner has no record of is an invention; a
+    world mark in a `who` answer counts in an answer's shape only (no
+    question, no tag, eight words or fewer), so "she was on that show
+    for years, wasn't she" learns nothing; the persona's own example
+    line said back ("Got it, added to the list.") is `example_parrot`
+    read before the action family, a register-family skip with its own
+    retry note. Rows: child-state-invented, remark-not-an-answer,
+    example-line-not-an-answer; the corpus rows; tests/setReads.test.ts.
+    Exit: `bash scripts/check.sh`.
+
 <a id="ask-02"></a>
 
 - [x] **ASK-02: Candidate hygiene, brands and services, hub-introduced names, the confirmed public figure** (S)

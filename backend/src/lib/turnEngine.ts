@@ -31,7 +31,7 @@ import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, normalizeForRepeat, splitIntoSentences, lookupShapeOf, lookupAnswered, readLookupDraft, LOOKUP_READ_MAX_CHARS, LOOKUP_FAILED_LINES, bannedPhraseRetryNote, repeatRetryNote, isRepeatReason, isRepeatReply, type LookupRead, type LookupShape, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, normalizeForRepeat, splitIntoSentences, lookupShapeOf, lookupAnswered, readLookupDraft, LOOKUP_READ_MAX_CHARS, LOOKUP_FAILED_LINES, bannedPhraseRetryNote, repeatRetryNote, isRepeatReason, isRepeatReply, EXAMPLE_PARROT_RETRY_NOTE, type LookupRead, type LookupShape, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
@@ -4162,7 +4162,7 @@ async function runTurnHoldingLease(
           const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => rawText.toLowerCase().includes(p.toLowerCase())) : null;
           // REP-01: a repeat or a self-assertion emptied it: the note says
           // so, and carries the objection when there was one.
-          const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : STATEMENT_RETRY_NOTE;
+          const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
           const again = await complete("chat", [...prepared.messages, { role: "system", content: note }], { thinking: false });
           generationDone = Date.now();
           if (again.ok) {
@@ -5110,7 +5110,7 @@ async function runTurnStreamHoldingLease(
               if (generations >= 2) return null;
               generations++;
               const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => modelMessages.some((m) => m.content.toLowerCase().includes(p.toLowerCase()))) : null;
-              const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : STATEMENT_RETRY_NOTE;
+              const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
               const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: note }], { thinking: false }, opts.signal);
               if (!again.ok) return null;
               return gateOutputSafety(holdOpening(again.tokens, false), actor, prepared.turnId);
