@@ -400,6 +400,13 @@ function contentWords(text: string): Set<string> {
   return new Set([...tokenize(text.replace(/[<>]/g, " "))].map((w) => w.replace(/'s$|'$/, "")));
 }
 
+/** Capitalized words that are not sentence-initial (case-insensitive). */
+function properNounsIn(text: string): string[] {
+  return [...text.matchAll(/\b[A-Z][a-z]+\b/g)]
+    .filter((match) => match.index !== 0 && !/[.!?] $/.test(text.slice(0, match.index)))
+    .map((match) => match[0]!.toLowerCase());
+}
+
 // Words the prompt's rules put into any fact of the shape, never a sign
 // of the example itself: the POSSESSIVE RULE turns the person's "my"
 // into "his"/"her", so a pronoun is in every resolved fact.
@@ -522,10 +529,7 @@ export function rejectUngrounded(
     const grounded =
       content.length > 0 &&
       shared >= Math.ceil(content.length / 2) &&
-      [...fact.text.matchAll(/\b[A-Z][a-z]+\b/g)].every((m) => {
-        const w = contentWords(m[0]!);
-        return w.size === 1 && (skip.has([...w][0]!) || said.has([...w][0]!));
-      }) &&
+      properNounsIn(fact.text).every((noun) => skip.has(noun) || said.has(noun)) &&
       [...fact.text.matchAll(/\d+/g)].every((m) => skip.has(m[0]!) || said.has(m[0]!));
     if (!grounded) {
       dropped.push({ fact, reason: "ungrounded" });
@@ -627,7 +631,7 @@ export function citeClause(
     }
     const clauseText = userText.slice(best.clause.range.start, best.clause.range.end);
     const clauseLower = clauseText.toLowerCase();
-    const properNouns = [...fact.text.matchAll(/\b[A-Z][a-z]+\b/g)].map((m) => m[0]!.toLowerCase()).filter((w) => !skip.has(w));
+    const properNouns = properNounsIn(fact.text).filter((w) => !skip.has(w));
     const numbers = [...fact.text.matchAll(/\d+/g)].map((m) => m[0]!).filter((n) => n !== year);
     const allPresent =
       properNouns.every((w) => clauseLower.includes(w)) &&

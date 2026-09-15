@@ -840,6 +840,8 @@ describe("MEM-06: a fact is grounded in the speaker's words", () => {
     expect(rejectUngrounded([fact("Sage owes 400 dollars")], "Sage", date, "I owe some money").dropped.length).toBe(1);
     expect(rejectUngrounded([fact("Sage likes tea")], "Sage", date, "").dropped.length).toBe(1);
     expect(rejectUngrounded([fact("Sage's favourite film is Marsh Lantern")], "Sage", date, "yes, the film", "So Marsh Lantern is your favourite film?").kept.length).toBe(1);
+    expect(rejectUngrounded([fact("The dog barks at night")], "Sage", date, "the dog barks at night").kept.length).toBe(1);
+    expect(rejectUngrounded([fact("The dog Rover barks at night")], "Sage", date, "the dog barks at night").dropped.length).toBe(1);
   });
 });
 
