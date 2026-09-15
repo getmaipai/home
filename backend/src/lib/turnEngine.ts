@@ -5160,6 +5160,15 @@ async function runTurnStreamHoldingLease(
   // TurnValue (StreamOutcome's `{ resolved }`), not as an "immediate"
   // result, because the decision is only known after the peek.
   //
+  if (modelTurn.turnContext.intent.decided) {
+    async function* decidedLookupStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
+      status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
+      const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, modelTurn.turnContext.intent.decided!.query);
+      return { resolved: resolved ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: modelTurn.safety, crisis_resources: modelTurn.crisisResources, conversation_id: conversation.id, turn_id: modelTurn.turnId } };
+    }
+    return buildStreamResult(decidedLookupStream());
+  }
+
   if (modelTurn.turnContext.intent.deliverable) {
     const deliverable = modelTurn.turnContext.intent.deliverable;
     async function* deliverableStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {

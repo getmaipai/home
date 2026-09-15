@@ -5200,6 +5200,25 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     });
   });
 
+  test("the stream: a decided follow-up lookup uses the album subject and resolves as the done value", async () => {
+    const { client } = await owner();
+    await withLookupStub({ draft: "I should check that first." }, async (seen) => {
+      await client.post("/api/turn", { text: "the new Marsh Lantern album drops soon" });
+      const before = seen.forced;
+      const res = await client.post("/api/turn/stream", { text: "how many tracks" });
+      expect(res.status).toBe(200);
+      const events = await readNdjson(res);
+      expect(events.map((e) => e.type)).toEqual(["turn_meta", "status", "done"]);
+      expect(seen.forced - before).toBe(1);
+      expect(seen.queries.some((q) => /marsh lantern/i.test(q) && /tracks/i.test(q))).toBe(true);
+      const value = events.find((e) => e.type === "done")!.value as { source: string; plugin_id?: string; reply: { text: string }; sources?: unknown[] };
+      expect(value.source).toBe("plugin");
+      expect(value.plugin_id).toBe("websearch");
+      expect(value.reply.text).toBe(SEARCH_ANSWER);
+      expect(value.sources?.length).toBeGreaterThan(0);
+    });
+  });
+
   test("the stream: a promise whose lookup answered nothing on any rung streams the honest line, never the promise", async () => {
     const { client } = await owner();
     const { LOOKUP_FAILED_LINE } = await import("@/lib/turnEngine");
