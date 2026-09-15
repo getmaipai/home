@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -2854,6 +2854,14 @@ async function prepareTurn(
     subjectsCarried: carried.length > 0,
     subjectPronouns,
   };
+  const deliverable = turnContext.intent.deliverable;
+  const backReference = deliverable === "link" && /^(?:\s*(?:where did you read that|link me|the source|send me the page)(?:\s*(?:,|and)\s*(?:where did you read that|link me|the source|send me the page))?\s*[?.!]?)$/i.test(text);
+  if (backReference) {
+    const prior = outcomesForConversation(conversation.id).slice(-3).reverse().flatMap((turn) => turn.outcomes).find((o) => o.status === "succeeded" && o.sources?.length);
+    if (prior?.sources?.length) {
+      return immediate({ reply: { text: "The link's below." }, source: "plugin", plugin_id: prior.packageId, safety, crisis_resources: crisisResources, sources: prior.sources }, subjects);
+    }
+  }
   markIncluded(turnContext, promptParts.context);
   const includedMemoryIds = new Set(turnContext.includedEvidenceIds);
   bumpUsage(memoryMatches.filter((m) => includedMemoryIds.has(`memory:${m.record.id}`)));
@@ -3644,10 +3652,10 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
  * the search runs next with the same query before anything reaches
  * the guards; the failed rung stays in the outcomes. Null when no rung
  * answered: the caller says the honest line. */
-async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: PersonRow, conversationId: string, text: string, read: Pick<LookupRead, "shape" | "sentence">, thinking: boolean | undefined): Promise<TurnValue | null> {
+async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: PersonRow, conversationId: string, text: string, read: Pick<LookupRead, "shape" | "sentence">, thinking: boolean | undefined, queryOverride?: string): Promise<TurnValue | null> {
   const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
   const history = prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content);
-  const expression = lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape });
+  const expression = queryOverride ?? lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape });
   const outcomes = prepared.turnContext.outcomes;
   const forced = await complete("chat", prepared.messages, { thinking, tools: prepared.lookupTools, tool_choice: "required" });
   let resolved =
@@ -3774,6 +3782,16 @@ async function runTurnHoldingLease(
   let guardReplaced = false;
   if (prepared.kind === "immediate") {
     value = prepared.value;
+  } else if (prepared.turnContext.intent.deliverable) {
+    const deliverable = prepared.turnContext.intent.deliverable;
+    const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverable, prepared.turnContext.subjects, text));
+    const sources = resolved?.sources ?? [];
+    if (!sources.length) value = resolved ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
+    else {
+      const child = prepared.turnContext.ageBand === "child";
+      const line = child ? "A grown-up can open that for you; ask them." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
+      value = { ...resolved!, reply: { text: line }, ...(child ? { sources: [] } : {}) };
+    }
   } else {
     // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
     // run "again on every streamed sentence") applied to this function's

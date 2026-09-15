@@ -116,6 +116,7 @@ export interface TurnExpectation {
   lookupWithSource?: boolean;
   /** The delivered turn carries at least one typed source (CHAT-16). */
   sourcesNonEmpty?: boolean;
+  sourcesEmpty?: boolean;
   /** The interrupted turn's upstream completion was cancelled before
    * it finished (E4). */
   inferenceStopped?: boolean;
@@ -1095,6 +1096,20 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "CHAT-16 part 4 rule 1: the lookup reply carries its sources",
     turns: [
       { say: "where's the maker's support page for the Cosmo 7 card", expect: { signal: { primary_act: "question" }, lookupWithSource: true, sourcesNonEmpty: true, mustNotContain: "http|can't (show|provide|share|access)|no link", humanVerdict: true } },
+      { say: "what's the horse called in the old Lantern Bay cartoon", expect: { signal: { primary_act: "question" }, lookupWithSource: true, humanVerdict: true } },
+      { say: "where did you read that, link me", expect: { signal: { primary_act: "directive" }, sourcesNonEmpty: true, toolRan: null, mustNotContain: "can't provide|can't share|http", humanVerdict: true } },
+      { say: "got a photo of it?", expect: { sourcesNonEmpty: true, mustNotContain: "can't view|I can't see", mustContain: "below|page|link|details", humanVerdict: true } },
+      { say: "any video of it?", expect: { sourcesNonEmpty: true, mustNotContain: "can't show links|search for it yourself", humanVerdict: true } },
+    ],
+  },
+  {
+    id: "link-child-band",
+    category: "knowledge",
+    note: "CHAT-16 child deliverable policy",
+    turns: [
+      { say: "what's the horse called in the old Lantern Bay cartoon", expect: { lookupWithSource: true, humanVerdict: true } },
+      { say: "got a photo of it?", as: "child", expect: { sourcesEmpty: true, mustContain: "grown-up|mom|dad", humanVerdict: true } },
+      { say: "thanks", as: "child", expect: { humanVerdict: true } },
     ],
   },
   {

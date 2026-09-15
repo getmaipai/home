@@ -3,7 +3,7 @@
 // own rules; tests/turnEngine.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
-import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 
 // ACT-01: the intent and the guards' shape read the frozen signal; the
@@ -117,6 +117,20 @@ describe("guardContextFrom(): the guard input from the included evidence alone",
 });
 
 describe("intentFor(): the provisional intent", () => {
+  test("classifies link, picture and video deliverables", () => {
+    expect(intentFor("send me a link", signalFor("send me a link")).deliverable).toBe("link");
+    expect(intentFor("where did you read that", signalFor("where did you read that")).deliverable).toBe("link");
+    expect(intentFor("a picture please", signalFor("a picture please")).deliverable).toBe("picture");
+    expect(intentFor("got a photo", signalFor("got a photo")).deliverable).toBe("picture");
+    expect(intentFor("a video please", signalFor("a video please")).deliverable).toBe("video");
+    expect(intentFor("any video of it", signalFor("any video of it")).deliverable).toBe("video");
+    expect(intentFor("what's the capital of Portugal", signalFor("what's the capital of Portugal")).deliverable).toBeUndefined();
+  });
+
+  test("builds a deliverable query from the live world subject", () => {
+    expect(deliverableQuery("link", [{ type: "world", kind: "thing", display_name: "Cosmo 7", year: null, source_kind: null, stable_key: null, recency: "unknown", carried_question: null }], "where's the maker's support page for the Cosmo 7 card")).toBe("Cosmo 7 support page");
+  });
+
   test("kind reads the shape and defaults to chat; query is the utterance", () => {
     expect(intentFor("who won the 1998 world cup", signalFor("who won the 1998 world cup")).kind).toBe("lookup");
     expect(intentFor("set a timer for ten minutes", signalFor("set a timer for ten minutes")).kind).toBe("action");

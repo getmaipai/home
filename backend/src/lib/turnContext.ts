@@ -145,6 +145,7 @@ export interface TurnIntent {
   /** Only for a case-insensitive "in detail", "detailed explanation" or
    * "step by step" (CHAT-12 reads it for the output reserve). */
   explicitDetailedAnswer: boolean;
+  deliverable?: "link" | "picture" | "video";
 }
 
 export interface FrozenPersona {
@@ -229,14 +230,27 @@ export function emptyTimings(): TurnTimings {
 }
 
 const DETAIL_PHRASES = [/\bin detail\b/i, /\bdetailed explanation\b/i, /\bstep by step\b/i];
+export const LINK_DELIVERABLE_PHRASES = [/\ba link\b/i, /\bthe link\b/i, /\blink me\b/i, /\ba url\b/i, /\bthe url\b/i, /\bthe page\b/i, /\bthe support page\b/i, /\bthe source\b/i, /\bwhere did you read that\b/i, /\bwhere can i (?:read|watch|buy|find|see) (?:it|that|this|more)\b/i, /\bsend me the (?:page|link|article)\b/i];
+export const PICTURE_DELIVERABLE_PHRASES = [/\ba picture\b/i, /\ba photo\b/i, /\bgot a photo\b/i, /\ban image\b/i, /\bshow me (?:it|what it looks like)\b/i, /\bwhat does (?:it|he|she) look like\b/i];
+export const VIDEO_DELIVERABLE_PHRASES = [/\ba video\b/i, /\bany video\b/i, /\bthe trailer\b/i, /\ba clip\b/i, /\bsend me the video\b/i, /\bshow me the video\b/i];
+
+export function deliverableQuery(deliverable: "link" | "picture" | "video", subjects: readonly SubjectRef[], utterance: string): string {
+  const subject = subjects[0];
+  const name = subject?.type === "world" ? subject.display_name : subject?.type === "unresolved" ? subject.surface_form : undefined;
+  const fallback = utterance.toLowerCase().replace(/\b(where(?:'s| is)?|what(?:'s| is)?|how|can|i|me|a|an|the|got|any|please|show|send|link|url|page|source|picture|photo|image|video|trailer|clip|of|it|that|this|for|does|look|like)\b/gi, " ").replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
+  const base = name ?? fallback;
+  return `${base}${deliverable === "link" ? /\bsupport\b/i.test(utterance) ? " support page" : " official page" : deliverable === "picture" ? " photos" : " video"}`.trim();
+}
 
 export function intentFor(utterance: string, signal: TurnSignal): TurnIntent {
   const shape = shapeOf(signal, utterance);
+  const deliverable = VIDEO_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "video" : PICTURE_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "picture" : LINK_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "link" : undefined;
   return {
     kind: shape === "question" ? "lookup" : shape === "command" ? "action" : "chat",
     query: utterance,
     subjectEntityIds: [],
     explicitDetailedAnswer: DETAIL_PHRASES.some((re) => re.test(utterance)),
+    ...(deliverable ? { deliverable } : {}),
   };
 }
 
