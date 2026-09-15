@@ -1,7 +1,13 @@
 import type { Source } from "@maipai/spec/gen/ts/source.js";
+import { createElement } from "react";
 
 export type TurnWithSources = { sources?: Source[] };
 export type TurnWithMedia = { media?: { kind: "image"; url: string; thumbnail: string | null; source: string } };
+
+export function ChatMedia({ media, sources }: { media: TurnWithMedia["media"]; sources?: Source[] }) {
+  if (media?.kind !== "image" || !sources?.[0]) return null;
+  return createElement("a", { href: sources[0].url, target: "_blank", rel: "noopener noreferrer", referrerPolicy: "no-referrer" }, createElement("img", { src: media.thumbnail ?? media.url, alt: `From ${media.source}`, loading: "lazy", className: "max-w-full rounded-xl" }));
+}
 
 const MARKER_RE = /\[(\d+)\]/g;
 // A fenced block (```…```) or an inline span (`…`) - split()'s own

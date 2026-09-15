@@ -89,6 +89,14 @@ beforeEach(() => {
   __resetRateLimiterForTests();
 });
 
+describe("CHAT-16 K7 picture lookup output", () => {
+  test("picture media and its two sources survive the adult output boundary", () => {
+    const value: TurnValue = { reply: { text: "Here is the picture." }, source: "plugin", plugin_id: "websearch", safety: { action: "allow", categories: [] }, conversation_id: "conv-k7", turn_id: "turn-k7", media: { kind: "image", url: "https://img.example.com/full.jpg", thumbnail: "https://img.example.com/thumb.jpg", source: "example.com" }, sources: [{ id: "s1", kind: "web", title: "Photo", url: "https://example.com/one", site: "example.com", snippet: null, source: "turn-k7", created_at: "2026-09-15T00:00:00Z", hlc: "1:0:test" }, { id: "s2", kind: "web", title: "Second", url: "https://example.com/two", site: "example.com", snippet: null, source: "turn-k7", created_at: "2026-09-15T00:00:00Z", hlc: "1:0:test" }] };
+    expect(applyOutputBoundary(fakeActor(), value).media).toEqual(value.media);
+    expect(applyOutputBoundary(fakeActor(), value).sources).toHaveLength(2);
+  });
+});
+
 afterEach(() => {
   __resetLlmSupervisorForTests();
 });

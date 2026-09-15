@@ -975,6 +975,27 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
 });
 
 describe("formatSearxngResults", () => {
+  test("an image search requests the images category and maps img_src to image", async () => {
+    let seenUrl = new URL("http://placeholder.invalid");
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenUrl = new URL(req.url);
+        return Response.json({ results: [{ title: "A photo", url: "https://example.com/page", content: "A photo", img_src: "https://cdn.example.com/photo.jpg" }] });
+      },
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = await host.integration.call("searxng", "search", { query: "photos", category: "images" }) as { rows: Array<{ image?: string }> };
+      expect(seenUrl.searchParams.get("categories")).toBe("images");
+      expect(result.rows[0]?.image).toBe("https://cdn.example.com/photo.jpg");
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("reports no results found for an empty results array", () => {
     expect(formatSearxngResults({ results: [] })).toBe("No web search results were found.");
   });
