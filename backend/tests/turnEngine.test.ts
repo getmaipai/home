@@ -205,13 +205,13 @@ describe("lib/turnEngine.ts runTurn()", () => {
     expect(result.value.reply.text).toContain("good morning");
   });
 
-  test("an unimplemented surface is a real, named gap, not a crash", async () => {
+  test("robot is implemented while tv remains a named gap", async () => {
     const { actor } = await owner();
 
-    const result = await runTurn(actor, "robot", "hello");
+    expect((await runTurn(actor, "robot", "hello")).ok).toBe(true);
+    const result = await runTurn(actor, "tv", "hello");
     expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.code).toBe("unsupported_surface");
+    if (!result.ok) expect(result.code).toBe("unsupported_surface");
   });
 
   test("rejects empty text", async () => {
@@ -322,10 +322,10 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     expect(value.reply.text).toBe(fullText);
   });
 
-  test("an unimplemented surface is a real, named gap, not a crash", async () => {
+  test("tv remains a named gap", async () => {
     const { actor } = await owner();
 
-    const result = await runTurnStream(actor, "robot", "hello");
+    const result = await runTurnStream(actor, "tv", "hello");
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.code).toBe("unsupported_surface");
@@ -3503,6 +3503,15 @@ describe("POST /api/turn", () => {
     expect(REMEMBER_CONFIRM_VARIANTS).toContain(body.reply.text);
   });
 
+  test("robot model replies get a spoken first sentence without URLs", async () => {
+    const { client } = await owner();
+    const res = await client.post("/api/turn", { surface: "robot", text: "good morning, how's it going" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply: { text: string; speech?: string } };
+    expect(body.reply.speech).toBe(body.reply.text.split(/[.!?](?:\s|$)/, 1)[0] + body.reply.text.match(/[.!?]/)?.[0]);
+    expect(body.reply.speech).not.toContain("http");
+  });
+
   test("400s for an unimplemented surface with a code the caller can branch on", async () => {
     const { client } = await owner();
     const res = await client.post("/api/turn", { surface: "tv", text: "hi" });
@@ -5005,6 +5014,19 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(seen.queries.some((q) => /page/i.test(q) && /cosmo 7/i.test(q))).toBe(true);
       expect(value.reply.text).toBe("Here's the page, the link's below.");
       expect(value.sources?.length).toBe(2);
+    });
+  });
+
+  test("robot deliverables are on the phone while chat wording stays unchanged", async () => {
+    const { client } = await owner();
+    await withLookupStub({ draft: "I can't directly access URLs, but I can help you find the page by name.", forcedCall: false, twoSources: true }, async () => {
+      const robot = await client.post("/api/turn", { surface: "robot", text: "what's the address of the new album page" });
+      expect(robot.status).toBe(200);
+      const robotValue = (await robot.json()) as { reply: { text: string }; sources?: unknown[] };
+      expect(robotValue.reply.text).toBe("The link's on your phone.");
+      expect(robotValue.sources?.length).toBe(2);
+      const chat = await client.post("/api/turn", { surface: "chat", text: "what's the address of the new album page" });
+      expect(((await chat.json()) as { reply: { text: string } }).reply.text).toBe("Here's the page, the link's below.");
     });
   });
 

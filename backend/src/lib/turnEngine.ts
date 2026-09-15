@@ -97,7 +97,7 @@ export type { TurnReply, TurnValue } from "@/wire";
 // core slice); the other five are a real, named gap the same shape as
 // llm.ts's IMPLEMENTED_ROLES, not silently missing.
 export type Surface = "chat" | "overlay" | "pod" | "robot" | "tv" | "phone";
-const IMPLEMENTED_SURFACES: ReadonlySet<Surface> = new Set(["chat"]);
+const IMPLEMENTED_SURFACES: ReadonlySet<Surface> = new Set(["chat", "robot"]);
 
 /** Shared by TurnOpResult and TurnStreamResult: runTurn() and
  * runTurnStream() run the identical validation/safety/plugin-floor logic
@@ -1547,6 +1547,7 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
 type PreparedTurn =
   | {
       kind: "immediate";
+      surface: Surface;
       /** ASK-01: the entity a `who` answer created or confirmed, logged
        * as the turn's subject so the next turn's pronoun keeps it. */
       subjects?: SubjectRef[];
@@ -1562,6 +1563,7 @@ type PreparedTurn =
     }
   | {
       kind: "model";
+      surface: Surface;
       messages: LlmMessage[];
       safety: SafetyResult;
       crisisResources?: string;
@@ -2383,6 +2385,7 @@ async function prepareTurn(
   timings.signal_us = Math.round((performance.now() - signalStart) * 1000);
   const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">, subjects?: SubjectRef[]): PreparedTurn => ({
     kind: "immediate",
+    surface,
     value: { ...value, conversation_id: conversation.id, turn_id: turnId },
     turnId,
     outcomes: directOutcomes,
@@ -2464,7 +2467,7 @@ async function prepareTurn(
   // answer; the re-ask ("Yes or no?") keeps the rule signal, since the
   // person said something else.
   if (protocol.answer && pendingAskValue) signal = classifyTurnSignal({ text, protocol: protocol.answer, ageBand });
-  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId, outcomes: directOutcomes, signal, timings, ...(protocol.subjectId ? { subjects: [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] } : protocol.subject ? { subjects: [protocol.subject] } : {}) };
+  if (pendingAskValue) return { kind: "immediate", surface, value: pendingAskValue, turnId, outcomes: directOutcomes, signal, timings, ...(protocol.subjectId ? { subjects: [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] } : protocol.subject ? { subjects: [protocol.subject] } : {}) };
 
   // ASK-01 part 4: a question the judge queued but has not asked yet
   // ("Who's Juniper?", pending) can be answered before it is put: "he's
@@ -2980,7 +2983,7 @@ async function prepareTurn(
   // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
   // seen on both paths.
   timings.prompt_ms = Math.round(performance.now() - promptStart);
-  return { kind: "model", messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, timings, unknownAsk };
+  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, timings, unknownAsk };
 }
 
 /** ASK-01: the name an open question is about, from its subject (an
@@ -3712,20 +3715,21 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
     if (result.ok) resolved = { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sourcesFromRows(result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined).length ? { sources: sourcesFromRows((result.value.data as { rows?: unknown }).rows) } : {}) };
   }
   if (resolved) prepared.lookupExpression = expression;
-  return resolved && denialDeliverable ? composeDeliverable(resolved, denialDeliverable, prepared.turnContext.ageBand) : resolved;
+  return resolved && denialDeliverable ? composeDeliverable(resolved, denialDeliverable, prepared.turnContext.ageBand, prepared.surface) : resolved;
 }
 
 function composeDeliverable(
   resolved: TurnValue,
   deliverable: "link" | "picture" | "video",
   ageBand: string,
+  surface: Surface,
 ): TurnValue {
   const child = ageBand === "child";
-  const line = child ? "A grown-up can open that for you; ask them." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
+  const line = child ? "A grown-up can open that for you; ask them." : surface === "robot" ? deliverable === "link" ? "The link's on your phone." : deliverable === "picture" ? "The page with the picture is on your phone." : "The video link's on your phone." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
   return { ...resolved, reply: { text: line }, ...(child ? { sources: [] } : {}) };
 }
 
-function finalizeReply(actor: PersonRow, rawValue: TurnValue, trace?: ReplyTrace): TurnValue {
+function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface = "chat", trace?: ReplyTrace): TurnValue {
   const value = enforceWellFormed(actor, applyOutputBoundary(actor, rawValue), trace);
   const { text, speech } = value.reply;
   // An explicit speech text that differs from the visible text is kept
@@ -3761,7 +3765,8 @@ function finalizeReply(actor: PersonRow, rawValue: TurnValue, trace?: ReplyTrace
         : value.source === "model"
           ? sentenceCaseOpener(text) // CHAT-04 (#81)
           : text;
-  return { ...value, reply: { text: variedText, speech: normalizeForSpeech(variedText) } };
+  const spokenText = surface === "robot" && speech === undefined ? splitIntoSentences(variedText)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : normalizeForSpeech(variedText);
+  return { ...value, reply: { text: variedText, speech: spokenText } };
 }
 
 /** Runs one conversation turn end to end: safety first, then the
@@ -3836,7 +3841,7 @@ async function runTurnHoldingLease(
     const sources = resolved?.sources ?? [];
     if (!sources.length) value = resolved ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
     else {
-      value = composeDeliverable(resolved!, deliverable, prepared.turnContext.ageBand);
+      value = composeDeliverable(resolved!, deliverable, prepared.turnContext.ageBand, prepared.surface);
     }
   } else {
     // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
@@ -4111,7 +4116,7 @@ async function runTurnHoldingLease(
   // person's open question, at the end of the reply.
   const ask = prepared.kind === "model" && value.source === "model" ? appendedAsk(prepared, actor, conversation.id, value.reply.text, text, false) : NO_ASK;
   if (ask.append) value = { ...value, reply: { ...value.reply, text: `${value.reply.text.trimEnd()}${ask.append}` } };
-  value = finalizeReply(actor, value, trace);
+  value = finalizeReply(actor, value, prepared.surface, trace);
   // Committed only when the delivered text still carries the question
   // (the boundary can replace the whole reply).
   if (value.source === "model") ask.commitIf(value.reply.text);
@@ -4681,7 +4686,7 @@ async function runTurnStreamHoldingLease(
 
   if (prepared.kind === "immediate") {
     const trace: ReplyTrace = { hits: [], replaced: false };
-    const value = finalizeReply(actor, prepared.value, trace);
+    const value = finalizeReply(actor, prepared.value, prepared.surface, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
     logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety });
     return { ok: true, kind: "immediate", value, signal: prepared.signal };
@@ -4856,7 +4861,7 @@ async function runTurnStreamHoldingLease(
         prepared.timings.retries = generations - 1;
         status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
         const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, read, opts.thinking);
-        if (resolved) return { resolved: finalizeReply(actor, resolved, resolvedTrace) };
+        if (resolved) return { resolved: finalizeReply(actor, resolved, modelTurn.surface, resolvedTrace) };
         console.log(`[turn] a ${shape}'s lookup for turn ${modelTurn.turnId} ran and found nothing; the honest line stands`);
         yield `${LOOKUP_FAILED_LINE} `;
         return undefined;
@@ -5100,6 +5105,7 @@ async function runTurnStreamHoldingLease(
             conversation_id: conversation.id,
             turn_id: prepared.turnId,
           },
+          modelTurn.surface,
           trace,
         );
         // CHAT-18: the lease was released above (or by the generator's
@@ -5176,7 +5182,7 @@ async function runTurnStreamHoldingLease(
     async function* deliverableStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
       status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
       const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverable, modelTurn.turnContext.subjects, text));
-      if (resolved?.sources?.length) return { resolved: composeDeliverable(resolved, deliverable, modelTurn.turnContext.ageBand) };
+      if (resolved?.sources?.length) return { resolved: composeDeliverable(resolved, deliverable, modelTurn.turnContext.ageBand, modelTurn.surface) };
       yield `${LOOKUP_FAILED_LINE} `;
       return undefined;
     }
@@ -5213,7 +5219,7 @@ async function runTurnStreamHoldingLease(
           // finished, so neither happens here.
           // OUT-01: a package line that fails the rule is replaced and
           // logged loudly by the boundary; finalize() logs the trace.
-          return { resolved: finalizeReply(actor, resolved, resolvedTrace) };
+          return { resolved: finalizeReply(actor, resolved, modelPrepared.surface, resolvedTrace) };
         }
         // Every proposed call failed - the exact "ask again, never a
         // silent drop" contract: a genuinely second completion, this time
