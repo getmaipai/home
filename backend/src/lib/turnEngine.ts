@@ -43,6 +43,7 @@ import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor } from "@/lib/replyConstraints";
 import { promptNow } from "@/lib/benchSampling";
+import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
   logTurn,
@@ -2597,6 +2598,32 @@ async function prepareTurn(
   const { subjects, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
   timings.subjects_ms = Math.round(performance.now() - subjectsStart);
   let literalYielded: LiteralYield | null = null;
+  // ALM-01 (chunk B): derived date/time questions are deterministic rule
+  // answers, before the literal router and model. Only the last two turns'
+  // succeeded compute outcomes carry a term/referent into a follow-up.
+  let carriedAlmanacTerm: string | null = null;
+  for (const row of [...outcomesForConversation(conversation.id)].reverse().slice(0, 2)) {
+    const outcome = [...row.outcomes].reverse().find((o) => o.packageId === "almanac-compute" && o.status === "succeeded");
+    const value = outcome?.args?.term ?? outcome?.args?.referent;
+    if (typeof value === "string" && value.trim()) { carriedAlmanacTerm = value; break; }
+  }
+  if (!inCrisis) {
+    const question = parseDateQuestion(text, carriedAlmanacTerm);
+    if (question) {
+      const matchedTerm = question.kind === "next_clock" || question.kind === "date_of_next_clock"
+        ? `${question.hour}:${String(question.minute).padStart(2, "0")}`
+        : question.kind === "days_until" || question.kind === "days_since" || question.kind === "weekday_of" || question.kind === "is_weekday"
+          ? String(question.referent.day)
+          : text;
+      const answer = computeDateAnswer(question, promptNow(), matchedTerm);
+      directOutcomes.push(outcomeOf({
+        callId: `${turnId}:compute`, packageId: "almanac-compute", status: "succeeded", via: "pattern",
+        args: answer.inputs,
+        result: { reply: { text: answer.text, speech: answer.text }, actions: [], data: { readings: answer.readings ?? null } },
+      }));
+      return immediate({ reply: { text: answer.text }, source: "plugin", plugin_id: "almanac-compute", safety, crisis_resources: crisisResources }, subjects);
+    }
+  }
   // SAFETY-01: in the crisis state nothing routes to a package; the
   // embed still runs for recall.
   const shortComment = !inCrisis && isShortCommentOnLiveSubject(text, subjects, signal);

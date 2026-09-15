@@ -198,6 +198,9 @@ export function parseDateQuestion(
 ): DateQuestion | null {
   const t = strip(text);
   if (!t) return null;
+  // A bare date question belongs to almanac-date; only derived questions
+  // carrying a relative term are compute intents.
+  if (t === "sowhatstodaysdate" || t === "whatsthedate" || t === "whatstodaydate") return null;
   const weekdayNames = WEEKDAYS.map((w) => w.toLowerCase()).join("|");
 
   // relative_weekday: "nextfriday", "whatsthe datenextfriday", "thismonday", "lastsunday"
