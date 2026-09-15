@@ -241,7 +241,10 @@ describe("the flows", () => {
         expect(getPendingAsk(first.value.conversation_id)).toBeNull();
       });
       const turn = lines.filter((l) => l.startsWith("[turn] {")).map((l) => JSON.parse(l.slice(7)) as { subjects?: { type: string; name: string; kind?: string }[] }).at(-1)!;
-      expect(turn.subjects).toEqual([{ type: "world", name: "Serena Vale", kind: "mention" }]);
+      expect(turn.subjects).toEqual([
+        { type: "world", name: "Serena Vale", kind: "mention" },
+        { type: "world", name: "Marsh Lantern", kind: "topic" },
+      ]);
       expect(lines.some((l) => l.startsWith("[ask]"))).toBe(false);
     });
   });

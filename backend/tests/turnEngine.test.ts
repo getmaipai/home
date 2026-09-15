@@ -5204,7 +5204,7 @@ describe("CHAT-13 chunk C2: the last succeeded lookup is a stack source", () => 
       const second = await runTurn(actor, "chat", "sounds good", { conversationId: conv.value.id });
       expect(second.ok).toBe(true);
       if (!second.ok) return;
-      expect(subjectsOfTurn(second.value.turn_id)).toEqual([{ type: "world", kind: "topic", display_name: "new Marsh Lantern album out", year: null, stable_key: null, recency: "unknown", source_kind: "web", carried_question: null }]);
+      expect(subjectsOfTurn(second.value.turn_id)).toEqual([{ type: "world", kind: "topic", display_name: "Marsh Lantern", year: null, stable_key: null, recency: "unknown", source_kind: "web", carried_question: null }]);
     });
   });
 
@@ -5231,7 +5231,7 @@ describe("CHAT-13 chunk C2: the last succeeded lookup is a stack source", () => 
       const third = await runTurn(actor, "chat", "sounds good", { conversationId: conv.value.id });
       expect(third.ok).toBe(true);
       if (!third.ok) return;
-      expect(subjectsOfTurn(third.value.turn_id)).toEqual([{ type: "world", kind: "topic", display_name: "new Marsh Lantern album out", year: null, stable_key: null, recency: "unknown", source_kind: "web", carried_question: null }]);
+      expect(subjectsOfTurn(third.value.turn_id)).toEqual([{ type: "world", kind: "topic", display_name: "Marsh Lantern", year: null, stable_key: null, recency: "unknown", source_kind: "web", carried_question: null }]);
     });
   });
 

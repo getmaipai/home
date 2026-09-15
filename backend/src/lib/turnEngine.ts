@@ -2236,22 +2236,26 @@ function resolveTurnSubjects(input: {
   // carried unresolved reference, and the stack is at most three deep
   // (dev.md section 16 part 5, rules 1 and 4; finding 30).
    let lookupSubject: SubjectRef | null = null;
+   let lookupNameForDecay: string | null = null;
    const lookupPackages = new Set(["media-lookup", "knowledge", "websearch"]);
    const recentIds = new Set(lastTurnIds(conversationId, 2));
-   const hubNameSet = new Set(hubNames.map((h) => h.name.toLowerCase()));
+   const rosterNameSet = new Set(rosterNames.map((name) => name.trim().toLowerCase()));
+   const registryNameSet = new Set(registry.map((entry) => entry.name.trim().toLowerCase()));
    for (const row of [...outcomesForConversation(conversationId, 10)].reverse()) {
      if (!recentIds.has(row.turnId)) continue;
      for (const o of row.outcomes) {
        if (o.status !== "succeeded" || !lookupPackages.has(o.packageId)) continue;
-       const replyText = o.result?.reply?.text ?? "";
-       const resultProperNouns = replyText ? properNounsIn(replyText, knownForHub, { properOnly: true }) : [];
-       if (resultProperNouns.some((n) => hubNameSet.has(n.name.toLowerCase()))) continue;
        const arg = (Object.values(o.args ?? {}) as unknown[]).find((v): v is string => typeof v === "string" && v.trim().length > 0)?.trim();
        if (arg) {
+         const displayName = o.packageId === "websearch" ? properNounsIn(arg, knownForHub, { properOnly: true })[0]?.name : arg;
+         if (!displayName) continue;
+         const lookupName = displayName.trim().toLowerCase();
+         if (rosterNameSet.has(lookupName) || registryNameSet.has(lookupName)) continue;
+         lookupNameForDecay = lookupName;
          lookupSubject = {
            type: "world",
            kind: o.packageId === "media-lookup" ? "film" : "topic",
-           display_name: arg,
+           display_name: displayName,
            year: null,
            stable_key: null,
            recency: "unknown",
@@ -2264,11 +2268,22 @@ function resolveTurnSubjects(input: {
      if (lookupSubject) break;
    }
    if (lookupSubject) {
-     const lookupName = lookupSubject!.display_name.toLowerCase();
+     const lookupName = lookupSubject!.display_name.trim().toLowerCase();
      const dup = [...resolved.subjects, ...carried].some((s) => s.type === "world" && (s as { type: "world"; display_name: string }).display_name.toLowerCase() === lookupName);
      if (dup) lookupSubject = null;
    }
   if (lookupSubject) carried = carried.filter((s) => s.type !== "unresolved");
+  if (carried.length > 0) {
+    const lastTwo = lastTwoTurnsSubjects(conversationId);
+    const older = lastTwo[1] ?? [];
+    const lowerText = text.toLowerCase();
+    carried = carried.filter((s) => {
+      if (s.type !== "world") return true;
+      const name = s.display_name.trim().toLowerCase();
+      const onOlder = older.some((o) => o.type === "world" && o.display_name.trim().toLowerCase() === name);
+      return !onOlder || name === lookupNameForDecay || lowerText.includes(name);
+    });
+  }
   // One entry per household entity (a name and its alias both resolve
   // to the one row; LOOKUP-02's set showed the dishwasher twice).
   const seenEntities = new Set<string>();
@@ -2653,7 +2668,7 @@ async function prepareTurn(
         safety,
         crisis_resources: crisisResources,
         routing: { tier: routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", score: routed.score },
-      });
+      }, subjects);
     } else {
     // Two real, different reasons runPlugin() can fail here. Fix B
     // (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
@@ -2681,7 +2696,7 @@ async function prepareTurn(
         plugin_id: routed.id,
         safety,
         crisis_resources: crisisResources,
-      });
+      }, subjects);
     }
   }
   if (tier0Miss && !utteranceVector) {
