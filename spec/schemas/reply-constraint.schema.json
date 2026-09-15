@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/reply-constraint.schema.json",
+  "title": "ReplyConstraint",
+  "description": "CONS-01, dev.md section 16 part 9 rule 2: a live constraint the turn engine sets on the hub's next reply in a given conversation. kind banned_phrase: the hub must never say the value's phrase. kind shape: the reply must take the value's shape token. kind length: the reply must stay within the value's positive-integer character budget, carried as a string.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "conversation_id", "person", "kind", "value", "set_at", "set_by_turn", "hlc"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^rc-[a-z0-9]{6,}$" },
+    "conversation_id": {
+      "type": "string",
+      "pattern": "^conv-[a-z0-9]{6,}$",
+      "description": "The conversation this constraint applies to, for the duration of it. Required: a reply constraint with no conversation to constrain is meaningless."
+    },
+    "person": {
+      "type": ["string", "null"],
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "Who the constraint was set for, when there is a person the reply is about - null when the hub set it for the conversation itself."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["banned_phrase", "shape", "length"],
+      "description": "banned_phrase: the hub must never say the value's phrase. shape: the reply must take the value's shape token (list, number, one_line). length: the reply must stay within the value's character budget."
+    },
+    "value": { "type": "string", "minLength": 1, "description": "The constraint's own value, shaped by kind: the banned phrase itself, a shape token, or a positive-integer character budget as a string." },
+    "set_at": { "type": "string", "format": "date-time" },
+    "set_by_turn": {
+      "type": ["string", "null"],
+      "pattern": "^turn-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "The turn that set this constraint, matching open-question.schema.json's provenance convention. Null when the constraint was set outside any recorded turn."
+    },
+    "hlc": {
+      "type": "string",
+      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+    }
+  }
+}

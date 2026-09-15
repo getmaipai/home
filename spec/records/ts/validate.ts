@@ -25,6 +25,7 @@ import type { List } from "../../gen/ts/list.js";
 import type { MemoryRecord } from "../../gen/ts/memory-record.js";
 import type { TurnSignal } from "../../gen/ts/turn-signal.js";
 import type { OpenQuestion } from "../../gen/ts/open-question.js";
+import type { ReplyConstraint } from "../../gen/ts/reply-constraint.js";
 import type { SubjectRef } from "../../gen/ts/subject-ref.js";
 
 const VOCAB_DIR = join(import.meta.dir, "..", "..", "vocab");
@@ -444,6 +445,28 @@ export function validateOpenQuestion(question: OpenQuestion): Problems {
   }
   if ((question.status === "pending" || question.status === "asked" || question.status === "expired") && question.resolved_at !== null) {
     problems.push(`status ${question.status} must not carry resolved_at`);
+  }
+
+  return problems;
+}
+
+/** CONS-01 (dev.md section 16 part 9 rule 2): a ReplyConstraint's kind
+ * and value have to agree on what the reply must look like. A shape
+ * constraint that names no reply shape, or a length constraint that names
+ * no positive integer, would constrain the hub to nothing at all. */
+export function validateReplyConstraint(constraint: ReplyConstraint): Problems {
+  const problems: Problems = [];
+
+  if (constraint.kind === "shape") {
+    if (!["list", "number", "one_line"].includes(constraint.value)) {
+      problems.push(`a shape constraint must name a reply shape (list, number, one_line), not "${constraint.value}"`);
+    }
+  }
+  if (constraint.kind === "length") {
+    const budget = Number(constraint.value);
+    if (!Number.isInteger(budget) || budget <= 0) {
+      problems.push(`a length constraint must carry a positive integer character budget, not "${constraint.value}"`);
+    }
   }
 
   return problems;

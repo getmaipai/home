@@ -25,6 +25,10 @@
     {"name":"answered-needs-resolution","kind":"question","base":"open-question.example.json","overrides":{"status":"answered","asked_at":"2026-09-14T00:00:00Z","resolved_at":null},"expected":"refuse","rule":"must carry resolved_at"},
     {"name":"world-ref-valid","kind":"subject","base":"subject-ref.world.example.json","expected":"accept"},
     {"name":"world-source-key-coupled","kind":"subject","base":"subject-ref.world.example.json","overrides":{"source_kind":null},"expected":"refuse","rule":"must be set together"},
-    {"name":"world-ref-no-entity-id","kind":"subject","base":"subject-ref.world.example.json","overrides":{"entity_id":"ent-p7q8r9"},"expected":"refuse","rule":"additionalProperties"}
+    {"name":"world-ref-no-entity-id","kind":"subject","base":"subject-ref.world.example.json","overrides":{"entity_id":"ent-p7q8r9"},"expected":"refuse","rule":"additionalProperties"},
+    {"name":"constraint-valid","kind":"constraint","base":"reply-constraint.example.json","expected":"accept"},
+    {"name":"shape-unknown-value","kind":"constraint","base":"reply-constraint.example.json","overrides":{"kind":"shape","value":"table"},"expected":"refuse","rule":"must name a reply shape"},
+    {"name":"length-not-a-number","kind":"constraint","base":"reply-constraint.example.json","overrides":{"kind":"length","value":"short"},"expected":"refuse","rule":"positive integer character budget"},
+    {"name":"length-zero","kind":"constraint","base":"reply-constraint.example.json","overrides":{"kind":"length","value":"0"},"expected":"refuse","rule":"positive integer character budget"}
   ]
 }

@@ -25,6 +25,7 @@ from gen.py.model_capabilities_schema import ModelCapabilities
 from gen.py.open_question_schema import OpenQuestion
 from gen.py.person_schema import Person
 from gen.py.relationship_schema import Relationship
+from gen.py.reply_constraint_schema import ReplyConstraint
 from gen.py.reply_plan_schema import ReplyPlan
 from gen.py.safety_result_schema import SafetyResult
 from gen.py.setting_value_schema import SettingValue
@@ -176,6 +177,10 @@ def test_conversation_turn_fixture():
 
 def test_open_question_fixture():
     OpenQuestion.model_validate(load_fixture("open-question.example.json"))
+
+
+def test_reply_constraint_fixture():
+    ReplyConstraint.model_validate(load_fixture("reply-constraint.example.json"))
 
 
 def test_person_missing_required_field_is_rejected():

@@ -12,6 +12,7 @@ those.
 
 from gen.py.memory_record_schema import MemoryRecord
 from gen.py.open_question_schema import OpenQuestion
+from gen.py.reply_constraint_schema import ReplyConstraint
 from gen.py.turn_signal_schema import TurnSignal
 
 Problems = list[str]
@@ -144,6 +145,31 @@ def validate_open_question(question: OpenQuestion) -> Problems:
         and question.resolved_at is not None
     ):
         problems.append(f"status {question.status} must not carry resolved_at")
+
+    return problems
+
+
+def validate_reply_constraint(constraint: ReplyConstraint) -> Problems:
+    """CONS-01 (dev.md section 16 part 9 rule 2): a ReplyConstraint's kind
+    and value have to agree on what the reply must look like. A shape
+    constraint that names no reply shape, or a length constraint that names
+    no positive integer, would constrain the hub to nothing at all."""
+    problems: Problems = []
+
+    if constraint.kind == "shape" and constraint.value not in (
+        "list",
+        "number",
+        "one_line",
+    ):
+        problems.append(
+            f'a shape constraint must name a reply shape (list, number, one_line), not "{constraint.value}"'
+        )
+    if constraint.kind == "length" and not (
+        constraint.value.isdigit() and int(constraint.value) > 0
+    ):
+        problems.append(
+            f'a length constraint must carry a positive integer character budget, not "{constraint.value}"'
+        )
 
     return problems
 

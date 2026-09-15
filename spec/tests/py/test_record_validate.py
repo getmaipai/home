@@ -12,11 +12,13 @@ from pydantic import ValidationError
 
 from gen.py.memory_record_schema import MemoryRecord, RetrievalFeedback
 from gen.py.open_question_schema import OpenQuestion
+from gen.py.reply_constraint_schema import ReplyConstraint
 from gen.py.subject_ref_schema import Household, Unresolved, World
 from gen.py.turn_signal_schema import TurnSignal
 from records.py.validate import (
     validate_memory_record,
     validate_open_question,
+    validate_reply_constraint,
     validate_subject_ref,
     validate_turn_signal,
 )
@@ -45,6 +47,12 @@ def turn_signal(**overrides) -> TurnSignal:
 def open_question(**overrides) -> OpenQuestion:
     return OpenQuestion.model_validate(
         {**load("open-question.example.json"), **overrides}
+    )
+
+
+def reply_constraint(**overrides) -> ReplyConstraint:
+    return ReplyConstraint.model_validate(
+        {**load("reply-constraint.example.json"), **overrides}
     )
 
 
@@ -260,6 +268,33 @@ def test_answered_needs_both_timestamps():
     assert validate_open_question(good) == []
 
 
+def test_reply_constraint_fixture_is_valid():
+    assert validate_reply_constraint(reply_constraint()) == []
+
+
+def test_shape_constraint_must_name_a_reply_shape():
+    bad = reply_constraint(kind="shape", value="table")
+    assert any("must name a reply shape" in p for p in validate_reply_constraint(bad))
+
+
+def test_length_constraint_must_carry_positive_integer_budget():
+    not_a_number = reply_constraint(kind="length", value="short")
+    assert any(
+        "positive integer character budget" in p
+        for p in validate_reply_constraint(not_a_number)
+    )
+    zero = reply_constraint(kind="length", value="0")
+    assert any(
+        "positive integer character budget" in p
+        for p in validate_reply_constraint(zero)
+    )
+
+
+def test_valid_length_constraint_passes():
+    good = reply_constraint(kind="length", value="40")
+    assert validate_reply_constraint(good) == []
+
+
 def test_world_subject_ref_fixture_is_valid():
     assert validate_subject_ref(world_subject_ref()) == []
 
@@ -310,6 +345,10 @@ def test_shared_cross_language_validation_conformance():
                 )
             elif case["kind"] == "question":
                 problems = validate_open_question(OpenQuestion.model_validate(raw))
+            elif case["kind"] == "constraint":
+                problems = validate_reply_constraint(
+                    ReplyConstraint.model_validate(raw)
+                )
             elif case["kind"] == "subject":
                 problems = validate_subject_ref(World.model_validate(raw))
         except ValidationError:

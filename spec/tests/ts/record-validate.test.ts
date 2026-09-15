@@ -18,6 +18,7 @@ import {
   validateMemoryRecord,
   validateTurnSignal,
   validateOpenQuestion,
+  validateReplyConstraint,
   validateSubjectRef,
   inverseRelationship,
 } from "../../records/ts/validate.js";
@@ -28,10 +29,12 @@ import type { List } from "../../gen/ts/list.js";
 import type { MemoryRecord } from "../../gen/ts/memory-record.js";
 import type { TurnSignal } from "../../gen/ts/turn-signal.js";
 import type { OpenQuestion } from "../../gen/ts/open-question.js";
+import type { ReplyConstraint } from "../../gen/ts/reply-constraint.js";
 import type { SubjectRef } from "../../gen/ts/subject-ref.js";
 import { MemoryRecord as MemoryRecordSchema } from "../../gen/ts/memory-record.js";
 import { TurnSignal as TurnSignalSchema } from "../../gen/ts/turn-signal.js";
 import { OpenQuestion as OpenQuestionSchema } from "../../gen/ts/open-question.js";
+import { ReplyConstraint as ReplyConstraintSchema } from "../../gen/ts/reply-constraint.js";
 import { SubjectRef as SubjectRefSchema } from "../../gen/ts/subject-ref.js";
 
 const FIXTURES = join(import.meta.dir, "..", "..", "fixtures", "records");
@@ -48,6 +51,7 @@ const memoryRecord = () => load<MemoryRecord>("memory-record.memory.example.json
 const legacyMemoryRecord = () => load<MemoryRecord>("memory-record.memory-legacy.example.json");
 const turnSignal = () => load<TurnSignal>("turn-signal.example.json");
 const openQuestion = () => load<OpenQuestion>("open-question.example.json");
+const replyConstraint = () => load<ReplyConstraint>("reply-constraint.example.json");
 const worldSubjectRef = () => load<SubjectRef>("subject-ref.world.example.json");
 const shoppingList = () => load<List>("list.shopping.example.json");
 const todoList = () => load<List>("list.todo.example.json");
@@ -278,6 +282,7 @@ describe("shared cross-language validation conformance", () => {
         if (fixture.kind === "memory") problems = validateMemoryRecord(MemoryRecordSchema.parse(raw));
         else if (fixture.kind === "turn") problems = validateTurnSignal(TurnSignalSchema.parse(raw), utterance);
         else if (fixture.kind === "question") problems = validateOpenQuestion(OpenQuestionSchema.parse(raw));
+        else if (fixture.kind === "constraint") problems = validateReplyConstraint(ReplyConstraintSchema.parse(raw));
         else if (fixture.kind === "subject") {
           const subject = SubjectRefSchema.parse(raw);
           problems = validateSubjectRef(subject);
@@ -330,6 +335,31 @@ describe("open question rules", () => {
     expect(
       validateOpenQuestion({ ...openQuestion(), status: "answered", asked_at: "2026-09-14T00:00:00Z", resolved_at: "2026-09-14T01:00:00Z" }),
     ).toEqual([]);
+  });
+});
+
+describe("reply constraint rules", () => {
+  test("every shipped fixture is valid", () => {
+    expect(validateReplyConstraint(replyConstraint())).toEqual([]);
+  });
+
+  test("a shape constraint must name a reply shape", () => {
+    expect(validateReplyConstraint({ ...replyConstraint(), kind: "shape", value: "table" })).toContainEqual(
+      expect.stringContaining("must name a reply shape"),
+    );
+  });
+
+  test("a length constraint must carry a positive integer character budget", () => {
+    expect(validateReplyConstraint({ ...replyConstraint(), kind: "length", value: "short" })).toContainEqual(
+      expect.stringContaining("positive integer character budget"),
+    );
+    expect(validateReplyConstraint({ ...replyConstraint(), kind: "length", value: "0" })).toContainEqual(
+      expect.stringContaining("positive integer character budget"),
+    );
+  });
+
+  test("a valid length constraint passes", () => {
+    expect(validateReplyConstraint({ ...replyConstraint(), kind: "length", value: "40" })).toEqual([]);
   });
 });
 
