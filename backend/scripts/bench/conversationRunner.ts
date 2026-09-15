@@ -13,6 +13,8 @@ import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
 import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, notePendingLookup, type TurnStreamResult, lookupQueryFor } from "@/lib/turnEngine";
+import { pickThinkingCue } from "@/lib/replyVariation";
+import { THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { resolveNames } from "@/lib/unknownNames";
 import { lookupShapeOf } from "@/lib/guards";
 import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation, listOpenQuestions, queueOpenQuestion, resolveOpenQuestionsAbout } from "@/lib/conversationHistory";
@@ -264,7 +266,7 @@ async function driveTurn(
   actor: PersonRow,
   say: string,
   opts: { conversationId: string; supersedes?: string; interrupt?: boolean },
-): Promise<{ value: TurnValue | null; text: string; timings: Timings; error: string | null; interrupted: boolean }> {
+): Promise<{ value: TurnValue | null; text: string; timings: Timings; error: string | null; interrupted: boolean; spokenCue: string | null }> {
   const t0 = performance.now();
   const controller = new AbortController();
   const elapsed = () => performance.now() - t0;
@@ -272,12 +274,24 @@ async function driveTurn(
   try {
     result = await runTurnStream(actor, "chat", say, { conversationId: opts.conversationId, supersedes: opts.supersedes, signal: controller.signal });
   } catch (err) {
-    return { value: null, text: "", timings: { firstDeltaMs: null, firstSentenceMs: null, totalMs: elapsed() }, error: (err as Error).message, interrupted: false };
+    return { value: null, text: "", timings: { firstDeltaMs: null, firstSentenceMs: null, totalMs: elapsed() }, error: (err as Error).message, interrupted: false, spokenCue: null };
   }
-  if (!result.ok) return { value: null, text: "", timings: { firstDeltaMs: null, firstSentenceMs: null, totalMs: elapsed() }, error: result.error, interrupted: false };
+  if (!result.ok) return { value: null, text: "", timings: { firstDeltaMs: null, firstSentenceMs: null, totalMs: elapsed() }, error: result.error, interrupted: false, spokenCue: null };
   if (result.kind === "immediate") {
     const total = elapsed();
-    return { value: result.value, text: result.value.reply.text, timings: { firstDeltaMs: total, firstSentenceMs: total, totalMs: total }, error: null, interrupted: false };
+    return { value: result.value, text: result.value.reply.text, timings: { firstDeltaMs: total, firstSentenceMs: total, totalMs: total }, error: null, interrupted: false, spokenCue: null };
+  }
+  // The route (src/routes/turn.ts, streamTurnEvents) plays the spoken cue
+  // when the model's first token is slow to arrive (a race against a
+  // 900 ms delay from startedAt) and the cue is not suppressed. The
+  // runner drains the tokens directly and never sees the cue, so it
+  // recomputes the same decision here, from the stream result's own
+  // `startedAt`, `cueSuppressed` and `bannedPhrases`, and records it so a
+  // row can check it.
+  let spokenCue: string | null = null;
+  if (!result.cueSuppressed) {
+    const elapsedAtStream = performance.now() - (result.startedAt ?? t0);
+    if (elapsedAtStream >= THINKING_CUE_DELAY_MS) spokenCue = pickThinkingCue(actor.id, result.bannedPhrases);
   }
   let text = "";
   let firstDeltaMs: number | null = null;
@@ -306,17 +320,17 @@ async function driveTurn(
     }
     if (step.done) outcome = step.value;
   } catch (err) {
-    if (!interrupted) return { value: null, text, timings: { firstDeltaMs, firstSentenceMs, totalMs: elapsed() }, error: (err as Error).message, interrupted };
+    if (!interrupted) return { value: null, text, timings: { firstDeltaMs, firstSentenceMs, totalMs: elapsed() }, error: (err as Error).message, interrupted, spokenCue };
   }
   if (interrupted) {
     // The route's disconnect path: nothing is finalized for a reply
     // nobody read; the lease releases through holdLease()'s finally.
-    return { value: null, text, timings: { firstDeltaMs, firstSentenceMs, totalMs: elapsed() }, error: null, interrupted };
+    return { value: null, text, timings: { firstDeltaMs, firstSentenceMs, totalMs: elapsed() }, error: null, interrupted, spokenCue };
   }
   const resolved = outcome && typeof outcome === "object" && "resolved" in outcome ? (outcome as { resolved: TurnValue }).resolved : null;
   const value = result.finalize(text, outcome as Parameters<typeof result.finalize>[1]);
   const finalValue = resolved ?? value;
-  return { value: finalValue, text: finalValue.reply.text, timings: { firstDeltaMs: firstDeltaMs ?? elapsed(), firstSentenceMs: firstSentenceMs ?? elapsed(), totalMs: elapsed() }, error: null, interrupted };
+  return { value: finalValue, text: finalValue.reply.text, timings: { firstDeltaMs: firstDeltaMs ?? elapsed(), firstSentenceMs: firstSentenceMs ?? elapsed(), totalMs: elapsed() }, error: null, interrupted, spokenCue };
 }
 
 /** The coherence review's question 5 (row 4): the runner scripts the
@@ -325,7 +339,7 @@ async function driveTurn(
  * unprompted. The turn is logged through logTurn() with the frozen
  * signal prepareTurn() would compute, and the engine's own offer scan
  * (notePendingLookup) binds the offer, one definition. */
-function seedTurn(actor: PersonRow, say: string, reply: string, conversationId: string): { value: TurnValue; text: string; timings: Timings; error: string | null; interrupted: boolean } {
+function seedTurn(actor: PersonRow, say: string, reply: string, conversationId: string): { value: TurnValue; text: string; timings: Timings; error: string | null; interrupted: boolean; spokenCue: string | null } {
   const turnId = newConversationTurnId();
   const signal = classifyTurnSignal({ text: say, commandOpeners: commandOpeners(loadAllManifests()), ageBand: speakerAgeBand(actor, new Date()) });
   const safety = evaluateSafety(say, speakerAgeBand(actor, new Date()));
@@ -337,7 +351,7 @@ function seedTurn(actor: PersonRow, say: string, reply: string, conversationId: 
   const offered = reply.split(/(?<=[.!?])\s+/).find((sentence) => lookupShapeOf(sentence) !== null);
   const expression = offered ? lookupQueryFor({ subjects, sentence: offered, utterance: say, history: [], roster: [], shape: lookupShapeOf(offered) ?? undefined }) : null;
   notePendingLookup(conversationId, reply, say, [], undefined, expression);
-  return { value, text: reply, timings: { firstDeltaMs: 0, firstSentenceMs: 0, totalMs: 0 }, error: null, interrupted: false };
+  return { value, text: reply, timings: { firstDeltaMs: 0, firstSentenceMs: 0, totalMs: 0 }, error: null, interrupted: false, spokenCue: null };
 }
 
 function memoryRowsFor(turnId: string | null): string[] {
@@ -640,6 +654,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       firstSentenceMs: driven.timings.firstSentenceMs,
       totalMs: driven.timings.totalMs,
       interrupted: driven.interrupted,
+      spokenCue: driven.spokenCue,
       rawModelText: requests.length ? (requests[requests.length - 1]?.responseText ?? null) : null,
       records: recordsFor(actor),
       // ACT-01: the frozen signal off the turn row (never the log line),

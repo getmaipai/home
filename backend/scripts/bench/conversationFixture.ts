@@ -73,6 +73,9 @@ export interface TurnExpectation {
   mustNotContain?: string;
   /** The reply is exactly this line. */
   fixedLine?: string;
+  /** CONS-01: the spoken cue the turn would play must not contain this
+   * phrase (a case-insensitive regex); no cue at all passes. */
+  cueNeverContains?: string;
   /** At most this many turn rows in the conversation carry the package
    * (the consequential row: one confirmed run, never two). */
   attemptsAtMost?: { packageId: string; count: number };
@@ -1472,8 +1475,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "CONS-01: a banned cue leaves the rotation for the conversation",
     turns: [
       { say: "what's the capital of Portugal", expect: { signal: { primary_act: "question" }, guard: null, humanVerdict: true } },
+      // The ban is in force from the next turn on; this turn still sees
+      // the cue the engine would have played (no cue check here).
       { say: "don't say one sec again", expect: { signal: { primary_act: "directive" }, mustNotContain: "^one sec\\.?$", humanVerdict: true } },
-      { say: "and of France", expect: { signal: { primary_act: "question" }, mustNotContain: "^one sec\\.?$", humanVerdict: true } },
+      { say: "and of France", expect: { signal: { primary_act: "question" }, mustNotContain: "^one sec\\.?$", cueNeverContains: "one sec", humanVerdict: true } },
     ],
   },
   {

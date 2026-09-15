@@ -38,6 +38,9 @@ export interface TurnObserved {
   firstDeltaMs: number | null;
   firstSentenceMs: number | null;
   totalMs: number;
+  /** The spoken cue the turn would play, when the first token is slow
+   * enough to fire it and it is not suppressed; null otherwise. */
+  spokenCue?: string | null;
   /** The turn was aborted on purpose (the interruption row). */
   interrupted?: boolean;
   /** The model's raw text for the turn's last completion, before any
@@ -176,6 +179,7 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.crisisResources) parts.push("crisis resources");
   if (e.mustContain) parts.push(`reply has /${e.mustContain}/`);
   if (e.mustNotContain) parts.push(`reply lacks /${e.mustNotContain}/`);
+  if (e.cueNeverContains) parts.push(`cue lacks /${e.cueNeverContains}/`);
   if (e.fixedLine) parts.push("the fixed line");
   if (e.attemptsAtMost) parts.push(`${e.attemptsAtMost.packageId} at most ${e.attemptsAtMost.count}`);
   if (e.answered) parts.push("answered");
@@ -277,6 +281,11 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   if (e.mustNotContain) {
     const m = new RegExp(e.mustNotContain, "i").exec(reply);
     checks.push({ name: "reply lacks", pass: m === null, detail: m ? `found "${m[0]}"` : `/${e.mustNotContain}/ absent` });
+  }
+  if (e.cueNeverContains) {
+    const cue = observed.spokenCue ?? null;
+    const m = cue === null ? null : new RegExp(e.cueNeverContains, "i").exec(cue);
+    checks.push({ name: "cue", pass: m === null, detail: m ? `cue "${cue}" contains /${e.cueNeverContains}/` : cue === null ? "no cue played" : `cue "${cue}" lacks /${e.cueNeverContains}/` });
   }
   if (e.fixedLine) checks.push({ name: "fixed line", pass: reply.trim() === e.fixedLine, detail: reply.trim() === e.fixedLine ? "exact" : `got "${reply.trim()}"` });
   if (e.transcriptRedacted && observed.storedUserText !== null) {

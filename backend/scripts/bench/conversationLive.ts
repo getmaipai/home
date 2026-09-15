@@ -245,7 +245,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
       for (const sc of run.scores) {
         const line = run.turnIds[sc.turnIndex] ? log.turns.get(run.turnIds[sc.turnIndex]!) : undefined;
         if (line?.timings) stageTimings.push(line.timings);
-        console.log(`[bench-turn] ${JSON.stringify({ conversation: sc.conversationId, turn: sc.turnIndex + 1, said: sc.say, pass: sc.pass, checks: sc.checks, reply: sc.observed.reply, source: sc.observed.source, pluginId: sc.observed.pluginId, guardHits: sc.observed.guardHits, rawModelText: sc.observed.rawModelText ?? null, memoryRows: sc.observed.memoryRows, offeredTools: sc.observed.offeredTools, firstDeltaMs: sc.observed.firstDeltaMs, totalMs: sc.observed.totalMs, signal: line?.signal ?? null, timings: line?.timings ?? null })}`);
+        console.log(`[bench-turn] ${JSON.stringify({ conversation: sc.conversationId, turn: sc.turnIndex + 1, said: sc.say, pass: sc.pass, checks: sc.checks, reply: sc.observed.reply, source: sc.observed.source, pluginId: sc.observed.pluginId, guardHits: sc.observed.guardHits, rawModelText: sc.observed.rawModelText ?? null, memoryRows: sc.observed.memoryRows, offeredTools: sc.observed.offeredTools, firstDeltaMs: sc.observed.firstDeltaMs, totalMs: sc.observed.totalMs, spokenCue: sc.observed.spokenCue ?? null, signal: line?.signal ?? null, timings: line?.timings ?? null })}`);
       }
     }
   } finally {
