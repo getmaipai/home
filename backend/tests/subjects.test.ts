@@ -118,9 +118,9 @@ describe("the judge writes the entity a fact is about", () => {
     expect(edge.statedByPersonId).toBeNull();
   });
 
-  test("an entity only the model named is inferred; one the speaker named is local", async () => {
+  test("an entity whose kind only the model inferred is inferred; one the speaker stated is local", async () => {
     const { actor } = await owner();
-    await judgeWith(actor, "the neighbor's dog barks all night", [
+    await judgeWith(actor, "Rover is the neighbor's dog", [
       { text: "The neighbor's dog barks at night", category: "person", scope: "person", importance: 0.4, subject: { name: "Rover", kind: "pet" } },
     ]);
     expect(db.select().from(entities).where(eq(entities.name, "Rover")).get()!.source).toBe("inferred");
@@ -285,7 +285,7 @@ describe("the review's cases", () => {
 
   test("a confirmed entity survives the forgetting of the fact that made it", async () => {
     const { client, actor } = await owner();
-    const { turn } = await judgeWith(actor, "the neighbor's dog barks all night", [
+    const { turn } = await judgeWith(actor, "Rover is the neighbor's dog", [
       { text: "The neighbor's dog barks at night", category: "person", scope: "person", importance: 0.4, subject: { name: "Rover", kind: "pet" } },
     ]);
     const rover = db.select().from(entities).where(eq(entities.name, "Rover")).get()!;
@@ -349,7 +349,7 @@ describe("the review's cases", () => {
     const { client, actor } = await owner();
     const created = await client.post("/api/people", { displayName: "Nadia", nickname: "Nads", role: "adult", secret: "0000" });
     expect(created.status).toBe(201);
-    await judgeWith(actor, "my sister Nads is coming over Sunday", [
+    await judgeWith(actor, "my sister Nads Nadia is coming over Sunday", [
       { text: "Nadia is coming over on Sunday", category: "event", scope: "person", importance: 0.5, subject: { name: "Nadia", kind: "person" }, relation: { type: "sibling_of", name: "Nads", stated: true } },
     ]);
     const edges = db.select().from(relationships).all();
@@ -458,7 +458,7 @@ describe("the review's cases", () => {
   test("a parent nicknamed by the relation word is still stated by it", async () => {
     const { client, actor } = await owner();
     await client.post("/api/people", { displayName: "Nadia", nickname: "Mom", role: "adult", secret: "0000" });
-    await judgeWith(actor, "my mom made dinner", [
+    await judgeWith(actor, "my mom Nadia made dinner", [
       { text: "Nadia made dinner", category: "event", scope: "person", importance: 0.4, subject: { name: "Mom", kind: "person" }, relation: { type: "child_of", name: "Mom", stated: true } },
     ]);
     expect(db.select().from(relationships).all().find((e) => e.type === "child_of")!.source).toBe("stated");
@@ -499,7 +499,7 @@ describe("recall and the prompt know whose fact it is", () => {
 
   test("an unconfirmed inferred relation is never said to the model (the name alone), and is plain once an adult confirms it", async () => {
     const { client, actor } = await owner();
-    await judgeWith(actor, "lunch with Quill again", [{ ...QUILL_FACT, relation: { type: "colleague_of", name: "Quill", stated: false } }]);
+    await judgeWith(actor, "Quill likes seltzer", [{ ...QUILL_FACT, relation: { type: "colleague_of", name: "Quill", stated: false } }]);
     const quill = db.select().from(entities).where(eq(entities.name, "Quill")).get()!;
     // ASK-01: the entity's kind is the model's guess too (no kind noun
     // beside the name), so the candidate gets no label at all until
@@ -526,7 +526,7 @@ describe("recall and the prompt know whose fact it is", () => {
 
   test("an unconfirmed inferred entity is a candidate: no label in the prompt, not a known name for the guards, not an identity recall reads by", async () => {
     const { actor } = await owner();
-    const { turn } = await judgeWith(actor, "the neighbor's dog barks all night", [
+    const { turn } = await judgeWith(actor, "Rover is the neighbor's dog", [
       { text: "The neighbor's dog barks at night", category: "person", scope: "person", importance: 0.4, subject: { name: "Rover", kind: "pet" } },
     ]);
     const rover = db.select().from(entities).where(eq(entities.name, "Rover")).get()!;
@@ -554,7 +554,7 @@ describe("recall and the prompt know whose fact it is", () => {
 
 describe("PATCH { confirm: true }", () => {
   async function inferredEdge(actor: PersonRow) {
-    await judgeWith(actor, "lunch with Quill again", [{ ...QUILL_FACT, relation: { type: "colleague_of", name: "Quill", stated: false } }]);
+    await judgeWith(actor, "Quill likes seltzer", [{ ...QUILL_FACT, relation: { type: "colleague_of", name: "Quill", stated: false } }]);
     const quill = db.select().from(entities).where(eq(entities.name, "Quill")).get()!;
     const edge = db.select().from(relationships).all().find((e) => e.toId === quill.id)!;
     return { quill, edge };
@@ -582,7 +582,7 @@ describe("PATCH { confirm: true }", () => {
   });
 
   async function inferredEdgeFor(actor: PersonRow) {
-    await judgeWith(actor, "lunch with Raven again", [
+    await judgeWith(actor, "Raven has lunch with Bramble", [
       { text: "Raven has lunch with Bramble", category: "person", scope: "person", importance: 0.5, subject: { name: "Raven", kind: "person" }, relation: { type: "friend_of", name: "Raven", stated: false } },
     ]);
     const raven = db.select().from(entities).where(eq(entities.name, "Raven")).get()!;
@@ -591,7 +591,7 @@ describe("PATCH { confirm: true }", () => {
 
   test("an inferred entity is confirmed to local by an adult; provenance is not settable through the edit body", async () => {
     const { client, actor } = await owner();
-    await judgeWith(actor, "the neighbor's dog barks all night", [
+    await judgeWith(actor, "Rover is the neighbor's dog", [
       { text: "The neighbor's dog barks at night", category: "person", scope: "person", importance: 0.4, subject: { name: "Rover", kind: "pet" } },
     ]);
     const rover = db.select().from(entities).where(eq(entities.name, "Rover")).get()!;
