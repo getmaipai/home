@@ -1137,6 +1137,15 @@ describe("WINDOW-01: no bank line survives withoutBankLines()", () => {
     expect(withoutBankLines("I haven't added anything to your list. The water's boiling now.")).toBe("The water's boiling now.");
     expect(withoutBankLines("It's a Pixar film. I don't know, sorry.")).toBe("It's a Pixar film.");
   });
+  test("a multi-sentence bank line is stripped whole wherever it occurs, including behind a prefix", () => {
+    // The forget family's none line is two sentences and is stripped as a
+    // whole line, not sentence-by-sentence.
+    expect(withoutBankLines("I haven't forgotten anything. Say \"forget that\" and I will.")).toBe("");
+    expect(withoutBankLines("Sure. I haven't forgotten anything. Say \"forget that\" and I will.")).toBe("Sure.");
+    // Same for the other two-sentence bank lines.
+    const chatLoop = "Sorry, I lost my train of thought. Say that again?";
+    expect(withoutBankLines("The water's boiling now. " + chatLoop)).toBe("The water's boiling now.");
+  });
 });
 
 describe("WINDOW-01: bankLineNote() maps bank lines to typed notes", () => {
@@ -1160,6 +1169,11 @@ describe("WINDOW-01: bankLineNote() maps bank lines to typed notes", () => {
         expect(note).toBe(family.note);
       }
     }
+  });
+  test("the save family's pending line notes the wait in the family's own words", () => {
+    expect(bankLineNote("That save is waiting on your confirmation.")).toBe("[The save is waiting on your confirmation.]");
+    // The generic WAITING line keeps the plain note.
+    expect(bankLineNote("That's waiting on your confirmation.")).toBe("[Waiting on your confirmation.]");
   });
   test("honesty lines, acknowledgments, and other bank lines return null", () => {
     expect(bankLineNote("I don't know, sorry.")).toBeNull();

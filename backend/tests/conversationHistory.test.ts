@@ -829,6 +829,12 @@ describe("buildConversationWindow() (step 3)", () => {
     const partial = buildConversationWindow(conv.value);
     expect(partial.messages.some((m) => m.role === "system" && m.content === '[The reply given was: "It\'s a Pixar film."]')).toBe(true);
     expect(partial.messages.some((m) => m.content.includes("I don't know, sorry"))).toBe(false);
+    // A save-family pending line renders a waiting note in the family's own
+    // words, not a "nothing saved" note (a review).
+    logTurn(actor, "chat", "remember this recipe", { reply: { text: "That save is waiting on your confirmation." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-pending" }, { guardReasons: ["unsupported_action"] });
+    const pending = buildConversationWindow(conv.value);
+    expect(pending.messages.some((m) => m.role === "system" && m.content === "[The save is waiting on your confirmation.]")).toBe(true);
+    expect(pending.messages.some((m) => m.content.includes("No memory was saved"))).toBe(false);
   });
 
   test("the newest 4 turns are always included verbatim; oldest dropped first past the 1,200-token estimate", async () => {

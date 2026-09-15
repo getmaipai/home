@@ -1295,6 +1295,10 @@ interface ActionFamily {
    * the families themselves, so a wording change can't silently lose a
    * note. */
   note: string;
+  /** WINDOW-01: the note the family's pending line becomes, in its own
+   * words ("The save is waiting..."); without one, the family's plain
+   * note is used. */
+  pendingNote?: string;
 }
 const WAITING = "That's waiting on your confirmation.";
 const I_DID = "\\bi(?:'ve| have)?\\s+(?:just\\s+)?";
@@ -1326,6 +1330,7 @@ export const ACTION_FAMILIES: readonly ActionFamily[] = [
     failed: "That didn't get saved.",
     pending: "That save is waiting on your confirmation.",
     note: "[No memory was saved.]",
+    pendingNote: "[The save is waiting on your confirmation.]",
   }),
   claimFamily({
     name: "list",
@@ -1696,11 +1701,28 @@ function bankLinesSet(): ReadonlySet<string> {
   }
   return _bankLinesCache;
 }
+export function bankLinesOf(text: string): string[] {
+  const collapsed = (text || "").replace(/\s+/g, " ");
+  const out: string[] = [];
+  for (const line of [...bankLinesSet()].sort((a, b) => b.length - a.length)) {
+    if (collapsed.includes(line.replace(/\s+/g, " ")) && !out.includes(line)) out.push(line);
+  }
+  return out;
+}
 export function withoutBankLines(text: string): string {
   const trimmed = (text || "").trim();
   const lines = bankLinesSet();
   if (lines.has(trimmed)) return "";
-  return splitIntoSentences(trimmed)
+  // A multi-sentence bank line is the unit the guard speaks, so it is
+  // stripped whole wherever it occurs, longest line first; the per-
+  // sentence pass then drops the single-sentence lines that remain.
+  let out = trimmed;
+  for (const line of [...lines].sort((a, b) => b.length - a.length)) {
+    const needle = line.replace(/\s+/g, " ");
+    if (out.includes(needle)) out = out.replace(needle, " ");
+  }
+  out = out.replace(/\s+/g, " ").trim();
+  return splitIntoSentences(out)
     .filter((s) => !lines.has(s.trim()))
     .join(" ")
     .trim();
@@ -1719,7 +1741,7 @@ const BANK_LINE_NOTES: Record<string, string> = (() => {
   for (const family of ACTION_FAMILIES) {
     notes[family.none] = family.note;
     notes[family.failed] = family.note;
-    if (family.pending) notes[family.pending] = family.note;
+    if (family.pending) notes[family.pending] = family.pendingNote ?? family.note;
   }
   notes["I'm not able to give medication amounts - check with a pharmacist or the label."] =
     "[Medication amounts were not given.]";
