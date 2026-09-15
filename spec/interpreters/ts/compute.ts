@@ -64,13 +64,13 @@ export function normalizeSpokenMath(text: string): string {
   // ("0x10" reaches the evaluator unchanged) while "12 x 12", "3x4",
   // "12 x12" and "12x 12" still become multiplications.
   const hexLiterals = result.match(/\b0[xX][0-9a-fA-F]+\b/g) ?? [];
-  for (let i = 0; i < hexLiterals.length; i++) {
-    result = result.replace(hexLiterals[i], `@HEX${i}@`);
-  }
+  hexLiterals.forEach((literal, i) => {
+    result = result.replace(literal, `@HEX${i}@`);
+  });
   result = result.replace(/(?<=\d)\s*x\s*(?=\d)/g, "*");
-  for (let i = 0; i < hexLiterals.length; i++) {
-    result = result.replace(`@HEX${i}@`, hexLiterals[i]);
-  }
+  hexLiterals.forEach((literal, i) => {
+    result = result.replace(`@HEX${i}@`, literal);
+  });
 
   // 5. Squared and cubed
   result = result.replace(/(\d+(?:\.\d+)?|\([^)]+\))\s+squared/gi, "$1^2");
