@@ -16,7 +16,8 @@
       "tell me today's date",
       "what's the current date"
     ],
-    "patterns": ["what's today's date", "what day is it", "what day of the week is it"]
+    "patterns": ["what's today's date", "what day is it", "what day of the week is it"],
+    "answers": []
   },
   "requires": [],
   "optional": [],

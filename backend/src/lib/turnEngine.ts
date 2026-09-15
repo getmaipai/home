@@ -1398,6 +1398,51 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
   return null;
 }
 
+/** CHAT-13 chunk D: the five entity kinds the deterministic tiers extract
+ * from an utterance, the vocabulary a manifest's `routing.answers` draws
+ * from (the kinds the deterministic tiers already extract - weekday,
+ * relative_date, clock_time, number, proper_noun - not the record entity
+ * kinds person/pet/place/organization/thing). */
+export type AnswerKind = "weekday" | "relative_date" | "clock_time" | "number" | "proper_noun";
+
+const WEEKDAY_WORDS: ReadonlySet<string> = new Set(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
+const RELATIVE_DATE_WORDS: ReadonlySet<string> = new Set(["today", "tomorrow", "yesterday"]);
+const CLOCK_TIME_RE = /\b(\d{1,2}):(\d{2})\b|\b\d{1,2}\s?(am|pm)\b/i;
+
+/** CHAT-13 chunk D: the entity kinds the deterministic tiers already
+ * extract from the utterance. A typed fixed-answer package may only win
+ * an utterance if every kind captured out of it is one it declared.
+ *
+ * - weekday: a bare weekday name ("Friday", "next Friday").
+ * - relative_date: an offset day ("today", "tomorrow", "yesterday").
+ * - clock_time: a numeric clock phrase ("7 pm", "15:30").
+ * - number: a bare number.
+ * - proper_noun: any capitalized word that is not the sentence opener.
+ */
+export function capturedEntityKinds(text: string): AnswerKind[] {
+  const kinds = new Set<AnswerKind>();
+  const words = text.replace(/[^\p{L}\p{N}]/gu, " ").split(/\s+/).filter(Boolean);
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]!;
+    const lower = w.toLowerCase();
+    if (WEEKDAY_WORDS.has(lower)) kinds.add("weekday");
+    if (RELATIVE_DATE_WORDS.has(lower)) kinds.add("relative_date");
+    if (/^[0-9]+$/.test(w)) kinds.add("number");
+    if (i > 0 && w[0]! === w[0]!.toUpperCase() && /[a-z]/.test(lower) && !/^[0-9]+$/.test(w)) kinds.add("proper_noun");
+  }
+  if (CLOCK_TIME_RE.test(text)) kinds.add("clock_time");
+  return [...kinds];
+}
+
+/** CHAT-13 chunk D: does this manifest's `routing.answers` declaration
+ * cover every captured entity kind? `undefined` (not declared) covers
+ * everything; an empty array covers none. */
+export function answersAllow(manifest: PackageManifest, kinds: readonly AnswerKind[]): boolean {
+  const answers = manifest.routing?.answers;
+  if (answers === undefined) return true;
+  return kinds.every((k) => answers.includes(k));
+}
+
 /** FAST-04: the fuzzy half of routing (embedding scores with the
  * keyword-overlap fallback, the Tier 1 threshold and margin, and the
  * full `ranked` list Tier 2 offers from). Only called once routeLiteral()
@@ -1437,9 +1482,11 @@ export async function routeSemantic(
   // clear its raised bar) - folded into canFire alongside the existing
   // arg-binding check, rather than excluded from `eligible`/`scored`
   // outright, so it still appears in `ranked` for Tier 2 to offer.
+  const capturedKinds = capturedEntityKinds(text);
   const canFire = (id: string) => {
     const manifest = eligible.find((e) => e.id === id)!.manifest;
     if (manifest.consequential) return false;
+    if (!answersAllow(manifest, capturedKinds)) return false;
     return deterministicArgs(manifest.args, null) !== null;
   };
   const tier1Winner = pickTier1WinnerAmong(scored, canFire);

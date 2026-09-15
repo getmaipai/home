@@ -57,6 +57,14 @@
         "always_offer": {
           "type": "boolean",
           "description": "Fix E (home/docs/dev.md, 'Chat reliability'): offered as a Tier 2 tool on every turn, regardless of this package's own embedding score against `examples` - never gated by the ambiguous-floor pre-filter (route()'s TIER2_AMBIGUOUS_FLOOR) that every other package still is. For a genuinely open-ended fallback capability (websearch is the first: no fixed vocabulary describes 'a question that needs a live lookup') where the pre-filter's own false negatives are common and costly, and native tool calling's own measured false-call rate (0% across the real corpus) makes the model's own judgment a better gate than a similarity score. Not a general escape from the floor: a package still needs a real role match and a manifest entry to be considered at all, and MAX_TIER2_TOOLS_OFFERED's own cap still bounds how many always-offered packages can exist before the prompt grows unbounded - use sparingly, for real fallback capabilities only, never as a way to skip tuning `examples`."
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["weekday", "relative_date", "clock_time", "number", "proper_noun"]
+          },
+          "description": "CHAT-13 chunk D (home/docs/dev.md section 16 part 3, rule 3): the small vocabulary of entity kinds a package declares it answers, one field, read by routeSemantic's canFire(). A semantic winner whose captured argument carries an entity kind the manifest does not list is refused the win (the utterance goes on to the model, Tier 2, or the Tier 1 compute) instead of the fixed-answer package answering it - a weekday or relative date ('what date is next Friday') is not a holiday, so the holiday package (which declares []) cannot win it. The kinds are the kinds the deterministic tiers already extract (weekday, relative_date, clock_time, number, proper_noun), not the record entity kinds (person, pet, place, organization, thing)."
         }
       }
     },

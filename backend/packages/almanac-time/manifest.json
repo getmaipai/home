@@ -16,7 +16,8 @@
       "tell me the time",
       "what time is it right now"
     ],
-    "patterns": ["what time is it", "what's the time", "tell me the time"]
+    "patterns": ["what time is it", "what's the time", "tell me the time"],
+    "answers": []
   },
   "requires": [],
   "optional": [],

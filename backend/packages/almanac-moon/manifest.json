@@ -16,7 +16,8 @@
       "what does the moon look like tonight",
       "tell me the moon phase"
     ],
-    "patterns": ["what phase is the moon in", "what's the moon phase tonight", "tell me the moon phase"]
+    "patterns": ["what phase is the moon in", "what's the moon phase tonight", "tell me the moon phase"],
+    "answers": []
   },
   "requires": [],
   "optional": [],

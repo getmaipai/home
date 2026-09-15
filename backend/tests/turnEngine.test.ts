@@ -18,7 +18,10 @@ import {
   matchPattern,
   capSection,
   route,
+  routeSemantic,
   loadAllManifests,
+  capturedEntityKinds,
+  answersAllow,
   PROMPT_SYSTEM_CHAR_BUDGET,
   MAX_TURN_TEXT_LENGTH,
   confirmPromptFor,
@@ -3221,6 +3224,160 @@ describe("route() never lets a consequential package win outright (session-d-pac
     const { winner, ranked } = await route("lock the front door", actor, loaded);
     expect(winner?.id).not.toBe("lock-doors");
     expect(ranked.some((c) => c.id === "lock-doors")).toBe(true);
+  });
+});
+
+describe("CHAT-13 chunk D: routing.answers", () => {
+  function makeManifest(answers?: string[]): { id: string; manifest: PackageManifest } {
+    const m = PackageManifest.parse({
+      id: "test-almanac",
+      version: "0.1.0",
+      kind: "plugin",
+      category: "Info",
+      display: "Test Almanac",
+      description: "A test almanac.",
+      author: "MaiPai",
+      license: "AGPL-3.0",
+      routing: {
+        examples: [
+          "what's today's calendar date",
+          "what's the date today",
+          "what day of the week is today",
+          "tell me today's date",
+          "what's the current date",
+        ],
+        ...(answers !== undefined ? { answers } : {}),
+      },
+      requires: [],
+      optional: [],
+      platforms: ["home"],
+      min_role: "child",
+      consequential: false,
+      offline: "full",
+      config: [],
+      data_sources: [],
+      permissions: [],
+      notifications: [],
+      backup: "exclude",
+      background: false,
+      contributes: {},
+      min_app: "0.1.0",
+      timeout_ms: 8000,
+      tier: 1,
+      quality_scale: "bronze",
+      smoke: { kind: "deno_test" },
+    });
+    return { id: "test-almanac", manifest: m };
+  }
+
+  test("capturedEntityKinds() extracts weekday from 'what date is next Friday'", () => {
+    const kinds = capturedEntityKinds("what date is next Friday");
+    expect(kinds).toContain("weekday");
+  });
+
+  test("capturedEntityKinds() extracts relative_date from 'what's the date tomorrow'", () => {
+    const kinds = capturedEntityKinds("what's the date tomorrow");
+    expect(kinds).toContain("relative_date");
+  });
+
+  test("capturedEntityKinds() extracts clock_time from 'what time is it at 7 pm'", () => {
+    const kinds = capturedEntityKinds("what time is it at 7 pm");
+    expect(kinds).toContain("clock_time");
+  });
+
+  test("capturedEntityKinds() extracts number from 'what is 2 plus 2'", () => {
+    const kinds = capturedEntityKinds("what is 2 plus 2");
+    expect(kinds).toContain("number");
+  });
+
+  test("capturedEntityKinds() extracts proper_noun from a capitalized word", () => {
+    const kinds = capturedEntityKinds("when does the Sun rise");
+    expect(kinds).toContain("proper_noun");
+  });
+
+  test("capturedEntityKinds() returns empty for a plain utterance with no entity kinds", () => {
+    const kinds = capturedEntityKinds("hello there");
+    expect(kinds).toEqual([]);
+  });
+
+  test("answersAllow() returns true when manifest has no answers declared (undefined)", () => {
+    const { manifest } = makeManifest(undefined);
+    expect(answersAllow(manifest, ["weekday", "relative_date"])).toBe(true);
+  });
+
+  test("answersAllow() returns true when manifest declares all captured kinds", () => {
+    const { manifest } = makeManifest(["weekday", "relative_date"]);
+    expect(answersAllow(manifest, ["weekday", "relative_date"])).toBe(true);
+  });
+
+  test("answersAllow() returns false when manifest declares [] (covers none)", () => {
+    const { manifest } = makeManifest([]);
+    expect(answersAllow(manifest, ["weekday"])).toBe(false);
+  });
+
+  test("answersAllow() returns false when a captured kind is not declared", () => {
+    const { manifest } = makeManifest(["weekday"]);
+    expect(answersAllow(manifest, ["weekday", "relative_date"])).toBe(false);
+  });
+
+  test("answersAllow() returns true when no kinds are captured", () => {
+    const { manifest } = makeManifest([]);
+    expect(answersAllow(manifest, [])).toBe(true);
+  });
+
+  test("routeSemantic refuses a manifest that declares [] when a weekday is captured", async () => {
+    const actor = fakeActor({ role: "adult" });
+    const loaded = [makeManifest([])];
+    const { winner } = await routeSemantic("what date is next Friday", actor, loaded, undefined);
+    expect(winner).toBeNull();
+  });
+
+  test("routeSemantic allows a manifest that declares the captured kind", async () => {
+    const actor = fakeActor({ role: "adult" });
+    // Add an example that scores high against "what day of the week is Friday"
+    // so the Tier 1 threshold clears; "Friday" is a weekday, declared in
+    // routing.answers, so answersAllow passes.
+    const m = PackageManifest.parse({
+      id: "test-almanac",
+      version: "0.1.0",
+      kind: "plugin",
+      category: "Info",
+      display: "Test Almanac",
+      description: "A test almanac.",
+      author: "MaiPai",
+      license: "AGPL-3.0",
+      routing: {
+        examples: [
+          "what day of the week is Friday",
+          "what's today's calendar date",
+          "what's the date today",
+          "tell me today's date",
+          "what's the current date",
+        ],
+        answers: ["weekday", "proper_noun"],
+      },
+      requires: [],
+      optional: [],
+      platforms: ["home"],
+      min_role: "child",
+      consequential: false,
+      offline: "full",
+      config: [],
+      data_sources: [],
+      permissions: [],
+      notifications: [],
+      backup: "exclude",
+      background: false,
+      contributes: {},
+      min_app: "0.1.0",
+      timeout_ms: 8000,
+      tier: 1,
+      quality_scale: "bronze",
+      smoke: { kind: "deno_test" },
+    });
+    const loaded = [{ id: "test-almanac", manifest: m }];
+    const { winner } = await routeSemantic("what day of the week is Friday", actor, loaded, undefined);
+    expect(winner?.id).toBe("test-almanac");
   });
 });
 

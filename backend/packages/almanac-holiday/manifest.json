@@ -16,7 +16,8 @@
       "what holiday is coming up next",
       "is there a day off coming up"
     ],
-    "patterns": ["what's the next holiday", "is there a holiday coming up"]
+    "patterns": ["what's the next holiday", "is there a holiday coming up"],
+    "answers": []
   },
   "requires": [],
   "optional": [],

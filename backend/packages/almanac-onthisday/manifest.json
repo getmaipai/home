@@ -16,7 +16,8 @@
       "this day in history",
       "what's special about today in history"
     ],
-    "patterns": ["what happened on this day in history", "what happened today in history", "this day in history"]
+    "patterns": ["what happened on this day in history", "what happened today in history", "this day in history"],
+    "answers": []
   },
   "requires": [],
   "optional": [],

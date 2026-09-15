@@ -99,4 +99,25 @@ describe("PackageManifest, step 2's new fields", () => {
       PackageManifest.parse({ ...BASE, smoke: { kind: "recipe_fixture", fixture: "tests/smoke.json" } }),
     ).not.toThrow();
   });
+
+  test("routing.answers: empty array (a fixed-answer package that answers no entity kind)", () => {
+    expect(PackageManifest.parse({ ...BASE, routing: { answers: [] } }).routing?.answers).toEqual([]);
+  });
+
+  test("routing.answers: a declared list of entity kinds", () => {
+    expect(
+      PackageManifest.parse({
+        ...BASE,
+        routing: { answers: ["weekday", "relative_date", "clock_time", "number", "proper_noun"] },
+      }).routing?.answers,
+    ).toEqual(["weekday", "relative_date", "clock_time", "number", "proper_noun"]);
+  });
+
+  test("routing.answers: a partial list", () => {
+    expect(PackageManifest.parse({ ...BASE, routing: { answers: ["clock_time"] } }).routing?.answers).toEqual(["clock_time"]);
+  });
+
+  test("routing.answers rejects a kind outside the vocabulary", () => {
+    expect(() => PackageManifest.parse({ ...BASE, routing: { answers: ["movie"] } })).toThrow();
+  });
 });
