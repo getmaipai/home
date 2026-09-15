@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type ClonedVoiceInfo } from "@/lib/api";
 import { Section } from "@/kit/primitives/Section";
 import { Input } from "@/kit/ui/input";
@@ -28,7 +28,7 @@ export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoadError(null);
     try {
       const [{ voices: list }, values] = await Promise.all([
@@ -41,11 +41,11 @@ export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
     } catch (e) {
       setLoadError(e instanceof ApiError ? e.message : "Could not load cloned voices.");
     }
-  }
+  }, [person.id]);
 
   useEffect(() => {
     void load();
-  }, [person.id]);
+  }, [load]);
 
   async function handleUpload(e: FormEvent) {
     e.preventDefault();

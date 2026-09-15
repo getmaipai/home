@@ -47,8 +47,9 @@ export function WakeWordToggle({ onWakeDetected: onWake, onStatusChange }: WakeW
     // Bumping it here closes the exact same race stop() already guards
     // against, just triggered by navigating away instead of a second
     // click.
+    const requestId = requestIdRef;
     return () => {
-      requestIdRef.current++;
+      requestId.current++;
       micRef.current?.stop();
       loopRef.current?.setEnabled(false);
     };
