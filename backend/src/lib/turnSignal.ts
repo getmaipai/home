@@ -491,6 +491,12 @@ export function freezeDirective(signal: TurnSignal): TurnSignal {
   return { ...signal, primary_act: "directive", secondary_acts: acts.filter((_, i) => i !== primaryIndex), clauses, act_confidence: Math.max(signal.act_confidence, 0.9), source: signal.source === "fallback" ? "rule" : signal.source };
 }
 
+/** Reclassify a short reaction to the current world subject. */
+export function asBackchannelOnLiveSubject(signal: TurnSignal): TurnSignal {
+  const clauses = signal.clauses.map((clause) => ({ ...clause, act: "backchannel" as const, stance: "asserted" as const }));
+  return { ...signal, primary_act: "backchannel", secondary_acts: [], clauses, source: "rule", act_confidence: Math.max(signal.act_confidence, 0.85) };
+}
+
 /** The router's and the guards' reading, projected from the signal:
  * `command` for a directive, `question` for a question, `first_person`
  * for a statement the speaker opens in the first person, `statement`

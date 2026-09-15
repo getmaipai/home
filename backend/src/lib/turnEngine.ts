@@ -35,7 +35,7 @@ import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isR
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
-import { classifyTurnSignal, fallbackSignal, freezeDirective, hasEligibleClause, shapeOf, type ProtocolAnswer } from "@/lib/turnSignal";
+import { asBackchannelOnLiveSubject, classifyTurnSignal, fallbackSignal, freezeDirective, hasEligibleClause, shapeOf, type ProtocolAnswer } from "@/lib/turnSignal";
 /** REG-01: the system note on the one retry a statement turn gets when
  * every sentence of the reply was register or an action claim. */
 export const STATEMENT_RETRY_NOTE = "Nothing was asked; respond to what they said.";
@@ -1328,7 +1328,10 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
   // the fact from a directive it should never read; the judge is keyed
   // on the signal now, so the package has to be the one that stores it.
   const bare = text.replace(COURTESY_PREFIX, "");
-  for (const { id, manifest } of loaded) {
+  const ordered = stack?.[0]?.type === "world" && MEDIA_KINDS.has(stack[0].kind)
+    ? [...loaded].sort((a, b) => (a.id === "media-lookup" ? -1 : b.id === "media-lookup" ? 1 : 0))
+    : loaded;
+  for (const { id, manifest } of ordered) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
     // The spec's own kind doc comment (spec/schemas/manifest.schema.json):
     // "a `skill` is plain instructions... composed into the chat model's
@@ -1398,6 +1401,14 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
     }
   }
   return null;
+}
+
+const SHORT_COMMENT_STOPWORDS = new Set(["a", "an", "the", "and", "or", "but", "to", "of", "in", "on", "is", "it", "that", "this", "was", "were", "be", "are", "my", "your", "i", "you", "we", "he", "she", "they"]);
+function isShortCommentOnLiveSubject(text: string, subjects: readonly SubjectRef[]): boolean {
+  if (text.includes("?")) return false;
+  const words = text.trim().match(/[A-Za-z]+(?:['-][A-Za-z]+)*/g);
+  if (!words || words.length < 1 || words.length > 2 || words.join(" ").length !== text.trim().length) return false;
+  return subjects[0]?.type === "world" && words.some((word) => !SHORT_COMMENT_STOPWORDS.has(word.toLowerCase()));
 }
 
 /** CHAT-13 chunk D: the five entity kinds the deterministic tiers extract
