@@ -5217,6 +5217,107 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(retained(consented.value.turn_id)?.map((o) => [o.packageId, o.status, o.via])).toEqual([["websearch", "failed", "ask"]]);
     });
   });
+
+  async function withCosmoLookupStub<T>(fn: (seen: { forced: number; queries: string[] }) => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const seen = { forced: 0, queries: [] as string[] };
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => {
+        if (request.tool_choice !== "required") return undefined;
+        if (request.messages.some((m) => typeof m.content === "string" && m.content.includes("got a photo of it"))) return undefined;
+        seen.forced++;
+        return [{ id: "call-cosmo", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "Cosmo 7 support page" }) } }];
+      },
+      scriptedChatReply: (request) => {
+        const text = request.messages.map((m) => typeof m.content === "string" ? m.content : "").join(" ");
+        if (text.includes("got a photo of it")) return "A grown-up can open that for you; ask them.";
+        if (text.includes("BEGIN SEARCH RESULTS")) return "Here's the page, the link's below.";
+        return "Let me check that for you.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    const searxng = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seen.queries.push(new URL(req.url).searchParams.get("q") ?? "");
+        return Response.json({ results: [
+          { title: "Cosmo 7 support", url: "https://example.com/cosmo-7/support", content: "Official support page." },
+          { title: "Cosmo 7 help", url: "https://example.com/cosmo-7/help", content: "Help and documentation." },
+        ] });
+      },
+    });
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
+    try {
+      return await fn(seen);
+    } finally {
+      stub.stop();
+      searxng.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+
+  test("CHAT-16 (b): a forced Cosmo 7 support lookup returns two sources", async () => {
+    const { actor } = await owner();
+    await withCosmoLookupStub(async (seen) => {
+      const result = await runTurn(actor, "chat", "where's the maker's support page for the Cosmo 7 card");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.forced).toBe(1);
+      expect(seen.queries[0]).toContain("support page");
+      expect(result.value.reply.text).toBe("Here's the page, the link's below.");
+      expect(result.value.sources).toHaveLength(2);
+      expect(retained(result.value.turn_id)?.map((o) => o.via)).toEqual(["forced"]);
+    });
+  });
+
+  test("CHAT-16 (b): asking where the link came from reuses sources without a tool", async () => {
+    const { actor } = await owner();
+    await withCosmoLookupStub(async (seen) => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const first = await runTurn(actor, "chat", "where's the maker's support page for the Cosmo 7 card", { conversationId: conv.value.id });
+      expect(first.ok).toBe(true);
+      const second = await runTurn(actor, "chat", "where did you read that, link me", { conversationId: conv.value.id });
+      expect(second.ok).toBe(true);
+      if (!second.ok) return;
+      expect(seen.forced).toBe(1);
+      expect(retained(second.value.turn_id)).toBeNull();
+      expect(second.value.sources).toHaveLength(2);
+    });
+  });
+
+  test("CHAT-16 (b): a child sees no lookup sources, while the conversation outcome retains both", async () => {
+    const { client, actor } = await owner();
+    const created = await client.post("/api/people", { displayName: "Cosmo Kid", role: "child" });
+    const child = db.select().from(people).where(eq(people.displayName, "Cosmo Kid")).get()!;
+    await withCosmoLookupStub(async () => {
+      const conv = resolveOrCreateConversation(child, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const first = await runTurn(child, "chat", "where's the maker's support page for the Cosmo 7 card", { conversationId: conv.value.id });
+      expect(first.ok).toBe(true);
+      const childResult = await runTurn(child, "chat", "got a photo of it?", { conversationId: conv.value.id });
+      expect(childResult.ok).toBe(true);
+      if (!childResult.ok) return;
+      expect(childResult.value.reply.text).toBe("A grown-up can open that for you; ask them.");
+      expect(childResult.value.sources ?? []).toHaveLength(0);
+      const { outcomesForConversation } = await import("@/lib/conversationHistory");
+      expect(outcomesForConversation(conv.value.id).some((t) => t.outcomes.some((o) => o.sources?.length === 2))).toBe(true);
+    });
+    expect(created.status).toBe(201);
+  });
+
+  test("CHAT-16 (b): the streaming lookup done value carries two sources", async () => {
+    const { client } = await owner();
+    await withCosmoLookupStub(async (seen) => {
+      const res = await client.post("/api/turn/stream", { text: "where's the maker's support page for the Cosmo 7 card" });
+      const events = await readNdjson(res);
+      const done = events.find((event) => event.type === "done");
+      expect(seen.forced).toBe(1);
+      expect((done?.value as { sources?: unknown[] }).sources).toHaveLength(2);
+    });
+  });
 });
 
 describe("CHAT-13 chunk C2: the last succeeded lookup is a stack source", () => {
