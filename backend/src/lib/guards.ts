@@ -143,6 +143,8 @@ export interface GuardContext {
    * closing or a backchannel is a statement, and a statement takes no
    * action claim). Absent, the shape decides. */
   act?: "inform" | "question" | "directive" | "commissive" | "greeting" | "closing" | "backchannel";
+  target?: "self" | "other" | "hub" | "world";
+  repair?: "none" | "retraction" | "correction";
   /** REG-01: the hub's own previous reply in this conversation, whose
    * question sentences a reply may not say back. */
   previousReply?: string;
@@ -409,15 +411,25 @@ const CLAIMED_EXPERIENCE_RE =
 // is not tasting.
 const EXPERIENCE_VERBS = String.raw`(?:watch(?:ing)?(?! (?:what|how|for|out for))|see(?:ing)?(?! (?:what|how|if|whether|your|you|where|which|who))|hear(?:ing)?(?! (?:what|how|about|your|from|more|all|back|you|the rest|the story|that|this|it from))|listen(?:ing)?(?! (?:to what|to how|to you|for|to the rest))|play(?:ing)?(?! (?:it|that|them) (?:for|back|to you))|read(?:ing)?(?! (?:what|your|you|it to|that to|them to|this to|aloud|out|through|over|back|along|the room))|check(?:ing)?(?: it| that| them| this)? out|giv(?:e|ing) (?:it|that|them) a (?:listen|watch|go|spin)|catch(?:ing)?|stream(?:ing)?|binge(?:ing)?|bingeing)\b`;
 const LOOKUP_OBJECT_RE = /\b(?:to\s+(?:find|check|look up|search)|through\s+the\s+results|the\s+page|what\s+came\s+back|the\s+results)\b/i;
-const CURRENT_WORLD_RE = /\b(?:current|new|latest|today|tonight|this week|this month)\b/i;
-const HEARSAY_EXPERIENCE_RE = /\b(?:i['’]?ve heard (?:it|the (?:film|album|show)) (?:is|was)\s+\w+|people say it['’]?s\s+\w+|it['’]?s supposed to be\s+\w+)\b/i;
-function currentWorldSubject(ctx: GuardContext): boolean { return (ctx.subjects ?? []).some((s) => s.type === "world" && s.recency === "current"); }
+const HEARSAY_EXPERIENCE_RE = /\b(?:i['’]?ve heard (?:it|the (?:film|album|show))?\s*(?:is|was|it['’]?s)\s+\w+|people say it['’]?s\s+\w+|it['’]?s supposed to be\s+\w+)\b/i;
+function currentWorldSubject(ctx: GuardContext): boolean { return (ctx.subjects ?? []).length === 0 || (ctx.subjects ?? []).some((s) => s.type === "world" && s.recency === "current"); }
+const CONSUMPTION_EXPERIENCE_RE = /\bi(?:'m| am| was|'ve| have|'d| had)?(?: just| also| even| already| actually)? (?:eat(?:ing)?|ate|drink(?:ing)?|drank|cook(?:ing|ed)|went|visit(?:ing|ed)|been to|waiting for|tried|tasted|bought|drove|driving)\b/i;
+const EXPERIENCE_OBJECT_WORDS = /\b(?:food|pasta|pizza|soup|cake|coffee|tea|restaurant|cafe|bar|place|park|museum|cinema|theater|film|movie|show|album|book|game|song|page|it|that|there|Paris)\b/i;
+function hasExperienceObject(sentence: string, ctx: GuardContext): boolean {
+  if (!CONSUMPTION_EXPERIENCE_RE.test(sentence)) return true;
+  if (EXPERIENCE_OBJECT_WORDS.test(sentence)) return true;
+  return (ctx.subjects ?? []).some((s) => s.type === "world" && s.recency !== "unknown" && s.display_name && new RegExp(`\\b${s.display_name.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "i").test(sentence));
+}
+function experienceEvidence(ctx: GuardContext): boolean {
+  return (ctx.outcomes ?? []).some((o) => o.status === "succeeded" && /review|rating/i.test(`${o.reason ?? ""} ${JSON.stringify((o as { args?: unknown }).args ?? {})}`));
+}
 function experienceTurn(ctx: GuardContext): boolean { return /\b(?:have you|did you|do you)\s+(?:seen|heard|watched|been)\b/i.test(ctx.utterance) || (/\b(?:seen|heard|watched|been)\b/i.test(ctx.utterance) && ctx.act === "question"); }
 function newExperienceForm(sentence: string, ctx: GuardContext): boolean {
   if (!currentWorldSubject(ctx)) return false;
+  if (experienceEvidence(ctx)) return false;
   if (/\bcan['’]?t wait(?: for\s+[^.!?]+)?\b/i.test(sentence)) return true;
   if (/\bi['’]?m (?:so |as |just as )?excited(?: as you)?(?: too)?\b/i.test(sentence) || /\bi['’]?m excited too\b/i.test(sentence)) return true;
-  if (HEARSAY_EXPERIENCE_RE.test(sentence) && !(ctx.outcomes ?? []).some((o) => /review|rating/i.test(`${o.packageId} ${o.reason ?? ""}`))) return true;
+  if (HEARSAY_EXPERIENCE_RE.test(sentence)) return true;
   return false;
 }
 // A plan spoken as the hub's own: the first-person forms, and the
@@ -828,7 +840,7 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
   // A promise the window actually holds ("I'll remind you at six" in
   // the hub's previous reply) is a record, not a claim (a review).
   if (CLAIMED_STATEMENT_RE.test(sentence) && !promiseInWindow(sentence, ctx)) return "claimed_statement";
-  if (!LOOKUP_OBJECT_RE.test(sentence) && (CLAIMED_EXPERIENCE_RE.test(sentence) || PLANNED_EXPERIENCE_RE.test(sentence))) return "claimed_experience";
+  if (!LOOKUP_OBJECT_RE.test(sentence) && ((CLAIMED_EXPERIENCE_RE.test(sentence) && hasExperienceObject(sentence, ctx)) || PLANNED_EXPERIENCE_RE.test(sentence))) return "claimed_experience";
   if (guessesAboutHousehold(sentence, ctx, grounded)) return "invention";
 
   if (claimsUngroundedHouseholdLocation(sentence, ctx, grounded)) return "invention";
@@ -1923,6 +1935,7 @@ export function dontKnowYetLine(name: string): string {
  * `unsupported_action` the line is narrated from the flagged sentence's
  * family and the turn's outcomes (CHAT-04) when both are given. */
 export function replacementFor(reason: GuardReason, personId: string, flagged?: { sentence: string; ctx: GuardContext }): string {
+  if (flagged?.ctx.target === "hub" && flagged.ctx.repair !== "none") return emptiedLine({ ...flagged.ctx, personId });
   if (reason === "unsupported_action" && flagged) return unsupportedActionLine(flagged.sentence, { ...flagged.ctx, personId });
   if (reason === "false_familiarity" && flagged) {
     const name = unknownNamedIn(flagged.sentence, flagged.ctx);

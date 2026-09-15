@@ -1312,6 +1312,16 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     ],
   },
   {
+    id: "experience-forms",
+    category: "knowledge",
+    note: "EXP-02 (dev.md section 16 part 8; finding 34): experience forms require current subjects and review evidence; objections keep the act response",
+    turns: [
+      { say: "the new Marsh Lantern film is the one I'm counting down to", expect: { signal: { primary_act: "inform" }, guard: null, mustNotContain: "heard (it|the film|the movie) is|can't wait|as excited as you|excited too", humanVerdict: true } },
+      { say: "heard from who?", seedReply: "I've heard it's really intense. People say it's the best one yet.", expect: { signal: { primary_act: "question" }, guard: null, mustNotContain: "heard it|people say|supposed to be|best one yet", lookupWithSource: true } },
+      { say: "you were meant to find it, not describe it", seedReply: "I tried to find it but nothing came up.", expect: { signal: { primary_act: "inform" }, guardAnyOf: [null, "lookup_confession"], mustNotContain: "can't watch|can't go|haven't seen|can't visit|never been", humanVerdict: true } },
+    ],
+  },
+  {
     id: "act-memory-eligibility",
     category: "memory",
     note: "section 12 part 6: only an asserted or reported inform or commissive clause can yield a memory; a question, a directive and a closing write nothing (ACT-01 skips the turn), a disclosure beside a package answer is judged",

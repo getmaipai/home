@@ -23,7 +23,7 @@ interface CorpusRow {
   roster?: string[];
   /** CHAT-04: the turn's tool outcomes, package id and status, for the
    * per-family action-claim match. */
-  outcomes?: { packageId: string; status: "succeeded" | "failed" | "pending" }[];
+  outcomes?: GuardContext["outcomes"];
   /** REG-01: the turn's primary act (ACT-01's signal) for the statement
    * rule, and the hub's previous reply for the repeated-question rule. */
   act?: GuardContext["act"];
@@ -35,6 +35,9 @@ interface CorpusRow {
   pronounsInPlay?: string[];
   /** LOOKUP-02: the turn's lookup tools serve the request. */
   lookupServed?: boolean;
+  target?: GuardContext["target"];
+  repair?: GuardContext["repair"];
+  subjects?: GuardContext["subjects"];
   expect: GuardReason | null;
   /** True only for a row that depends on the whole-reply lookahead
    * guardReply() has and gateGuards() (the streaming path) genuinely
@@ -48,7 +51,7 @@ interface CorpusRow {
 const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "spec", "llm", "guard-corpus.json"), "utf-8"));
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
-  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed };
+  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects };
 }
 
 async function* sentenceStream(reply: string): AsyncGenerator<string, undefined, void> {

@@ -265,6 +265,8 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     // REG-01: the act for the statement rule, and the hub's previous
     // reply for the repeated-question check.
     act: ctx.signal.primary_act,
+    target: ctx.signal.target,
+    repair: ctx.signal.repair,
     previousReply: [...ctx.history].reverse().find((m) => m.role === "assistant")?.content,
     // ASK-01: the unknown names, the subjects' pronouns, and the
     // pronoun families the person used this turn and the last two.

@@ -1122,6 +1122,27 @@ describe("EXP-01: the outside review's cases", () => {
   });
 });
 
+describe("EXP-02", () => {
+  const current = [{ type: "world" as const, kind: "film", display_name: "Marsh Lantern", year: null, source_kind: null, stable_key: null, recency: "current" as const, carried_question: null }];
+  test("hearsay is guarded on a non-experience turn while the rest stands", () => {
+    const g = guardReply("The film is popular. I've heard it's really intense.", ctx({ utterance: "tell me about the new film", act: "inform", subjects: current }));
+    expect([g.reason, g.replaced, g.reply]).toEqual(["claimed_experience", false, "The film is popular."]);
+  });
+  test("a whole-reply experience claim gets the capability line on an experience turn", () => {
+    const g = guardReply("I've heard it's really intense.", ctx({ utterance: "have you seen it", act: "question", subjects: current }));
+    expect(g.reason).toBe("claimed_experience");
+    expect(g.reply).toMatch(/can't actually watch|can't say from experience/i);
+  });
+  test("an objection gets the emptied act line", () => {
+    const g = guardReply("I've heard it's really intense.", ctx({ utterance: "you were meant to find it, not describe it", act: "inform", target: "hub", repair: "correction", subjects: current }));
+    expect(g.reason).toBe("claimed_experience");
+    expect(g.reply).not.toMatch(/can't watch|can't go|haven't seen|can't visit|never been/i);
+  });
+  test("lookup infinitive is not an experience claim", () => {
+    expect(guardReply("I tried to find it but nothing came up.", ctx({ utterance: "did you find the page", act: "question", subjects: current })).reason).not.toBe("claimed_experience");
+  });
+});
+
 describe("RECALL-03's set: a recalled fact said back as 'you told me' stands", () => {
   test("the attribution's frame words are scaffolding, never the invented part", () => {
     const earlier = { utterance: "what did I tell you at the start", act: "question" as const, episodes: ["the new Marsh Lantern album comes out at midnight on Friday"] };
