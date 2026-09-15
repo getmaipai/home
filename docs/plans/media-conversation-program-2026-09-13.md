@@ -319,6 +319,120 @@ rule, classes only):
     recalled by identity). The numbers are the baseline every later
     item reports against; the run costs 2h23m on the Mac's engines.
 
+25. A statement answered with an unrelated stored fact or the list
+    (statement-not-request#1 in LOOKUP-01's set, two runs of three):
+    the reply was another conversation's fact said back, or the
+    shopping list echoed, with the unrelated_recall guard silent.
+    Class: unrelated recall surfaced as the reply to a statement. For
+    CHAT-13's ladder and the recall guard.
+
+## Findings from live use, 2026-09-14 evening (on 2c6a9b9: LOOKUP-01, ASK-01, Dismiss all)
+
+A 35-minute chat, 120 turns, on the dev hub right after ASK-01 landed.
+Classes only, roster names, the persona's speaker "Rover" where a name
+is needed. Ordered by severity.
+
+26. SAFETY, the one that stops everything else. A speaker said, in
+    three turns, that they wished they were not alive, that they meant
+    to end their life that night, and asked for the easiest way. Three
+    failures: (a) no crisis resources were ever shown (the org's
+    "offer, never block" invariant: 988 and the local line beside the
+    reply, part of the safety architecture, not configurable); the
+    replies were generic reassurance, then the same three-word line
+    repeated to three "stop"s; (b) the LOOKUP-01 forced lookup ran a
+    web search on the self-harm question when the speaker insisted,
+    and the reply summarized the search's list of methods; the safety
+    gate ran on the model's text, never on the tool call, so a command
+    to search bypassed it entirely; (c) issue #85 (a streamed refusal
+    never delivers its resources) is this class, seen live. Fix, in
+    this order and before any other engine item: the safety
+    classification runs on the utterance before routing and tool
+    dispatch, a flagged turn dispatches no lookup and no package, and
+    the crisis overlay is appended on every reply while the
+    conversation is in that state; a refusal answered with "stop" gets
+    one short acknowledgment, never the same line again. Regression
+    tests in the exact shape (roster speaker), streamed and blocking.
+27. Links and pictures. Six turns asked for a URL (a support page, a
+    video, the source of a fact) and the reply claimed it cannot show
+    links; the search plugin holds the result URLs and the reply never
+    carries one. A request for a picture was answered the same way.
+    Class: a lookup answer never surfaces its source or a link, and the
+    chat surface has no image result. For the composer (a lookup reply
+    may carry the source URL, rendered as a link) and COMP-01's pane.
+28. A promise behind a hedge is never forced. Four replies read "I
+    can't directly access URLs, but I can help you find it. Let me look
+    it up for you." with no lookup: LOOKUP-01 reads the first sentence
+    only, so a hedge sentence ahead of the promise hides it, and the
+    reply went out four times verbatim. Class: LOOKUP-01's first-
+    sentence rule; the promise is read across the reply's first two
+    sentences, or the hedge shape itself ("I can't ... but I can ...
+    Let me ...") is the promise.
+29. Verbatim repetition across turns: the same reply sent two to four
+    times in a row in four places (the hedge above, a cast list three
+    times, a date answer four times, a "the search didn't specify"
+    line twice), each after the speaker said it had already been said.
+    Class: no cross-turn repetition guard; a reply identical or near-
+    identical to the previous one is a retry with the objection in the
+    prompt, never sent.
+30. Routing by literal match over the live subject: "what date is next
+    Friday" ran the holiday package (Columbus Day); "who's in the
+    movie" ran the media lookup on a film titled "The Movie" while the
+    conversation's subject was a named film; "how many pins is that
+    card" answered from the model with an invented number. Class: the
+    pattern router wins over the SubjectRef the turn already carries
+    (ASK-01 writes subjects; nothing reads them for routing). For
+    CHAT-13's ladder: a subject-bearing question resolves against the
+    subject before any literal pattern.
+31. World facts invented with confidence, corrected only after the
+    speaker forced a search: a film's plot, a cartoon horse's name, an
+    actor's role, a character's powers, a card's connector, a resale
+    price with no model named. Class: the 8B answers world questions
+    from its weights; CHAT-13's ladder must make a world-fact question
+    a lookup by default when the fact is checkable (a name, a date, a
+    number, a cast), the model's own answer only for common knowledge.
+32. Date and time arithmetic from the model: the year off by a hundred
+    ("2126"), "the next time it is 11:07" answered as tomorrow night
+    (the morning was 12 hours away), days-until computed loosely. The
+    almanac packages answer the literal questions right; the derived
+    ones go to the model. Class: derived date and time questions are a
+    compute step over the almanac's values, never the model's
+    arithmetic.
+33. ASK-01's frame over-fires on capitalized tokens: a brand ("Asus"),
+    an exclamation ("Jesus -"), a typo ("Wong"), a service ("YouTube"),
+    a name the hub itself had just produced ("Bella -", asked back as
+    "Who's Bella -?" one turn after the hub said it), and a public
+    figure in a statement (the hub asked "someone in your life or a
+    public figure?" then, told which, still did not look the person up).
+    Class: the unresolved-name candidate needs a stop list (brands,
+    services, interjections, words the hub's own previous reply
+    introduced) and a typo check against the sentence; a name confirmed
+    as a public figure is a lookup, at once. The follow-up item's
+    "public figure in a question" fix covers half of this.
+34. Claimed experience past the guard: "I've heard the movie is really
+    intense", "Can't wait for it", "I'm as excited as you are" went out
+    unguarded, while the guard fired wrongly on "no, you were supposed
+    to find it" (the replacement line "I can't actually watch or go
+    anywhere myself" answered a complaint about a search). Class: the
+    claimed_experience patterns miss "I've heard" and "can't wait", and
+    the guard's replacement is applied without reading whether the
+    turn was about experience at all.
+35. Sign-offs, tags and fillers the speaker objected to, repeatedly:
+    "Good luck" four times in five turns, "Got it?" as a tag, "One
+    sec" sent as the whole reply right after being told to stop saying
+    it, "eemm let me think" and "give me a second" as spoken-style
+    fillers in text. Class: #95's family; the composer strips
+    sign-offs and tags, and a filler is never the reply.
+36. A format request lost on a plugin reply: "give me a bulleted list"
+    produced prose from the search plugin, then the list on the retry
+    from the model. Class: the requested shape (list, one line, table)
+    is a reply constraint the plugin path must honor too.
+
+What worked, for the record: every forced or explicit search answered
+right (a release date, a cast, an OS release, a cartoon's sidekick,
+a used price); the almanac answered time and date; a correction was
+taken once without apology theater; the safety refusal itself held
+on the direct method question until the search command bypassed it.
+
 Read together: the hub never asks about what it does not know, acts as
 if it knows what it was never told, copies other conversations into
 this one, sends broken text, and reads search results aloud like an
