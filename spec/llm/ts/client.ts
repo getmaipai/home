@@ -12,7 +12,6 @@ import type {
   EmbeddingResponse,
   ToolCallWire,
 } from "./types.js";
-import { validateToolMessages } from "./types.js";
 import { readTextLines } from "../../streaming/ts/lineReader.js";
 
 export class LlmClientError extends Error {
@@ -106,11 +105,6 @@ export class LlamaServerClient {
    * is never sent, and a response carrying it would need SSE handling
    * this client doesn't have yet. */
   async chatComplete(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
-    if (!Array.isArray(request.messages) || request.messages.length === 0) {
-      throw new LlmClientError("messages is required");
-    }
-    const toolMessageError = validateToolMessages(request.messages);
-    if (toolMessageError) throw new LlmClientError(toolMessageError);
     const timeoutMs = this.opts.chatTimeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS;
     let res: Response;
     try {
@@ -177,11 +171,6 @@ export class LlamaServerClient {
    * the identical concatenation this method already does for plain text
    * content, just keyed by call instead of by nothing. */
   async *chatCompleteStream(request: ChatCompletionRequest, externalSignal?: AbortSignal): AsyncGenerator<string, ToolCallWire[] | undefined, void> {
-    if (!Array.isArray(request.messages) || request.messages.length === 0) {
-      throw new LlmClientError("messages is required");
-    }
-    const toolMessageError = validateToolMessages(request.messages);
-    if (toolMessageError) throw new LlmClientError(toolMessageError);
     // A review, 2026-09-06, found this was the one method on this client
     // still missing a timeout after chatComplete()/embed() got theirs -
     // the exact "wedged llama-server" failure mode is just as reachable

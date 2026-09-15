@@ -11,7 +11,7 @@
 // contract. Hand-written types are the same choice spec/safety/ts and
 // spec/interpreters/ts made for logic that isn't a stored shape.
 
-export type ChatRole = "system" | "user" | "assistant" | "tool";
+export type ChatRole = "system" | "user" | "assistant";
 
 // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
 // round trip): llama-server's own OpenAI-compatible tool-calling shape,
@@ -54,28 +54,14 @@ export interface ToolCallWire {
 export interface ChatMessage {
   role: ChatRole;
   content: string;
-  /** Required when role is `tool`; identifies the preceding assistant tool call this result answers. */
-  tool_call_id?: string;
-  /** An assistant message in a request may carry the tool calls it made, so
-   * a following `role: "tool"` message can answer each call by id. */
+  /** Only ever present on an ASSISTANT message this client itself just
+   * received (a tool-calling reply) - never sent as part of a request's
+   * own `messages` array this pass (spec/llm/README.md's own "deferred"
+   * scope): a tool result answers the turn directly (turnEngine.ts's
+   * resolveToolCalls()), it's never fed back to the model for a second
+   * completion in the same turn, so there's no `role: "tool"` message
+   * shape to round-trip yet either. */
   tool_calls?: ToolCallWire[];
-}
-
-export function isToolResultMessage(m: ChatMessage): m is ChatMessage & { role: "tool"; tool_call_id: string } {
-  return m.role === "tool" && typeof m.tool_call_id === "string" && m.tool_call_id.length > 0;
-}
-
-export function validateToolMessages(messages: ChatMessage[]): string | null {
-  const pending = new Set<string>();
-  for (const message of messages) {
-    if (message.role === "assistant") {
-      for (const call of message.tool_calls ?? []) pending.add(call.id);
-    } else if (message.role === "tool") {
-      if (!isToolResultMessage(message)) return "a tool message needs tool_call_id";
-      if (!pending.has(message.tool_call_id)) return `tool message ${message.tool_call_id} answers no preceding assistant tool call`;
-    }
-  }
-  return null;
 }
 
 export interface ChatCompletionRequest {
