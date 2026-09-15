@@ -78,6 +78,7 @@ const createRoute_ = createRoute({
   },
   responses: {
     201: { content: { "application/json": { schema: Entity } }, description: "Created." },
+    200: { content: { "application/json": { schema: Entity } }, description: "Existing entity returned (find-or-create, #111)." },
     ...errorResponses({ 400: "Invalid entity", 401: "Not signed in" }),
   },
 });
@@ -86,7 +87,7 @@ entitiesRoutes.openapi(createRoute_, (c) => {
   const body = c.req.valid("json");
   const result = createEntity(actor, body);
   if (!result.ok || !result.value) return c.json({ error: result.error ?? "invalid entity" }, 400);
-  return c.json(result.value, 201);
+  return result.status === 200 ? c.json(result.value, 200) : c.json(result.value, 201);
 });
 
 const patchRoute = createRoute({

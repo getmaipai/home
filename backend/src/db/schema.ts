@@ -1,4 +1,5 @@
-import { sqliteTable, text, integer, real, blob, primaryKey, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, blob, primaryKey, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
 // validated shape; this is its storage). `role` and `source` are the
@@ -777,7 +778,14 @@ export const entities = sqliteTable("entities", {
   updatedAt: text("updated_at").notNull(),
   deletedAt: text("deleted_at"),
   hlc: text("hlc").notNull(),
-});
+}, (table) => [
+  // #111: one entity per household member - a person entity with a given
+  // account_person_id is unique while live. Soft-deleted rows are excluded
+  // so a member can be deleted and later re-created.
+  uniqueIndex("entities_account_person_id_unique")
+    .on(table.accountPersonId)
+    .where(sql`account_person_id IS NOT NULL AND deleted_at IS NULL`),
+]);
 
 // ASK-01: mirrors spec/schemas/open-question.schema.json. A question
 // the hub wants to ask one person, not necessarily now and not

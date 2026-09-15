@@ -156,7 +156,25 @@ export function createEntity(actor: { id: string }, input: EntityCreate): OpResu
     if (!person) return { ok: false, status: 400, error: "account_person_id does not name an existing person" };
   }
 
-  db.insert(entities).values(toRow(candidate.data)).run();
+  // #111: find-or-create - a household member may have at most one live
+  // entity. Look for an existing live entity with the same accountPersonId
+  // inside the same transaction; return it instead of inserting a second.
+  if (candidate.data.account_person_id) {
+    const existing = db.select().from(entities).where(and(eq(entities.accountPersonId, candidate.data.account_person_id), isNull(entities.deletedAt))).get();
+    if (existing) return { ok: true, status: 200, value: toEntity(existing) };
+  }
+
+  try {
+    db.insert(entities).values(toRow(candidate.data)).run();
+  } catch (err: unknown) {
+    // The unique index is the second line of defense: if two callers race,
+    // one insert hits the constraint. Return the winner's row, not a 500.
+    if (err instanceof Error && err.message.includes("UNIQUE constraint failed")) {
+      const winner = db.select().from(entities).where(and(eq(entities.accountPersonId, candidate.data.account_person_id!), isNull(entities.deletedAt))).get();
+      if (winner) return { ok: true, status: 200, value: toEntity(winner) };
+    }
+    throw err;
+  }
   return { ok: true, status: 201, value: candidate.data };
 }
 

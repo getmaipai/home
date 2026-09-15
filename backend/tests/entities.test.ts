@@ -57,6 +57,57 @@ describe("POST /api/entities", () => {
     const body = (await res.json()) as { person: string | null };
     expect(body.person).toBe(me.id);
   });
+
+  // #111: find-or-create - one entity per household member
+  test("a second entity for the same account_person_id returns the existing one", async () => {
+    const owner = await ownerSession();
+    const meRes = await owner.get("/api/auth/me");
+    const me = (await meRes.json()) as { id: string };
+
+    const first = await owner.post("/api/entities", { kind: "person", name: "Sage", account_person_id: me.id });
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { id: string };
+
+    const second = await owner.post("/api/entities", { kind: "person", name: "Sage", account_person_id: me.id });
+    expect(second.status).toBe(200);
+    const secondBody = (await second.json()) as { id: string };
+    expect(secondBody.id).toBe(firstBody.id);
+  });
+
+  test("a soft-deleted entity does not block re-creation for the same member", async () => {
+    const owner = await ownerSession();
+    const meRes = await owner.get("/api/auth/me");
+    const me = (await meRes.json()) as { id: string };
+
+    const first = await owner.post("/api/entities", { kind: "person", name: "Sage", account_person_id: me.id });
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { id: string };
+
+    const del = await owner.request(`/api/entities/${firstBody.id}`, { method: "DELETE" });
+    expect(del.status).toBe(200);
+
+    const second = await owner.post("/api/entities", { kind: "person", name: "Sage", account_person_id: me.id });
+    expect(second.status).toBe(201);
+    const secondBody = (await second.json()) as { id: string };
+    expect(secondBody.id).not.toBe(firstBody.id);
+  });
+
+  test("entities for different members are independent", async () => {
+    const owner = await ownerSession();
+    const meRes = await owner.get("/api/auth/me");
+    const me = (await meRes.json()) as { id: string };
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const adult = (await adultRes.json()) as { id: string };
+
+    const sage = await owner.post("/api/entities", { kind: "person", name: "Sage", account_person_id: me.id });
+    expect(sage.status).toBe(201);
+
+    const marlow = await owner.post("/api/entities", { kind: "person", name: "Marlow", account_person_id: adult.id });
+    expect(marlow.status).toBe(201);
+    const marlowBody = (await marlow.json()) as { id: string };
+    const sageBody = (await sage.json()) as { id: string };
+    expect(marlowBody.id).not.toBe(sageBody.id);
+  });
 });
 
 describe("GET /api/entities", () => {
