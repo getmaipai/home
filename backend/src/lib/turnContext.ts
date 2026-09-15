@@ -23,6 +23,20 @@ import { pronounFamiliesIn, type SubjectRef } from "@/lib/unknownNames";
 import { bannedPhrasesFor } from "@/lib/replyConstraints";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { nextHlc } from "@/lib/hlc";
+import type { SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
+
+/** Section 6: sensitive records are allowed on the robot only when the
+ * body confirms the speaker and confirms that the speaker is alone. An
+ * empty or missing present list means the body said nothing, so nothing
+ * sensitive is said; switching it off withholds sensitive records entirely
+ * rather than guessing. */
+export function sensitiveAllowed(surface: Surface, speakerEvidence: SpeakerEvidence | null | undefined, present: readonly PresentPerson[] | null | undefined, actorId: string): boolean {
+  if (surface !== "robot") return true;
+  const confirmedSpeaker = speakerEvidence?.person === actorId && speakerEvidence.level === "confirmed";
+  const signedInSpeaker = speakerEvidence?.person === actorId && speakerEvidence.basis === "signed_in";
+  const alone = present?.length === 1 && present[0]?.person === actorId && present[0]?.level === "confirmed";
+  return (confirmedSpeaker || signedInSpeaker) && alone;
+}
 
 /** The record's kinds, plus `episode`: JOIN-01's recalled turns postdate
  * the record, ground a reply the way a memory line does, and are held

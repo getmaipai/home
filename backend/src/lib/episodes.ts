@@ -188,6 +188,8 @@ export interface EpisodeMatch {
 }
 
 export interface RecallEpisodesOptions {
+  /** Withhold episodes whose source turn contains a sensitive record. */
+  withholdSensitive?: boolean;
   limit?: number;
   /** The conversation currently in progress: its newest four turns are
    * already in the model's window, so they are never recalled here too. */
@@ -417,6 +419,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
       : []),
   ]);
   const within = opts.withinConversationId;
+  const sensitiveTurnIds = opts.withholdSensitive ? new Set(sqlite.query("SELECT DISTINCT source AS id FROM memory_records WHERE sensitive = 1 AND source IS NOT NULL").all().map((r) => (r as { id: string }).id)) : new Set<string>();
 
   // Lexical: BM25 over the person's own rows (bm25() is lower-is-better).
   // The date window and the excluded turns are part of the SQL, so a
@@ -447,7 +450,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
          ORDER BY bm25(episodes_fts) LIMIT ?`,
       )
       .all(fts, actor.id, window?.start.toISOString() ?? null, window?.start.toISOString() ?? null, window?.end.toISOString() ?? null, window?.end.toISOString() ?? null, ...(within ? [within] : []), ...excluded, CANDIDATES_PER_SOURCE) as CandidateRow[];
-    lexical.push(...rows);
+    lexical.push(...rows.filter((r) => !sensitiveTurnIds.has(r.turnId)));
   }
 
   // Vector: brute-force cosine over the person's embedded episodes, the
@@ -482,7 +485,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
       .all();
     __vectorRowsScanned += rows.length;
     const scored = rows
-      .filter((r) => inWindow(r, window) && !excludedTurnIds.has(r.turnId) && (sides === "both" || r.speaker === "user") && (!within || r.conversationId === within))
+      .filter((r) => inWindow(r, window) && !excludedTurnIds.has(r.turnId) && !sensitiveTurnIds.has(r.turnId) && (sides === "both" || r.speaker === "user") && (!within || r.conversationId === within))
       .map((r) => ({ row: r as CandidateRow & { vector: Buffer }, cosine: cosineSimilarity(queryVector, bufferToVector(r.vector as Buffer)) }))
       .filter((s) => s.cosine >= EPISODE_MIN_COSINE)
       .sort((a, b) => b.cosine - a.cosine)

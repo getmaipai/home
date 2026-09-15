@@ -641,7 +641,7 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
 
   /** Runs one turn against a stub that answers `reply` and records the
    * context message the engine sent. */
-  async function turnWith(actor: PersonRow, utterance: string, reply: string, opts: { calls?: (offered: string[]) => { name: string; args: string }[] } = {}) {
+  async function turnWith(actor: PersonRow, utterance: string, reply: string, opts: { calls?: (offered: string[]) => { name: string; args: string }[]; speakerEvidence?: { person: string; basis: "signed_in" | "voice" | "face" | "voice_and_face" | "claimed" | "unknown"; level: "confirmed" | "tentative" | "unknown" } | null; present?: readonly { person: string; basis: "signed_in" | "voice" | "face" | "voice_and_face" | "claimed" | "unknown"; level: "confirmed" | "tentative" | "unknown" }[] | null } = {}) {
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     let contextMessage = "";
@@ -660,7 +660,7 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
     });
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
-      const result = await runTurn(actor, "chat", utterance);
+      const result = await runTurn(actor, opts.speakerEvidence ? "robot" : "chat", utterance, opts);
       return { result, contextMessage, offeredNames };
     } finally {
       stub.stop();
@@ -670,6 +670,21 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
   }
 
   const LOCATION_REPLY = "Pippa is at soccer practice right now.";
+
+  test("SURFACE-01: sensitive memory is said to the confirmed robot speaker only when alone", async () => {
+    const { actor } = await ownerWithPippa();
+    const fact = remember(actor, { text: "Sage's private medical appointment is on Friday", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.9, sensitive: true });
+    expect(fact.ok).toBe(true);
+    const evidence = { person: actor.id, basis: "voice" as const, level: "confirmed" as const };
+    const alone = await turnWith(actor, "when is the private medical appointment", "Noted.", { speakerEvidence: evidence, present: [evidence] });
+    expect(alone.contextMessage).toContain("Sage's private medical appointment is on Friday");
+    const withOther = await turnWith(actor, "when is the private medical appointment", "Noted.", { speakerEvidence: evidence, present: [evidence, { person: "unknown", basis: "unknown", level: "tentative" }] });
+    expect(withOther.contextMessage).not.toContain("private medical appointment");
+    const absent = await turnWith(actor, "when is the private medical appointment", "Noted.", { speakerEvidence: evidence });
+    expect(absent.contextMessage).not.toContain("private medical appointment");
+    const chat = await turnWith(actor, "when is the private medical appointment", "Noted.");
+    expect(chat.contextMessage).toContain("Sage's private medical appointment is on Friday");
+  });
 
   test("an included profile fact passes grounding: a location claim about a household member the profile paragraph states is not cut", async () => {
     const { actor } = await ownerWithPippa();

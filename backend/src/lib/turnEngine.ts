@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, lookupDecision, CURRENCY_MARK_RE, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -2344,6 +2344,8 @@ async function prepareTurn(
   // card) in a conversation in the crisis state still routes to its
   // package; the state's rules are for what the person reads as a reply.
   ephemeral = false,
+  speakerEvidence: SpeakerEvidence | null = null,
+  present: readonly PresentPerson[] | null = null,
 ): Promise<PreparedTurn> {
   const turnId = newConversationTurnId();
   // Stamps conversation_id/turn_id exactly once, rather than at each of
@@ -2774,7 +2776,8 @@ async function prepareTurn(
   // scoring runs whenever the embed backend is up; embedQueryForRecall()
   // degrades to undefined on any failure, which recall() already treats
   // as "fall back to keyword overlap" - no separate handling needed here.
-  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined });
+  const withholdSensitive = !sensitiveAllowed(surface, speakerEvidence, present, actor.id);
+  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive });
   // JOIN-01: what was actually said in earlier conversations (MEM-03's
   // verbatim episodes, MEM-04's hybrid recall), beside the extracted
   // facts. This conversation is excluded whole: its turns are the
@@ -2786,7 +2789,7 @@ async function prepareTurn(
   // person's own side only, unless the question asks what the hub said,
   // and then the hub's side comes as a reported note, never a line.
   const episodeMatches = episodeQueryEligible(text)
-    ? recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
+    ? recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, withholdSensitive, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
     : [];
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own
@@ -2806,7 +2809,7 @@ async function prepareTurn(
     // #88: an edited-and-resent message's original is off the branch
     // and never recalled here either (a review).
     const excludeTurnIds = supersedes ? [...window.turnIds, supersedes] : window.turnIds;
-    const byFloors = contentTerms(text).length >= 2 && !isBareSocialTurn(text) ? recallEpisodes(actor, text, utteranceVector, { withinConversationId: conversation.id, excludeTurnIds, sides: "user", limit: 2 }) : [];
+    const byFloors = contentTerms(text).length >= 2 && !isBareSocialTurn(text) ? recallEpisodes(actor, text, utteranceVector, { withinConversationId: conversation.id, excludeTurnIds, sides: "user", limit: 2, withholdSensitive }) : [];
     earlierMatches.push(...byFloors.map((m) => ({ ...m, earlierInThisConversation: true })));
     if (ASKS_ABOUT_START_RE.test(text)) {
       const first = earliestDroppedTurn(actor, conversation.id, excludeTurnIds, supersedes);
@@ -2835,7 +2838,7 @@ async function prepareTurn(
   // (the rule `actuallyInjected` applied to memory bullets alone before
   // this item, now to every kind); the usage bump and the guard input
   // both read the included set.
-  const profile = getProfileParagraph(actor);
+  const profile = getProfileParagraph(actor, { withholdSensitive });
   const evidence: TurnEvidence[] = [
     { id: `user:${turnId}`, kind: "user_assertion", text, rendered: text, entityIds: [] },
     ...memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map(
@@ -3821,7 +3824,7 @@ async function runTurnHoldingLease(
   opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): Promise<TurnOpResult> {
   const loaded = loadAllManifests(); // one catalog scan, shared below
-  const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id));
+  const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, false, opts.speakerEvidence ?? null, opts.present ?? null);
 
   let value: TurnValue;
   // REG-01: set by answerWithSafetyAndGuards() when the guards emptied
@@ -4688,7 +4691,7 @@ async function runTurnStreamHoldingLease(
   startedAt: number,
   opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): Promise<TurnStreamResult> {
-  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, opts.ephemeral === true);
+  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, opts.ephemeral === true, opts.speakerEvidence ?? null, opts.present ?? null);
 
   if (prepared.kind === "immediate") {
     const trace: ReplyTrace = { hits: [], replaced: false };

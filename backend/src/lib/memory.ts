@@ -42,7 +42,8 @@ export type MemoryOpResult<T> =
 // parental view (list()/recall() called with no selfOnly, the real
 // "list route's parental view", unchanged) is the only sanctioned way
 // to read someone else's person-scope memories.
-function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>, selfOnly = false): boolean {
+function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>, selfOnly = false, withholdSensitive = false): boolean {
+  if (withholdSensitive && record.sensitive) return false;
   if (record.scope === "self") return false;
   if (record.scope === "person") {
     if (!record.person) return false;
@@ -406,6 +407,8 @@ function entityNameWords(entityText: string): Set<string> {
 }
 
 export interface RecallOptions extends ListOptions {
+  /** Withhold all sensitive records for a surface that cannot safely say them. */
+  withholdSensitive?: boolean;
   /** Whether recall() bumps uses/last_used_at on the records it returns.
    * Defaults to true: the direct recall API and the `recall` package
    * (a result someone actually asked for and got back counts as
@@ -598,7 +601,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // household forgets it from the Memory page as before).
   rows = rows.filter((r) => !detectCredential(r.text).detected);
   if (opts.excludeSource) rows = rows.filter((r) => r.source !== opts.excludeSource);
-  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
+  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly, opts.withholdSensitive));
 
   const queryWords = tokenize(query);
 
@@ -1357,13 +1360,14 @@ export const PROFILE_SOURCE = "memory.consolidate:profile";
  * lookup by (person, source), not a recall() candidate: the profile
  * paragraph is unconditional context about who's speaking, not
  * something that competes with other facts for a cosine-scored slot. */
-export function getProfileParagraph(actor: PersonRow): MemoryRecord | undefined {
+export function getProfileParagraph(actor: PersonRow, opts: { withholdSensitive?: boolean } = {}): MemoryRecord | undefined {
   const row = db
     .select()
     .from(memoryRecords)
     .where(and(eq(memoryRecords.person, actor.id), eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
     .get();
   if (!row) return undefined;
+  if (opts.withholdSensitive && row.sensitive) return undefined;
   // CHAT-03, the read side: a profile paragraph carrying a credential
   // (derived before the policy existed) is withheld, not deleted.
   return detectCredential(row.text).detected ? undefined : toMemoryRecord(row);

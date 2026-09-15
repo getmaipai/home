@@ -3,7 +3,7 @@
 // own rules; tests/turnEngine.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
-import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, exactFieldOf, lookupDecision, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, exactFieldOf, lookupDecision, sensitiveAllowed, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 
 // ACT-01: the intent and the guards' shape read the frozen signal; the
@@ -11,6 +11,20 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 // bundled command openers a test needs.
 const openers = new Set(["set", "explain", "give", "walk", "tell"]);
 const signalFor = (text: string) => classifyTurnSignal({ text, commandOpeners: openers, ageBand: "adult" });
+
+test("sensitiveAllowed(): the robot requires a confirmed speaker who is confirmed alone", () => {
+  const owner = "person-1";
+  const confirmed = { person: owner, basis: "voice" as const, level: "confirmed" as const };
+  const present = [{ person: owner, basis: "face" as const, level: "confirmed" as const }];
+  expect(sensitiveAllowed("chat", null, null, owner)).toBe(true);
+  expect(sensitiveAllowed("robot", confirmed, present, owner)).toBe(true);
+  expect(sensitiveAllowed("robot", { ...confirmed, basis: "signed_in" }, present, owner)).toBe(true);
+  expect(sensitiveAllowed("robot", { ...confirmed, level: "tentative" }, present, owner)).toBe(false);
+  expect(sensitiveAllowed("robot", { ...confirmed, person: "person-2" }, present, owner)).toBe(false);
+  expect(sensitiveAllowed("robot", confirmed, [...present, { person: "unknown", basis: "unknown", level: "tentative" }], owner)).toBe(false);
+  expect(sensitiveAllowed("robot", confirmed, [], owner)).toBe(false);
+  expect(sensitiveAllowed("robot", confirmed, undefined, owner)).toBe(false);
+});
 
 test("exactFieldOf(): recognizes exact lookup fields and leaves stable questions alone", () => {
   expect(exactFieldOf("what's it called")).toBe("name");
