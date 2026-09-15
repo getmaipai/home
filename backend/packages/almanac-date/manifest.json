@@ -17,7 +17,7 @@
       "what's the current date"
     ],
     "patterns": ["what's today's date", "what day is it", "what day of the week is it"],
-    "answers": []
+    "answers": ["relative_date"]
   },
   "requires": [],
   "optional": [],

@@ -3379,6 +3379,42 @@ describe("CHAT-13 chunk D: routing.answers", () => {
     const { winner } = await routeSemantic("what day of the week is Friday", actor, loaded, undefined);
     expect(winner?.id).toBe("test-almanac");
   });
+
+  test("capturedEntityKinds() extracts relative_date from 'tonight', 'next week', 'next month', 'this year', 'in 3 days'", () => {
+    expect(capturedEntityKinds("tonight")).toContain("relative_date");
+    expect(capturedEntityKinds("what's the moon phase next week")).toContain("relative_date");
+    expect(capturedEntityKinds("what's happening next month")).toContain("relative_date");
+    expect(capturedEntityKinds("what happened this year")).toContain("relative_date");
+    expect(capturedEntityKinds("in 3 days")).toContain("relative_date");
+  });
+
+  test("capturedEntityKinds() extracts weekday and relative_date from 'next Friday'", () => {
+    const kinds = capturedEntityKinds("next Friday");
+    expect(kinds).toContain("weekday");
+    expect(kinds).toContain("relative_date");
+  });
+
+  test("capturedEntityKinds() does not extract proper_noun from 'I', single-letter words, or sentence-boundary capitals", () => {
+    expect(capturedEntityKinds("what does I think")).not.toContain("proper_noun");
+    expect(capturedEntityKinds("what is X")).not.toContain("proper_noun");
+    expect(capturedEntityKinds("hello. what is this")).not.toContain("proper_noun");
+    expect(capturedEntityKinds("hello? what is this")).not.toContain("proper_noun");
+    expect(capturedEntityKinds("hello! what is this")).not.toContain("proper_noun");
+  });
+
+  test("capturedEntityKinds() extracts weekday and relative_date from 'next week'", () => {
+    const kinds = capturedEntityKinds("next week");
+    expect(kinds).toContain("weekday");
+    expect(kinds).toContain("relative_date");
+  });
+
+  test("routeSemantic: almanac packages with relative_date answers win on 'what's the date tomorrow'", () => {
+    const loaded = loadAllManifests();
+    const dateManifest = loaded.find((l) => l.id === "almanac-date")!;
+    expect(dateManifest.manifest.routing?.answers).toContain("relative_date");
+    expect(answersAllow(dateManifest.manifest, capturedEntityKinds("what's the date tomorrow"))).toBe(true);
+    expect(answersAllow(dateManifest.manifest, capturedEntityKinds("what's the date next Friday"))).toBe(false);
+  });
 });
 
 describe("POST /api/turn", () => {
@@ -4390,6 +4426,18 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
     // A non-outside-the-house package (list-add) with a wildcard is untouched by reference logic.
     const r5 = routeLiteral("add it to the shopping list", actor, loaded, ["Sage"], undefined, worldStack);
     expect(r5?.winner?.id).toBe("list-add");
+    // A lookup package (websearch) with a reference capture resolves to the world head.
+    const r6 = routeLiteral("search the web for that movie", actor, loaded, [], undefined, worldStack);
+    expect(r6?.winner?.id).toBe("websearch");
+    expect(r6?.winner?.args).toEqual({ expression: "Marsh Lantern" });
+    // No world head -> websearch yields with unresolved_reference.
+    const yields3: { id: string; reason: string }[] = [];
+    const y3 = routeLiteral("search the web for that movie", actor, loaded, [], (y) => yields3.push(y));
+    expect(y3).toBeNull();
+    expect(yields3).toEqual([{ id: "websearch", reason: "unresolved_reference" }]);
+    // A non-lookup package with a reference capture (the "the movie" shape) is NOT resolved and NOT yielded; it wins as usual.
+    const r7 = routeLiteral("what's the runtime of the movie", actor, loaded, [], undefined, worldStack);
+    expect(r7?.winner?.id).toBe("media-lookup");
   });
 
   test("runTurn(): a knowledge miss reaches the model, the reply is the model's, and the miss is on the turn as a failed outcome", async () => {

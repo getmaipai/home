@@ -17,7 +17,7 @@
       "tell me the moon phase"
     ],
     "patterns": ["what phase is the moon in", "what's the moon phase tonight", "tell me the moon phase"],
-    "answers": []
+    "answers": ["relative_date"]
   },
   "requires": [],
   "optional": [],

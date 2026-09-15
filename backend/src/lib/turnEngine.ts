@@ -1318,6 +1318,8 @@ function isReference(captured: string): boolean {
   return PRONOUN_RE.test(captured) || DETERMINER_KIND_RE.test(captured) || BARE_KIND_RE.test(captured);
 }
 
+const REFERENCE_PACKAGES: ReadonlySet<string> = new Set(["media-lookup", "knowledge", "websearch"]);
+
 export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[], roster: readonly string[] = [], onYield?: (y: LiteralYield) => void, stack?: readonly SubjectRef[]): RouteResult | null {
   // ACT-01's set: a polite request ("can you remember that Marlow's
   // birthday is in June") is the pattern behind its courtesy prefix,
@@ -1380,7 +1382,7 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
         // on to the model.
         const argName = Object.keys(args)[0];
         const argValue = argName ? args[argName] : undefined;
-        if (looksOutsideTheHouse(manifest) && argName && typeof argValue === "string" && isReference(argValue)) {
+        if (REFERENCE_PACKAGES.has(id) && argName && typeof argValue === "string" && isReference(argValue)) {
           if (stack?.[0]?.type === "world") {
             args[argName] = stack[0]!.display_name;
             return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
@@ -1408,16 +1410,21 @@ export type AnswerKind = "weekday" | "relative_date" | "clock_time" | "number" |
 const WEEKDAY_WORDS: ReadonlySet<string> = new Set(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
 const RELATIVE_DATE_WORDS: ReadonlySet<string> = new Set(["today", "tomorrow", "yesterday"]);
 const CLOCK_TIME_RE = /\b(\d{1,2}):(\d{2})\b|\b\d{1,2}\s?(am|pm)\b/i;
+const RELATIVE_DATE_PHRASE_RE = /^(?:tonight|next\s+(?:week|month|year|weekend)|this\s+(?:week|month|year|weekend)|in\s+\d+\s+(?:days|weeks|months)|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))$/i;
+const RELATIVE_DATE_PERIOD_RE = /^(?:tonight|next\s+(?:week|month|year|weekend)|this\s+(?:week|month|year|weekend))$/i;
 
 /** CHAT-13 chunk D: the entity kinds the deterministic tiers already
  * extract from the utterance. A typed fixed-answer package may only win
  * an utterance if every kind captured out of it is one it declared.
  *
  * - weekday: a bare weekday name ("Friday", "next Friday").
- * - relative_date: an offset day ("today", "tomorrow", "yesterday").
+ * - relative_date: an offset day ("today", "tomorrow", "yesterday"), a
+ *   named period ("tonight", "next week", "this month", "in 3 days").
  * - clock_time: a numeric clock phrase ("7 pm", "15:30").
  * - number: a bare number.
- * - proper_noun: any capitalized word that is not the sentence opener.
+ * - proper_noun: a capitalized word that is not a single letter, the
+ *   pronoun "I", or the capital that merely opens a sentence after a
+ *   period, question mark, or exclamation.
  */
 export function capturedEntityKinds(text: string): AnswerKind[] {
   const kinds = new Set<AnswerKind>();
@@ -1428,7 +1435,19 @@ export function capturedEntityKinds(text: string): AnswerKind[] {
     if (WEEKDAY_WORDS.has(lower)) kinds.add("weekday");
     if (RELATIVE_DATE_WORDS.has(lower)) kinds.add("relative_date");
     if (/^[0-9]+$/.test(w)) kinds.add("number");
-    if (i > 0 && w[0]! === w[0]!.toUpperCase() && /[a-z]/.test(lower) && !/^[0-9]+$/.test(w)) kinds.add("proper_noun");
+    if (i > 0 && w[0]! === w[0]!.toUpperCase() && /[a-z]/.test(lower) && !/^[0-9]+$/.test(w) && w.length > 1 && lower !== "i") kinds.add("proper_noun");
+  }
+  // A multi-word relative-date phrase ("next week", "this month",
+  // "in 3 days"): the words are joined and matched against the phrase
+  // set as a whole, so "what's the date next week" captures it while
+  // "in 3 days of rain" does not.
+  for (let i = 0; i + 1 < words.length + 1; i++) {
+    const tail = words.slice(i).join(" ");
+    if (RELATIVE_DATE_PHRASE_RE.test(tail)) {
+      kinds.add("relative_date");
+      if (RELATIVE_DATE_PERIOD_RE.test(tail)) kinds.add("weekday");
+      break;
+    }
   }
   if (CLOCK_TIME_RE.test(text)) kinds.add("clock_time");
   return [...kinds];

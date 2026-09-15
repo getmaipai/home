@@ -17,7 +17,7 @@
       "what time is it right now"
     ],
     "patterns": ["what time is it", "what's the time", "tell me the time"],
-    "answers": []
+    "answers": ["relative_date"]
   },
   "requires": [],
   "optional": [],
