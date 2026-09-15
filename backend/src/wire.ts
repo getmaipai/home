@@ -1,6 +1,7 @@
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
+import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { conversationTurns, conversations } from "./db/schema";
 // hardware.ts has zero "@/"-aliased imports of its own, unlike backup.ts
 // and modelCatalog.ts below, so its types are re-exported directly
@@ -71,9 +72,11 @@ export interface TurnValue {
    * routingStats() aggregates this from the logged turn, not from here
    * directly. */
   routing?: { tier: "pattern" | "embedding" | "keyword" | "tool"; score: number };
+  /** CHAT-16 part 4 rule 1: lookup sources carried additively on the wire. */
+  sources?: Source[];
 }
 
-export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
+export type ConversationTurnRow = Omit<typeof conversationTurns.$inferSelect, "sources"> & { sources?: Source[] };
 
 export type ConversationRow = typeof conversations.$inferSelect;
 

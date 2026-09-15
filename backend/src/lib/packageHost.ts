@@ -615,7 +615,7 @@ export function formatSearxngResults(data: unknown, count = 5): string {
  * (a real API answering plain text is not a fetch failure); and Wikipedia
  * answers a direct-topic query via `infoboxes`, not `results` (see
  * `formatSearxngResults`). */
-export async function searxngSearch(args: unknown): Promise<unknown> {
+export async function searxngSearch(args: unknown): Promise<{ text: string; rows: { title: string; url: string; snippet: string | null }[] }> {
   const query = (args as { query?: unknown } | undefined)?.query;
   if (typeof query !== "string" || query.length === 0) {
     throw new HostError("invalid_input", `searxng search needs a string "query" argument`);
@@ -638,7 +638,12 @@ export async function searxngSearch(args: unknown): Promise<unknown> {
       baseUrl,
       "check the SearXNG URL in Settings (a URL that redirects to a login page, or an instance with JSON output disabled, both look like this)",
     );
-    return formatSearxngResults(value);
+    const rows = Array.isArray(value.results) ? value.results.slice(0, 8).flatMap((raw: unknown) => {
+      const row = raw as { title?: unknown; url?: unknown; content?: unknown };
+      if (typeof row.title !== "string" || typeof row.url !== "string") return [];
+      try { const parsed = new URL(row.url); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return []; parsed.username = ""; parsed.password = ""; parsed.hash = ""; return [{ title: row.title, url: parsed.toString(), snippet: typeof row.content === "string" ? row.content : null }]; } catch { return []; }
+    }) : [];
+    return { text: formatSearxngResults(value), rows };
   }
   throw result.error;
 }

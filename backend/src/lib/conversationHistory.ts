@@ -244,6 +244,7 @@ export function logTurn(
     // and trimmed to a bounded row; null when the turn proposed no
     // package call.
     outcomes: opts.outcomes && opts.outcomes.length > 0 ? JSON.stringify(opts.outcomes.map(outcomeForRow)) : null,
+    sources: value.sources ? JSON.stringify(value.sources) : null,
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
     // row (CHAT-03) they are approximate, and a `policy` turn is skipped
@@ -872,7 +873,7 @@ export function listConversationTurns(
 
   const byTurn = memoryIdsByTurn(rows.map((r) => r.id));
 
-  return { ok: true, value: rows.map((r) => ({ ...r, memory_ids: byTurn.get(r.id) ?? [] })) };
+  return { ok: true, value: rows.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, memory_ids: byTurn.get(r.id) ?? [] })) };
 }
 
 /** PATCH /api/conversations/:id: title only (step 3's contract). Same

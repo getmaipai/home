@@ -114,6 +114,8 @@ export interface TurnExpectation {
   /** A lookup package ran for this turn and a source URL reached the
    * model (C2). */
   lookupWithSource?: boolean;
+  /** The delivered turn carries at least one typed source (CHAT-16). */
+  sourcesNonEmpty?: boolean;
   /** The interrupted turn's upstream completion was cancelled before
    * it finished (E4). */
   inferenceStopped?: boolean;
@@ -1085,6 +1087,14 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "where's the maker's support page for the Cosmo 7 card", seedReply: "I can't open pages myself, but I can help you find it. Let me look it up for you.", expect: { signal: { primary_act: "question" }, mustNotContain: "let me look|i can help you find|can't open", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*support|support.*cosmo 7" } }, lookupWithSource: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
       { say: "anything on the warranty there", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "link-is-the-answer",
+    category: "knowledge",
+    note: "CHAT-16 part 4 rule 1: the lookup reply carries its sources",
+    turns: [
+      { say: "where's the maker's support page for the Cosmo 7 card", expect: { signal: { primary_act: "question" }, lookupWithSource: true, sourcesNonEmpty: true, mustNotContain: "http|can't (show|provide|share|access)|no link", humanVerdict: true } },
     ],
   },
   {

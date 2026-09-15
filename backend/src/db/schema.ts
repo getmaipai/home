@@ -375,6 +375,7 @@ export const conversationTurns = sqliteTable(
     // outcomesForConversation() for the composer (CHAT-16) and the
     // guards, never by the judge, never a memory record.
     outcomes: text("outcomes"),
+    sources: text("sources"),
     // ACT-01: the turn's frozen TurnSignal (spec/schemas/turn-signal.
     // schema.json as JSON), computed before routing and never
     // recomputed, the judge's queue key and REVIEW-01's record of what

@@ -38,7 +38,7 @@ export async function checkSearxngHealth(): Promise<void> {
 
   let result: unknown;
   try {
-    result = await searxngSearch({ query: CANARY_QUERY });
+    result = (await searxngSearch({ query: CANARY_QUERY })).text;
   } catch (err) {
     resolveIssue(ISSUE_SOURCE, "searxng_empty");
     await raiseIssue({

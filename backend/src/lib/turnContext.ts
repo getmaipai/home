@@ -21,6 +21,8 @@ import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { shapeOf } from "@/lib/turnSignal";
 import { pronounFamiliesIn, type SubjectRef } from "@/lib/unknownNames";
 import { bannedPhrasesFor } from "@/lib/replyConstraints";
+import type { Source } from "@maipai/spec/gen/ts/source.js";
+import { nextHlc } from "@/lib/hlc";
 
 /** The record's kinds, plus `episode`: JOIN-01's recalled turns postdate
  * the record, ground a reply the way a memory line does, and are held
@@ -95,13 +97,23 @@ export interface ToolExecutionOutcome {
   /** Safe for the household; never a developer diagnostic. */
   userMessage?: string;
   source?: OutcomeSource;
+  sources?: Source[];
 }
 
 /** Stamps the time and, from a succeeded result, the citation fields,
  * so every producer records the same shape. */
 export function outcomeOf(partial: Omit<ToolExecutionOutcome, "at" | "source"> & { at?: string }): ToolExecutionOutcome {
   const source = partial.status === "succeeded" && partial.result ? sourceFromResult(partial.result) : undefined;
-  return { ...partial, at: partial.at ?? new Date().toISOString(), ...(source ? { source } : {}) };
+  const sources = partial.status === "succeeded" && partial.result ? sourcesFromRows(partial.result.data && typeof partial.result.data === "object" ? (partial.result.data as { rows?: unknown }).rows : undefined) : [];
+  return { ...partial, at: partial.at ?? new Date().toISOString(), ...(source ? { source } : {}), ...(sources.length ? { sources } : {}) };
+}
+
+export function sourcesFromRows(rows: unknown): Source[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.slice(0, 8).flatMap((raw): Source[] => {
+    if (!raw || typeof raw !== "object" || typeof (raw as any).title !== "string" || typeof (raw as any).url !== "string") return [];
+    try { const u = new URL((raw as any).url); if (u.protocol !== "http:" && u.protocol !== "https:") return []; u.username = ""; u.password = ""; u.hash = ""; const now = new Date().toISOString(); return [{ id: `src-${Math.random().toString(36).slice(2, 12)}`, kind: "web", title: (raw as any).title, url: u.toString(), site: u.hostname.replace(/^www\./, ""), snippet: typeof (raw as any).snippet === "string" ? (raw as any).snippet : null, source: "websearch", created_at: now, hlc: nextHlc() }]; } catch { return []; }
+  });
 }
 
 function sourceFromResult(result: PluginResult): OutcomeSource | undefined {

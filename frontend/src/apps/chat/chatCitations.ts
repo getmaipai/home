@@ -1,10 +1,5 @@
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 
-/** backend/src/wire.ts's `TurnValue` and the conversation_turns row don't
- * carry `sources` yet (lane 10 item 1 is spec + frontend only; Session A
- * adds the real field to both when CHAT-16 emits it) - this is the one
- * shape both adapters read through until then, narrower than a cast to
- * `any` and gone the moment the real field lands. */
 export type TurnWithSources = { sources?: Source[] };
 
 const MARKER_RE = /\[(\d+)\]/g;

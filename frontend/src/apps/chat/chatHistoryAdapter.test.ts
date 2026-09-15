@@ -1,6 +1,7 @@
 import { describe, expect, test, mock } from "bun:test";
 import { createChatHistoryAdapter, rowsToBranchableMessages } from "@/apps/chat/chatHistoryAdapter";
 import type { ConversationTurnWithMemoryIds } from "@/lib/api";
+import type { Source } from "@maipai/spec/gen/ts/source.js";
 
 function makeRow(id: string, replyText: string, memoryIds: string[] = [], supersedes: string | null = null): ConversationTurnWithMemoryIds {
   return {
@@ -51,7 +52,7 @@ describe("rowsToBranchableMessages", () => {
   // render identically whether the message just streamed in or came back
   // from a reload.
   test("a row carrying sources passes them into the reply's metadata.custom.sources", () => {
-    const sources = [{ id: "src-1", kind: "web", title: "A page", url: "https://example.com/a", site: "example.com", snippet: null, source: "row-1", created_at: "2026-09-13T00:00:00Z", hlc: "1757000000000:0:abc123" }];
+    const sources: Source[] = [{ id: "src-1", kind: "web", title: "A page", url: "https://example.com/a", site: "example.com", snippet: null, source: "row-1", created_at: "2026-09-13T00:00:00Z", hlc: "1757000000000:0:abc123" }];
     const row = { ...makeRow("row-1", "a reply"), sources };
     const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
     expect(items[1]!.message.metadata!.custom!.sources).toEqual(sources);

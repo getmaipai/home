@@ -326,6 +326,10 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     const pass = ran.length > 0 && observed.sourceUrls.length > 0;
     checks.push({ name: "lookup with source", pass, detail: ran.length === 0 ? `no lookup ran (source ${observed.source ?? "none"}, ran ${observed.pluginId ?? "none"})` : observed.sourceUrls.length === 0 ? `${ran.join("+")} ran, no source reached the model` : `${ran.join("+")}: ${observed.sourceUrls[0]}` });
   }
+  if (e.sourcesNonEmpty) {
+    const pass = observed.sourceUrls.length > 0;
+    checks.push({ name: "sources non-empty", pass, detail: pass ? `${observed.sourceUrls.length} source(s)` : "no sources on the delivered turn" });
+  }
   if (e.inferenceStopped) checks.push({ name: "inference stopped", pass: observed.inferenceStopped === true, detail: observed.inferenceStopped === null ? "no completion was made" : observed.inferenceStopped ? "the upstream completion was cancelled" : "the upstream completion ran to its end" });
   if (e.reconciled) checks.push({ name: "reconciled", pass: observed.reconciledRow, detail: observed.reconciledRow ? "a turn row holds what was delivered" : "no turn row for the interrupted turn" });
   if (e.delivered) {

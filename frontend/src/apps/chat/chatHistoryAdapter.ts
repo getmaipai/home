@@ -1,6 +1,5 @@
 import { ExportedMessageRepository, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
-import type { TurnWithSources } from "@/apps/chat/chatCitations";
 
 /** One {message, parentId} pair per turn's user half, in the exact branch
  * shape ExportedMessageRepository.fromBranchableArray() wants. */
@@ -67,9 +66,6 @@ export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], 
       // `deriveMemoryStatus()` needs it alongside `memoryIds` and
       // `source` to tell "not yet judged" from "judged, nothing worth
       // remembering" from "a plugin turn the judge never queues."
-      // `sources` (lane 10 item 1): not on ConversationTurnRow yet -
-      // TurnWithSources reads it forward-compatibly, absent until
-      // CHAT-16 lands and Session A adds the column.
       metadata: {
         custom: {
           turnId: row.id,
@@ -79,7 +75,7 @@ export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], 
           source: row.source,
           pluginId: row.pluginId,
           commandId: row.commandId,
-          sources: (row as TurnWithSources).sources,
+          sources: row.sources,
         },
       },
     };

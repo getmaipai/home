@@ -930,9 +930,17 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       expect(seenUrl.pathname).toBe("/search");
       expect(seenUrl.searchParams.get("q")).toBe("node.js runtime");
       expect(seenUrl.searchParams.get("format")).toBe("json");
-      expect(result).toBe(
+      const searchResult = result as {
+        text: string;
+        rows: { title: string; url: string; snippet: string | null }[];
+      };
+      expect(searchResult.text).toBe(
         "1. Node.js (https://nodejs.org/) - Node.js is a JavaScript runtime.\n2. Node.js docs (https://nodejs.org/docs) - API documentation.",
       );
+      expect(searchResult.rows).toEqual([
+        { title: "Node.js", url: "https://nodejs.org/", snippet: "Node.js is a JavaScript runtime." },
+        { title: "Node.js docs", url: "https://nodejs.org/docs", snippet: "API documentation." },
+      ]);
     } finally {
       server.stop(true);
     }
