@@ -17275,6 +17275,17 @@ constraint outlives the conversation now, or waits for PREF-01 to
 promote it (the recommendation: waits; a ban the person gave once in
 one conversation is that conversation's).
 
+**Answered (2026-09-15, the owner).** (1) The spoken cue stays, with
+part 9's three bounds. (2) Both readings in one sentence. (3) Pictures
+and videos are shown inline on the chat surface, before and after
+COMP-01: the search's own image results for a picture, the platform's
+embed for a video through the household's existing integration where
+one exists, otherwise the search's video result; both are new outbound
+connections, each with its own privacy-page row in the same commit, and
+CHAT-16's deliverables item carries the work (the "link to the page"
+form stays as the fallback when no result is an image or a video). (4)
+A standing constraint is that conversation's until PREF-01 promotes it.
+
 ## Session B, lane 16: ACT-02's training half (2026-09-14)
 
 `backend/scripts/train/turn-signal-heads.ts` and its tests, per
