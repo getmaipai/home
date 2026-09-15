@@ -37,6 +37,7 @@ import { turnActiveWithin, activeTurnCount, acquireTurnLease, __setTurnActivityC
 import { forgetByIds, remember, recall, PROFILE_SOURCE } from "@/lib/memory";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { __resetDenoHostForTests } from "@/lib/denoHost";
+import { __setPromptClockForBench } from "@/lib/benchSampling";
 import { loadManifestOnly } from "@/lib/plugins";
 import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
@@ -3505,6 +3506,68 @@ describe("POST /api/turn", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe("unsupported_surface");
+  });
+});
+
+describe("ALM-01: a derived date question is a compute", () => {
+  const retained = (turnId: string) => {
+    const row = db.select({ outcomes: conversationTurns.outcomes }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    return row?.outcomes ? (JSON.parse(row.outcomes) as { packageId: string; status: string; args?: Record<string, unknown> }[]) : null;
+  };
+
+  beforeEach(() => {
+    __setPromptClockForBench(() => new Date(2026, 8, 14, 22, 43));
+  });
+
+  afterEach(() => {
+    __setPromptClockForBench(null);
+  });
+
+  test("computes the next occurrence of a clock time", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "when's the next time it's 10:41");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("almanac-compute");
+    expect(result.value.reply.text).toContain("September 15");
+    expect(result.value.reply.text).toMatch(/am/i);
+    const outcomes = retained(result.value.turn_id);
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes?.[0]?.packageId).toBe("almanac-compute");
+    expect(typeof outcomes?.[0]?.args?.clock).toBe("string");
+  });
+
+  test("carries the clock into a date question in the same conversation", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const first = await runTurn(actor, "chat", "when's the next time it's 10:41", { conversationId: conv.value.id });
+    expect(first.ok).toBe(true);
+    const second = await runTurn(actor, "chat", "which date is that", { conversationId: conv.value.id });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.plugin_id).toBe("almanac-compute");
+    expect(second.value.reply.text).toContain("September 15");
+  });
+
+  test("routes today's date to the date package", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "so what's today's date");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.plugin_id).toBe("almanac-date");
+    expect(result.value.plugin_id).not.toBe("almanac-compute");
+  });
+
+  test("does not retain an almanac compute outcome for an unrelated question", async () => {
+    const { actor } = await owner();
+    await withChat("Lisbon.", async () => {
+      const result = await runTurn(actor, "chat", "what's the capital of Portugal");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(retained(result.value.turn_id)?.some((outcome) => outcome.packageId === "almanac-compute")).toBe(false);
+    });
   });
 });
 
