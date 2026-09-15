@@ -1614,7 +1614,24 @@ invented for the roster's household, and added to
 
 <a id="ask-01-followups"></a>
 
-- [ ] **ASK-01 follow-ups: the resolver's edges** (S)
+- [x] **ASK-01 follow-ups: the resolver's edges** (S)
+    Done 2026-09-14 (docs/dev/session-a.md "ASK-01", "The follow-ups"):
+    the eleven lows of the second and third reviews and the seven of
+    the fourth, in `lib/unknownNames.ts`, `lib/turnEngine.ts`,
+    `lib/conversationHistory.ts`, `lib/memoryJudge.ts` and
+    `lib/guards.ts`, each with a regression test in
+    `tests/unknownNames.test.ts` or `tests/ask01.test.ts`: the About
+    line's entries and the memory bullets' subject labels are
+    grounding evidence; the relation question uses the prompt's own
+    phrase per type; a bare answer binds only a question this
+    conversation raised or about its last subject; a declined engine
+    ask is recorded so the judge's later candidate queues no twin; a
+    question whose subject is gone, or a pending one older than a
+    week, lapses (`expired`); "of course" is not familiarity; the third
+    relation pattern needs its connector; a bare yes answers a relation
+    question only; a confirmed entity is never replaced by an answer;
+    the replacement is created before the guess is retired; "and" is
+    never the noun; a possessive name is filtered after the strip.
 
     Objective: the five low findings of ASK-01's second review, each a
     small change in `backend/src/lib/unknownNames.ts` or

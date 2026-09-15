@@ -57,6 +57,8 @@ import {
   markOpenQuestionAsked,
   resolveOpenQuestion,
   resolveOpenQuestionsAbout,
+  expireOpenQuestion,
+  queueOpenQuestion,
   type PendingAsk,
   type OpenQuestionRow,
 } from "@/lib/conversationHistory";
@@ -1643,6 +1645,13 @@ export async function resolvePendingAsk(
       // it: a cancel is never asked again (a review).
       const twin = name ? candidateByName(actor, name) : null;
       if (twin) resolveOpenQuestionsAbout(actor.id, twin.id, "declined");
+      // The judge may not have seen the name yet: the decline is
+      // recorded so its later candidate queues no question (a review).
+      if (name && !pending.openQuestionId) {
+        const record = queueOpenQuestion({ person: actor.id, conversationId: conversation.id, kind: "who", text: whoQuestion(name), source: turnId });
+        markOpenQuestionAsked(record.id);
+        resolveOpenQuestion(record.id, "declined");
+      }
       protocol.answer = { kind: "who", answer: "negative" };
       return { reply: { text: "Okay, no problem." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
     }
@@ -1960,7 +1969,12 @@ async function prepareTurn(
   const openPending = nextOpenQuestionFor(actor.id);
   if (openPending && openPending.kind === "who" && openPending.subjectId) {
     const about = openQuestionName(openPending);
-    if (about && looksLikeWhoAnswer(text, about)) {
+    // Only a question this conversation raised, or one about the
+    // subject the last turn here was about: a bare "she's a teacher"
+    // is about the current subject, never a candidate from another
+    // day's thread (a review).
+    const here = openPending.conversationId === conversation.id || lastTurnSubjects(conversation.id).some((s) => s.type === "household" && s.entity_id === openPending.subjectId);
+    if (about && here && looksLikeWhoAnswer(text, about)) {
       const parsed = parseWhoAnswer(text, about);
       if (parsed && parsed !== "declined" && parsed.kind) {
         const outcome = applyWhoAnswer(actor, { name: about, subjectId: openPending.subjectId }, parsed, turnId);
@@ -2272,7 +2286,7 @@ async function prepareTurn(
   const subjects: SubjectRef[] = [...resolved.subjects, ...carried];
   const unknownAsk = resolved.unknown.find((u) => u.ask)?.name ?? null;
   const subjectPronouns = subjectPronounsFor(actor, subjects, resolved.unknown);
-  const subjectsSection = subjectsSectionFor(actor, subjects);
+  const { section: subjectsSection, about: aboutEntries } = subjectsSectionFor(actor, subjects);
   timings.subjects_ms = Math.round(performance.now() - subjectsStart);
   const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
@@ -2304,6 +2318,12 @@ async function prepareTurn(
     ),
     ...(window.summaryLine ? [{ id: `summary:${conversation.id}`, kind: "summary" as const, text: window.summaryLine, rendered: window.summaryLine, sourceId: conversation.id, entityIds: [] }] : []),
     ...household.map((p): TurnEvidence => ({ id: `household:${p.id}`, kind: "household", text: sanitizeForPrompt(p.displayName), rendered: `- ${sanitizeForPrompt(p.displayName)} (${p.role})`, sourceId: p.id, entityIds: [p.id] })),
+    // ASK-01: what the prompt says about the turn's subjects (the About
+    // line's entries) and the memory bullets' subject labels ("Quill
+    // (your coworker)") ground the reply too, or the role a reply
+    // repeats from the prompt reads as invented (a review).
+    ...aboutEntries.map((a): TurnEvidence => ({ id: `subject:${a.entityId}`, kind: "household", text: a.text, rendered: a.text, sourceId: a.entityId, entityIds: [a.entityId] })),
+    ...[...subjectLabels.entries()].map(([entityId, label]): TurnEvidence => ({ id: `subjectlabel:${entityId}`, kind: "household", text: label, rendered: label, sourceId: entityId, entityIds: [entityId] })),
     { id: "clock", kind: "clock", text: localTimeLine(frozen.now, frozen.locale), rendered: localTimeLine(frozen.now, frozen.locale), entityIds: [] },
   ];
   const turnContext: TurnContext = {
@@ -2442,13 +2462,13 @@ function subjectPronounsFor(actor: PersonRow, subjects: readonly SubjectRef[], u
  * holds (its kind, its relation to the speaker when stated, its
  * pronouns), so a pronoun-only turn keeps its subject. Never a
  * candidate's guessed kind (subjectLabel() hides it). */
-function subjectsSectionFor(actor: PersonRow, subjects: readonly SubjectRef[]): string {
+function subjectsSectionFor(actor: PersonRow, subjects: readonly SubjectRef[]): { section: string; about: { entityId: string; text: string }[] } {
   const lines: string[] = [];
   // The names framed as household with no noun settling them, this
   // turn's and the carried ones: still unknown until an answer.
   const unknownLine = unknownNamesLine(framedUnknownNames({ subjects }));
   if (unknownLine) lines.push(unknownLine);
-  const about: string[] = [];
+  const about: { entityId: string; text: string }[] = [];
   for (const ref of subjects) {
     if (ref.type !== "household") continue;
     const entity = entityForSpeaker(actor, ref.entity_id);
@@ -2461,10 +2481,10 @@ function subjectsSectionFor(actor: PersonRow, subjects: readonly SubjectRef[]): 
     const kind = label.includes("(") ? label : `${label} (${entity.kind === "person" ? "someone the household knows" : `a ${entity.kind}`})`;
     const pronouns = entity.pronouns ? `, ${entity.pronouns}` : "";
     const description = entity.description ? `: ${sanitizeForPrompt(entity.description)}` : "";
-    about.push(`${kind}${pronouns}${description}`);
+    about.push({ entityId: entity.id, text: `${kind}${pronouns}${description}` });
   }
-  if (about.length > 0) lines.push(`About: ${about.join("; ")}.`);
-  return lines.length > 0 ? `\n\n${lines.join("\n")}` : "";
+  if (about.length > 0) lines.push(`About: ${about.map((a) => a.text).join("; ")}.`);
+  return { section: lines.length > 0 ? `\n\n${lines.join("\n")}` : "", about };
 }
 
 
@@ -3038,6 +3058,12 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
   const question = nextOpenQuestionFor(actor.id);
   if (!question) return NO_ASK;
   const name = openQuestionName(question);
+  if (question.subjectId && name === null) {
+    // The subject is gone (deleted in the registry): nothing to ask.
+    expireOpenQuestion(question.id);
+    console.log(`[ask] the open question ${question.id} lapsed: its subject is gone`);
+    return NO_ASK;
+  }
   // The model's own question about the name counts as the ask.
   const asked = name !== null && replyAsksAbout(visible, name);
   return {

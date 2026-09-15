@@ -64,7 +64,7 @@ import { tokenize } from "@/lib/text";
 import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
 import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, saidAs, speakerNamed, speakerNamedAny, speakerStated, writeRelation } from "@/lib/subjects";
 import { candidateQuestion, relationPhraseFor, speakerStatedKind } from "@/lib/unknownNames";
-import { listOpenQuestions, queueOpenQuestion } from "@/lib/conversationHistory";
+import { listOpenQuestions, openQuestionDeclined, queueOpenQuestion } from "@/lib/conversationHistory";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
@@ -652,7 +652,9 @@ function resolveSubject(speaker: PersonRow, fact: ExtractedFact, turn: Conversat
     const stated = speakerNamed(turn.userText, named.name) && speakerStatedKind(turn.userText, named.name, named.kind);
     const result = ensureSubjectEntity(speaker, named, stated);
     if (result.ok && result.value) {
-      if (result.status === 201 && result.value.source === "inferred") {
+      // A name the person already declined to explain ("never mind" to
+      // the engine's own ask) is not asked about again by the judge.
+      if (result.status === 201 && result.value.source === "inferred" && !openQuestionDeclined(speaker.id, candidateQuestion("entity", result.value.name))) {
         queueOpenQuestion({ person: speaker.id, conversationId: turn.conversationId, kind: "who", text: candidateQuestion("entity", result.value.name), subjectId: result.value.id, source: turn.id });
         console.log(`[memoryJudge] an inferred entity is a candidate with an open question (turn ${turn.id})`);
       }

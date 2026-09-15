@@ -686,7 +686,7 @@ function claimsUngroundedHouseholdRole(sentence: string, ctx: GuardContext, grou
 // "I remember Clover"); a decline in the same sentence ("I don't know
 // Nadia") is honesty, never familiarity.
 const FAMILIARITY_RE =
-  /\b(?:that'?s right|you'?re right|i remember|i recall|i know (?!that (?:you|it|this|feeling|one))|as you (?:mentioned|said|told me)|like you (?:said|mentioned)|you (?:mentioned|told me about|said) (?:earlier|before|last|the other day|a while)|i'?ve heard (?:about|of|so much about)|i heard about|i know all about|of course|good old|our (?:friend|pal|buddy))\b/i;
+  /\b(?:that'?s right|you'?re right|i remember|i recall|i know (?!that (?:you|it|this|feeling|one))|as you (?:mentioned|said|told me)|like you (?:said|mentioned)|you (?:mentioned|told me about|said) (?:earlier|before|last|the other day|a while)|i'?ve heard (?:about|of|so much about)|i heard about|i know all about|good old|our (?:friend|pal|buddy))\b/i;
 const NOT_FAMILIAR_RE = /\b(?:don'?t know|do not know|haven'?t heard|have not heard|never heard|not sure who|not sure what|don'?t think (?:i|we)'?ve met|who'?s that|who is that|haven'?t met)\b/i;
 /** Whole-word, case-insensitive, letter lookarounds (no ASCII word
  * boundary between "é" and an apostrophe). */

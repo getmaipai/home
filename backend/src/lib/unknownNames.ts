@@ -20,9 +20,9 @@ import { entityKindNouns, kindForNoun, relationshipTypes } from "@maipai/spec/re
 import { db } from "@/db";
 import { entities, memoryRecords, relationships } from "@/db/schema";
 import { and, eq, isNull, or } from "drizzle-orm";
-import { deleteEntity, updateEntity } from "@/lib/entities";
+import { createEntity, deleteEntity, toEntity, updateEntity } from "@/lib/entities";
 import { deleteRelationship, promoteToStated } from "@/lib/relationships";
-import { ensureSubjectEntity, kindForRelation, saidAs, writeRelation } from "@/lib/subjects";
+import { ensureSubjectEntity, kindForRelation, RELATION_PHRASES, writeRelation } from "@/lib/subjects";
 import { nextHlc } from "@/lib/hlc";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { PersonRow } from "@/types";
@@ -157,7 +157,9 @@ function relationNounPatterns(): RegExp[] {
   relationNounRes = [
     new RegExp(`(?<![\\p{L}])(?<head>my|our|the|a|an)\\s+(?:[a-z-]+\\s+)?${nouns},?\\s+${name}`, "giu"),
     new RegExp(`(?<![\\p{L}])(?<head>\\p{Lu}[\\p{L}]+'s)\\s+(?:[a-z-]+\\s+)?${nouns},?\\s+${name}`, "giu"),
-    new RegExp(`${name}(?:,|\\s+(?:is|who is|who's))?\\s+(?<head>my|our)\\s+(?:[a-z-]+\\s+)?${nouns}(?![\\p{L}])`, "giu"),
+    // The connector is required: "Tell Nadia my phone is broken" is a
+    // verb and its object, not Nadia's phone (a review).
+    new RegExp(`${name}(?:,|\\s+(?:is|who is|who's))\\s+(?<head>my|our)\\s+(?:[a-z-]+\\s+)?${nouns}(?![\\p{L}])`, "giu"),
   ];
   return relationNounRes;
 }
@@ -246,8 +248,10 @@ function candidatesIn(text: string): Candidate[] {
     const capitalized = /^\p{Lu}/u.test(word);
     const proper = tags.has("ProperNoun") && capitalized && !tags.has("Date") && !tags.has("Pronoun");
     const initialNoun = !proper && capitalized && sentenceStarts.has(term.offset.start) && tags.has("Noun") && !tags.has("Pronoun") && !tags.has("Date") && !tags.has("Possessive");
-    if ((proper || initialNoun) && word.length >= 2 && !NOT_A_NAME.has(word.toLowerCase())) {
-      const bare = word.replace(/(?:'s|’s)$/u, "");
+    const bare = word.replace(/(?:'s|’s)$/u, "");
+    // The possessive comes off before the filter ("Grandma's" is
+    // Grandma, a review).
+    if ((proper || initialNoun) && bare.length >= 2 && !NOT_A_NAME.has(bare.toLowerCase())) {
       if (open && !/[,.;:!?]/.test(text.slice(open.at, term.offset.start))) {
         open = { name: `${open.name} ${bare}`, at: open.at, tokens: open.tokens + 1 };
       } else {
@@ -346,7 +350,7 @@ export function framedName(subjectId: string | null | undefined, personId: strin
 // on purpose (a review: "my sister is visiting tomorrow" and "my dog
 // is sick" are statements of their own, never the answer to a question
 // nobody asked); a statement that names anybody else is its own turn.
-const PRONOUN_ANSWER_RE = /^(?:(?:oh|well|ok(?:ay)?|hmm|yes|yeah|actually)[,\s]+)*(?:he|she|they|it|that|this)(?:'s| is| was|'re| are)\s+(?:(?:a|an|the|my|our|one of my|one of our)\s+)?(?:[a-z-]+\s+)?([a-z-]+)/i;
+const PRONOUN_ANSWER_RE = /^(?:(?:oh|well|ok(?:ay)?|hmm|yes|yeah|actually)[,\s]+)*(?:he|she|they|it|that|this)(?:'s| is| was|'re| are)\s+(?:(?:a|an|the|my|our|one of my|one of our)\s+)?(?:(?!(?:and|but|or|so)\b)[a-z-]+\s+)?((?!(?:and|but|or|so)\b)[a-z-]+)/i;
 const BARE_NOUN_ANSWER_RE = /^(?:(?:oh|well|ok(?:ay)?|hmm|actually)[,\s]+)*(?:a|an|the|my|our|one of my|one of our)\s+(?:[a-z-]+\s+)?([a-z-]+)(?:\s+(?:from|at|of)\s+[a-z-]+)?\s*[.!]?$/i;
 export function looksLikeWhoAnswer(text: string, name: string): boolean {
   const plain = text.trim().replace(/[‘’]/g, "'");
@@ -436,7 +440,9 @@ export function parseWhoAnswer(text: string, name?: string, opts: { relationAske
     return { kind: undefined, relationType: null, noun: null, pronouns: null, description: null, verdict: "no" };
   }
   if (DECLINE_RE.test(plain)) return "declined";
-  if (YES_RE.test(plain)) return { kind: undefined, relationType: null, noun: null, pronouns: null, description: null, verdict: "yes" };
+  // A bare yes answers "Is Raven your coworker?"; to "Who's Clover?"
+  // it says nothing and is unreadable (a review: "sure" was "Got it.").
+  if (YES_RE.test(plain)) return opts.relationAsked ? { kind: undefined, relationType: null, noun: null, pronouns: null, description: null, verdict: "yes" } : null;
   const pronounSet = pronounFamiliesIn(plain);
   const pronouns = pronounSet.size === 1 ? [...pronounSet][0]! : null;
   // "my cousin", "our rabbit", "a friend from work", "the neighbor's dog".
@@ -529,15 +535,22 @@ export function applyWhoAnswer(speaker: PersonRow, pending: { name: string; subj
   // rather than a second entity made beside it.
   const candidateEntityId = subjectId?.startsWith("ent-") ? subjectId : candidateEdge ? (candidateEdge.fromId === selfEntityId(speaker) ? candidateEdge.toId : candidateEdge.fromId) : (candidateByName(speaker, name)?.id ?? null);
   const candidate = candidateEntityId ? entityRow(candidateEntityId) : null;
-  if (candidate && candidate.kind !== answer.kind) {
-    // The stated kind wins: a new local entity, the guess retired.
-    const made = ensureFreshEntity(speaker, name, answer.kind, candidate.id);
+  const candidateUnconfirmed = candidate !== null && candidate.source === "inferred" && candidate.confirmedByPersonId === null;
+  if (candidate && candidate.kind !== answer.kind && candidateUnconfirmed) {
+    // The stated kind wins over the guess: a new local entity first,
+    // then the records and edges follow it and the guess is retired
+    // (a review: nothing is deleted before the replacement exists). A
+    // confirmed or stated entity of another kind is not a guess and
+    // is left as it is.
+    const made = createFreshEntity(speaker, name, answer.kind);
     if (made) {
       repointEntity(candidate.id, made.id, answer.kind);
       deleteEntity(speaker, candidate.id);
       entity = made;
       replacedEntityId = candidate.id;
     }
+  } else if (candidate && candidate.kind !== answer.kind) {
+    entity = entityRowToEntity(candidate.id);
   } else if (candidate) {
     entity = confirmCandidateEntity(speaker, candidate.id, null);
   } else {
@@ -597,16 +610,16 @@ function confirmCandidateEntity(speaker: PersonRow, id: string, pronouns: "he" |
 }
 
 /** A new local entity of the stated kind, created beside the candidate
- * of the wrong kind (ensureSubjectEntity would find the candidate by
- * name, so the candidate is hidden from the lookup for the call). */
-function ensureFreshEntity(speaker: PersonRow, name: string, kind: EntityKind, hideId: string): Entity | null {
-  const now = new Date().toISOString();
-  // Hidden by a soft delete for the duration of the ensure, then the
-  // caller retires it for good; a throw in between leaves it deleted,
-  // which is the intended end state anyway.
-  db.update(entities).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(entities.id, hideId)).run();
-  const made = ensureSubjectEntity(speaker, { name: displayName(name), kind }, true);
+ * of the wrong kind: createEntity directly, since ensureSubjectEntity
+ * would find the candidate by name. */
+function createFreshEntity(speaker: PersonRow, name: string, kind: EntityKind): Entity | null {
+  const made = createEntity(speaker, { kind, name: displayName(name), scope: "person", person: speaker.id, source: "local", ...(kind === "place" ? { place_kind: "map" as const } : {}) });
   return made.ok && made.value ? made.value : null;
+}
+
+function entityRowToEntity(id: string): Entity | null {
+  const row = entityRow(id);
+  return row ? toEntity(row) : null;
 }
 
 /** The candidate's records and edges follow the entity that replaces
@@ -646,7 +659,7 @@ export function candidateQuestion(kind: "entity" | "relationship", name: string,
  * the vocabulary's own said_as ("my coworker" becomes "your coworker"),
  * or null for a type nobody says ("owned_by"). */
 export function relationPhraseFor(type: string): string | null {
-  const first = saidAs(type)[0];
-  if (!first) return null;
-  return first.replace(/^my /, "your ").replace(/^our /, "your ").replace(/^i /, "someone you ");
+  // The prompt's own phrase for the type (subjects.ts), never a rewrite
+  // of a said_as example (a review: "Is Tesla your dog?" for owns).
+  return RELATION_PHRASES[type] ?? null;
 }

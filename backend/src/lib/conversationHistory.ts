@@ -585,6 +585,7 @@ export function queueOpenQuestion(input: { person: string; conversationId?: stri
 
 /** The person's oldest pending question, or null. */
 export function nextOpenQuestionFor(personId: string): OpenQuestionRow | null {
+  expireStaleOpenQuestions(personId);
   const row = db.select().from(openQuestions).where(and(eq(openQuestions.person, personId), eq(openQuestions.status, "pending"))).orderBy(openQuestions.createdAt).get();
   return (row as OpenQuestionRow | undefined) ?? null;
 }
@@ -593,6 +594,35 @@ export function nextOpenQuestionFor(personId: string): OpenQuestionRow | null {
  * tests read it; no route yet). */
 export function listOpenQuestions(personId: string): OpenQuestionRow[] {
   return db.select().from(openQuestions).where(eq(openQuestions.person, personId)).orderBy(desc(openQuestions.createdAt)).all() as OpenQuestionRow[];
+}
+
+/** A question whose subject is gone, or one nobody asked within the
+ * household's retention, lapses (the spec's `expired`: no resolved_at). */
+export function expireOpenQuestion(id: string): void {
+  db.update(openQuestions).set({ status: "expired", hlc: nextHlc() }).where(and(eq(openQuestions.id, id), inArray(openQuestions.status, ["pending", "asked"]))).run();
+}
+
+/** Pending questions older than the retention lapse before the next
+ * one is read: a candidate's question from a week ago is not put to a
+ * person who has long moved on (a review). */
+const OPEN_QUESTION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+export function expireStaleOpenQuestions(personId: string, now: Date = new Date()): void {
+  const cutoff = new Date(now.getTime() - OPEN_QUESTION_RETENTION_MS).toISOString();
+  db.update(openQuestions)
+    .set({ status: "expired", hlc: nextHlc() })
+    .where(and(eq(openQuestions.person, personId), eq(openQuestions.status, "pending"), lt(openQuestions.createdAt, cutoff)))
+    .run();
+}
+
+/** A question of this text the person already declined: the engine's
+ * own ask, cancelled before the judge saw the name, is recorded so the
+ * judge's twin is never queued (a review's race). */
+export function openQuestionDeclined(personId: string, text: string): boolean {
+  return db
+    .select({ id: openQuestions.id })
+    .from(openQuestions)
+    .where(and(eq(openQuestions.person, personId), eq(openQuestions.status, "declined"), eq(openQuestions.text, text)))
+    .get() !== undefined;
 }
 
 /** The question was appended to a reply: asked once, now. */

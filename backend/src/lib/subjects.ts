@@ -115,7 +115,7 @@ function isSymmetric(type: string): boolean {
  * speaker's side of the edge (the speaker's own person entity is
  * `from`), as the chat prompt says them. Both directions of an edge are
  * stored, so the speaker-as-from edge always exists when any does. */
-const RELATION_PHRASES: Record<string, string> = {
+export const RELATION_PHRASES: Record<string, string> = {
   parent_of: "your child",
   child_of: "your parent",
   sibling_of: "your sibling",

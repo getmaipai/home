@@ -77,6 +77,9 @@ describe("resolveNames(): the known set and the household frames", () => {
     const lantern = resolve("I love the new Marsh Lantern album");
     expect(lantern.subjects).toEqual([{ type: "unresolved", surface_form: "Marsh Lantern", candidate_kinds: [], provenance: "turn-t", confidence: 0.4, carried_question: null }]);
     expect(asks("Dinner is at six")).toEqual([]);
+    expect(asks("Dinner is at Grandma's, she said six")).toEqual([]);
+    expect(relationFramesIn("Tell Nadia my phone is broken")).toEqual([]);
+    expect(relationFramesIn("Remind Clover our dog needs walking")).toEqual([]);
     // A question about a public figure carries a pronoun too and is
     // the world's (a review).
     for (const world of ["what did Shakespeare write before he died", "is Messi still playing? he must be old", "did Beyonce say she is touring"]) expect([world, asks(world)]).toEqual([world, []]);
@@ -120,6 +123,9 @@ describe("the question, the context line, and the reply's own question", () => {
     expect(candidateQuestion("entity", "juniper")).toBe("Who's Juniper?");
     expect(candidateQuestion("relationship", "Raven", relationPhraseFor("colleague_of") ?? undefined)).toBe("Is Raven your coworker?");
     expect(relationPhraseFor("owned_by")).toBeNull();
+    // The prompt's own phrase per type (a review: never "your dog" for owns).
+    expect(candidateQuestion("relationship", "Tesla", relationPhraseFor("owns") ?? undefined)).toBe("Is Tesla yours?");
+    expect(relationPhraseFor("parent_of")).toBe("your child");
   });
 
   test("replyAsksAbout(): a question sentence naming the unknown counts as the ask", () => {
@@ -146,7 +152,10 @@ describe("parseWhoAnswer(): a pet, a relative, a verdict, and an answer it canno
   test("a kind with no relation of the speaker's, and a verdict", () => {
     expect(parseWhoAnswer("a friend from work", "Quill")).toMatchObject({ kind: "person", relationType: null, noun: "friend" });
     expect(parseWhoAnswer("the neighbor's dog", "Juniper")).toMatchObject({ kind: "pet", relationType: null, noun: "dog" });
-    expect(parseWhoAnswer("yes", "Raven")).toMatchObject({ verdict: "yes", kind: undefined });
+    expect(parseWhoAnswer("yes", "Raven", { relationAsked: true })).toMatchObject({ verdict: "yes", kind: undefined });
+    // A bare yes or "sure" to "Who's X?" says nothing (a review).
+    expect(parseWhoAnswer("yes", "Raven")).toBeNull();
+    expect(parseWhoAnswer("sure", "Clover")).toBeNull();
     expect(parseWhoAnswer("no, she is my sister", "Raven")).toMatchObject({ verdict: "no", kind: "person", relationType: "sibling_of", pronouns: "she" });
   });
   test("a cancel is declined; a new subject or a question is unreadable (null)", () => {
@@ -155,6 +164,7 @@ describe("parseWhoAnswer(): a pet, a relative, a verdict, and an answer it canno
   });
   test("looksLikeWhoAnswer(): the bare answer shape with no other name in it, and never a statement of its own (the review's rows)", () => {
     expect(looksLikeWhoAnswer("he's our rabbit", "juniper")).toBe(true);
+    expect(looksLikeWhoAnswer("he's our rabbit and he bites", "juniper")).toBe(true);
     expect(looksLikeWhoAnswer("she is my sister", "Raven")).toBe(true);
     expect(looksLikeWhoAnswer("my cousin", "Clover")).toBe(true);
     expect(looksLikeWhoAnswer("a friend from work", "Quill")).toBe(true);
@@ -210,6 +220,8 @@ describe("the two guard shapes, both ways", () => {
     // (a review); "you said earlier" about an unknown name is.
     expect(guardReply("You said Nadia just got back from her first marathon.", ctx).reason).toBeNull();
     expect(guardReply("You mentioned earlier that Nadia runs.", ctx).reason).toBe("false_familiarity");
+    // Agreement is not familiarity (a review).
+    expect(guardReply("Of course, I'll remind you to call Nadia.", { ...ctx, utterance: "Nadia ran her marathon, remind me to call her" }).reason).not.toBe("false_familiarity");
   });
 
   test("pronoun_mismatch: a reply pronoun against the subject's is skipped and the rest stands; the subject's own, one in play, or another referent passes", () => {

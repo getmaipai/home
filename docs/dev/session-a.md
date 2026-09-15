@@ -5358,6 +5358,27 @@ finding 24 first), `tests/ask01.test.ts` (the flows through
 updated for the amendment (a name alone is a candidate with the
 question queued).
 
+**The follow-ups (the same evening).** Four reviews of the landed
+diff in all; the lows of the second, third and fourth landed as the
+backlog's "ASK-01 follow-ups: the resolver's edges", one commit after
+2c6a9b9. The ones that change behavior: the About line's entries and
+the memory bullets' subject labels are grounding evidence for the
+guards (a role the prompt supplied is never cut as invented; the
+corpus row had hidden this by putting the label in `sources`); the
+judge's relation question uses `RELATION_PHRASES` (never "Is Tesla
+your dog?"); a bare answer before the question is put binds only a
+question this conversation raised or one about the last turn's own
+subject; a declined engine ask is recorded as a declined question so
+the judge's later candidate for the name queues no twin (the
+answer-before-judge race); a question whose subject was deleted and a
+pending question older than a week lapse as `expired`; "of course" is
+agreement, not familiarity; the third relation pattern needs its
+connector ("Tell Nadia my phone is broken" frames nothing); a bare
+"yes" or "sure" answers a relation question only, and says nothing to
+"Who's X?"; a confirmed or stated entity is never replaced by an
+answer of another kind (only an unconfirmed candidate is), and the
+replacement is created before the guess is retired.
+
 **Left on record.** Three reviews of this diff. The third's three
 that mattered are in the tree: the stated-kind rule is for people and
 pets (a place, an organization or a thing is stated by its name, and

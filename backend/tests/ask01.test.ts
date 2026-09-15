@@ -19,7 +19,7 @@ import { getPendingAsk, resolveOrCreateConversation, listOpenQuestions, queueOpe
 import { ensureSubjectEntity, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { remember } from "@/lib/memory";
 import { db } from "@/db";
-import { people, entities, relationships, conversationTurns, memoryRecords } from "@/db/schema";
+import { people, entities, relationships, conversationTurns, memoryRecords, openQuestions } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { PersonRow } from "@/types";
@@ -222,7 +222,8 @@ describe("the answer to the ask", () => {
       queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Clover?", subjectId: guessed.value.id, source: "turn-judge" });
       const cancel = await runTurn(actor, "chat", "never mind", { conversationId });
       if (!cancel.ok) throw new Error(cancel.error);
-      expect(listOpenQuestions(actor.id).map((q) => q.status)).toEqual(["declined"]);
+      // The twin and the engine's own recorded decline: both declined.
+      expect(listOpenQuestions(actor.id).map((q) => q.status)).toEqual(["declined", "declined"]);
       const next = await runTurn(actor, "chat", "she brought it back today anyway", { conversationId });
       if (!next.ok) throw new Error(next.error);
       expect(next.value.reply.text).toBe("Sounds like a fun weekend.");
@@ -333,12 +334,14 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     });
   });
 
-  test("answered before it is asked: a bare answer shape about the candidate is read, and nothing asks again", async () => {
+  test("answered before it is asked: a bare answer shape about the candidate is read on the conversation that raised it, and nothing asks again", async () => {
     const { actor } = await owner();
     const juniper = candidate(actor, "juniper", "pet");
-    queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Juniper?", subjectId: juniper.id, source: "turn-judge" });
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    queueOpenQuestion({ person: actor.id, conversationId: conv.value.id, kind: "who", text: "Who's Juniper?", subjectId: juniper.id, source: "turn-judge" });
     await withChat("Okay.", async (seen) => {
-      const answer = await runTurn(actor, "chat", "he's our rabbit");
+      const answer = await runTurn(actor, "chat", "he's our rabbit", { conversationId: conv.value.id });
       if (!answer.ok) throw new Error(answer.error);
       expect(answer.value).toMatchObject({ source: "confirm", reply: { text: "Got it, juniper is your rabbit." } });
       expect(seen.requests).toHaveLength(0);
@@ -417,14 +420,107 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     });
   });
 
+  test("a bare answer in another conversation is not a question's from elsewhere: the model's turn, the question asked at its end (a review)", async () => {
+    const { actor } = await owner();
+    const juniper = candidate(actor, "juniper", "pet");
+    const { createConversation } = await import("@/lib/conversationHistory");
+    const raised = createConversation(actor, { surface: "chat" });
+    if (!raised.ok) throw new Error(raised.error);
+    queueOpenQuestion({ person: actor.id, conversationId: raised.value.id, kind: "who", text: "Who's Juniper?", subjectId: juniper.id, source: "turn-judge" });
+    const elsewhere = createConversation(actor, { surface: "chat" });
+    if (!elsewhere.ok) throw new Error(elsewhere.error);
+    await withChat("Nice.", async (seen) => {
+      const other = await runTurn(actor, "chat", "she's a teacher", { conversationId: elsewhere.value.id });
+      if (!other.ok) throw new Error(other.error);
+      expect(other.value.source).toBe("model");
+      expect(seen.requests).toHaveLength(1);
+      expect(entityNamed("juniper")).toMatchObject({ source: "inferred" });
+      expect(other.value.reply.text).toBe("Nice. Who's Juniper?");
+    });
+  });
+
+  test("the About line and a memory bullet's label ground the reply: a role the prompt supplied is never cut as invented (a review)", async () => {
+    const { actor } = await owner();
+    const { writeRelation } = await import("@/lib/subjects");
+    const quill = ensureSubjectEntity(actor, { name: "Quill", kind: "person" }, true);
+    if (!quill.ok || !quill.value) throw new Error(quill.error);
+    const edge = writeRelation(actor, { type: "colleague_of", name: "Quill", stated: true }, quill.value, "turn-t", 1);
+    if (!edge.ok) throw new Error(edge.error);
+    const record = remember(actor, { text: "Quill likes seltzer", category: "preference", tier: "durable", scope: "person", person: actor.id, source: "turn-t", importance: 0.7, subject_id: quill.value.id });
+    if (!record.ok) throw new Error(record.error);
+    await withChat("Quill is your coworker, the one who likes seltzer.", async (seen) => {
+      const result = await runTurn(actor, "chat", "who is Quill");
+      if (!result.ok) throw new Error(result.error);
+      expect(contextOf(seen.requests[0]!)).toContain("Quill (your coworker)");
+      expect(result.value.reply.text).toBe("Quill is your coworker, the one who likes seltzer.");
+    });
+    const juniper = ensureSubjectEntity(actor, { name: "Juniper", kind: "pet" }, true);
+    if (!juniper.ok || !juniper.value) throw new Error(juniper.error);
+    const { updateEntity } = await import("@/lib/entities");
+    expect(updateEntity(actor, juniper.value.id, { description: "rabbit", pronouns: "he" }).ok).toBe(true);
+    await withChat("Juniper is a rabbit, keep him inside.", async (seen) => {
+      const result = await runTurn(actor, "chat", "Juniper looks hot today");
+      if (!result.ok) throw new Error(result.error);
+      expect(contextOf(seen.requests[0]!)).toContain("Juniper (a pet), he: rabbit");
+      expect(result.value.reply.text).toBe("Juniper is a rabbit, keep him inside.");
+    });
+  });
+
+  test("a question whose subject is gone lapses; a stale pending question lapses; a confirmed entity is never replaced by an answer (a review)", async () => {
+    const { actor } = await owner();
+    const gone = candidate(actor, "Clover", "person");
+    const q = queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Clover?", subjectId: gone.id, source: "turn-judge" });
+    const { deleteEntity } = await import("@/lib/entities");
+    expect(deleteEntity(actor, gone.id).ok).toBe(true);
+    const stale = candidate(actor, "Marlow", "person");
+    const old = queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Marlow?", subjectId: stale.id, source: "turn-judge" });
+    db.update(openQuestions).set({ createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString() }).where(eq(openQuestions.id, old.id)).run();
+    await withChat("Warm and sunny.", async () => {
+      const result = await runTurn(actor, "chat", "what's the weather like");
+      if (!result.ok) throw new Error(result.error);
+      expect(result.value.reply.text).toBe("Warm and sunny.");
+      expect(getPendingAsk(result.value.conversation_id)).toBeNull();
+      expect(listOpenQuestions(actor.id).find((x) => x.id === q.id)?.status).toBe("expired");
+      expect(listOpenQuestions(actor.id).find((x) => x.id === old.id)?.status).toBe("expired");
+    });
+    // A confirmed person answered as a pet stays a person.
+    const { updateEntity } = await import("@/lib/entities");
+    const confirmed = candidate(actor, "Willow", "person");
+    expect(updateEntity(actor, confirmed.id, { confirm: true }).ok).toBe(true);
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    queueOpenQuestion({ person: actor.id, conversationId: conv.value.id, kind: "who", text: "Who's Willow?", subjectId: confirmed.id, source: "turn-judge" });
+    await withChat("Okay.", async () => {
+      const answer = await runTurn(actor, "chat", "she's our dog", { conversationId: conv.value.id });
+      if (!answer.ok) throw new Error(answer.error);
+      expect(entityNamed("Willow")).toMatchObject({ id: confirmed.id, kind: "person", pronouns: "she" });
+      expect(db.select().from(entities).where(and(isNull(entities.deletedAt), eq(entities.name, "Willow"))).all()).toHaveLength(1);
+    });
+  });
+
+  test("a declined engine ask is remembered: the judge's later candidate for the name queues no question (a review's race)", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds like a fun weekend.", async () => {
+      const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend");
+      if (!first.ok) throw new Error(first.error);
+      const cancel = await runTurn(actor, "chat", "never mind", { conversationId: first.value.conversation_id });
+      if (!cancel.ok) throw new Error(cancel.error);
+    });
+    const { openQuestionDeclined } = await import("@/lib/conversationHistory");
+    expect(openQuestionDeclined(actor.id, "Who's Clover?")).toBe(true);
+    expect(listOpenQuestions(actor.id).map((x) => x.status)).toEqual(["declined"]);
+  });
+
   test("a candidate of the wrong kind is replaced by the stated one: records re-pointed, the guess gone", async () => {
     const { actor } = await owner();
     const guessed = candidate(actor, "Juniper", "person");
     const record = remember(actor, { text: "Juniper chewed through the garden hose", category: "event", tier: "episodic", scope: "person", person: actor.id, source: "turn-judge", importance: 0.4, subject_id: guessed.id });
     if (!record.ok) throw new Error(record.error);
-    queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Juniper?", subjectId: guessed.id, source: "turn-judge" });
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    queueOpenQuestion({ person: actor.id, conversationId: conv.value.id, kind: "who", text: "Who's Juniper?", subjectId: guessed.id, source: "turn-judge" });
     await withChat("Okay.", async () => {
-      const answer = await runTurn(actor, "chat", "he's our rabbit");
+      const answer = await runTurn(actor, "chat", "he's our rabbit", { conversationId: conv.value.id });
       if (!answer.ok) throw new Error(answer.error);
       const rabbit = entityNamed("Juniper")!;
       expect(rabbit).toMatchObject({ kind: "pet", source: "local", pronouns: "he" });
