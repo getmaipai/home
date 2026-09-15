@@ -605,7 +605,7 @@ export function citeClause(
   turnDate: string,
 ): {
   kept: { fact: ExtractedFact; clause: SignalClause | null }[];
-  dropped: { fact: ExtractedFact; reason: "ineligible_act" | "unknown_grounding" | "subject_mismatch" }[];
+  dropped: { fact: ExtractedFact; reason: "ineligible_act" | "quoted" | "hypothetical" | "joking" | "unknown_grounding" | "subject_mismatch" }[];
 } {
   if (!signal || signal.clauses.length === 0) {
     return { kept: facts.map((fact) => ({ fact, clause: null })), dropped: [] };
@@ -614,22 +614,38 @@ export function citeClause(
   const year = turnDate.match(/(\d{4})/)?.[1] ?? null;
   const eligible = signal.clauses.filter(isEligibleClause);
   const kept: { fact: ExtractedFact; clause: SignalClause | null }[] = [];
-  const dropped: { fact: ExtractedFact; reason: "ineligible_act" | "unknown_grounding" | "subject_mismatch" }[] = [];
+  const dropped: { fact: ExtractedFact; reason: "ineligible_act" | "quoted" | "hypothetical" | "joking" | "unknown_grounding" | "subject_mismatch" }[] = [];
+  const stanceReason = (stance: SignalClause["stance"]): "quoted" | "hypothetical" | "joking" | null =>
+    stance === "quoted" ? "quoted" : stance === "hypothetical" ? "hypothetical" : stance === "joke" ? "joking" : null;
   for (const fact of facts) {
     const words = contentWords(fact.text);
     const content = [...words].filter((w) => !skip.has(w));
     let best: { clause: SignalClause; shared: number } | null = null;
-    for (const clause of eligible) {
+    for (const clause of signal.clauses) {
       const clauseText = userText.slice(clause.range.start, clause.range.end);
       const clauseWords = contentWords(clauseText);
       const shared = content.filter((w) => clauseWords.has(w)).length;
       if (!best || shared > best.shared) best = { clause, shared };
     }
-    if (!best || best.shared === 0) {
+    if (best && best.shared > 0) {
+      const reason = stanceReason(best.clause.stance);
+      if (reason) {
+        dropped.push({ fact, reason });
+        continue;
+      }
+    }
+    let bestEligible: { clause: SignalClause; shared: number } | null = null;
+    for (const clause of eligible) {
+      const clauseText = userText.slice(clause.range.start, clause.range.end);
+      const clauseWords = contentWords(clauseText);
+      const shared = content.filter((w) => clauseWords.has(w)).length;
+      if (!bestEligible || shared > bestEligible.shared) bestEligible = { clause, shared };
+    }
+    if (!bestEligible || bestEligible.shared === 0) {
       dropped.push({ fact, reason: "ineligible_act" });
       continue;
     }
-    const clauseText = userText.slice(best.clause.range.start, best.clause.range.end);
+    const clauseText = userText.slice(bestEligible.clause.range.start, bestEligible.clause.range.end);
     const clauseLower = clauseText.toLowerCase();
     const properNouns = properNounsIn(fact.text).filter((w) => !skip.has(w));
     const numbers = [...fact.text.matchAll(/\d+/g)].map((m) => m[0]!).filter((n) => n !== year);
@@ -641,12 +657,12 @@ export function citeClause(
       continue;
     }
     const factIsThirdParty = fact.subject !== null && fact.subject.name.toLowerCase() !== speakerName.toLowerCase();
-    const clauseIsSpeaker = best.clause.subject?.kind === "speaker" || best.clause.subject === null;
+    const clauseIsSpeaker = bestEligible.clause.subject?.kind === "speaker" || bestEligible.clause.subject === null;
     if (factIsThirdParty !== !clauseIsSpeaker) {
       dropped.push({ fact, reason: "subject_mismatch" });
       continue;
     }
-    kept.push({ fact, clause: best.clause });
+    kept.push({ fact, clause: bestEligible.clause });
   }
   return { kept, dropped };
 }

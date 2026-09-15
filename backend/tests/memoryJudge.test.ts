@@ -1690,3 +1690,55 @@ describe("MEM-06 (b): a passing state and a world fact are not written", () => {
     expect(rows.length).toBe(0);
   });
 });
+
+describe("MEM-06: a quoted, hypothetical or joking clause writes nothing", () => {
+  test("a fact whose best clause carries a quoted, hypothetical or joking stance is dropped with that reason; an asserted inform clause keeps it", async () => {
+    const { citeClause, turnDateFor } = await import("@/lib/memoryJudge");
+    const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
+    const fact = (text: string, subject: { name: string; kind: "person" } | null = null) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject, relation: null });
+    const clause = (partial: Partial<{ act: "inform" | "commissive"; stance: "asserted" | "reported" | "quoted" | "hypothetical" | "joke" | "unknown"; subject: { kind: "speaker" } | { kind: "household" } }>) => ({
+      range: { start: 0, end: 100 },
+      act: partial.act ?? ("inform" as const),
+      stance: partial.stance ?? ("asserted" as const),
+      subject: partial.subject ?? ({ kind: "speaker" as const }),
+      emotion: "happiness" as const,
+      emotion_intensity: "none" as const,
+      confidence: 0.9,
+    });
+    const signal = (c: ReturnType<typeof clause>) => ({
+      primary_act: "inform" as const,
+      secondary_acts: [] as ("inform" | "question" | "directive" | "commissive" | "greeting" | "closing" | "backchannel")[],
+      expressed_emotion: "happiness" as const,
+      emotion_intensity: "high" as const,
+      target: "self" as const,
+      repair: "none" as const,
+      refers_to_prior: null,
+      clauses: [c],
+      act_confidence: 0.9,
+      emotion_confidence: 0.9,
+      source: "rule" as const,
+      classifier_id: null,
+      age_band: "adult" as const,
+      age_band_basis: "identified_profile" as const,
+    });
+    // A quoted clause drops the fact it grounds, with reason "quoted".
+    const quoted = citeClause([fact("Sage is moving to Lisbon", { name: "Sage", kind: "person" })], signal(clause({ act: "inform", stance: "quoted", subject: { kind: "household" } })), "my sister said 'I'm moving to Lisbon'", "Sage", date);
+    expect(quoted.dropped.length).toBe(1);
+    expect(quoted.dropped[0]!.reason).toBe("quoted");
+    expect(quoted.kept.length).toBe(0);
+    // A hypothetical clause drops the fact it grounds, with reason "hypothetical".
+    const hypothetical = citeClause([fact("Sage is buying a boat", { name: "Sage", kind: "person" })], signal(clause({ act: "inform", stance: "hypothetical" })), "if I won the lottery I'd buy a boat", "Sage", date);
+    expect(hypothetical.dropped.length).toBe(1);
+    expect(hypothetical.dropped[0]!.reason).toBe("hypothetical");
+    expect(hypothetical.kept.length).toBe(0);
+    // A joking clause drops the fact it grounds, with reason "joking".
+    const joking = citeClause([fact("Sage is basically a professional napper", { name: "Sage", kind: "person" })], signal(clause({ act: "inform", stance: "joke" })), "I'm basically a professional napper haha", "Sage", date);
+    expect(joking.dropped.length).toBe(1);
+    expect(joking.dropped[0]!.reason).toBe("joking");
+    expect(joking.kept.length).toBe(0);
+    // An asserted inform clause keeps the fact.
+    const asserted = citeClause([fact("Sage is moving to Lisbon in September")], signal(clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" } })), "I'm moving to Lisbon in September", "Sage", date);
+    expect(asserted.kept.length).toBe(1);
+    expect(asserted.dropped.length).toBe(0);
+  });
+});
