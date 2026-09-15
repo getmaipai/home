@@ -17288,6 +17288,91 @@ CHAT-16's deliverables item carries the work (the "link to the page"
 form stays as the fallback when no result is an image or a video). (4)
 A standing constraint is that conversation's until PREF-01 promotes it.
 
+#### 13. CHAT-16's composer core, chunked (the coordinator, 2026-09-15 evening)
+
+What landed today under CHAT-16 is part 4's amendments (the sources on
+the wire and the row, the deliverables, the denied deliverable) and the
+`status` events. The core is the composer itself, designed above under
+"Structured execution and bounded composition" (one shared path from
+outcomes to a reply; the decision table; the native tool-result
+messages; the two-completion budget) with part 4, 6 and 9's amendments
+riding on it. It is cut into seven chunks so that the judgment sits in
+two of them and the rest is typing with a precise brief.
+
+K1, the native tool-result messages (mechanical). `spec/llm/ts/types.ts`
+gains `role: tool` messages with `tool_call_id`, and an assistant
+message retains its `tool_calls`; the client serializes both for the
+OpenAI-style API; the wire tests cover them; nothing in the engine sends
+them yet.
+
+K2, the composer (judgment; Session A). One module,
+`backend/src/lib/composer.ts`, `composeTurn(outcomes, context, constraints)`,
+called on both paths wherever the engine turns retained outcomes into a
+reply today (the plugin-reply sites, the forced ladder, the deliverable
+line stays as it is). The decision table verbatim: one succeeded outcome
+with a `reply` and no `synthesis_hint` is delivered as it is; a
+data-only result, a result with `synthesis_hint`, or two outcomes with
+at least one success and no pending interaction take one final
+completion, the turn's second and last model call, with the results as
+native tool-result messages (K1), no tools offered, the persona and the
+context as on a model turn, results as data never instructions, and
+the composed text through the guards like any draft; every outcome
+failed takes the deterministic safe text; a pending interaction stays
+literal; a composition that fails falls back to the ordered direct
+replies and failure messages; a data-only result with no usable reply
+is "I found information, but couldn't put the answer together", never
+"Done.". The budget is enforced in one place: a turn that already spent
+its initial call and its corrective or composing call makes no third.
+The websearch recipe's private `llm_complete` step goes when the
+composer composes its rows (chunk A of part 4 already carries the rows
+in `data`), so the search answer costs one composition and not a third
+call. CONS-01's readers ride here: the constraints' `shape`, `length`
+and banned phrases are one line of the composer prompt, and the shape
+is a parameter of the composed turn (K4 renders it). The `[turn]` line
+records `composed: direct | composition | failure | pending`.
+
+K3, `model_knowledge` marking (mechanical, after K2). A world question
+answered from the weights with no lookup carries an outcome of evidence
+kind `model_knowledge` (part 1 rule 7); "how do you know that" is
+composed from the outcome ("that one I just know" or "I looked it up,
+the link's below"); the chip shows only for a lookup. Rows:
+`checkable-fact`'s last two turns.
+
+K4, the requested shape (mechanical, after K2). Part 9 rule 4: a `shape`
+or `length` constraint, or a shape ask in the same utterance, renders a
+list from the result rows (up to five in the bubble, the rest in the
+document once COMP-01 exists), a number-only answer as the number, a
+one-line answer as one line; `max_sentences` yields to an explicit
+shape. Row: `list-shape-on-lookup`.
+
+K5, typed dates (mechanical, after K2). Part 6 rule 2: every date a
+lookup or typed source returned reaches the composer with its relation
+to the frozen clock from `dateRelation()`, and the line uses it when
+the question was about timing ("yes, today", never "on the 14th" when
+the 14th is today). Row: `lookup-date-relative`.
+
+K6, the streaming state machine (judgment; Session A, inside K2 or right
+after). One machine owns deciding, executing, composing, finished and
+cancelled; the composing phase streams the composition's own deltas
+sentence by sentence; the blocking path collects the same approved
+deltas; the public events stay as they are (K1's messages are internal).
+
+K7, pictures and videos inline (mechanical, after K2; the owner's call
+of 2026-09-15). A picture ask whose search returns an image result puts
+the image on the reply (`TurnValue.media`, additive: kind, url, source
+host), the chat surface renders it in the bubble, and the "page with it
+is below" line becomes the fallback when no result is an image; a video
+ask embeds the platform's player through the household's existing
+integration where one exists, else the search's video result; each is a
+new outbound connection with its own privacy-page row in the same
+commit. The child band keeps its grown-up line and no media.
+
+Order: K1 now (Codex), K2 and K6 (A) as soon as K1 is in, then K3, K4,
+K5 and K7 (Codex) on K2's branch. ACT-03's plan (the composer's
+permitted moves, `repeat: forbidden` after an objection) is the item
+after; K2 takes the moves as a parameter with a default so ACT-03 plugs
+in without reopening the composer.
+
 ## Session B, lane 16: ACT-02's training half (2026-09-14)
 
 `backend/scripts/train/turn-signal-heads.ts` and its tests, per
