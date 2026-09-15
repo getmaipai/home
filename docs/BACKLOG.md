@@ -528,10 +528,20 @@ not permission to expand scope.
     routing and reference resolution, the carried reference's decay,
     the last succeeded lookup as a stack source, a manifest's
     `routing.answers` entity kinds, and a short turn on a live subject
-    read as a comment. Open: the typed world subject from a bare
-    proper noun with a kind noun ("the new Marsh Lantern film" as
-    `world:film`), which `subject-before-pattern` waits on, and the
-    judgment half (the claim-type decision before generation).
+    read as a comment. The typed world subject landed 2026-09-15
+    (447e763: "the new Marsh Lantern film" and "the film Marsh Lantern"
+    put a world subject of kind film on the stack with its recency
+    from the determiner phrase; `subject-before-pattern` is live
+    again). The judgment half landed as a first slice (d622648,
+    09fb919): a follow-up question asking for an exact field about the
+    current world subject ("how many tracks" after the album turn) is
+    decided a lookup from the signal and the subject, and the engine
+    runs the typed source and the search itself, both paths. Open: the
+    full rule (a question that names its subject, "when is the new
+    Marsh Lantern album out"), which collides with eleven LOOKUP-01 and
+    LOOKUP-02 mechanism tests that seed a model draft on exactly those
+    questions; a design call with the test rewrites, Session A's on
+    Saturday.
 
     Depends on: CHAT-10, CHAT-12, CHAT-15. Files:
     `backend/src/lib/turnEngine.ts`, `routing.ts`, `turnContext.ts`,
@@ -2473,6 +2483,14 @@ invented for the roster's household, and added to
 <a id="cur-01"></a>
 
 - [ ] **CUR-01: The memory curator** (S-M, after MEM-06)
+
+    Progress 2026-09-15 (on the next stack): a record past its own
+    `valid_to` is archived with `expired_at`, provenance intact, a bare
+    date ending at the end of its day, a pin never keeping it alive
+    (9f7c625); an exact re-assertion never writes a second record, a
+    state is extended to the later end date, anything else counts a
+    use, neither embedded nor sent to the model (1fdc85d). The rest
+    below stays open.
 
     Objective: the store stays clean and honest without inventing
     anything. Files: `backend/src/lib/memoryJudge.ts`
