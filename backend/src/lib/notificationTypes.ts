@@ -75,6 +75,20 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app", "telegram"],
     toast: true,
   },
+  // The owner's decision on 2026-09-14: on by default, with no switch per
+  // child or per household. The body never carries the child's words, the
+  // topic, the reply or a transcript link; the record keeps the child id,
+  // the turn id for dedupe, the policy version and the coarse result, never
+  // the safety result.
+  {
+    id: "child.worrying_conversation",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "{childName} had a conversation that seemed to weigh on them. A check-in may help.",
+    configurable: false,
+    defaultChannels: ["in_app", "telegram"],
+    toast: true,
+  },
   {
     id: "model.download_ready",
     level: "time_sensitive",

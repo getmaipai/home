@@ -35,6 +35,8 @@ Owners and admins can view (never edit) what a child or teen has talked about, a
 - On the **Conversations** page, use the person picker at the top. Switch to their conversations.
 - On the **Memory** page, do the same. You'll see what's been remembered for them. You can forget anything you'd rather MaiPai not keep.
 
+If a child's conversation seems to weigh on them, you get a note with their name only, never what was said, and you cannot turn it off. The child is told that MaiPai may mention it to a grown-up.
+
 ## Still need help?
 
 If someone can't sign in, or you don't see the account options you expect, see [Fix a problem](fix-a-problem.md).

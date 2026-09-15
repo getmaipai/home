@@ -1,6 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import { getNotificationType, registerPackageNotificationTypes } from "@/lib/notificationTypes";
 
+test("child.worrying_conversation is an adult-only, non-configurable notice with one safe template slot", () => {
+  const type = getNotificationType("child.worrying_conversation");
+  expect(type).toBeDefined();
+  expect(type?.level).toBe("time_sensitive");
+  expect(type?.audience).toBe("adults");
+  expect(type?.configurable).toBe(false);
+  expect(type?.defaultChannels).toEqual(["in_app", "telegram"]);
+  expect(type?.toast).toBe(true);
+  const rendered = type!.template.replace("{childName}", "Bramble");
+  expect(rendered).toBe("Bramble had a conversation that seemed to weigh on them. A check-in may help.");
+  expect(rendered).not.toContain("{");
+});
+
 describe("registerPackageNotificationTypes", () => {
   test("a package's declared type becomes real and dispatchable", () => {
     registerPackageNotificationTypes({
