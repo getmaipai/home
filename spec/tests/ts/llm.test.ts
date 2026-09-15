@@ -6,6 +6,7 @@ import { describe, expect, test, afterEach } from "bun:test";
 import { LlamaServerClient, LlmClientError, engineLabel } from "../../llm/ts/client.js";
 import { startStubLlmServer, type StubLlmServerHandle } from "../../llm/ts/stubServer.js";
 import type { ChatCompletionRequest } from "../../llm/ts/types.js";
+import type { ToolCallWire } from "../../llm/ts/types.js";
 
 let handle: StubLlmServerHandle | undefined;
 
@@ -70,6 +71,39 @@ describe("LlamaServerClient against the stub server", () => {
     await expect(
       client.chatComplete({ model: "chat", messages: undefined as unknown as [] }),
     ).rejects.toThrow(LlmClientError);
+  });
+
+  test("chatComplete sends native tool results after the assistant tool call", async () => {
+    handle = startStubLlmServer();
+    const client = new LlamaServerClient(handle.url);
+    const call: ToolCallWire = { id: "call-1", type: "function", function: { name: "weather", arguments: "{}" } };
+    await client.chatComplete({ model: "chat", messages: [
+      { role: "assistant", content: "", tool_calls: [call] },
+      { role: "tool", tool_call_id: "call-1", content: "sunny" },
+    ] });
+    expect(handle.requests()[0]?.messages).toEqual([
+      { role: "assistant", content: "", tool_calls: [call] },
+      { role: "tool", tool_call_id: "call-1", content: "sunny" },
+    ]);
+  });
+
+  test("chatComplete refuses malformed native tool results before any request", async () => {
+    handle = startStubLlmServer();
+    const client = new LlamaServerClient(handle.url);
+    await expect(client.chatComplete({ model: "chat", messages: [{ role: "tool", content: "sunny" }] })).rejects.toThrow("a tool message needs tool_call_id");
+    await expect(client.chatComplete({ model: "chat", messages: [{ role: "tool", tool_call_id: "missing", content: "sunny" }] })).rejects.toThrow("tool message missing answers no preceding assistant tool call");
+    expect(handle.requests()).toHaveLength(0);
+  });
+
+  test("chatCompleteStream accepts native tool results", async () => {
+    handle = startStubLlmServer();
+    const client = new LlamaServerClient(handle.url);
+    const call: ToolCallWire = { id: "call-stream", type: "function", function: { name: "weather", arguments: "{}" } };
+    for await (const _delta of client.chatCompleteStream({ model: "chat", messages: [
+      { role: "assistant", content: "", tool_calls: [call] },
+      { role: "tool", tool_call_id: "call-stream", content: "sunny" },
+    ] })) { /* drain */ }
+    expect(handle.requests()[0]?.messages[1]).toEqual({ role: "tool", tool_call_id: "call-stream", content: "sunny" });
   });
 
   test("chatComplete throws LlmClientError when the server is unreachable", async () => {
