@@ -26,6 +26,20 @@ import { nextHlc } from "@/lib/hlc";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
+
+/** AGE-02(b): the child-band conversation floor. Subjects may carry the
+ * roster role as ephemeral metadata supplied by turnEngine.ts. */
+export function worryingConversation(signal: TurnSignal, subjects: readonly (SubjectRef & { role?: string; utterance?: string })[], safety: Pick<SafetyResult, "notify_parent">): boolean {
+  if (safety.notify_parent) return true;
+  if (signal.age_band !== "child") return false;
+  const cue = /\b(?:fighting|always fighting|shouting|yelling at|hurt me|hurts me|hit me|hits me|scared of|afraid of|bullied|bullying|bully|picks on me|pick on me|don't want to go home|hate going home|not eating|haven't eaten|don't eat|always alone|alone all the time|nobody's home|no one is home)\b/i;
+  if (cue.test(subjects.map((s) => s.utterance ?? (s.type === "unresolved" ? s.surface_form : "")).join(" "))) return true;
+  const aimedAtPerson = signal.target === "other" && ["moderate", "high"].includes(signal.emotion_intensity) && ["sadness", "fear", "anger"].includes(signal.expressed_emotion);
+  if (!aimedAtPerson) return false;
+  return subjects.some((subject) => (subject.type === "unresolved" && subject.provenance !== "roster") || ["owner", "admin", "adult"].includes(subject.role ?? ""));
+}
+
 
 export function effectiveBand(surface: Surface, actor: PersonRow, speakerEvidence: SpeakerEvidence | null | undefined, now: Date): { band: AgeBand; basis: "identified_profile" | "unknown_speaker_default" } {
   const unknownRobot = surface === "robot" && (!speakerEvidence || speakerEvidence.level === "unknown" || speakerEvidence.person !== actor.id);

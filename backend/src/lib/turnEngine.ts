@@ -18,7 +18,7 @@ import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin, safeFailureM
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, commandOpenersFrom, type UtteranceShape } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
-import { notifyIfFlagged } from "@/lib/notifications";
+import { notifyIfFlagged, trigger } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameById, registryNamesFor, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { deleteEntity } from "@/lib/entities";
@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -2622,6 +2622,11 @@ async function prepareTurn(
   if (replyConstraint) { setReplyConstraint({ conversationId: conversation.id, person: actor.id, ...replyConstraint, setByTurn: turnId }); console.log(`[turn] constraint: ${replyConstraint.kind} ${replyConstraint.value}`); }
   const subjectsStart = performance.now();
   const { subjects, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
+  const worrySubjects = [...subjects, ...household.map((person) => ({ type: "unresolved" as const, surface_form: person.displayName, candidate_kinds: ["person" as const], provenance: "roster", confidence: 1, carried_question: null, role: person.role, utterance: text }))];
+  if (worryingConversation(signal, worrySubjects, safety) && !safety.notify_parent && turnId && !notifiedThisTurn.has(`${turnId}:worrying`)) {
+    notifiedThisTurn.add(`${turnId}:worrying`);
+    void trigger("child.worrying_conversation", { childName: actor.displayName }, { subjectPersonId: actor.id, subjectTurnId: turnId }).catch((err: unknown) => console.error(`[turn] child.worrying_conversation notification failed: ${(err as Error).message}`));
+  }
   timings.subjects_ms = Math.round(performance.now() - subjectsStart);
   let literalYielded: LiteralYield | null = null;
   // ALM-01 (chunk B): derived date/time questions are deterministic rule
@@ -4149,6 +4154,9 @@ async function runTurnHoldingLease(
   }
 
   const trace: ReplyTrace = { hits: guardHits, replaced: guardReplaced };
+  if (prepared.turnId && notifiedThisTurn.has(`${prepared.turnId}:worrying`) && !/\b(?:grown-up|adult|mom|dad|parent)\b/i.test(value.reply.text)) {
+    value = { ...value, reply: { ...value.reply, text: `${value.reply.text.trimEnd()} I might mention to a grown-up that you seemed sad.` } };
+  }
   // ASK-01: the engine's question about an unknown name, or the
   // person's open question, at the end of the reply.
   const ask = prepared.kind === "model" && value.source === "model" ? appendedAsk(prepared, actor, conversation.id, value.reply.text, text, false) : NO_ASK;

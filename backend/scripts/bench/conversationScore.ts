@@ -337,6 +337,7 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     const hit = observed.deliveries.includes(e.delivered.notification);
     checks.push({ name: "delivered", pass: hit, detail: hit ? `${e.delivered.notification} delivered` : `${e.delivered.notification} not delivered within ${e.delivered.withinMs} ms (pending: ${observed.deliveries.join(", ") || "none"})` });
   }
+  if (e.notificationExists) checks.push({ name: "notification exists", pass: observed.deliveries.includes(e.notificationExists), detail: observed.deliveries.includes(e.notificationExists) ? `${e.notificationExists} exists` : `${e.notificationExists} not delivered` });
   if (e.subject) checks.push({ name: "subject", pass: observed.subject !== null && observed.subject.toLowerCase() === e.subject.toLowerCase(), detail: observed.subject ? `resolved to ${observed.subject}` : "no subject recorded on the turn" });
   if (e.maxWords || e.minWords) {
     const words = reply.trim() ? reply.trim().split(/\s+/).length : 0;

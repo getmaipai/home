@@ -613,7 +613,8 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     // promise row sees its own job pending, then the scheduler's own
     // delivery of it.
     const jobs = since(jobsBefore, jobsNow(actor));
-    const deliveries = turn.expect.delivered ? await observeDelivery(actor, turn.expect.delivered.notification, turn.expect.delivered.withinMs, tick, deliveriesBefore) : [];
+    const deliveryExpectation = turn.expect.delivered ?? (turn.expect.notificationExists ? { notification: turn.expect.notificationExists, withinMs: 12_000 } : undefined);
+    const deliveries = deliveryExpectation ? await observeDelivery(actor, deliveryExpectation.notification, deliveryExpectation.withinMs, tick, deliveriesBefore) : [];
     // The turn's own completions: the interrupted one is the first
     // (a summary refresh may follow it on the same proxy).
     const own = requests[0];
