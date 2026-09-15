@@ -55,6 +55,7 @@ import {
   resolveSupersedes,
   lastTurnSubjects,
   lastTwoTurnsSubjects,
+  lastTurnIds,
   nextOpenQuestionFor,
   pendingOpenQuestionsFor,
   markOpenQuestionAsked,
@@ -2163,15 +2164,54 @@ function resolveTurnSubjects(input: {
       return !onOlder || lowerText.includes(sf);
     });
   }
+  // CHAT-13 chunk C2: the subject stack's sources, in order - the
+  // utterance's own, the last succeeded outside lookup on the last two
+  // turns (a world subject), and the carry - the lookup supersedes a
+  // carried unresolved reference, and the stack is at most three deep
+  // (dev.md section 16 part 5, rules 1 and 4; finding 30).
+   let lookupSubject: SubjectRef | null = null;
+   const lookupPackages = new Set(["media-lookup", "knowledge", "websearch"]);
+   const recentIds = new Set(lastTurnIds(conversationId, 2));
+   const hubNameSet = new Set(hubNames.map((h) => h.name.toLowerCase()));
+   for (const row of [...outcomesForConversation(conversationId, 10)].reverse()) {
+     if (!recentIds.has(row.turnId)) continue;
+     for (const o of row.outcomes) {
+       if (o.status !== "succeeded" || !lookupPackages.has(o.packageId)) continue;
+       const replyText = o.result?.reply?.text ?? "";
+       const resultProperNouns = replyText ? properNounsIn(replyText, knownForHub, { properOnly: true }) : [];
+       if (resultProperNouns.some((n) => hubNameSet.has(n.name.toLowerCase()))) continue;
+       const arg = (Object.values(o.args ?? {}) as unknown[]).find((v): v is string => typeof v === "string" && v.trim().length > 0)?.trim();
+       if (arg) {
+         lookupSubject = {
+           type: "world",
+           kind: o.packageId === "media-lookup" ? "film" : "topic",
+           display_name: arg,
+           year: null,
+           stable_key: null,
+           recency: "unknown",
+           source_kind: o.packageId === "websearch" ? "web" : o.packageId === "knowledge" ? "wikipedia" : "package",
+           carried_question: null,
+         };
+         break;
+       }
+     }
+     if (lookupSubject) break;
+   }
+   if (lookupSubject) {
+     const lookupName = lookupSubject!.display_name.toLowerCase();
+     const dup = [...resolved.subjects, ...carried].some((s) => s.type === "world" && (s as { type: "world"; display_name: string }).display_name.toLowerCase() === lookupName);
+     if (dup) lookupSubject = null;
+   }
+  if (lookupSubject) carried = carried.filter((s) => s.type !== "unresolved");
   // One entry per household entity (a name and its alias both resolve
   // to the one row; LOOKUP-02's set showed the dishwasher twice).
   const seenEntities = new Set<string>();
-  const subjects: SubjectRef[] = [...resolved.subjects, ...carried].filter((s) => {
+  const subjects: SubjectRef[] = [...resolved.subjects, ...(lookupSubject ? [lookupSubject] : []), ...carried].filter((s) => {
     if (s.type !== "household") return true;
     if (seenEntities.has(s.entity_id)) return false;
     seenEntities.add(s.entity_id);
     return true;
-  });
+  }).slice(0, 3);
   const unknownAsk = resolved.unknown.find((u) => u.ask)?.name ?? null;
   const subjectPronouns = subjectPronounsFor(actor, subjects, resolved.unknown);
   const { section: subjectsSection, about: aboutEntries } = subjectsSectionFor(actor, subjects);

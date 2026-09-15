@@ -330,6 +330,17 @@ export function lastTurnSubjects(conversationId: string): SubjectRef[] {
  * newest first, for the carried-unresolved decay (dev.md section 16
  * part 5 rule 4): a carried `unresolved` entry drops when it appears on
  * both stacks and the utterance does not re-mention it. */
+export function lastTurnIds(conversationId: string, n = 2): string[] {
+  const rows = db
+    .select({ id: conversationTurns.id })
+    .from(conversationTurns)
+    .where(eq(conversationTurns.conversationId, conversationId))
+    .orderBy(desc(conversationTurns.createdAt))
+    .limit(n)
+    .all();
+  return rows.map((row) => row.id);
+}
+
 export function lastTwoTurnsSubjects(conversationId: string): SubjectRef[][] {
   const rows = db
     .select({ subjects: conversationTurns.subjects })

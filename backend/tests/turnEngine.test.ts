@@ -48,6 +48,7 @@ import type { PersonRow } from "@/types";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import type { ToolExecutionOutcome } from "@/lib/turnContext";
 
 // A PersonRow with no DB row behind it, for the buildSystemPrompt() unit
 // tests below that only need a shaped actor to render the speaker block,
@@ -4932,6 +4933,131 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     });
   });
 });
+
+describe("CHAT-13 chunk C2: the last succeeded lookup is a stack source", () => {
+  const retained = (turnId: string) => {
+    const row = db.select({ outcomes: conversationTurns.outcomes }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    return row?.outcomes ? (JSON.parse(row.outcomes) as { packageId: string; status: string; via?: string; args?: Record<string, unknown> }[]) : null;
+  };
+
+  const SEARCH_ANSWER = "It's out on September 22, with twelve tracks.";
+  async function withLookupStub<T>(opts: { draft: string | ((request: ChatCompletionRequest) => string); forcedCall?: boolean; searxng?: boolean }, fn: (seen: { forced: number; queries: string[] }) => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const seen = { forced: 0, queries: [] as string[] };
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => {
+        if (request.tool_choice !== "required") return undefined;
+        seen.forced++;
+        return opts.forcedCall === false ? undefined : [{ id: "call-lookup", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "when the new album is out" }) } }];
+      },
+      scriptedChatReply: (request) => {
+        if (request.messages.some((m) => typeof m.content === "string" && m.content.includes("BEGIN SEARCH RESULTS"))) return SEARCH_ANSWER;
+        return typeof opts.draft === "function" ? opts.draft(request) : opts.draft;
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    const searxng =
+      opts.searxng === false
+        ? null
+        : Bun.serve({
+            port: 0,
+            fetch: (req) => {
+              seen.queries.push(new URL(req.url).searchParams.get("q") ?? "");
+              return Response.json({ results: [{ title: "The new album", url: "https://example.com/album", content: "Out on September 22 with twelve tracks." }] });
+            },
+          });
+    if (searxng) setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
+    try {
+      return await fn(seen);
+    } finally {
+      stub.stop();
+      searxng?.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+
+  const SAFE: SafetyResult = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-01-01T00:00:00.000Z" };
+  const LOOKUP_OUTCOME: ToolExecutionOutcome[] = [
+    { callId: "call-lookup", packageId: "websearch", status: "succeeded", via: "forced", args: { expression: "new Marsh Lantern album out" } },
+  ];
+
+  test("a succeeded websearch on the previous turn is a world subject on the next turn", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds good.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const { logTurn } = await import("@/lib/conversationHistory");
+      logTurn(actor, "chat", "when is the new Marsh Lantern album out", {
+        reply: { text: "It's out on September 22." },
+        source: "model",
+        safety: SAFE,
+        conversation_id: conv.value.id,
+        turn_id: "turn-lookup",
+      }, { outcomes: LOOKUP_OUTCOME });
+      const second = await runTurn(actor, "chat", "sounds good", { conversationId: conv.value.id });
+      expect(second.ok).toBe(true);
+      if (!second.ok) return;
+      expect(subjectsOfTurn(second.value.turn_id)).toEqual([{ type: "world", kind: "topic", display_name: "new Marsh Lantern album out", year: null, stable_key: null, recency: "unknown", source_kind: "web", carried_question: null }]);
+    });
+  });
+
+  test("the lookup subject supersedes a carried unresolved reference", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds good.", async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const { logTurn } = await import("@/lib/conversationHistory");
+      logTurn(actor, "chat", "Clover borrowed our tent for the weekend", {
+        reply: { text: "Sounds like a fun weekend." },
+        source: "model",
+        safety: SAFE,
+        conversation_id: conv.value.id,
+        turn_id: "turn-clover",
+      }, { subjects: [{ type: "unresolved", surface_form: "Clover", candidate_kinds: [], provenance: "turn-clover", confidence: 0.8, carried_question: null }] });
+      logTurn(actor, "chat", "when is the new Marsh Lantern album out", {
+        reply: { text: "It's out on September 22." },
+        source: "model",
+        safety: SAFE,
+        conversation_id: conv.value.id,
+        turn_id: "turn-lookup",
+      }, { outcomes: LOOKUP_OUTCOME });
+      const third = await runTurn(actor, "chat", "sounds good", { conversationId: conv.value.id });
+      expect(third.ok).toBe(true);
+      if (!third.ok) return;
+      expect(subjectsOfTurn(third.value.turn_id)).toEqual([{ type: "world", kind: "topic", display_name: "new Marsh Lantern album out", year: null, stable_key: null, recency: "unknown", source_kind: "web", carried_question: null }]);
+    });
+  });
+
+      test("a succeeded lookup older than two turns is not a stack source", async () => {
+        const { actor } = await owner();
+        await withLookupStub({ draft: "The date is September 22." }, async () => {
+          const conv = resolveOrCreateConversation(actor, "chat");
+          if (!conv.ok) throw new Error(conv.error);
+          await runTurn(actor, "chat", "when is the new album out", { conversationId: conv.value.id });
+          await runTurn(actor, "chat", "the weather looks fine", { conversationId: conv.value.id });
+          await runTurn(actor, "chat", "nothing else to say", { conversationId: conv.value.id });
+          const fourth = await runTurn(actor, "chat", "sounds good", { conversationId: conv.value.id });
+          expect(fourth.ok).toBe(true);
+          if (!fourth.ok) return;
+          expect(subjectsOfTurn(fourth.value.turn_id)).toEqual([]);
+        });
+      });
+
+      test("a failed lookup is not a stack source", async () => {
+        const { actor } = await owner();
+        await withLookupStub({ draft: "The date is September 22.", searxng: false }, async () => {
+          const conv = resolveOrCreateConversation(actor, "chat");
+          if (!conv.ok) throw new Error(conv.error);
+          await runTurn(actor, "chat", "when is the new album out", { conversationId: conv.value.id });
+          const second = await runTurn(actor, "chat", "sounds good", { conversationId: conv.value.id });
+          expect(second.ok).toBe(true);
+          if (!second.ok) return;
+          expect(subjectsOfTurn(second.value.turn_id)).toEqual([]);
+        });
+      });
+  });
 
 describe("CHAT-13 chunk C1: a carried unresolved reference decays after two turns", () => {
   test("an unresolved ref carried from the previous turn drops on the next turn when the utterance does not re-mention it", async () => {
