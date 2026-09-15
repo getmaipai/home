@@ -15,6 +15,7 @@ export interface StubLlmServerHandle {
   url: string;
   stop: () => void;
   aborted: () => number;
+  requests: () => ChatCompletionRequest[];
 }
 
 const STUB_PREFIX = "[stub model: no real model loaded, this is a canned reply]";
@@ -216,6 +217,7 @@ export interface StubLlmServerOptions {
 export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): StubLlmServerHandle {
   let abortedRequests = 0;
   let activeRequests = 0;
+  const requests: ChatCompletionRequest[] = [];
   const server = Bun.serve({
     port,
     fetch: async (req) => {
@@ -234,6 +236,7 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
         if (!body || !Array.isArray(body.messages)) {
           return Response.json({ error: "messages is required" }, { status: 400 });
         }
+        requests.push(body);
         const toolCalls = opts.scriptedToolCalls?.(body);
         if (toolCalls && toolCalls.length > 0) {
           if (body.stream) {
@@ -281,5 +284,6 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
     url: `http://127.0.0.1:${server.port}`,
     stop: () => { if (activeRequests > 0) abortedRequests += activeRequests; server.stop(true); },
     aborted: () => abortedRequests,
+    requests: () => requests,
   };
 }
