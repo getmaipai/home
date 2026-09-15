@@ -3,7 +3,7 @@
 // own rules; tests/turnEngine.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
-import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, exactFieldOf, lookupDecision, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 
 // ACT-01: the intent and the guards' shape read the frozen signal; the
@@ -11,6 +11,27 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 // bundled command openers a test needs.
 const openers = new Set(["set", "explain", "give", "walk", "tell"]);
 const signalFor = (text: string) => classifyTurnSignal({ text, commandOpeners: openers, ageBand: "adult" });
+
+test("exactFieldOf(): recognizes exact lookup fields and leaves stable questions alone", () => {
+  expect(exactFieldOf("what's it called")).toBe("name");
+  expect(exactFieldOf("how many tracks")).toBe("count");
+  expect(exactFieldOf("when is it out")).toBe("date");
+  expect(exactFieldOf("what's the price")).toBe("price");
+  expect(exactFieldOf("who's in it")).toBe("cast");
+  expect(exactFieldOf("what resolution is it")).toBe("spec");
+  expect(exactFieldOf("what's the policy")).toBe("policy");
+  expect(exactFieldOf("why is the sky blue")).toBeNull();
+  expect(exactFieldOf("what does irony mean")).toBeNull();
+  expect(exactFieldOf("how do I reset it")).toBeNull();
+});
+
+test("lookupDecision(): uses a current world subject, rejects dated subjects, and honors currency", () => {
+  expect(lookupDecision("when is it out", [{ type: "world", kind: "album", display_name: "Marsh Lantern", year: null, source_kind: "web", stable_key: null, recency: "current", carried_question: null }], [])).toEqual({ field: "date", query: "Marsh Lantern release date" });
+  expect(lookupDecision("when is it out", [{ type: "world", kind: "album", display_name: "Marsh Lantern", year: 2020, source_kind: "web", stable_key: null, recency: "dated", carried_question: null }], [])).toBeNull();
+  const current = lookupDecision("what's the newest Rivet phone", [], [])?.query ?? "";
+  expect(current).toContain("newest");
+  expect(current).toContain("Rivet phone");
+});
 
 test("sourcesFromRows(): keeps eight safe web sources and normalizes URLs", () => {
   const rows = Array.from({ length: 9 }, (_, i) => ({ title: `Result ${i}`, url: `https://example.com/${i}` }));

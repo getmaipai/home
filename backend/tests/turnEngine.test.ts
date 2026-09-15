@@ -4938,6 +4938,19 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     }
   }
 
+  test("a plain exact-field question forces lookup before generation", async () => {
+    const { client } = await owner();
+    await withLookupStub({ draft: "I should check that first.", twoSources: true }, async (seen) => {
+      await client.post("/api/turn", { text: "the new Marsh Lantern album drops soon" });
+      const before = seen.forced;
+      const res = await client.post("/api/turn", { text: "how many tracks" });
+      expect(res.status).toBe(200);
+      expect(seen.forced - before).toBe(1);
+      expect(seen.queries.some((q) => /marsh lantern/i.test(q) && /tracks/i.test(q))).toBe(true);
+      expect(((await res.json()) as { sources?: unknown[] }).sources?.length).toBeGreaterThan(0);
+    });
+  });
+
   test("lookupShapeOf(): promises, offers, and the phrases that are neither", async () => {
     const { lookupShapeOf } = await import("@/lib/guards");
     for (const promise of ["Let me check that for you.", "I'll look it up.", "I'll look that up for you right now.", "Let me find out.", "Give me a second while I check.", "I'm going to search for that.", "Hold on, let me see what I can find.", "Let me see if I can find that.", "I'll check the weather for you."]) {

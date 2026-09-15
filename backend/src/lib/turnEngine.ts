@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, lookupDecision, CURRENCY_MARK_RE, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -1711,7 +1711,6 @@ function stripLead(text: string): string {
   return out;
 }
 const LOOKUP_FIELD_FILLER_RE = /\b(?:it|its|it's|that|this|them|they|they're|their|there|for you|for me|you|me|we|us|our|your|is|are|was|were|be|being|been|do|does|did|can|could|would|should|will|get|got|of|to|the|a|an|and|or|so|then|now|just|please|too|also|really|actually|currently|right now|these days|at the moment)\b/gi;
-const CURRENCY_MARK_RE = /\b(?:new|newest|latest|current|currently|today|tonight|tomorrow|this (?:year|week|month|season|weekend)|still|yet|upcoming|out yet|come out|came out|released?)\b/i;
 const NOT_A_QUESTION_TURN_RE = /^(?:(?:that'?s|this is) (?:twice|three times|the (?:second|third) time)|you (?:already|just) said|you said that|stop|enough|no|yes|ok(?:ay)?|sure|thanks|thank you|go on|do it|just do it|well|hmm|uh|um)\b/i;
 // A question whose only subject is a pronoun ("when did it happen",
 // "how long is it", "who was in it").
@@ -2882,6 +2881,14 @@ async function prepareTurn(
     subjectsCarried: carried.length > 0,
     subjectPronouns,
   };
+  if (shapeOf(signal, text) === "question" && !householdSubjectTurn(text, turnContext)) {
+    const decided = lookupDecision(text, subjects, turnContext.roster);
+    const namesSubject = subjects.some((s) => s.type === "world" || s.type === "unresolved") && subjects.some((s) => {
+      const name = s.type === "world" ? s.display_name : s.type === "unresolved" ? s.surface_form : "";
+      return name.length > 0 && new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").test(text);
+    });
+    if (decided && !namesSubject && subjects.some((s) => s.type === "world" || s.type === "unresolved")) turnContext.intent.decided = decided;
+  }
   const deliverable = turnContext.intent.deliverable;
   const backReference = deliverable === "link" && /^(?:\s*(?:where did you read that|link me|the source|send me the page)(?:\s*(?:,|and)\s*(?:where did you read that|link me|the source|send me the page))?\s*[?.!]?)$/i.test(text);
   if (backReference) {
@@ -3821,6 +3828,8 @@ async function runTurnHoldingLease(
   let guardReplaced = false;
   if (prepared.kind === "immediate") {
     value = prepared.value;
+  } else if (prepared.turnContext.intent.decided) {
+    value = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, prepared.turnContext.intent.decided.query) ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
   } else if (prepared.turnContext.intent.deliverable) {
     const deliverable = prepared.turnContext.intent.deliverable;
     const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverable, prepared.turnContext.subjects, text));

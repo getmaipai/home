@@ -146,6 +146,35 @@ export interface TurnIntent {
    * "step by step" (CHAT-12 reads it for the output reserve). */
   explicitDetailedAnswer: boolean;
   deliverable?: "link" | "picture" | "video";
+  decided?: { field: string; query: string };
+}
+
+export const CURRENCY_MARK_RE = /\b(?:new|newest|latest|current|currently|today|tonight|tomorrow|this (?:year|week|month|season|weekend)|still|yet|upcoming|out yet|come out|came out|released?)\b/i;
+
+const FIELD_STOP_RE = /\b(?:what(?:'s| is)?|which|how|many|much|long|old|when|where|who(?:'s| is)?|is|are|was|were|does|do|did|can|could|would|will|should|it|its|this|that|the|a|an|in|on|of|to|for|out|yet|please|me|you|they|them|he|she)\b/gi;
+export function exactFieldOf(utterance: string): string | null {
+  if (/\b(?:what(?:'s| is)? the )?name(?: of)?\b|\bwhat(?:'s| is) it called\b|\bwho (?:plays|directed)\b|^\s*what(?:'s| is)\s+(?:the\s+)?(?:newest|latest|current)\b/i.test(utterance)) return "name";
+  if (/\bwho (?:is|was)\s+[A-Z][\w'-]*/.test(utterance)) return "who";
+  if (/\bhow much does\b|\bprice\b|\bcost\b/i.test(utterance)) return "price";
+  if (/\bhow many\b|\bhow much\b|\bhow long\b|\bpopulation\b|\bhow old\b/i.test(utterance)) return "count";
+  if (/\bwhen\b|\bwhat year\b|\bwhat day\b|\bwhat date\b|\brelease date\b|\bout yet\b/i.test(utterance)) return "date";
+  if (/\bwho(?:'s| is) in\b|\bcast\b/i.test(utterance)) return "cast";
+  if (/\bhow big\b|\bhow fast\b|\bwhat size\b|\bwhat resolution\b|\bspecs?\b/i.test(utterance)) return "spec";
+  if (/\bwhat(?:'s| is) the policy\b|\bis it allowed\b|\bdo they allow\b/i.test(utterance)) return "policy";
+  return null;
+}
+
+export function lookupDecision(utterance: string, subjects: readonly SubjectRef[], roster: readonly string[]): { field: string; query: string } | null {
+  const field = exactFieldOf(utterance);
+  if (!field) return null;
+  const subject = subjects.find((s) => (s.type === "world" && s.recency !== "dated") || (s.type === "unresolved" && (s.confidence === 0.4 || s.candidate_kinds.includes("organization"))));
+  const currency = utterance.match(CURRENCY_MARK_RE)?.[0];
+  if (!subject && !currency) return null;
+  const name = subject ? subject.type === "world" ? subject.display_name : subject.type === "unresolved" ? subject.surface_form : "" : "";
+  const words = utterance.replace(CURRENCY_MARK_RE, " ").replace(name ? new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu") : /$^/, " ").replace(FIELD_STOP_RE, " ").replace(/[^\p{L}\p{N}' -]/gu, " ").replace(/\s+/g, " ").trim();
+  const fieldWords = field === "date" && /\bout\b/i.test(utterance) ? "release date" : words || field;
+  const query = [name, fieldWords, currency].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  return query ? { field, query } : null;
 }
 
 export interface FrozenPersona {
