@@ -24,14 +24,18 @@ _ureg = UnitRegistry()
 # miles to km" normalized to "(50/100)*2 miles to km" converts instead of
 # raising; anything else keeps the existing error. The expression is
 # evaluated with simple_eval, the same restricted evaluator the plain
-# arithmetic path below already uses - no bare `eval`. pint's own string
-# parser (`Quantity(str)`) refuses the split value+unit form anyway, and
-# refuses it ambiguously for offset units like fahrenheit/celsius
-# (`OffsetUnitCalculusError`), so the value and unit are parsed apart here
-# and passed to `Quantity(value, unit)` instead, which every unit (offset
-# or not) accepts.
+# arithmetic path below already uses - no bare `eval`. The numeric half
+# also accepts scientific notation ("1e3", "2.5E-2") in addition to the
+# plain arithmetic expression - mathjs's own expression grammar
+# (compute.ts's side) already does on any number literal, and a code
+# review (2026-09-06) caught this regex silently rejecting it as "not a
+# recognized quantity" instead of converting. The unit may follow the
+# number with no space ("2miles"), since the expression character class
+# cannot swallow the unit's first letter.
 _CONVERT_RE = re.compile(r"^(.+?)\s+to\s+([a-zA-Z][a-zA-Z_ ]*)$")
-_QUANTITY_RE = re.compile(r"^([0-9.() \t+-/*]+)\s+([a-zA-Z][a-zA-Z_ ]*)$")
+_QUANTITY_RE = re.compile(
+    r"^(?:([0-9.() \t+*/-]+)([eE][+-]?[0-9]+)?)(?:\s*)([a-zA-Z][a-zA-Z_ ]*)$"
+)
 
 # 6 significant digits, matching compute.ts's own DISPLAY_PRECISION -
 # unit conversion routinely produces a long repeating decimal
@@ -135,8 +139,12 @@ def evaluate_expression(raw_expression: str) -> str:
         # bare number - evaluate it with simple_eval, the same restricted
         # evaluator the plain arithmetic path below already uses (never a
         # bare `eval`), and hand pint the resulting number.
+        # Reassemble the numeric expression: the base and the optional
+        # exponent (e.g. "1" + "e3" -> "1e3") so simple_eval sees the
+        # full scientific-notation literal.
+        numeric = quantity_match.group(1) + (quantity_match.group(2) or "")
         try:
-            value = simple_eval(quantity_match.group(1))
+            value = simple_eval(numeric)
         except Exception as err:  # simpleeval raises several distinct error types; all mean "not a valid expression"
             raise ComputeError(
                 f'"{expression}" failed to evaluate: not a valid quantity expression'
@@ -145,7 +153,7 @@ def evaluate_expression(raw_expression: str) -> str:
             raise ComputeError(
                 f'"{expression}" failed to evaluate: not a valid quantity expression'
             )
-        unit = quantity_match.group(2).strip()
+        unit = quantity_match.group(3).strip()
         try:
             converted = _ureg.Quantity(float(value), unit).to(target_unit)
         except Exception as err:  # pint raises several distinct error types; all mean "not a valid conversion"

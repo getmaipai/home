@@ -77,6 +77,20 @@ def test_evaluate_expression_quantity_with_a_letter_still_raises() -> None:
         evaluate_expression("x miles to km")
 
 
+def test_evaluate_expression_quantity_with_scientific_notation() -> None:
+    assert evaluate_expression("1e3 m to km") == "1 km"
+    assert evaluate_expression("2.5E-2 km to m") == "25 m"
+
+
+def test_evaluate_expression_quantity_with_no_space_before_unit() -> None:
+    assert evaluate_expression("2miles to km").startswith("3.21")
+
+
+def test_evaluate_expression_quantity_with_comma_raises() -> None:
+    with pytest.raises(ComputeError):
+        evaluate_expression("1,000 m to km")
+
+
 def test_evaluate_expression_raises_for_a_malformed_expression() -> None:
     with pytest.raises(ComputeError):
         evaluate_expression("12 times")
