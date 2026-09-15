@@ -821,6 +821,21 @@ describe("the judge drops its own prompt's examples, placeholders and credential
   });
 });
 
+describe("MEM-06: a fact is grounded in the speaker's words", () => {
+  test("a fact the speaker did not ground is dropped as ungrounded, in every form", async () => {
+    const { rejectUngrounded, turnDateFor } = await import("@/lib/memoryJudge");
+    const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
+    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
+    expect(rejectUngrounded([fact("Sage was in Ohio visiting his parents")], "Sage", date, "we drove out to see my parents in Ohio").kept.length).toBe(1);
+    expect(rejectUngrounded([fact("Sage's wedding is in October 2026")], "Sage", date, "our wedding is in October").kept.length).toBe(1);
+    expect(rejectUngrounded([fact("Sage's favourite film is Marsh Lantern")], "Sage", date, "I liked the film").dropped.length).toBe(1);
+    expect(rejectUngrounded([fact("Sage's favourite film is Marsh Lantern")], "Sage", date, "I liked the film").dropped[0]!.reason).toBe("ungrounded");
+    expect(rejectUngrounded([fact("Sage owes 400 dollars")], "Sage", date, "I owe some money").dropped.length).toBe(1);
+    expect(rejectUngrounded([fact("Sage likes tea")], "Sage", date, "").dropped.length).toBe(1);
+    expect(rejectUngrounded([fact("Sage's favourite film is Marsh Lantern")], "Sage", date, "yes, the film", "So Marsh Lantern is your favourite film?").kept.length).toBe(1);
+  });
+});
+
 describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
   // The real construction path: logTurn() with the signal prepareTurn()
   // computes and the status judgeStatusAtInsert() decides, for any

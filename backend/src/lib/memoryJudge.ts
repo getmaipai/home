@@ -490,6 +490,48 @@ export function rejectPromptEchoes(
   return { kept, dropped };
 }
 
+/** MEM-06 (a): the judge grounds every fact in the speaker's words - a
+ * fact the model built from the hub's reply, a lookup result or a guess
+ * is dropped as ungrounded. Against the speaker's words (the user's
+ * text, plus the assistant's line when they confirmed it), a fact stands
+ * when at least one of its content words (after the same skip set as
+ * the echo filter: the speaker's name, the date words, pronouns,
+ * calendar words) appears in them, and every proper noun (a capitalized
+ * word not at a sentence start and not the speaker's name) and every
+ * number in it appears too. A fact with no content words at all is
+ * ungrounded. Each drop is counted on the same log line as the echo
+ * drops. */
+export function rejectUngrounded(
+  facts: ExtractedFact[],
+  speakerName: string,
+  turnDate: string,
+  userText: string,
+  confirmedAssistantText?: string | null,
+): { kept: ExtractedFact[]; dropped: { fact: ExtractedFact; reason: "ungrounded" }[] } {
+  const skip = new Set([...contentWords(speakerName), ...contentWords(turnDate), ...PRONOUNS, ...CALENDAR]);
+  const said = contentWords(confirmedAssistantText ? `${userText}\n${confirmedAssistantText}` : userText);
+  const kept: ExtractedFact[] = [];
+  const dropped: { fact: ExtractedFact; reason: "ungrounded" }[] = [];
+  for (const fact of facts) {
+    const words = contentWords(fact.text);
+    const content = [...words].filter((w) => !skip.has(w));
+    const grounded =
+      content.length > 0 &&
+      content.some((w) => said.has(w)) &&
+      [...fact.text.matchAll(/\b[A-Z][a-z]+\b/g)].every((m) => {
+        const w = contentWords(m[0]!);
+        return w.size === 1 && (skip.has([...w][0]!) || said.has([...w][0]!));
+      }) &&
+      [...fact.text.matchAll(/\d+/g)].every((m) => skip.has(m[0]!) || said.has(m[0]!));
+    if (!grounded) {
+      dropped.push({ fact, reason: "ungrounded" });
+      continue;
+    }
+    kept.push(fact);
+  }
+  return { kept, dropped };
+}
+
 /** Phase 1: one grammar-constrained chat call, or null on any failure
  * (network, malformed JSON, an empty/non-object response) - null is what
  * counts against the poison guard; an empty array is a real, valid
@@ -797,9 +839,13 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     return { ok: false, factsWritten: 0 };
   }
   // The output-side rejection: the prompt's own examples, an unfilled
-  // placeholder, a credential. Counted per drop, so a run's log says
-  // how often the model echoed its instructions instead of the turn.
-  const { kept: facts, dropped } = rejectPromptEchoes(extracted, speakerName, turnDateFor(turn.createdAt), `${turn.userText}\n${turn.replyText}`);
+  // placeholder, a credential, and anything not grounded in the speaker's
+  // words (MEM-06 (a); the confirmed assistant line is passed by a later
+  // chunk). Counted per drop, so a run's log says how often the model
+  // echoed its instructions or wrote what the person never said.
+  const { kept: echoed, dropped: echoDropped } = rejectPromptEchoes(extracted, speakerName, turnDateFor(turn.createdAt), `${turn.userText}\n${turn.replyText}`);
+  const { kept: facts, dropped: ungroundedDropped } = rejectUngrounded(echoed, speakerName, turnDateFor(turn.createdAt), turn.userText, null);
+  const dropped = [...echoDropped, ...ungroundedDropped];
   if (dropped.length > 0) {
     const counts: Record<string, number> = {};
     for (const d of dropped) counts[d.reason] = (counts[d.reason] ?? 0) + 1;
