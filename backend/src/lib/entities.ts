@@ -4,12 +4,13 @@
 // cannot carry the cross-field rules (place_kind, account_person_id,
 // parent_id, scope/person), so every write goes through here rather than
 // straight through Drizzle.
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
-import { entities, people } from "@/db/schema";
+import { entities, people, relationships } from "@/db/schema";
 import { newEntityId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { validateEntity } from "@maipai/spec/records/ts/validate.js";
+import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
 import { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Entity as EntityT } from "@maipai/spec/gen/ts/entity.js";
 
@@ -229,10 +230,28 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
   return { ok: true, status: 200, value: candidate.data };
 }
 
+// #110: a deleted entity's edges must not survive it; the frontend's
+// "someone no longer known" fallback stays as belt and braces.
 export function deleteEntity(actor: { id: string; role: string }, id: string): OpResult<{ id: string }> {
   const existing = getEntity(actor, id);
   if (!existing.ok) return { ok: false, status: existing.status, error: existing.error };
   const now = new Date().toISOString();
-  db.update(entities).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(entities.id, id)).run();
+  db.transaction(() => {
+    db.update(entities).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(entities.id, id)).run();
+    // Soft-delete every live relationship whose from_id or to_id is this
+    // entity, twin rows included. Only rows not already soft-deleted are
+    // touched, so an earlier deletedAt is preserved.
+    const rows = db.select().from(relationships).where(and(or(eq(relationships.fromId, id), eq(relationships.toId, id)), isNull(relationships.deletedAt))).all();
+    for (const row of rows) {
+      db.update(relationships).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(relationships.id, row.id)).run();
+      // Soft-delete the stored inverse (same pair, opposite direction,
+      // opposite type, same scope) if it exists and is still live.
+      const type = relationshipTypes().find((t) => t.id === row.type);
+      if (type && !type.symmetric && type.inverse) {
+        const inverse = db.select().from(relationships).where(and(eq(relationships.fromId, row.toId), eq(relationships.toId, row.fromId), eq(relationships.type, type.inverse), eq(relationships.scope, row.scope), isNull(relationships.deletedAt))).all().find((r) => row.scope === "household" || r.person === row.person);
+        if (inverse) db.update(relationships).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(relationships.id, inverse.id)).run();
+      }
+    }
+  });
   return { ok: true, status: 200, value: { id } };
 }
