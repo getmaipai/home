@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -3682,7 +3682,8 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
 async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: PersonRow, conversationId: string, text: string, read: Pick<LookupRead, "shape" | "sentence">, thinking: boolean | undefined, queryOverride?: string): Promise<TurnValue | null> {
   const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
   const history = prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content);
-  const expression = queryOverride ?? lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape });
+  const denialDeliverable = read.shape === "denial" ? (prepared.turnContext.intent.deliverable ?? deliverableInDenial(read.sentence)) : undefined;
+  const expression = queryOverride ?? (denialDeliverable ? deliverableQuery(denialDeliverable, prepared.turnContext.subjects, text) : lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape }));
   const outcomes = prepared.turnContext.outcomes;
   const forced = await complete("chat", prepared.messages, { thinking, tools: prepared.lookupTools, tool_choice: "required" });
   let resolved =
@@ -3703,7 +3704,7 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
     if (result.ok) resolved = { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sourcesFromRows(result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined).length ? { sources: sourcesFromRows((result.value.data as { rows?: unknown }).rows) } : {}) };
   }
   if (resolved) prepared.lookupExpression = expression;
-  return resolved;
+  return resolved && denialDeliverable ? composeDeliverable(resolved, denialDeliverable, prepared.turnContext.ageBand) : resolved;
 }
 
 function composeDeliverable(

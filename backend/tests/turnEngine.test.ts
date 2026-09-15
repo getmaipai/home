@@ -28,6 +28,7 @@ import {
   confirmPromptFor,
   type TurnStreamResult,
 } from "@/lib/turnEngine";
+import { deliverableInDenial } from "@/lib/turnContext";
 import { __embedCallCountForTests, __resetEmbedCallCountForTests } from "@/lib/routing";
 import { streamTurnEvents } from "@/routes/turn";
 import { guardReply } from "@/lib/guards";
@@ -4871,11 +4872,31 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     return row?.outcomes ? (JSON.parse(row.outcomes) as { packageId: string; status: string; via?: string; args?: Record<string, unknown> }[]) : null;
   };
 
+  test("deliverableInDenial identifies the requested kind and defaults to a link", () => {
+    expect(deliverableInDenial("I can't show pictures here.")).toBe("picture");
+    expect(deliverableInDenial("I can't play that video clip.")).toBe("video");
+    expect(deliverableInDenial("I can't access that page.")).toBe("link");
+    expect(deliverableInDenial("I can't do that.")).toBe("link");
+  });
+
+  test("a denied deliverable uses the deliverable lookup path and composer", async () => {
+    const { client } = await owner();
+    await client.post("/api/turn", { text: "what's the maker's support page for the Cosmo 7 card" });
+    await withLookupStub({ draft: "I can't directly access URLs, but I can help you find the page by name.", forcedCall: false, twoSources: true }, async (seen) => {
+      const res = await client.post("/api/turn", { text: "what's the address of that page" });
+      expect(res.status).toBe(200);
+      const value = (await res.json()) as { reply: { text: string }; sources?: unknown[] };
+      expect(seen.queries.some((q) => /page/i.test(q) && /cosmo 7/i.test(q))).toBe(true);
+      expect(value.reply.text).toBe("Here's the page, the link's below.");
+      expect(value.sources?.length).toBe(2);
+    });
+  });
+
   /** A stub whose plain reply is `draft`, whose forced lookup (tool_choice
    * "required") calls websearch when `forcedCall` is set, and whose
    * llm_complete step (the websearch recipe's summary) answers
    * SEARCH_ANSWER; a fake SearXNG behind the real websearch recipe. */
-  async function withLookupStub<T>(opts: { draft: string | ((request: ChatCompletionRequest) => string); forcedCall?: boolean; searxng?: boolean }, fn: (seen: { forced: number; queries: string[] }) => Promise<T>): Promise<T> {
+  async function withLookupStub<T>(opts: { draft: string | ((request: ChatCompletionRequest) => string); forcedCall?: boolean; searxng?: boolean; twoSources?: boolean }, fn: (seen: { forced: number; queries: string[] }) => Promise<T>): Promise<T> {
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const seen = { forced: 0, queries: [] as string[] };
@@ -4898,7 +4919,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
             port: 0,
             fetch: (req) => {
               seen.queries.push(new URL(req.url).searchParams.get("q") ?? "");
-              return Response.json({ results: [{ title: "The new album", url: "https://example.com/album", content: "Out on September 22 with twelve tracks." }] });
+              return Response.json({ results: [{ title: "The new album", url: "https://example.com/album", content: "Out on September 22 with twelve tracks." }, ...(opts.twoSources ? [{ title: "The official album page", url: "https://example.com/official", content: "Official details." }] : [])] });
             },
           });
     if (searxng) setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);

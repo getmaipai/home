@@ -242,6 +242,12 @@ export function deliverableQuery(deliverable: "link" | "picture" | "video", subj
   return `${base}${deliverable === "link" ? /\bsupport\b/i.test(utterance) ? " support page" : " official page" : deliverable === "picture" ? " photos" : " video"}`.trim();
 }
 
+export function deliverableInDenial(sentence: string): "link" | "picture" | "video" {
+  if (/\b(?:picture|photo|image)s?\b/i.test(sentence)) return "picture";
+  if (/\b(?:video|clip)s?\b/i.test(sentence)) return "video";
+  return "link";
+}
+
 export function intentFor(utterance: string, signal: TurnSignal): TurnIntent {
   const shape = shapeOf(signal, utterance);
   const deliverable = VIDEO_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "video" : PICTURE_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "picture" : LINK_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "link" : undefined;

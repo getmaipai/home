@@ -1113,6 +1113,16 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     ],
   },
   {
+    id: "false-capability-cut",
+    category: "knowledge",
+    note: "CHAT-16 part 4 rule 4: a denial of a deliverable is cut and the deliverable path runs with the deliverable query",
+    turns: [
+      { say: "what's the maker's support page for the Cosmo 7 card", expect: { signal: { primary_act: "question" }, lookupWithSource: true, sourcesNonEmpty: true, humanVerdict: true } },
+      { say: "what's the address of that page", seedReply: "I can't directly access URLs, but I can help you find the page by name.", expect: { signal: { primary_act: "question" }, outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*(support|official) page|page.*cosmo 7" } }, sourcesNonEmpty: true, mustNotContain: "can't (directly )?access|find the page by name|http", mustContain: "below|link", humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
     id: "offer-binds-the-question",
     category: "knowledge",
     note: "LOOKUP-02 (finding 37): a pending lookup binds the offered question, never the turn: the search runs on the card and 'used' or 'price', never the previous utterance verbatim",
