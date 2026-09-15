@@ -28,7 +28,8 @@
     "type": "object",
     "required": ["expression"],
     "properties": {
-      "expression": { "type": "string", "minLength": 1 }
+      "expression": { "type": "string", "minLength": 1 },
+      "category": { "type": "string", "enum": ["images"] }
     }
   },
   "requires": [],
@@ -43,7 +44,7 @@
       "id": "searxng",
       "destination": "the household's own SearXNG instance (search.searxng_url)",
       "when": "the household searches the web",
-      "what": "the search query, nothing else",
+      "what": "the search query, nothing else; an image search is the same query to the same instance, with the images category",
       "who": "whichever search engines the household's own SearXNG instance is configured to use",
       "opt_in": true,
       "retention": "controlled entirely by the household's own SearXNG instance"

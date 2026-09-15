@@ -1,6 +1,7 @@
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 
 export type TurnWithSources = { sources?: Source[] };
+export type TurnWithMedia = { media?: { kind: "image"; url: string; thumbnail: string | null; source: string } };
 
 const MARKER_RE = /\[(\d+)\]/g;
 // A fenced block (```…```) or an inline span (`…`) - split()'s own

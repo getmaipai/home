@@ -358,6 +358,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   // so a live reply carries sources the moment CHAT-16
                   // emits them with no adapter change needed then.
                   sources: (event.value as TurnWithSources).sources,
+                  media: event.value.media,
                 },
               },
             };

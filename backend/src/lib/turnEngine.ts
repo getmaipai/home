@@ -3769,7 +3769,7 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
   const searched = outcomes.some((o) => o.packageId === "websearch" && o.via === "forced");
   if (!resolved && lookupIds.has("websearch") && !searched && expression) {
     console.log(`[turn] the forced lookup's first rung answered nothing on turn ${prepared.turnId}; the search runs next`);
-    const result = await runPlugin("websearch", actor, { expression }, prepared.turnId);
+    const result = await runPlugin("websearch", actor, { expression, ...(denialDeliverable === "picture" ? { category: "images" } : {}) }, prepared.turnId);
     outcomes.push(
       outcomeOf(
         result.ok
@@ -3777,9 +3777,15 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
           : { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "failed", args: { expression }, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
       ),
     );
-    if (result.ok) resolved = { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sourcesFromRows(result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined).length ? { sources: sourcesFromRows((result.value.data as { rows?: unknown }).rows) } : {}) };
+    if (result.ok) { const rows = result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined; const sources = sourcesFromRows(rows); const first = Array.isArray(rows) ? rows.find((row) => row && typeof row === "object" && typeof (row as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null } | undefined : undefined; resolved = { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}), ...(first && denialDeliverable === "picture" ? { media: { kind: "image" as const, url: first.image, thumbnail: first.thumbnail ?? null, source: new URL(sources[0]!.url).host } } : {}) }; }
   }
   if (resolved) prepared.lookupExpression = expression;
+  if (resolved && denialDeliverable === "picture" && !resolved.media) {
+    const outcome = [...outcomes].reverse().find((item) => item.packageId === "websearch" && item.status === "succeeded");
+    const rows = outcome?.result?.data && typeof outcome.result.data === "object" ? (outcome.result.data as { rows?: unknown }).rows : undefined;
+    const row = Array.isArray(rows) ? rows.find((item) => item && typeof item === "object" && typeof (item as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null } | undefined : undefined;
+    if (row && resolved.sources?.[0]) resolved = { ...resolved, media: { kind: "image", url: row.image, thumbnail: row.thumbnail ?? null, source: new URL(resolved.sources[0].url).host } };
+  }
   return resolved && denialDeliverable ? composeDeliverable(resolved, denialDeliverable, prepared.turnContext.ageBand, prepared.surface) : resolved;
 }
 
@@ -3790,8 +3796,8 @@ function composeDeliverable(
   surface: Surface,
 ): TurnValue {
   const child = ageBand === "child";
-  const line = child ? "A grown-up can open that for you; ask them." : surface === "robot" ? deliverable === "link" ? "The link's on your phone." : deliverable === "picture" ? "The page with the picture is on your phone." : "The video link's on your phone." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
-  return { ...resolved, reply: { text: line }, ...(child ? { sources: [] } : {}) };
+  const line = child ? "A grown-up can open that for you; ask them." : surface === "robot" ? deliverable === "link" ? "The link's on your phone." : deliverable === "picture" ? "The page with the picture is on your phone." : "The video link's on your phone." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? resolved.media ? "Here's a picture; the page it's from is below." : "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
+  return { ...resolved, reply: { text: line }, ...(child ? { sources: [], media: undefined } : {}) };
 }
 
 function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface = "chat", trace?: ReplyTrace): TurnValue {

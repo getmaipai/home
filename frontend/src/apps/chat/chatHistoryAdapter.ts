@@ -76,6 +76,7 @@ export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], 
           pluginId: row.pluginId,
           commandId: row.commandId,
           sources: row.sources,
+          media: row.media,
         },
       },
     };

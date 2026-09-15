@@ -2,7 +2,7 @@
   "id": "websearch",
   "inputs": [{ "name": "expression", "selector": "text" }],
   "steps": [
-    { "op": "integration.call", "as": "search_results", "id": "searxng", "method": "search", "args": { "query": "{expression}" } },
+    { "op": "integration.call", "as": "search_results", "id": "searxng", "method": "search", "args": { "query": "{expression}", "category": "{category}" } },
     { "op": "pick", "as": "search_text", "from": "search_results", "path": "text" },
     { "op": "pick", "as": "search_rows", "from": "search_results", "path": "rows" },
     {

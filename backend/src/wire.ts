@@ -75,6 +75,8 @@ export interface TurnValue {
   routing?: { tier: "pattern" | "embedding" | "keyword" | "tool"; score: number };
   /** CHAT-16 part 4 rule 1: lookup sources carried additively on the wire. */
   sources?: Source[];
+  /** CHAT-16 K7: the first inline picture result from the household search. */
+  media?: { kind: "image"; url: string; thumbnail: string | null; source: string };
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
@@ -97,7 +99,7 @@ export interface ConversationSummary {
 /** GET /api/conversations/:id/turns' per-turn shape (step 3's contract):
  * the turn plus which memory records trace their provenance to it -
  * empty until the judge (step 6) or an in-turn `remember` writes one. */
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources"> & { sources?: Source[]; memory_ids: string[] };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media"> & { sources?: Source[]; media?: TurnValue["media"]; memory_ids: string[] };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

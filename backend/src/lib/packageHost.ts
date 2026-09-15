@@ -615,13 +615,15 @@ export function formatSearxngResults(data: unknown, count = 5): string {
  * (a real API answering plain text is not a fetch failure); and Wikipedia
  * answers a direct-topic query via `infoboxes`, not `results` (see
  * `formatSearxngResults`). */
-export async function searxngSearch(args: unknown): Promise<{ text: string; rows: { title: string; url: string; snippet: string | null }[] }> {
-  const query = (args as { query?: unknown } | undefined)?.query;
+export async function searxngSearch(args: unknown): Promise<{ text: string; rows: { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null }[] }> {
+  const input = args as { query?: unknown; category?: unknown } | undefined;
+  const query = input?.query;
   if (typeof query !== "string" || query.length === 0) {
     throw new HostError("invalid_input", `searxng search needs a string "query" argument`);
   }
   const { baseUrl } = requireSearxngSettings();
-  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json`;
+  const category = input?.category === "images" ? "&categories=images" : "";
+  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}`;
   // No retry, unlike getHomeAssistantState's own GET - a code review
   // (2026-09-06) found the retry doubled this call's own worst case to
   // ~20s (SEARXNG_TIMEOUT_MS twice plus the retry delay) on top of
@@ -639,9 +641,9 @@ export async function searxngSearch(args: unknown): Promise<{ text: string; rows
       "check the SearXNG URL in Settings (a URL that redirects to a login page, or an instance with JSON output disabled, both look like this)",
     );
     const rows = Array.isArray(value.results) ? value.results.slice(0, 8).flatMap((raw: unknown) => {
-      const row = raw as { title?: unknown; url?: unknown; content?: unknown };
+      const row = raw as { title?: unknown; url?: unknown; content?: unknown; img_src?: unknown; thumbnail_src?: unknown };
       if (typeof row.title !== "string" || typeof row.url !== "string") return [];
-      try { const parsed = new URL(row.url); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return []; parsed.username = ""; parsed.password = ""; parsed.hash = ""; return [{ title: row.title, url: parsed.toString(), snippet: typeof row.content === "string" ? row.content : null }]; } catch { return []; }
+      try { const parsed = new URL(row.url); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return []; parsed.username = ""; parsed.password = ""; parsed.hash = ""; const safeUrl = (value: unknown) => { if (typeof value !== "string") return null; try { const parsed = new URL(value); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null; parsed.username = ""; parsed.password = ""; parsed.hash = ""; return parsed.toString(); } catch { return null; } }; return [{ title: row.title, url: parsed.toString(), snippet: typeof row.content === "string" ? row.content : null, ...(input?.category === "images" ? { image: safeUrl(row.img_src), thumbnail: safeUrl(row.thumbnail_src) } : {}) }]; } catch { return []; }
     }) : [];
     return { text: formatSearxngResults(value), rows };
   }

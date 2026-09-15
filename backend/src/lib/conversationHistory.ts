@@ -250,6 +250,7 @@ export function logTurn(
     // package call.
     outcomes: opts.outcomes && opts.outcomes.length > 0 ? JSON.stringify(opts.outcomes.map(outcomeForRow)) : null,
     sources: value.sources ? JSON.stringify(value.sources) : null,
+    media: value.media ? JSON.stringify(value.media) : null,
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
     // row (CHAT-03) they are approximate, and a `policy` turn is skipped
@@ -890,7 +891,7 @@ export function listConversationTurns(
 
   const byTurn = memoryIdsByTurn(rows.map((r) => r.id));
 
-  return { ok: true, value: rows.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, memory_ids: byTurn.get(r.id) ?? [] })) };
+  return { ok: true, value: rows.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, memory_ids: byTurn.get(r.id) ?? [] })) };
 }
 
 /** PATCH /api/conversations/:id: title only (step 3's contract). Same
@@ -1323,7 +1324,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const capped = rows.slice(0, LIST_CAP);
   const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
-  return capped.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, memory_ids: byTurn.get(r.id) ?? [] }));
+  return capped.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, memory_ids: byTurn.get(r.id) ?? [] }));
 }
 
 /** The full per-person archive (4.14: "export per person is one
