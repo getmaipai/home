@@ -1584,3 +1584,157 @@ describe("recall's relevance floors (#93)", () => {
     expect(EPISODIC_MIN_COSINE).toBeLessThan(MEASURED_NULL_FLOOR.weakestSignal);
   });
 });
+
+describe("AGE-01 (b): household record reads by the actor's age band", () => {
+  async function setup() {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const child = (await owner.post("/api/people", { displayName: "Bramble", role: "child" }).then((r) => r.json())) as { id: string };
+    const teen = (await owner.post("/api/people", { displayName: "Fern", role: "teen" }).then((r) => r.json())) as { id: string };
+    const childRow = db.select().from(people).where(eq(people.displayName, "Bramble")).get()!;
+    const teenRow = db.select().from(people).where(eq(people.displayName, "Fern")).get()!;
+    const ownerRow = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    return { ownerRow, childRow, teenRow, childId: child.id, teenId: teen.id };
+  }
+
+  test("a child reads a household record whose child_disclosure is child_ok", async () => {
+    const { ownerRow, childRow } = await setup();
+    const created = remember(ownerRow, {
+      text: "we got a puppy",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      child_disclosure: "child_ok",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const matches = recall(childRow, "puppy", { bumpUsage: false });
+    expect(matches.some((m) => m.record.text.includes("puppy"))).toBe(true);
+  });
+
+  test("a child does NOT read a household record whose child_disclosure is teen_ok", async () => {
+    const { ownerRow, childRow } = await setup();
+    const created = remember(ownerRow, {
+      text: "the teen's study schedule",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      child_disclosure: "teen_ok",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const matches = recall(childRow, "study schedule", { bumpUsage: false });
+    expect(matches.some((m) => m.record.text.includes("study schedule"))).toBe(false);
+  });
+
+  test("a child does NOT read a household record whose child_disclosure is adult_only", async () => {
+    const { ownerRow, childRow } = await setup();
+    const created = remember(ownerRow, {
+      text: "the household bank details",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      child_disclosure: "adult_only",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const matches = recall(childRow, "bank details", { bumpUsage: false });
+    expect(matches.some((m) => m.record.text.includes("bank details"))).toBe(false);
+  });
+
+  test("a teen reads a household record whose child_disclosure is child_ok", async () => {
+    const { ownerRow, teenRow } = await setup();
+    const created = remember(ownerRow, {
+      text: "we got a puppy",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      child_disclosure: "child_ok",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const matches = recall(teenRow, "puppy", { bumpUsage: false });
+    expect(matches.some((m) => m.record.text.includes("puppy"))).toBe(true);
+  });
+
+  test("a teen reads a household record whose child_disclosure is teen_ok", async () => {
+    const { ownerRow, teenRow } = await setup();
+    const created = remember(ownerRow, {
+      text: "the teen's study schedule",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      child_disclosure: "teen_ok",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const matches = recall(teenRow, "study schedule", { bumpUsage: false });
+    expect(matches.some((m) => m.record.text.includes("study schedule"))).toBe(true);
+  });
+
+  test("a teen does NOT read a household record whose child_disclosure is adult_only", async () => {
+    const { ownerRow, teenRow } = await setup();
+    const created = remember(ownerRow, {
+      text: "the household bank details",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      child_disclosure: "adult_only",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const matches = recall(teenRow, "bank details", { bumpUsage: false });
+    expect(matches.some((m) => m.record.text.includes("bank details"))).toBe(false);
+  });
+
+  test("an adult reads a household record regardless of child_disclosure", async () => {
+    const { ownerRow, childRow } = await setup();
+    for (const disclosure of ["child_ok", "teen_ok", "adult_only"] as const) {
+      const created = remember(ownerRow, {
+        text: `a fact with disclosure ${disclosure}`,
+        category: "fact",
+        tier: "durable",
+        scope: "household",
+        source: "test",
+        importance: 0.5,
+        child_disclosure: disclosure,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      const matches = recall(ownerRow, `disclosure ${disclosure}`, { bumpUsage: false });
+      expect(matches.some((m) => m.record.text.includes(disclosure))).toBe(true);
+    }
+  });
+
+  test("a sensitive household record is still owner/admin only, even for a child", async () => {
+    const { ownerRow, childRow } = await setup();
+    const created = remember(ownerRow, {
+      text: "the sensitive household fact",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      sensitive: true,
+      child_disclosure: "child_ok",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const childMatches = recall(childRow, "sensitive household fact", { bumpUsage: false });
+    expect(childMatches.some((m) => m.record.text.includes("sensitive"))).toBe(false);
+    const ownerMatches = recall(ownerRow, "sensitive household fact", { bumpUsage: false });
+    expect(ownerMatches.some((m) => m.record.text.includes("sensitive"))).toBe(true);
+  });
+});

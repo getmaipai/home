@@ -15,6 +15,7 @@ import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people, conversatio
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { toMemoryRecord } from "@/lib/memoryShape";
 import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { tokenize } from "@/lib/text";
 import { embed } from "@/lib/llm";
 import { getEmbedBackendKind } from "@/lib/embedSupervisor";
@@ -42,6 +43,9 @@ export type MemoryOpResult<T> =
 // parental view (list()/recall() called with no selfOnly, the real
 // "list route's parental view", unchanged) is the only sanctioned way
 // to read someone else's person-scope memories.
+// AGE-01 (b): a child or a teen reads a household record by its audience.
+// The "teen exception" - an adult writing a key whose audience is set to
+// child so the teen never sees it - is NOT built.
 function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>, selfOnly = false, withholdSensitive = false): boolean {
   if (withholdSensitive && record.sensitive) return false;
   if (record.scope === "self") return false;
@@ -51,8 +55,11 @@ function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, 
     return canAccessPerson(actor, record.person, roleOf);
   }
   // household
-  if (!record.sensitive) return true;
-  return isOwnerOrAdmin(actor);
+  if (record.sensitive) return isOwnerOrAdmin(actor);
+  const band = speakerAgeBand(actor, new Date());
+  if (band === "child") return record.childDisclosure === "child_ok";
+  if (band === "teen") return record.childDisclosure === "child_ok" || record.childDisclosure === "teen_ok";
+  return true;
 }
 
 function assertCanWrite(
