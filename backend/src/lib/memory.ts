@@ -841,6 +841,36 @@ export function archive(actor: PersonRow, id: string): MemoryOpResult<MemoryReco
   return { ok: true, value: toMemoryRecord(updated) };
 }
 
+/** AGE-01 (c): an adult chooses who may hear a household memory. The
+ * setter and the time are recorded on the record itself, not just the
+ * value, so a later adult can see who tightened or loosened it. */
+export function setChildDisclosure(
+  actor: PersonRow,
+  id: string,
+  value: "child_ok" | "teen_ok" | "adult_only",
+): MemoryOpResult<MemoryRecord> {
+  const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get();
+  if (!row) return { ok: false, status: 404, error: "memory record not found" };
+  if (row.scope !== "household" || row.status === "deleted") {
+    return { ok: false, status: 400, error: "audience applies to household records only" };
+  }
+  if (speakerAgeBand(actor, new Date()) !== "adult") {
+    return { ok: false, status: 403, error: "only an adult can change who may hear this" };
+  }
+  const now = new Date().toISOString();
+  db.update(memoryRecords)
+    .set({
+      childDisclosure: value,
+      childDisclosureSetBy: actor.id,
+      childDisclosureSetAt: now,
+      hlc: nextHlc(),
+    })
+    .where(eq(memoryRecords.id, id))
+    .run();
+  const updated = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+  return { ok: true, value: toMemoryRecord(updated) };
+}
+
 /** #88: the system retiring what it wrote. When a turn is edited and
  * resent (conversation_turns.supersedes), every active record whose
  * provenance is the replaced turn is archived, the same status

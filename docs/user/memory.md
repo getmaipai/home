@@ -31,6 +31,10 @@ Tap **Export**. This downloads everything MaiPai remembers about you. Keep the f
 
 Owners and admins can switch to another household member. Use the person picker at the top of the page. You'll see their memories the same way. You can view or forget entries there too. This helps you manage what MaiPai keeps about a child.
 
+## Who may hear a household memory
+
+A household memory can be limited to some of the house. An adult can set **Who may hear this** on a memory to Everyone, Teens and adults, or Adults only. The choice, and who made it, are recorded on the memory itself. Children and teens see no control and cannot change it; the memory just isn't shown to them when it's set above their level.
+
 ## People and things
 
 MaiPai also keeps a list of who and what it knows about: people, pets, places, groups, and things, plus how they connect ("Sage's coworker Marsh," "Bramble's dog Rover"). Open **Memory**, then tap **People and things** at the top.

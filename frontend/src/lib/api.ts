@@ -527,6 +527,11 @@ export const api = {
     request<MemoryRecord[]>(`/api/memory/export?personId=${encodeURIComponent(personId)}`),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),
+  setAudience: (id: string, childDisclosure: "child_ok" | "teen_ok" | "adult_only") =>
+    request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/audience`, {
+      method: "POST",
+      body: JSON.stringify({ child_disclosure: childDisclosure }),
+    }),
   // POST /api/memory (backend/src/lib/memory.ts's remember(), already on
   // main) backs the chat "remember this" action (step 4). Its real input
   // type (RememberInput) lives in backend/src/wire.ts, a file Session A

@@ -44,6 +44,12 @@ function subtitleFor(m: MemoryRecord): string {
  * panel are each view's own (the copy - "your own"/a named child's -
  * and what "clear all" means for each differ), the same "kit owns the
  * bar, the page owns the wording" split BatchBar.tsx documents. */
+const AUDIENCE_LABELS: Record<"child_ok" | "teen_ok" | "adult_only", string> = {
+  child_ok: "Everyone",
+  teen_ok: "Teens and adults",
+  adult_only: "Adults only",
+};
+
 function MemoryRows({
   records,
   selectMode,
@@ -52,6 +58,9 @@ function MemoryRows({
   onArchive,
   archivingId,
   subtitle = subtitleFor,
+  actorIsAdult = false,
+  audienceId,
+  onSetAudience,
 }: {
   records: MemoryRecord[];
   selectMode: boolean;
@@ -65,6 +74,12 @@ function MemoryRows({
    * "person" there (a child's own memories), so it would be a redundant
    * word on every row, not new information. */
   subtitle?: (m: MemoryRecord) => string;
+  /** AGE-01 (c): an adult may set who hears a household memory; the
+   * control renders only on household-scope rows and only for an adult.
+   * A child or teen sees no control and cannot change it. */
+  actorIsAdult?: boolean;
+  audienceId?: string | null;
+  onSetAudience?: (id: string, value: "child_ok" | "teen_ok" | "adult_only") => void;
 }) {
   return (
     <List
@@ -91,15 +106,27 @@ function MemoryRows({
         selectMode
           ? undefined
           : (m) => (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Archive "${m.text}"`}
-                disabled={archivingId === m.id}
-                onClick={() => onArchive(m.id)}
-              >
-                <ArchiveIcon className="h-5 w-5" aria-hidden />
-              </Button>
+              <div className="flex shrink-0 items-center gap-1">
+                {actorIsAdult && m.scope === "household" && onSetAudience ? (
+                  <Select
+                    value={m.child_disclosure ?? "child_ok"}
+                    onValueChange={(v) => onSetAudience(m.id, v as "child_ok" | "teen_ok" | "adult_only")}
+                    options={["child_ok", "teen_ok", "adult_only"]}
+                    getLabel={(v) => AUDIENCE_LABELS[v as "child_ok" | "teen_ok" | "adult_only"]}
+                    disabled={audienceId === m.id}
+                    aria-label={`Who may hear this`}
+                  />
+                ) : null}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Archive "${m.text}"`}
+                  disabled={archivingId === m.id}
+                  onClick={() => onArchive(m.id)}
+                >
+                  <ArchiveIcon className="h-5 w-5" aria-hidden />
+                </Button>
+              </div>
             )
       }
     />
@@ -242,7 +269,7 @@ function OtherPersonMemories({ personId, personName }: { personId: string; perso
 // for; inventing one for a single page is exactly the kind of ahead-of-
 // need primitive docs/plans/session-b-ui.md step 5 says not to build).
 // The subtitle shows the raw scope value instead.
-function OwnMemories({ filterIds }: { filterIds: Set<string> | null }) {
+function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string> | null; actorIsAdult: boolean }) {
   const queryClient = useQueryClient();
   const query = useQuery<MemoryRecord[]>({
     queryKey: ["memory-list", ME],
@@ -256,6 +283,20 @@ function OwnMemories({ filterIds }: { filterIds: Set<string> | null }) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [audienceId, setAudienceId] = useState<string | null>(null);
+
+  async function handleSetAudience(id: string, value: "child_ok" | "teen_ok" | "adult_only") {
+    setAudienceId(id);
+    setActionError(null);
+    try {
+      await api.setAudience(id, value);
+      await queryClient.invalidateQueries({ queryKey: ["memory-list", ME] });
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not change who may hear that memory.");
+    } finally {
+      setAudienceId(null);
+    }
+  }
 
   function leaveSelectMode() {
     selectMode.exit();
@@ -362,6 +403,9 @@ function OwnMemories({ filterIds }: { filterIds: Set<string> | null }) {
             onToggle={selectMode.toggle}
             onArchive={handleArchive}
             archivingId={archivingId}
+            actorIsAdult={actorIsAdult}
+            audienceId={audienceId}
+            onSetAudience={handleSetAudience}
           />
         )}
       </AsyncState>
@@ -466,7 +510,7 @@ export function MemoryPage({ person }: MemoryPageProps) {
                     </Link>
                   </div>
                 ) : null}
-                <OwnMemories filterIds={filterIds} />
+                <OwnMemories filterIds={filterIds} actorIsAdult={person.role === "adult"} />
               </>
             )}
           </TabsContent>

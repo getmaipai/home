@@ -436,6 +436,67 @@ describe("MemoryPage", () => {
     });
   });
 
+  // AGE-01 (c): an adult chooses who may hear a household memory.
+  // A child sees no control and cannot change it.
+  function householdRecord(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
+    return record({ scope: "household", person: null, ...overrides });
+  }
+  describe("who may hear a household memory (audience control)", () => {
+    test("an adult sees the control on a household row and changing it calls the real route", async () => {
+      let audienceBody: unknown = null;
+      const original = globalThis.fetch;
+      globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.endsWith("/api/memory/mem1-abc123/audience") && init?.method === "POST") {
+          audienceBody = JSON.parse(init.body as string);
+          return Promise.resolve(new Response(JSON.stringify({ ...householdRecord(), child_disclosure: "adult_only" }), { status: 200 }));
+        }
+        if (url.endsWith("/api/memory")) {
+          return Promise.resolve(new Response(JSON.stringify([householdRecord()]), { status: 200 }));
+        }
+        throw new Error(`unstubbed fetch: ${url}`);
+      }) as unknown as typeof fetch;
+      try {
+        const { findByRole, findByText, queryByRole } = renderMemoryPage();
+        await findByText("Likes dinosaurs");
+        const control = await findByRole("combobox", { name: "Who may hear this" });
+        fireEvent.click(control);
+        fireEvent.click(await findByRole("option", { name: "Adults only" }));
+        await waitFor(() => expect(audienceBody).toEqual({ child_disclosure: "adult_only" }));
+        // The trigger shows the new label after the refetch lands.
+        expect(queryByRole("combobox", { name: "Who may hear this" })).toBeInTheDocument();
+      } finally {
+        globalThis.fetch = original;
+      }
+    });
+
+    test("a child sees no audience control and an adult-only memory still renders", async () => {
+      const restore = stubFetch({
+        "/api/memory": [householdRecord({ child_disclosure: "adult_only" })],
+      });
+      try {
+        const { findByText, queryByRole } = renderMemoryPage("/memory", defaultPerson({ role: "child" }));
+        await findByText("Likes dinosaurs");
+        expect(queryByRole("combobox", { name: "Who may hear this" })).toBeNull();
+      } finally {
+        restore();
+      }
+    });
+
+    test("a person-scope row never shows the audience control, even for an adult", async () => {
+      const restore = stubFetch({
+        "/api/memory": [record()], // scope=person
+      });
+      try {
+        const { findByText, queryByRole } = renderMemoryPage();
+        await findByText("Likes dinosaurs");
+        expect(queryByRole("combobox", { name: "Who may hear this" })).toBeNull();
+      } finally {
+        restore();
+      }
+    });
+  });
+
   // docs/UI.md: "the active tab lives in the URL" - a second code review
   // caught this section fully uncontrolled (a reload or a shared link
   // always landed on Memories regardless of what was open).

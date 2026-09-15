@@ -751,6 +751,91 @@ describe("supersede and archive", () => {
   });
 });
 
+describe("POST /api/memory/:id/audience (set child disclosure)", () => {
+  test("an adult sets the audience and the setter is recorded on the record", async () => {
+    const { owner } = await ownerAndChild();
+    const created = await owner.post("/api/memory", {
+      text: "a household fact with an audience to set",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    const original = (await created.json()) as MemoryRecord;
+    expect(original.child_disclosure).toBe("child_ok");
+
+    const res = await owner.post(`/api/memory/${original.id}/audience`, { child_disclosure: "adult_only" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MemoryRecord;
+    expect(body.child_disclosure).toBe("adult_only");
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, original.id)).get()!;
+    const ownerRow = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    expect(row.childDisclosureSetBy).toBe(ownerRow.id);
+    expect(body.child_disclosure_set_by).toBe(ownerRow.id);
+    expect(body.child_disclosure_set_at).not.toBeNull();
+  });
+
+  test("a child cannot change who may hear a household memory", async () => {
+    const { owner, childClient } = await ownerAndChild();
+    const created = await owner.post("/api/memory", {
+      text: "a household fact a child must not touch",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    const original = (await created.json()) as MemoryRecord;
+
+    const res = await childClient.post(`/api/memory/${original.id}/audience`, { child_disclosure: "child_ok" });
+    expect(res.status).toBe(403);
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, original.id)).get()!;
+    expect(row.childDisclosure).toBe("child_ok");
+  });
+
+  test("a person-scope record is refused with the exact scope error", async () => {
+    const { owner, childClient, childId } = await ownerAndChild();
+    const created = await childClient.post("/api/memory", {
+      text: "a person-scope fact",
+      category: "preference",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "test",
+      importance: 0.5,
+    });
+    const original = (await created.json()) as MemoryRecord;
+    void owner;
+
+    const res = await owner.post(`/api/memory/${original.id}/audience`, { child_disclosure: "adult_only" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("audience applies to household records only");
+  });
+
+  test("an invalid audience value is refused with 400", async () => {
+    const { owner } = await ownerAndChild();
+    const created = await owner.post("/api/memory", {
+      text: "a household fact with a bad audience",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    const original = (await created.json()) as MemoryRecord;
+
+    const res = await owner.post(`/api/memory/${original.id}/audience`, { child_disclosure: "nobody" });
+    expect(res.status).toBe(400);
+  });
+
+  test("an unknown record is refused with 404", async () => {
+    const { owner } = await ownerAndChild();
+    const res = await owner.post("/api/memory/nope-000000/audience", { child_disclosure: "adult_only" });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("forget and export", () => {
   // Step 10 (session-a-intelligence.md): forget() tombstones, it no
   // longer hard-deletes - a hard delete cannot be told apart from "never

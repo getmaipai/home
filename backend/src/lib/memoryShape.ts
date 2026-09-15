@@ -31,5 +31,8 @@ export function toMemoryRecord(row: MemoryRecordRow): MemoryRecord {
     embedding_space: row.embeddingSpace,
     hlc: row.hlc,
     deleted_at: row.deletedAt,
+    child_disclosure: row.childDisclosure ?? null,
+    child_disclosure_set_by: row.childDisclosureSetBy ?? null,
+    child_disclosure_set_at: row.childDisclosureSetAt ?? null,
   });
 }

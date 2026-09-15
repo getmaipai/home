@@ -11,6 +11,7 @@ import {
   forget,
   forgetByIds,
   exportPerson,
+  setChildDisclosure,
   runMaintenance,
   isPrivilegedRecordKind,
   type MemoryOpResult,
@@ -230,6 +231,24 @@ memoryRoutes.post("/maintenance/run", requireRole("owner", "admin"), async (c) =
 memoryRoutes.post("/:id/archive", requireAuth, async (c) => {
   const actor = c.get("person");
   const result = archive(actor, c.req.param("id"));
+  if (!result.ok) return fail(c, result);
+  return c.json(result.value);
+});
+
+const AudienceBodySchema = z.object({
+  child_disclosure: z.enum(["child_ok", "teen_ok", "adult_only"]),
+});
+
+// AGE-01 (c): an adult chooses who may hear a household memory. The
+// actor check (adult only, via speakerAgeBand in setChildDisclosure)
+// and the scope check (household only) both live in the store, same as
+// archive()'s own checks, so this route stays a thin pass-through.
+memoryRoutes.post("/:id/audience", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const rawBody = await c.req.json().catch(() => null);
+  const parsed = AudienceBodySchema.safeParse(rawBody);
+  if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
+  const result = setChildDisclosure(actor, c.req.param("id"), parsed.data.child_disclosure);
   if (!result.ok) return fail(c, result);
   return c.json(result.value);
 });
