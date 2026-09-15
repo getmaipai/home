@@ -2919,6 +2919,9 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "toast": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -2930,7 +2933,8 @@
                       "readAt",
                       "dismissedAt",
                       "subjectTurnId",
-                      "memoryIds"
+                      "memoryIds",
+                      "toast"
                     ]
                   }
                 }
@@ -3006,6 +3010,9 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "toast": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -3017,7 +3024,8 @@
                       "readAt",
                       "dismissedAt",
                       "subjectTurnId",
-                      "memoryIds"
+                      "memoryIds",
+                      "toast"
                     ]
                   }
                 }
@@ -3102,6 +3110,9 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "toast": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -3113,7 +3124,8 @@
                     "readAt",
                     "dismissedAt",
                     "subjectTurnId",
-                    "memoryIds"
+                    "memoryIds",
+                    "toast"
                   ]
                 }
               }

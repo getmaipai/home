@@ -15,6 +15,7 @@ const NotificationSchema = z.object({
   dismissedAt: z.string().nullable(),
   subjectTurnId: z.string().nullable(),
   memoryIds: z.array(z.string()).nullable(),
+  toast: z.boolean(),
 });
 
 const IdParamSchema = idParamSchema("id", "notif-a1b2c3");

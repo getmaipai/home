@@ -39,6 +39,14 @@ export interface NotificationType {
    * for a non-configurable type, the starting point for a configurable
    * one before per-person preferences narrow or widen it. */
   defaultChannels: readonly NotificationChannel[];
+  /** Whether the shell's NotificationBell fires a Toast when this type
+   * arrives (in addition to the badge and the pending list, which every
+   * type always gets). Declared once here, carried on the delivery view,
+   * and read by the frontend - a package-declared type (via its
+   * manifest) carries no `toast` field and is treated as `true`, since
+   * toasting is the least surprising default for a notification a
+   * package chose to fire at all. */
+  toast: boolean;
 }
 
 export type NotificationChannel = "in_app" | "telegram";
@@ -65,6 +73,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "{childName}'s conversation was flagged ({categories}) and may need your attention.",
     configurable: false,
     defaultChannels: ["in_app", "telegram"],
+    toast: true,
   },
   {
     id: "model.download_ready",
@@ -73,6 +82,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "{modelName} finished downloading and is ready to use.",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: true,
   },
   {
     id: "model.download_failed",
@@ -81,6 +91,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "{modelName} failed to download: {error}",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: true,
   },
   // Session F (platform and trust), step 1: the Health/Repairs surface.
   // Only `error`-severity issues fire this (lib/issues.ts's raiseIssue());
@@ -94,6 +105,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "{title}",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: true,
   },
   // The memory judge (step 6, session-a-intelligence.md: "one
   // memory.updated notification per run that wrote something"). `person`
@@ -113,6 +125,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "I remembered: {summary}",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: false,
   },
   // Step 7 (session-f-platform-and-trust.md): "the band change on a
   // birthday with its passive notification" - lib/personLifecycle.ts's
@@ -126,6 +139,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "{displayName} is now old enough to be a {newRole} - their profile band updated automatically.",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: true,
   },
   // Issues #35/#47 (a code review of that fix, 2026-09-06, found this
   // sweep was the one path that could still produce a credential-free
@@ -141,6 +155,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "{displayName} is old enough to be an adult, but needs a PIN, password, or passkey set before they can be promoted.",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: true,
   },
   // Step 7: the approval queue (plan's "Ask to Install, Ask to Browse").
   // `time_sensitive`, not `passive`: a child or teen is waiting on this
@@ -153,6 +168,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "{displayName} is asking: {summary}",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: true,
   },
   // Step 8: "a failure raises a Repairs item and two in a row notify
   // admins" (2.5). A single failure only sits on the Repairs list
@@ -168,6 +184,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "Backups to {target} have failed {count} times in a row: {message}",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: true,
   },
   // Step 10: "a digest-level notification at most once a day" - the
   // daily core job's own cadence already satisfies "at most once a day"
@@ -180,6 +197,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     template: "MaiPai Home {version} is available.",
     configurable: true,
     defaultChannels: ["in_app"],
+    toast: true,
   },
 ] as const;
 
@@ -211,6 +229,9 @@ interface ManifestNotificationType {
   template: string;
   configurable: boolean;
   default_channels: readonly NotificationChannel[];
+  /** Present only when the manifest schema carries it (the schema does
+   * not yet - a package that doesn't declare one is treated as `true`). */
+  toast?: boolean;
 }
 
 /** Registers every entry in a package's manifest `notifications[]` id-first
@@ -228,8 +249,8 @@ export function registerPackageNotificationTypes(manifest: {
   for (const declared of manifest.notifications ?? []) {
     if (NOTIFICATION_TYPES.some((t) => t.id === declared.id)) continue;
     if (packageNotificationTypes.has(declared.id)) continue;
-    const { default_channels, ...rest } = declared;
-    packageNotificationTypes.set(declared.id, { ...rest, defaultChannels: default_channels });
+    const { default_channels, toast, ...rest } = declared;
+    packageNotificationTypes.set(declared.id, { ...rest, defaultChannels: default_channels, toast: toast ?? true });
   }
 }
 

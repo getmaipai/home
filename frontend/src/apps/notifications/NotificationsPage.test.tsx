@@ -18,6 +18,7 @@ function notification(overrides: Partial<NotificationDeliveryView> = {}): Notifi
     dismissedAt: null,
     subjectTurnId: null,
     memoryIds: null,
+    toast: true,
     ...overrides,
   };
 }

@@ -69,7 +69,7 @@ export function NotificationBell() {
         // this bell's own badge and pending list are the fallback - a
         // real delivery still lands there and in the 30-day history,
         // only the toast itself is skipped.
-        if (n.typeId === "memory.updated") continue;
+        if (!n.toast) continue;
         push(n.text);
       }
     }

@@ -370,4 +370,5 @@ export interface NotificationDeliveryView {
   dismissedAt: string | null;
   subjectTurnId: string | null;
   memoryIds: string[] | null;
+  toast: boolean;
 }

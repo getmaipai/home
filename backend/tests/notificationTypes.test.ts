@@ -23,6 +23,7 @@ describe("registerPackageNotificationTypes", () => {
       template: "Severe weather: {summary}",
       configurable: true,
       defaultChannels: ["in_app"],
+      toast: true,
     });
   });
 

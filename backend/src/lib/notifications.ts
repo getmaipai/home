@@ -189,6 +189,13 @@ export interface NotificationDeliveryView {
   dismissedAt: string | null;
   subjectTurnId: string | null;
   memoryIds: string[] | null;
+  /** Whether the shell's NotificationBell fires a Toast for this delivery,
+   * declared once on NotificationType (lib/notificationTypes.ts) and
+   * carried here so the frontend reads one field instead of string-matching
+   * its own copy of the registry. An undeclared typeId (a package that
+   * registered a type whose manifest predates the field) is treated as
+   * `true` - toasting is the least surprising default. */
+  toast: boolean;
 }
 
 function toView(row: typeof notificationDeliveries.$inferSelect): NotificationDeliveryView {
@@ -202,6 +209,7 @@ function toView(row: typeof notificationDeliveries.$inferSelect): NotificationDe
     dismissedAt: row.dismissedAt,
     subjectTurnId: row.subjectTurnId,
     memoryIds: row.memoryIds ? (JSON.parse(row.memoryIds) as string[]) : null,
+    toast: getNotificationType(row.typeId)?.toast ?? true,
   };
 }
 

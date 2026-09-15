@@ -18,10 +18,13 @@ function renderBell() {
   );
 }
 
-function notification(id: string, text: string): NotificationDeliveryView {
+// getmaipai/home#109: `toast` is declared once on NotificationType
+// (backend/src/lib/notificationTypes.ts) and carried on the delivery
+// view; the bell reads it directly instead of string-matching.
+function notification(id: string, text: string, opts?: { typeId?: string; toast?: boolean }): NotificationDeliveryView {
   return {
     id,
-    typeId: "model.download_ready",
+    typeId: opts?.typeId ?? "model.download_ready",
     text,
     channels: ["in_app"],
     createdAt: "2026-09-05T00:00:00.000Z",
@@ -29,6 +32,8 @@ function notification(id: string, text: string): NotificationDeliveryView {
     dismissedAt: null,
     subjectTurnId: null,
     memoryIds: null,
+    // Default to true; the memory.updated tests pass `toast: false`.
+    toast: opts?.toast ?? true,
   };
 }
 
@@ -160,7 +165,7 @@ describe("NotificationBell", () => {
       const { findByRole, getByRole, getByText, queryByText, queryClient } = renderBell();
       await findByRole("button", { name: /Notifications$/ });
 
-      queryClient.setQueryData(["notifications"], [{ ...notification("n1", "I remembered: the wifi password"), typeId: "memory.updated" }]);
+      queryClient.setQueryData(["notifications"], [notification("n1", "I remembered: the wifi password", { typeId: "memory.updated", toast: false })]);
 
       // The badge update proves the delivery reached this component at
       // all - if the toast-skip also silently dropped the item, this
@@ -173,6 +178,67 @@ describe("NotificationBell", () => {
 
       fireEvent.click(getByRole("button", { name: /Notifications \(1 pending\)/ }));
       expect(getByText("I remembered: the wifi password")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  // getmaipai/home#109: the toast decision is declared once on
+  // NotificationType (backend/src/lib/notificationTypes.ts) and carried
+  // on the delivery view; the bell reads `toast` directly instead of
+  // string-matching its own copy of the registry.
+  test("a delivery with toast: false is in the pending list but does not fire a toast", async () => {
+    const restore = stubFetch({ "/api/notifications": [] });
+    try {
+      const { findByRole, getByRole, getByText, queryByText, queryClient } = renderBell();
+      await findByRole("button", { name: /Notifications$/ });
+
+      queryClient.setQueryData(["notifications"], [notification("n1", "I remembered: trash day is Tuesday", { typeId: "memory.updated", toast: false })]);
+
+      await waitFor(() => expect(getByRole("button", { name: /Notifications \(1 pending\)/ })).toBeInTheDocument());
+      // No toast: the popover is still closed, so the only way this text
+      // could be findable is a toast - the same assertion the memory.updated
+      // test above makes, but driven by the `toast` field rather than the
+      // typeId string.
+      expect(queryByText("I remembered: trash day is Tuesday")).toBeNull();
+
+      fireEvent.click(getByRole("button", { name: /Notifications \(1 pending\)/ }));
+      expect(getByText("I remembered: trash day is Tuesday")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a delivery with toast: true fires a toast when it arrives after the first load", async () => {
+    const restore = stubFetch({ "/api/notifications": [] });
+    try {
+      const { findByRole, getByText, queryClient } = renderBell();
+      await findByRole("button", { name: /Notifications$/ });
+
+      queryClient.setQueryData(["notifications"], [notification("n1", "Qwen3 8B finished downloading and is ready to use.", { toast: true })]);
+
+      // The toast fires the moment the notification arrives as "new"
+      // after the first-load seed. The popover is closed, so the only
+      // way the text is findable is the toast.
+      await waitFor(() => expect(getByText("Qwen3 8B finished downloading and is ready to use.")).toBeInTheDocument());
+    } finally {
+      restore();
+    }
+  });
+
+  test("typeId 'memory.updated' with toast: true DOES fire a toast - the declaration decides, not the string", async () => {
+    const restore = stubFetch({ "/api/notifications": [] });
+    try {
+      const { findByRole, getByText, queryClient } = renderBell();
+      await findByRole("button", { name: /Notifications$/ });
+
+      queryClient.setQueryData(["notifications"], [notification("n1", "I remembered: trash day is Tuesday", { typeId: "memory.updated", toast: true })]);
+
+      // The bell must toast even though typeId is "memory.updated",
+      // because the delivery view carries toast: true. This pins the
+      // contract: the declaration on NotificationType is the sole source
+      // of truth, not a string check in the frontend.
+      await waitFor(() => expect(getByText("I remembered: trash day is Tuesday")).toBeInTheDocument());
     } finally {
       restore();
     }
