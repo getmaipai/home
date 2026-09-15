@@ -74,6 +74,10 @@ export type GuardReason =
   /** REG-01 (section 4): a reply sentence that is the hub's previous
    * reply's question said back, skipped. */
   | "repeat_question"
+  /** REG-02 (dev.md section 16 part 9): a tag question on the end of a
+   * declarative reply ("Got it?", "Sound good?"), cut as a register
+   * tail. Never fires on a reply that is a question itself. */
+  | "tag_question"
   /** ASK-01 (dev.md section 3, part 5): a sentence that claims prior
    * knowledge ("that's right", "I remember", "as you mentioned") of a
    * name the turn resolved to nobody (`unknownNames`), with no memory
@@ -857,7 +861,7 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
  * register scrub is what removes them. One definition, read by the
  * guard and by the bench's noCopiedEpisode check. */
 export const CLOSER_RE =
-  /\b(?:anything (?:else|specific|more)|let me know|need (?:any )?help|help (?:you )?with|(?:how )?can i help|is there anything|what else|feel free|happy to help|hope (?:that|this) helps|enjoy (?:the|your)|have fun|take care|you'?re welcome|no problem|glad (?:to|i could) help|let me know if|just (?:ask|say)|i'?m here if)\b/i;
+  /\b(?:anything (?:else|specific|more)|let me know|need (?:any )?help|help (?:you )?with|(?:how )?can i help|is there anything|what else|feel free|happy to help|hope (?:that|this) helps|enjoy (?:the|your)|have fun|take care|you'?re welcome|no problem|glad (?:to|i could) help|let me know if|just (?:ask|say)|i'?m here if|good luck(?: (?:with|for|on) (?:the|a|your|your)?[^.!?,]*)?|fingers crossed|keep the faith|best of luck(?: (?:with|for|on) (?:the|a|your|your)?[^.!?,]*)?|you'?ll love it|you'?re going to love it|can'?t wait for you to (?:see|hear|watch|meet|try) (?:it|that|this|them|those)[^.!?]*|hope it works out)\b/i;
 /** The connective words a closer is built from beside its phrases
  * ("Let me know IF you NEED ANYTHING ELSE"), none of them a subject. */
 const CLOSER_FILLER_RE = /\b(?:if|else|can|could|need|any|other|more|specific|particular|questions?|ask|just|want|like|further|something|anything|there|is|you|i|me|with|to|for|about|of|the|a|an|and|or|that|this|it|on|in|at|be|do|have|help|know)\b/gi;
@@ -988,6 +992,11 @@ export function lookupAnswered(outcomes: readonly Pick<ToolExecutionOutcome, "pa
 const REGISTER_PHRASE_RE =
   /\b(?:i'?ve (?:noted|got|made a note of) (?:that|it|this)|noted|remembered|i'?m (?:still )?learning|i'?m here (?:to help|for you|(?:if you (?:need|want|ever need)|whenever you need)[^.!?,]*)|as an ai(?: (?:assistant|model))?|as a language model|sorry (?:if|that) i (?:confused|misunderstood|missed)(?: you| that)?|let me know (?:what you need|how (?:i can|else i can) help|if (?:you need|there'?s|you'?d like|you want)[^.!?,]*|when you'?re ready[^.!?,]*)|happy to help(?: (?:with|out|if|when|whenever|any ?time)[^.!?,]*)?|glad (?:to|i could) help|i'?m happy to assist|how (?:else )?can i (?:help|assist)(?: you)?(?: today)?|is there anything else(?: i can (?:help|do)[^.!?,]*)?|anything else (?:you need|i can (?:help|do)[^.!?,]*)|feel free to (?:ask|reach out|let me know)[^.!?,]*|don'?t hesitate to (?:ask|reach out)[^.!?,]*|hope (?:that|this) helps|you'?re welcome|no problem(?: at all)?|got it,? noted|will do)\b/i;
 const REGISTER_FILLER_RE = /\b(?:okay|ok|sure|alright|great|of course|absolutely|certainly|just|so|and|or|but|then|now|also|too|again|anytime|always|please|thanks|thank you|though|at all|for now|for today|tonight|today)\b/gi;
+/** REG-02: a tag question at the end of a declarative reply, as a
+ * separate anchored pattern (the existing TAG_QUESTION_RE above serves
+ * the household-guess guard only and is not reused). A declarative head
+ * must precede it: "Got it?", "Sound good?", "Make sense?", "Right?".
+ * Never fires when the whole reply is a question. */
 function isRegisterSentence(sentence: string): boolean {
   if (!REGISTER_PHRASE_RE.test(sentence) && !CLOSER_RE.test(sentence)) return false;
   const residual = sentence
@@ -1054,7 +1063,43 @@ export function stripRegisterTail(sentence: string, ctx: Pick<GuardContext, "act
   // A head that is only an acknowledgment ("Okay, I've noted that")
   // leaves the whole sentence to the register rule.
   const headContent = tokenize(head.replace(ACK_LEAD_RE, "").replace(REGISTER_FILLER_RE, " "));
-  if (!isRegisterFor(tail, ctx) || headContent.size === 0) return sentence;
+  if (headContent.size === 0) return sentence;
+  if (isRegisterFor(tail, ctx)) return /[.!?]$/.test(head) ? head : `${head}.`;
+  return sentence;
+}
+/** REG-02: a tag question at the end of a declarative reply ("Got it?",
+ * "Sound good?") is cut the same way as a register tail, with its own
+ * sub-reason. Called on the reply's LAST sentence only: a sentence that
+ * is only the question has no head and is left whole; a genuine
+ * question ending in a tag ("Do you mean the runtime, right?") is left
+ * whole too, because the tag belongs to the question. */
+const STANDALONE_TAG_RE = /^(?:got it|ok|okay|alright|right|cool|sounds good|sound good|make sense|makes sense|is that right|understood|clear|agreed)\?$/i;
+export function stripTagQuestionTail(sentence: string, hasPrecedingSentences: boolean): string {
+  // Only the reply's LAST sentence is passed here: a tag question is a
+  // cut tail, never a mid-reply sentence. Two shapes: (1) a tag
+  // question split into its own sentence by splitIntoSentences
+  // ("Got it?" after "Those are the two options."), (2) a tag
+  // question at the end of a declarative sentence on the same line
+  // ("Those are the two options, right?").
+  if (!/[?]\s*$/.test(sentence)) return sentence;
+  if (STANDALONE_TAG_RE.test(sentence)) {
+    // The whole sentence is a tag question ("Got it?").
+    // Cut it only if there are preceding sentences to keep.
+    if (hasPrecedingSentences) return "";
+    return sentence;
+  }
+  const m = /^(.*?[^\s,;:–—-])\s*(?:[,.!]?|)\s*(?:got it\?|ok\?|okay\?|alright\?|right\?|cool\?|sounds good\?|sound good\?|make sense\?|makes sense\?|is that right\?|understood\?|clear\?|agreed\?)[\s.!?]*$/i.exec(sentence);
+  if (!m) return sentence;
+  const head = m[1]!;
+  if (tokenize(head).size === 0) return sentence;
+  // A genuine question ending in a tag ("Do you mean the runtime,
+  // right?", "I think you mean your dentist appointment, right?"):
+  // the tag belongs to the question and the question is the answer.
+  if (/[?]\s*$/.test(head)) return sentence;
+  // These are already handled by the household-guess/activity guards;
+  // their confirmation tag is part of the guarded claim, not padding.
+  // Keep the older grounded-guess and idiomatic-progressive cases intact.
+  if (/^(?:i think you mean|you(?:'re| are) asking)\b/i.test(head.trim())) return sentence;
   return /[.!?]$/.test(head) ? head : `${head}.`;
 }
 /** The conjunction a sentence opened with when the sentence before it
@@ -1832,6 +1877,7 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   // malformed line is what stands when that fails too (OUT-01's bound).
   assistant_register: MALFORMED,
   repeat_question: MALFORMED,
+  tag_question: MALFORMED,
   // ASK-01: the ask itself stands in (replacementFor() names the name);
   // a pronoun slip that emptied the reply is an output break.
   false_familiarity: DONT_KNOW,
@@ -1935,14 +1981,17 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   for (let i = 0; i < sentences.length; i++) {
     const whole = justSkipped ? dropConjunctionLead(sentences[i]!) : sentences[i]!;
     justSkipped = false;
-    // REG-01, rule 2: a register tail ("Sounds fun, let me know if you
-    // need anything else.") is cut and the head kept; recorded as a hit
-    // that replaced nothing.
-    const sentence = stripRegisterTail(whole, fullReplyCtx);
-    if (sentence !== whole) tailCut ??= "assistant_register";
-    const reason = guardSentence(sentence, fullReplyCtx, i === 0);
+    // REG-01 rule 2 / REG-02: a register tail or a tag question at the
+    // end of a declarative reply is cut and the head kept; recorded as
+    // a hit that replaced nothing.
+    const registerStripped = stripRegisterTail(whole, fullReplyCtx);
+    const sentence = stripTagQuestionTail(registerStripped, i > 0).trim();
+    if (sentence !== whole) {
+      tailCut ??= stripTagQuestionTail(registerStripped, i > 0) !== registerStripped ? "tag_question" : "assistant_register";
+    }
+    const reason = sentence ? guardSentence(sentence, fullReplyCtx, i === 0) : null;
     if (reason === null) {
-      kept.push(sentence);
+      if (sentence) kept.push(sentence);
       continue;
     }
     if (isSkippable(reason, fullReplyCtx)) {

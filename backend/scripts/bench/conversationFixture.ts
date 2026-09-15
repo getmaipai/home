@@ -1302,6 +1302,16 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     ],
   },
   {
+    id: "sign-offs",
+    category: "etiquette",
+    note: "REG-02 (dev.md section 16 part 9): wishes and tag questions are register; a wish sentence is skipped, a wish tail is cut, a tag question tail is cut with its own reason, and a wish naming its subject stands. The 'stop saying good luck' turn belongs to CONS-01, not here.",
+    turns: [
+      { say: "fingers crossed the new card sorts the stutter", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|fingers crossed|hope it works out|you'?ll love", guard: null, humanVerdict: true } },
+      { say: "should be here Thursday", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|fingers crossed|hope it works out|you'?ll love", guard: "assistant_register", humanVerdict: true } },
+      { say: "worth selling the old one if it does", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|(got it|ok|okay|alright|right|cool|sounds? good|make sense|makes sense)\\?", toolRan: null, humanVerdict: true } },
+    ],
+  },
+  {
     id: "act-memory-eligibility",
     category: "memory",
     note: "section 12 part 6: only an asserted or reported inform or commissive clause can yield a memory; a question, a directive and a closing write nothing (ACT-01 skips the turn), a disclosure beside a package answer is judged",

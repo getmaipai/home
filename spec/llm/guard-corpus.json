@@ -538,6 +538,46 @@
     "note": "A different question is a new one."
   },
   {
+    "id": "reg02-wish-register-skipped",
+    "utterance": "the new card is in the mail",
+    "act": "inform",
+    "reply": "Good luck with the new card!",
+    "expect": "assistant_register",
+    "note": "REG-02: a wish sentence is the assistant register, skipped wherever it sits."
+  },
+  {
+    "id": "reg02-wish-tail-cut",
+    "utterance": "when does the new card arrive",
+    "act": "question",
+    "reply": "It should be here Thursday, fingers crossed.",
+    "expect": "assistant_register",
+    "note": "REG-02: a wish tail behind a comma is cut and the head kept ('It should be here Thursday.'). The tail is register, so the recorded reason is assistant_register."
+  },
+  {
+    "id": "reg02-tag-question-tail-cut",
+    "utterance": "what are the two options",
+    "act": "question",
+    "reply": "Those are the two options. Got it?",
+    "expect": "tag_question",
+    "note": "REG-02: a tag question at the end of a declarative reply is cut as a register tail with its own sub-reason."
+  },
+  {
+    "id": "reg02-tag-question-whole-reply-stands",
+    "utterance": "did you catch that",
+    "act": "question",
+    "reply": "Got it?",
+    "expect": null,
+    "note": "REG-02: a reply that is a question itself is not a tag-question tail; the pattern only fires on the end of a declarative sentence."
+  },
+  {
+    "id": "reg02-wish-with-subject-stands",
+    "utterance": "is the interview going well",
+    "act": "question",
+    "reply": "I hope it works out for the interview",
+    "expect": null,
+    "note": "REG-02: a wish that names its subject ('I hope it works out for the interview') is not a closer; the whole sentence is content and stands."
+  },
+  {
     "id": "exp01-plan-to-listen",
     "utterance": "are you gonna listen to it",
     "act": "question",

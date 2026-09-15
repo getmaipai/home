@@ -1024,6 +1024,37 @@ describe("REG-01: a statement is not a request, and the assistant register is st
   });
 });
 
+describe("REG-02: wishes and tag questions are register", () => {
+  const inform = (utterance: string, over: Partial<GuardContext> = {}) => ctx({ utterance, act: "inform", ...over });
+
+  test("a wish sentence is register and is skipped wherever it sits", () => {
+    for (const line of ["Good luck with the new card!", "Fingers crossed.", "Best of luck!", "You'll love it!", "Keep the faith!", "Can't wait for you to see it."]) {
+      const g = guardReply(`It's a big day. ${line}`, inform("the new card is in the mail"));
+      expect([g.reason, g.replaced, g.reply]).toEqual(["assistant_register", false, "It's a big day."]);
+    }
+  });
+
+  test("a wish tail behind a comma is cut and the head kept", () => {
+    const g = guardReply("It should be here Thursday, fingers crossed.", ctx({ utterance: "when does the new card arrive", act: "question" }));
+    expect([g.reason, g.replaced, g.reply]).toEqual(["assistant_register", false, "It should be here Thursday."]);
+  });
+
+  test("a tag question at the end of a declarative reply is cut with its own sub-reason", () => {
+    const g = guardReply("Those are the two options. Got it?", ctx({ utterance: "what are the two options", act: "question" }));
+    expect([g.reason, g.replaced, g.reply]).toEqual(["tag_question", false, "Those are the two options."]);
+  });
+
+  test("a reply that is a question itself is not a tag-question tail", () => {
+    const g = guardReply("Got it?", ctx({ utterance: "did you catch that", act: "question" }));
+    expect([g.reason, g.reply]).toEqual([null, "Got it?"]);
+  });
+
+  test("a wish that names its subject is content and stands", () => {
+    const g = guardReply("I hope it works out for the interview", ctx({ utterance: "is the interview going well", act: "question" }));
+    expect([g.reason, g.reply]).toEqual([null, "I hope it works out for the interview"]);
+  });
+});
+
 describe("EXP-01: experience and plan claims", () => {
   const asked = (over: Partial<GuardContext> = {}) => ctx({ utterance: "are you gonna listen to it", act: "question", ...over });
 
