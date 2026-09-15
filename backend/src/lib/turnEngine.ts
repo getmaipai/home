@@ -1279,7 +1279,7 @@ export function householdSubjectTurn(text: string, ctx: { roster: readonly strin
 }
 
 /** The literal yield's own reason, for the `[route]` line. */
-export type LiteralYield = { id: string; reason: "household_subject" | "arithmetic" };
+export type LiteralYield = { id: string; reason: "household_subject" | "arithmetic" | "unresolved_reference" };
 
 export function literalYield(id: string, manifest: PackageManifest, text: string, args: Record<string, unknown>, roster: readonly string[]): LiteralYield | null {
   if (!looksOutsideTheHouse(manifest)) return null;
@@ -1304,7 +1304,19 @@ function politeCapture(captured: string | null): string | null {
   return captured !== null && QUESTION_CAPTURE_RE.test(captured) ? null : captured;
 }
 
-export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[], roster: readonly string[] = [], onYield?: (y: LiteralYield) => void): RouteResult | null {
+// CHAT-13 (chunk B): the reference check for a wildcard capture on an
+// outside-the-house package. A pronoun, a determiner phrase, or a bare
+// kind noun is a reference to the turn's live subject, never a title.
+// The kind check (whether "the film" is the right kind for a film
+// lookup) waits for the manifest's `routing.answers` field (chunk D).
+const PRONOUN_RE = /^\s*(?:it|that|this|her|him|them|one)\s*$/i;
+const DETERMINER_KIND_RE = /^\s*(?:the|that|this|its)\s+(?:movie|film|show|series|album|record|song|book|game|band|one|card|thing|place|episode)\s*$/i;
+const BARE_KIND_RE = /^\s*(?:movie|film|show|series|album|record|song|book|game|band|card|thing|place|episode)\s*$/i;
+function isReference(captured: string): boolean {
+  return PRONOUN_RE.test(captured) || DETERMINER_KIND_RE.test(captured) || BARE_KIND_RE.test(captured);
+}
+
+export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[], roster: readonly string[] = [], onYield?: (y: LiteralYield) => void, stack?: readonly SubjectRef[]): RouteResult | null {
   // ACT-01's set: a polite request ("can you remember that Marlow's
   // birthday is in June") is the pattern behind its courtesy prefix,
   // ROUTE-01's own rule for the shape applied to the literal match. The
@@ -1356,6 +1368,22 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
         const yielded = literalYield(id, manifest, text, args, roster);
         if (yielded) {
           onYield?.(yielded);
+          continue;
+        }
+        // CHAT-13 (chunk B, dev.md section 16 part 5 rule 2): a capture
+        // that is a reference ("the movie", "it"), on a package that
+        // looks outside the house, resolves to the turn's live subject -
+        // the stack's world head - instead of being looked up as a
+        // title. With no world head the pattern yields and the turn goes
+        // on to the model.
+        const argName = Object.keys(args)[0];
+        const argValue = argName ? args[argName] : undefined;
+        if (looksOutsideTheHouse(manifest) && argName && typeof argValue === "string" && isReference(argValue)) {
+          if (stack?.[0]?.type === "world") {
+            args[argName] = stack[0]!.display_name;
+            return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
+          }
+          onYield?.({ id, reason: "unresolved_reference" });
           continue;
         }
         // A literal pattern match always wins, immediately - no ranking
@@ -2400,10 +2428,21 @@ async function prepareTurn(
   // literal pattern of an outside-looking package can yield on a
   // household name; the same list feeds the prompt and the guards below.
   const routingStart = performance.now();
+  // CHAT-13 (chunk B): the subject stack is computed BEFORE the literal
+  // router runs (dev.md section 16 part 5, rule 1): the router needs it to
+  // tell a reference ("the movie", "it") from a real title, and the
+  // [turn] line's "the subject" is what the turn was really about, which
+  // only this earlier pass knows. The window it reads from is built here,
+  // not at the recall stage below (whose other use of it is only
+  // `summaryLine` for the prompt).
+  const window = buildConversationWindow(conversation, { supersedes });
+  const subjectsStart = performance.now();
+  const { subjects, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
+  timings.subjects_ms = Math.round(performance.now() - subjectsStart);
   let literalYielded: LiteralYield | null = null;
   // SAFETY-01: in the crisis state nothing routes to a package; the
   // embed still runs for recall.
-  let { winner: routed, ranked }: RouteResult = inCrisis ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y)) ?? { winner: null, ranked: [] });
+  let { winner: routed, ranked }: RouteResult = inCrisis ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
   // ACT-01: a literal-pattern win is a directive by construction, frozen
   // on the signal before the package runs.
   if (routed?.viaPattern) signal = freezeDirective(signal);
@@ -2561,8 +2600,8 @@ async function prepareTurn(
   // exchange in the messages array, not just in the system prompt's own
   // text - buildConversationWindow() returns both the verbatim
   // user/assistant messages AND, when older turns exist beyond them, one
-  // summary line for the system prompt's volatile zone.
-  const window = buildConversationWindow(conversation, { supersedes });
+  // summary line for the system prompt's volatile zone. The window was
+  // already built at the routing stage (CHAT-13 chunk B, rule 1).
   // RECALL-03: this conversation's own turns that fell out of the
   // window are evidence for the turn too (a fact stated at turn 1 and
   // asked back at turn 12 was cut to the honesty line, the live chat of
@@ -2586,9 +2625,6 @@ async function prepareTurn(
   const promptStart = performance.now();
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
-  const subjectsStart = performance.now();
-  const { subjects, resolved, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
-  timings.subjects_ms = Math.round(performance.now() - subjectsStart);
   const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own

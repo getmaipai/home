@@ -4182,6 +4182,42 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
     expect(literalYield("knowledge", knowledge.manifest, "what is a pip", { topic: "a pip" }, ["Pippa"])).toBeNull(); // whole word only
   });
 
+  test("routeLiteral(): a wildcard capture that is a reference resolves to the stack's world head, and yields with no world head (CHAT-13 chunk B)", async () => {
+    const { actor } = await owner();
+    const { routeLiteral } = await import("@/lib/turnEngine");
+    const loaded = loadAllManifests();
+    const worldStack = [{ type: "world", kind: "film", display_name: "Marsh Lantern", year: null, source_kind: null, stable_key: null, recency: "current" as const, carried_question: null }] as const;
+    // "what's the runtime of *" captures "the movie" -> reference -> resolves
+    // to the world head; only the media-lookup package matches this shape
+    // (the kind check that would prefer it over the knowledge package, which
+    // also matches "what is *", is chunk D's).
+    const r1 = routeLiteral("what's the runtime of the movie", actor, loaded, [], undefined, worldStack);
+    expect(r1?.winner?.id).toBe("media-lookup");
+    expect(r1?.winner?.args).toEqual({ title: "Marsh Lantern" });
+    // "it" is a pronoun -> reference -> resolves.
+    const r2 = routeLiteral("what's the runtime of it", actor, loaded, [], undefined, worldStack);
+    expect(r2?.winner?.id).toBe("media-lookup");
+    expect(r2?.winner?.args).toEqual({ title: "Marsh Lantern" });
+    // A real title is not a reference: untouched.
+    const r4 = routeLiteral("what's the runtime of Cobra", actor, loaded, [], undefined, worldStack);
+    expect(r4?.winner?.id).toBe("media-lookup");
+    expect(r4?.winner?.args).toEqual({ title: "Cobra" });
+    // No world head -> yield.
+    const yields1: { id: string; reason: string }[] = [];
+    const y1 = routeLiteral("what's the runtime of the movie", actor, loaded, [], (y) => yields1.push(y));
+    expect(y1).toBeNull();
+    expect(yields1).toEqual([{ id: "media-lookup", reason: "unresolved_reference" }]);
+    // Household head (not world) -> also yield.
+    const householdStack = [{ type: "household", entity_id: "sage", carried_question: null }] as const;
+    const yields2: { id: string; reason: string }[] = [];
+    const y2 = routeLiteral("what's the runtime of the movie", actor, loaded, ["Sage"], (y) => yields2.push(y), householdStack);
+    expect(y2).toBeNull();
+    expect(yields2).toEqual([{ id: "media-lookup", reason: "unresolved_reference" }]);
+    // A non-outside-the-house package (list-add) with a wildcard is untouched by reference logic.
+    const r5 = routeLiteral("add it to the shopping list", actor, loaded, ["Sage"], undefined, worldStack);
+    expect(r5?.winner?.id).toBe("list-add");
+  });
+
   test("runTurn(): a knowledge miss reaches the model, the reply is the model's, and the miss is on the turn as a failed outcome", async () => {
     const { actor } = await owner();
     const plugins = await import("@/lib/plugins");

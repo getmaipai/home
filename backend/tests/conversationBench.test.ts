@@ -93,9 +93,10 @@ describe("the fixture", () => {
     // SAFETY-01's self-harm-state, and LOOKUP-02's six (hedged-promise,
     // offer-binds-the-question and its go-on-then variant,
     // objection-reruns, hedged-draft, ladder-falls-through), and
-    // ASK-02's three (not-a-name, hub-named-it, public-figure).
-    expect(CONVERSATIONS.length).toBe(86);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(86);
+    // ASK-02's three (not-a-name, hub-named-it, public-figure), and
+    // CHAT-13 chunk B's subject-before-pattern.
+    expect(CONVERSATIONS.length).toBe(87);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(87);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);

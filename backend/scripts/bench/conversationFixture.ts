@@ -1432,4 +1432,19 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "what did I tell you at the start", expect: { signal: { primary_act: "question" }, recallInContext: ["midnight"], mustContain: "midnight", mustNotContain: HONESTY_LINES, guard: null } },
     ],
   },
+  // CHAT-13 (chunk B, dev.md section 16 part 5 rule 1 & 2): the subject
+  // stack is computed before the literal router runs, and a wildcard
+  // capture that is a reference ("the movie", "it") resolves to the
+  // stack's world head instead of being looked up as a title.
+  {
+    id: "subject-before-pattern",
+    category: "knowledge",
+    note: "CHAT-13 chunk B: a reference in a literal pattern resolves to the live world subject, not a title lookup; the media-lookup package runs with the resolved name as its argument",
+    turns: [
+      { say: "the new Marsh Lantern film is the one I'm counting down to", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "world", name: "Marsh Lantern", kind: "film" }], guard: null, humanVerdict: true } },
+      { say: "when is it out", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } },
+      { say: "what is the movie about", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } }, // "who's in the film" returns once chunk D's manifest kind field lands
+      { say: "what's it rated", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } },
+    ],
+  },
 ];
