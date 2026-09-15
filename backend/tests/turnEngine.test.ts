@@ -3508,7 +3508,9 @@ describe("POST /api/turn", () => {
     const res = await client.post("/api/turn", { surface: "robot", text: "good morning, how's it going" });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { reply: { text: string; speech?: string } };
-    expect(body.reply.speech).toBe(body.reply.text.split(/[.!?](?:\s|$)/, 1)[0] + body.reply.text.match(/[.!?]/)?.[0]);
+    const first = body.reply.text.split(/[.!?](?:\s|$)/, 1)[0] ?? "";
+    const mark = body.reply.text.match(/[.!?]/)?.[0] ?? "";
+    expect(body.reply.speech).toBe(first + mark);
     expect(body.reply.speech).not.toContain("http");
   });
 
