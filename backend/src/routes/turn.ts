@@ -52,6 +52,8 @@ const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "tu
 // fields, the same "reject at the edge, then validate the content"
 // pairing lib/turnEngine.ts's own length check backs up.
 const TURN_BODY_LIMIT = 64 * 1024;
+const evidence = z.object({ person: z.string().regex(/^person-[a-z0-9]{6,}$/).nullable(), basis: z.enum(["signed_in", "voice", "face", "voice_and_face", "claimed", "unknown"]), level: z.enum(["confirmed", "tentative", "unknown"]) }).strict();
+const present = z.array(evidence).nullable();
 
 turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");
@@ -64,12 +66,17 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     thinking?: boolean;
     conversation_id?: string;
     supersedes?: string;
+    speaker_evidence?: unknown;
+    present?: unknown;
   };
+  const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional() }).safeParse(body);
+  if (!parsedEvidence.success) return c.json({ error: "Invalid turn evidence", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
   const result = await runTurn(actor, surface, body.text ?? "", {
     thinking: body.thinking,
     conversationId: body.conversation_id,
     supersedes: body.supersedes,
+    ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
   });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
@@ -256,7 +263,11 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     conversation_id?: string;
     supersedes?: string;
     ephemeral?: boolean;
+    speaker_evidence?: unknown;
+    present?: unknown;
   };
+  const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional() }).safeParse(body);
+  if (!parsedEvidence.success) return c.json({ error: "Invalid turn evidence", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
   // getmaipai/home#91 (a code review of the original ephemeral fix,
   // 2026-09-13): honoring the flag for whatever text a caller sends
@@ -296,6 +307,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     // typed message does (getmaipai/home BACKLOG, found 2026-09-11).
     ephemeral,
     signal: abortController.signal,
+    ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
   });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);

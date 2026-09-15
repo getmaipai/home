@@ -38,6 +38,8 @@
   "document": null,
   "review_id": null,
   "notice_ids": null,
+  "speaker_evidence": { "person": "person-a1b2c3", "basis": "voice", "level": "confirmed" },
+  "present": [{ "person": "person-a1b2c3", "basis": "voice", "level": "confirmed" }],
   "created_at": "2026-09-14T10:00:00Z",
   "hlc": "1757836800000:0:a1b2c3"
 }

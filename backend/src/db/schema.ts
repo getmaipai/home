@@ -394,6 +394,8 @@ export const conversationTurns = sqliteTable(
     // CHAT-13's stack. Null on rows written before ASK-01 and on a
     // turn that named nothing.
     subjects: text("subjects"),
+    speakerEvidence: text("speaker_evidence"),
+    present: text("present"),
     // Session C step 1: null for every non-plugin turn (a command, the
     // model, a safety refusal). "pattern"/"embedding"/"keyword" for a
     // plugin turn - which tier of route()'s decision actually fired it,

@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": [
     "id", "conversation_id", "person", "surface", "user_text", "reply_text", "source",
-    "signal", "plan", "subjects", "outcomes", "document", "review_id", "notice_ids",
+    "signal", "plan", "subjects", "outcomes", "document", "review_id", "notice_ids", "speaker_evidence", "present",
     "created_at", "hlc"
   ],
   "$defs": {
@@ -91,6 +91,29 @@
       "items": { "type": "string", "minLength": 1 },
       "default": null,
       "description": "AGE-02 (dev.md section 13 part 4, the outside review reconciled): the notification ids this turn raised, so a dedupe check and an audit trail both read the turn record rather than a separate index. Null until AGE-02."
+    },
+    "speaker_evidence": {
+      "type": ["object", "null"], "default": null,
+      "description": "What the body knows about who is speaking is evidence, typed on the turn.",
+      "additionalProperties": false,
+      "required": ["person", "basis", "level"],
+      "properties": {
+        "person": { "type": ["string", "null"], "pattern": "^person-[a-z0-9]{6,}$" },
+        "basis": { "type": "string", "enum": ["signed_in", "voice", "face", "voice_and_face", "claimed", "unknown"] },
+        "level": { "type": "string", "enum": ["confirmed", "tentative", "unknown"] }
+      }
+    },
+    "present": {
+      "type": ["array", "null"], "default": null,
+      "description": "The body's list of people with a fresh track or a fresh voice in the last thirty seconds, each at its own level.",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["person", "basis", "level"],
+        "properties": {
+          "person": { "type": ["string", "null"], "pattern": "^person-[a-z0-9]{6,}$" },
+          "basis": { "type": "string", "enum": ["signed_in", "voice", "face", "voice_and_face", "claimed", "unknown"] },
+          "level": { "type": "string", "enum": ["confirmed", "tentative", "unknown"] }
+        }
+      }
     },
     "created_at": { "type": "string", "format": "date-time" },
     "hlc": {

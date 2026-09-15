@@ -802,6 +802,75 @@ export const ConversationTurn = z
         "AGE-02 (dev.md section 13 part 4, the outside review reconciled): the notification ids this turn raised, so a dedupe check and an audit trail both read the turn record rather than a separate index. Null until AGE-02.",
       )
       .default(null),
+    /**What the body knows about who is speaking is evidence, typed on the turn.*/
+    speaker_evidence: z
+      .union([
+        z
+          .object({
+            person: z.union([
+              z.string().regex(new RegExp("^person-[a-z0-9]{6,}$")),
+              z.null(),
+            ]),
+            basis: z.enum([
+              "signed_in",
+              "voice",
+              "face",
+              "voice_and_face",
+              "claimed",
+              "unknown",
+            ]),
+            level: z.enum(["confirmed", "tentative", "unknown"]),
+          })
+          .strict()
+          .describe(
+            "What the body knows about who is speaking is evidence, typed on the turn.",
+          ),
+        z
+          .null()
+          .describe(
+            "What the body knows about who is speaking is evidence, typed on the turn.",
+          ),
+      ])
+      .describe(
+        "What the body knows about who is speaking is evidence, typed on the turn.",
+      )
+      .default(null),
+    /**The body's list of people with a fresh track or a fresh voice in the last thirty seconds, each at its own level.*/
+    present: z
+      .union([
+        z
+          .array(
+            z
+              .object({
+                person: z.union([
+                  z.string().regex(new RegExp("^person-[a-z0-9]{6,}$")),
+                  z.null(),
+                ]),
+                basis: z.enum([
+                  "signed_in",
+                  "voice",
+                  "face",
+                  "voice_and_face",
+                  "claimed",
+                  "unknown",
+                ]),
+                level: z.enum(["confirmed", "tentative", "unknown"]),
+              })
+              .strict(),
+          )
+          .describe(
+            "The body's list of people with a fresh track or a fresh voice in the last thirty seconds, each at its own level.",
+          ),
+        z
+          .null()
+          .describe(
+            "The body's list of people with a fresh track or a fresh voice in the last thirty seconds, each at its own level.",
+          ),
+      ])
+      .describe(
+        "The body's list of people with a fresh track or a fresh voice in the last thirty seconds, each at its own level.",
+      )
+      .default(null),
     created_at: z.string().datetime({ offset: true }),
     /**Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses.*/
     hlc: z

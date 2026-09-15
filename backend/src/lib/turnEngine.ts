@@ -231,13 +231,15 @@ export function judgeStatusAtInsert(value: Pick<TurnValue, "source">, signal: Tu
   if (value.source === "safety_refuse" || value.source === "policy") return "skipped";
   return hasEligibleClause(signal) ? null : "skipped";
 }
+export type SpeakerEvidence = { person: string | null; basis: "signed_in" | "voice" | "face" | "voice_and_face" | "claimed" | "unknown"; level: "confirmed" | "tentative" | "unknown" };
+export type PresentPerson = SpeakerEvidence;
 
 function logTurnSafely(
   actor: PersonRow,
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): void {
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
@@ -264,7 +266,7 @@ function logTurnSafely(
       // SAFETY-01: the self-harm category on the utterance or on the
       // reply marks the row, whatever the reply's own action.
       const crisisSignal = (meta.inputSafety !== undefined && carriesCrisisSignal(meta.inputSafety)) || carriesCrisisSignal(value.safety);
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal });
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present });
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
@@ -3775,8 +3777,10 @@ export async function runTurn(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean; conversationId?: string; supersedes?: string } = {},
+  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
 ): Promise<TurnOpResult> {
+  // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
+  if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
   // Fix A4 (docs/dev.md's 2026-09-07 incident note): measured from the
   // very top, so `duration_ms` in the `[turn]` log line reflects the
   // whole turn (routing, any plugin call, the model round trip), not
@@ -3814,7 +3818,7 @@ async function runTurnHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; conversationId?: string; supersedes?: string },
+  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): Promise<TurnOpResult> {
   const loaded = loadAllManifests(); // one catalog scan, shared below
   const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id));
@@ -4128,7 +4132,7 @@ async function runTurnHoldingLease(
     if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
   }
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, speakerEvidence: opts.speakerEvidence, present: opts.present });
   return { ok: true, value };
 }
 
@@ -4636,8 +4640,10 @@ export async function runTurnStream(
   // shows up in the person's real chat history. finalizeReply() (the
   // output safety boundary) and the lease still run for it exactly as
   // for a real turn: only the log write is conditional.
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean } = {},
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
 ): Promise<TurnStreamResult> {
+  // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
+  if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
   // Fix A4 (docs/dev.md's 2026-09-07 incident note): matches runTurn()'s
   // own placement - measured from the top so the streamed path's
   // `duration_ms` covers routing and the model round trip too, not just
@@ -4680,7 +4686,7 @@ async function runTurnStreamHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean },
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): Promise<TurnStreamResult> {
   const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, opts.ephemeral === true);
 
@@ -4688,7 +4694,7 @@ async function runTurnStreamHoldingLease(
     const trace: ReplyTrace = { hits: [], replaced: false };
     const value = finalizeReply(actor, prepared.value, prepared.surface, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety, speakerEvidence: opts.speakerEvidence, present: opts.present });
     return { ok: true, kind: "immediate", value, signal: prepared.signal };
   }
 
@@ -5038,7 +5044,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, speakerEvidence: opts.speakerEvidence, present: opts.present });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -5121,7 +5127,7 @@ async function runTurnStreamHoldingLease(
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
         }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, speakerEvidence: opts.speakerEvidence, present: opts.present });
         return value;
       },
     };

@@ -62,6 +62,7 @@ export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 // shape through the @maipai/home-backend workspace dependency; re-exported
 // here since this is where callers already look for it.
 import type { ConversationTurnRow } from "@/wire";
+import type { SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
 import { TurnSignal as TurnSignalSchema, type TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { SubjectRef as SubjectRefSchema } from "@maipai/spec/gen/ts/subject-ref.js";
 import type { SubjectRef } from "@/lib/unknownNames";
@@ -184,7 +185,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -261,6 +262,8 @@ export function logTurn(
     crisisSignal: opts.crisisSignal ?? false,
     // ASK-01: the turn's SubjectRefs; a credential turn keeps none.
     subjects: opts.subjects && opts.subjects.length > 0 && !credentialTurn ? JSON.stringify(opts.subjects) : null,
+    speakerEvidence: opts.speakerEvidence ? JSON.stringify(opts.speakerEvidence) : null,
+    present: opts.present ? JSON.stringify(opts.present) : null,
     hlc: nextHlc(),
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
@@ -289,6 +292,16 @@ export function turnSignalOf(row: Pick<ConversationTurnRow, "signal">): TurnSign
   } catch {
     return null;
   }
+}
+
+export function speakerEvidenceOf(row: Pick<ConversationTurnRow, "speakerEvidence">): SpeakerEvidence | null {
+  if (!row.speakerEvidence) return null;
+  try { return JSON.parse(row.speakerEvidence) as SpeakerEvidence; } catch { return null; }
+}
+
+export function presentOf(row: Pick<ConversationTurnRow, "present">): PresentPerson[] {
+  if (!row.present) return [];
+  try { const parsed = JSON.parse(row.present); return Array.isArray(parsed) ? parsed as PresentPerson[] : []; } catch { return []; }
 }
 
 /** SAFETY-01: the safety action, source and reply of the conversation's

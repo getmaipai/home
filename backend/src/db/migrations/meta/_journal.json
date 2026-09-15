@@ -281,6 +281,13 @@
       "when": 1789495695301,
       "tag": "0039_chat16_turn_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1789505306132,
+      "tag": "0040_surface01_speaker_evidence",
+      "breakpoints": true
     }
   ]
 }

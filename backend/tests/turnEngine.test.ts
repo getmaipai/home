@@ -116,6 +116,22 @@ async function withChat<T>(reply: string, fn: () => Promise<T>): Promise<T> {
 const subjectsOfTurn = (turnId: string) => turnSubjectsOf(db.select({ subjects: conversationTurns.subjects }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
 
 describe("lib/turnEngine.ts runTurn()", () => {
+  test("SURFACE-01b persists robot evidence and withholds it from chat", async () => {
+    const { actor } = await owner();
+    const evidence = { person: actor.id, basis: "voice" as const, level: "confirmed" as const };
+    const present = [evidence];
+    const robot = await runTurn(actor, "robot", "hello", { speakerEvidence: evidence, present });
+    expect(robot.ok).toBe(true);
+    const robotRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, robot.ok ? robot.value.turn_id : "")).get()!;
+    expect(JSON.parse(robotRow.speakerEvidence!)).toEqual(evidence);
+    expect(JSON.parse(robotRow.present!)).toEqual(present);
+    const chat = await runTurn(actor, "chat", "hello again", { speakerEvidence: evidence, present });
+    expect(chat.ok).toBe(true);
+    const chatRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, chat.ok ? chat.value.turn_id : "")).get()!;
+    expect(chatRow.speakerEvidence).toBeNull();
+    expect(chatRow.present).toBeNull();
+  });
+
   test("safety refuse: a harmful request never reaches plugin routing or the model", async () => {
     const { actor } = await owner();
 

@@ -10,6 +10,28 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, constr
 from . import reply_plan_schema, result_schema, subject_ref_schema, turn_signal_schema
 
 
+class SpeakerEvidence(BaseModel):
+    """
+    What the body knows about who is speaking is evidence, typed on the turn.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    person: constr(pattern=r'^person-[a-z0-9]{6,}$') | None
+    basis: Literal['signed_in', 'voice', 'face', 'voice_and_face', 'claimed', 'unknown']
+    level: Literal['confirmed', 'tentative', 'unknown']
+
+
+class PresentItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    person: constr(pattern=r'^person-[a-z0-9]{6,}$') | None
+    basis: Literal['signed_in', 'voice', 'face', 'voice_and_face', 'claimed', 'unknown']
+    level: Literal['confirmed', 'tentative', 'unknown']
+
+
 class Source(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -99,6 +121,14 @@ class ConversationTurn(BaseModel):
     notice_ids: list[constr(min_length=1)] | None = Field(
         ...,
         description='AGE-02 (dev.md section 13 part 4, the outside review reconciled): the notification ids this turn raised, so a dedupe check and an audit trail both read the turn record rather than a separate index. Null until AGE-02.',
+    )
+    speaker_evidence: SpeakerEvidence | None = Field(
+        ...,
+        description='What the body knows about who is speaking is evidence, typed on the turn.',
+    )
+    present: list[PresentItem] | None = Field(
+        ...,
+        description="The body's list of people with a fresh track or a fresh voice in the last thirty seconds, each at its own level.",
     )
     created_at: AwareDatetime
     hlc: constr(pattern=r'^[0-9]+:[0-9]+:[a-z0-9]{6,}$') = Field(
