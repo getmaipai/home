@@ -2,7 +2,7 @@
 // the turn signal both read. routing.test.ts covers utteranceShape()'s
 // own verdicts; this file covers the cut itself.
 import { describe, expect, test } from "bun:test";
-import { readClauses, utteranceShape, shapeFromReading } from "@/lib/utteranceShape";
+import { COURTESY_PREFIX, readClauses, utteranceShape, shapeFromReading } from "@/lib/utteranceShape";
 
 const openers = new Set(["add", "set", "remember", "turn"]);
 const cut = (text: string) => readClauses(text, openers).clauses.map((c) => text.slice(c.start, c.end));
@@ -37,5 +37,15 @@ describe("readClauses()", () => {
     expect(shapeFromReading(reading)).toBe("question");
     expect(utteranceShape("please, set a timer", openers)).toBe("command");
     expect(readClauses("", openers).clauses).toEqual([{ text: "", start: 0, end: 0, signal: "none", polite: false }]);
+  });
+});
+
+describe("ALM-01: a leading connective is stripped with the courtesy prefix", () => {
+  test("the connective is gone, and a bare question is unchanged", () => {
+    expect("and what's today's date".replace(COURTESY_PREFIX, "")).toBe("what's today's date");
+    expect("so, can you please remember that".replace(COURTESY_PREFIX, "")).toBe("remember that");
+    expect("ok so what day is it".replace(COURTESY_PREFIX, "")).toBe("what day is it");
+    expect("what's today's date".replace(COURTESY_PREFIX, "")).toBe("what's today's date");
+    expect("android phones are fine".replace(COURTESY_PREFIX, "")).toBe("android phones are fine");
   });
 });

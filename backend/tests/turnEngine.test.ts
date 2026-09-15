@@ -4151,6 +4151,13 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     expect(routeLiteral("please add eggs to the shopping list", actor, loadAllManifests())?.winner?.id).toBe("list-add");
   });
 
+  test("ALM-01: a leading connective is stripped with the courtesy prefix, so the bare almanac question routes literally", async () => {
+    const { actor } = await owner();
+    const { routeLiteral } = await import("@/lib/turnEngine");
+    expect(routeLiteral("and what day is it", actor, loadAllManifests())?.winner?.id).toBe("almanac-date");
+    expect(routeLiteral("so what's today's date", actor, loadAllManifests())?.winner?.id).toBe("almanac-date");
+  });
+
   test("a tools-offered turn whose first token takes 1,200 ms yields turn_meta, then spoken_cue, then deltas, in that order", async () => {
     const { client } = await owner();
     await withStub(
