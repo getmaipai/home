@@ -164,7 +164,13 @@ export function startFakeSearxng(): FakeSearxng {
       // ASK-02: the film's cast row names Serena Vale (the hub-named
       // subject), and a query about her answers with her own facts.
       const results = /serena vale/i.test(q)
-        ? [{ title: "Serena Vale (actress)", url: `https://example.com/${slug}`, content: "Serena Vale is an actress; she plays the lighthouse keeper in the new Marsh Lantern film and won a stage award last year." }]
+        ? [
+            { title: "Serena Vale (actress)", url: `https://example.com/${slug}`, content: "Serena Vale is an actress; she plays the lighthouse keeper in the new Marsh Lantern film and won a stage award last year." },
+            // The public-figure row's raising turn asks what happened to her
+            // (the set's read: the recipe's summary said the results did not
+            // say, rightly, until the fixture carried it).
+            { title: "Serena Vale found safe after a week missing", url: `https://example.com/${slug}/news`, content: "What happened to Serena Vale: the actress was found safe after a week missing; she had been filming in secret on a closed shoot for the Marsh Lantern film." },
+          ]
         : /marsh lantern/i.test(q) && /film|movie|cast|stars?|about|who/i.test(q)
           ? [
               { title: "Marsh Lantern (film): cast and plot", url: `https://example.com/${slug}`, content: "The new Marsh Lantern film follows a lighthouse keeper on a rock through one winter; it stars Serena Vale as the keeper and Vincent Marlow as her brother, and it is out in October." },

@@ -402,6 +402,56 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     });
   });
 
+  test("the set's read: a queued question whose name is on the turn goes first; a relationship question about a name not in play holds", async () => {
+    const { actor } = await owner();
+    const { writeRelation } = await import("@/lib/subjects");
+    const clover = candidate(actor, "Clover", "person");
+    const edge = writeRelation(actor, { type: "partner_of", name: "Clover", stated: false }, clover, "turn-judge", 0.5);
+    if (!edge.ok || !edge.value) throw new Error(edge.error);
+    const older = queueOpenQuestion({ person: actor.id, kind: "who", text: "Is Clover your partner?", subjectId: edge.value.id, source: "turn-judge" });
+    const juniper = candidate(actor, "juniper", "pet");
+    const newer = queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Juniper?", subjectId: juniper.id, source: "turn-judge" });
+    await withChat("Third time this week.", async () => {
+      const first = await runTurn(actor, "chat", "juniper chewed through the garden hose again");
+      if (!first.ok) throw new Error(first.error);
+      expect(first.value.reply.text).toBe("Third time this week. Who's Juniper?");
+      expect(getPendingAsk(first.value.conversation_id)).toMatchObject({ openQuestionId: newer.id });
+      const answer = await runTurn(actor, "chat", "he's our rabbit", { conversationId: first.value.conversation_id });
+      if (!answer.ok) throw new Error(answer.error);
+      expect(entityNamed("juniper")).toMatchObject({ kind: "pet", source: "local", pronouns: "he" });
+      // Clover is not in play: the relationship question holds.
+      const later = await runTurn(actor, "chat", "what's the weather like", { conversationId: first.value.conversation_id });
+      if (!later.ok) throw new Error(later.error);
+      expect(later.value.reply.text).toBe("Third time this week.");
+      expect(listOpenQuestions(actor.id).find((q) => q.id === older.id)).toMatchObject({ status: "pending" });
+      // Named again, it is put.
+      const named = await runTurn(actor, "chat", "Clover is coming for dinner", { conversationId: first.value.conversation_id });
+      if (!named.ok) throw new Error(named.error);
+      expect(named.value.reply.text).toBe("Third time this week. Is Clover your partner?");
+    });
+  });
+
+  test("the answer volunteered before the ask goes to the question in play, not the oldest one about somebody else (a review)", async () => {
+    const { actor } = await owner();
+    const { writeRelation } = await import("@/lib/subjects");
+    const clover = candidate(actor, "Clover", "person");
+    const edge = writeRelation(actor, { type: "partner_of", name: "Clover", stated: false }, clover, "turn-judge", 0.5);
+    if (!edge.ok || !edge.value) throw new Error(edge.error);
+    queueOpenQuestion({ person: actor.id, kind: "who", text: "Is Clover your partner?", subjectId: edge.value.id, source: "turn-judge" });
+    await withChat("Third time this week.", async () => {
+      const first = await runTurn(actor, "chat", "juniper chewed through the garden hose again");
+      if (!first.ok) throw new Error(first.error);
+      // The judge's question about juniper arrives after the reply, on this conversation.
+      const juniper = candidate(actor, "juniper", "pet");
+      const q = queueOpenQuestion({ person: actor.id, conversationId: first.value.conversation_id, kind: "who", text: "Who's Juniper?", subjectId: juniper.id, source: "turn-judge" });
+      const answer = await runTurn(actor, "chat", "he's our rabbit", { conversationId: first.value.conversation_id });
+      if (!answer.ok) throw new Error(answer.error);
+      expect(answer.value.reply.text).toBe("Got it, juniper is your rabbit.");
+      expect(listOpenQuestions(actor.id).find((x) => x.id === q.id)).toMatchObject({ status: "answered" });
+      expect(entityNamed("juniper")).toMatchObject({ kind: "pet", source: "local", pronouns: "he" });
+    });
+  });
+
   test("a bare 'no' to a relationship question drops the guess (a review)", async () => {
     const { actor } = await owner();
     const { writeRelation } = await import("@/lib/subjects");
@@ -409,8 +459,10 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     const edge = writeRelation(actor, { type: "colleague_of", name: "Raven", stated: false }, raven, "turn-judge", 0.5);
     if (!edge.ok || !edge.value) throw new Error(edge.error);
     queueOpenQuestion({ person: actor.id, kind: "who", text: "Is Raven your coworker?", subjectId: edge.value.id, source: "turn-judge" });
+    // The set's read: the name is in play (said on the turn), so the
+    // relationship question is put.
     await withChat("That sounds tiring.", async () => {
-      const first = await runTurn(actor, "chat", "I had a long day");
+      const first = await runTurn(actor, "chat", "Raven ran the meeting today and it went long");
       if (!first.ok) throw new Error(first.error);
       const no = await runTurn(actor, "chat", "No", { conversationId: first.value.conversation_id });
       if (!no.ok) throw new Error(no.error);
@@ -565,8 +617,10 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     const edge = writeRelation(actor, { type: "colleague_of", name: "Raven", stated: false }, raven, "turn-judge", 0.5);
     if (!edge.ok || !edge.value) throw new Error(edge.error);
     const question = queueOpenQuestion({ person: actor.id, kind: "who", text: "Is Raven your coworker?", subjectId: edge.value.id, source: "turn-judge" });
+    // The set's read: the name is in play (said on the turn), so the
+    // relationship question is put.
     await withChat("That sounds tiring.", async () => {
-      const first = await runTurn(actor, "chat", "I had a long day");
+      const first = await runTurn(actor, "chat", "Raven ran the meeting today and it went long");
       if (!first.ok) throw new Error(first.error);
       expect(first.value.reply.text).toBe("That sounds tiring. Is Raven your coworker?");
       const yes = await runTurn(actor, "chat", "yes", { conversationId: first.value.conversation_id });
@@ -582,7 +636,7 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     if (!guess.ok || !guess.value) throw new Error(guess.error);
     queueOpenQuestion({ person: actor.id, kind: "who", text: "Is Marlow your coworker?", subjectId: guess.value.id, source: "turn-judge" });
     await withChat("That sounds tiring.", async () => {
-      const first = await runTurn(actor, "chat", "I had a long day");
+      const first = await runTurn(actor, "chat", "Marlow kept me on the phone all evening");
       if (!first.ok) throw new Error(first.error);
       const no = await runTurn(actor, "chat", "no, she's my sister", { conversationId: first.value.conversation_id });
       if (!no.ok) throw new Error(no.error);

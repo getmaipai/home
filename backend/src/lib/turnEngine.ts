@@ -55,6 +55,7 @@ import {
   resolveSupersedes,
   lastTurnSubjects,
   nextOpenQuestionFor,
+  pendingOpenQuestionsFor,
   markOpenQuestionAsked,
   resolveOpenQuestion,
   resolveOpenQuestionsAbout,
@@ -1254,6 +1255,28 @@ export function asksAboutHousehold(text: string, roster: readonly string[]): boo
   });
 }
 
+/** LOOKUP-02's set: the stand-down reads the turn's own subjects too,
+ * the registry's things and places included ("the dishwasher is
+ * making a grinding noise again" drew a promise and the ladder searched
+ * the web for the family's dishwasher, which the roster of people and
+ * pets never named). A carried household subject counts: a pronoun
+ * question after a turn about the household is about the household. */
+const REFERS_BACK_RE = /(?<![\p{L}])(?:it|its|it's|they|them|their|he|him|his|she|her|hers)(?![\p{L}])/iu;
+// An expletive "it" refers to nothing ("is it going to rain", "what
+// time is it", "is it a holiday tomorrow"; a review): it comes off the
+// text before the refer-back read.
+const EXPLETIVE_IT_RE = /(?<![\p{L}])(?:(?:is|was|will|would|could|might|does|did|isn[\u2019']?t|won[\u2019']?t|wasn[\u2019']?t) it (?:(?:going to|gonna|likely to|supposed to|meant to|about to) )?(?:be )?(?:rain|snow|storm|hail|freeze|pour|clear up|get (?:cold|hot|warm|dark|light|late)|cold|hot|warm|sunny|rainy|wet|dry|windy|foggy|icy|late|early|dark|light|busy|open|closed|(?:a |the )?(?:holiday|weekend|school day|long weekend|bank holiday)|raining|snowing)|what (?:time|day|date|year) is it|it(?:[\u2019']s| is| will| might| could) (?:(?:going to|gonna) )?(?:rain|snow|raining|snowing|cold|hot|warm|late|early|(?:a |the )?(?:holiday|weekend)))(?![\p{L}])/giu;
+export function householdSubjectTurn(text: string, ctx: { roster: readonly string[]; subjects: readonly SubjectRef[]; subjectsCarried?: boolean }): boolean {
+  if (asksAboutHousehold(text, ctx.roster)) return true;
+  if (!ctx.subjects.some((s) => s.type === "household")) return false;
+  // A carried household subject counts only when the utterance refers
+  // back to it ("should we get it looked at"); "what's the weather
+  // tomorrow" or "is it going to rain" after a turn about the dog is a
+  // world question (a review). A generic "they" ("when did they land on
+  // the moon") is the stated limit.
+  return !ctx.subjectsCarried || REFERS_BACK_RE.test(text.replace(EXPLETIVE_IT_RE, " "));
+}
+
 /** The literal yield's own reason, for the `[route]` line. */
 export type LiteralYield = { id: string; reason: "household_subject" | "arithmetic" };
 
@@ -1576,6 +1599,17 @@ function stripLead(text: string): string {
 const LOOKUP_FIELD_FILLER_RE = /\b(?:it|its|it's|that|this|them|they|they're|their|there|for you|for me|you|me|we|us|our|your|is|are|was|were|be|being|been|do|does|did|can|could|would|should|will|get|got|of|to|the|a|an|and|or|so|then|now|just|please|too|also|really|actually|currently|right now|these days|at the moment)\b/gi;
 const CURRENCY_MARK_RE = /\b(?:new|newest|latest|current|currently|today|tonight|tomorrow|this (?:year|week|month|season|weekend)|still|yet|upcoming|out yet|come out|came out|released?)\b/i;
 const NOT_A_QUESTION_TURN_RE = /^(?:(?:that'?s|this is) (?:twice|three times|the (?:second|third) time)|you (?:already|just) said|you said that|stop|enough|no|yes|ok(?:ay)?|sure|thanks|thank you|go on|do it|just do it|well|hmm|uh|um)\b/i;
+// A question whose only subject is a pronoun ("when did it happen",
+// "how long is it", "who was in it").
+// "that" and "this" stay out: "what year was that war fought" names its
+// subject (a review).
+const PRONOUN_ONLY_QUESTION_RE = /^(?:what|which|how(?: (?:long|many|much|old|far|big))?|when|where|who|why|is|are|was|were|does|do|did|can|could|would|will|should)\b[^?]{0,30}?\b(?:it|they|them|he|she|him|her)\b\s*(?:\w+\s*){0,3}\??$/i;
+const QUERY_CONNECTIVE_RE = /^(?:but|though|although|however|also|still|anyway|so|and|or|yet)$/i;
+const TIME_FILLER_RE = /^(?:ago|while|year|years|month|months|day|days|week|weeks|time|times|once|later|earlier|before|after|recently|lately|soon|already|last|next)$/i;
+// The hedge words and the promise's own lookup verb, out of the
+// confessing sentence when it becomes the query.
+// The hedge frames, not content: "around" only before a number (a review).
+const HEDGE_WORDS_RE = /\b(?:i think|i believe|i'?m not (?:entirely |completely |100% )?sure|not (?:entirely |completely )?sure|probably|typically|usually|generally|(?:around|roughly|approximately|about)(?=\s+\d)|if i remember(?: correctly| right)?|as far as i (?:know|remember|recall)|but (?:do )?check|let me (?:just |quickly )?(?:check|look(?: that| it)?(?: up)?|find out|see|verify|confirm)(?: (?:that|it|this))?(?: for you)?|i'?ll (?:check|look(?: that| it)?(?: up)?|find out|verify|confirm)(?: (?:that|it|this))?(?: for you)?)\b/gi;
 export function lookupQueryFor(input: { subjects: readonly SubjectRef[]; sentence: string; utterance: string; history: readonly string[]; roster: readonly string[]; shape?: LookupShape }): string | null {
   const subject = input.subjects.find((s) => s.type === "world" || s.type === "unresolved");
   const subjectName = subject ? (subject.type === "world" ? subject.display_name : subject.type === "unresolved" ? subject.surface_form : null) : null;
@@ -1598,6 +1632,35 @@ export function lookupQueryFor(input: { subjects: readonly SubjectRef[]; sentenc
   const questionTurns = [input.utterance, ...[...input.history].reverse()].filter((t) => t.trim().split(/\s+/).length > 1 && !NOT_A_QUESTION_TURN_RE.test(t.trim()) && (/\?\s*$/.test(t.trim()) || /^(?:what|which|how|when|where|who|why|is|are|does|do|did|can|could|would|will|should)\b/i.test(t.trim())));
   const question = subjectName ? questionTurns.find((t) => new RegExp(subjectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").test(t)) : questionTurns[0];
   const currency = [input.utterance, question ?? ""].map((t) => CURRENCY_MARK_RE.exec(t)?.[0]).find((m): m is string => !!m);
+  // LOOKUP-02's set: no world or unresolved subject on the stack and a
+  // pronoun-only question ("when did it happen" after a turn about the
+  // moon landing): the confessing sentence's own words are the query,
+  // its hedge marker, its value and the fillers out ("moon landing
+  // happened"), never the pronoun question alone.
+  if (!subjectName && field.length === 0 && (input.shape === "hedged_fact" || input.shape === "promise") && PRONOUN_ONLY_QUESTION_RE.test(input.utterance.trim())) {
+    // The household's names never reach the search (a review): the
+    // roster's names come off the sentence first, possessives with them.
+    let own = input.sentence;
+    for (const name of input.roster) {
+      if (name.trim().length > 1) own = own.replace(new RegExp(`(?<![\\p{L}\\p{N}])${name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[\u2019']s)?(?![\\p{L}\\p{N}])`, "giu"), " ");
+    }
+    own = own
+      .replace(HEDGE_WORDS_RE, " ")
+      .replace(/\b\d[\d.,]*\b/g, " ")
+      .replace(/(?<=\p{L})[\u2019']\s*(?:re|s|m|ve|ll|d)\b/giu, "")
+      .replace(LOOKUP_FIELD_FILLER_RE, " ")
+      .replace(/[^\p{L}\p{N}'\s-]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const words = own.split(" ").filter((w) => w.length > 0 && !LOOKUP_FIELD_LEAD_RE.test(`${w} `) && !QUERY_CONNECTIVE_RE.test(w));
+    while (words.length > 0 && /^(?:in|on|at|by|for|of|to|from|with|since|until|around)$/i.test(words[words.length - 1]!)) words.pop();
+    // At least one content word the question did not carry (a noun the
+    // sentence introduced), never a time filler: "but year ago" and
+    // "happened while ago" search nothing (a review).
+    const asked = new Set(input.utterance.toLowerCase().split(/[^\p{L}\p{N}']+/u).filter((w) => w.length > 0).map((w) => w.slice(0, 4)));
+    const content = words.filter((w) => w.length >= 3 && !asked.has(w.toLowerCase().slice(0, 4)) && !TIME_FILLER_RE.test(w));
+    if (words.length >= 2 && content.length >= 1) return [words.join(" "), currency ?? ""].filter(Boolean).join(" ").trim();
+  }
   if (field.length > 0 && subjectName) return [subjectName, field, currency && !field.toLowerCase().includes(currency.toLowerCase()) ? currency : ""].filter(Boolean).join(" ");
   // The field the offer named is the query even with no subject on the
   // stack ("I'll check the weather" is "weather tomorrow", not the
@@ -2141,7 +2204,10 @@ async function prepareTurn(
   // again at the end of the reply. Only a bare answer shape that names
   // nobody else (looksLikeWhoAnswer); a statement about another name
   // is its own turn.
-  const openPending = nextOpenQuestionFor(actor.id);
+  // The same in-play selection as the appended ask (the set's read):
+  // the answer goes to the question about the name in play, never the
+  // oldest one about somebody else.
+  const openPending = nextOpenQuestionInPlay(actor.id, text, { history: [], subjects: lastTurnSubjects(conversation.id) });
   if (openPending && openPending.kind === "who" && openPending.subjectId) {
     const about = openQuestionName(openPending);
     // Only a question this conversation raised, or one about the
@@ -2484,7 +2550,15 @@ async function prepareTurn(
     turnId,
   );
   const carried = resolved.subjects.length === 0 && !supersedes ? lastTurnSubjects(conversation.id).slice(0, 2) : [];
-  const subjects: SubjectRef[] = [...resolved.subjects, ...carried];
+  // One entry per household entity (a name and its alias both resolve
+  // to the one row; LOOKUP-02's set showed the dishwasher twice).
+  const seenEntities = new Set<string>();
+  const subjects: SubjectRef[] = [...resolved.subjects, ...carried].filter((s) => {
+    if (s.type !== "household") return true;
+    if (seenEntities.has(s.entity_id)) return false;
+    seenEntities.add(s.entity_id);
+    return true;
+  });
   const unknownAsk = resolved.unknown.find((u) => u.ask)?.name ?? null;
   const subjectPronouns = subjectPronounsFor(actor, subjects, resolved.unknown);
   const { section: subjectsSection, about: aboutEntries } = subjectsSectionFor(actor, subjects);
@@ -2555,6 +2629,7 @@ async function prepareTurn(
     roster: [...rosterNames, ...subjectRoster],
     signal,
     subjects,
+    subjectsCarried: carried.length > 0,
     subjectPronouns,
   };
   markIncluded(turnContext, promptParts.context);
@@ -2647,6 +2722,31 @@ async function prepareTurn(
  * entity, or the far end of a relationship from the speaker). */
 function openQuestionName(question: OpenQuestionRow): string | null {
   return framedName(question.subjectId, question.person);
+}
+
+/** The next open question to put: the oldest pending one whose subject
+ * is in play (named in the utterance or the last two user turns, or a
+ * subject on the turn), else the oldest pending entity question; a
+ * relationship question about a name not in play waits. */
+function nextOpenQuestionInPlay(personId: string, utterance: string, ctx: { history: readonly { role: string; content: string }[]; subjects: readonly SubjectRef[] }): OpenQuestionRow | null {
+  // A question whose subject is gone (deleted in the registry) lapses
+  // here, so it never shadows the rest (a review).
+  const pending = pendingOpenQuestionsFor(personId).filter((q) => {
+    if (!q.subjectId || openQuestionName(q) !== null) return true;
+    expireOpenQuestion(q.id);
+    console.log(`[ask] the open question ${q.id} lapsed: its subject is gone`);
+    return false;
+  });
+  if (pending.length === 0) return null;
+  const recent = [utterance, ...ctx.history.filter((m) => m.role === "user").slice(-2).map((m) => m.content)].join("\n");
+  const subjectIds = new Set(ctx.subjects.flatMap((s) => (s.type === "household" ? [s.entity_id] : [])));
+  const named = (q: OpenQuestionRow): string | null => openQuestionName(q);
+  const inPlay = (q: OpenQuestionRow): boolean => {
+    if (q.subjectId && subjectIds.has(q.subjectId)) return true;
+    const name = named(q);
+    return name !== null && new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(recent);
+  };
+  return pending.find(inPlay) ?? pending.find((q) => !(q.subjectId ?? "").startsWith("rel-")) ?? null;
 }
 
 /** ASK-01: the pronoun family each subject takes: an entity's stored
@@ -3282,9 +3382,13 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
   // An offer in the reply binds the lookup instead (notePendingLookup
   // runs after this): the open question waits for the next reply.
   const lookupIds = prepared.lookupTools.map((t) => t.id);
-  const offers = lookupIds.includes("websearch") && !lookupAnswered(prepared.turnContext.outcomes) && !asksAboutHousehold(utterance, prepared.turnContext.roster) && splitIntoSentences(visible).some((sentence) => lookupShapeOf(sentence) !== null);
+  const offers = lookupIds.includes("websearch") && !lookupAnswered(prepared.turnContext.outcomes) && !householdSubjectTurn(utterance, prepared.turnContext) && splitIntoSentences(visible).some((sentence) => lookupShapeOf(sentence) !== null);
   if (offers) return NO_ASK;
-  const question = nextOpenQuestionFor(actor.id);
+  // The set's read: a queued question whose subject is on the turn or
+  // in the last two turns goes first; a relationship question about a
+  // name not in play holds (the pet row had the judge's "Is Clover your
+  // partner?" from an earlier row appended where juniper's belonged).
+  const question = nextOpenQuestionInPlay(actor.id, utterance, prepared.turnContext);
   if (!question) return NO_ASK;
   const name = openQuestionName(question);
   if (question.subjectId && name === null) {
@@ -3653,7 +3757,7 @@ async function runTurnHoldingLease(
       // to the knowledge pattern) is never looked up on the web: the
       // promise stands as text and binds nothing (LOOKUP-01's follow-up:
       // "why does Rover keep getting sick" ran a websearch on the dog).
-      const householdSubject = asksAboutHousehold(text, prepared.turnContext.roster);
+      const householdSubject = householdSubjectTurn(text, prepared.turnContext);
       // LOOKUP-02: the read covers the first two sentences (or 160
       // characters): a denial of a deliverable is cut first, then a
       // promise, an offer, or a hedged fact on a world question.
@@ -3724,7 +3828,7 @@ async function runTurnHoldingLease(
   if (value.source === "model") ask.commitIf(value.reply.text);
   // LOOKUP-01: an offer or a late promise in the reply that went out
   // binds the next consent word to the lookup.
-  if (prepared.kind === "model" && value.source === "model" && !asksAboutHousehold(text, prepared.turnContext.roster)) {
+  if (prepared.kind === "model" && value.source === "model" && !householdSubjectTurn(text, prepared.turnContext)) {
     const offered = splitIntoSentences(visibleText(value.reply.text)).find((sentence) => lookupShapeOf(sentence) !== null);
     const expression = offered ? lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: offered, utterance: text, history: prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content), roster: prepared.turnContext.roster, shape: lookupShapeOf(offered) ?? undefined }) : null;
     if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
@@ -4379,7 +4483,7 @@ async function runTurnStreamHoldingLease(
       // A household subject in the question is never looked up on the
       // web (the follow-up, as on the blocking path): a promise about it
       // is dropped and the rest streams.
-      const householdSubject = asksAboutHousehold(text, modelTurn.turnContext.roster);
+      const householdSubject = householdSubjectTurn(text, modelTurn.turnContext);
       const iterator = inner[Symbol.asyncIterator]();
       let buffer = "";
       // A think block is not held (a review: OUT-01's rule that the
@@ -4700,7 +4804,7 @@ async function runTurnStreamHoldingLease(
         finalized = value;
         // LOOKUP-01: an offer or a late promise that went out on the
         // wire binds the next consent word to the lookup.
-        if (value.source === "model" && !opts.ephemeral && !asksAboutHousehold(text, prepared.turnContext.roster)) {
+        if (value.source === "model" && !opts.ephemeral && !householdSubjectTurn(text, prepared.turnContext)) {
           const offered = splitIntoSentences(visibleText(value.reply.text)).find((sentence) => lookupShapeOf(sentence) !== null);
           const expression = offered ? lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: offered, utterance: text, history: prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content), roster: prepared.turnContext.roster, shape: lookupShapeOf(offered) ?? undefined }) : null;
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;

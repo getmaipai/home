@@ -13,7 +13,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { runTurn, lookupQueryFor, lookupConsent, LOOKUP_FAILED_LINE, withoutSentences } from "@/lib/turnEngine";
+import { runTurn, lookupQueryFor, lookupConsent, LOOKUP_FAILED_LINE, withoutSentences, householdSubjectTurn } from "@/lib/turnEngine";
 import { readLookupDraft, lookupShapeOf, hedgedFactShape, falseCapabilityShape, guardReply } from "@/lib/guards";
 import { getPendingAsk } from "@/lib/conversationHistory";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -220,6 +220,77 @@ describe("the engine: the read on both paths, the ladder, the binding, the conse
       expect(seen.forced).toBe(0);
       expect(result.value.source).toBe("model");
     });
+  });
+
+  test("the set's read: a registered thing on the turn, or a carried household subject, stands the lookup down; the stack holds one entry per entity", async () => {
+    const { actor } = await owner();
+    await withLookup({ draft: "Let me check that for you. Grinding usually means the pump." }, async (seen) => {
+      const { ensureSubjectEntity } = await import("@/lib/subjects");
+      const { updateEntity } = await import("@/lib/entities");
+      const made = ensureSubjectEntity(actor, { name: "the dishwasher", kind: "thing" }, true);
+      if (!made.ok || !made.value) throw new Error(made.error);
+      expect(updateEntity(actor, made.value.id, { aliases: ["dishwasher", "the Bosch"] }).ok).toBe(true);
+      const lines: string[] = [];
+      const original = console.log;
+      console.log = (...args: unknown[]) => {
+        lines.push(args.map(String).join(" "));
+        original(...args);
+      };
+      try {
+        const first = await runTurn(actor, "chat", "the dishwasher is making a grinding noise again");
+        if (!first.ok) throw new Error(first.error);
+        expect(seen.forced).toBe(0);
+        expect(first.value.source).toBe("model");
+        expect(first.value.reply.text).toBe("Grinding usually means the pump.");
+        const turn = lines.filter((l) => l.startsWith("[turn] {")).map((l) => JSON.parse(l.slice(7)) as { subjects?: { type: string; name: string }[] }).at(-1)!;
+        expect(turn.subjects).toEqual([{ type: "household", name: "the dishwasher" }]);
+        // The pronoun question after it carries the dishwasher: still the household's.
+        const second = await runTurn(actor, "chat", "should we get it looked at", { conversationId: first.value.conversation_id });
+        if (!second.ok) throw new Error(second.error);
+        expect(seen.forced).toBe(0);
+        expect(second.value.source).toBe("model");
+        expect(seen.queries).toEqual([]);
+        // A world question that names nothing and refers back to nothing
+        // is not the household's, whatever is carried (a review).
+        const third = await runTurn(actor, "chat", "what's the release date of the new Cosmo 7 card", { conversationId: first.value.conversation_id });
+        if (!third.ok) throw new Error(third.error);
+        expect(seen.forced).toBe(1);
+        expect(third.value.source).toBe("plugin");
+        // An expletive "it" refers to nothing: the weather question right
+        // after the dishwasher (a fresh conversation, the dishwasher
+        // carried) is the world's too (a review).
+        const again = await runTurn(actor, "chat", "the dishwasher is making a grinding noise again");
+        if (!again.ok) throw new Error(again.error);
+        const fourth = await runTurn(actor, "chat", "is it going to rain tomorrow", { conversationId: again.value.conversation_id });
+        if (!fourth.ok) throw new Error(fourth.error);
+        expect(seen.forced).toBe(2);
+        expect(fourth.value.source).toBe("plugin");
+      } finally {
+        console.log = original;
+      }
+    });
+  });
+
+  test("the set's read: householdSubjectTurn() reads a carried subject only through a pronoun that refers back", () => {
+    const carried = { roster: ["Pippa"], subjects: [{ type: "household" as const, entity_id: "ent-dishwasher", carried_question: null }], subjectsCarried: true };
+    expect(householdSubjectTurn("should we get it looked at", carried)).toBe(true);
+    expect(householdSubjectTurn("what's the weather tomorrow", carried)).toBe(false);
+    for (const q of ["is it going to rain tomorrow", "is it a holiday tomorrow", "what time is it", "it\u2019s raining, should we cancel", "isn't it going to rain", "isn\u2019t it going to rain", "won\u2019t it be cold tomorrow", "will it be raining tomorrow"]) expect(householdSubjectTurn(q, carried)).toBe(false);
+    expect(householdSubjectTurn("is it going to rain tomorrow", { ...carried, subjectsCarried: false })).toBe(true);
+  });
+
+  test("the set's read: a pronoun-only question with no world subject on the stack searches the confessing sentence's own words", () => {
+    expect(lookupQueryFor({ subjects: [], sentence: "I think the moon landing happened in 1969.", utterance: "when did it happen", history: ["Pippa is learning about the moon landing at school"], roster: ["Pippa"], shape: "hedged_fact" })).toBe("moon landing happened");
+    expect(lookupQueryFor({ subjects: [], sentence: "Let me check how long the film runs.", utterance: "how long is it", history: [], roster: [], shape: "promise" })).toBe("how long film runs");
+    // The household's names never reach the search; filler-only and
+    // time-only leftovers search nothing; "that <noun>" is no pronoun
+    // question (a review).
+    expect(lookupQueryFor({ subjects: [], sentence: "I think Pippa's class covered it last year, but let me check.", utterance: "when did it happen", history: [], roster: ["Pippa"], shape: "promise" })).not.toMatch(/pippa/i);
+    expect(lookupQueryFor({ subjects: [], sentence: "I'm not sure, but I think it was around a year ago.", utterance: "when did it happen", history: [], roster: [], shape: "hedged_fact" })).not.toBe("but year ago");
+    expect(lookupQueryFor({ subjects: [], sentence: "I'm not sure, it happened a while ago.", utterance: "when did it happen", history: [], roster: [], shape: "hedged_fact" })).not.toBe("happened while ago");
+    expect(lookupQueryFor({ subjects: [], sentence: "I think it was fought in 1812.", utterance: "what year was that war fought", history: [], roster: [], shape: "hedged_fact" })).toBe("year war fought"); // the question's own words, never the sentence's
+    // With a subject on the stack the builder is unchanged.
+    expect(lookupQueryFor({ subjects: [{ type: "unresolved", surface_form: "Cosmo 7", candidate_kinds: [], provenance: "t", confidence: 0.4, carried_question: null }], sentence: "It usually takes a 12-pin connector.", utterance: "how many pins is the Cosmo 7 card", history: [], roster: [], shape: "hedged_fact" })).toBe("pins Cosmo 7 card");
   });
 
   test("the ladder: the model picks knowledge first and it finds nothing, so the search runs next with the engine's query, and both outcomes stay", async () => {

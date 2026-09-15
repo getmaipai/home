@@ -589,9 +589,14 @@ export function queueOpenQuestion(input: { person: string; conversationId?: stri
 
 /** The person's oldest pending question, or null. */
 export function nextOpenQuestionFor(personId: string): OpenQuestionRow | null {
+  return pendingOpenQuestionsFor(personId)[0] ?? null;
+}
+
+/** Every pending question of the person's, oldest first, the stale
+ * ones expired first (the engine picks the one in play). */
+export function pendingOpenQuestionsFor(personId: string): OpenQuestionRow[] {
   expireStaleOpenQuestions(personId);
-  const row = db.select().from(openQuestions).where(and(eq(openQuestions.person, personId), eq(openQuestions.status, "pending"))).orderBy(openQuestions.createdAt).get();
-  return (row as OpenQuestionRow | undefined) ?? null;
+  return db.select().from(openQuestions).where(and(eq(openQuestions.person, personId), eq(openQuestions.status, "pending"))).orderBy(openQuestions.createdAt).all() as OpenQuestionRow[];
 }
 
 /** Every question of the person's, newest first (the bench and the

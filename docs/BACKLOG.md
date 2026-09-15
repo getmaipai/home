@@ -1715,7 +1715,17 @@ invented for the roster's household, and added to
     world kind or the hinted kinds. Bench: not-a-name, hub-named-it,
     public-figure (the fake search's film cast row names Serena Vale),
     `subjectsAbsent` and a subject `kind` as expectation kinds. Tests:
-    `backend/tests/ask02.test.ts`. Exit: `bash scripts/check.sh`.
+    `backend/tests/ask02.test.ts`. Exit: `bash scripts/check.sh`. The
+    full set on bc738b5 (86 rows, three runs): 240, 237, 239 of 302,
+    the hard rows 12 of 12, the question rate 27.6 to 29.2 percent;
+    LOOKUP-02 and ASK-02 accepted on it. The follow-up commit: the
+    lookup stand-down reads the turn's household subjects (things,
+    places, the carried ones), the stack deduped by entity; the query
+    for a pronoun-only question with no world subject is the
+    confessing sentence's own words; a queued question in play goes
+    first and a relationship question about a name not in play holds;
+    hub-named-it seeds its promise, the Serena Vale fixture carries
+    what happened, not-a-name names Answer.
 
 <a id="lookup-02"></a>
 

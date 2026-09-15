@@ -177,6 +177,10 @@ export interface TurnContext {
    * by the person's own words (the engine asks); 0.4 is a bare proper
    * noun (no ask). CHAT-13's stack grows from here. */
   subjects: SubjectRef[];
+  /** LOOKUP-02's set: the subjects were carried from the last turn (the
+   * utterance named nobody), so a household one stands a lookup down
+   * only when the utterance refers back with a pronoun. */
+  subjectsCarried?: boolean;
   /** ASK-01: the pronoun family each subject takes, from the entity's
    * stored pronouns or the pronoun the person used for the name this
    * turn, for the guards' pronoun check. */

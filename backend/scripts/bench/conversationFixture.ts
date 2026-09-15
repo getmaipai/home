@@ -1149,7 +1149,9 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     turns: [
       { say: "Lord, that took ages", expect: { signal: { primary_act: "inform" }, subjectsAbsent: [{ type: "unresolved" }], pendingAsk: null, mustNotContain: "who's lord|who is lord", humanVerdict: true } },
       { say: "wow, the Cosmo 7 card is a beast", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "unresolved", name: "Cosmo 7", kind: "organization" }], pendingAsk: null, mustNotContain: "who's cosmo|who is cosmo|who's the cosmo", humanVerdict: true } },
-      { say: "that Answer was wrong", expect: { subjectsAbsent: [{ type: "unresolved" }], pendingAsk: null, mustNotContain: "who's answer|who is answer", humanVerdict: true } },
+      // The turn names nobody, so the previous turn's Cosmo 7 is carried:
+      // the check is that no "Answer" stands (the set's read).
+      { say: "that Answer was wrong", expect: { subjectsAbsent: [{ type: "unresolved", name: "Answer" }], pendingAsk: null, mustNotContain: "who's answer|who is answer", humanVerdict: true } },
     ],
   },
   {
@@ -1157,7 +1159,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "knowledge",
     note: "ASK-02 (rule 3; finding 44): the search's cast row names Serena Vale; asked who she is, the hub never asks back about a name it introduced, and the answer comes from a lookup or the retained result",
     turns: [
-      { say: "who's in the new Marsh Lantern film", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustContain: "serena|vale", guard: null } },
+      // The set's read: the 8B offers ("Want me to look that up?") and an
+      // offer binds rather than runs, so the promise is seeded, as
+      // ladder-falls-through seeds it, and the cast row comes.
+      { say: "who's in the new Marsh Lantern film", seedReply: "Let me check that for you.", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustContain: "serena|vale", guard: null } },
       { say: "who's Serena Vale", expect: { signal: { primary_act: "question" }, pendingAsk: null, subjects: [{ type: "world", name: "Serena Vale" }], subjectsAbsent: [{ type: "unresolved" }], mustContain: "actress|keeper|lighthouse|film|plays|stars", mustNotContain: "who's serena|do you mean|someone you know|public figure", guard: null } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
@@ -1168,7 +1173,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "ASK-02 (rule 4; finding 33): a bare name in a statement is unresolved with no engine ask; the model's own 'someone you know or a public figure?' is bound as the ask, and the answer that makes her a public figure runs the raising turn as a lookup on her at once",
     turns: [
       { say: "sounds like they worked out what happened to Serena", seedReply: "Serena? Is that someone you know or a public figure?", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "unresolved", name: "Serena" }], pendingAsk: "who", mustNotContain: "who's serena", humanVerdict: true } },
-      { say: "the actress, Serena Vale", expect: { pendingAsk: null, subjects: [{ type: "world", name: "Serena Vale" }], entityAbsent: "Serena Vale", toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "serena vale" } }, lookupWithSource: true, mustContain: "actress|keeper|lighthouse|film|award", mustNotContain: "are you saying|what are you thinking|let me know|got it, serena" } },
+      { say: "the actress, Serena Vale", expect: { pendingAsk: null, subjects: [{ type: "world", name: "Serena Vale" }], entityAbsent: "Serena Vale", toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "serena vale" } }, lookupWithSource: true, mustContain: "actress|keeper|lighthouse|film|award|safe|missing|shoot|filming", mustNotContain: "are you saying|what are you thinking|let me know|got it, serena" } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },

@@ -5836,6 +5836,60 @@ a query about Serena Vale with her own facts. Tests:
 question, the query, and the two flows against the stub with a fake
 SearXNG, plus the acknowledgment with nothing carried).
 
+**The full set** (2026-09-15, on bc738b5, the whole 86 rows, three
+runs; the 8B chat engine, the 4B judge started for the set and
+stopped after it; logs `bench-ask02-set1-seed-{a,b,c}.log`; the
+acceptance for LOOKUP-02 and ASK-02 together). 240, 237 and 239 of
+302 scored turns (ASK-01's full set on de9d6a4: 216, 210, 211 of
+276; 26 scored turns new), the hard rows 12 of 12 in every run. The
+question rate 27.6, 29.2 and 28.8 percent (after a non-question turn
+33.9, 37.8, 35.6; after a question 19.1, 17.6, 19.8) against the
+reference's 32.9, 42.8 and 16.3: a measurement until ACT-03.
+LOOKUP-02's six rows 18 of 18 every run; ASK-01's design rows and
+`self-harm-state` green every run, `who-ask-declined` and
+`open-question-once` newly green after the second round; ASK-02's
+`not-a-name` turns 1 and 2 and `public-figure` turn 1 green every run
+(the oath and the brand never asked; the model's own "someone you
+know or a public figure?" bound). The coordinator's read, in the
+follow-up commit: two of LOOKUP-02's own surfaced by the full set
+(`household-subject-thing`: "the dishwasher is making a grinding
+noise again" drew a promise and the ladder searched the web for the
+family's dishwasher, a registered thing the roster of people and pets
+never named, so `householdSubjectTurn()` now reads the turn's own
+household subjects, things and places included, on every stand-down
+site, a carried one only when the utterance refers back with a
+pronoun ("should we get it looked at"; "what's the weather tomorrow"
+or "is it going to rain", an expletive it, after a turn about the dog
+is a world question, the review; a generic "they", "when did they
+land on the moon", and "will it be open tomorrow" about a carried
+place, which the expletive read takes as the weather's, are the
+stated limits), and the stack holds one entry per entity;
+`world-knowledge-history`: "when did it happen" after a turn about the
+moon landing drew a hedged 1969 and the forced lookup ran on a useless
+query, so with no world or unresolved subject on the stack and a
+pronoun-only question (it, they, he, she; never "that war") the query
+is the confessing sentence's own words with the hedge frames, the
+value, the fillers, the connectives and the household's names out,
+and only when a content word the question did not carry remains,
+"moon landing happened", never "but year ago"); three fixture premises (`hub-named-it` seeds the promise
+since the 8B's offer binds and never runs; the fake search's Serena
+Vale row carries what happened to her, so the recipe's honest "the
+results do not say" has something to say; `not-a-name` turn 3 names
+Answer, the carried Cosmo 7 being right); and the queue order
+(`nextOpenQuestionInPlay()`: a queued question whose subject is on
+the turn or in the last two user turns goes first, else the oldest
+entity question, and a relationship question about a name not in
+play holds, on the appended ask and the answered-before-asked path
+alike, a question whose subject is gone lapsing in the picker; `unknown-name-pet-lowercase` had the judge's "Is Clover
+your partner?" from an earlier row appended where juniper's belonged,
+once LOOKUP-02's offers deferred it onto that row). Pre-existing or
+variance: `inferred-coworker-candidate` and `household-subject-
+person` cut by invention on an invented role or gender, rightly;
+`new-album`, `pending-ask-lookup`, `copied-line-history` turn 2 and
+the written-to-fail rows as before. The empty-result reply shape (the
+recipe's summary of nothing reaching the person) stays CHAT-13's and
+CHAT-16's.
+
 **Left on record.** The third review's one is in the tree: the
 frame pattern "Name, my noun" also matches an oath before a clause
 ("God, my dad is going to be so mad"), so a frame's name is exempt
