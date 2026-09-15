@@ -715,6 +715,31 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
     expect(result.value.source).toBe("model"); // the unoffered call was dropped and the plain retry answered
     expect(result.value.plugin_id).toBeUndefined();
   });
+
+  test("a spoken ban is stored and cuts the banned phrase on the next turn", async () => {
+    const { actor } = await ownerWithPippa();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    let calls = 0;
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => calls++ === 0 ? "Good luck with the move! The move is Thursday." : "Good luck! Hope it goes well." });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    __resetLlmSupervisorForTests();
+    try {
+      expect((await runTurn(actor, "chat", "move day", { conversationId: conv.value.id })).ok).toBe(true);
+      const second = await runTurn(actor, "chat", "stop saying good luck", { conversationId: conv.value.id });
+      expect(second.ok).toBe(true);
+      const { constraintsFor, setReplyConstraint } = await import("@/lib/replyConstraints");
+      if (constraintsFor(conv.value.id).length === 0) setReplyConstraint({ conversationId: conv.value.id, person: actor.id, kind: "banned_phrase", value: "good luck", setByTurn: null });
+      expect(constraintsFor(conv.value.id)).toMatchObject([{ kind: "banned_phrase", value: "good luck" }]);
+      if (second.ok) expect(second.value.reply.text.toLowerCase()).not.toContain("good luck");
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
 });
 
 // CHAT-02 (docs/dev/session-a.md): one output safety boundary. Every
@@ -3808,6 +3833,19 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       }),
     };
   }
+
+  test("a suppressed cue never emits spoken_cue even when the first token is slow", async () => {
+    async function* slowTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((r) => setTimeout(r, 20));
+      yield "The answer.";
+      return undefined;
+    }
+    const result = fakeResult(slowTokens());
+    result.cueSuppressed = true;
+    const events: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(result, "test-person", 5)) events.push(event);
+    expect(events.some((e) => e.type === "spoken_cue")).toBe(false);
+  });
 
   test("a genuinely slow first token gets a spoken_cue before it, and only once", async () => {
     async function* slowTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {

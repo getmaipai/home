@@ -3,8 +3,26 @@ import { resetDb } from "./reset-db";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { parseReplyConstraint, setReplyConstraint, constraintsFor, bannedPhrasesFor, clearReplyConstraints } from "@/lib/replyConstraints";
+import { __resetThinkingCuesForTests, pickThinkingCue, THINKING_CUE_VARIANTS } from "@/lib/replyVariation";
 
 beforeEach(() => resetDb());
+
+describe("CONS-01: the cue", () => {
+  beforeEach(() => __resetThinkingCuesForTests());
+
+  test("rotates, filters, and exhausts thinking cues", () => {
+    let previous: string | null = null;
+    for (let i = 0; i < 10; i++) {
+      const cue = pickThinkingCue("person-a");
+      expect(cue).not.toBe(previous);
+      previous = cue;
+    }
+    __resetThinkingCuesForTests();
+    for (let i = 0; i < 10; i++) expect(pickThinkingCue("person-a", ["one sec"])?.toLowerCase()).not.toContain("one sec");
+    __resetThinkingCuesForTests();
+    expect(pickThinkingCue("person-a", THINKING_CUE_VARIANTS.flatMap((cue) => cue.toLowerCase().split(/\s+/)))).toBeNull();
+  });
+});
 
 describe("reply constraint parser", () => {
   test("parses bans only when the hub said the phrase", () => {

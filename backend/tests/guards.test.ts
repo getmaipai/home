@@ -10,6 +10,21 @@ function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
 }
 
+describe("CONS-01: a banned phrase is cut", () => {
+  test("cuts a banned phrase while preserving the rest of the reply", () => {
+    const context = ctx({ utterance: "the card ships Thursday", act: "inform", bannedPhrases: ["good luck"] });
+    const cut = guardReply("Good luck with it! The card ships Thursday.", context);
+    expect(cut.reason).toBe("banned_phrase");
+    expect(cut.replaced).toBe(false);
+    expect(cut.reply).toBe("The card ships Thursday.");
+    const emptied = guardReply("Good luck!", context);
+    expect(emptied.reason).toBe("banned_phrase");
+    expect(emptied.emptied).toBe(true);
+    expect(emptied.reply).not.toMatch(/good luck/i);
+    expect(guardReply("Good luck with it! The card ships Thursday.", ctx({ utterance: "the card ships Thursday", act: "inform" })).reason).not.toBe("banned_phrase");
+  });
+});
+
 describe("LOOKUP-02 promise and hedge edges", () => {
   test("recall promises are not lookup promises, while an actual schedule check is", () => {
     expect(readLookupDraft("Let me check if I remember anything about the dishwasher.", { worldQuestion: true, lookupServed: true })).toBeNull();
