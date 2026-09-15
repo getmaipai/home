@@ -1816,19 +1816,29 @@ invented for the roster's household, and added to
     a world-answer mark taken on a long statement that is no answer,
     and the prompt-side drift that draws "Got it, added to the list."
     on a plain statement.
-- [ ] **CONS-01: Standing reply constraints** (spec S done, engine S)
-    Spec half done 2026-09-15 (7e816a7: `spec/schemas/reply-
-    constraint.schema.json`, the generated bindings and fixture). The
-    engine half (dev.md section 16 part 9, rules 2 and 3): chunk A, the
-    `reply_constraints` table, the deterministic parser ("stop saying
-    X" checked against the last two replies, the shape and length asks)
-    and the store; chunk B, the write from the turn, the guard reading
-    `banned_phrase` (a sentence carrying one is cut, a reply that is
-    only the phrase takes REG-01's retry), the cue picker dropping any
-    cue containing it and the cue's three bounds (never twice in a row,
-    removed by a ban, never on an objection turn). Bench: `sign-offs`
-    turn 3, `cue-banned`; `list-shape-on-lookup` waits for CHAT-16.
-    Exit: `bash scripts/check.sh`.
+- [x] **CONS-01: Standing reply constraints** (spec S, engine S)
+    Done 2026-09-15 (7e816a7 the spec; 145d2df, f773e80, 9ccaf9f,
+    16f678f the engine; dev.md section 16 part 9, rules 2 and 3): the
+    `reply_constraints` table and its migration, a deterministic parser
+    ("stop saying X" checked against the hub's last two replies, the
+    shape and length asks) and store (`lib/replyConstraints.ts`); the
+    engine writes the constraint after the window and lets the model
+    answer; a sentence carrying a banned phrase is cut (`banned_phrase`,
+    skippable) and an emptied reply retries with the phrase in the note;
+    the spoken cue drops any banned cue, never plays twice in a row for
+    a person, and never plays on an objection to the hub
+    (`cueSuppressed` on the stream result). Bench: `sign-offs` turn 3,
+    `cue-banned`; `list-shape-on-lookup` waits for CHAT-16's composer.
+    Tests: replyConstraints.test.ts, guards.test.ts "CONS-01", the
+    corpus row, two stream tests.
+- [x] **ALM-01 (a): the almanac compute module** (S)
+    Done 2026-09-15 (dbf42dd; dev.md section 16 part 6):
+    `lib/almanacCompute.ts` parses the relative-term grammar, answers
+    from a given clock with fixed plain templates and the inputs
+    recorded, and annotates a date's relation to today for the
+    composer; 18 tests on a pinned Monday clock. Chunk B (the compute
+    intent before routing on both paths, the carried term, the rows
+    with a per-row bench clock) is in progress.
 - [x] **LOOKUP-01: A promise is the lookup, an offer is a pending ask** (S-M)
     Done 2026-09-14 (docs/dev/session-a.md "LOOKUP-01"): the promise
     and offer shapes in `lib/guards.ts` (`lookupShapeOf()`, one
@@ -4182,18 +4192,24 @@ frequently a hard prerequisite, not just a preference.
       A pure lookup against a metadata API - explicitly NOT the same
       skill as playing anything (see Priority 3 below); this is the
       half of "media" that's cheap, safe, and useful standalone.
-- [ ] Unit and currency conversion (S) - pure `host.fetch` shape, same
-      pattern as `weather`/`define` (e.g. frankfurter.app for currency).
-- [ ] Math / quick calculation (S)
-- [ ] News headlines (S-M) - most free headline APIs need a key; find one
-      that doesn't, or accept the config step.
-- [ ] Sports scores (S-M)
-- [ ] Translation (S-M)
+- [x] Unit and currency conversion (S) - shipped as the bundled
+      `convert` (a recipe) and `currency` (a handler) packages; ticked
+      2026-09-15 on a backlog read.
+- [x] Math / quick calculation (S) - shipped as the bundled `math`
+      recipe package; ticked 2026-09-15 on a backlog read.
+- [x] News headlines (S-M) - shipped as the bundled `news` handler
+      package; ticked 2026-09-15 on a backlog read.
+- [x] Sports scores (S-M) - shipped as the bundled `sports` handler
+      package; ticked 2026-09-15 on a backlog read.
+- [x] Translation (S-M) - shipped as the bundled `translate` recipe
+      package; ticked 2026-09-15 on a backlog read.
 
 **Priority 2 - simple local actions (writes to our own data, no external
 device or service to control):**
 
-- [ ] Reminders / timers (S-M) - `host.schedule` already exists; this is
+- [x] Reminders / timers (S-M) - shipped as the bundled `remind` and
+      `timer` recipe packages (ticked 2026-09-15 on a backlog read); the
+      note below is the history. `host.schedule` already exists; this is
       mostly a recipe + manifest away. Session E's step 2 (2026-09-06)
       scoped "a running timer, as its own page and a card" here and found
       nothing to build against yet: no recipe, no manifest entry, no
@@ -5260,7 +5276,7 @@ approvals are still real, unstarted work for a future session.
       plain words, create (with an optional relationship to a household
       member), edit a name, remove one or several. `docs/user/memory.md`
       gained its own section.
-- [ ] **Confirming an inferred entity or relationship** (S) - the
+- [x] **Confirming an inferred entity or relationship** (S) - the
       transition is built (step 3a, 2026-09-13, docs/dev/session-a.md):
       `PATCH /api/entities/:id` and `PATCH /api/relationships/:id` with
       body `{ "confirm": true }`, a household adult only (403 otherwise),
@@ -5294,6 +5310,9 @@ approvals are still real, unstarted work for a future session.
       pipeline for one picture. Lands as its own S line, "Screenshot
       the Confirm row," once a deterministic producer exists (ASK-01's
       open-question path or a seed hook, whichever comes first).
+      The entity half shipped too (f16f5ad, home#119 closed): the
+      Unconfirmed mark and the Confirm control on an inferred entity's
+      own row. Ticked 2026-09-15 on a backlog read.
 - [ ] **Screenshot the Confirm row** (S, after ASK-01 or a deterministic
       seed hook for an inferred relationship, whichever lands first) -
       the Confirm control itself already shipped (above); once
