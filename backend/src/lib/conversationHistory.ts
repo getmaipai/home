@@ -33,7 +33,7 @@
 // when no real model is running yet.
 import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc } from "drizzle-orm";
 import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
-import { withoutHonestyLines } from "@/lib/guards";
+import { withoutBankLines, bankLineNote, splitIntoSentences } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands, openQuestions, relationships } from "@/db/schema";
@@ -1025,8 +1025,12 @@ function pluginDisplayName(pluginId: string): string {
  * honesty lines stripped, whatever else was said quoted in nobody's
  * voice, and a turn that was only the honesty line noted as no reply. */
 function guardedTurnNote(t: ConversationTurnRow): string {
-  const kept = withoutHonestyLines(t.replyText);
-  return kept ? `[The reply given was: "${redactCredentials(kept)}"]` : "[No reply was given to this.]";
+  const kept = withoutBankLines(t.replyText);
+  const notes = splitIntoSentences(t.replyText)
+    .map((s) => bankLineNote(s))
+    .filter((n): n is string => n !== null);
+  const parts = [kept ? `[The reply given was: "${redactCredentials(kept)}"]` : null, ...notes].filter((p): p is string => p !== null);
+  return parts.length > 0 ? parts.join("\n") : "[No reply was given to this.]";
 }
 
 function nonModelWindowNote(t: ConversationTurnRow): string {

@@ -817,10 +817,10 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(assistantLines).toEqual(["A clownfish looking for his son."]);
     expect(window.messages.some((m) => m.role === "system" && m.content === "[No reply was given to this.]")).toBe(true);
     expect(window.messages.some((m) => m.content.includes("nobody's told me"))).toBe(false);
-    // A replaced line that carries a fact the next turn needs is quoted as a note, in nobody's voice (a review).
+    // A replaced line that carries a fact the next turn needs becomes a typed note, in nobody's voice.
     logTurn(actor, "chat", "add milk to the list", { reply: { text: "I haven't added anything to your list." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-narrated" }, { guardReasons: ["unsupported_action"] });
     const again = buildConversationWindow(conv.value);
-    expect(again.messages.some((m) => m.role === "system" && m.content === '[The reply given was: "I haven\'t added anything to your list."]')).toBe(true);
+    expect(again.messages.some((m) => m.role === "system" && m.content === "[Nothing was added to the list.]")).toBe(true);
     expect(again.messages.filter((m) => m.role === "assistant").map((m) => m.content)).toEqual(["A clownfish looking for his son."]);
     // The streaming path can store a spoken sentence beside the honesty
     // line (a later sentence tripped a non-cuttable guard): the spoken

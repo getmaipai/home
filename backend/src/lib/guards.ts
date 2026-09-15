@@ -1670,6 +1670,79 @@ export function withoutHonestyLines(text: string): string {
     .join(" ")
     .trim();
 }
+// WINDOW-01: every line any guard can speak, honesty vocabulary included -
+// the set guardedTurnNote() strips so no bank line is ever rendered to the
+// model. Multi-sentence lines (e.g. "Hmm, I'm going in circles. Try me a
+// different way?") are stripped as a whole, not sentence-by-sentence, since
+// a full line is the unit the guard speaks.
+let _bankLinesCache: ReadonlySet<string> | null = null;
+function bankLinesSet(): ReadonlySet<string> {
+  if (!_bankLinesCache) {
+    _bankLinesCache = new Set([...HONESTY_VOCABULARY, ...allReplacementLines()]);
+  }
+  return _bankLinesCache;
+}
+export function withoutBankLines(text: string): string {
+  const trimmed = (text || "").trim();
+  const lines = bankLinesSet();
+  if (lines.has(trimmed)) return "";
+  return splitIntoSentences(trimmed)
+    .filter((s) => !lines.has(s.trim()))
+    .join(" ")
+    .trim();
+}
+// WINDOW-01: the typed note a bank line becomes in nobody's voice. A bank
+// line that carried a fact the next turn needs is preserved as a note;
+// every other bank line is just dropped (null).
+const BANK_LINE_NOTES: Record<string, string> = {
+  "I haven't saved that as a memory.": "[No memory was saved.]",
+  "That didn't get saved.": "[No memory was saved.]",
+  "That save is waiting on your confirmation.": "[The save is waiting on your confirmation.]",
+  "I haven't added anything to your list.": "[Nothing was added to the list.]",
+  "Adding that to your list didn't work.": "[Nothing was added to the list.]",
+  "I haven't set a timer.": "[No timer was set.]",
+  "The timer didn't get set.": "[No timer was set.]",
+  "I haven't set a reminder.": "[No reminder was set.]",
+  "The reminder didn't get set.": "[No reminder was set.]",
+  "I haven't changed the lights.": "[The lights were not changed.]",
+  "The lights didn't change.": "[The lights were not changed.]",
+  "I haven't locked or unlocked anything.": "[No lock action was taken.]",
+  "The lock didn't respond.": "[No lock action was taken.]",
+  "I haven't forgotten anything. Say \"forget that\" and I will.": "[Nothing was forgotten.]",
+  "That didn't get forgotten.": "[Nothing was forgotten.]",
+  "I didn't look that up.": "[Nothing was looked up.]",
+  "That lookup didn't work.": "[Nothing was looked up.]",
+  "I can't send messages, make calls, or order anything from here.": "[No messages were sent, no calls made, nothing ordered.]",
+  "I can't actually watch or go anywhere myself.": "[No experience was gained.]",
+  "I don't get to watch things or go places, so I can't say from experience.": "[No experience was gained.]",
+  "I don't have a record of saying that.": "[No record of saying that.]",
+  "I can't find that in what I said before.": "[No record of saying that.]",
+  "Okay.": "[Acknowledged.]",
+  "Got it.": "[Acknowledged.]",
+  "Noted.": "[Acknowledged.]",
+  "I can't actually do that from a chat like this.": "[The action could not be taken from here.]",
+  "I'm not able to do that yet, sorry.": "[The action could not be taken from here.]",
+  "That's not something I can do right now.": "[The action could not be taken from here.]",
+  "Sorry, I lost my train of thought. Say that again?": "[The reply was lost.]",
+  "I fumbled that one. Ask me again?": "[The reply was lost.]",
+  "Lost the thread there, sorry. One more time?": "[The reply was lost.]",
+  "That's waiting on your confirmation.": "[Waiting on your confirmation.]",
+  "I haven't actually done that.": "[Nothing was done.]",
+  "I'm not able to give medication amounts - check with a pharmacist or the label.": "[Medication amounts were not given.]",
+  "I can't advise on doses - a pharmacist or doctor is the safe call there.": "[Medication amounts were not given.]",
+  "You're welcome.": "[Acknowledged.]",
+  "Anytime.": "[Acknowledged.]",
+  "Glad to help.": "[Acknowledged.]",
+  "Hi there.": "[Acknowledged.]",
+  "Hello.": "[Acknowledged.]",
+  "Hey, good to hear from you.": "[Acknowledged.]",
+  "Fair enough.": "[Acknowledged.]",
+  "Makes sense.": "[Acknowledged.]",
+  "I hear you.": "[Acknowledged.]",
+};
+export function bankLineNote(sentence: string): string | null {
+  return BANK_LINE_NOTES[sentence.trim()] ?? null;
+}
 // Item 1b: a reason whose sentence is dropped wherever it sits, first
 // sentence included, and the rest of the reply goes on; the honest
 // line stands in only when nothing else was said.

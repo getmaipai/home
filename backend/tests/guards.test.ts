@@ -4,7 +4,7 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, replacementFor, withoutHonestyLines, stripRegisterTail, dropConjunctionLead, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, withoutHonestyLines, withoutBankLines, bankLineNote, allReplacementLines, stripRegisterTail, dropConjunctionLead, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
@@ -1113,6 +1113,52 @@ describe("GUARD-LINES: the replacement bank says the plain honest line", () => {
     // The legacy lines are still recognized by the window's strip.
     expect(withoutHonestyLines("I don't actually have that - nobody's told me.")).toBe("");
     expect(withoutHonestyLines("I don't have that one yet.")).toBe("");
+  });
+});
+
+describe("WINDOW-01: no bank line survives withoutBankLines()", () => {
+  test("every line allReplacementLines() returns is stripped, including multi-sentence lines", () => {
+    const bankLines = new Set([...allReplacementLines()]);
+    const split = (text: string) => text.split(/(?<=[.!?])\s+/).filter(Boolean);
+    for (const line of bankLines) {
+      // The full line, as the guard speaks it, is stripped.
+      expect(withoutBankLines(line)).toBe("");
+      // Any single sentence from a multi-sentence line is NOT a bank line
+      // and survives: the window only strips whole lines.
+      const parts = split(line);
+      if (parts.length > 1) {
+        for (const sentence of parts) {
+          expect(withoutBankLines(sentence)).not.toBe("");
+        }
+      }
+    }
+  });
+  test("a reply mixing a bank line and real content keeps only the real content", () => {
+    expect(withoutBankLines("I haven't added anything to your list. The water's boiling now.")).toBe("The water's boiling now.");
+    expect(withoutBankLines("It's a Pixar film. I don't know, sorry.")).toBe("It's a Pixar film.");
+  });
+});
+
+describe("WINDOW-01: bankLineNote() maps bank lines to typed notes", () => {
+  test("action family none/failed lines become typed notes", () => {
+    expect(bankLineNote("I haven't added anything to your list.")).toBe("[Nothing was added to the list.]");
+    expect(bankLineNote("Adding that to your list didn't work.")).toBe("[Nothing was added to the list.]");
+    expect(bankLineNote("I haven't set a timer.")).toBe("[No timer was set.]");
+    expect(bankLineNote("The timer didn't get set.")).toBe("[No timer was set.]");
+    expect(bankLineNote("I haven't saved that as a memory.")).toBe("[No memory was saved.]");
+    expect(bankLineNote("That didn't get saved.")).toBe("[No memory was saved.]");
+  });
+  test("medication caution lines become typed notes", () => {
+    expect(bankLineNote("I'm not able to give medication amounts - check with a pharmacist or the label.")).toBe("[Medication amounts were not given.]");
+    expect(bankLineNote("I can't advise on doses - a pharmacist or doctor is the safe call there.")).toBe("[Medication amounts were not given.]");
+  });
+  test("honesty lines, acknowledgments, and other bank lines return null", () => {
+    expect(bankLineNote("I don't know, sorry.")).toBeNull();
+    expect(bankLineNote("I don't have that one yet.")).toBeNull();
+    expect(bankLineNote("Okay.")).toBe("[Acknowledged.]");
+    expect(bankLineNote("Noted.")).toBe("[Acknowledged.]");
+    expect(bankLineNote("I haven't actually done that.")).toBe("[Nothing was done.]");
+    expect(bankLineNote("That's waiting on your confirmation.")).toBe("[Waiting on your confirmation.]");
   });
 });
 
