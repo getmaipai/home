@@ -1740,6 +1740,8 @@ describe("MEM-06: a quoted, hypothetical or joking clause writes nothing", () =>
     const asserted = citeClause([fact("Sage is moving to Lisbon in September")], signal(clause({ act: "inform", stance: "asserted", subject: { kind: "speaker" } })), "I'm moving to Lisbon in September", "Sage", date);
     expect(asserted.kept.length).toBe(1);
     expect(asserted.dropped.length).toBe(0);
+  });
+});
 
 describe("CUR-01: an exact re-assertion is not a second record", () => {
   const FACT = { text: "The kettle is on the stove", category: "fact" as const, scope: "household" as const, importance: 0.5 };

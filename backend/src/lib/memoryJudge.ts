@@ -1249,6 +1249,12 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         console.log(`[memoryJudge] turn ${turn.id}: duplicate of ${reassert.id}`);
       }
       reassertCount++;
+      // A re-asserted fact still carries its subject and relation: the
+      // record already exists, so it is not written a second time, but
+      // the subject and the relation the speaker states with it are
+      // written the same way the write path does them, on this record.
+      const subject = resolveSubject(speaker, fact, turn);
+      if (fact.relation) writeFactRelation(speaker, fact, subject, turn);
       continue;
     }
     const embedded = await embed([fact.text]);
