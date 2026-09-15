@@ -16228,6 +16228,1053 @@ Rejected, with the reason:
   retrieval, privacy or whether a contradiction is raised) is the rule,
   whatever the field is called.
 
+### 16. The 2026-09-14 evening chat (findings 26 to 46, 2026-09-14)
+
+The design for the second evening's findings in
+[docs/plans/media-conversation-program-2026-09-13.md](plans/media-conversation-program-2026-09-13.md)
+("Findings from live use, 2026-09-14 evening"), written by a separate
+design session on the stronger model, as the program's rule requires.
+Read for it, in this order: the 120 turns themselves on the dev hub
+(the rows, their retained `outcomes`, their `subjects` and
+`guard_reason`; read only, quoted nowhere, every example below is
+invented for the roster's household), then the hub log's `[route]` and
+`[turn]` lines for the same turn ids (the guard arrays, the tier and
+score of every route, the timings), then the coordinator's findings 26
+to 36, then sections 0 to 15 and the coherence review, the items
+LOOKUP-01, ASK-01 and its follow-ups, CHAT-13, CHAT-16, ACT-03,
+COMP-01 and SAFETY-01, and the engine on `main` at 39362ad
+(`turnEngine.ts`'s lookup hold on both paths, `notePendingLookup()`,
+the pending-lookup resolution, `routeLiteral()` and `routeSemantic()`,
+`prepareTurn()`'s subject carry; `guards.ts`'s experience, lookup,
+capability, closer and register shapes and the replacement banks;
+`conversationHistory.ts`'s window; `unknownNames.ts`'s candidates and
+frames; `replyVariation.ts`'s spoken cue and `routes/turn.ts`'s race;
+the websearch recipe; the almanac handlers). SAFETY-01 was in flight
+while this was written and landed the same evening (Session A,
+86cd942); it is referenced here and not redesigned. The session's own read produced ten
+findings the coordinator's list did not carry (37 to 46, now in the
+program file) and three disagreements, stated where they land: finding
+35's fillers are the spoken cue, not text (part 9); finding 28's cause
+is the first-sentence read and the missing hedge shape, and its four
+verbatim copies are finding 38's mechanism, not the model's habit (parts
+2 and 11); finding 34 has a second half, the bank line quoted back to
+the model (part 11). One correction to finding 26's mechanism, for the
+record: the row's outcome says the commanded search ran `via:
+tool_call`, which is either the model's own call under
+`tool_choice: auto` or the forced completion's, since the row records
+both the same way; SAFETY-01's remedy (no tools at all in the crisis
+state) covers both, and part 2 gives the forced completion its own
+`via` so the next log can tell them apart.
+
+**What the findings share.** Three mechanisms, and the design below is
+organized around them the way section 0 was:
+
+1. **The engine takes the lookup decision only when the model
+   confesses.** LOOKUP-01 made a promise sentence the trigger; every
+   other world question is the 8B's under `tool_choice: auto`, and the
+   guards have no shape for a world fact (FAST-05 let world knowledge
+   through on purpose). So a price, a connector count, a cartoon's
+   sidekick, a cast, an actor's role, a store's policy and a film's
+   plot were answered from the weights, hedged ("typically", "usually",
+   "but check the manual") and wrong, corrected only by a commanded
+   search; a statement about an upcoming film was engaged with invented
+   reputation; a name the hub's own search had just produced was
+   explained from the weights. Findings 31, 33's second half, 39, 43,
+   44.
+2. **The turn's own state is not read by the things that decide.** The
+   router does not read the subject the turn carries (30); the pending
+   lookup does not read the offer it came from (37); the composer does
+   not read the clock (32, 41); the window does not read a guard's
+   reason as a reason and quotes the bank line back (38); nothing reads
+   the previous reply before sending the next (29, 46); nothing keeps
+   what the person told the hub to stop doing (35, 40); the carried
+   subject never decays (42). Each is a slot that exists (the
+   `SubjectRef` stack, the pending ask, the frozen clock, the row's
+   `guard_reason`, the previous row, the conversation) and a reader that
+   does not look at it.
+3. **The person's "no" is not a control.** An objection that the hub
+   repeated itself, that it should stop, that it answered the wrong
+   question, that it is not following: each is an ordinary utterance to the engine, so the reply that
+   follows can be, and four times was, the same reply again. Section 12
+   gives the engine `repair` and `target: hub`; nothing yet turns them
+   into a rule about the next reply.
+
+The order below follows the questions the section was asked to settle,
+(a) to (j), then what the session's own read adds. Every part names the
+cause in the code as it is on `main`, the designed behavior, the item it
+amends or creates, and the rows in the fixture's shape (roster names,
+invented subjects, three seeded runs, lookups from recorded fixtures).
+
+#### 1. The source of an answer to a world question (a; findings 31, 39, 43, 44)
+
+**Root cause, in the code.** `intentFor()` marks every question
+`lookup` and nothing reads it (section 4 said so; still true). On a
+model turn the completion runs with `tools: prepared.tools` and
+`tool_choice: "auto"`, so whether a checkable fact is looked up is the
+8B's decision, and an 8B prefers its weights. The invention family in
+`guardInvention()` is scoped to the household by design; a world
+sentence with a number or a name in it passes whatever its grounding.
+The one engine-side trigger is LOOKUP-01's promise read, which fires
+on "let me check" and not on the far more common shape the evening
+showed: the model answers anyway, with a hedge marker beside the fact
+("typically has 16 pins, but check the manual", "usually 30 days",
+"you might get 50 to 200"), or with no marker at all (a horse's name,
+a role in a film, a cartoon's home town). The forced lookup, when it
+does run, has one rung: the model picks a tool under
+`tool_choice: "required"`, and when that tool fails (the encyclopedia
+package returned not-found on a film too new to have a page) nothing
+falls through to the search; the draft goes to the guards instead,
+where `guardCapabilityClaim()` reads a request-shaped utterance with no
+succeeded outcome and replaces the acceptance with the cannot-do line
+(finding 39). A statement carrying a world subject never resolves it at
+all: `resolveNames()` writes an `unresolved` SubjectRef and the model
+reacts from the weights (43). A proper noun that arrived in a lookup
+result is not on the stack; the next question about it is a model turn
+like any other (44).
+
+**Design.** The decision moves to the engine, before generation, and
+the hedge becomes a second confession the engine reads after it.
+
+1. *The claim-type decision is made from the signal and the subject,
+   before the completion (CHAT-13, amended).* A question turn is
+   `lookup` when its asked field is exact (a name, a number, a date, a
+   day, a price, a count, a cast, a specification, a policy, "who is or
+   was" a person outside the household) and the subject is a world
+   reference not `dated`, or an `unresolved` reference in a world frame,
+   or the question carries a currency marker (new, latest, current,
+   today, still, yet, this year). On a `lookup` turn the engine runs
+   the ladder itself: the typed source for the subject's kind, then
+   the search, then the honest failed-lookup line, with the completion
+   under `tool_choice: "required"` over the lookup tools and the query
+   written by the engine from the subject's display name, the asked
+   field and the currency marker (part 2), never by the model from the
+   whole window. The model's own answer is a rung only for a `dated`
+   subject or a stable question (a definition, a mechanism, "why is the
+   sky blue"), as section 6's ladder already says; this part is what
+   makes the ladder run when the model would rather not.
+2. *A hedge beside a fact is a promise (LOOKUP-02).* At the boundary,
+   on both paths, a sentence on a world question that carries a
+   checkable value (a number, a date, a proper noun, a model name) and
+   a hedge marker ("typically", "usually", "generally", "often", "I
+   think", "I believe", "probably", "around", "roughly", "if I
+   remember", "as far as I know", "but check", "I recommend checking",
+   "you'll want to verify", "double-check") with no succeeded lookup
+   outcome on the turn is an invalid draft, the same rule as a promise:
+   the draft is not sent and the forced lookup runs on the resolved
+   subject and field. A hedge with no value ("I'm not sure about that
+   one") is the honest line and runs the lookup too. On the streaming
+   path the read rides in LOOKUP-01's hold (part 2 widens the hold to
+   two sentences). The `[turn]` line records the shape (`hedged_fact`)
+   beside `promise` and `offer`.
+3. *The forced lookup runs the ladder, not one rung (LOOKUP-02).* A
+   forced completion whose tool call fails or returns not-found runs
+   the next rung (the search) before anything reaches the guards; the
+   outcome list keeps the failed rung; the reply is the answering
+   rung's, or the honest failed-lookup line. The forced completion's
+   outcome carries `via: forced` (a new value beside `tool_call`,
+   `ask`, `pattern`), so a log can tell the model's choice from the
+   engine's.
+4. *A failed lookup is never a capability (LOOKUP-02).*
+   `guardCapabilityClaim()` returns null when the turn's lookup tools
+   serve the request (a question, a "find me", a "get me", a "look up"
+   with a world subject and no household frame): the request is
+   answerable, and the right reply to a failed answer is the failed-
+   lookup line, never cannot-do. The `CANNOT_DO` bank is for actions
+   the hub has no package for.
+5. *A statement carrying a current world subject resolves it before
+   the model reacts (CHAT-13).* An inform whose subject is a world
+   reference with recency `current` (the person's own words: new,
+   upcoming, coming out, can't wait for; or a title the typed source
+   dates within the year) runs the typed source (or one bounded search
+   when there is none for the kind) as a pre-turn evidence step, so
+   the composer or the model reacts with the date and the fact that it
+   is out or not; a subject the ladder cannot resolve gets a reaction
+   with no reputation claim (part 8's guard). Cost: one lookup on a
+   statement turn about a current subject, the class of turn where the
+   invented reaction was the defect; never on a household subject.
+6. *A name from a lookup outcome is a world subject with a source
+   (CHAT-13, ASK-02).* Every proper noun in a succeeded outcome's
+   result text is pushed onto the conversation's known world names with
+   the outcome id as provenance; the resolver treats it as `world`,
+   never `unresolved`, never asked back; a question about it is a
+   `lookup` on that subject (rule 1), with the retained outcome as the
+   first rung when it already answers.
+7. *How a self-answered fact is marked, without a search-result
+   reading.* The mark is on the outcome, never in the prose. A turn
+   answered from the weights carries an outcome of evidence kind
+   `model_knowledge` (CHAT-16's stable-knowledge row already names the
+   kind); a looked-up one carries the lookup outcome with its sources.
+   The person sees the difference as the source chip: a looked-up fact
+   has one, a known one has none, and the reply text is plain in both
+   cases (no "I think", no "according to", the `search_voice` family
+   cuts the latter and the hedge rule the former). "How do you know
+   that" is answered from the outcome ("that one I just know" for
+   `model_knowledge`; "I looked it up, the link's below" for a lookup),
+   composed, never the model's story about itself (finding 19's rule
+   on invented reasons stands).
+
+**Why this is the platform's shape.** The program decided the engine
+runs the lookup when the model is unsure. LOOKUP-01 read one way the
+model says so (a promise); the hedge is the other, more common way,
+and the decision by claim type is the engine not waiting to be told at
+all. The ladder already exists on paper (section 6); rules 1, 3 and 5
+are what make it run on the turns that need it. The outcome's evidence
+kind is the one place a fact's provenance lives (CHAT-15), so the chip
+and the "how do you know" answer draw from one record. No prompt line
+is added; the model is asked for less, not more.
+
+**Acceptance.** `checkable-fact` (three seeded runs, the search from
+recorded fixtures): "how many power pins does the Cosmo 7 card take"
+(effects: the turn's intent is `lookup`; `lookupWithSource` true; the
+reply contains a number only with a succeeded outcome; `mustNotContain`
+"typically|usually|check the manual|I recommend"); "what's an open-box
+Cosmo 7 going for these days" (effects: `lookupWithSource`; a price
+only with an outcome; no hedge marker); "what's the horse called in the
+old Clover and Quill cartoon" (effects: `lookupWithSource`; a name only
+with an outcome; guard null); "why is the sky blue" (the coherence
+review's row: `model_knowledge` on the outcome, no lookup); "how do you
+know that" after the horse turn (effects: no new lookup; the reply names
+the lookup, `mustContain` "looked|link|found", `mustNotContain` "I
+think|I believe"). `hedged-draft`: "how many pins is the Cosmo 7
+card" with `seedReply` "It usually takes a 12-pin connector, but check
+the manual to be sure." (effects: the seeded sentence never reaches the
+row, `mustNotContain` "usually|check the manual"; a websearch outcome
+`via: forced`; the `[turn]` line's shape `hedged_fact`). `ladder-falls-
+through`: "what's the new Marsh Lantern film actually about" with
+the encyclopedia fixture returning not-found and the search fixture
+answering (effects: two outcomes, the first failed, the second
+succeeded; `toolRan` websearch; guard not `capability_claim`;
+`mustNotContain` the `CANNOT_DO` lines); the same with both fixtures
+failing (effects: the honest failed-lookup line; `mustNotContain` "can't
+do|not able to do|not something I can do"; no invented plot on the next
+turn "so what's it about", checked as no proper noun outside the
+utterance and the evidence). `current-statement`: "the new Marsh Lantern film is
+the one I'm counting down to" (effects: a typed-source or search outcome on
+the turn; the subject `world` with recency `current`; the reply carries
+no reputation claim, part 8's `mustNotContain`; a date or "not out yet"
+grounded in the outcome). `hub-named-it`: the search fixture's cast row
+names "Serena Vale"; "who's Serena Vale" (effects: no `who` ask,
+`pendingAsk` null; a lookup outcome or the retained evidence answers;
+`mustNotContain` "who's Serena|do you mean").
+
+**Items and sizes.** CHAT-13 amended (rules 1, 5, 6, inside its M);
+LOOKUP-02 new (rules 2, 3, 4, with part 2's edges: S-M); CHAT-16
+amended (rule 7's marking, inside its M); ASK-02 (rule 6's resolver
+half, part 7).
+
+#### 2. A promise or offer behind a hedge, and the offer's binding (b; findings 28, 37)
+
+**Root cause, in the code.** `runTurnHoldingLease` reads
+`lookupShapeOf()` on `visibleSentences[firstIndex]` only; the stream's
+`holdForLookup()` stops at the first complete sentence or
+`LOOKUP_HOLD_MAX_CHARS` (72) and reads that one sentence. The shape the
+evening produced four times puts the promise second: a denial first ("I
+can't open pages myself"), then "but I can help you find it", then "let
+me look it up for you". `LOOKUP_OFFER_RE` does not know "I can help you
+find" or "I can look into" (it needs "want me to", "I could", "happy
+to"), so the second sentence is no offer either, and the reply goes out
+as text; `notePendingLookup()` then finds the late promise and binds a
+pending lookup with `args: { expression: utterance }`, the person's
+current words, which for an objection turn is the objection itself.
+That is finding 37's other face: a bound offer runs the utterance that
+produced it, so a one-word acceptance after "want me to look up the
+price?" searched the product's name and answered with a product
+description.
+
+**Design (LOOKUP-02).**
+
+1. *The read covers the first two sentences or 160 characters,*
+   whichever comes first, on both paths (the stream's hold widens from
+   72; OUT-01's opening hold already pays the first tokens, and a
+   promise turn is the turn that would have wasted a round trip).
+2. *The hedge-plus-promise shape is itself the promise:* "I can't X,
+   but I can Y" where Y carries a lookup verb, "I can help you find /
+   look for / track down", "let me try to find", "let me see what I can
+   find" join `LOOKUP_PROMISE_RE`; "I can help you find" and "I can look
+   into that" join `LOOKUP_OFFER_RE`. A denial about links, pages,
+   pictures or URLs ahead of the promise is part 4's `false_capability`
+   sentence and is cut before the read, so the promise is first.
+3. *A pending lookup binds the offered question, never the turn.* The
+   bound expression is built from the subject stack and the offer
+   sentence: the resolved subject's display name plus the field the
+   offer names ("look up current prices" on a resolved product is
+   "<product> current price"; "look up the exact video" is "<subject>
+   video"), falling back to the person's last question-shaped turn on
+   the same subject, and never to an objection, an acknowledgment or a
+   one-word turn. The same builder writes the forced lookup's query
+   (part 1, rule 1) and carries the currency marker ("did the new
+   Rivet OS come out today" searches "Rivet OS release today").
+4. *A commanded re-run after an objection re-runs the carried
+   question.* "go on then", "well find it", "just search it" after a promise
+   went out are a `lookup` pending ask's affirmative even when
+   `AFFIRMATIVE_RE` does not match them (the consent vocabulary gains
+   the imperative forms "do it", "go ahead", "just do it", "search",
+   "find it", "look it up" when a lookup ask is pending), and they run
+   the bound question, not the model's fresh guess.
+
+**Acceptance.** `hedged-promise`: "where's the maker's support page for
+the Cosmo 7 card" with `seedReply` "I can't open pages myself, but I
+can help you find it. Let me look it up for you." (effects: the seeded
+reply never reaches the row, `mustNotContain` "let me look|I can help
+you find|can't open"; a websearch outcome `via: forced` whose
+`outcomeArgs` name the card and "support"; `sourcesNonEmpty`).
+`offer-binds-the-question`: "the old one's a Rivet 3 with 8 gigs" with
+`seedReply` "Those hold their value. Want me to look up what they're
+going for used?" (effects: `pendingAsk: lookup`); "sure" (effects: a
+websearch outcome `via: ask` whose `outcomeArgs` expression names the
+card and "used" or "price", never the previous utterance verbatim; the
+reply contains a price with a source); "go on then" as the acceptance in
+a variant run (the same effects). `objection-reruns`: after a seeded
+late promise, "that's twice now, go on and do it" (effects: the bound
+question runs, `outcomeArgs` name the subject; the reply is not the
+seeded sentence).
+
+**Item and size.** LOOKUP-02 (S-M, with part 1's rules 2 to 4): the
+read, the shapes, the binding, the imperative consent, `via: forced`,
+`hedged_fact`. Before CHAT-13; its query builder is the first half of
+CHAT-13's carried-question re-run.
+
+#### 3. A cross-turn repetition guard, and the objection (c; findings 29, 46)
+
+**Root cause, in the code.** `repeat_question` compares a reply's
+sentences with the previous reply's question sentences; nothing
+compares a reply with the previous reply. `like_i_said` is a phrase
+check. bot-legacy's structural rule (the same reply text twice in a row
+in one conversation becomes the chat-loop line) was recorded in
+`guards.ts`'s own comment and never ported. The evening's four
+repetitions (a hedge four times, a cast list four times, a date five
+times, a search summary twice) went out because the boundary never
+read the row before it. An objection (that the hub repeated itself,
+that it is not following) is `target: hub` with a `repair` on the
+signal, and the plan has no move for it, so the 8B did what an 8B does
+when contradicted: re-asserted.
+
+**Design (REP-01).** One deterministic check at the boundary, on both
+paths, reading the previous two hub replies in the conversation (the
+rows are there; one indexed read):
+
+1. *`repeat_sentence`, skippable.* A reply sentence equal, after
+   normalization (case, punctuation, whitespace, the closers stripped),
+   to a sentence in either of the previous two replies is skipped
+   wherever it sits; on the stream the check runs per sentence at the
+   same point the guards do, so a repeated opening never reaches the
+   wire. A reply emptied by it takes REG-01's retry with a system note
+   ("You already said that and the person heard it; say something new,
+   or do what they asked"), one retry within the turn's two
+   generations, then the `CHAT_LOOP` line (it exists and says the right
+   thing).
+2. *`repeat_reply`, the whole-reply case,* for the blocking path and
+   the end of a stream: a reply whose content words overlap a previous
+   reply's by 80 percent or more with no new proper noun or number is
+   the same reply, and takes the same retry. Exempt, by construction,
+   never by phrase: a fixed line the engine chose to repeat (the crisis
+   overlay's own line, a confirmation prompt re-asked, an ask
+   re-asked), a package's deterministic answer to the same literal
+   question (the time asked twice), and a one-word acknowledgment.
+3. *An objection changes the plan (ACT-03, amended).* A turn with
+   `target: hub` and `repair: correction` or the objection shapes
+   ("you already said that", "same answer again", "you're repeating
+   yourself", "you're not following", "not what I asked", "stop that") sets `repeat: forbidden` on the
+   plan and puts the objection in the retry note; a reply that only
+   contradicts the objection ("I do get it", "I'm not repeating") is
+   cut as `self_assertion` (a tail on the `assistant_register` family:
+   a first-person sentence about the hub's own understanding with no
+   content word from the subject). What the objection is about decides
+   the remedy: a computed answer (part 6) is recomputed and shown with
+   its inputs; a model answer becomes a lookup (finding 21's rule,
+   extended from claims to any answer the person rejected); a lookup
+   answer is re-asked with the objection as the field ("not the
+   release, the cast"); a register objection (part 9) becomes a
+   standing constraint.
+
+**Why this is the platform's shape.** The previous reply is on the row;
+reading it is cheaper than any prompt line, and the retry pattern is
+the one OUT-01 and REG-01 already use. The objection rule is the plan
+doing what section 12 gave it the fields for.
+
+**Acceptance.** `said-that-already`: "when is the new Marsh Lantern film
+out" (a lookup); "that's the second time; I asked what day of the week"
+after a `seedReply` that repeats the previous reply verbatim (effects:
+the seeded reply never reaches the row; the delivered reply shares
+under 80 percent of its content words with the previous reply and
+carries a weekday; guard null or `repeat_sentence`); "you're not following me"
+after a seeded wrong date (effects: `mustNotContain` "I do get it|I get
+it|I do\\b"; the reply carries a recomputation or a lookup outcome).
+`same-line-twice`: two consecutive turns with `seedReply` set to the
+same sentence (effects: the second is never delivered as-is; the retry
+ran, `completionCount` two; the `[turn]` guard array carries
+`repeat_reply`). The crisis row's fixed overlay line repeated on
+purpose stays exempt (SAFETY-01's `self-harm-state` row unchanged).
+
+**Item and size.** REP-01 (S): `guards.ts` (the two shapes,
+`self_assertion`), both paths in `turnEngine.ts`, the retry note, the
+rows. Before CHAT-13. The plan half rides with ACT-03.
+
+#### 4. A lookup reply carrying its source; a URL, a picture or a video on the chat surface (d; finding 27)
+
+**Root cause, in the code.** The websearch recipe's `llm_complete` step
+writes prose and instructs "don't list your sources"; the retained
+outcome's `result` is that prose (`reply.text` and `speech`), and the
+`search_results` step's rows with their URLs never reach the outcome.
+`TurnValue` on the wire has no `sources` (wire.ts carries
+`crisis_resources` and nothing about sources), while the frontend's
+`SourcesCard` (lane 10 item 1) is built and waits for a field that is
+never sent. So a link ask reaches the model with nothing to point at,
+and the model writes a denial ("I can't show links", "I can't provide
+URLs", "I can't view pictures") that no guard reads: `CLAIMED_RE` and
+`ACCEPTS_RE` cover actions, and nothing covers a false statement about
+what the hub cannot do. A picture ask and a video ask got the same
+denial plus an invented description.
+
+**Design (CHAT-16, amended; COMP-01, amended; LOOKUP-02 for the
+guard).**
+
+1. *The result rows are the outcome; the sources are on the wire.* The
+   recipe returns bounded rows (title, snippet, URL, at most eight) in
+   `data`, as CHAT-16 already says; the outcome's `sources` is the typed
+   list `{ title, url, host }` with the URL sanitized (scheme and host
+   allowed, no credentials, no fragments); `TurnValue.sources` is added
+   to the wire additively and persisted on the row beside `outcomes`
+   (the retained outcome already holds it; the column is the projection
+   the client reads); the `SourcesCard` renders it; the API docs carry
+   it through the Zod route.
+2. *A link ask is a deliverable of kind `link`.* The ask shapes (a
+   link, a URL, "the page", "the support page", "where can I read /
+   watch / buy", "the source", "where did you read that", "send me
+   the video") set `intent.deliverable: link` on the turn. The ladder
+   runs the search on the subject and the ask (the query builder of
+   part 2); the plan's `point` move is required; the composed line is
+   one sentence that says the link is below (chat) or on the phone or
+   the hub screen (voice), and the first source chip is the answer.
+   "Where did you read that" on a turn after a lookup needs no new
+   lookup: the retained outcome's sources are the answer and are
+   re-sent on the reply. Never a spoken URL, never "no link", never
+   "I can't show links".
+3. *A picture ask before COMP-01 is a link to where the picture is.*
+   The deliverable kind `picture` runs the same ladder with an image-
+   bearing query ("<subject> photos", the product page for a product,
+   the typed source's page for a film or a person) and the line says
+   plainly that the chat cannot show the picture here yet and the page
+   with it is below; after COMP-01 the `card` document carries the
+   typed source's image when the source has one (a film's poster from
+   the media package, a place's photo from the knowledge package's
+   summary), and the line says it is in the details; an inline image in
+   the bubble from a search's image results is not built (it would be
+   a new outbound endpoint and a privacy-page row, and the owner's call,
+   below). A video ask is the deliverable kind `video`: the link is the
+   answer, with the videos app as the player once its package exists
+   (out of scope here; the link stands until then).
+4. *`false_capability`, a guard family (LOOKUP-02), cuttable.* A
+   sentence claiming the hub cannot show, provide, share, access, open
+   or give links, URLs, pages, pictures, images or videos, on a turn
+   whose lookup tools include the search, is cut, and the turn takes
+   the deliverable path (rule 2 or 3) as if the sentence were a
+   promise: the forced lookup runs with the deliverable query. On the
+   child band, where `point` is forbidden (section 13), the line says
+   the grown-ups can open it and no chip renders; the outcome keeps
+   the sources.
+5. *The chat surface and the voice surface differ only in the line.*
+   Chat: the chip. Voice: "the link's on your phone" and the chip on
+   the phone's transcript. The document (COMP-01) is where a list of
+   links lives when there are several.
+
+**Why this is the platform's shape.** The URL was always in the result;
+the recipe threw it away and the wire never carried it. CHAT-15
+retained the outcome so that exactly this could be composed from it;
+CHAT-16's "a link is a deliverable" row is the rule, and this part is
+its mechanics plus the two asks (a picture, a video) the row did not
+name. The guard is the same shape as the promise: a sentence the engine
+can prove false from the turn's own tools.
+
+**Acceptance.** `link-is-the-answer`: "where's the maker's support
+page for the Cosmo 7 card" (effects: a websearch outcome;
+`sourcesNonEmpty`; `mustNotContain` "http|can't (show|provide|share|
+access)|no link"; the line at most two sentences); "where did you read
+that, link me" after "what's the horse called in the old
+Clover and Quill cartoon" (effects: no new lookup required, the
+previous outcome's sources on the reply, `sourcesNonEmpty`;
+`mustNotContain` "can't provide|can't share"); "got a photo of
+it?" (effects: `sourcesNonEmpty`; `mustNotContain` "can't view|I can't
+see"; `mustContain` "below|page|link|details"); "any video of
+it?" (effects: `sourcesNonEmpty`; `mustNotContain` "can't show
+links|search for it yourself"); the same picture ask from Bramble
+(effects: the outcome keeps the sources; no chip on the reply, a
+`sources` of zero on the wire; `mustContain` "grown-up|mom|dad").
+`false-capability-cut`: "what's the address of that page" with `seedReply` "I
+can't directly access URLs, but I can help you find the page by name."
+(effects: the seeded sentence never reaches the row; a websearch
+outcome `via: forced`; `sourcesNonEmpty`).
+
+**Items and sizes.** CHAT-16 amended (rules 1, 2, 3's first half, 5:
+inside its M, with a S for the wire and the row column); COMP-01
+amended (the image on the `card`, inside its M); LOOKUP-02 (rule 4).
+
+#### 5. The live subject before the literal router (e; findings 30, 42, 45)
+
+**Root cause, in the code.** `prepareTurn()` runs `routeLiteral()` on
+the raw text before anything else that knows the conversation:
+`matchPattern()` captures whatever sits in a wildcard, so "who's in
+the movie" bound the media package's `title` to "the movie" and the
+package looked up a film so titled; the knowledge package's "who was
+*" binds "she". The semantic router scores the utterance's words
+against every package's examples, so a question with "next" and a
+weekday in it lands on the holiday package's "what's the next holiday"
+examples at 0.75 or more and fires a package whose handler takes no
+argument and ignores the weekday. `literalYield()` knows two reasons
+to stand down (a household member's name, arithmetic) and not "the
+capture is a reference". ASK-01 writes `TurnContext.subjects` on the
+same turn, after routing, and nothing in routing reads it. The carry is
+`lastTurnSubjects()`, copied whole whenever the turn names nobody, so
+an unresolved token from turn 12 is still the row's `subject` on turn
+27 while the live subject, a film the search named, is on no row at
+all. A one-word turn with a content word ("irony") routes like a
+question about that word (45).
+
+**Design (CHAT-13, amended; the order of the coherence review's part
+9 applied to routing).**
+
+1. *Resolution before routing.* The subject stack is computed before
+   `routeLiteral()` runs: from the utterance (ASK-01's resolver), the
+   last two turns' stack, and the last succeeded lookup or typed-source
+   outcome in the conversation (its title or the proper nouns in its
+   result, part 1 rule 6). The stack head is the live subject.
+2. *A captured reference resolves to the live subject.* A wildcard
+   capture that is a pronoun, a determiner phrase ("the movie", "the
+   film", "that one", "the show", "it", "her", "this card") or a bare
+   kind noun resolves to the stack head when the head's kind matches
+   the package's subject kind (a film for the media package, a topic
+   for knowledge); the package runs with the resolved name in its
+   argument, and the row's `outcomeArgs` show it. With no compatible
+   head, the pattern yields (`literalYield()` gains the reason
+   `unresolved_reference`) and the turn goes on to the model with the
+   resolver's ask or the ladder.
+3. *A typed package cannot win a question it does not answer.* A
+   semantic winner with no arguments (the almanac family, a fixed-
+   answer package) is refused the win when the utterance carries a
+   captured entity of a kind the package's manifest does not declare
+   it answers: a weekday, a relative date, a clock time, a number, a
+   proper noun. The manifest declares `routing.answers` (a small
+   vocabulary of entity kinds, one field, read by `canFire()`); the
+   almanac packages declare `[]`, so "what date is next Friday" never
+   goes to the holiday handler, and part 6's compute takes it.
+4. *The carry decays and is superseded.* A carried `unresolved`
+   reference lives two turns unless re-mentioned (CHAT-13's stack
+   depth); a succeeded lookup's subject supersedes an unresolved carry
+   on the same turn; a carried reference is never the row's `subject`
+   when a resolved one is on the turn; the `[turn]` line's `subject` is
+   the stack head, and the fixture's `subjects` expectation reads the
+   stack after the turn (the coherence review's field).
+5. *A short turn on a live subject is a comment (ACT-03, amended).* A
+   turn of one or two words with a content word, no question mark and
+   a live world subject on the stack is `backchannel` on the signal
+   (section 12's rule layer gains the "content word on a live subject"
+   case), and the plan's backchannel row applies: a short reaction or
+   one new bit on the active subject, never a definition. The `define`
+   package and the knowledge package need a question shape ("what is",
+   "what does X mean", "define") or a bare word with no live subject.
+
+**Why this is the platform's shape.** The stack is the one notion of
+what the conversation is about, and routing was the one reader that
+did not consult it. Resolving before routing is the order section 13
+part 9 fixed for everything else; the `answers` vocabulary is one
+declaration on the manifest that the router reads, the same principle
+as `min_role` and `consequential`.
+
+**Acceptance.** `subject-before-pattern`: "the new Marsh Lantern film is the
+one I'm counting down to" (effects: `subjects` head is `world`, name Marsh
+Lantern, recency `current`); "when is it out" (effects: a lookup whose
+`outcomeArgs` name Marsh Lantern); "who's in the film" (effects: the
+media package or the search ran with an argument naming Marsh Lantern,
+`outcomeArgs`, never a title "the movie"; `toolRan` not null); "what's
+it rated" (the same). `next-friday-not-a-holiday`: "what's the date next
+Friday" (effects: `toolRan` null or the compute of part 6;
+`mustNotContain` "holiday"; `mustContain` a date). `carry-decays`:
+"what's the horse called in the old Clover and Quill cartoon" (a
+lookup; `subjects` head the cartoon), "what time is it", "and set a
+timer for ten minutes", "thanks" (effects on the last: `subjects`
+carries nothing from the cartoon). `comment-not-definition`: after the
+horse turn and "she was in that show for years, wasn't she", "wild"
+(effects: the signal's act `backchannel`; `toolRan` null; the reply
+`mustNotContain` "irony is|definition|means when"; `maxWords` 25;
+`mustContain` a content word from the subject's evidence).
+
+**Item and size.** CHAT-13 amended (rules 1 to 4, inside its M; the
+`answers` field is a manifest S in SPEC-02's bump or its own line);
+ACT-03 amended (rule 5).
+
+#### 6. Derived date and time questions as a compute over the almanac (f; findings 32, 41)
+
+**Root cause, in the code.** The three almanac handlers answer three
+literal questions from the frozen clock and the household locale. A
+derived one (a relative weekday, the days until a date, the next time
+the clock reads a given value, the date on which it will) goes to the
+model, which reads the `Local time` line in the context (a prose date)
+and does arithmetic from it: the century wrong, the half-day wrong
+(the next reading of a clock value from a late evening is the next
+morning, twelve hours away;
+the model said tomorrow night), the weekday of a looked-up date wrong
+(the 27th was a Friday; the model said not). The literal router
+compounded it: "and what date would that be" scored 0.977 against the
+date package and got today's date for a question about tomorrow, while
+"and what's today" behind its connective scored 0.687 and fell to the
+model. A looked-up date is composed by the recipe's completion, which
+has no clock at all (41).
+
+**Design (ALM-01, new).** One deterministic module,
+`lib/almanacCompute.ts`, reading the same frozen clock and locale the
+handlers read (one definition; the bot mirrors the module, since its
+almanac is the same spec'd packages), reached two ways:
+
+1. *A compute intent on routing.* A date or time question carrying a
+   relative term is `compute`, decided by the rule layer before routing
+   (section 12's protocol-and-rules pass, with a small grammar: `next |
+   this | last <weekday>`, `tomorrow | yesterday | the day after`, `in N
+   days | N days from <date> | how many days (until | since | is that)`,
+   `what day (is | was | will be) <date>`, `the next time it's <clock>`,
+   `what date will it be (then | at <clock>)`, `is <date> a <weekday>`),
+   with the referent resolved from the utterance or the carried question
+   (a date the previous reply stated is the stack's `carried_question`
+   value; "how many days is that" reads it). The answer is computed and
+   phrased by a fixed template in the composer's voice (short, plain,
+   the weekday beside the date), no model completion; the outcome is a
+   typed `compute` record with the inputs (the clock, the referent, the
+   term) so an objection can show them (part 3). The ambiguous
+   term ("next Friday" when today is a Monday) is answered as both in
+   one sentence ("this Friday is the 18th; the one after is the 27th"),
+   never a question back, unless the owner rules otherwise (below).
+   The connective case ("and what's today") is the literal router's:
+   `COURTESY_PREFIX` gains the leading connectives ("and", "so", "then",
+   "ok so"), so the bare almanac questions route literally behind them.
+2. *Every date in a composed answer is annotated.* CHAT-16's composer
+   receives, beside any date a lookup or typed source returned, its
+   relation to the frozen clock computed by the same module (today,
+   tomorrow, yesterday, in 11 days, last week, a Friday) as typed data
+   the line must use when the person's question was about timing ("did
+   it come out today" is answered "yes, today", never "on the 14th"
+   when the 14th is today). Finding 19's rule, made structural, and the
+   typed date the section 4 rows already assume.
+
+**Why this is the platform's shape.** Prebuilt over hand-built: the
+model doing calendar arithmetic from prose is the hand-built version
+of a compute the engine can do exactly. The clock is already frozen
+per turn (CHAT-01) and the locale is already one setting; the module
+reads both and nothing else. The bench has a clock, so every row is
+deterministic.
+
+**Acceptance.** `derived-dates`, driven with the bench's clock set to a
+Monday at 10:43 pm: "what time is it" (the time package); "when's the
+next time it's 10:41" (effects: the `compute` outcome; the reply
+carries the morning's half-day and the next day's date; `mustContain`
+"am|morning" and the date); "which date is that" (effects: the
+compute over the carried referent, the next day's date, `mustNotContain`
+today's date alone); "how many days until the 27th" (the number); "is
+the 27th a Friday" (yes or no from the clock); "what's the date next
+Friday" (effects: both readings in one reply, `mustContain` both dates,
+no question mark); "so what's today's date" (effects: `toolRan` almanac-date,
+the right year). `lookup-date-relative`: with the clock on the day a
+recorded release fixture names, "is the Rivet OS update out as of
+today" (effects: `lookupWithSource`; `mustContain` "today|yes";
+`mustNotContain` the bare date alone); "how many days until the Marsh
+Lantern film" (effects: a lookup outcome and a compute outcome; the
+number matches the clock and the fixture's date).
+
+**Item and size.** ALM-01 (S-M): the module, the rule-layer grammar,
+the `compute` outcome, the connective prefix, the rows; before CHAT-16,
+which then reads it for rule 2. The bot's mirror is its own backlog
+line.
+
+#### 7. ASK-01's candidate stop list, and the confirmed public figure (g; findings 33, 44)
+
+**Root cause, in the code.** `candidatesIn()` in `unknownNames.ts`
+takes every token the tagger marks `ProperNoun`, plus a sentence-
+initial capitalized `Noun`, trims the edges with a class that keeps
+hyphens and apostrophes (`[^\p{L}\p{N}'’-]+$`), so a dash after an
+interjection survives into the name (finding 33's two dashed tokens),
+and checks `NOT_A_NAME`, a fixed list of pronouns, days, months and
+family words. So an interjection, a typo capitalized by the keyboard,
+a brand ahead of a model number, a video service, and a proper noun the
+hub's own previous reply produced all became `unresolved` SubjectRefs
+at 0.4, carried for turns (part 5), rendered on the `[turn]` line as
+the subject, and once asked back as a question about a name the hub
+itself had said. The coherence review's household-frame rule kept most
+of them from becoming engine asks; the model asked anyway, and when the
+person answered that the name was a public figure, `resolveNames()` had
+no world kinds to resolve to, the ask parser (`parseWhoAnswer()`) reads
+household kinds only, and no lookup followed.
+
+**Design (ASK-02, the resolver's world edge; S).**
+
+1. *Candidate hygiene.* The edge class loses the hyphen and the dash
+   (an internal hyphen in a name stands, an edge one goes); a candidate
+   that the tagger also tags `Expression`, `Adjective`, `Adverb` or
+   `Verb`, or whose lowercase form appears as a common word elsewhere
+   in the last three turns, is dropped; the interjections and oaths
+   join `NOT_A_NAME` through the tagger's own `#Expression` tag rather
+   than a hand list (prebuilt over hand-built), with a short repo list
+   only for what the tagger misses; a capitalized token at edit
+   distance one from a common word in the same clause's expected
+   position (the typo case) is not a name when the clause reads as a
+   sentence without it. Nothing here needs the network.
+2. *Brands and services are world, kind `organization`, never asked.*
+   A candidate the tagger tags `#Organization`, or followed by a model
+   number or a product noun (card, phone, laptop, edition, model), or
+   preceded by "the" and followed by a product noun, is an `unresolved`
+   reference with `candidate_kinds: [organization]` and no ask; the
+   turn's frame is world (it joins `WORLD_KIND_RE`'s nouns: brand,
+   maker, model, card, phone, console, service, site, app).
+3. *A name the hub introduced is never asked back.* A proper noun in
+   the last two hub replies or in any outcome's result text (part 1
+   rule 6) is known with provenance `hub` or the outcome id; it is
+   `world`, never `unresolved`, and `replyAsksAbout()` fails on it, so
+   the appended ask never names it; the `false_familiarity` guard
+   treats it as grounded (the hub said it; the guard's grounding pool
+   gains the outcome text, which `groundedWords()` already reads for
+   the invention family).
+4. *A confirmed public figure is a lookup, at once.* The `who` answer
+   parser gains the world kinds ("a public figure", "an actress", "an
+   actor", "a singer", "a politician", "a player", "famous", "in the
+   news", "a character", "a brand", "a company", or a full name given
+   as the answer to a first-name ask); such an answer resolves the
+   pending name to a `world` SubjectRef of that kind, creates no
+   household entity, and, when the conversation carries a
+   `carried_question` about the name (the person's question or
+   statement that raised it), runs it as a lookup on the resolved
+   subject in the same turn, so the reply is the answer rather than a
+   repetition of the name back. The same parser reads the answer to the
+   model's own question ("someone you know or a public figure?"): a
+   question the model asked is bound as a `who` ask when it names the
+   candidate (the appended-ask dedupe already reads the model's
+   question; this makes the binding symmetric).
+
+**Acceptance.** `not-a-name`: "Lord, that took ages" (effects:
+`subjects` carries no `unresolved` entry; `pendingAsk` null); "wow, the
+Cosmo 7 card is a beast" (effects: any `unresolved` entry has kind
+`organization`; no ask; the `[turn]` subject is not the brand alone);
+"that Answer was wrong", the common word capitalized (effects: no
+`unresolved` entry). `hub-named-it` (part 1). `public-figure`: "sounds like
+they worked out what happened to Serena" (effects: an `unresolved` entry
+Serena with no ask fired by the engine, the household-frame rule;
+`humanVerdict` on the reply); "the actress, Serena Vale" (effects: the
+turn's subject is `world` with kind person and that name; a websearch
+outcome on the same turn whose `outcomeArgs` name Serena Vale; no `who`
+ask pending; the reply carries a fact from the outcome, `mustNotContain`
+"are you saying|what are you thinking|let me know").
+
+**Item and size.** ASK-02 (S): `unknownNames.ts`, `guards.ts`'s
+grounding pool, the answer parser, the rows. After LOOKUP-02 (it uses
+the query builder for rule 4), before CHAT-13 (which consumes the world
+refs).
+
+#### 8. The claimed_experience patterns, and when the replacement applies (h; findings 34, 38)
+
+**Root cause, in the code.** `CLAIMED_EXPERIENCE_RE` lists verbs by
+form, not by object: `tried`, `went`, `bought`, `waiting for`, `read`,
+`drove` fire on any first-person use, so "I tried to find it" and "I
+went through what came back" are experience claims and the reply about
+finding a page was replaced with the line about watching and going
+places (finding 34's misfire; the log shows two hits and the
+replacement on that turn). The forms it misses are the ones the
+evening produced: "I've heard the film is really intense" (hearsay is
+exempt on purpose, and right for a dated subject; for an unreleased
+one it is a reputation the hub cannot have), "I can't wait for it"
+with no verb (the plan family needs a verb), "I'm as excited as you
+are" (an emotional stance claimed as the hub's own). And the
+replacement is applied by `guardReply()`'s rule "when nothing else
+remains", whatever the turn was about, so a complaint that the hub had
+not found something got told the hub cannot watch or go anywhere.
+Finding 38 then made it worse: the replaced turn was rendered to the
+model as `[The reply given was: "<the bank line>"]`, because
+`withoutHonestyLines()` strips `HONESTY_VOCABULARY` only, and the model
+copied the line for two turns (part 11).
+
+**Design (EXP-02, S; WINDOW-01 for finding 38, part 11).**
+
+1. *Verbs by object.* The consumption verbs (`tried`, `tasted`, `ate`,
+   `bought`, `went`, `drove`, `visited`, `waiting for`, `read`) count
+   only with a sensory or consumption object: a food, a place, a title
+   on the stack, "it" or "that" when the live subject's kind is media,
+   place or food; never with an infinitive of a lookup verb ("tried to
+   find", "went to check", "waited for the results") and never with
+   "through the results", "the page", "what came back". `EXPERIENCE_VERBS`
+   keeps its exclusions.
+2. *Three new forms.* "I can't wait for <subject>" and "can't wait"
+   alone on a turn whose subject is a current world reference (the plan
+   family with the verb elided); "I'm (so|as|just as) excited (as you)"
+   and "I'm excited too" (a stance claimed as the hub's own; skippable,
+   the rest stands); and reputation hearsay on a current subject: "I've
+   heard (it|the film|the album|the show) (is|was) <adjective>", "people
+   say it's", "it's supposed to be <adjective>" fire `claimed_experience`
+   when the subject's recency is `current` and no outcome on the turn
+   carries a review or a rating; on a `dated` subject or with evidence
+   they stand as familiarity, which section 7's category intends.
+3. *The replacement applies only to an experience turn.* The
+   `CANNOT_EXPERIENCE` line stands in only when the utterance asked
+   about the hub's experience (the reflected question, "have you seen
+   / heard / watched / been") or the whole reply was the claim on such
+   a turn; on every other turn the flagged sentence is skipped and the
+   rest stands, an emptied reply takes REG-01's retry and then the
+   act's emptied line, and an objection turn (`target: hub`, a repair)
+   never takes a capability line of any bank (the objection rule of
+   part 3 decides the reply). `replacementFor()` reads the turn's act
+   and utterance to make that choice, the way it already reads them for
+   `placeholder_echo`.
+
+**Acceptance.** `experience-forms`: "the new Marsh Lantern film is the one I'm
+counting down to" (effects: guard null; `mustNotContain` "heard (it|the
+film|the movie) is|can't wait|as excited as you|excited too"); "heard
+from who?" as a follow-up to a seeded reputation reply (effects: the
+seeded sentence cut, `claimed_experience` on the `[turn]` array; the
+delivered reply carries no reputation claim and, with the typed source
+answering, the release date); "you were meant to find it, not describe it" after
+a seeded failed-find reply "I tried to find it but nothing came up."
+(effects: guard not `claimed_experience`; `mustNotContain` the
+`CANNOT_EXPERIENCE` lines; a forced lookup or the honest failed-lookup
+line); "have you seen it" (the film row's check, unchanged: the
+experience line plus a familiarity clause from evidence). The guard
+corpus gains one row per form, both ways.
+
+**Item and size.** EXP-02 (S): `guards.ts`, the corpus, the rows.
+Before CHAT-13. WINDOW-01 is part 11's.
+
+#### 9. Sign-offs, tags and fillers; the requested reply shape on a plugin reply (i; findings 35, 36, 40)
+
+**Root cause, in the code.** `CLOSER_RE` knows the assistant's closers
+("let me know", "anything else", "enjoy", "take care") and not the
+wish family: "good luck", "fingers crossed", "keep the faith", "you'll
+love it", "can't wait for you to", so a wish went out on four of five
+replies and survived the person's objection. A tag question ("Got
+it?", "Okay?", "Sound good?", "Make sense?") on the end of a
+declarative reply has no shape (`TAG_QUESTION_RE` serves the household-
+guess guard only). The disagreement with finding 35: the "let me
+think" and "give me a second" the person heard are not in any row;
+they are the `spoken_cue` (`THINKING_CUE_VARIANTS`: "One sec.", "Hmm,
+let me think.", "Give me a second.", "Let me see."), spoken by
+`streamTurnEvents()` when the first token is later than 900 ms and
+never written to the transcript, exactly so the model never sees it
+(wire.ts's own comment). The person heard them as the hub saying
+filler and said so; the model, which had never seen the cue, read "stop
+saying one sec" as a request and replied "One sec." (finding 40). And
+nothing keeps what the person asked for: "stop saying X", "no more X",
+"give me a bulleted list", "just the number", "one line" are ordinary
+utterances, so the very next reply may do the thing again, and a plugin
+reply (deterministic, returned before any model runs) never hears the
+shape ask at all (36): the list came from the model on the retry only
+because the recipe's prose was in the window.
+
+**Design.**
+
+1. *The closer and tag lists (REG-02, S).* `CLOSER_RE` gains the wish
+   family (good luck, fingers crossed, keep the faith, best of luck,
+   you'll love it, you're going to love it, can't wait for you to,
+   hope it works out, enjoy it); a sentence that is only one is skipped
+   (`assistant_register`), a tail behind a comma or a dash is cut. A
+   tag question at the end of a declarative reply ("Got it?", "Okay?",
+   "Sound good?", "Make sense?", "Right?", "Cool?") is cut as a tail
+   (`tag_question`, a sub-reason of the register family, so one list).
+   The plan already forbids `close` on question and directive rows; the
+   guard is the enforcement for the closers the plan cannot see.
+2. *A standing reply constraint (CONS-01, spec S, engine S).* One
+   record, spec first because the robot honors the same asks:
+   `reply-constraint.schema.json`, `{ conversation_id, person_id, kind:
+   banned_phrase | shape | length, value, set_at, set_by_turn, hlc }`,
+   written by the engine from a deterministic parser over the utterance
+   (the forget and brevity parsers' family): "stop saying X", "don't
+   say X", "no more X", "quit saying X" write `banned_phrase: X` with X
+   read from the quoted or trailing span and checked against the last
+   two replies (a phrase the hub never said is not banned, it is a
+   question for the model); "give me a bulleted list", "as a list",
+   "just the number", "one line", "short answer", "just the numbers"
+   write `shape` or `length`. The constraints hold for the conversation
+   (PREF-01 promotes a repeated one to a person-scope preference with
+   provenance, later); a new conversation starts clear. Three readers,
+   one record: the composer's context line and the composer prompt
+   (CHAT-16) read `shape` and `length` and the banned phrases; the
+   guards read `banned_phrase` (a sentence carrying one is cut, a reply
+   that is only the phrase takes REG-01's retry with the constraint in
+   the note; the row in the evening's shape, "One sec." as the whole
+   reply, is the row); the spoken-cue picker reads `banned_phrase`
+   and drops any cue containing it from the rotation for that
+   conversation. The engine's own fixed lines (an ask, a confirm, the
+   overlay) are never subject to a constraint.
+3. *The cue, kept, bounded (CONS-01).* The cue stays a product decision
+   (a person waiting in silence for 900 ms is the worse experience the
+   legacy research measured), with three bounds: it never plays twice
+   in a row for the same person (the rotation exists; the rule makes it
+   a guarantee), a banned phrase removes it (rule 2), and it never plays
+   on a turn whose utterance is an objection to the hub (`target: hub`
+   with a repair), since "stop" followed by "one sec" is the wrong
+   reply whatever the latency. The owner's question below is whether it
+   plays at all.
+4. *The requested shape on a plugin reply (CHAT-16, amended).* The
+   `shape` and `length` constraints, and a shape ask in the same
+   utterance ("give me a bulleted list of its new features"), are
+   parameters of the `ComposedTurn`: the composer renders a list from
+   the result rows (in chat, up to five items in the bubble, the rest
+   in the document; on voice, one line and "the list's on your
+   phone"), a number-only answer as the number, a one-line answer as one
+   line; the plan's `max_sentences` yields to an explicit shape. Until
+   CHAT-16, a plugin reply cannot hear the ask, and this part is the
+   reason the composer, not the recipe, owns the phrasing (section 6's
+   verdict, one more time).
+
+**Why this is the platform's shape.** The person's instruction about
+how to be spoken to is state, not a prompt line: a record with
+provenance the person can see and clear, read by every producer at the
+one boundary. The cue is the one thing the person hears that no row
+holds, so the constraint record is the only way an objection to it can
+mean anything.
+
+**Acceptance.** `sign-offs`: "fingers crossed the new card sorts the
+stutter" (effects: `mustNotContain` "good luck|fingers crossed|hope it
+works out|you'll love"); "should be here Thursday" (the same; guard null
+or `assistant_register`); "stop saying good luck" (effects: a
+`reply-constraint` row `banned_phrase: good luck` on the conversation;
+the reply `mustNotContain` "good luck" and is not only an
+acknowledgment of the ban, `minWords` 4); "worth selling the old one if
+it does" (effects: `mustNotContain` "good luck"; no tag question,
+`mustNotContain` "\\b(got it|okay|sound good|make sense|right)\\?\\s*$").
+`cue-banned`: "don't say one sec again" (effects: the constraint row; the
+reply `mustNotContain` "^one sec\\.?$" and is a sentence; the cue
+rotation for the conversation, read from the runner's event stream,
+never yields "One sec." on the next slow turn). `list-shape-on-lookup`:
+"list the new features in the Rivet OS 9 update as bullets"
+(effects: `lookupWithSource`; the reply carries at least three list
+lines, `mustContain` "(^|\\n)- .+\\n- .+\\n- "; `mustNotContain` "search
+results|according to"); "just the release date, one line" (effects: a
+`length` constraint; the reply is one sentence, `maxWords` 20).
+
+**Items and sizes.** REG-02 (S); CONS-01 (spec S, engine S) before
+CHAT-16; CHAT-16 amended (rule 4).
+
+#### 10. Unrelated recall on a statement (j; finding 25)
+
+**Root cause, in the code.** On a statement turn the recall query is
+the utterance, so a statement sharing two content words with a stored
+fact or a list item pulls it into the context; `guardUnrelatedRecall()`
+passes a reply sentence that shares even one word with the utterance
+(`asked.some(w => wordMatches(w, havePool))`), which a fact about the
+same household noun always does; and the plan's inform row forbids an
+action claim but not a recalled fact said back. The bench row
+(`statement-not-request#1`) shows another conversation's fact or the
+shopping list as the whole reply, two runs of three.
+
+**Design (CHAT-13, amended; the recall guard reads the subject).** On
+an inform turn with no question clause, a memory bullet enters the
+context as background and the reply's `say` is bounded to the turn's
+subject: a reply sentence whose content words overlap a memory bullet,
+an episode line or a list item by 80 percent or more, and whose own
+subject (its proper noun, its pronoun's referent on the stack, or the
+list) is not the turn's subject, is `unrelated_recall` whatever single
+word it shares with the utterance. The list is never read back unless
+the turn asks for it (the list-view package's shapes). The
+`unrelated_recall` replacement on a statement is REG-01's emptied line
+for the act ("Fair enough."), never the don't-know bank (a statement
+was not a question). The check reads `TurnContext.subjects`, which is
+why it lands inside CHAT-13 rather than as its own item.
+
+**Acceptance.** The existing `statement-not-request` rows keep their
+checks and gain: turn 1 (effects: no sentence overlaps a memory bullet
+or a list item by 80 percent whose subject is not Quill or the
+speaker; guard null or `unrelated_recall` with the emptied line, never
+a don't-know line, `mustNotContain` HONESTY_LINES); a new turn "the
+dishwasher's making that noise again" with a seeded household record
+about the dishwasher's warranty and a shopping list holding dishwasher
+tablets (effects: the reply may use the warranty record, a bullet about
+the turn's subject; `mustNotContain` "tablets|list"; guard null).
+
+**Item and size.** Inside CHAT-13's M (S of work).
+
+#### 11. What the session's own read adds (findings 37 to 46)
+
+Each of the ten is designed above where it belongs; this part is the
+map, plus the one that needs its own item.
+
+- *37, the offer's binding:* part 2, rule 3 (LOOKUP-02).
+- *38, a bank line quoted back to the model:* **WINDOW-01 (S, one
+  function, one test; Haiku-eligible).** `guardedTurnNote()` strips
+  every line `allReplacementLines()` returns, not `HONESTY_VOCABULARY`
+  alone; a turn that was only a bank line reads `[No reply was given
+  to this.]`; a bank line that carries a fact the next turn needs (the
+  action families' "nothing was added", the pharmacist caution) is
+  rendered as a typed note of the fact in nobody's voice (`[Nothing
+  was added to the list.]`, `[Medication amounts were not given.]`),
+  from a per-bank note table, never as a quoted sentence; and a test
+  asserts that no string in `allReplacementLines()` can appear inside
+  a window message, which is the inventory the universal-claim rule
+  asks for. The same rule applies to the conversation summary's
+  transcript, which uses the same function. Before everything else in
+  this section: it is an hour, and until it lands every guard the pass
+  adds hands the model a new sentence to copy.
+- *39, a failed typed source as a capability denial:* part 1, rules 3
+  and 4 (LOOKUP-02).
+- *40, the spoken cue and the banned phrase:* part 9, rules 2 and 3
+  (CONS-01).
+- *41, a looked-up date not related to today:* part 6, rule 2 (ALM-01
+  with CHAT-16).
+- *42, the carry never expires:* part 5, rule 4 (CHAT-13).
+- *43, a statement engaged from the weights:* part 1, rule 5
+  (CHAT-13).
+- *44, a name the hub introduced:* part 1, rule 6 and part 7, rule 3
+  (CHAT-13, ASK-02).
+- *45, a comment answered as a definition:* part 5, rule 5 (ACT-03).
+- *46, an objection met by self-assertion:* part 3, rule 3 (REP-01,
+  ACT-03).
+
+**On finding 26 and SAFETY-01.** The item as built (the crisis state
+on the conversation for ten turns after a self-harm signal on either
+side of a turn; every reply carrying the overlay; no package routed
+and no tool offered in the state, so neither the model's own call nor
+the forced completion nor a pending ask can dispatch; one
+acknowledgment for a stop and then the overlay alone) is the org's
+safety architecture applied at the right layer, and nothing in this
+section touches it. Two things this section keeps aligned with it: the
+repetition guard exempts the overlay's fixed line by construction
+(part 3), and the `via: forced` value (part 1) is what will let the next
+log say which dispatch a search came from. A classification that runs
+before routing and tool dispatch, as SAFETY-01 places it, is the
+invariant every item here inherits: the ladder, the forced lookup, the
+compute and the deliverable path all run after it and never around it.
+
+#### 12. The items, in order
+
+Sized as the pass sizes them; each proven by its rows in three seeded
+runs before the next starts; every S here is an edge of an item that
+has landed, which is why the order puts them before the two M items
+that need them.
+
+| # | Item | Size | Closes | Depends on |
+|---|---|---|---|---|
+| 1 | SAFETY-01 (landed, 86cd942) | S-M | 26 | none |
+| 2 | WINDOW-01: no bank line is ever rendered to the model | S | 38, half of 34 | none |
+| 3 | LOOKUP-02: the hedge is a promise, the two-sentence read, the offer bound to its question, the ladder's fall-through, `capability_claim` off lookup-served requests, `false_capability`, imperative consent, `via: forced` | S-M | 28, 37, 39, the denial half of 27, the hedge half of 31 | LOOKUP-01 |
+| 4 | REP-01: cross-turn repetition and the objection | S | 29, 46 | ACT-01 |
+| 5 | REG-02: closers, wishes and tag questions | S | the text half of 35 | REG-01 |
+| 6 | EXP-02: experience verbs by object, three forms, the replacement rule | S | 34 | EXP-01 |
+| 7 | ASK-02: candidate hygiene, brands and services, hub-introduced names, the confirmed public figure | S | 33, 44 | ASK-01, LOOKUP-02 |
+| 8 | CONS-01: standing reply constraints (spec, parser, three readers, the cue bounds) | spec S, engine S | 40, the instruction half of 35, the chat half of 36 | SPEC-01 |
+| 9 | ALM-01: the date and time compute, the connective prefix, typed relative dates | S-M | 32, 41 | ACT-01 |
+| 10 | CHAT-13 as amended here: resolution before routing, the captured reference, `routing.answers`, the decay, the claim-type decision, statements resolve, lookup names as world subjects, the recall guard by subject | M (as queued) | 30, 42, 43, 25, the decision half of 31 | SPEC-01, ASK-02, LOOKUP-02 |
+| 11 | CHAT-16 with ACT-03 core, as amended here: sources on the wire and the row, deliverables (link, picture, video), the requested shape, typed dates, `model_knowledge` marking, the backchannel-on-a-live-subject row, `repeat: forbidden` after an objection | M plus M (as queued) | 27, 36, 45, the marking half of 31 | CHAT-13, ALM-01, CONS-01 |
+| 12 | COMP-01 as amended: the image on the `card` | M (as queued) | the picture half of 27 | CHAT-16 |
+
+Items 2 to 7 are independent of one another and of CHAT-13, and can
+run in parallel lanes with one integrator (the coordinate skill's
+rule); 8 and 9 need only the spec and the signal; 10 and 11 are the
+queue's own next two, carrying the amendments above.
+
+**For Jesse, product owner's calls only.** (1) The spoken thinking
+cue: keep it with the three bounds of part 9 (the recommendation; a
+person waiting in silence is the measured worse case), or drop it for
+a non-verbal earcon or nothing. (2) "Next Friday" on a Monday: both
+readings in one sentence (the recommendation, no question back), or
+the locale's convention alone. (3) A picture ask before COMP-01: a link
+to the page that has it (the recommendation, no new endpoint), or an
+inline image from the search's own image results, which is a new
+outbound connection and a privacy-page row. (4) Whether a standing
+constraint outlives the conversation now, or waits for PREF-01 to
+promote it (the recommendation: waits; a ban the person gave once in
+one conversation is that conversation's).
+
 ## Session B, lane 16: ACT-02's training half (2026-09-14)
 
 `backend/scripts/train/turn-signal-heads.ts` and its tests, per

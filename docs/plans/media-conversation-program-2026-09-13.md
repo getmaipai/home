@@ -332,6 +332,14 @@ A 35-minute chat, 120 turns, on the dev hub right after ASK-01 landed.
 Classes only, roster names, the persona's speaker "Rover" where a name
 is needed. Ordered by severity.
 
+**Designed:** the design pass's section 16,
+[docs/dev.md, "The 2026-09-14 evening chat"](../dev.md#16-the-2026-09-14-evening-chat-findings-26-to-46-2026-09-14),
+written by a separate design session on the stronger model from the
+raw turns, the rows' outcomes and subjects and the hub log; findings 37
+to 46 below are that session's additions to this list. Finding 26 is
+SAFETY-01, built by Session A the same day and referenced there, not
+redesigned.
+
 26. SAFETY, the one that stops everything else. A speaker said, in
     three turns, that they wished they were not alive, that they meant
     to end their life that night, and asked for the easiest way. Three
@@ -426,6 +434,112 @@ is needed. Ordered by severity.
     produced prose from the search plugin, then the list on the retry
     from the model. Class: the requested shape (list, one line, table)
     is a reply constraint the plugin path must honor too.
+
+37. A confirmed offer runs the wrong query. An offer to look up a
+    price was accepted with one word, and the search ran with the
+    person's previous utterance (a product name) as its whole query,
+    so the answer was a product description and the price had to be
+    asked for again. Cause: `notePendingLookup()` binds
+    `args: { expression: utterance }`, the utterance that produced the
+    offer, never the offer's own question; LOOKUP-01 recorded this as
+    the interim until CHAT-13, and this is its live cost. Class: a
+    pending lookup is bound to the offered question (the offer
+    sentence's object on the resolved subject), and the forced
+    lookup's query is built by the engine from the subject, the asked
+    field and the recency marker, never by the model from the whole
+    window (the OS-release search dropped "today" and answered with a
+    stale version for the same reason).
+38. A guard's replacement line quoted back to the model and copied.
+    One reply was replaced with the `claimed_experience` bank line;
+    the next two model replies opened with that sentence verbatim,
+    with no guard hit on either row. Cause: `guardedTurnNote()` in
+    `lib/conversationHistory.ts` strips only `HONESTY_VOCABULARY`
+    (the not-told, don't-know, chat-loop and legacy lines); every
+    other bank (`CANNOT_EXPERIENCE`, `CANNOT_DO`, `MED_CAUTION`,
+    `MALFORMED`, the emptied lines, the action families) is rendered as
+    `[The reply given was: "..."]`, a quoted sentence in the hub's
+    voice, section 0's first mechanism. Class: no bank line is ever
+    rendered to the model in any form; a replaced turn reads as a
+    typed note of what was withheld.
+39. A failed typed source became a capability denial, then invention.
+    A synopsis ask ran the forced lookup; the model chose the
+    encyclopedia package, which returned not-found; the draft's
+    acceptance then tripped `capability_claim` (a request-shaped
+    utterance with no succeeded outcome) and the reply was the
+    cannot-do line; the next three turns invented a plot behind "I
+    can't access that", and only a commanded search answered. Cause:
+    the forced lookup has one rung (whichever tool the model picks),
+    a failed rung never falls through to the search, and the guard
+    reads "no outcome succeeded" as "cannot do". Class: the ladder's
+    rungs run in order until one answers; a failed lookup is narrated
+    as a failed lookup; `capability_claim` never fires on a request a
+    lookup tool serves.
+40. The spoken thinking cue heard as filler, then echoed. The
+    "let me think" and "give me a second" the speaker objected to are
+    not in any reply text: they are the `spoken_cue` continuers
+    (`THINKING_CUE_VARIANTS` in `lib/replyVariation.ts`) the stream
+    speaks when the first token is slow, invisible in the transcript;
+    finding 35 reads them as text. The objection "stop saying one sec"
+    then got "One sec." as the whole reply (the model echoed the
+    banned phrase, which is also in the cue bank). Class: a "stop
+    saying X" is a standing constraint the engine records and enforces
+    (the composer, the guards and the cue rotation all read it), never
+    an instruction the model interprets; a cue the person objected to
+    leaves the rotation for that conversation.
+41. A looked-up date not related to today. The search answered that a
+    release happened on the 14th when the frozen clock said the 14th;
+    the person expected "today". Cause: the recipe's own completion
+    phrases the result with no clock; the `Local time` line is in the
+    chat model's prompt, not the package's. Class: every date a lookup
+    or typed source returns is annotated with its relation to the
+    frozen clock (today, yesterday, in 11 days, a Friday) as typed
+    data the composer must use; finding 19's rule made structural.
+42. An unresolved subject never expires. A brand token carried on the
+    row for fifteen turns and a public figure's name for twenty, across
+    subject changes, and the `[turn]` line's `subject` was the stale
+    token while the live subject was a film. Cause: `prepareTurn()`
+    copies `lastTurnSubjects()` whenever the current turn names nobody,
+    with no decay and no supersession by a lookup outcome's title.
+    Class: a carried subject decays after two turns unless re-mentioned;
+    a succeeded lookup's title becomes the world subject and supersedes
+    an unresolved carry; the line's `subject` is the stack head.
+43. A statement about a current world subject engaged from the weights.
+    An excited statement about an upcoming film got invented reputation
+    ("heard it's intense") and a question whether the person would watch
+    it that night, when it was not yet released; the release date was
+    one typed-source call away. Class: finding 31's rule applied to
+    statements: an inform carrying a world subject with recency
+    `current` resolves the subject (the typed source, or one bounded
+    search) before the model reacts, so the reaction is grounded in
+    what is known (upcoming, out since, the release date).
+44. A name the hub's own lookup introduced, asked about from the
+    weights. One turn after a search named a film's lead, "who's <that
+    actor>" was answered from the model with a wrong role. Cause: a
+    proper noun that entered the conversation through a lookup outcome
+    is not a subject the resolver knows; the question routes to the
+    model like any other. Class: a name from a lookup outcome is a
+    `world` SubjectRef with the outcome as its source; a question about
+    it is a lookup on that subject (finding 33's second half, with the
+    provenance already on the row).
+45. A one-word comment on the live subject answered as a definition.
+    After a run of facts about a subject, a single abstract noun said
+    as a comment (the irony of the facts just given) got a dictionary
+    definition and an invitation to give an example. Cause: a
+    backchannel-length turn with a content word routes as a question
+    about that word; nothing reads it against the live subject. Class:
+    a one- or two-word turn on a live subject is a comment
+    (section 12's backchannel row: a short reaction or one new bit on
+    the active subject), and a definition needs a question shape.
+46. An objection to a computed answer met by self-assertion. "You
+    don't get it" got "I get it." and then "I do." with the same wrong
+    date repeated twice more. Cause: an objection (`target: hub`, a
+    repair) is an ordinary utterance; the plan has no move for it, and
+    the previous reply is not read. Class: an objection to an answer
+    the hub gave is never met by re-asserting it: a computed answer is
+    recomputed and shown with its inputs, a model answer becomes a
+    lookup (finding 21's rule extended from claims to computed
+    answers), and a reply that only contradicts the objection is cut
+    (finding 29's guard, with the objection in the retry note).
 
 What worked, for the record: every forced or explicit search answered
 right (a release date, a cast, an OS release, a cartoon's sidekick,
