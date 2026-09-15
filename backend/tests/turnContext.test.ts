@@ -3,7 +3,7 @@
 // own rules; tests/turnEngine.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
-import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 
 // ACT-01: the intent and the guards' shape read the frozen signal; the
@@ -11,6 +11,19 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 // bundled command openers a test needs.
 const openers = new Set(["set", "explain", "give", "walk", "tell"]);
 const signalFor = (text: string) => classifyTurnSignal({ text, commandOpeners: openers, ageBand: "adult" });
+
+test("sourcesFromRows(): keeps eight safe web sources and normalizes URLs", () => {
+  const rows = Array.from({ length: 9 }, (_, i) => ({ title: `Result ${i}`, url: `https://example.com/${i}` }));
+  rows[8] = { title: "Script", url: "javascript:alert(1)" };
+  rows[2] = { title: "Credentials", url: "https://user:pw@example.com/a#frag" };
+  rows[3] = { title: "WWW", url: "https://www.example.com/" };
+  const sources = sourcesFromRows(rows);
+  expect(sources).toHaveLength(8);
+  expect(sources.some((s) => s.url === "https://example.com/a")).toBe(true);
+  expect(sources.find((s) => s.title === "Credentials")?.site).toBe("example.com");
+  expect(sources.find((s) => s.title === "WWW")?.site).toBe("example.com");
+  expect(sources.some((s) => s.url.startsWith("javascript:"))).toBe(false);
+});
 
 const evidence = (id: string, kind: TurnEvidence["kind"], text: string, rendered = text): TurnEvidence => ({ id, kind, text, rendered, entityIds: [] });
 

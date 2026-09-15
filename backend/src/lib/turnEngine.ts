@@ -1998,7 +1998,7 @@ export async function resolvePendingAsk(
               : { callId: `${turnId}:who`, packageId: "websearch", status: "failed", args: { expression }, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
           ),
         );
-        if (result.ok) return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+        if (result.ok) { const outcome = outcomes[outcomes.length - 1]!; return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) }; }
         return { reply: { text: `Got it, ${subject.display_name}. ${LOOKUP_FAILED_LINE}` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
       }
       return { reply: { text: `Got it, ${subject.display_name}.` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
@@ -2032,7 +2032,8 @@ export async function resolvePendingAsk(
         ),
       );
       if (result.ok) {
-        return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+        const outcome = outcomes[outcomes.length - 1]!;
+        return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
       }
       // Fix B (docs/dev.md's "Chat reliability" B2): the same 502 ->
       // fallback_reply treatment as prepareTurn()'s own Tier 0/1 branch
@@ -2093,7 +2094,8 @@ export async function resolvePendingAsk(
     );
     protocol.answer = { kind: "lookup", answer: "affirmative" };
     if (result.ok) {
-      return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+      const outcome = outcomes[outcomes.length - 1]!;
+      return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
     }
     // The package's own honest line on a 502 (Fix B2, as the confirm
     // branch above), the lookup family's otherwise (a review).
@@ -2141,7 +2143,8 @@ export async function resolvePendingAsk(
   );
   if (!result.ok) return null; // the continuation attempt failed - fall through rather than report a confusing error for an utterance that wasn't really about this
   protocol.answer = { kind: "ask", answer: "value" }; // ACT-01: only a consumed answer is the protocol layer's (a review)
-  return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+  const outcome = outcomes[outcomes.length - 1]!;
+  return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
 }
 
 /** Safety-first routing and the deterministic plugin floor (4.5), shared
@@ -2687,6 +2690,7 @@ async function prepareTurn(
         safety,
         crisis_resources: crisisResources,
         routing: { tier: routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", score: routed.score },
+        ...(floorOutcome.sources?.length ? { sources: floorOutcome.sources } : {}),
       }, subjects);
     } else {
     // Two real, different reasons runPlugin() can fail here. Fix B
@@ -3372,6 +3376,7 @@ async function resolveToolCallsInOrder(
   const replyText = oks.map((r) => r.result.value.reply?.text ?? "Done.").join(" ");
   const pluginIds = oks.map((r) => r.call.tool).join("+");
   const bestScore = Math.max(...oks.map((r) => rankedById.get(r.call.tool)?.score ?? 0));
+  const pluginSources = outcomes.filter((o) => o.status === "succeeded" && o.sources?.length).flatMap((o) => o.sources!);
   // Item 4a, a mixed batch ("add milk to the list and set a timer" with
   // no length): the calls that ran are reported and the withheld one's
   // question follows, the shape a package's own ask takes above (a
@@ -3393,6 +3398,7 @@ async function resolveToolCallsInOrder(
     routing: { tier: "tool", score: bestScore },
     conversation_id: conversationId,
     turn_id: turnId,
+    ...(pluginSources.length ? { sources: pluginSources } : {}),
   };
 }
 

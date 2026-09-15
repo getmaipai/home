@@ -1306,7 +1306,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const capped = rows.slice(0, LIST_CAP);
   const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
-  return capped.map((r) => ({ ...r, memory_ids: byTurn.get(r.id) ?? [] }));
+  return capped.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, memory_ids: byTurn.get(r.id) ?? [] }));
 }
 
 /** The full per-person archive (4.14: "export per person is one
