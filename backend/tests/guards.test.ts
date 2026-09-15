@@ -1163,10 +1163,14 @@ describe("WINDOW-01: bankLineNote() maps bank lines to typed notes", () => {
   });
   test("every action family's none, failed, and pending lines map to its own note", () => {
     for (const family of ACTION_FAMILIES) {
-      for (const line of [family.none, family.failed, family.pending]) {
+      for (const line of [family.none, family.failed]) {
         if (line === undefined) continue;
         const note = bankLineNote(line);
         expect(note).toBe(family.note);
+      }
+      if (family.pending !== undefined) {
+        const note = bankLineNote(family.pending);
+        expect(note).toBe(family.pendingNote ?? "[Waiting on your confirmation.]");
       }
     }
   });
