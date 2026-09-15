@@ -418,6 +418,13 @@ describe("lane 12 item 3: the fixture's new expectation kinds (conversationScore
     expect(scoreTurn(conv, 0, lookup, observed({ pendingAsk: null })).pass).toBe(false);
   });
 
+  test("cueNeverContains: the spoken cue the turn would play is checked, never the reply", () => {
+    const turn = { say: "x", expect: { cueNeverContains: "one sec" } };
+    expect(scoreTurn(conv, 0, turn, observed({ spokenCue: "One sec." })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ spokenCue: "Let me see." })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ spokenCue: null })).pass).toBe(true);
+  });
+
   test("seedRecords and seedReply are declared on the fixture's own types and survive on the conversation (the runner reads seedReply since LOOKUP-01, binding a lookup offer only; seedRecords is still unread)", () => {
     const seeded = byId("seeded-household-record");
     expect(seeded.seedRecords).toEqual([{ text: "Pippa is allergic to shellfish", category: "health", scope: "household", disclosure: "adult_only" }]);
