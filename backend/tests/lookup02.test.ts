@@ -201,10 +201,12 @@ describe("the engine: the read on both paths, the ladder, the binding, the conse
         original(...args);
       };
       try {
-        const result = await runTurn(actor, "chat", "how many pins is the Cosmo 7 card");
+        // A question with no exact field (a count would be CHAT-13's own
+        // lookup decision before the model): the hedged draft is the read.
+        const result = await runTurn(actor, "chat", "which connector is the Cosmo 7 card");
         if (!result.ok) throw new Error(result.error);
         expect(seen.forced).toBe(1);
-        expect(seen.queries).toEqual(["pins Cosmo 7 card"]);
+        expect(seen.queries).toEqual(["connector Cosmo 7 card"]);
         expect(result.value.reply.text).toBe(SEARCH_ANSWER);
         expect(lines.some((l) => l.startsWith("[turn] {") && l.includes('"lookup_shape":"hedged_fact"'))).toBe(true);
       } finally {

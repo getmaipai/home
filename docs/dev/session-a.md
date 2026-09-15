@@ -6030,3 +6030,74 @@ repeat of a reply from three turns back is not read (two replies is
 the design's window). The end-of-stream whole-reply case cannot unsay
 what streamed; its record is the finding for a hold, if one is ever
 wanted.
+
+## CHAT-13: the full lookup decision (2026-09-16)
+
+Section 16 part 1, rule 1, the judgment half. The slice on `main`
+(d622648, 09fb919) decided a lookup only for a follow-up that does not
+name its subject ("how many tracks" after the album turn). The rule
+says the engine decides when a world subject's exact field is asked and
+the subject is not dated, whether the question names it or refers back
+to it: `prepareTurn()` sets `intent.decided` for any question the
+shape is a question, not the household's, with a `lookupDecision()`.
+Two readings taken, in the code and the commit body: the decision
+needs a world or unresolved subject on the stack (`lookupDecision()`
+returns nothing for a currency marker alone, "when is the new album
+out" with nothing on the stack: the design's rule names a world
+subject, a marker names none, and the model's turn keeps LOOKUP-02's
+promise-and-offer path); and the query is the subject first, a
+superlative or a time word riding between, the field after ("Marsh
+Lantern release date", "Rivet newest phone"), a bare "new", "still",
+"yet" or "out" never trailing.
+
+The eleven mechanism tests: nine LOOKUP-01 tests ask "when is the new
+album out" in a fresh conversation with nothing on the stack, which
+the subject rule leaves to the model, so they pass as written; the
+output-safety gate test asks "what's the latest book out there", the
+same case. `hedged-draft` (the test and the row) asked a count of the
+Cosmo 7 card, which is the rule's own case, so it asks with no exact
+field now ("which connector is the Cosmo 7 card": the seeded hedge is
+the read, the query "connector Cosmo 7 card"); `offer-binding`'s row
+seeded an offer on the album's date, the rule's case too, so it asks
+"is the new Marsh Lantern album any good" and "do it" runs the bound
+question. `hub-named-it` asks the cast and is the rule's lookup now
+(its seeded promise unread, the same outcome). Tests:
+`tests/turnContext.test.ts` (the subject rule, the query order),
+`tests/lookup02.test.ts`.
+
+**The review's five, all in the tree.** The stack's head is the
+subject and a dated one ends the decision, never passed over for a
+carried entry ("when was the 2020 Marsh Lantern album out" with Rivet
+carried is no Rivet lookup); a bare single unresolved name with no
+kind ("who is Serena", "how old is Serena") is ASK-02's ask, never a
+subject to search, so an unresolved reference decides only with a
+kind (a brand before a product noun) or more than one word; the
+decision is dropped when no lookup tool is offered (no search
+installed, a role below its floor, the crisis state), so the turn is
+the model's and never "I couldn't look that up"; the asked field
+rides when its own words were stop words ("how long is the new Marsh
+Lantern film" searches the length); and a lookup on the previous two
+turns with the same subject and the same field is in the window, so
+the model answers from it (a lookup of the date does not answer the
+tracks).
+
+**The order-dependent red, found and fixed.** `tests/turnEngine.test.ts`'s
+household stand-down test ("why does Rover keep getting sick" with
+"Let me look into that for you." as the whole draft) went red in full
+runs and green alone: with `tests/lookup02.test.ts` ahead of it the
+streaming half delivered the promise unread. The stream's
+`holdForLookup()` returned the draft unread whenever no lookup tool
+was offered, and the router's ranking of the search for that
+utterance depends on the routing-embedding cache the earlier file
+leaves behind, so the stand-down never ran; the blocking path reads
+the draft either way. The stream now reads a household subject's
+draft whether or not a lookup tool was offered, as the blocking path
+does; and the emptied line the drop yields then met REP-01 downstream
+(the blocking half had said the same emptied line to the same
+question a moment before), was skipped as a repeat, and the retry's
+stream carries no lookup hold, so the promise went out: the engine's
+own fixed lines (the honesty bank, the emptied lines, the families'
+lines) are never a repeat now, the exemption by construction the
+design named, in REP-01's own commit. The pair and the full suite run
+green.
+

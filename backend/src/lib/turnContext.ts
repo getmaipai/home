@@ -190,7 +190,7 @@ const FIELD_STOP_RE = /\b(?:what(?:'s| is)?|which|how|many|much|long|old|when|wh
 export function exactFieldOf(utterance: string): string | null {
   if (/\b(?:what(?:'s| is)? the )?name(?: of)?\b|\bwhat(?:'s| is) it called\b|\bwho (?:plays|directed)\b|^\s*what(?:'s| is)\s+(?:the\s+)?(?:newest|latest|current)\b/i.test(utterance)) return "name";
   if (/\bwho (?:is|was)\s+[A-Z][\w'-]*/.test(utterance)) return "who";
-  if (/\bhow much does\b|\bprice\b|\bcost\b/i.test(utterance)) return "price";
+  if (/\bhow much (?:does|is|are|was|were)\b|\bprice\b|\bcost\b/i.test(utterance)) return "price";
   if (/\bhow many\b|\bhow much\b|\bhow long\b|\bpopulation\b|\bhow old\b/i.test(utterance)) return "count";
   if (/\bwhen\b|\bwhat year\b|\bwhat day\b|\bwhat date\b|\brelease date\b|\bout yet\b/i.test(utterance)) return "date";
   if (/\bwho(?:'s| is) in\b|\bcast\b/i.test(utterance)) return "cast";
@@ -199,16 +199,53 @@ export function exactFieldOf(utterance: string): string | null {
   return null;
 }
 
+/** The noun "how many" counts ("how many tracks"), when the word after
+ * it is one and not a stop word ("how many are on it" counts nothing
+ * named; a review). */
+function countedNoun(utterance: string): string | null {
+  const word = utterance.match(/\bhow (?:many|much)\s+(\p{L}+)/iu)?.[1] ?? null;
+  if (!word) return null;
+  return new RegExp(`^(?:${FIELD_STOP_RE.source})$`, "i").test(word) ? null : word;
+}
+
 export function lookupDecision(utterance: string, subjects: readonly SubjectRef[], roster: readonly string[]): { field: string; query: string } | null {
   const field = exactFieldOf(utterance);
   if (!field) return null;
-  const subject = subjects.find((s) => (s.type === "world" && s.recency !== "dated") || (s.type === "unresolved" && (s.confidence === 0.4 || s.candidate_kinds.includes("organization"))));
+  // Section 16 part 1 rule 1: the decision needs a world subject on the
+  // stack (a world reference not dated, or a bare unresolved name,
+  // CHAT-13's world subject) and an exact field. A currency marker
+  // alone ("when is the new album out" with nothing on the stack) names
+  // no subject to look up: the question is the model's, and a promise
+  // or an offer in its draft takes LOOKUP-02's path.
+  // The stack's head is the subject (the utterance's own first, else
+  // the carried one): a dated one ends the decision, never passed over
+  // for another entry ("when was the 2020 Marsh Lantern album out" with
+  // Rivet carried is not a Rivet lookup; a review). A bare single
+  // unresolved name with no kind ("who is Serena") is ASK-02's, not a
+  // world subject to search: an unresolved reference decides only with
+  // a kind (a brand, an organization) or more than one word.
+  const head = subjects.find((s) => s.type === "world" || s.type === "unresolved");
+  if (!head) return null;
+  if (head.type === "world" && head.recency === "dated") return null;
+  if (head.type === "unresolved" && !(head.candidate_kinds.length > 0 || head.surface_form.trim().split(/\s+/).length > 1)) return null;
+  if (head.type === "unresolved" && head.candidate_kinds.length > 0 && !head.candidate_kinds.includes("organization")) return null;
+  const subject = head;
   const currency = utterance.match(CURRENCY_MARK_RE)?.[0];
-  if (!subject && !currency) return null;
   const name = subject ? subject.type === "world" ? subject.display_name : subject.type === "unresolved" ? subject.surface_form : "" : "";
   const words = utterance.replace(CURRENCY_MARK_RE, " ").replace(name ? new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu") : /$^/, " ").replace(FIELD_STOP_RE, " ").replace(/[^\p{L}\p{N}' -]/gu, " ").replace(/\s+/g, " ").trim();
-  const fieldWords = field === "date" && /\bout\b/i.test(utterance) ? "release date" : words || field;
-  const query = [name, fieldWords, currency].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  // The asked field rides when its own words were all stop words ("how
+  // long is the new Marsh Lantern film" asks the length, not the film;
+  // a review).
+  const fieldNoun = field === "date" && /\bout\b/i.test(utterance) ? "release date" : field === "price" ? "price" : /\bhow long\b/i.test(utterance) ? "length" : /\bhow old\b/i.test(utterance) ? "age" : /\bhow (?:many|much)\b/i.test(utterance) ? (countedNoun(utterance) ? "" : "how many") : field === "count" || field === "who" || field === "name" || field === "cast" ? "" : field;
+  const fieldWords = field === "date" && /\bout\b/i.test(utterance) ? "release date" : [words, words && fieldNoun && !new RegExp(`\\b${fieldNoun}\\b`, "i").test(words) ? fieldNoun : ""].filter(Boolean).join(" ") || fieldNoun || field;
+  // The subject leads and the field follows ("Marsh Lantern release
+  // date"). A superlative or a time word rides between them ("Rivet
+  // newest phone", "Marsh Lantern showtimes tonight" reads as "Marsh
+  // Lantern tonight showtimes"); a bare "new", "still", "yet" or "out"
+  // says nothing the subject and the field do not, and never trails
+  // ("release date new").
+  const rides = currency && /^(?:newest|latest|current|currently|today|tonight|tomorrow|this (?:year|week|month|season|weekend)|upcoming)$/i.test(currency) ? currency : "";
+  const query = [name, rides, fieldWords].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
   return query ? { field, query } : null;
 }
 

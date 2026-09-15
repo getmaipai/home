@@ -536,12 +536,21 @@ not permission to expand scope.
     09fb919): a follow-up question asking for an exact field about the
     current world subject ("how many tracks" after the album turn) is
     decided a lookup from the signal and the subject, and the engine
-    runs the typed source and the search itself, both paths. Open: the
-    full rule (a question that names its subject, "when is the new
-    Marsh Lantern album out"), which collides with eleven LOOKUP-01 and
-    LOOKUP-02 mechanism tests that seed a model draft on exactly those
-    questions; a design call with the test rewrites, Session A's on
-    Saturday.
+    runs the typed source and the search itself, both paths. The full
+    rule landed 2026-09-16 (Session A, the judgment lane): the
+    decision takes the question that names its subject too, and needs
+    a world or unresolved subject on the stack (a currency marker
+    alone, "when is the new album out" with nothing on the stack, names
+    no subject: the model's turn, LOOKUP-02's path for a promise or an
+    offer in its draft); the query is the subject first, a superlative
+    or time word riding, the field after ("Marsh Lantern release
+    date", "Rivet newest phone"), never a trailing "new". The eleven
+    LOOKUP-01 and LOOKUP-02 mechanism tests: nine asked "when is the
+    new album out" with nothing on the stack and pass under the
+    subject rule as they were; the hedged-draft test and its row ask
+    with no exact field now ("which connector is the Cosmo 7 card",
+    a count being the rule's own case); offer-binding's row asks with
+    none too ("is the new Marsh Lantern album any good").
 
     Depends on: CHAT-10, CHAT-12, CHAT-15. Files:
     `backend/src/lib/turnEngine.ts`, `routing.ts`, `turnContext.ts`,

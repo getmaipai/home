@@ -1209,7 +1209,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "knowledge",
     note: "LOOKUP-02 (finding 31's hedge half): a hedge beside a checkable value on a world question is the other confession; the draft is not sent, the forced lookup runs on the subject and the field, and the turn line says hedged_fact",
     turns: [
-      { say: "how many pins is the Cosmo 7 card", seedReply: "It usually takes a 12-pin connector, but check the manual to be sure.", expect: { signal: { primary_act: "question" }, mustNotContain: "usually|check the manual", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*pins|pins.*cosmo 7" } }, lookupShape: "hedged_fact" } },
+      // CHAT-13's lookup decision takes a count question before the
+      // model, so the row asks with no exact field and the seeded hedge
+      // is the read.
+      { say: "which connector is the Cosmo 7 card", seedReply: "It usually takes a 12-pin connector, but check the manual to be sure.", expect: { signal: { primary_act: "question" }, mustNotContain: "usually|check the manual", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*connector|connector.*cosmo 7" } }, lookupShape: "hedged_fact" } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
       { say: "is that a lot", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
     ],
@@ -1311,8 +1314,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "knowledge",
     note: "section 4: an offer is a pending ask; 'do it' runs the websearch bound to the question (LOOKUP-02's built query, the frame words out), via ask, with a source",
     turns: [
-      { say: "when is the new Marsh Lantern album out", seedReply: "I don't have a date for that one. Want me to look it up?", expect: { signal: { primary_act: "question" }, pendingAsk: "lookup", guard: null } },
-      { say: "do it", expect: { signal: { primary_act: "directive" }, pendingAsk: null, lookupWithSource: true, outcomeArgs: { packageId: "websearch", args: { expression: "new Marsh Lantern album out" }, via: "ask" }, mustContain: "september|22|twelve|12", mustNotContain: HONESTY_LINES } },
+      // CHAT-13's lookup decision takes an exact field (the date) before
+      // the model, so the offer is seeded on a question with none.
+      { say: "is the new Marsh Lantern album any good", seedReply: "I don't have a take on that one. Want me to look it up?", expect: { signal: { primary_act: "question" }, pendingAsk: "lookup", guard: null } },
+      { say: "do it", expect: { signal: { primary_act: "directive" }, pendingAsk: null, lookupWithSource: true, outcomeArgs: { packageId: "websearch", args: { expression: "new Marsh Lantern album any good" }, via: "ask" }, mustContain: "strongest|reviews?|drumming|september|22|twelve|12", mustNotContain: HONESTY_LINES } },
       // The set's read (2026-09-14): the count sits in the previous
       // turn's own lookup result, still in the window; answering from it
       // is right (a person would not search again), so the row accepts a

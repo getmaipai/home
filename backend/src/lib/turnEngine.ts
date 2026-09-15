@@ -2924,13 +2924,34 @@ async function prepareTurn(
     setPendingAsk(conversation.id, { kind: "relay", prompt: line, packageId: "relay", args: {}, name: deferredSubjectName, subjectId: deferredSubject.entity_id });
     return immediate({ reply: { text: line }, source: "policy", safety, crisis_resources: crisisResources }, [deferredSubject]);
   }
+  // CHAT-13, section 16 part 1 rule 1: a world subject's exact field (a
+  // date, a count, a price, a cast, a spec) is the engine's lookup before
+  // the model runs, whether the question names the subject or refers
+  // back to it; the model's knowledge is a rung only for a dated
+  // subject (lookupDecision() skips one). The slice that landed first
+  // took follow-ups only; the rule takes the question that names its
+  // subject too.
   if (shapeOf(signal, text) === "question" && !householdSubjectTurn(text, turnContext)) {
     const decided = lookupDecision(text, subjects, turnContext.roster);
-    const namesSubject = subjects.some((s) => s.type === "world" || s.type === "unresolved") && subjects.some((s) => {
-      const name = s.type === "world" ? s.display_name : s.type === "unresolved" ? s.surface_form : "";
-      return name.length > 0 && new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").test(text);
-    });
-    if (decided && !namesSubject && subjects.some((s) => s.type === "world" || s.type === "unresolved")) turnContext.intent.decided = decided;
+    // A lookup on the previous two turns that already names the subject
+    // is in the window: the model answers from it, a person would not
+    // search again (the offer-binding row's own read; a review).
+    // The previous two turns themselves (lastTurnIds), never the last
+    // two turns that happened to run a tool, so a lookup fifteen chat
+    // turns back is not "in the window" (a review); the knowledge
+    // rung's topic counts beside the search's expression.
+    const recentTurns = new Set(lastTurnIds(conversation.id, 2));
+    const answered = decided !== null && outcomesForConversation(conversation.id, 2).some((row) => recentTurns.has(row.turnId) && row.outcomes.some((o) => {
+      const expression = typeof o.args?.expression === "string" ? o.args.expression : typeof o.args?.topic === "string" ? o.args.topic : null;
+      if (o.status !== "succeeded" || !LOOKUP_FAMILY.has(o.packageId) || expression === null) return false;
+      // The same subject and the same field: every word of the decided
+      // query is in the earlier expression (a lookup of the date does
+      // not answer the tracks).
+      const earlier = tokenize(expression);
+      const asked = [...tokenize(decided.query)];
+      return asked.length > 0 && asked.every((w) => earlier.has(w));
+    }));
+    if (decided && !answered) turnContext.intent.decided = decided;
   }
   const deliverable = turnContext.intent.deliverable;
   const backReference = deliverable === "link" && /^(?:\s*(?:where did you read that|link me|the source|send me the page)(?:\s*(?:,|and)\s*(?:where did you read that|link me|the source|send me the page))?\s*[?.!]?)$/i.test(text);
@@ -3016,6 +3037,10 @@ async function prepareTurn(
   // forced completion can pick the typed source first and the search
   // runs next when it finds nothing.
   const lookupTools: ToolSpec[] = inCrisis ? [] : ranked.filter((r) => r.manifest.routing?.always_offer || (LOOKUP_FAMILY.has(r.id) && r.score >= TIER2_AMBIGUOUS_FLOOR)).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
+  // The decision needs a rung to run on: with no lookup tool offered
+  // (no search installed, a role below its floor, the crisis state) the
+  // turn is the model's, never "I couldn't look that up" (a review).
+  if (turnContext.intent.decided && lookupTools.length === 0) delete turnContext.intent.decided;
 
   turnContext.offeredToolIds = tools.map((t) => t.id);
   // CHAT-01: the guards' context is derived from the included evidence
@@ -4853,11 +4878,15 @@ async function runTurnStreamHoldingLease(
     // A later promise or an offer becomes a pending ask in finalize().
     const lookupIds = new Set(offeringTools ? modelTurn.lookupTools.map((t) => t.id) : []);
     async function* holdForLookup(inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
-      if (!offeringTools || lookupIds.size === 0 || lookupAnswered(modelTurn.turnContext.outcomes)) return yield* inner;
       // A household subject in the question is never looked up on the
       // web (the follow-up, as on the blocking path): a promise about it
-      // is dropped and the rest streams.
+      // is dropped and the rest streams, whether or not a lookup tool was
+      // offered this turn (the blocking path reads the draft either way;
+      // the stream let the promise through when the router ranked no
+      // lookup, an order-dependent red in tests/turnEngine.test.ts).
       const householdSubject = householdSubjectTurn(text, modelTurn.turnContext);
+      if (!householdSubject && (!offeringTools || lookupIds.size === 0)) return yield* inner;
+      if (lookupAnswered(modelTurn.turnContext.outcomes)) return yield* inner;
       const iterator = inner[Symbol.asyncIterator]();
       let buffer = "";
       // A think block is not held (a review: OUT-01's rule that the

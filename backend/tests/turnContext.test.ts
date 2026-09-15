@@ -74,9 +74,29 @@ test("exactFieldOf(): recognizes exact lookup fields and leaves stable questions
 test("lookupDecision(): uses a current world subject, rejects dated subjects, and honors currency", () => {
   expect(lookupDecision("when is it out", [{ type: "world", kind: "album", display_name: "Marsh Lantern", year: null, source_kind: "web", stable_key: null, recency: "current", carried_question: null }], [])).toEqual({ field: "date", query: "Marsh Lantern release date" });
   expect(lookupDecision("when is it out", [{ type: "world", kind: "album", display_name: "Marsh Lantern", year: 2020, source_kind: "web", stable_key: null, recency: "dated", carried_question: null }], [])).toBeNull();
-  const current = lookupDecision("what's the newest Rivet phone", [], [])?.query ?? "";
-  expect(current).toContain("newest");
-  expect(current).toContain("Rivet phone");
+  // A currency marker alone names no subject: nothing to decide (the
+  // model's turn, LOOKUP-02's path for a promise or an offer in it).
+  expect(lookupDecision("when is the new album out", [], [])).toBeNull();
+  const film = { type: "unresolved" as const, surface_form: "Marsh Lantern", candidate_kinds: [] as never[], provenance: "t", confidence: 0.4, carried_question: null };
+  // With the subject on the stack (a bare proper noun is CHAT-13's world
+  // subject), the subject leads, a superlative rides, and a bare "new"
+  // never trails.
+  // A brand before a product noun carries ASK-02's organization kind; a
+  // bare single name with no kind ("who is Serena") is ASK-02's ask, not
+  // a subject to search (a review).
+  const rivet = { type: "unresolved" as const, surface_form: "Rivet", candidate_kinds: ["organization"] as never[], provenance: "t", confidence: 0.4, carried_question: null };
+  expect(lookupDecision("what's the newest Rivet phone", [rivet], [])?.query).toBe("Rivet newest phone");
+  const serena = { type: "unresolved" as const, surface_form: "Serena", candidate_kinds: [] as never[], provenance: "t", confidence: 0.4, carried_question: null };
+  expect(lookupDecision("who is Serena", [serena], [])).toBeNull();
+  expect(lookupDecision("how old is Serena", [serena], [])).toBeNull();
+  // A dated head ends the decision; a carried subject never takes it.
+  const dated = { type: "world" as const, kind: "album", display_name: "Marsh Lantern", year: 2020, source_kind: null, stable_key: null, recency: "dated" as const, carried_question: null };
+  expect(lookupDecision("when was the 2020 Marsh Lantern album out", [dated, rivet], [])).toBeNull();
+  // The asked field rides when its own words were stop words.
+  expect(lookupDecision("how long is the new Marsh Lantern film", [film], [])?.query).toBe("Marsh Lantern film length");
+  expect(lookupDecision("how much is the Rivet phone", [rivet], [])).toEqual({ field: "price", query: "Rivet phone price" });
+  expect(lookupDecision("when is the new Marsh Lantern film out", [film], [])?.query).toBe("Marsh Lantern release date");
+  expect(lookupDecision("how many tracks are on the new Marsh Lantern album", [film], [])?.query).toBe("Marsh Lantern tracks album");
 });
 
 test("sourcesFromRows(): keeps eight safe web sources and normalizes URLs", () => {
