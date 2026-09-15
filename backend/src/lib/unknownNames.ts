@@ -269,7 +269,28 @@ function rosterShapeAround(text: string, name: string, knownInText: readonly str
 // A kind noun in front of a name says it is the world's ("the band
 // Tempo", "the film Cobra"): never a household unknown, whatever else
 // the sentence carries.
-const WORLD_KIND_RE = /(?<![\p{L}])(?:the|a|an|that|this)\s+(?:new\s+|latest\s+|old\s+)?(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon)\s+$/iu;
+const WORLD_KIND_RE = /(?<![\p{L}])(?:the|a|an|that|this)\s+(?:(?:new|latest|upcoming|next|old|classic|original|first)\s+)?(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon)\s+$/iu;
+// The kind noun right after a titled name: "the new Marsh Lantern film",
+// "the film Marsh Lantern" (a kind noun in front).
+const KIND_NOUN_AFTER_RE = /^\s*(?:film|movie|show|series|game|album|song|track|book|novel|cartoon|podcast|band|restaurant|cafe)(?![\p{L}])/iu;
+function kindOf(noun: string): string {
+  const n = noun.toLowerCase();
+  if (n === "film" || n === "movie") return "film";
+  if (n === "show" || n === "series" || n === "cartoon") return "show";
+  if (n === "song" || n === "track") return "song";
+  if (n === "book" || n === "novel") return "book";
+  if (n === "cafe" || n === "restaurant") return "restaurant";
+  return n;
+}
+/** CHAT-13: the recency a titled work carries, read from the words
+ * before its name (the determiner-to-name slot). */
+function recencyOf(determinerPhrase: string): "current" | "dated" | "unknown" {
+  const year = determinerPhrase.match(/\b(?:19|20)\d{2}\b/);
+  if (year) return "dated";
+  if (/(?:new|latest|upcoming|next)\b/iu.test(determinerPhrase)) return "current";
+  if (/(?:old|classic|original|first)\b/iu.test(determinerPhrase)) return "dated";
+  return "unknown";
+}
 function worldFramed(text: string, at: number): boolean {
   return WORLD_KIND_RE.test(text.slice(0, at));
 }
@@ -504,6 +525,38 @@ export function resolveNames(text: string, signal: TurnSignal | undefined, known
     if (!framedByRelation && productFramed(text, c, c.tags)) {
       subjects.push({ type: "unresolved", surface_form: c.name, candidate_kinds: ["organization"], provenance, confidence: 0.4, carried_question: null });
       unknown.push({ name: c.name, hintedKinds: ["organization"], ask: false, pronoun: null });
+      continue;
+    }
+    // CHAT-13: a kind noun beside the name, in front ("the film Marsh
+    // Lantern") or after ("the new Marsh Lantern film"), makes it the
+    // world's, kind read off the noun, recency read off the words before
+    // the name; a titled work is the world's, never a household unknown,
+    // never asked about.
+    const afterSlice = text.slice(c.at + c.name.length);
+    const beforeSlice = text.slice(0, c.at);
+    if (!framedByRelation && (worldFramed(text, c.at) || KIND_NOUN_AFTER_RE.test(afterSlice))) {
+      const after = KIND_NOUN_AFTER_RE.test(afterSlice);
+      // The kind noun: the one right after the name (after-shape) or the
+      // one in front of it (before-shape).
+      const kindNoun = after
+        ? (afterSlice.match(KIND_NOUN_AFTER_RE) ?? [""])[0]!.trim()
+        : (beforeSlice.match(/(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon)\s+$/iu) ?? [""])[0]!.trim();
+      // The determiner-to-name slot where the recency word lives: for the
+      // after-shape it is the words before the name ("the new Marsh
+      // Lantern film" -> "the new"); for the before-shape it is the slot
+      // before the kind noun ("the new Marsh Lantern" -> "the new").
+      const recencyPhrase = after ? beforeSlice : beforeSlice.replace(kindNoun, "").trim();
+      const year = (recencyPhrase.match(/\b(?:19|20)\d{2}\b/) ?? [null])[0] ?? null;
+      subjects.push({
+        type: "world",
+        kind: kindOf(kindNoun),
+        display_name: c.name,
+        year: year === null ? null : Number(year),
+        source_kind: null,
+        stable_key: null,
+        recency: recencyOf(recencyPhrase),
+        carried_question: null,
+      });
       continue;
     }
     // A roster name inside a longer proper noun is the world's

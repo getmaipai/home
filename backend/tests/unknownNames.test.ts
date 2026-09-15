@@ -79,7 +79,7 @@ describe("resolveNames(): the known set and the household frames", () => {
     expect(asks("juniper chewed through the garden hose again")).toEqual([]);
     expect(unresolved("juniper chewed through the garden hose again")).toEqual([]);
     const lantern = resolve("I love the new Marsh Lantern album");
-    expect(lantern.subjects).toEqual([{ type: "unresolved", surface_form: "Marsh Lantern", candidate_kinds: [], provenance: "turn-t", confidence: 0.4, carried_question: null }]);
+    expect(lantern.subjects).toEqual([{ type: "world", kind: "album", display_name: "Marsh Lantern", year: null, source_kind: null, stable_key: null, recency: "current", carried_question: null }]);
     expect(asks("Dinner is at six")).toEqual([]);
     expect(asks("Dinner is at Grandma's, she said six")).toEqual([]);
     // A model number stays with a name the household does not know
@@ -277,5 +277,28 @@ describe("the two guard shapes, both ways", () => {
     for (const world of ["Snoopy is a dog in Peanuts.", "A Rottweiler is a dog breed.", "Socrates was a teacher in Athens."]) {
       expect([world, guardReply(world, { utterance: "who is that", act: "question", personId: "person-t", roster: ["Sage"], unresolvedNames: ["Snoopy", "Rottweiler", "Socrates"] }).reason]).toEqual([world, null]);
     }
+  });
+});
+
+describe("CHAT-13: a titled work with its kind noun is a world subject", () => {
+  test("the kind noun after the name, recency read from the determiner phrase", () => {
+    const film = resolve("the new Marsh Lantern film is the one I'm counting down to");
+    expect(film.subjects).toEqual([{ type: "world", kind: "film", display_name: "Marsh Lantern", year: null, source_kind: null, stable_key: null, recency: "current", carried_question: null }]);
+    expect(film.unknown).toEqual([]);
+    expect(resolve("the film Marsh Lantern is the one I'm counting down to").subjects).toEqual([{ type: "world", kind: "film", display_name: "Marsh Lantern", year: null, source_kind: null, stable_key: null, recency: "unknown", carried_question: null }]);
+  });
+
+  test("the kind noun and the recency read the same in front of the name", () => {
+    expect(resolve("what's the horse called in the old Lantern Bay cartoon").subjects).toEqual([{ type: "world", kind: "show", display_name: "Lantern Bay", year: null, source_kind: null, stable_key: null, recency: "dated", carried_question: null }]);
+    expect(resolve("the 1986 Cobra movie is great").subjects).toEqual([{ type: "world", kind: "film", display_name: "Cobra", year: 1986, source_kind: null, stable_key: null, recency: "dated", carried_question: null }]);
+  });
+
+  test("the relation frame and the product rule still win", () => {
+    const brother = resolve("my brother Vincent is visiting");
+    expect(brother.subjects).toEqual([{ type: "unresolved", surface_form: "Vincent", candidate_kinds: ["person"], provenance: "turn-t", confidence: 0.8, carried_question: null }]);
+    expect(brother.unknown).toEqual([{ name: "Vincent", hintedKinds: ["person"], ask: false, pronoun: null }]);
+    const card = resolve("the new Rivet 3 card is a beast");
+    expect(card.subjects).toEqual([{ type: "unresolved", surface_form: "Rivet 3", candidate_kinds: ["organization"], provenance: "turn-t", confidence: 0.4, carried_question: null }]);
+    expect(card.unknown).toEqual([{ name: "Rivet 3", hintedKinds: ["organization"], ask: false, pronoun: null }]);
   });
 });

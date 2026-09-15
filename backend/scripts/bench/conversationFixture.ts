@@ -1459,7 +1459,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
   {
     id: "subject-before-pattern",
     category: "knowledge",
-    note: "CHAT-13 chunk B: a reference in a literal pattern resolves to the live world subject, not a title lookup; the media-lookup package runs with the resolved name as its argument. Red until CHAT-13's typed world subject lands (the coordinator's set read, 2026-09-15).",
+    note: "CHAT-13 chunk B: a reference in a literal pattern resolves to the live world subject, not a title lookup; the media-lookup package runs with the resolved name as its argument.",
     turns: [
       { say: "the new Marsh Lantern film is the one I'm counting down to", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "world", name: "Marsh Lantern", kind: "film" }], guard: null, humanVerdict: true } },
       { say: "when is it out", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } },
