@@ -559,7 +559,6 @@
     "act": "question",
     "reply": "Those are the two options. Got it?",
     "expect": "tag_question",
-    "streamingSkip": true,
     "note": "REG-02: a tag question at the end of a declarative reply is cut as a register tail with its own sub-reason."
   },
   {

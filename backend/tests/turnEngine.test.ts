@@ -1347,6 +1347,22 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     return undefined;
   }
 
+  test("REG-02 cuts a standalone tag question after a delivered sentence and records the hit", async () => {
+    const hits: string[] = [];
+    const gated = gateGuards(fromSentences("Those are the two options.", "Got it?"), { utterance: "what are the two options" }, "person-1", (reason) => hits.push(reason));
+    const delivered: string[] = [];
+    for await (const chunk of gated) delivered.push(chunk);
+    expect(delivered.join("").trim()).toBe("Those are the two options.");
+    expect(hits).toContain("tag_question");
+  });
+
+  test("REG-02 cuts a same-line tag question", async () => {
+    const gated = gateGuards(fromSentences("It's the band you played last week, right?"), { utterance: "what are the two options" }, "person-1");
+    const delivered: string[] = [];
+    for await (const chunk of gated) delivered.push(chunk);
+    expect(delivered.join("").trim()).toBe("It's the band you played last week.");
+  });
+
   // Item 1b (#67): a claimed experience is dropped wherever it sits and
   // the rest streams on; alone, the cannot-experience line stands in.
   test("skippable (claimed_experience): the first sentence is dropped and the rest streams; alone it is replaced with the world's own line", async () => {
