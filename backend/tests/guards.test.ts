@@ -4,11 +4,22 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, replacementFor, withoutHonestyLines, withoutBankLines, bankLineNote, allReplacementLines, stripRegisterTail, dropConjunctionLead, ACTION_FAMILIES, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, withoutHonestyLines, withoutBankLines, bankLineNote, allReplacementLines, stripRegisterTail, dropConjunctionLead, ACTION_FAMILIES, MALFORMED, EMPTIED_LINES, readLookupDraft, hedgedFactShape, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
 }
+
+describe("LOOKUP-02 promise and hedge edges", () => {
+  test("recall promises are not lookup promises, while an actual schedule check is", () => {
+    expect(readLookupDraft("Let me check if I remember anything about the dishwasher.", { worldQuestion: true, lookupServed: true })).toBeNull();
+    expect(readLookupDraft("Let me check the schedule.", { worldQuestion: true, lookupServed: true })).toMatchObject({ shape: "promise" });
+  });
+
+  test("'supposed to be' marks a hedged checkable fact", () => {
+    expect(hedgedFactShape("It's supposed to be 12 tracks.")).toBe(true);
+  });
+});
 
 describe("item 4b: the forget family (the review's findings 8 and 9)", () => {
   test("'I've forgotten your birthday' is a forget claim with no outcome", () => {

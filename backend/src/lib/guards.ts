@@ -936,11 +936,11 @@ export function isCloserSentence(sentence: string): boolean {
 // object is the household's own (the list, the calendar, a timer, a
 // memory) is a package's, never the websearch's, so it is no lookup
 // shape here.
-const HOUSEHOLD_OBJECT = String.raw`(?! (?:what'?s (?:on|in) )?(?:your|the|our|my|that|this) (?:lists?|shopping|grocery|groceries|calendar|schedule|timers?|reminders?|memory|memories|notes?)\b)`;
+const HOUSEHOLD_OBJECT = String.raw`(?! (?:what'?s (?:on|in) )?(?:your|the|our|my|that|this) (?:lists?|shopping|grocery|groceries|calendar|timers?|reminders?|memory|memories|notes?)\b)`;
 // A clarification is not a lookup either: "let me see if I've got this
 // right", "let me double-check I understood", "can I check something
 // with you" (a review).
-const UNDERSTANDING = String.raw`(?! (?:i(?:'ve| have)? (?:got|understand|understood|follow|heard|read|have)|that i|what you|my understanding|i'm following|we're on the same page|this is right|this right|something with you|with you))`;
+const UNDERSTANDING = String.raw`(?! (?:i(?:'ve| have)? (?:got|understand|understood|follow|heard|read|have)|check (?:if|whether|what) i (?:remember|know|have)|that i|what you|my understanding|i'm following|we're on the same page|this is right|this right|something with you|with you))`;
 const LOOKUP_VERB = String.raw`(?:check(?:ing)?(?! (?:it|that|this|them|those) out)(?! (?:in|on|with|back|up on)\b)(?! something\b)${UNDERSTANDING}|look(?:ing)?(?: (?:that|it|this|them|those))? up|look(?:ing)? into (?:that|it|this)|find(?:ing)? out${UNDERSTANDING}|see (?:if|whether)(?! (?:i can (?:do|help)|that|you|there'?s anything i can do))${UNDERSTANDING}|see what (?:i can find|comes up|the (?:web|internet|search) (?:says|has|turns up)|the (?:date|time|schedule|reviews?|results?) (?:is|are|say))|see about|search(?:ing)?(?: (?:for|online|the web))?|dig(?:ging)? (?:that|it|this) up|double[- ]check(?:ing)?${UNDERSTANDING}|verify(?:ing)?${UNDERSTANDING}|pull(?:ing)? (?:that|it|this) up|get (?:you )?(?:the|that|those|some) (?:details|info|numbers|dates?|times?|results?|answers?))${HOUSEHOLD_OBJECT}`;
 // A filler alone ("hang on", "give me a second") is no promise; it is
 // one only with the lookup verb behind it (a review).
@@ -957,7 +957,7 @@ const LOOKUP_OFFER_RE = new RegExp(String.raw`\b(?:(?:do you )?want me to|would 
 // draft, read the same way as a promise. A number word is a number
 // (LOOKUP-02's set: "I think it's seven tracks" went out unread);
 // "one" stays out, a pronoun as often as a count ("the one", "one of").
-const HEDGE_MARK_RE = /\b(?:typically|usually|generally|often|i think|i believe|probably|around|roughly|approximately|if i remember|as far as i (?:know|remember|recall)|but (?:do )?check|i(?:'d)? recommend (?:checking|verifying)|you(?:'ll| will| may| might)? want to (?:verify|double[- ]check|check)|double[- ]check|i'?m not (?:entirely |completely |100% )?(?:sure|certain)|not (?:entirely |completely )?sure)\b/i;
+const HEDGE_MARK_RE = /\b(?:typically|usually|generally|often|i think|i believe|probably|around|roughly|approximately|if i remember|as far as i (?:know|remember|recall)|but (?:do )?check|i(?:'d)? recommend (?:checking|verifying)|you(?:'ll| will| may| might)? want to (?:verify|double[- ]check|check)|double[- ]check|i'?m not (?:entirely |completely |100% )?(?:sure|certain)|not (?:entirely |completely )?sure|supposed to be|meant to be)\b/i;
 const CHECKABLE_VALUE_RE = /\b\d[\d.,]*\b|(?<=\S\s)\p{Lu}[\p{L}\p{N}-]+|\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|dozen)\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/u;
 export function hedgedFactShape(sentence: string): boolean {
   return HEDGE_MARK_RE.test(sentence) && CHECKABLE_VALUE_RE.test(sentence);
@@ -975,7 +975,9 @@ export function falseCapabilityShape(sentence: string): boolean {
 // statement that the person can check is not ("you can check the
 // label").
 export type LookupShape = "promise" | "offer" | "hedged_fact" | "denial";
+const RECALL_CHECK_RE = /\bcheck (?:if|whether|what) i (?:remember|know|have)\b/i;
 export function lookupShapeOf(sentence: string): LookupShape | null {
+  if (RECALL_CHECK_RE.test(sentence)) return null;
   if (LOOKUP_OFFER_RE.test(sentence)) return "offer";
   if (LOOKUP_PROMISE_RE.test(sentence)) return "promise";
   return null;

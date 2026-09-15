@@ -21,6 +21,7 @@ import {
   routeSemantic,
   loadAllManifests,
   capturedEntityKinds,
+  isShortCommentOnLiveSubject,
   answersAllow,
   PROMPT_SYSTEM_CHAR_BUDGET,
   MAX_TURN_TEXT_LENGTH,
@@ -3224,6 +3225,22 @@ describe("route() never lets a consequential package win outright (session-d-pac
     const { winner, ranked } = await route("lock the front door", actor, loaded);
     expect(winner?.id).not.toBe("lock-doors");
     expect(ranked.some((c) => c.id === "lock-doors")).toBe(true);
+  });
+});
+
+describe("CHAT-13 chunk E: short comments yield to social acts", () => {
+  const world = [{ type: "world", kind: "show", display_name: "Lantern Bay", year: null, source_kind: null, stable_key: null, recency: "current", carried_question: null }] as const;
+
+  test("thanks forms after a lookup stay closing and are not banked", () => {
+    for (const text of ["thanks", "ok thanks"]) {
+      expect(isShortCommentOnLiveSubject(text, world, { primary_act: "closing" })).toBe(false);
+    }
+  });
+
+  test("a real short comment remains a live-subject backchannel candidate", () => {
+    for (const text of ["brilliant", "so good"]) {
+      expect(isShortCommentOnLiveSubject(text, world, { primary_act: "inform" })).toBe(true);
+    }
   });
 });
 

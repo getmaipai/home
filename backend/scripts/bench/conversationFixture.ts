@@ -1459,7 +1459,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
   {
     id: "subject-before-pattern",
     category: "knowledge",
-    note: "CHAT-13 chunk B: a reference in a literal pattern resolves to the live world subject, not a title lookup; the media-lookup package runs with the resolved name as its argument",
+    note: "CHAT-13 chunk B: a reference in a literal pattern resolves to the live world subject, not a title lookup; the media-lookup package runs with the resolved name as its argument. Red until CHAT-13's typed world subject lands (the coordinator's set read, 2026-09-15).",
     turns: [
       { say: "the new Marsh Lantern film is the one I'm counting down to", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "world", name: "Marsh Lantern", kind: "film" }], guard: null, humanVerdict: true } },
       { say: "when is it out", expect: { signal: { primary_act: "question" }, outcomeArgs: { packageId: "media-lookup", args: { title: "Marsh Lantern" } }, toolRan: "media-lookup", mustNotContain: "the movie|the film", humanVerdict: true } },
@@ -1472,7 +1472,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "knowledge",
     note: "CHAT-13 chunk E: a short content-word reaction on a live world subject is a backchannel, not a definition",
     turns: [
-      { say: "what's the horse called in the old Clover and Quill cartoon", expect: { signal: { primary_act: "question" }, subjects: [{ type: "world", name: "Clover and Quill", kind: "show" }], guard: null, humanVerdict: true } },
+      { say: "what's the horse called in the old Lantern Bay cartoon", expect: { signal: { primary_act: "question" }, subjects: [{ type: "world", name: "Lantern Bay", kind: "show" }], guard: null, humanVerdict: true } },
       { say: "she was in that show for years, wasn't she", expect: { signal: { primary_act: "question" }, guard: null, humanVerdict: true } },
       { say: "wild", expect: { signal: { primary_act: "backchannel" }, toolRan: null, mustNotContain: "irony is|definition|means when", maxWords: 25, humanVerdict: true } },
     ],
@@ -1486,10 +1486,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "knowledge",
     note: "CHAT-13 chunk C2: a carried world reference lives two turns unless re-mentioned; a package turn keeps the carry, and by the fourth turn the cartoon is gone from the stack",
     turns: [
-      { say: "what's the horse called in the old Clover and Quill cartoon", expect: { signal: { primary_act: "question" }, toolRan: "websearch", subjects: [{ type: "world", name: "Clover and Quill" }], humanVerdict: true } },
-      { say: "what time is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", subjects: [{ type: "world", name: "Clover and Quill" }], humanVerdict: true } },
-      { say: "and set a timer for ten minutes", expect: { signal: { primary_act: "inform" }, toolRan: "timer", subjects: [{ type: "world", name: "Clover and Quill" }], humanVerdict: true } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, subjectsAbsent: [{ type: "world", name: "Clover and Quill" }], humanVerdict: true } },
+      { say: "what's the horse called in the old Lantern Bay cartoon", expect: { signal: { primary_act: "question" }, toolRan: "websearch", subjects: [{ type: "world", name: "Lantern Bay" }], humanVerdict: true } },
+      { say: "what time is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", subjects: [{ type: "world", name: "Lantern Bay" }], humanVerdict: true } },
+      { say: "and set a timer for ten minutes", expect: { signal: { primary_act: "inform" }, toolRan: "timer", subjects: [{ type: "world", name: "Lantern Bay" }], humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, subjectsAbsent: [{ type: "world", name: "Lantern Bay" }], humanVerdict: true } },
     ],
   },
 ];

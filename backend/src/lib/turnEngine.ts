@@ -1405,7 +1405,9 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
 }
 
 const SHORT_COMMENT_STOPWORDS = new Set(["a", "an", "the", "and", "or", "but", "to", "of", "in", "on", "is", "it", "that", "this", "was", "were", "be", "are", "my", "your", "i", "you", "we", "he", "she", "they"]);
-function isShortCommentOnLiveSubject(text: string, subjects: readonly SubjectRef[]): boolean {
+const THANKS_FORM_RE = /^(?:thanks|thank you|ta|cheers|ok thanks)$/i;
+export function isShortCommentOnLiveSubject(text: string, subjects: readonly SubjectRef[], signal: Pick<TurnSignal, "primary_act">): boolean {
+  if (signal.primary_act === "closing" || signal.primary_act === "greeting" || signal.primary_act === "backchannel" || THANKS_FORM_RE.test(text.trim())) return false;
   if (text.includes("?")) return false;
   const words = text.trim().match(/[A-Za-z]+(?:['-][A-Za-z]+)*/g);
   if (!words || words.length < 1 || words.length > 2 || words.join(" ").length !== text.trim().length) return false;
@@ -2591,7 +2593,7 @@ async function prepareTurn(
   let literalYielded: LiteralYield | null = null;
   // SAFETY-01: in the crisis state nothing routes to a package; the
   // embed still runs for recall.
-  const shortComment = !inCrisis && isShortCommentOnLiveSubject(text, subjects);
+  const shortComment = !inCrisis && isShortCommentOnLiveSubject(text, subjects, signal);
   if (shortComment) signal = asBackchannelOnLiveSubject(signal);
   let { winner: routed, ranked }: RouteResult = inCrisis || shortComment ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
   // ACT-01: a literal-pattern win is a directive by construction, frozen
