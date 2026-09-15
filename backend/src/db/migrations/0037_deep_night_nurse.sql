@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `entities_account_person_id_unique` ON `entities` (`account_person_id`) WHERE account_person_id IS NOT NULL AND deleted_at IS NULL;
