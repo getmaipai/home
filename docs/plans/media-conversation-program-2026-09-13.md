@@ -722,7 +722,29 @@ The turn log tells the story without the words.
     utterance as its query ("how know <name>, show proof") and searched
     a regulator's filing system; that is finding 59's case.
 
-Design of 53 to 59 is Session A's; 60 is mechanical (chat-gap design is reserved). Every
+61. The owner's rule, 2026-09-16: when a lookup ran, the reply carries
+    the rows and nothing else. We built the search package, we compose
+    the query, we know whether rows came back and what they say, and
+    we own every byte that reaches the person; a model that writes
+    "based on the search results" over rows that said nothing, or adds
+    a title the rows do not contain, is a hole in that control, not a
+    model quirk. Today the composer hands the rows to the model with a
+    hint ("answer from these results; say plainly when they don't")
+    and delivers whatever comes back. The rule replaces the hint with a
+    check: a composition over a lookup outcome is grounded when every
+    title, name, year and quoted value in it appears in the rows (a
+    containment check against the rows' title, snippet and typed
+    fields, deterministic, no model); a composition that fails the
+    check is not delivered, the rows are rendered directly (K4's list
+    or the one-row line with its source) and the turn line says
+    `composed: grounded_fallback` with the offending span, so the
+    weekly report counts it. Empty rows compose nothing: the line is
+    the fixed "the search found nothing on that" with the query shown,
+    never a model sentence. RVW-6's encoder check runs beside this in
+    shadow later; the containment check ships now. Rows:
+    `lookup-reply-only-rows`, `lookup-empty-rows-says-so`.
+
+Design of 53 to 59 is Session A's; 60 and 61 are mechanical (chat-gap design is reserved). Every
 row above is written red first, with roster names and invented titles.
 
 What worked, for the record: every forced or explicit search answered
