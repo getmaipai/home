@@ -651,7 +651,15 @@ The turn log tells the story without the words.
     covers the "checkable fact" shape only for some fields; "what was
     the X's name", "who did the Y", "what were their hits" are the
     commonest forms and none fired. This is RVW-3's case: a router on
-    the subject and field, not more patterns.
+    the subject and field, not more patterns. The same rule covers every
+    list the chat produced: "give me a list of films from those years
+    with that theme" is a checkable field (a list of works), and each
+    list in the retest came from the weights (five titles, two of them
+    repeated from the turn before, one cut off) or from the junk image
+    search of finding 60 while the line claimed "based on the search
+    results". A list ask on a world subject is a lookup whose rows K4
+    renders; the model never writes the list itself, and a composition
+    never claims the rows when the rows did not answer (finding 54).
 
 54. "You made that up, search it" ran the search and the reply
     repeated the previous wrong answer word for word. The forced
