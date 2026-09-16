@@ -92,6 +92,8 @@ export const RULES = {
   "lookup.read.offer": "the draft offered a lookup",
   "lookup.read.hedged_fact": "the draft hedged a checkable fact on a world question",
   "lookup.read.denial": "the draft denied a deliverable",
+  "composition.grounded_fallback": "a lookup composition named a span absent from its rows and rendered the rows directly",
+  "composition.empty_rows": "a lookup returned no rows and used the fixed empty-result line",
   // The deliverable kinds (CHAT-16 part 4).
   "deliverable.link": "a link ask",
   "deliverable.picture": "a picture ask",

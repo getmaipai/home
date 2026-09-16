@@ -55,6 +55,8 @@ interface TurnLine {
   subjects?: { type: "household" | "world" | "unresolved"; name: string }[];
   /** LOOKUP-02: the shape the draft confessed. */
   lookup_shape?: string;
+  composed?: string;
+  ungrounded?: string;
   /** ACT-01: the frozen signal's headline and the per-stage timings. */
   signal?: { act: string; secondary: string[]; emotion: string; intensity: string; target: string; repair: string; source: string };
   timings?: TurnTimings;
@@ -166,7 +168,9 @@ export function startFakeSearxng(): FakeSearxng {
       // check a real fact fail as they did with no search at all.
       // ASK-02: the film's cast row names Serena Vale (the hub-named
       // subject), and a query about her answers with her own facts.
-      const results = /serena vale/i.test(q) && /photo|picture|image/i.test(q)
+      const results = /no results fixture/i.test(q)
+        ? []
+        : /serena vale/i.test(q) && /photo|picture|image/i.test(q)
         ? [
             { title: "Serena Vale portrait", url: `https://example.com/${slug}/portrait`, content: "A portrait of Serena Vale.", img_src: "https://images.example.com/serena-vale-portrait.jpg", thumbnail_src: "https://images.example.com/thumbs/serena-vale-portrait.jpg" },
             { title: "Serena Vale on stage", url: `https://example.com/${slug}/stage`, content: "A stage photo of Serena Vale.", img_src: "https://images.example.com/serena-vale-stage.jpg", thumbnail_src: "https://images.example.com/thumbs/serena-vale-stage.jpg" },
@@ -701,6 +705,8 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       pendingAsk: getPendingAsk(conversationId)?.kind ?? null,
       pendingAskName: getPendingAsk(conversationId)?.name ?? null,
       lookupShape: line?.lookup_shape ?? null,
+      composed: line?.composed ?? null,
+      ungrounded: line?.ungrounded ?? null,
       // REP-01: the turn's extra generations (the retry), and the reply
       // this conversation delivered before it.
       retries: line?.timings?.retries ?? null,
@@ -711,7 +717,10 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       listItems: since(listItemsAtStart, listItemsNow()),
       jobs,
       homeCalls: homeCallsSince(),
-      sourceUrls: requests.flatMap((r) => r.sourceUrls),
+      sourceUrls: [...new Set([
+        ...(driven.value?.sources ?? []).map((source) => source.url),
+        ...requests.flatMap((r) => r.sourceUrls),
+      ])],
       mediaPresent: Boolean(driven.value?.media_items?.length ?? driven.value?.media),
       mediaItems: driven.value?.media_items?.length ?? (driven.value?.media ? 1 : 0),
       mediaDisjointFromPrevious,

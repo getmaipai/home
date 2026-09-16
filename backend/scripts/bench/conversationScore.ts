@@ -85,6 +85,10 @@ export interface TurnObserved {
   pendingAskName?: string | null;
   /** LOOKUP-02: the shape the `[turn]` line says the draft confessed. */
   lookupShape?: string | null;
+  /** CHAT-16: the composition mode on the `[turn]` line. */
+  composed?: string | null;
+  /** CHAT-16 finding 61: the grounding guard's named span. */
+  ungrounded?: string | null;
   /** REP-01: the turn's retries off the `[turn]` line, and the reply the
    * conversation delivered before this one. */
   retries?: number | null;
@@ -196,6 +200,10 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.jobScheduled) parts.push(`job ${e.jobScheduled} pending`);
   if (e.homeCalls) parts.push(`${e.homeCalls.service} called ${e.homeCalls.count}x`);
   if (e.lookupWithSource) parts.push("lookup with a source");
+  if (e.sourcesNonEmpty) parts.push("sources non-empty");
+  if (e.sourcesEmpty) parts.push("sources empty");
+  if (e.composed) parts.push(`composed ${e.composed}`);
+  if (e.ungrounded) parts.push(`ungrounded ${e.ungrounded}`);
   if (e.mediaPresent) parts.push("media present");
   if (e.mediaItems !== undefined) parts.push(`${e.mediaItems} media item(s)`);
   if (e.mediaDisjointFromPrevious) parts.push("media disjoint from previous");
@@ -354,6 +362,14 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     checks.push({ name: "sources non-empty", pass, detail: pass ? `${observed.sourceUrls.length} source(s)` : "no sources on the delivered turn" });
   }
   if (e.sourcesEmpty) checks.push({ name: "sources empty", pass: observed.sourceUrls.length === 0, detail: observed.sourceUrls.length === 0 ? "no sources" : `${observed.sourceUrls.length} source(s)` });
+  if (e.composed) {
+    const pass = observed.composed?.startsWith(e.composed) === true;
+    checks.push({ name: "composed", pass, detail: observed.composed ? `mode ${observed.composed}` : "no composed marker on the turn line" });
+  }
+  if (e.ungrounded) {
+    const pass = observed.ungrounded === e.ungrounded;
+    checks.push({ name: "ungrounded", pass, detail: observed.ungrounded ? `span ${observed.ungrounded}` : "no ungrounded span on the turn line" });
+  }
   if (e.mediaPresent) checks.push({ name: "media present", pass: observed.mediaPresent === true, detail: observed.mediaPresent ? `${observed.mediaItems ?? 0} picture item(s)` : "no media on the delivered turn" });
   if (e.mediaItems !== undefined) checks.push({ name: "media items", pass: observed.mediaItems === e.mediaItems, detail: `${observed.mediaItems ?? 0} item(s), expected ${e.mediaItems}` });
   if (e.mediaDisjointFromPrevious) checks.push({ name: "media disjoint", pass: observed.mediaDisjointFromPrevious === true, detail: observed.mediaDisjointFromPrevious ? "no image URL repeated" : "an image URL repeated or no prior media" });

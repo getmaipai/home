@@ -122,6 +122,10 @@ export interface TurnExpectation {
   /** The delivered turn carries at least one typed source (CHAT-16). */
   sourcesNonEmpty?: boolean;
   sourcesEmpty?: boolean;
+  /** CHAT-16: the composed marker on the turn line starts with this mode. */
+  composed?: string;
+  /** CHAT-16 finding 61: the grounding guard names this span. */
+  ungrounded?: string;
   /** Finding 60: the delivered turn carries one or more picture items. */
   mediaPresent?: boolean;
   /** Finding 60: the delivered turn carries exactly this many picture items. */
@@ -1199,11 +1203,31 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "knowledge",
     note: "CHAT-16 part 4 rule 1: the lookup reply carries its sources",
     turns: [
-      { say: "where's the maker's support page for the Cosmo 7 card", expect: { signal: { primary_act: "question" }, lookupWithSource: true, sourcesNonEmpty: true, mustNotContain: "http|can't (show|provide|share|access)|no link", humanVerdict: true } },
-      { say: "what's the horse called in the old Lantern Bay cartoon", expect: { signal: { primary_act: "question" }, lookupWithSource: true, humanVerdict: true } },
-      { say: "where did you read that, link me", expect: { signal: { primary_act: "directive" }, sourcesNonEmpty: true, toolRan: null, mustNotContain: "can't provide|can't share|http", humanVerdict: true } },
+      { say: "where's the maker's support page for the Cosmo 7 card", seedReply: "Let me look it up for you.", expect: { signal: { primary_act: "question" }, lookupWithSource: true, sourcesNonEmpty: true, mustNotContain: "http|can't (show|provide|share|access)|no link", humanVerdict: true } },
+      { say: "what's the horse called in the old Lantern Bay cartoon", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
+      { say: "where did you read that, link me", expect: { signal: { primary_act: "question" }, sourcesNonEmpty: true, lookupWithSource: true, toolRan: "websearch", mustNotContain: "can't provide|can't share|http", humanVerdict: true } },
       { say: "got a photo of it?", expect: { sourcesNonEmpty: true, mustNotContain: "can't view|I can't see", mustContain: "below|page|link|details", humanVerdict: true } },
       { say: "any video of it?", expect: { sourcesNonEmpty: true, mustNotContain: "can't show links|search for it yourself", humanVerdict: true } },
+    ],
+  },
+  {
+    id: "lookup-reply-only-rows",
+    category: "knowledge",
+    note: "CHAT-16 finding 61: a lookup composition that invents a title is replaced by the rows and names the ungrounded span",
+    turns: [
+      { say: "search the web for the horse in the old Lantern Bay cartoon", seedReply: "The horse is named Invented Meadow in the Invented Chronicle (2024).", expect: { signal: { primary_act: "directive" }, lookupWithSource: true, sourcesNonEmpty: true, mustContain: "Lantern Bay|Copper", mustNotContain: "Invented Meadow|Invented Chronicle|2024", composed: "grounded_fallback", ungrounded: "Invented Meadow" } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "lookup-empty-rows-says-so",
+    category: "knowledge",
+    note: "CHAT-16 finding 61: an empty lookup uses the fixed no-results line without a model call",
+    turns: [
+      { say: "search the web for the no results fixture", expect: { signal: { primary_act: "directive" }, toolsRan: ["websearch"], sourcesEmpty: true, mustContain: "The search found nothing on that|no results fixture", composed: "empty_rows" } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
     ],
   },
   {

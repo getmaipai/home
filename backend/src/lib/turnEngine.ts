@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -47,7 +47,7 @@ import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor, constraints
 import { planFor, planLine } from "@/lib/register";
 import { rungOf, rulesFired, type Rung, type RuleName } from "@/lib/ruleNames";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
-import { buildDocument, projectDocument, planComposition, composedText, composedLog, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
+import { buildDocument, projectDocument, planComposition, composedText, composedLog, groundedIn, renderLookupRows, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
 import { promptNow } from "@/lib/benchSampling";
 import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
@@ -224,6 +224,7 @@ interface TurnLogRecord {
    * outcomes into a reply (`<mode> calls=<n>`, the budget and fallback
    * marks), and K6's last phase. */
   composed?: string;
+  ungrounded?: string;
   phase?: string;
   /** RVW-1: which rung answered, and the deterministic rules that
    * fired (the engine's by name, the guard hits as `guard.<reason>`). */
@@ -259,7 +260,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     ...(value.source === "model" || (timings?.first_token_ms ?? null) !== null ? { engine: formatEngineIdentity(getChatEngineIdentity()) } : {}),
     ...(named.length > 0 ? { subjects: named, subject: named[0]!.name } : {}),
     ...(lookupShape ? { lookup_shape: lookupShape } : {}),
-    ...(composed ? { composed: composedLog(composed), phase: composed.phase } : {}),
+    ...(composed ? { composed: composedLog(composed), ...(composed.ungrounded ? { ungrounded: composed.ungrounded } : {}), phase: composed.phase } : {}),
     ...(rung ? { rung } : {}),
     ...(rules && rules.length > 0 ? { rules: [...rules] } : {}),
   };
@@ -284,7 +285,7 @@ export function judgeStatusAtInsert(value: Pick<TurnValue, "source">, signal: Tu
   return hasEligibleClause(signal) ? null : "skipped";
 }
 /** CHAT-16: what the `[turn]` line says about a composed turn. */
-export type ComposedRecord = Pick<ComposedTurn, "mode" | "model_calls" | "budget_spent" | "fell_back" | "synthetic_ids"> & { phase: string };
+export type ComposedRecord = Pick<ComposedTurn, "mode" | "model_calls" | "budget_spent" | "fell_back" | "synthetic_ids" | "ungrounded"> & { phase: string };
 
 export type SpeakerEvidence = { person: string | null; basis: "signed_in" | "voice" | "face" | "voice_and_face" | "claimed" | "unknown"; level: "confirmed" | "tentative" | "unknown" };
 export type PresentPerson = SpeakerEvidence;
@@ -3260,6 +3261,13 @@ function directNeedsComposer(value: TurnValue, outcomes: readonly ToolExecutionO
   return !!last && last.status === "succeeded" && needsComposition(last.result);
 }
 
+function hasLookupOutcome(outcomes: readonly ToolExecutionOutcome[]): boolean {
+  return outcomes.some((outcome) => {
+    if (outcome.status !== "succeeded" || !outcome.result?.data || typeof outcome.result.data !== "object") return false;
+    return Array.isArray((outcome.result.data as { rows?: unknown }).rows);
+  });
+}
+
 /** ASK-01: the name an open question is about, from its subject (an
  * entity, or the far end of a relationship from the speaker). */
 function openQuestionName(question: OpenQuestionRow): string | null {
@@ -4347,6 +4355,7 @@ async function runTurnHoldingLease(
     const plan = planComposition(composerInputFor(modelPrepared, conversation.id, resolutionOutcomes, direct));
     const sources = plan.sources.length > 0 ? plan.sources : resolved.sources;
     if (plan.mode !== "composition") {
+      if (plan.mode === "empty_rows") ruleFired(modelPrepared, "composition.empty_rows");
       modelPrepared.composed = { mode: plan.mode, model_calls: 0, ...(plan.budget_spent ? { budget_spent: true } : {}), phase: machine.phase };
       return { ...resolved, reply: plan.reply, ...(sources?.length ? { sources } : {}) };
     }
@@ -4359,6 +4368,15 @@ async function runTurnHoldingLease(
       console.log(`[turn] the composition on turn ${modelPrepared.turnId} ${answer.ok ? "answered nothing usable" : `failed: ${answer.error}`}; the direct replies stand`);
       modelPrepared.composed = { mode: "composition", model_calls: 1, fell_back: true, ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
       return { ...resolved, reply: plan.fallback, ...(sources?.length ? { sources } : {}) };
+    }
+    const ungrounded = hasLookupOutcome(resolutionOutcomes)
+      ? groundedIn(composed, resolutionOutcomes, [composerInputFor(modelPrepared, conversation.id, resolutionOutcomes, direct).question ?? "", modelPrepared.messages.filter((message) => message.role === "user").at(-1)?.content ?? ""].join(" "))
+      : null;
+    if (ungrounded !== null) {
+      ruleFired(modelPrepared, "composition.grounded_fallback");
+      modelPrepared.composed = { mode: "grounded_fallback", model_calls: 1, ungrounded, phase: machine.phase };
+      groundOutcomes(modelPrepared.turnContext, resolutionOutcomes);
+      return { ...resolved, reply: renderLookupRows(resolutionOutcomes, plan.shape), ...(sources?.length ? { sources } : {}) };
     }
     modelPrepared.composed = { mode: "composition", model_calls: 1, ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
     groundOutcomes(modelPrepared.turnContext, resolutionOutcomes);
@@ -5289,6 +5307,7 @@ async function runTurnStreamHoldingLease(
     const sources = plan.sources.length > 0 ? plan.sources : resolved.sources;
     const withSources: TurnValue = { ...resolved, ...(sources?.length ? { sources } : {}) };
     if (plan.mode !== "composition") {
+      if (plan.mode === "empty_rows") ruleFired(modelTurn, "composition.empty_rows");
       modelTurn.composed = { mode: plan.mode, model_calls: 0, ...(plan.budget_spent ? { budget_spent: true } : {}), phase: machine.phase };
       return { resolved: finalizeReply(actor, { ...withSources, reply: plan.reply }, modelTurn.surface, resolvedTrace) };
     }
@@ -5297,8 +5316,8 @@ async function runTurnStreamHoldingLease(
     modelTurn.modelCalls++;
     groundOutcomes(modelTurn.turnContext, resolutionOutcomes);
     composedFrom = withSources;
-    const record = (fellBack: boolean) => {
-      modelTurn.composed = { mode: "composition", model_calls: 1, ...(fellBack ? { fell_back: true } : {}), ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
+    const record = (fellBack: boolean, mode: "composition" | "grounded_fallback" = "composition", ungrounded?: string) => {
+      modelTurn.composed = { mode, model_calls: 1, ...(fellBack ? { fell_back: true } : {}), ...(ungrounded ? { ungrounded } : {}), ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
     };
     const started = await startCompleteStream("chat", plan.messages, { thinking: false }, opts.signal);
     if (!started.ok) {
@@ -5314,12 +5333,14 @@ async function runTurnStreamHoldingLease(
     // carries two words or a sentence boundary, so a composition that
     // ends inside the hold is known to be a fragment before anything is
     // on the wire, and the direct replies stand for it.
+    const holdForGrounding = hasLookupOutcome(resolutionOutcomes);
     let sent = "";
     let buffer = "";
     let released = false;
     try {
       for await (const delta of started.tokens) {
         sent += delta;
+        if (holdForGrounding) continue;
         if (released) {
           yield delta;
           continue;
@@ -5343,6 +5364,27 @@ async function runTurnStreamHoldingLease(
       console.log(`[turn] the composition on turn ${modelTurn.turnId} answered nothing; the direct replies stand`);
       record(true);
       yield `${plan.fallback.text} `;
+      return undefined;
+    }
+    if (holdForGrounding) {
+      const candidate = composedText(sent);
+      const ungrounded = candidate === null
+        ? null
+        : groundedIn(candidate, resolutionOutcomes, [composerInputFor(modelTurn, conversation.id, resolutionOutcomes, direct).question ?? "", modelTurn.messages.filter((message) => message.role === "user").at(-1)?.content ?? "", resolutionOutcomes.map(outcomeText).join(" ")].join(" "));
+      if (ungrounded !== null) {
+        ruleFired(modelTurn, "composition.grounded_fallback");
+        record(false, "grounded_fallback", ungrounded);
+        yield `${renderLookupRows(resolutionOutcomes, plan.shape).text} `;
+        return undefined;
+      }
+      if (candidate === null) {
+        console.log(`[turn] the composition on turn ${modelTurn.turnId} came back as a fragment; the direct replies stand`);
+        record(true);
+        yield `${plan.fallback.text} `;
+        return undefined;
+      }
+      record(false);
+      yield candidate;
       return undefined;
     }
     if (!released) {

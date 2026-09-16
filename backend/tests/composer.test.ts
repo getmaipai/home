@@ -24,6 +24,7 @@ import {
   needsComposition,
   questionOf,
   composedLog,
+  groundedIn,
   TurnMachine,
   COMPOSE_FALLBACK_LINE,
   COMPOSE_FAILURE_LINE,
@@ -384,6 +385,27 @@ describe("COMP-01 typed document builders", () => {
 });
 
 describe("the grounding", () => {
+  test("groundedIn checks titles, years, units, and the person's own words", () => {
+    const rows = [{ title: "Marsh Lantern film", url: "https://example.com/marsh-lantern", snippet: "Released in 2026, 12 miles away." }];
+    expect(groundedIn("Marsh Lantern film opened in 2026.", rows)).toBeNull();
+    expect(groundedIn("Invented Chronicle is the answer.", rows)).toBe("Invented Chronicle");
+    expect(groundedIn("Marsh Lantern premiered in 2025.", rows)).toBe("2025");
+    expect(groundedIn("Marsh Lantern is my favorite.", rows, "Marsh Lantern")).toBeNull();
+    expect(groundedIn("Marsh Lantern is 12 miles away.", rows)).toBeNull();
+  });
+
+  test("a lookup composition falls back to rows, and an empty lookup never calls the model", async () => {
+    const lookup = searchOutcome();
+    const fallback = await composeTurn(input([lookup]), scripted("The horse is named Invented Meadow in the Invented Chronicle (2024)."));
+    expect(fallback).toMatchObject({ mode: "grounded_fallback", model_calls: 1, ungrounded: "Invented Meadow" });
+    expect(fallback.reply.text).toContain("Marsh Lantern (film)");
+    expect(fallback.reply.text).not.toContain("Invented Meadow");
+    const empty = outcome({ callId: "call-empty", packageId: "websearch", status: "succeeded", args: { expression: "no results fixture" }, result: { actions: [], data: { rows: [], query: "no results fixture" }, synthesis_hint: "answer from these results" } });
+    const noRows = await composeTurn(input([empty]), scripted("never called"));
+    expect(noRows).toMatchObject({ mode: "empty_rows", model_calls: 0, reply: { text: "The search found nothing on that: no results fixture." } });
+    expect(seenMessages).toEqual([]);
+  });
+
   test("a resolution's outcomes join the turn's evidence as package results, once per call, with the rows' titles and snippets as their text", () => {
     const ctx = { evidence: [], includedEvidenceIds: [] } as unknown as TurnContext;
     expect(outcomeText(searchOutcome())).toBe("Marsh Lantern (film) A lighthouse keeper on a rock through one winter. query: marsh lantern film");
@@ -635,6 +657,33 @@ describe("the engine composes a two-outcome turn in one call", () => {
       expect(value.plugin_id).toBe("websearch");
       expect(value.sources?.length).toBe(1);
       expect(turnLine(log.lines)).toMatchObject({ composed: "composition calls=1 ids=synthetic" });
+    } finally {
+      log.restore();
+      stub.stop();
+      searxng.stop(true);
+    }
+  });
+
+  test("a streamed lookup holds invented sentences and delivers the rows instead", async () => {
+    const { actor } = await owner();
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: (request) => request.messages.some((message) => message.role === "tool") ? "The horse is named Invented Meadow in the Invented Chronicle (2024)." : "Sure." });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    const searxng = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "Lantern Bay (cartoon)", url: "https://example.com/lantern-bay", content: "The old Lantern Bay cartoon's horse is called Copper." }] }) });
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
+    const log = captureLog();
+    try {
+      const streamed = await runTurnStream(actor, "chat", "search the web for the horse in the old Lantern Bay cartoon");
+      if (!streamed.ok || streamed.kind !== "stream") throw new Error("expected a stream");
+      const iterator = streamed.tokens[Symbol.asyncIterator]();
+      const deltas: string[] = [];
+      let step = await iterator.next();
+      while (!step.done) { deltas.push(step.value); step = await iterator.next(); }
+      const value = streamed.finalize(deltas.join("").trim(), step.value);
+      expect(value.reply.text).toContain("Copper");
+      expect(value.reply.text).not.toContain("Invented Meadow");
+      expect(log.lines.some((line) => line.includes('"composed":"grounded_fallback calls=1') && line.includes('"ungrounded":"Invented Meadow"'))).toBe(true);
     } finally {
       log.restore();
       stub.stop();

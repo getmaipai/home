@@ -24,7 +24,7 @@
 // turn's counter and, with the second call spent, composes without a
 // model call: the direct reply when an outcome has one, else the fixed
 // fallback.
-import { sourcesFromRows, type DocumentOutcome, type ToolExecutionOutcome } from "@/lib/turnContext";
+import { outcomeText, sourcesFromRows, type DocumentOutcome, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { LlmMessage } from "@/lib/llm";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { ToolCallWire } from "@maipai/spec/llm/ts/types.js";
@@ -48,7 +48,7 @@ export const COMPOSER_MAX_CALLS = 2;
  * on any outcome (the error catalogue's own generic apology). */
 export const COMPOSE_FAILURE_LINE = "Sorry, I couldn't do that.";
 
-export type ComposeMode = "direct" | "composition" | "failure" | "pending";
+export type ComposeMode = "direct" | "composition" | "failure" | "pending" | "grounded_fallback" | "empty_rows";
 export type ComposedShape = "list" | "number" | "one_line";
 
 /** ACT-03's hook: the composer's permitted moves. Every move is allowed
@@ -103,6 +103,8 @@ export interface ComposedTurn {
   /** The composition's model call failed or answered nothing; the reply
    * is the ordered direct replies and failure messages. */
   fell_back?: boolean;
+  /** The first composition span that was not present in the lookup rows. */
+  ungrounded?: string;
   /** The tool call ids in the composition were the engine's own (a
    * deterministic route, the forced ladder), never the model's. */
   synthetic_ids?: boolean;
@@ -145,6 +147,127 @@ function dataCandidates(outcome: Succeeded): RecordData[] {
   if (!data) return [];
   const nested = recordData(data.result) ?? recordData(data.record);
   return nested ? [data, nested] : [data];
+}
+
+/** A lookup's rows are evidence, not prose for the model to paraphrase
+ * without a check. The input also accepts raw scripted rows for the pure
+ * unit tests. */
+export type GroundingRows = readonly unknown[];
+
+function normalizedGrounding(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function addGroundingValue(out: string[], value: unknown, key?: string): void {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    if (key === "url" || key === "source_url") {
+      try { out.push(new URL(String(value)).hostname); } catch { /* an invalid URL is not evidence */ }
+    } else out.push(String(value));
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) addGroundingValue(out, item);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const [childKey, child] of Object.entries(value as Record<string, unknown>)) addGroundingValue(out, child, childKey);
+}
+
+function groundingEvidence(rows: GroundingRows): string[] {
+  const evidence: string[] = [];
+  for (const raw of rows) {
+    const outcome = recordData(raw);
+    if (outcome && outcome.status === "succeeded") {
+      const data = recordData(outcome.result);
+      if (data) addGroundingValue(evidence, data.data);
+      for (const source of Array.isArray(outcome.sources) ? outcome.sources : []) addGroundingValue(evidence, source);
+      continue;
+    }
+    const row = recordData(raw);
+    if (!row) continue;
+    addGroundingValue(evidence, row.title);
+    addGroundingValue(evidence, row.snippet);
+    addGroundingValue(evidence, row.url, "url");
+    addGroundingValue(evidence, row);
+  }
+  return evidence.map(normalizedGrounding).filter(Boolean);
+}
+
+function groundingSpans(text: string): { text: string; index: number }[] {
+  const spans: { text: string; index: number }[] = [];
+  const collect = (pattern: RegExp, transform: (match: RegExpExecArray) => string = (match) => match[0]) => {
+    for (const match of text.matchAll(pattern)) {
+      const value = transform(match as RegExpExecArray).trim();
+      if (value) spans.push({ text: value, index: match.index ?? 0 });
+    }
+  };
+  collect(/["“]([^"”]+)["”]/gu, (match) => match[1] ?? "");
+  collect(/\*([^*]+)\*/gu, (match) => match[1] ?? "");
+  // Only title-cased runs of at least two words are claims. A single
+  // capitalized word is usually sentence casing, not a title.
+  collect(/\b\p{Lu}[\p{L}\p{N}'-]*(?:[\s-]+\p{Lu}[\p{L}\p{N}'-]*)+\b/gu);
+  collect(/\b\d{4}\b/gu);
+  collect(/\b\d+(?:\.\d+)?(?:\s*[-/]\s*|\s+)(?:degrees?|percent|miles?|kilometers?|meters?|feet|foot|inches?|centimeters?|millimeters?|kilograms?|grams?|pounds?|ounces?|liters?|litres?|gallons?|hours?|minutes?|seconds?|days?|weeks?|months?|years?)\b/giu);
+  collect(/\b\d+(?:\.\d+)?%/gu);
+  return spans
+    .sort((a, b) => a.index - b.index || b.text.length - a.text.length)
+    .filter((span, index, all) => index === 0 || all[index - 1]!.index !== span.index || all[index - 1]!.text !== span.text);
+}
+
+/** Returns the first title, quote, year, or number-with-unit in `text`
+ * that cannot be found in the lookup rows or the optional allowed words.
+ * Matching ignores punctuation and case, but keeps word boundaries. */
+export function groundedIn(text: string, rows: GroundingRows, allowedText = ""): string | null {
+  const evidence = [...groundingEvidence(rows), normalizedGrounding(allowedText)].filter(Boolean).map((item) => ` ${item} `);
+  return groundingSpans(text).find((span) => {
+    const wanted = normalizedGrounding(span.text);
+    return wanted.length > 0 && !evidence.some((item) => item.includes(` ${wanted} `));
+  })?.text ?? null;
+}
+
+function lookupRows(outcomes: readonly ToolExecutionOutcome[]): RecordData[] {
+  return outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded").flatMap((outcome) => dataCandidates(outcome).flatMap((data) => Array.isArray(data.rows) ? data.rows.flatMap((row) => {
+    const record = recordData(row);
+    return record ? [record] : [];
+  }) : []));
+}
+
+function lookupOutcome(outcome: ToolExecutionOutcome): { rows: RecordData[]; query: string | null } | null {
+  if (outcome.status !== "succeeded") return null;
+  const data = recordData(outcome.result?.data);
+  if (!data || !Array.isArray(data.rows)) return null;
+  const query = textField(data, "query", "expression", "topic") ?? textField(outcome.args ?? {}, "expression", "topic", "query");
+  return { rows: data.rows.flatMap((row) => { const record = recordData(row); return record ? [record] : []; }), query };
+}
+
+function lookupQuery(outcomes: readonly ToolExecutionOutcome[]): string {
+  return outcomes.map(lookupOutcome).find((value) => value?.query)?.query ?? "that";
+}
+
+/** The deterministic line for a lookup that returned no rows. */
+export function emptyLookupLine(outcomes: readonly ToolExecutionOutcome[]): string {
+  return `The search found nothing on that: ${lookupQuery(outcomes)}.`;
+}
+
+function lookupRowTitle(row: RecordData): string {
+  const title = textField(row, "title", "name", "label") ?? "Untitled result";
+  const year = typeof row.year === "number" && Number.isInteger(row.year) ? ` (${row.year})` : "";
+  return `${title}${year}`;
+}
+
+/** K4's direct rendering for a lookup whose model composition failed the
+ * grounding check. */
+export function renderLookupRows(outcomes: readonly ToolExecutionOutcome[], shape?: ComposedShape): { text: string } {
+  const rows = lookupRows(outcomes);
+  if (shape === "list") {
+    const shown = rows.slice(0, 5).map(lookupRowTitle);
+    if (rows.length > 5) shown.push(`and ${rows.length - 5} more`);
+    return { text: shown.join("\n") };
+  }
+  const row = rows[0];
+  if (!row) return { text: emptyLookupLine(outcomes) };
+  const line = textField(row, "snippet", "line", "description", "text", "content");
+  return { text: line ? `${lookupRowTitle(row)}: ${line}` : `${lookupRowTitle(row)} is the page.` };
 }
 
 function documentOutcome(outcome: Succeeded): DocumentOutcome | null {
@@ -423,7 +546,7 @@ export function projectDocumentForChild(document: TurnArtifactValue): ChildTurnA
  * carries the messages to send and the fallback text; everything else
  * is final. */
 export type ComposePlan =
-  | { mode: "direct" | "failure" | "pending"; reply: { text: string; speech?: string }; sources: Source[]; shape?: ComposedShape; model_calls: 0; budget_spent?: boolean }
+  | { mode: "direct" | "failure" | "pending" | "empty_rows"; reply: { text: string; speech?: string }; sources: Source[]; shape?: ComposedShape; model_calls: 0; budget_spent?: boolean }
   | { mode: "composition"; messages: LlmMessage[]; fallback: { text: string; speech?: string }; sources: Source[]; shape?: ComposedShape; model_calls: 1; synthetic_ids: boolean };
 
 type Succeeded = ToolExecutionOutcome & { status: "succeeded" };
@@ -629,6 +752,10 @@ export function planComposition(input: ComposerInput): ComposePlan {
     const messages = outcomes.filter((o) => o.status === "failed" && o.userMessage).map((o) => o.userMessage!);
     return { mode: "failure", reply: { text: messages.length > 0 ? [...new Set(messages)].join(" ") : COMPOSE_FAILURE_LINE }, sources, shape, model_calls: 0 };
   }
+  const lookups = succeeded.map(lookupOutcome).filter((lookup): lookup is { rows: RecordData[]; query: string | null } => lookup !== null);
+  if (lookups.length > 0 && lookups.every((lookup) => lookup.rows.length === 0)) {
+    return { mode: "empty_rows", reply: { text: emptyLookupLine(succeeded) }, sources, shape, model_calls: 0 };
+  }
   const only = outcomes.length === 1 ? succeeded[0]! : null;
   if (only && !needsComposition(only.result)) return { mode: "direct", reply: usableReply(only)!, sources, shape, model_calls: 0 };
   if (input.budget.spent >= COMPOSER_MAX_CALLS) {
@@ -673,6 +800,19 @@ export async function composeTurn(input: ComposerInput, complete: CompleteFn): P
   }
   const answer = await complete(plan.messages);
   const text = answer.ok ? composedText(answer.text) : null;
+  const ungrounded = text !== null && input.outcomes.some((outcome) => lookupOutcome(outcome) !== null)
+    ? groundedIn(text, input.outcomes, [input.question ?? "", input.messages.filter((message) => message.role === "user").at(-1)?.content ?? "", input.outcomes.map(outcomeText).join(" ")].join(" "))
+    : null;
+  if (ungrounded !== null) {
+    return {
+      reply: renderLookupRows(input.outcomes, plan.shape),
+      sources: plan.sources,
+      mode: "grounded_fallback",
+      model_calls: 1,
+      ...(plan.shape ? { shape: plan.shape } : {}),
+      ungrounded,
+    };
+  }
   return {
     reply: dateAwareReply(input, shapedReply(plan.shape, input.outcomes, text !== null ? { text } : plan.fallback)),
     sources: plan.sources,

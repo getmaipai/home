@@ -14,7 +14,7 @@ import { activeTurnCount } from "@/lib/turnActivity";
 import { CONVERSATIONS, CREDENTIAL_LINE, type BenchConversation } from "../scripts/bench/conversationFixture";
 import { scoreTurn as scoreTurnBare, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence, EPISODES_HEADER_TEXT, wellFormedTotals } from "../scripts/bench/conversationScore";
 import { EPISODES_HEADER } from "@/lib/episodes";
-import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy, startFakeHomeAssistant, type RunDeps } from "../scripts/bench/conversationRunner";
+import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy, startFakeHomeAssistant, startFakeSearxng, type RunDeps } from "../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import type { BenchTurn } from "../scripts/bench/conversationFixture";
@@ -95,8 +95,8 @@ describe("the fixture", () => {
     // objection-reruns, hedged-draft, ladder-falls-through), and
     // ASK-02's three (not-a-name, hub-named-it, public-figure), and
     // CHAT-13 chunk B's subject-before-pattern.
-    expect(CONVERSATIONS.length).toBe(119);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(119);
+    expect(CONVERSATIONS.length).toBe(121);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(121);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(c.id === "link-is-the-answer" ? 1 : 3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
@@ -545,6 +545,37 @@ describe("the runner against the stub (control-flow rows)", () => {
       expect(scores[0]?.observed.totalMs).toBeGreaterThan(0);
     });
   }, 20_000);
+
+  test("CHAT-16 finding 61: lookup rows replace invented composition and empty rows use the fixed line", async () => {
+    await withStubBench({ reply: () => "The horse is named Invented Meadow in the Invented Chronicle (2024)." }, async (deps) => {
+      const search = startFakeSearxng();
+      try {
+        const grounded = await runConversation(byId("lookup-reply-only-rows"), deps);
+        expect(grounded.scores[0]?.pass).toBe(true);
+        expect(grounded.scores[0]?.observed.composed?.startsWith("grounded_fallback calls=1")).toBe(true);
+        expect(grounded.scores[0]?.observed.reply).toContain("Copper");
+        const empty = await runConversation(byId("lookup-empty-rows-says-so"), deps);
+        expect(empty.scores[0]?.pass).toBe(true);
+        expect(empty.scores[0]?.observed.composed).toBe("empty_rows calls=0");
+        expect(empty.scores[0]?.observed.reply).toContain("The search found nothing on that");
+      } finally {
+        search.stop();
+      }
+    });
+  }, 30_000);
+
+  test("CHAT-16 addendum: the link-is-the-answer conversation carries sources on the delivered turns", async () => {
+    await withStubBench({ reply: () => "Okay." }, async (deps) => {
+      const search = startFakeSearxng();
+      try {
+        const { scores } = await runConversation(byId("link-is-the-answer"), deps);
+        const failures = scores.flatMap((score) => score.checks.filter((check) => !check.pass).map((check) => `${score.turnIndex}:${check.name} ${check.detail}`));
+        expect(failures).toEqual([]);
+      } finally {
+        search.stop();
+      }
+    });
+  }, 30_000);
 
   // The effect standard (docs/plans/conversation-competencies-2026-09-13.md,
   // "Bench-row rule"): each rewritten row observes the effect, and the
