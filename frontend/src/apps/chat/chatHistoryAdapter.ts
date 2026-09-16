@@ -27,7 +27,14 @@ function normalizedRows(rows: ConversationTurnWithMemoryIds[]): Array<{ row: Con
   const parentByRowId = new Map<string, string | null>();
   let chainTail: string | null = null;
   return orderedRows.map((row) => {
-    const parentId = row.parentTurnId !== undefined ? row.parentTurnId : row.supersedes && parentByRowId.has(row.supersedes) ? parentByRowId.get(row.supersedes)! : chainTail;
+    // The synced record points to a turn id, while assistant-ui's branch
+    // repository points to a message id. A follow-up therefore attaches to
+    // the earlier turn's assistant reply, not to the database id that is
+    // absent from the message tree. Legacy rows already carry message ids
+    // through the fallback chain below.
+    const parentId = row.parentTurnId !== undefined
+      ? row.parentTurnId === null ? null : `${row.parentTurnId}-reply`
+      : row.supersedes && parentByRowId.has(row.supersedes) ? parentByRowId.get(row.supersedes)! : chainTail;
     parentByRowId.set(row.id, parentId);
     chainTail = `${row.id}-reply`;
     return { row, parentId };
@@ -56,7 +63,7 @@ export function chosenBranchHeadId(rows: ConversationTurnWithMemoryIds[]): strin
     if (!selected || visited.has(selected.row.id)) break;
     visited.add(selected.row.id);
     head = selected.row;
-    parentId = selected.row.id;
+    parentId = `${selected.row.id}-reply`;
   }
   return head ? `${head.id}-reply` : undefined;
 }

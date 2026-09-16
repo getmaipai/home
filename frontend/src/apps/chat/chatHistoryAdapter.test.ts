@@ -135,7 +135,7 @@ describe("rowsToBranchableMessages", () => {
       "row-1-user", "row-1-reply", "row-2-user", "row-2-reply",
       "row-3-user", "row-3-reply", "row-4-user", "row-4-reply",
     ]);
-    expect(items.find(({ message }) => message.id === "row-4-user")!.parentId).toBe("row-1");
+    expect(items.find(({ message }) => message.id === "row-4-user")!.parentId).toBe("row-1-reply");
   });
 
   test("a persisted choice can move the replay head to a retained sibling's descendant", () => {

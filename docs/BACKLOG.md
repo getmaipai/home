@@ -6516,7 +6516,7 @@ approvals are still real, unstarted work for a future session.
             screenshots pass. Exit: targeted child, retention and frontend
             tests, wait for other benches, then `bash scripts/check.sh` as
             the landing gate.
-- [ ] **Chat stream reconnection and persistent message branches** (M) -
+- [x] **Chat stream reconnection and persistent message branches** (M) -
       `chatModelAdapter.ts`, `chatHistoryAdapter.ts`, and the turn API.
       Markdown, multiline input, stop, copy, suggestions, timestamps,
       day dividers, and streaming announcements already exist; the old
@@ -6526,19 +6526,19 @@ approvals are still real, unstarted work for a future session.
       reload with the chosen history. Spec-first design before changing
       persisted shapes. Out of scope: projects and attachments. Exit:
       `bash scripts/check.sh` plus new stream/branch regression tests.
-      - [ ] **CHAT-STREAM-01: resumable turn stream** (S, design landed
+      - [x] **CHAT-STREAM-01: resumable turn stream** (S, design landed
             2026-09-16). Add an opaque owner-bound resume token to the
             initial `turn_meta` event, sequence deltas, and resume an
             interrupted generation without replaying acknowledged text.
             Preserve the original safety, routing, guard and ceiling
             decisions. Exit: backend and frontend interruption tests.
-      - [ ] **CHAT-STREAM-02: persisted branch runtime** (M, spec landed
+      - [x] **CHAT-STREAM-02: persisted branch runtime** (M, spec landed
             2026-09-16). Use `parent_turn_id` and `branch_chosen` from the
             ConversationTurn record for edits and regenerated alternatives;
             reload the chosen path while retaining siblings for
             assistant-ui's `BranchPickerPrimitive`. Exit: API, history,
             merge and picker tests.
-      - [ ] **CHAT-STREAM-03: landing gate** (S). Combine stream resume,
+      - [x] **CHAT-STREAM-03: landing gate** (S). Combine stream resume,
             branch choice and reload coverage; judge the chat screenshots,
             run the targeted suites, and run `bash scripts/check.sh`.
 - [x] **Conversations as records** (M, spec first) - done, session A step
