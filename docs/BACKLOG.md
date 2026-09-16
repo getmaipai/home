@@ -706,7 +706,12 @@ not permission to expand scope.
       the weekly report prints hits per guard reason and per signal
       rule. Acceptance: a week of the dev hub exported, the counts
       reconciled against the log, a rule with zero hits named. First,
-      because RVW-2, RVW-3 and RVW-6 train from it.
+      because RVW-2, RVW-3 and RVW-6 train from it. Progress 2026-09-16
+      (docs/dev/session-a.md "RVW-1"): the rung, the rules and the
+      correction flag on the row and the `[turn]` line
+      (`lib/ruleNames.ts`, migration 0044), `scripts/bench/labels.ts`
+      with its report and tests; open: the first week of the dev hub
+      exported and reconciled.
     - [ ] **RVW-2: Human labels for the signal, then a small encoder for
       the residual** (a person's hours, then M). The 500-turn sheet
       (`data-scratch/eval/turn-signal-review-sheet.md`) reviewed for act,

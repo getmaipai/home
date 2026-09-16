@@ -387,6 +387,17 @@ export const conversationTurns = sqliteTable(
     signal: text("signal"),
     // ACT-03: the frozen ReplyPlan computed beside the signal.
     plan: text("plan"),
+    // RVW-1: which rung answered the turn (lib/ruleNames.ts's Rung:
+    // typed_source, search, model_knowledge, failed, none), whether the
+    // next turn corrected it (its signal's repair with target hub; set
+    // on this row when that turn is logged), and the deterministic
+    // rules that fired on the turn (a JSON list of lib/ruleNames.ts's
+    // names plus the guard hits as `guard.<reason>`), the labels the
+    // weekly export (scripts/bench/labels.ts) reads. Null on rows
+    // written before RVW-1.
+    rung: text("rung"),
+    correctedNextTurn: integer("corrected_next_turn"),
+    rules: text("rules"),
     // SAFETY-01: the turn carried the self-harm category on its input
     // or its output classification, whatever the reply's own action
     // (a refused reply keeps it). The conversation's crisis state reads

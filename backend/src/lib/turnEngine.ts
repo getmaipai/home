@@ -43,6 +43,7 @@ import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor, constraintsFor } from "@/lib/replyConstraints";
 import { planFor, planLine } from "@/lib/register";
+import { rungOf, rulesFired, type Rung, type RuleName } from "@/lib/ruleNames";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import { planComposition, composedText, composedLog, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, type ComposedTurn, type ComposerInput } from "@/lib/composer";
 import { promptNow } from "@/lib/benchSampling";
@@ -57,6 +58,7 @@ import {
   getPendingAsk,
   setPendingAsk,
   recentTurnSafety,
+  markPreviousTurnCorrected,
   turnRowsById,
   routingStats,
   resolveSupersedes,
@@ -191,9 +193,13 @@ interface TurnLogRecord {
    * marks), and K6's last phase. */
   composed?: string;
   phase?: string;
+  /** RVW-1: which rung answered, and the deterministic rules that
+   * fired (the engine's by name, the guard hits as `guard.<reason>`). */
+  rung?: Rung;
+  rules?: string[];
 }
 
-function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape, plan?: ReplyPlan, composed?: ComposedRecord): void {
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape, plan?: ReplyPlan, composed?: ComposedRecord, rung?: Rung, rules?: readonly string[]): void {
   // ASK-02: the world kind, or the kinds an unresolved name hinted.
   const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form, ...(s.type === "world" ? { kind: s.kind } : s.type === "unresolved" && s.candidate_kinds.length > 0 ? { kind: s.candidate_kinds.join("/") } : {}) }));
   const record: TurnLogRecord = {
@@ -221,6 +227,8 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     ...(named.length > 0 ? { subjects: named, subject: named[0]!.name } : {}),
     ...(lookupShape ? { lookup_shape: lookupShape } : {}),
     ...(composed ? { composed: composedLog(composed), phase: composed.phase } : {}),
+    ...(rung ? { rung } : {}),
+    ...(rules && rules.length > 0 ? { rules: [...rules] } : {}),
   };
   const line = `[turn] ${JSON.stringify(record)}`;
   // One writer (#73): the hub's console mirror (lib/log.ts, installed
@@ -253,8 +261,15 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): void {
+  // RVW-1: the answering rung, read once here from the delivered value,
+  // the retained outcomes and the signal, and the rules that fired (the
+  // engine's, then every guard hit); both ride on the wire (the value
+  // is the one returned to the caller), the `[turn]` line and the row.
+  const rules = rulesFired(meta.rules ?? [], meta.guardHits, meta.signal.source);
+  const rung = rungOf(value, meta.outcomes ?? [], meta.signal, { householdSubject: rules.includes("lookup.household_subject") || (meta.subjects ?? []).some((s) => s.type === "household") });
+  value.rung = rung;
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
   // point every runTurnStream() finalize site routes through, so a
@@ -281,12 +296,15 @@ function logTurnSafely(
       // reply marks the row, whatever the reply's own action.
       const crisisSignal = (meta.inputSafety !== undefined && carriesCrisisSignal(meta.inputSafety)) || carriesCrisisSignal(value.safety);
       const plan = meta.plan ?? planFor({ signal: meta.signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: meta.signal.age_band, deferred: false, disclosureWithheld: false });
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, plan, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present });
+      // RVW-1: a repair aimed at the hub corrects the previous reply;
+      // that row is marked before this one is inserted.
+      if (meta.signal.target === "hub" && meta.signal.repair !== "none") markPreviousTurnCorrected(value.conversation_id, value.turn_id);
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, plan, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present, rung, rules });
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
   }
-  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan, meta.composed);
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan, meta.composed, rung, rules);
   if (meta.ephemeral) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
@@ -1583,6 +1601,8 @@ type PreparedTurn =
        * an answered confirmation or ask, a household command), retained
        * on the turn row like a model turn's. */
       outcomes: ToolExecutionOutcome[];
+      /** RVW-1: the deterministic rules that fired, in order. */
+      rules: string[];
     }
   | {
       kind: "model";
@@ -1660,6 +1680,9 @@ type PreparedTurn =
       /** K6: the turn's phases; created by the run function that owns
        * the abort signal. */
       machine?: TurnMachine;
+      /** RVW-1: the deterministic rules that fired, in order (the
+       * guard hits join at log time). */
+      rules: string[];
     };
 
 // Session C step 2: a plain word-list, not a model call - a pendingAsk
@@ -2435,6 +2458,11 @@ async function prepareTurn(
   // list the guards read; a household name resolves to no entity (a
   // person row), a subject name to its entity.
   const timings = emptyTimings();
+  // RVW-1: the deterministic rules that fire on this turn, by name
+  // (lib/ruleNames.ts), pushed at the point each fires; the `[turn]`
+  // line and the row carry the list, the guard hits joining at log time.
+  const rules: string[] = [];
+  const fired = (rule: RuleName) => { if (!rules.includes(rule)) rules.push(rule); };
   const signalStart = performance.now();
   const household = listActivePeople();
   const rosterNames = household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName]));
@@ -2463,6 +2491,7 @@ async function prepareTurn(
     signal,
     plan: initialPlan,
     timings,
+    rules,
     ...(subjects && subjects.length > 0 ? { subjects } : {}),
   });
   const safety = evaluateSafety(text, ageBand);
@@ -2500,6 +2529,7 @@ async function prepareTurn(
   // block"): the model still answers, without tools.
   const crisisResources = deriveCrisisResources(safety) ?? (inCrisis ? CRISIS_RESOURCES_TEXT : undefined);
   if (inCrisis) {
+    fired("crisis.state");
     const standing = getPendingAsk(conversation.id);
     if (standing?.kind === "lookup" || standing?.kind === "confirm" || standing?.kind === "ask") {
       setPendingAsk(conversation.id, null);
@@ -2509,6 +2539,7 @@ async function prepareTurn(
       const previous = recentTurnSafety(conversation.id, 1)[0];
       const repeat = previous?.source === "policy" && (previous.replyText === CRISIS_STOP_ACK || previous.replyText === CRISIS_LINE);
       console.log(`[safety] a stop in the crisis state on turn ${turnId}: ${repeat ? "the overlay alone" : "one acknowledgment"}`);
+      fired("crisis.stop");
       return immediate({ reply: { text: repeat ? CRISIS_LINE : CRISIS_STOP_ACK }, source: "policy", safety, crisis_resources: crisisResources });
     }
   }
@@ -2522,6 +2553,7 @@ async function prepareTurn(
   // unlabeled string with no known shape) meets remember()'s own check
   // and the judge's before it could become a memory.
   if (detectCredential(text).detected) {
+    fired("credential");
     console.log("[turn] credential detected in the utterance; answered with the fixed line, value never logged");
     return immediate({ reply: { text: CREDENTIAL_SAFE_MESSAGE }, source: "policy", safety, crisis_resources: crisisResources });
   }
@@ -2535,6 +2567,14 @@ async function prepareTurn(
   if (supersedes) setPendingAsk(conversation.id, null);
   const protocol: { answer?: ProtocolAnswer; subjectId?: string; subject?: SubjectRef } = {};
   const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources, directOutcomes, protocol, { inCrisis });
+  // RVW-1: the ask rule that read the answer, from the protocol layer.
+  if (protocol.answer) {
+    const { kind, answer } = protocol.answer;
+    if (kind === "who") fired(protocol.subject ? "ask.world_answer" : "ask.who_answer");
+    else if (kind === "lookup") fired(answer === "negative" ? "ask.cancel" : "ask.consent");
+    else if (kind === "confirm") fired("ask.confirm");
+    else if (kind === "ask") fired(answer === "negative" ? "ask.cancel" : "ask.confirm");
+  }
   // ACT-01: the protocol layer wins when the state machine read the
   // answer; the re-ask ("Yes or no?") keeps the rule signal, since the
   // person said something else.
@@ -2547,7 +2587,7 @@ async function prepareTurn(
   // outcomes already on the context, the literal value the fallback.
   const directSubjects: SubjectRef[] = protocol.subjectId ? [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] : protocol.subject ? [protocol.subject] : [];
   let composeDirect: TurnValue | null = pendingAskValue && directNeedsComposer(pendingAskValue, directOutcomes) ? pendingAskValue : null;
-  if (pendingAskValue && !composeDirect) return { kind: "immediate", surface, value: pendingAskValue, turnId, outcomes: directOutcomes, signal, plan: planFor({ signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: ageBand, deferred: false, disclosureWithheld: false }), timings, ...(directSubjects.length > 0 ? { subjects: directSubjects } : {}) };
+  if (pendingAskValue && !composeDirect) return { kind: "immediate", surface, value: pendingAskValue, turnId, outcomes: directOutcomes, signal, rules, plan: planFor({ signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: ageBand, deferred: false, disclosureWithheld: false }), timings, ...(directSubjects.length > 0 ? { subjects: directSubjects } : {}) };
 
   // ASK-01 part 4: a question the judge queued but has not asked yet
   // ("Who's Juniper?", pending) can be answered before it is put: "he's
@@ -2590,6 +2630,7 @@ async function prepareTurn(
   // ask's own cancel, not a memory command.
   const forget = composeDirect ? null : parseForgetCommand(text);
   if (forget) {
+    fired("command.forget");
     const outcome = forgetFromConversation(actor, conversation.id, forget.topic, turnId);
     console.log(`[turn] forget: ${outcome.forgotten.length} record(s) tombstoned, ${outcome.skippedTurnIds.length} turn(s) skipped`);
     return immediate({ reply: { text: outcome.reply }, source: "command", command_id: FORGET_COMMAND_ID, safety, crisis_resources: crisisResources });
@@ -2604,6 +2645,7 @@ async function prepareTurn(
   // override, not a collision to prevent.
   const matchedCommand = composeDirect ? null : matchCommand(text, actor);
   if (matchedCommand) {
+    fired("command.household");
     const result = await runCommand(matchedCommand);
     // CHAT-15: a household command is a package call too (a reply, or a
     // Home Assistant service through the same host), so it leaves the
@@ -2676,7 +2718,7 @@ async function prepareTurn(
   // `summaryLine` for the prompt).
   const window = buildConversationWindow(conversation, { supersedes });
   const replyConstraint = parseReplyConstraint(text, window.messages.filter((m) => m.role === "assistant").slice(-2).map((m) => m.content));
-  if (replyConstraint) { setReplyConstraint({ conversationId: conversation.id, person: actor.id, ...replyConstraint, setByTurn: turnId }); console.log(`[turn] constraint: ${replyConstraint.kind} ${replyConstraint.value}`); }
+  if (replyConstraint) { fired(`constraint.${replyConstraint.kind}`); setReplyConstraint({ conversationId: conversation.id, person: actor.id, ...replyConstraint, setByTurn: turnId }); console.log(`[turn] constraint: ${replyConstraint.kind} ${replyConstraint.value}`); }
   const subjectsStart = performance.now();
   const { subjects, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
   // CHAT-16: an answered ask's own subject (the entity a `who` answer
@@ -2686,6 +2728,7 @@ async function prepareTurn(
   const worrySubjects = [...subjects, ...household.map((person) => ({ type: "unresolved" as const, surface_form: person.displayName, candidate_kinds: ["person" as const], provenance: "roster", confidence: 1, carried_question: null, role: person.role, utterance: text }))];
   if (worryingConversation(signal, worrySubjects, safety) && !safety.notify_parent && turnId && !notifiedThisTurn.has(`${turnId}:worrying`)) {
     notifiedThisTurn.add(`${turnId}:worrying`);
+    fired("worrying");
     void trigger("child.worrying_conversation", { childName: actor.displayName }, { subjectPersonId: actor.id, subjectTurnId: turnId }).catch((err: unknown) => console.error(`[turn] child.worrying_conversation notification failed: ${(err as Error).message}`));
   }
   timings.subjects_ms = Math.round(performance.now() - subjectsStart);
@@ -2713,17 +2756,18 @@ async function prepareTurn(
         args: answer.inputs,
         result: { reply: { text: answer.text, speech: answer.text }, actions: [], data: { readings: answer.readings ?? null } },
       }));
+      fired("almanac");
       return immediate({ reply: { text: answer.text }, source: "plugin", plugin_id: "almanac-compute", safety, crisis_resources: crisisResources }, subjects);
     }
   }
   // SAFETY-01: in the crisis state nothing routes to a package; the
   // embed still runs for recall.
   const shortComment = !inCrisis && !composeDirect && isShortCommentOnLiveSubject(text, subjects, signal);
-  if (shortComment) signal = asBackchannelOnLiveSubject(signal);
+  if (shortComment) { fired("signal.backchannel_on_subject"); signal = asBackchannelOnLiveSubject(signal); }
   let { winner: routed, ranked }: RouteResult = inCrisis || shortComment || composeDirect ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
   // ACT-01: a literal-pattern win is a directive by construction, frozen
   // on the signal before the package runs.
-  if (routed?.viaPattern) signal = freezeDirective(signal);
+  if (routed?.viaPattern) { fired("signal.directive_freeze"); signal = freezeDirective(signal); }
   if (!routed && !inCrisis && !shortComment && !composeDirect) {
     utteranceVector = await embedUtterance(text);
     ({ winner: routed, ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
@@ -2756,6 +2800,7 @@ async function prepareTurn(
   // outcome so the guards and the [turn] line see it.
   let tier0Miss: { packageId: string; error: string } | null = null;
   if (routed && !outscoredBySkill) {
+    fired(routed.viaPattern ? "route.pattern" : routed.viaEmbedding ? "route.embedding" : "route.keyword");
     logRoute(turnId, routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", shape, routed.id, ranked, []);
     // Item 4a: a literal pattern's capture can be a bare pronoun ("add
     // it to the shopping list" captured "it", and the list gained the
@@ -2915,6 +2960,7 @@ async function prepareTurn(
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
   const plan = planFor({ signal, surface, brevity: constraintsFor(conversation.id).some((c) => c.kind === "length" && /short|brief|one line/i.test(c.value)) || /\b(?:just the number(?:s)?|short answer|one line)\b/i.test(text), evidence: { choices: 0, sources: 0, deliverable: Boolean(intentFor(text, signal).deliverable) }, companion: { directness: "diplomatic", engagement: persona.engagement, complexity: persona.complexity }, band: ageBand, deferred: false, disclosureWithheld: memoryMatches.withheldForBand > 0 || Boolean(window.summaryLine) });
+  if (memoryMatches.withheldForBand > 0) fired("disclosure.withheld");
   const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis }, plan, signal);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
@@ -2999,6 +3045,7 @@ async function prepareTurn(
   const deferredSubjectName = deferredSubject ? registryNameById(deferredSubject.entity_id) : null;
   const mayDefer = (ageBand === "child" || ageBand === "teen") && shapeOf(signal, text) === "question" && householdSubject && memoryMatches.withheldForBand > 0 && deferredSubjectName !== null && deferredSubject !== undefined && !memoryMatches.some((match) => match.record.subject_id === deferredSubject.entity_id);
   if (mayDefer && deferredSubject) {
+    fired("plan.deferred");
     const line = "That's one for your mom or dad to talk with you about. Want me to let them know?";
     console.log(`[turn] deferred subject=${deferredSubjectName}`);
     setPendingAsk(conversation.id, { kind: "relay", prompt: line, packageId: "relay", args: {}, name: deferredSubjectName, subjectId: deferredSubject.entity_id });
@@ -3031,11 +3078,14 @@ async function prepareTurn(
       const asked = [...tokenize(decided.query)];
       return asked.length > 0 && asked.every((w) => earlier.has(w));
     }));
-    if (decided && !answered) turnContext.intent.decided = decided;
+    if (decided && answered) fired("lookup.answered_recently");
+    if (decided && !answered) { fired("lookup.decided"); turnContext.intent.decided = decided; }
   }
   const deliverable = turnContext.intent.deliverable;
   const backReference = deliverable === "link" && /^(?:\s*(?:where did you read that|link me|the source|send me the page)(?:\s*(?:,|and)\s*(?:where did you read that|link me|the source|send me the page))?\s*[?.!]?)$/i.test(text);
+  if (deliverable) fired(`deliverable.${deliverable}`);
   if (backReference && !composeDirect) {
+    fired("deliverable.back_reference");
     const prior = outcomesForConversation(conversation.id).slice(-3).reverse().flatMap((turn) => turn.outcomes).find((o) => o.status === "succeeded" && o.sources?.length);
     if (prior?.sources?.length) {
       return immediate({ reply: { text: "The link's below." }, source: "plugin", plugin_id: prior.packageId, safety, crisis_resources: crisisResources, sources: prior.sources }, subjects);
@@ -3128,7 +3178,7 @@ async function prepareTurn(
   // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
   // seen on both paths.
   timings.prompt_ms = Math.round(performance.now() - promptStart);
-  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, plan, timings, unknownAsk, modelCalls: 0, ...(composeDirect ? { compose: composeDirect } : {}) };
+  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, plan, timings, unknownAsk, modelCalls: 0, rules, ...(composeDirect ? { compose: composeDirect } : {}) };
 }
 
 /** CHAT-16 (K2): whether a direct route's plugin reply is one the
@@ -3852,6 +3902,7 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
   const expression = queryOverride ?? (denialDeliverable ? deliverableQuery(denialDeliverable, prepared.turnContext.subjects, text) : lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape }));
   const outcomes = prepared.turnContext.outcomes;
   prepared.machine?.enter("executing");
+  ruleFired(prepared, "lookup.forced");
   // CHAT-16 (K2): the model's rung runs only when it has a choice to
   // make and the turn can still afford the composition after it. With
   // the search the only lookup tool ranked and the query the engine's,
@@ -3928,6 +3979,12 @@ function composerInputFor(prepared: Extract<PreparedTurn, { kind: "model" }>, co
     budget: { spent: prepared.modelCalls },
     now: prepared.turnContext.now,
   };
+}
+
+/** RVW-1: a rule that fired after prepareTurn() (the draft's read, the
+ * forced lookup), onto the prepared turn's list, once. */
+function ruleFired(prepared: Pick<Extract<PreparedTurn, { kind: "model" }>, "rules">, rule: RuleName): void {
+  if (!prepared.rules.includes(rule)) prepared.rules.push(rule);
 }
 
 /** The `[turn]` line's composed record, with K6's last phase. */
@@ -4321,12 +4378,13 @@ async function runTurnHoldingLease(
       // promise, an offer, or a hedged fact on a world question.
       const lookupServed = offeringTools && prepared.lookupTools.some((t) => t.id === "websearch") && !householdSubject;
       const read = lookupAnswered(prepared.turnContext.outcomes) ? null : readLookupDraft(visibleReply, { worldQuestion: shapeOf(prepared.signal, text) === "question" && !householdSubject, lookupServed });
-      if (read) prepared.lookupShape = read.shape;
+      if (read) { prepared.lookupShape = read.shape; ruleFired(prepared, `lookup.read.${read.shape}`); }
       const promisesLookup = read !== null && !householdSubject;
       // A promise about the household is not kept by any lookup: the
       // sentence is dropped and the rest stands, or the act's own
       // emptied line (a review).
       if (read !== null && householdSubject) {
+        ruleFired(prepared, "lookup.household_subject");
         console.log(`[turn] a ${read.shape} to look up a household subject on turn ${prepared.turnId} is dropped (${read.sentence.length} chars)`);
         rawText = `${thinkingPrefix(rawText)}${withoutSentences(visibleReply, [read.index, ...read.denials], emptiedLine({ act: prepared.signal?.primary_act, utterance: text, personId: actor.id }))}`;
       }
@@ -4405,7 +4463,7 @@ async function runTurnHoldingLease(
   }
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
   if (prepared.kind === "model") prepared.machine?.enter("finished");
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, composed: composedRecordOf(prepared), speakerEvidence: opts.speakerEvidence, present: opts.present });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
   return { ok: true, value };
 }
 
@@ -4988,7 +5046,7 @@ async function runTurnStreamHoldingLease(
     const trace: ReplyTrace = { hits: [], replaced: false };
     const value = finalizeReply(actor, prepared.value, prepared.surface, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety, speakerEvidence: opts.speakerEvidence, present: opts.present });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety, rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
     return { ok: true, kind: "immediate", value, signal: prepared.signal };
   }
 
@@ -5226,8 +5284,9 @@ async function runTurnStreamHoldingLease(
       const read = readLookupDraft(visibleHeld, { worldQuestion: shapeOf(modelTurn.signal, text) === "question" && !householdSubject, lookupServed: lookupIds.has("websearch") && !householdSubject });
       const shape = read?.shape ?? null;
       const first = read?.sentence ?? "";
-      if (read) modelTurn.lookupShape = read.shape;
+      if (read) { modelTurn.lookupShape = read.shape; ruleFired(modelTurn, `lookup.read.${read.shape}`); }
       if (read && householdSubject) {
+        ruleFired(modelTurn, "lookup.household_subject");
         console.log(`[turn] a ${shape} to look up a household subject on turn ${modelTurn.turnId} is dropped (${first.length} chars)`);
         const rest = withoutSentences(visibleHeld, [read.index, ...read.denials], "");
         let sent = false;
@@ -5454,7 +5513,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), speakerEvidence: opts.speakerEvidence, present: opts.present });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
           return outcome.resolved;
         }
         // CHAT-16 (K2, K6): the composition's deltas were the stream:
@@ -5466,7 +5525,7 @@ async function runTurnStreamHoldingLease(
           const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace);
           finalized = composedValue;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), speakerEvidence: opts.speakerEvidence, present: opts.present });
+          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
           return composedValue;
         }
         const outputSafety = outcome;
@@ -5552,7 +5611,7 @@ async function runTurnStreamHoldingLease(
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
         }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), speakerEvidence: opts.speakerEvidence, present: opts.present });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
         return value;
       },
     };

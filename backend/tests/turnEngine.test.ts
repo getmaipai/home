@@ -6127,3 +6127,61 @@ describe("CHAT-13 chunk C1: a carried unresolved reference decays after two turn
     });
   });
 });
+
+// RVW-1: the answering rung on the row, and the correction flag the
+// next turn's repair sets on the previous row.
+describe("RVW-1: the rung on the row and the correction flag", () => {
+  const rowOf = (turnId: string) => db.select({ rung: conversationTurns.rung, rules: conversationTurns.rules, correctedNextTurn: conversationTurns.correctedNextTurn }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
+
+  test("a search-answered turn's row says search, with the rules that fired", async () => {
+    const { actor } = await owner();
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: () => undefined,
+      scriptedChatReply: (request) => (request.messages.some((m) => m.role === "tool") ? "It's out on September 22." : "Let me check that for you."),
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    const searxng = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "The new album", url: "https://example.com/album", content: "Out on September 22." }] }) });
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
+    try {
+      const result = await runTurn(actor, "chat", "when is the new Marsh Lantern album out");
+      if (!result.ok) throw new Error(result.error);
+      expect(result.value.rung).toBe("search");
+      const row = rowOf(result.value.turn_id);
+      expect(row.rung).toBe("search");
+      expect(JSON.parse(row.rules!)).toContain("lookup.forced");
+      expect(row.correctedNextTurn).toBeNull();
+    } finally {
+      stub.stop();
+      searxng.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("an almanac turn's row says typed_source and a plain chat turn's says none", async () => {
+    const { actor } = await owner();
+    const almanac = await runTurn(actor, "chat", "how many days until the 27th");
+    if (!almanac.ok) throw new Error(almanac.error);
+    expect(almanac.value.plugin_id).toBe("almanac-compute");
+    expect(rowOf(almanac.value.turn_id).rung).toBe("typed_source");
+    expect(JSON.parse(rowOf(almanac.value.turn_id).rules!)).toContain("almanac");
+    const chat = await runTurn(actor, "chat", "long day, glad it's over");
+    if (!chat.ok) throw new Error(chat.error);
+    expect(chat.value.source).toBe("model");
+    expect(rowOf(chat.value.turn_id).rung).toBe("none");
+    expect(JSON.parse(rowOf(chat.value.turn_id).rules!)).toContain("signal.rule");
+  });
+
+  test("an objection aimed at the hub marks the previous turn's row corrected", async () => {
+    const { actor } = await owner();
+    const first = await runTurn(actor, "chat", "what time is the dentist on Friday");
+    if (!first.ok) throw new Error(first.error);
+    expect(rowOf(first.value.turn_id).correctedNextTurn).toBeNull();
+    const second = await runTurn(actor, "chat", "you're not listening, I asked what time", { conversationId: first.value.conversation_id });
+    if (!second.ok) throw new Error(second.error);
+    expect(rowOf(first.value.turn_id).correctedNextTurn).toBe(1);
+    expect(rowOf(second.value.turn_id).correctedNextTurn).toBeNull();
+  });
+});

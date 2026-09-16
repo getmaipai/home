@@ -77,6 +77,9 @@ export interface TurnValue {
   sources?: Source[];
   /** CHAT-16 K7: the first inline picture result from the household search. */
   media?: { kind: "image"; url: string; thumbnail: string | null; source: string };
+  /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
+   * the wire and on the turn row. */
+  rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;

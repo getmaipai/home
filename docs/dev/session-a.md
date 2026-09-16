@@ -6332,3 +6332,55 @@ C2 row) and never scripts a seeded draft into a composition.
 
 The bench rows the brief names read a composed answer on the fake
 SearXNG now; the set measurement is the coordinator's call.
+
+## RVW-1: the rung on the row, the rules on the line, the weekly labels (2026-09-16)
+
+The chat architecture review's first correction (section 5 item 1) and
+the org rule "no rule without a counter and a row". `lib/ruleNames.ts`
+is the one definition: `Rung` (`typed_source | search |
+model_knowledge | failed | none`) with `rungOf()` reading it from the
+delivered value, the retained outcomes and the signal (a plugin reply
+by its package: the search, or a typed source, the almanacs, the
+weather, the media and knowledge lookups and their kin; a lookup that
+ran and left no succeeded lookup is `failed`; a model reply to a world
+question with no lookup and no household subject is
+`model_knowledge` until K3's own marking on the outcome, which
+`rungOf()` reads when present; everything else `none`), and `RULES`,
+the engine's deterministic rules by name with a one-line meaning each
+(the signal's source and its two freezes, the lookup decision and the
+draft's reads, the deliverable kinds, CONS-01's constraints, the
+deferral and the withheld disclosure, the worrying class, the crisis
+state, the credential line, the commands, the almanac, the floor's
+routes, the ask answers). `prepareTurn()` collects the rules that fire
+on the turn (`fired()`), the run functions add the draft's read, the
+household stand-down and the forced lookup (`ruleFired()`), and at log
+time the signal's source leads and every guard hit joins as
+`guard.<reason>`. `TurnValue.rung` rides the wire additively; the row
+gains `rung`, `rules` (the JSON list) and `corrected_next_turn`
+(migration 0044): a turn whose signal aims a repair at the hub marks
+the previous turn's row corrected before its own row is written
+(`markPreviousTurnCorrected()`). The `[turn]` line prints `rung` and
+`rules`.
+
+`scripts/bench/labels.ts --since <ISO date>` (from backend/) writes
+one JSON lines file per ISO week under the data directory's `labels/`
+with, per turn, the id, the signal (act, the first clause's stance,
+emotion, intensity, source), the rung, the guard hits, whether a forced
+lookup ran, the correction flag, the rules and the person's text in
+roster form (`toRosterForm()`: every household name, the people first
+then the registry's persons and pets with aliases, replaced by the
+persona roster's name at its position, whole words, any case; the org
+CLAUDE.md's list is the roster, never an invented one); a credential
+turn is never exported. The report prints hits per guard reason, hits
+per rule, rungs by count, corrections by rung, and the rules with zero
+hits in the window, the engine's names and every guard reason of
+`spec/vocab/defect-codes.json`. Tests: `tests/labels.test.ts` (the
+roster form, the week key, the export over seeded rows with a
+credential turn skipped, the report naming a zero-hit rule) and the
+RVW-1 block of `tests/turnEngine.test.ts` (a search turn's row says
+search with `lookup.forced`, an almanac turn typed_source, a chat turn
+none, an objection marks the previous row). Not yet done, the
+acceptance's live half: a week of the dev hub exported and reconciled
+against the log; the first weekly run is the next step, and the
+`rules` column is this lane's addition to the brief so the export
+reads the rules off the row rather than the log.

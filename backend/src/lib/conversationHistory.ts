@@ -51,6 +51,7 @@ import { nextHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
+import type { Rung } from "@/lib/ruleNames";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
 import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
@@ -198,7 +199,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -273,6 +274,11 @@ export function logTurn(
     // Sunshine" named a subject).
     signal: opts.signal ? JSON.stringify(credentialTurn ? withoutNames(opts.signal) : opts.signal) : null,
     plan: opts.plan ? JSON.stringify(opts.plan) : null,
+    // RVW-1: the answering rung and the rules that fired; the
+    // correction flag is written on this row by the next turn's log.
+    rung: opts.rung ?? null,
+    correctedNextTurn: null,
+    rules: opts.rules && opts.rules.length > 0 ? JSON.stringify(opts.rules) : null,
     // SAFETY-01: the self-harm category on either side of the turn.
     crisisSignal: opts.crisisSignal ?? false,
     // ASK-01: the turn's SubjectRefs; a credential turn keeps none.
@@ -288,6 +294,24 @@ export function logTurn(
   // corrected statement's own facts are what the judge extracts next.
   if (supersedes) archiveByProvenance(supersedes);
   return row;
+}
+
+/** RVW-1: the newest turn of the conversation before `beforeTurnId`
+ * is marked corrected: the turn now being logged carried a repair
+ * aimed at the hub (its signal's `target: "hub"` with a repair), so
+ * the previous reply is the one it corrected. Returns the id marked,
+ * or null when the conversation had no earlier turn. */
+export function markPreviousTurnCorrected(conversationId: string, beforeTurnId: string): string | null {
+  const previous = db
+    .select({ id: conversationTurns.id })
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, conversationId), not(eq(conversationTurns.id, beforeTurnId))))
+    .orderBy(desc(conversationTurns.createdAt), desc(conversationTurns.hlc))
+    .limit(1)
+    .get();
+  if (!previous) return null;
+  db.update(conversationTurns).set({ correctedNextTurn: 1 }).where(eq(conversationTurns.id, previous.id)).run();
+  return previous.id;
 }
 
 /** The signal with every named subject made unknown: nothing of the
