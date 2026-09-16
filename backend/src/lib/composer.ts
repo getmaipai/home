@@ -29,6 +29,7 @@ import type { LlmMessage } from "@/lib/llm";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { ToolCallWire } from "@maipai/spec/llm/ts/types.js";
 import { repairReply, assessReply, visibleText } from "@/lib/wellFormed";
+import { dateRelation } from "@/lib/almanacCompute";
 
 /** The fixed line for a data-only result the composer could not phrase
  * (the model failed, or the budget was spent with no direct reply). */
@@ -80,6 +81,8 @@ export interface ComposerInput {
    * is not it (a direct route: a consent word, a who-answer); the
    * engine sets it there alone. */
   question?: string | null;
+  /** The turn's frozen clock, used for typed date relations. */
+  now?: Date;
 }
 
 export interface ComposedTurn {
@@ -187,6 +190,22 @@ function shapedReply(shape: ComposedShape | undefined, outcomes: readonly ToolEx
   }
   if (shape === "one_line") return { text: fallback.text.replace(/\s*\n\s*/g, " ").trim() };
   return fallback;
+}
+
+function dateAwareReply(input: ComposerInput, reply: { text: string; speech?: string }): { text: string; speech?: string } {
+  const question = input.question ?? input.messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+  if (!/\b(?:when|today|tomorrow|yesterday|what date|what day)\b/i.test(question) || !input.now) return reply;
+  for (const outcome of input.outcomes) {
+    if (outcome.status !== "succeeded") continue;
+    const data = outcome.result?.data as { date?: unknown; date_iso?: unknown; value?: unknown } | undefined;
+    const raw = [data?.date, data?.date_iso, data?.value].find((v): v is string => typeof v === "string" && !Number.isNaN(Date.parse(v)));
+    if (!raw) continue;
+    const relation = dateRelation(new Date(raw), input.now);
+    if (["today", "tomorrow", "yesterday"].includes(relation) || /^in \d+ days$/.test(relation) || /^\d+ days ago$/.test(relation)) {
+      return { ...reply, text: `${relation}${reply.text ? `, ${reply.text}` : ""}` };
+    }
+  }
+  return reply;
 }
 
 function shapeOf(constraints: readonly ComposerConstraint[] | undefined): ComposedShape | undefined {
@@ -334,12 +353,12 @@ export type CompleteFn = (messages: LlmMessage[]) => Promise<{ ok: true; text: s
 export async function composeTurn(input: ComposerInput, complete: CompleteFn): Promise<ComposedTurn> {
   const plan = planComposition(input);
   if (plan.mode !== "composition") {
-    return { reply: shapedReply(plan.shape, input.outcomes, plan.reply), sources: plan.sources, mode: plan.mode, model_calls: 0, ...(plan.shape ? { shape: plan.shape } : {}), ...(plan.budget_spent ? { budget_spent: true } : {}) };
+    return { reply: dateAwareReply(input, shapedReply(plan.shape, input.outcomes, plan.reply)), sources: plan.sources, mode: plan.mode, model_calls: 0, ...(plan.shape ? { shape: plan.shape } : {}), ...(plan.budget_spent ? { budget_spent: true } : {}) };
   }
   const answer = await complete(plan.messages);
   const text = answer.ok ? composedText(answer.text) : null;
   return {
-    reply: shapedReply(plan.shape, input.outcomes, text !== null ? { text } : plan.fallback),
+    reply: dateAwareReply(input, shapedReply(plan.shape, input.outcomes, text !== null ? { text } : plan.fallback)),
     sources: plan.sources,
     mode: "composition",
     model_calls: 1,

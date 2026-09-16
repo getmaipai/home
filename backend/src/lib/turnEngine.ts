@@ -3926,6 +3926,7 @@ function composerInputFor(prepared: Extract<PreparedTurn, { kind: "model" }>, co
     ageBand: prepared.turnContext.ageBand,
     surface: prepared.surface,
     budget: { spent: prepared.modelCalls },
+    now: prepared.turnContext.now,
   };
 }
 

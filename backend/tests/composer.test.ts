@@ -231,6 +231,23 @@ describe("the constraints and the shape", () => {
   });
 });
 
+describe("typed date relations", () => {
+  const clock = new Date("2026-09-15T12:00:00.000Z");
+  const dateOutcome = (date: string) => outcome({ callId: "call-date", packageId: "almanac-date", status: "succeeded", result: { actions: [], data: { date } } });
+
+  test("today and tomorrow use relative words", async () => {
+    const today = await composeTurn(input([dateOutcome("2026-09-15")], { now: clock, messages: [{ role: "user", content: "when is it" }] }), scripted("The date is September 15."));
+    const tomorrow = await composeTurn(input([dateOutcome("2026-09-16")], { now: clock, messages: [{ role: "user", content: "when is it" }] }), scripted("The date is September 16."));
+    expect(today.reply.text).toContain("today");
+    expect(tomorrow.reply.text).toContain("tomorrow");
+  });
+
+  test("a date six weeks out stays a calendar date", async () => {
+    const turn = await composeTurn(input([dateOutcome("2026-10-27")], { now: clock, messages: [{ role: "user", content: "when is it" }] }), scripted("The date is October 27."));
+    expect(turn.reply.text).toContain("October 27");
+  });
+});
+
 describe("the grounding", () => {
   test("a resolution's outcomes join the turn's evidence as package results, once per call, with the rows' titles and snippets as their text", () => {
     const ctx = { evidence: [], includedEvidenceIds: [] } as unknown as TurnContext;
