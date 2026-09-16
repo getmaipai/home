@@ -2169,6 +2169,26 @@ invented for the roster's household, and added to
     hub is gone, or a small watchdog the install registers with the
     OS), and that watcher's alert path is the design's to name.
 
+    **The watcher is its own process (owner, 2026-09-16): WATCH-01.**
+    A crash of the hub must not take the watcher with it, so the
+    watcher is a separate small process the install registers with
+    the OS (launchd, systemd, a Windows service), started with the
+    hub and kept alive independently. It watches the engines through
+    their health endpoints and the hub itself through `/api/health`,
+    and it alerts on its own: it carries the household's outbound
+    alert channels (Telegram first, the channel the notification
+    system already defines in `docs/dev.md` "telegram", a direct
+    hub-to-Telegram connection) and sends "the hub is down since
+    <time>" without the hub. One definition: the channel settings and
+    the bot credential are the hub's (the settings registry and the
+    keystore, `lib/secrets`), read by the watcher from the same store
+    with the same file permissions, never a second copy; when the hub
+    is up its notification center receives the same alerts through
+    the normal path so nothing is delivered twice. The watcher's own
+    outbound connection gets its privacy-page row. Every alert the
+    watcher sends is facts first, the model's diagnosis only when
+    chat answers, as above.
+
     Rules the design pass fixes: the minimum set per install (from
     the device inventory `detectHardware` reads at boot, and what the
     setup wizard tells the person if the machine cannot carry it);
