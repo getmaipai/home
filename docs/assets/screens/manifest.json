@@ -136,7 +136,7 @@
     "route": "chat",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-16T09:47:07.800Z",
+    "capturedAt": "2026-09-16T11:27:01.428Z",
     "captureScript": "scripts/screenshot.ts --chat-review"
   },
   "conversations-phone-dark.png": {
@@ -493,7 +493,7 @@
     "route": "chat",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-16T09:47:07.800Z",
+    "capturedAt": "2026-09-16T11:27:01.428Z",
     "captureScript": "scripts/screenshot.ts --chat-review"
   },
   "conversations-desktop-light.png": {
@@ -955,28 +955,28 @@
     "route": "chat-feedback-reasons",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-16T09:47:07.800Z",
+    "capturedAt": "2026-09-16T11:27:01.428Z",
     "captureScript": "scripts/screenshot.ts --chat-review"
   },
   "chat-feedback-reasons-desktop-light.png": {
     "route": "chat-feedback-reasons",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-16T09:47:07.800Z",
+    "capturedAt": "2026-09-16T11:27:01.428Z",
     "captureScript": "scripts/screenshot.ts --chat-review"
   },
   "chat-document-pane-phone-dark.png": {
     "route": "chat-document-pane",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-16T09:47:07.800Z",
+    "capturedAt": "2026-09-16T11:27:01.428Z",
     "captureScript": "scripts/screenshot.ts --chat-review"
   },
   "chat-document-pane-desktop-light.png": {
     "route": "chat-document-pane",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-16T09:47:07.800Z",
+    "capturedAt": "2026-09-16T11:27:01.428Z",
     "captureScript": "scripts/screenshot.ts --chat-review"
   },
   "chat-turn-stats-desktop-light.png": {

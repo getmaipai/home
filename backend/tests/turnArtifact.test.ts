@@ -32,6 +32,18 @@ const ARTIFACT = TurnArtifact.parse({
   hlc: "1789516800000:1:abc123",
 });
 
+const ATTACHMENT_ARTIFACT = TurnArtifact.parse({
+  id: "doc-attachment123",
+  turn_id: "turn-attachment123",
+  revision: 1,
+  evidence_version: "outcome-attachment1",
+  section: { type: "document", attachment_id: "att-example123", chunks: [{ attachment_id: "att-example123", page: 1, text: "A locally retained page.", source_id: "src-attachment123" }] },
+  sources: [{ id: "src-attachment123", kind: "package", title: "Attachment page 1", url: "attachment://att-example123/page/1", site: "MaiPai Home", snippet: "A locally retained page.", source: "turn-attachment123", created_at: "2026-09-16T00:00:00.000Z", hlc: "1789516800000:0:abc123" }],
+  provenance: "composer:turn-attachment123:document",
+  created_at: "2026-09-16T00:00:00.000Z",
+  hlc: "1789516800000:1:abc123",
+});
+
 async function owner(): Promise<{ client: TestClient; actor: PersonRow }> {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -105,5 +117,21 @@ describe("GET /api/conversations/turns/:id/document", () => {
     const id = turnFor(actor, ARTIFACT);
     sqlite.query("UPDATE conversation_turns SET document = ? WHERE id = ?").run(JSON.stringify({ ...ARTIFACT, turn_id: "turn-other123" }), id);
     expect((await client.get(`/api/conversations/turns/${id}/document`)).status).toBe(404);
+  });
+
+  test("adult delivery keeps an attachment document while child delivery gets no document or source link", async () => {
+    const { client: ownerClient } = await owner();
+    const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "child" });
+    const childId = ((await created.json()) as { id: string }).id;
+    const childActor = db.select().from(people).where(eq(people.id, childId)).get()!;
+    const id = turnFor(childActor, ATTACHMENT_ARTIFACT);
+
+    const adultResponse = await ownerClient.get(`/api/conversations/turns/${id}/document`);
+    expect(adultResponse.status).toBe(200);
+    expect(await adultResponse.json()).toEqual(ATTACHMENT_ARTIFACT);
+
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: childId });
+    expect((await childClient.get(`/api/conversations/turns/${id}/document`)).status).toBe(404);
   });
 });

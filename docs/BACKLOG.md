@@ -6506,7 +6506,7 @@ approvals are still real, unstarted work for a future session.
             vision role and the live chat path refuses before fetch. Exit:
             frontend adapter tests, capability tests and privacy check, then
             `bash scripts/check.sh`.
-      - [ ] **ATT-01e: child projection and landing gate** (mechanical).
+      - [x] **ATT-01e: child projection and landing gate** (mechanical).
             Apply the existing `effectiveBand` content ceiling to extracted
             and image-derived evidence before composition, mirroring
             `backend/src/lib/turnContext.ts` and COMP-01's child projection.
