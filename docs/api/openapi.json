@@ -4909,6 +4909,190 @@
         }
       }
     },
+    "/api/conversations/turns/{id}/document": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Read the details document for an assistant turn",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "turn-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The validated details document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^doc-[a-z0-9]{6,}$",
+                      "description": "Stable identity for this document revision. A later revision has a new id."
+                    },
+                    "turn_id": {
+                      "type": "string",
+                      "pattern": "^turn-[a-z0-9]{6,}$",
+                      "description": "The assistant turn whose retained outcomes produced this document."
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "One-based revision number for a living document on the same subject."
+                    },
+                    "evidence_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Stable version of the retained outcome evidence used to build this revision."
+                    },
+                    "section": {},
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^src-[a-z0-9]{6,}$"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "web",
+                              "wikidata",
+                              "wikipedia",
+                              "weather",
+                              "package"
+                            ],
+                            "description": "Which evidence rung this came from: web is the household's own SearXNG; wikidata/wikipedia/weather are the typed lookups CHAT-15 already retains; package is a future catalog package's own citation (its manifest names the site)."
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The cited page or result's own title, exactly as the source gave it, never rewritten by the model."
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "Opened directly by the citation chip, rel=\"noopener noreferrer\" and referrerpolicy=\"no-referrer\" on the client (the privacy page's promise: a cited site learns nothing from the click but the click)."
+                          },
+                          "site": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The hostname a citation chip shows (e.g. \"wikipedia.org\"), so a household member sees where an answer came from without hovering the link."
+                          },
+                          "snippet": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The short passage the evidence was drawn from, when the source has one worth showing; null for a source that is just a link (e.g. a typed weather lookup)."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "The short passage the evidence was drawn from, when the source has one worth showing; null for a source that is just a link (e.g. a typed weather lookup)."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "The short passage the evidence was drawn from, when the source has one worth showing; null for a source that is just a link (e.g. a typed weather lookup)."
+                          },
+                          "source": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Free-text provenance: the turn id this citation was gathered for (mirrors memory-record.schema.json's own 'source' field and naming)."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "hlc": {
+                            "type": "string",
+                            "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                            "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "title",
+                          "url",
+                          "site",
+                          "source",
+                          "created_at",
+                          "hlc"
+                        ],
+                        "additionalProperties": false,
+                        "description": "One citation on an assistant reply: the evidence ladder CHAT-16 phrases factual answers from (media-conversation-program-2026-09-13.md step 4 - a typed source, then websearch, then model knowledge), numbered and rendered as `[N]` markers in the reply text (docs/BACKLOG.md's 'Inline citation markers on sourced answers', the Perplexity-shaped pattern legacy already validated once). Lives on the assistant turn (backend/src/wire.ts's TurnValue, additive when CHAT-16 lands - home is the whole record, no separate hub/robot split for this one), never independently synced or merged, which is why it carries the shared envelope (source, hlc, created_at) but no updated_at: a citation is a snapshot of what was true when the reply was generated, not an editable record."
+                      },
+                      "minItems": 1,
+                      "description": "The citation snapshots available to this document. Child-band delivery strips this list without widening the content ceiling."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free-text provenance for the build, such as the composer run or the originating outcome."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "turn_id",
+                    "revision",
+                    "evidence_version",
+                    "section",
+                    "sources",
+                    "provenance",
+                    "created_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "COMP-01's immutable details document for one assistant turn. The section is built from retained typed outcomes, not model prose. A changed evidence version creates a new revision; an existing revision is never edited in place."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Turn or details document not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/search": {
       "get": {
         "tags": [

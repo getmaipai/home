@@ -2269,7 +2269,7 @@ invented for the roster's household, and added to
     (COMP-02). Exit: the spec suite, backend and frontend suites, the
     screenshot review, `bash scripts/check.sh`.
 
-    - [ ] **COMP-01a: document storage** (mechanical). Add the
+    - [x] **COMP-01a: document storage** (mechanical). Add the
       `document` JSON column and migration in
       `backend/src/db/schema.ts`, `backend/src/lib/conversationHistory.ts`
       and the migrations directory. Mirror the existing `outcomes`
@@ -2277,7 +2277,7 @@ invented for the roster's household, and added to
       typed-source or procedural material keep `document` null and a
       valid `TurnArtifact` round-trips beside outcomes. Exit: targeted
       migration and history tests, then `bash scripts/check.sh`.
-    - [ ] **COMP-01b: document route and wire** (mechanical). Add the
+    - [x] **COMP-01b: document route and wire** (mechanical). Add the
       named GET route and additive `document_available` in
       `backend/src/routes/conversations.ts` and `backend/src/wire.ts`.
       Mirror `createRoute`, the `SourcesCard` source shape and generated

@@ -37,6 +37,7 @@ import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from 
 import { archiveByProvenance } from "@/lib/memory";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands, openQuestions, relationships } from "@/db/schema";
+import { TurnArtifact, type TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 import { newConversationTurnId, newConversationId, newOpenQuestionId } from "@/lib/id";
 import { canAccessPerson } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -199,7 +200,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -213,6 +214,10 @@ export function logTurn(
   // credential line's turn keeps the marker alone.
   const credentialTurn = value.source === "policy" && value.reply.text === CREDENTIAL_SAFE_MESSAGE;
   const userText = credentialTurn ? CREDENTIAL_REDACTION : redactCredentials(rawUserText);
+  const document = opts.document ? TurnArtifact.parse(opts.document) : null;
+  if (document && document.turn_id !== value.turn_id) {
+    throw new Error(`TurnArtifact ${document.id} belongs to ${document.turn_id}, not ${value.turn_id}`);
+  }
   // Built and returned directly from the caller's own values, not
   // re-selected after the insert: a review (2026-09-04) pointed out every
   // field is already known here, the same "don't round-trip the database
@@ -263,6 +268,7 @@ export function logTurn(
     // and trimmed to a bounded row; null when the turn proposed no
     // package call.
     outcomes: opts.outcomes && opts.outcomes.length > 0 ? JSON.stringify(opts.outcomes.map(outcomeForRow)) : null,
+    document: document ? JSON.stringify(document) : null,
     sources: value.sources ? JSON.stringify(value.sources) : null,
     media: value.media ? JSON.stringify(value.media) : null,
     // ACT-01: the frozen signal, as the engine computed it before
@@ -287,6 +293,9 @@ export function logTurn(
     present: opts.present ? JSON.stringify(opts.present) : null,
     hlc: nextHlc(),
   };
+  // COMP-01: keep the wire response additive and honest about whether this
+  // turn has a validated details document stored beside its outcomes.
+  value.document_available = Boolean(opts.document);
   insertTurnAndBumpConversation(row, value.conversation_id);
   recordEpisodes(row);
   // #88: the replaced turn leaves the current branch; the memories the

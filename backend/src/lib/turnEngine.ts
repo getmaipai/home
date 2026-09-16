@@ -4030,7 +4030,7 @@ function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface =
           ? sentenceCaseOpener(text) // CHAT-04 (#81)
           : text;
   const spokenText = surface === "robot" && speech === undefined ? splitIntoSentences(variedText)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : normalizeForSpeech(variedText);
-  return { ...value, reply: { text: variedText, speech: spokenText } };
+  return { ...value, document_available: value.document_available ?? false, reply: { text: variedText, speech: spokenText } };
 }
 
 /** Runs one conversation turn end to end: safety first, then the

@@ -3,6 +3,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
+import { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import { requireAuth } from "@/middleware/auth";
 import { db } from "@/db";
 import { conversationTurns, replyFeedback } from "@/db/schema";
@@ -151,6 +152,19 @@ const postFeedbackRoute = createRoute({
   responses: feedbackResponses,
 });
 
+const documentRoute = createRoute({
+  method: "get",
+  path: "/turns/{id}/document",
+  tags: ["Conversations"],
+  summary: "Read the details document for an assistant turn",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "turn-example123") },
+  responses: {
+    200: { content: { "application/json": { schema: TurnArtifact } }, description: "The validated details document." },
+    ...errorResponses({ 401: "Sign in first", 404: "Turn or details document not found" }),
+  },
+});
+
 function visibleTurn(actor: PersonRow, id: string) {
   const turn = db.select().from(conversationTurns).where(eq(conversationTurns.id, id)).get();
   if (!turn || !canAccessPerson(actor, turn.personId)) return null;
@@ -222,6 +236,18 @@ conversationsRoutes.openapi(postFeedbackRoute, (c) => {
     .where(and(eq(replyFeedback.turnId, id), eq(replyFeedback.personId, actor.id)))
     .get()!;
   return c.json(toReplyFeedback(saved), 200);
+});
+
+conversationsRoutes.openapi(documentRoute, (c) => {
+  const actor = c.get("person");
+  const turn = visibleTurn(actor, c.req.valid("param").id);
+  if (!turn || !turn.document) return c.json({ error: "document not found" }, 404);
+  try {
+    const parsed = TurnArtifact.safeParse(JSON.parse(turn.document));
+    return parsed.success && parsed.data.turn_id === turn.id ? c.json(parsed.data, 200) : c.json({ error: "document not found" }, 404);
+  } catch {
+    return c.json({ error: "document not found" }, 404);
+  }
 });
 
 const EpisodeSchema = z.object({

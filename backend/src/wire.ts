@@ -80,6 +80,8 @@ export interface TurnValue {
   /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
    * the wire and on the turn row. */
   rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
+  /** COMP-01: whether a validated details document is available for this turn. */
+  document_available?: boolean;
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;

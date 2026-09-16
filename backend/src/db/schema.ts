@@ -378,6 +378,9 @@ export const conversationTurns = sqliteTable(
     // outcomesForConversation() for the composer (CHAT-16) and the
     // guards, never by the judge, never a memory record.
     outcomes: text("outcomes"),
+    // COMP-01: a validated TurnArtifact, null until a document builder
+    // writes one beside the retained outcomes.
+    document: text("document"),
     sources: text("sources"),
     media: text("media"),
     // ACT-01: the turn's frozen TurnSignal (spec/schemas/turn-signal.
