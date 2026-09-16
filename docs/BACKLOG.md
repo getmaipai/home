@@ -2232,6 +2232,105 @@ invented for the roster's household, and added to
     section in `docs/dev.md`, then the mechanical items it names,
     each with `bash scripts/check.sh`.
 
+<a id="engine-host-03"></a>
+
+- [ ] **ENGINE-HOST-03: First-day Metal validation on the Studio** (S, after the Apple Silicon design pass)
+
+    Objective: measure the actual M5 Max placement before selecting a
+    foreground model. Files: the new Metal validation bench under
+    `backend/scripts/bench/`, its report, `backend/src/lib/hardware.ts`,
+    `engineStats.ts`, and the supervisor test fixtures. Mirror the GPU
+    validation bench's identity, fill, throughput, and soak shape. Record
+    Apple identity and `llama-server --version`, fill the 27B and 122B
+    4-bit candidates, measure cold load, first token, decode and prompt
+    throughput at 4k, 16k, and 32k, prefix reuse, two slots, and the
+    resident minimum set. Soak each profile for two hours while sampling
+    memory pressure, process RSS, thermal state, and output correctness.
+    Acceptance: a report with command lines, model and engine hashes,
+    peak and median numbers, and a clear go/no-go for the 122B role.
+    Out of scope: changing defaults, adding a second placement, or running
+    a cloud model. Exit: the isolated bench and `bash scripts/check.sh`.
+
+<a id="engine-host-04"></a>
+
+- [ ] **ENGINE-HOST-04: Add Metal and MLX engine entries under one URL contract** (M, after ENGINE-HOST-03)
+
+    Objective: let `engineCatalog.ts` describe the verified llama.cpp Metal
+    binary and a pinned `mlx-lm` launcher, with one client contract for
+    `/v1/chat/completions`, health, model identity, and restart. Files:
+    `backend/src/lib/engineCatalog.ts`, `llmSupervisor.ts`, the shared
+    engine client, download pins, and supervisor tests. Mirror the existing
+    lazy-start-once, generation guard, `watchEngine`, and resource-governor
+    paths. Treat MTP as unavailable on Metal until a later measured pin.
+    Acceptance: both URL and child-process tiers report identity, pass the
+    same scripted tool and safety fixtures, survive a watched restart, and
+    never silently fall back between engines. Out of scope: CUDA changes,
+    runtime failover, and new shared spec records. Exit: supervisor tests,
+    the isolated engine bench, and `bash scripts/check.sh`.
+
+<a id="engine-host-05"></a>
+
+- [ ] **ENGINE-HOST-05: Provision the measured one-box resident roles** (M, after ENGINE-HOST-04)
+
+    Objective: provision one selected intelligence or chat model, the
+    current 27B coder, and the minimum embed, background judge, Moonshine,
+    and Pocket TTS roles on one Apple Silicon host. Files: model catalog and
+    download jobs, role settings, `backgroundSupervisor.ts`, Repairs and AI
+    models UI, and their tests. Mirror ENGINE-HOST-02's feature-offline line,
+    hold time, and no-secondary rule. Acceptance: the chosen profile fits
+    the measured memory budget, coding does not silently evict chat, the
+    generator controls show exact offline state under pressure, and all
+    model downloads are pinned and checksum verified. Out of scope: a larger
+    coder before a quality bench, a static memory reservation, and backup
+    model shuffling. Exit: role and UI tests, a scratch-household live
+    migration check, and `bash scripts/check.sh`.
+
+<a id="engine-host-06"></a>
+
+- [ ] **ENGINE-HOST-06: Standalone one-box watcher and telemetry** (M, after ENGINE-HOST-05)
+
+    Objective: implement WATCH-01 as the independent launchd watcher for
+    the Studio. Files: the watcher process and launchd service, health and
+    telemetry records, notification delivery, privacy documentation, and
+    the hub heartbeat reader. Mirror ENGINE-HOST-02's facts-first alert,
+    model diagnosis only when chat answers, hold time, Repairs entry, and
+    one notification on down and up. Acceptance: a killed hub produces a
+    single Telegram alert from the watcher, engine and hub pressure samples
+    are visible, a missed beat does not alert, and the hub reports a dead
+    watcher after its hold. Out of scope: a second outbound channel, a
+    cloud monitor, and power-loss detection. Exit: watcher tests, a real
+    launchd scratch install, the privacy check, and `bash scripts/check.sh`.
+
+<a id="media-host-01"></a>
+
+- [ ] **MEDIA-HOST-01: Supervised local image generation on MPS** (M, after ENGINE-HOST-05)
+
+    Objective: run ComfyUI as a local supervised sidecar with FLUX.2 Klein
+    and Juggernaut XL, with image safety before display or persistence. Files:
+    the sidecar supervisor, pinned Python environment, workflow assets,
+    image route and UI, safety adapters, and tests. Acceptance: health,
+    cancel, restart, cold and warm 1024-pixel timings, peak memory, and the
+    exact generator offline line all work in a scratch household. Out of
+    scope: remote ComfyUI API nodes, cloud image providers, and a new safety
+    classifier. Exit: sidecar and safety tests, the first-day media bench,
+    and `bash scripts/check.sh`.
+
+<a id="media-host-02"></a>
+
+- [ ] **MEDIA-HOST-02: Wan video on MPS with measured degradation** (L, after MEDIA-HOST-01)
+
+    Objective: run Wan2.2 TI2V-5B through the local ComfyUI path at 720p,
+    measure five- and ten-second clips, and expose it as an on-demand
+    feature. Files: the video workflow, model pin, sidecar queue, route,
+    UI, memory governor integration, and tests. Acceptance: the report
+    records total wall time, peak memory, frame rate, settings, and whether
+    the Studio can carry the job beside the minimum set; pressure takes the
+    role offline with no model shuffle. Hailuo-02 stays hosted and is not
+    added as an outbound connection. Out of scope: a Hailuo API connector,
+    automatic clip extension, and a second video placement. Exit: the video
+    bench, safety and sidecar tests, the privacy check, and
+    `bash scripts/check.sh`.
+
 <a id="mem-06"></a>
 
 - [x] **MEM-06: The judge grounds every fact in the speaker's words** (S-M)

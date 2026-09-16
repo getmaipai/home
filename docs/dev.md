@@ -6,6 +6,43 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## The single-box Apple Silicon engine host (2026-09-17)
+
+The owner ordered a Mac Studio M5 Max with 128 GB unified memory and a 2 TB
+SSD for the whole hub. The old eGPU layout is superseded. The decision is
+recorded in `docs/plans/hub-on-apple-silicon-2026-09-17.md`, including the
+memory arithmetic, the migration boundary, and the first-day measurement.
+
+The architectural choice is a role-specific runtime, not a runtime failover.
+llama.cpp with Metal remains the production baseline for chat and coding
+because `llmSupervisor.ts` already owns its OpenAI-compatible URL contract,
+prefix cache fields, two-slot controls, health identity, generation guard,
+process watch, auto-heal, and memory-pressure restart. MLX is added as a
+first-class candidate for the intelligence role because its native Apple
+Silicon runtime is the practical path to a 122B-A10B 4-bit model. The MLX
+server's `draft_model`, prompt cache, and concurrency controls are useful,
+but its own production warning and the loss of batching with quantized KV
+make it an evidence-backed candidate, not an unqualified replacement.
+
+The Studio has one device. `HardwareInfo` reports unified memory, and a role
+records its local child and URL rather than a GPU placement. The minimum set
+is chat or intelligence, embed, background judge, STT, and TTS. Coding,
+image, and video are on-demand features. The governor watches macOS memory
+pressure, process RSS, and thermal state; it may turn a generator off when
+the box is under pressure. No backup model, eGPU, or Thunderbolt engine path
+is part of the design. ENGINE-HOST-02 remains the graceful-degradation rule;
+ENGINE-HOST-03 through MEDIA-HOST-02 are the mechanical follow-ups.
+
+The alternatives rejected are a two-card layout, because there is no second
+card; a static memory reservation, because it wastes idle unified memory;
+CUDA-only MTP, because it is not a verified Metal dependency on the pinned
+engine; and an automatic primary-secondary model system, because it requires
+reserved memory or unpredictable shuffling. ComfyUI is a local supervised
+sidecar with API nodes disabled, not a remote media service. Hailuo-02 is not
+treated as a local model because its hosted service does not provide a
+downloadable checkpoint and Metal runtime. Wan2.2 TI2V-5B is the nearest
+measured candidate for local video.
+
 ## What happened to the old repo
 
 The pre-rebuild hub's full history (244 commits of the Bun/Hono monolith,
