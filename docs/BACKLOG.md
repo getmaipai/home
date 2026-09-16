@@ -2150,6 +2150,25 @@ invented for the roster's household, and added to
     hold, not a respawn loop, and the role returns by itself when the
     device does.
 
+    **The monitor stands alone (owner, 2026-09-16).** The part that
+    watches roles and raises the alert depends on nothing it watches:
+    it runs without the chat engine, without embed, without the
+    judge, and its alert path (the notification, Repairs) is plain
+    code. When it finds a role down it first gathers the deterministic
+    facts itself (which device, the exit code, the last log lines, the
+    probe that failed, since when) and puts them in the alert. Then,
+    only if the chat engine answers, it asks the model for a short
+    diagnosis over those facts and appends it, marked as the hub's
+    guess and grounded in the quoted lines (finding 61's rule applies
+    to a diagnosis as it does to a lookup: no line the logs do not
+    support). If chat is the thing that is down, the alert goes out
+    with the facts alone and no model call is attempted. The design
+    pass also answers how far "standalone" reaches: the monitor inside
+    the hub process covers every engine; a hub process that is itself
+    down needs a watcher outside it (a robot or pod that notices the
+    hub is gone, or a small watchdog the install registers with the
+    OS), and that watcher's alert path is the design's to name.
+
     Rules the design pass fixes: the minimum set per install (from
     the device inventory `detectHardware` reads at boot, and what the
     setup wizard tells the person if the machine cannot carry it);
