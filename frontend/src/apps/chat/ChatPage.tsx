@@ -23,6 +23,7 @@ import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 import { consumeSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { cn, FOCUS_RING } from "@/kit/utils";
 import { ChatDocumentOpenContext, ChatDocumentPane } from "@/apps/chat/chatDocumentPane";
+import { ChatTurnStatsVisibleContext } from "@/apps/chat/chatTurnStats";
 import type { Roster } from "@/lib/api";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
@@ -60,6 +61,16 @@ interface ChatPageProps {
 export function ChatPage({ person }: ChatPageProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [documentTurnId, setDocumentTurnId] = useState<string | null>(null);
+  const canViewTurnStats = person.role === "owner" || person.role === "admin" || person.role === "adult";
+  const [turnStatsVisible, setTurnStatsVisible] = useState(false);
+  useEffect(() => {
+    setTurnStatsVisible(false);
+    if (!canViewTurnStats) return;
+    api.settingsValues(`person:${person.id}`).then((values) => {
+      const setting = values.find((value) => value.key === "ui.show_turn_stats");
+      setTurnStatsVisible(setting?.value === true);
+    }).catch(() => {});
+  }, [canViewTurnStats, person.id]);
   // Home's prompt box and the search palette's "Ask MaiPai" row both
   // navigate here with `state: { initialText }` (step 6) - read once,
   // not kept reactive to `location.state` changing later, since a
@@ -198,6 +209,7 @@ export function ChatPage({ person }: ChatPageProps) {
   return (
     <ChatActorContext.Provider value={person.id}>
       <ChatChildBandContext.Provider value={person.role === "child"}>
+        <ChatTurnStatsVisibleContext.Provider value={canViewTurnStats && turnStatsVisible}>
         <ChatFeedbackOpenContext.Provider value={feedbackOpen}>
           <ChatFeedbackOpenSetterContext.Provider value={setFeedbackOpen}>
             <ChatDocumentOpenContext.Provider value={setDocumentTurnId}>
@@ -210,6 +222,11 @@ export function ChatPage({ person }: ChatPageProps) {
                 <HistoryIcon className="size-4" />
               </Button>
               <h2 className="text-base font-semibold">Chat</h2>
+              {canViewTurnStats ? <Button type="button" variant={turnStatsVisible ? "secondary" : "ghost"} size="sm" aria-pressed={turnStatsVisible} aria-label="Show advanced reply stats" onClick={() => {
+                const next = !turnStatsVisible;
+                setTurnStatsVisible(next);
+                void api.setSetting(`person:${person.id}`, "ui.show_turn_stats", next).catch(() => {});
+              }}>Details</Button> : null}
               {/* `relative before:-inset-1.5`: the touch-target floor
                   (docs/UI.md, BACKLOG.md lane 8 item 1, 2026-09-13) - a
                   `size="icon-lg"` prop alone loses this component's own
@@ -260,6 +277,7 @@ export function ChatPage({ person }: ChatPageProps) {
             </ChatDocumentOpenContext.Provider>
           </ChatFeedbackOpenSetterContext.Provider>
         </ChatFeedbackOpenContext.Provider>
+        </ChatTurnStatsVisibleContext.Provider>
       </ChatChildBandContext.Provider>
     </ChatActorContext.Provider>
   );

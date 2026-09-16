@@ -39,6 +39,20 @@ export interface TurnReply {
   speech?: string;
 }
 
+export interface TurnStats {
+  prompt_tokens: number | null;
+  predicted_tokens: number | null;
+  tokens_per_second: number | null;
+  time_to_first_token_ms: number | null;
+  total_time_ms: number | null;
+  context_tokens: number | null;
+  context_used_percent: number | null;
+  cache_reuse_tokens: number | null;
+  cache_reuse_percent: number | null;
+  engine: string | null;
+  stop_reason: string | null;
+}
+
 export interface TurnValue {
   reply: TurnReply;
   // "confirm" (Session C step 2): a pendingAsk resolved to "no" - the
@@ -82,6 +96,8 @@ export interface TurnValue {
   rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
   /** COMP-01: whether a validated details document is available for this turn. */
   document_available?: boolean;
+  /** STATS-01: optional adult-only engine telemetry, never required. */
+  stats?: TurnStats;
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
@@ -104,7 +120,7 @@ export interface ConversationSummary {
 /** GET /api/conversations/:id/turns' per-turn shape (step 3's contract):
  * the turn plus which memory records trace their provenance to it -
  * empty until the judge (step 6) or an in-turn `remember` writes one. */
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media"> & { sources?: Source[]; media?: TurnValue["media"]; memory_ids: string[] };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats"> & { sources?: Source[]; media?: TurnValue["media"]; stats?: TurnStats; memory_ids: string[] };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

@@ -38,6 +38,7 @@ import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { createCitationComponents } from "@/apps/chat/chatCitationLink";
 import { SourcesCard } from "@/apps/chat/chatSourcesCard";
 import { ChatDocumentHandle } from "@/apps/chat/chatDocumentPane";
+import { ChatTurnStats } from "@/apps/chat/chatTurnStats";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
 import { Button } from "@/kit/ui/button";
 import { Skeleton } from "@/kit/ui/skeleton";
@@ -621,6 +622,7 @@ const AssistantMessage: FC = () => {
         </MessagePrimitive.GroupedParts>
         <MessageError />
         <ChatSourceCaption />
+        <ChatTurnStats />
         <ChatMedia media={media} sources={sources} />
         {!running && <SourcesCard sources={sources} />}
         <MemoryUpdatedChip />

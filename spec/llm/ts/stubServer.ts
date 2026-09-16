@@ -9,7 +9,7 @@
 // model loaded, this is a canned reply]", mirroring the emulator's own
 // llm.complete wording, so a canned answer can never be mistaken for a
 // real one downstream.
-import type { ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse, ToolCallWire } from "./types.js";
+import type { ChatCompletionRequest, ChatCompletionResponse, ChatCompletionTimings, ChatCompletionUsage, EmbeddingRequest, EmbeddingResponse, ToolCallWire } from "./types.js";
 
 export interface StubLlmServerHandle {
   url: string;
@@ -51,13 +51,13 @@ function handleChatCompletion(request: ChatCompletionRequest): ChatCompletionRes
  * own output-safety-gate tests, which need a MODEL reply that differs
  * from the input - the default echo can't ever produce that by
  * construction) can override it with any string. */
-function streamChatCompletion(request: ChatCompletionRequest, text: string = stubReplyText(request)): ReadableStream<Uint8Array> {
+function streamChatCompletion(request: ChatCompletionRequest, text: string = stubReplyText(request), stats?: { usage?: ChatCompletionUsage; timings?: ChatCompletionTimings }): ReadableStream<Uint8Array> {
   const words = text.split(" ");
   const id = `stub-${Date.now()}`;
   const model = request.model || "stub-chat";
   const encoder = new TextEncoder();
-  const sseLine = (choice: unknown) =>
-    encoder.encode(`data: ${JSON.stringify({ id, model, choices: [choice] })}\n\n`);
+  const sseLine = (choice: unknown, extra: Record<string, unknown> = {}) =>
+    encoder.encode(`data: ${JSON.stringify({ id, model, choices: [choice], ...extra })}\n\n`);
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
@@ -66,7 +66,7 @@ function streamChatCompletion(request: ChatCompletionRequest, text: string = stu
         const content = i === 0 ? word : ` ${word}`;
         controller.enqueue(sseLine({ index: 0, delta: { content }, finish_reason: null }));
       });
-      controller.enqueue(sseLine({ index: 0, delta: {}, finish_reason: "stop" }));
+      controller.enqueue(sseLine({ index: 0, delta: {}, finish_reason: "stop" }, stats));
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();
     },
@@ -180,6 +180,8 @@ function handleEmbeddings(request: EmbeddingRequest): EmbeddingResponse {
 }
 
 export interface StubLlmServerOptions {
+  /** Optional final-chunk telemetry for browser review fixtures. */
+  chatStats?: { usage?: ChatCompletionUsage; timings?: ChatCompletionTimings };
   /** Session-a-intelligence.md step 6: the memory judge's tests need a
    * SPECIFIC canned JSON reply per test case (a possessive resolved a
    * certain way, a particular dedupe decision), not the generic
@@ -256,7 +258,7 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
         activeRequests -= 1;
         const scriptedContent = scripted !== undefined ? (typeof scripted === "string" ? scripted : JSON.stringify(scripted)) : undefined;
         if (body.stream) {
-          return new Response(streamChatCompletion(body, scriptedContent), {
+          return new Response(streamChatCompletion(body, scriptedContent, opts.chatStats), {
             headers: { "content-type": "text/event-stream" },
           });
         }

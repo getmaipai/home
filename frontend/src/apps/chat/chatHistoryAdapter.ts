@@ -87,6 +87,7 @@ export function rowsToBranchableMessages(
           documentAvailable: Boolean(row.document),
           sources: row.sources,
           media: row.media,
+          stats: row.stats,
         },
       },
     };

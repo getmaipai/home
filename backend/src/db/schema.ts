@@ -383,6 +383,9 @@ export const conversationTurns = sqliteTable(
     document: text("document"),
     sources: text("sources"),
     media: text("media"),
+    // STATS-01: nullable engine telemetry for the adult advanced view.
+    // Hub-internal and additive, not part of the synced conversation record.
+    stats: text("stats"),
     // ACT-01: the turn's frozen TurnSignal (spec/schemas/turn-signal.
     // schema.json as JSON), computed before routing and never
     // recomputed, the judge's queue key and REVIEW-01's record of what

@@ -576,6 +576,20 @@
     ]
   },
   {
+    "key": "ui.show_turn_stats",
+    "scope": "person",
+    "selector": "boolean",
+    "default": false,
+    "label": "Show advanced reply stats",
+    "help": "Show engine timing and token details below your chat replies.",
+    "level": "advanced",
+    "secret": false,
+    "lives_in": "profile.appearance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "voice.hf_token",
     "scope": "household",
     "selector": "text",

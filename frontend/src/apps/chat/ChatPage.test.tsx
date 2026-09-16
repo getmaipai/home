@@ -34,7 +34,7 @@ function makePerson(): Roster {
 
 const SAFETY = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" };
 
-function stubFetch(options: { ttsCalls?: string[]; brain?: string } = {}): () => void {
+function stubFetch(options: { ttsCalls?: string[]; brain?: string; settingWrites?: unknown[] } = {}): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -43,6 +43,12 @@ function stubFetch(options: { ttsCalls?: string[]; brain?: string } = {}): () =>
     if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/plugins")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    if (url.includes("/api/settings?") && (!init?.method || init.method === "GET")) return Promise.resolve(Response.json([]));
+    if (url === "/api/settings" && init?.method === "PUT") {
+      const body = JSON.parse(String(init.body ?? "{}")) as unknown;
+      options.settingWrites?.push(body);
+      return Promise.resolve(Response.json(body));
+    }
     if (url.includes("/api/turn/stream")) {
       return Promise.resolve(
         new Response(
@@ -132,6 +138,29 @@ describe("ChatPage", () => {
     } finally {
       restore();
     }
+  });
+
+  test("an owner can persist the advanced reply details preference", async () => {
+    const settingWrites: unknown[] = [];
+    const restore = stubFetch({ settingWrites });
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+      const toggle = await view.findByRole("button", { name: "Show advanced reply stats" });
+      expect(toggle.getAttribute("aria-pressed")).toBe("false");
+      fireEvent.click(toggle);
+      await waitFor(() => expect(toggle.getAttribute("aria-pressed")).toBe("true"));
+      expect(settingWrites).toContainEqual({ scope: "person:person-abc123", key: "ui.show_turn_stats", value: true });
+    } finally { restore(); }
+  });
+
+  test("a child cannot see the advanced reply details toggle", async () => {
+    const restore = stubFetch();
+    try {
+      const child = { ...makePerson(), role: "child" as const };
+      const view = renderWithQueryClient(<MemoryRouter><ChatPage person={child} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      expect(view.queryByRole("button", { name: "Show advanced reply stats" })).toBeNull();
+    } finally { restore(); }
   });
 });
 

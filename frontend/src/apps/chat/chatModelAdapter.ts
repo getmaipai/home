@@ -360,6 +360,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   // emits them with no adapter change needed then.
                   sources: (event.value as TurnWithSources).sources,
                   media: event.value.media,
+                  stats: event.value.stats,
                 },
               },
             };

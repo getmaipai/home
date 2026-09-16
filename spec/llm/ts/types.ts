@@ -217,10 +217,25 @@ export interface ChatCompletionChunkChoice {
   finish_reason: string | null;
 }
 
+/** llama-server's optional final-generation telemetry. Older engines and
+ * the test stub omit it, so every member is optional and callers must
+ * treat absent values as unknown rather than zero. */
+export interface ChatCompletionTimings {
+  prompt_n?: number;
+  prompt_ms?: number;
+  prompt_per_second?: number;
+  predicted_n?: number;
+  predicted_ms?: number;
+  predicted_per_second?: number;
+  cache_n?: number;
+}
+
 export interface ChatCompletionChunk {
   id: string;
   model: string;
   choices: ChatCompletionChunkChoice[];
+  usage?: ChatCompletionUsage;
+  timings?: ChatCompletionTimings;
 }
 
 // The embeddings half of "OpenAI-compatible HTTP for text and

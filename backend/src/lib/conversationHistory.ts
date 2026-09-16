@@ -51,6 +51,7 @@ import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import { nextHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
+import type { TurnStats } from "@/lib/turnStats";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Rung } from "@/lib/ruleNames";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
@@ -271,6 +272,7 @@ export function logTurn(
     document: document ? JSON.stringify(document) : null,
     sources: value.sources ? JSON.stringify(value.sources) : null,
     media: value.media ? JSON.stringify(value.media) : null,
+    stats: value.stats ? JSON.stringify(value.stats) : null,
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
     // row (CHAT-03) they are approximate, and a `policy` turn is skipped
@@ -956,7 +958,7 @@ export function listConversationTurns(
 
   const byTurn = memoryIdsByTurn(rows.map((r) => r.id));
 
-  return { ok: true, value: rows.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, memory_ids: byTurn.get(r.id) ?? [] })) };
+  return { ok: true, value: rows.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] })) };
 }
 
 /** PATCH /api/conversations/:id: title only (step 3's contract). Same
@@ -1392,7 +1394,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const capped = rows.slice(0, LIST_CAP);
   const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
-  return capped.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, memory_ids: byTurn.get(r.id) ?? [] }));
+  return capped.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] }));
 }
 
 /** The full per-person archive (4.14: "export per person is one

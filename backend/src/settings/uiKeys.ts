@@ -6,6 +6,17 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const UI_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
+    key: "ui.show_turn_stats",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Show advanced reply stats",
+    help: "Show engine timing and token details below your chat replies.",
+    level: "advanced",
+    lives_in: "profile.appearance",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "ui.appearance",
     scope: "person",
     selector: "select",

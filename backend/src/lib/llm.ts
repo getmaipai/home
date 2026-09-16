@@ -16,7 +16,7 @@
 import { getChatClient, reportChatBackendUnreachable } from "@/lib/llmSupervisor";
 import { getEmbedClient } from "@/lib/embedSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
-import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
+import { LlmClientError, type ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import type { ChatRole, ChatCompletionRequest, ToolDefinition, ToolCallWire } from "@maipai/spec/llm/ts/types.js";
 import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
 import { seedFields } from "@/lib/benchSampling";
@@ -325,7 +325,7 @@ export async function complete(
 }
 
 export type LlmStreamStartResult =
-  | { ok: true; tokens: AsyncGenerator<string, ToolCall[] | undefined, void> }
+  | { ok: true; tokens: AsyncGenerator<string, ToolCall[] | undefined, void>; stats: ChatCompletionStreamStats }
   | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string };
 
 /** Real token-by-token streaming (2026-09-04): validates and resolves a
@@ -363,6 +363,7 @@ export async function startCompleteStream(
 
   const { thinking, tools, tool_choice, ...rest } = opts;
   const offering = !!tools && tools.length > 0;
+  const stats: ChatCompletionStreamStats = { usage: null, timings: null, stopReason: null };
   // Fix E: `yield*` delegation both forwards every text delta the inner
   // generator yields AND evaluates to its own return value once it ends
   // (spec/llm/ts/client.ts's own chatCompleteStream(), assembled from
@@ -390,6 +391,7 @@ export async function startCompleteStream(
           id_slot: 0,
         },
         signal,
+        stats,
       );
       return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
     } catch (err) {
@@ -403,7 +405,7 @@ export async function startCompleteStream(
       throw new Error(`chat model unavailable: ${message}`);
     }
   }
-  return { ok: true, tokens: tokens() };
+  return { ok: true, tokens: tokens(), stats };
 }
 
 export interface EmbedValue {

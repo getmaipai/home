@@ -32,6 +32,9 @@
 // instead of the paths above (issue #76: every browser used to share the
 // same output paths, so a `--webkit` run silently overwrote the published
 // Chromium screenshots). Only Chromium's output is ever committed.
+// `--chat-stats-review` runs one dedicated adult-only chat capture with the
+// advanced reply-details popover open, plus the normal chat accessibility
+// checks; it is intentionally separate from the ordinary matrix shots.
 import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
 import { startStubLlmServer } from "../spec/llm/ts/stubServer";
 import AxeBuilder from "@axe-core/playwright";
@@ -205,6 +208,7 @@ const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
 const chatFocusReview = process.argv.includes("--chat-focus-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview;
+const chatStatsReview = process.argv.includes("--chat-stats-review");
 const settingsReview = process.argv.includes("--settings-review");
 // Lane 15: judges the bell popover's own "Dismiss all" and the history
 // page's multi-select in one throwaway run, the same shape chatReview/
@@ -387,6 +391,10 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
+  const seededPeople = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } });
+  if (!seededPeople.ok) throw new Error(`seed people lookup failed: ${seededPeople.status}`);
+  const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
+  if (!sage) throw new Error("seed people lookup did not return Sage");
   for (const person of [
     { displayName: "Marlow", role: "teen" },
     { displayName: "Nova", role: "child" },
@@ -397,6 +405,15 @@ async function seedHousehold(): Promise<string> {
       body: JSON.stringify(person),
     });
     if (!res.ok) throw new Error(`seed person ${person.displayName} failed: ${res.status}`);
+  }
+
+  if (chatStatsReview) {
+    const statsSetting = await fetch(`${BASE_URL}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+      body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.show_turn_stats", value: true }),
+    });
+    if (!statsSetting.ok) throw new Error(`seed ui.show_turn_stats failed: ${statsSetting.status}`);
   }
 
   // household.home_place, found live 2026-09-13: without it, Home's own
@@ -926,6 +943,35 @@ async function captureChatDocumentPane(browser: Browser, sessionValue: string, v
   }
 }
 
+/** STATS-01's dedicated review: a real model stream supplies final-chunk
+ * telemetry, the signed-in owner enables the persisted preference, and the
+ * compact readout is opened from the real assistant reply before capture. */
+async function captureChatStatsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.getByRole("textbox", { name: "Message input" }).fill("Help me plan a small garden");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByText("Start with a sunny spot and a few easy plants.", { exact: false }).waitFor();
+    const statsToggle = page.getByRole("button", { name: "Show advanced reply stats", exact: true });
+    await statsToggle.waitFor();
+    await page.waitForFunction(() => document.querySelector('[aria-label="Show advanced reply stats"]')?.getAttribute("aria-pressed") === "true");
+    await page.getByRole("button", { name: "View reply stats", exact: true }).click();
+    await page.getByRole("heading", { name: "Reply details", exact: true }).waitFor();
+    await settleAnimations(page);
+    const screenshot = "chat-turn-stats-desktop-light.png";
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-turn-stats", viewport: viewport.slug, theme: "light" });
+  } finally {
+    await context.close();
+  }
+}
+
 /** Lane 11 item 2's own acceptance: "the screenshot script gains the
  * section (desktop and phone), opened and judged." The route matrix's
  * own /memory capture never sees this section - Radix's Tabs.Content
@@ -1377,7 +1423,10 @@ async function main() {
   // answer for real - this branch only ever fires if routing changes to
   // send the question to the model instead. The herbs/book branches
   // stay chat-review's.
-  const chatModel = startStubLlmServer(0, { scriptedChatReply: (request) => {
+  const chatModel = startStubLlmServer(0, { chatStats: {
+    usage: { prompt_tokens: 182, completion_tokens: 46, total_tokens: 228 },
+    timings: { prompt_n: 182, predicted_n: 46, predicted_ms: 248, predicted_per_second: 185, cache_n: 1200 },
+  }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
     if (text.includes("book")) return "What kind of story would you enjoy: a mystery, an adventure, or something funny?";
@@ -1535,7 +1584,9 @@ async function main() {
       }
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !notificationsReview) {
+    if (!a11yOnly && chatStatsReview) await captureChatStatsReview(browser, sessionValue);
+
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !notificationsReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -1568,7 +1619,7 @@ async function main() {
     // browser contexts that would only ever iterate zero routes below.
     const combos = notificationsReview
       ? []
-      : a11yOnly || settingsReview || chatReview
+      : a11yOnly || settingsReview || chatReview || chatStatsReview
         ? A11Y_ONLY_COMBOS
         : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
 
@@ -1578,14 +1629,14 @@ async function main() {
     // seeded backend - its two combos (`A11Y_ONLY_COMBOS`) would race
     // each other's chat history if run concurrently, so this mode stays
     // sequential (pool size 1). Every other mode only ever reads.
-    const poolSize = chatReview ? 1 : CONTEXT_POOL_SIZE;
+    const poolSize = chatReview || chatStatsReview ? 1 : CONTEXT_POOL_SIZE;
     const comboResults = await runPool(combos, poolSize, async (combo): Promise<RunResult[]> => {
       const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
       if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of (chatReview ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
+        for (const route of ((chatReview || chatStatsReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -1596,7 +1647,7 @@ async function main() {
           // as a failure for this one combo, never silently skipped.
           comboResult.push(
             await Promise.race([
-              visitRoute(context, route, viewport, combo.theme, !a11yOnly),
+              visitRoute(context, route, viewport, combo.theme, !a11yOnly && !chatStatsReview),
               new Promise<RunResult>((_, reject) =>
                 setTimeout(() => reject(new Error(`timed out after ${PAGE_VISIT_TIMEOUT_MS}ms`)), PAGE_VISIT_TIMEOUT_MS),
               ),
@@ -1635,7 +1686,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !settingsReview && !chatReview && !notificationsReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !notificationsReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);

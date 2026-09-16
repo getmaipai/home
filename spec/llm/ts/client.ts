@@ -7,6 +7,8 @@ import type {
   ChatCompletionChunk,
   ChatCompletionRequest,
   ChatCompletionResponse,
+  ChatCompletionTimings,
+  ChatCompletionUsage,
   ModelInfo,
   EmbeddingRequest,
   EmbeddingResponse,
@@ -23,6 +25,12 @@ export class LlmClientError extends Error {
     super(message);
     this.name = "LlmClientError";
   }
+}
+
+export interface ChatCompletionStreamStats {
+  usage: ChatCompletionUsage | null;
+  timings: ChatCompletionTimings | null;
+  stopReason: string | null;
 }
 
 // COR-2 (code review, 2026-09-06): neither chatComplete() nor embed() had
@@ -176,7 +184,7 @@ export class LlamaServerClient {
    * `delta.tool_calls` fragments accumulated per `index` as they arrive,
    * the identical concatenation this method already does for plain text
    * content, just keyed by call instead of by nothing. */
-  async *chatCompleteStream(request: ChatCompletionRequest, externalSignal?: AbortSignal): AsyncGenerator<string, ToolCallWire[] | undefined, void> {
+  async *chatCompleteStream(request: ChatCompletionRequest, externalSignal?: AbortSignal, stats?: ChatCompletionStreamStats): AsyncGenerator<string, ToolCallWire[] | undefined, void> {
     if (!Array.isArray(request.messages) || request.messages.length === 0) {
       throw new LlmClientError("messages is required");
     }
@@ -280,6 +288,12 @@ export class LlamaServerClient {
           chunk = JSON.parse(data);
         } catch {
           continue; // a malformed line is skipped, not fatal - the rest of the stream may still be good
+        }
+        if (stats) {
+          if (chunk.usage) stats.usage = chunk.usage;
+          if (chunk.timings) stats.timings = chunk.timings;
+          const finishReason = chunk.choices?.[0]?.finish_reason;
+          if (finishReason) stats.stopReason = finishReason;
         }
         // A code review (2026-09-04) found this guarded against an empty
         // `choices` array but not a chunk that omits the field entirely

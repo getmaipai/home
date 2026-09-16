@@ -31,6 +31,8 @@ import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
+import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
+import { buildTurnStats } from "@/lib/turnStats";
 import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, normalizeForRepeat, splitIntoSentences, lookupShapeOf, lookupAnswered, readLookupDraft, LOOKUP_READ_MAX_CHARS, LOOKUP_FAILED_LINES, bannedPhraseRetryNote, repeatRetryNote, isRepeatReason, isRepeatReply, EXAMPLE_PARROT_RETRY_NOTE, type LookupRead, type LookupShape, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
@@ -191,6 +193,10 @@ interface TurnLogRecord {
    * the per-stage timings. */
   signal?: { act: string; secondary: string[]; emotion: string; intensity: string; target: string; repair: string; source: string };
   timings?: TurnTimings;
+  /** STATS-01: the same sanitized, nullable engine telemetry retained on
+   * the turn row, so an operational `[turn]` line cannot drift from the
+   * household-visible value. */
+  stats?: TurnValue["stats"];
   /** ENGINE-HOST-01: which chat engine answered ("external b10797
    * qwen3-8b...", "local ...", "stub"), the host as a label only. */
   engine?: string;
@@ -213,7 +219,7 @@ interface TurnLogRecord {
   rules?: string[];
 }
 
-function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape, plan?: ReplyPlan, composed?: ComposedRecord, rung?: Rung, rules?: readonly string[]): void {
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape, plan?: ReplyPlan, composed?: ComposedRecord, rung?: Rung, rules?: readonly string[], stats?: TurnValue["stats"]): void {
   // ASK-02: the world kind, or the kinds an unresolved name hinted.
   const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form, ...(s.type === "world" ? { kind: s.kind } : s.type === "unresolved" && s.candidate_kinds.length > 0 ? { kind: s.candidate_kinds.join("/") } : {}) }));
   const record: TurnLogRecord = {
@@ -234,6 +240,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     ...(signal ? { signal: { act: signal.primary_act, secondary: signal.secondary_acts, emotion: signal.expressed_emotion, intensity: signal.emotion_intensity, target: signal.target, repair: signal.repair, source: signal.source } } : {}),
     ...(plan ? { plan: `${Object.entries(plan.moves).filter(([, v]) => v === "required").map(([move]) => move).join("+")}/${plan.max_words}` } : {}),
     ...(timings ? { timings } : {}),
+    ...(stats ? { stats } : {}),
     // Only when the chat engine answered (a model turn, or a package the
     // model's own call resolved: a first token was measured), never on a
     // deterministic tier's turn (a review).
@@ -275,13 +282,14 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; streamStats?: ChatCompletionStreamStats },
 ): void {
   // RVW-1: the answering rung, read once here from the delivered value,
   // the retained outcomes and the signal, and the rules that fired (the
   // engine's, then every guard hit); both ride on the wire (the value
   // is the one returned to the caller), the `[turn]` line and the row.
   const rules = rulesFired(meta.rules ?? [], meta.guardHits, meta.signal.source);
+  if (meta.streamStats) value.stats = buildTurnStats(meta.streamStats, meta.timings, meta.startedAt, Date.now(), getChatEngineIdentity());
   const rung = rungOf(value, meta.outcomes ?? [], meta.signal, { householdSubject: rules.includes("lookup.household_subject") || (meta.subjects ?? []).some((s) => s.type === "household") });
   value.rung = rung;
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
@@ -321,7 +329,7 @@ function logTurnSafely(
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
   }
-  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan, meta.composed, rung, rules);
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan, meta.composed, rung, rules, value.stats);
   if (meta.ephemeral) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
@@ -1694,6 +1702,8 @@ type PreparedTurn =
       compose?: TurnValue;
       /** CHAT-16: the composer's decision on this turn, for the log. */
       composed?: ComposedRecord;
+      /** STATS-01: the latest model stream's engine-owned telemetry. */
+      streamStats?: ChatCompletionStreamStats;
       /** K6: the turn's phases; created by the run function that owns
        * the abort signal. */
       machine?: TurnMachine;
@@ -5141,6 +5151,7 @@ async function runTurnStreamHoldingLease(
       yield `${plan.fallback.text} `;
       return undefined;
     }
+    modelTurn.streamStats = started.stats;
     // The composition's own opening hold (OUT-01's rule, in one place
     // for both paths: the promise path's composition runs inside the
     // lookup hold, past holdOpening()): the first chunk is held until it
@@ -5407,6 +5418,7 @@ async function runTurnStreamHoldingLease(
         modelTurn.modelCalls++;
         const again = await startCompleteStream("chat", modelMessages, { thinking: false, max_tokens: RETRY_TOKEN_CAP }, opts.signal);
         if (again.ok) {
+          modelTurn.streamStats = again.stats;
           // A regeneration that fails before it has put anything on the
           // wire (an idle timeout, the engine restarting) is not the
           // turn's failure: the first generation finished, and the
@@ -5503,6 +5515,7 @@ async function runTurnStreamHoldingLease(
               const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
               const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: note }], { thinking: false }, opts.signal);
               if (!again.ok) return null;
+              modelTurn.streamStats = again.stats;
               return gateOutputSafety(holdOpening(again.tokens, false), actor, prepared.turnId);
             },
           ),
@@ -5530,7 +5543,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
           return outcome.resolved;
         }
         // CHAT-16 (K2, K6): the composition's deltas were the stream:
@@ -5542,7 +5555,7 @@ async function runTurnStreamHoldingLease(
           const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace);
           finalized = composedValue;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
+          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
           return composedValue;
         }
         const outputSafety = outcome;
@@ -5628,7 +5641,7 @@ async function runTurnStreamHoldingLease(
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
         }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
         return value;
       },
     };
@@ -5659,6 +5672,7 @@ async function runTurnStreamHoldingLease(
       // fails, it's a real down-engine case, not a request-shape one.
       return { ok: false, status: 503, code: "unavailable", error: started.error };
     }
+    modelTurn.streamStats = started.stats;
     return buildStreamResult(started.tokens);
   }
 
@@ -5724,6 +5738,7 @@ async function runTurnStreamHoldingLease(
     return { ok: false, status: 503, code: "unavailable", error: startResult.error }; // released by the caller's finally
   }
   const started = startResult as Extract<typeof startResult, { ok: true }>;
+  modelTurn.streamStats = started.stats;
 
   async function* peekAndHandle(): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
     const iterator = started.tokens[Symbol.asyncIterator]();
@@ -5755,6 +5770,7 @@ async function runTurnStreamHoldingLease(
         // buildStreamResult()'s guardFirstStep() catches this (nothing
         // has been yielded yet) and marks the turn finished.
         if (!retry.ok) throw new StreamUnavailable(retry.error);
+        modelTurn.streamStats = retry.stats;
         yield* retry.tokens;
         return undefined;
       }
