@@ -57,7 +57,7 @@ import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Rung } from "@/lib/ruleNames";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
-import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
+import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds, Media } from "@/wire";
 export type { ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
 export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 
@@ -67,6 +67,20 @@ export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 // here since this is where callers already look for it.
 import type { ConversationTurnRow } from "@/wire";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
+
+function mediaFields(raw: string | null): { media?: Media; media_items?: Media[] } {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as { kind?: unknown; url?: unknown; thumbnail?: unknown; source?: unknown; source_url?: unknown; media_items?: unknown };
+    const media = parsed.kind === "image" && typeof parsed.url === "string" && typeof parsed.source === "string"
+      ? { kind: "image" as const, url: parsed.url, thumbnail: typeof parsed.thumbnail === "string" ? parsed.thumbnail : null, source: parsed.source, ...(typeof parsed.source_url === "string" ? { source_url: parsed.source_url } : {}) }
+      : undefined;
+    const media_items = Array.isArray(parsed.media_items) ? parsed.media_items as Media[] : undefined;
+    return { ...(media ? { media } : {}), ...(media_items ? { media_items } : {}) };
+  } catch {
+    return {};
+  }
+}
 import { TurnSignal as TurnSignalSchema, type TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { ReplyPlan as ReplyPlanSchema, type ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import { SubjectRef as SubjectRefSchema } from "@maipai/spec/gen/ts/subject-ref.js";
@@ -342,7 +356,7 @@ export function logTurn(
     outcomes: opts.outcomes && opts.outcomes.length > 0 ? JSON.stringify(opts.outcomes.map(outcomeForRow)) : null,
     document: document ? JSON.stringify(document) : null,
     sources: value.sources ? JSON.stringify(value.sources) : null,
-    media: value.media ? JSON.stringify(value.media) : null,
+    media: value.media ? JSON.stringify(value.media_items?.length ? { ...value.media, media_items: value.media_items } : value.media) : null,
     stats: value.stats ? JSON.stringify(value.stats) : null,
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
@@ -508,6 +522,20 @@ export function lastTurnSubjects(conversationId: string): SubjectRef[] {
     .limit(1)
     .get();
   return row ? turnSubjectsOf(row) : [];
+}
+
+/** Finding 60 addendum: the latest inline picture payload is the small
+ * continuation state for "show me more"; the full result stays in the
+ * turn row's bounded media JSON, never in prompt history. */
+export function lastTurnMedia(conversationId: string): { media?: Media; media_items?: Media[] } {
+  const row = db
+    .select({ media: conversationTurns.media })
+    .from(conversationTurns)
+    .where(eq(conversationTurns.conversationId, conversationId))
+    .orderBy(desc(conversationTurns.createdAt))
+    .limit(1)
+    .get();
+  return mediaFields(row?.media ?? null);
 }
 
 /** CHAT-13 (chunk C): the subjects of the conversation's last two turns,
@@ -1109,7 +1137,10 @@ export function listConversationTurns(
 
   const byTurn = memoryIdsByTurn(rows.map((r) => r.id));
 
-  return { ok: true, value: rows.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] })) };
+  return { ok: true, value: rows.map((r) => {
+    const { media: rawMedia, ...row } = r;
+    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] };
+  }) };
 }
 
 /** PATCH /api/conversations/:id: title and pin state (step 3's contract
@@ -1570,7 +1601,10 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const capped = rows.slice(0, LIST_CAP);
   const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
-  return capped.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] }));
+  return capped.map((r) => {
+    const { media: rawMedia, ...row } = r;
+    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] };
+  });
 }
 
 /** The full per-person archive (4.14: "export per person is one

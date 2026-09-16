@@ -5947,10 +5947,10 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     });
   });
 
-  async function withCosmoLookupStub<T>(fn: (seen: { forced: number; queries: string[] }) => Promise<T>): Promise<T> {
+  async function withCosmoLookupStub<T>(fn: (seen: { forced: number; queries: string[]; categories: (string | null)[] }) => Promise<T>): Promise<T> {
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const seen = { forced: 0, queries: [] as string[] };
+    const seen = { forced: 0, queries: [] as string[], categories: [] as (string | null)[] };
     const stub = startStubLlmServer(0, {
       scriptedToolCalls: (request) => {
         if (request.tool_choice !== "required") return undefined;
@@ -5969,10 +5969,12 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     const searxng = Bun.serve({
       port: 0,
       fetch: (req) => {
-        seen.queries.push(new URL(req.url).searchParams.get("q") ?? "");
+        const url = new URL(req.url);
+        seen.queries.push(url.searchParams.get("q") ?? "");
+        seen.categories.push(url.searchParams.get("categories"));
         return Response.json({ results: [
-          { title: "Cosmo 7 support", url: "https://example.com/cosmo-7/support", content: "Official support page." },
-          { title: "Cosmo 7 help", url: "https://example.com/cosmo-7/help", content: "Help and documentation." },
+          { title: "Cosmo 7 support", url: "https://example.com/cosmo-7/support", content: "Official support page.", img_src: "https://img.example.com/cosmo-7.jpg" },
+          { title: "Cosmo 7 alternate", url: "https://example.com/cosmo-7/alternate", content: "An alternate Cosmo 7 image.", img_src: "https://img.example.com/cosmo-7-alt.jpg" },
         ] });
       },
     });
@@ -5986,6 +5988,77 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       __resetLlmSupervisorForTests();
     }
   }
+
+  test("a text lookup ignores a model-selected images category and records the counter", async () => {
+    const { actor } = await owner();
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const seen = { modelCalls: 0, categories: [] as (string | null)[] };
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => {
+        if (request.tool_choice === "required" || !request.tools?.some((tool) => tool.function.name === "websearch")) return undefined;
+        seen.modelCalls++;
+        return [{ id: "call-text-search", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "Serena Vale songs", category: "images" }) } }];
+      },
+      scriptedChatReply: (request) => request.messages.some((message) => message.role === "tool") ? "Sunday Bay is one of her songs." : "Let me search for that.",
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    const searxng = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        seen.categories.push(url.searchParams.get("categories"));
+        return Response.json({ results: [{ title: "Sunday Bay - Serena Vale", url: "https://example.com/sunday-bay", content: "Sunday Bay is one of Serena Vale's songs." }] });
+      },
+    });
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
+    try {
+      const result = await runTurn(actor, "chat", "give me a list of songs by Serena Vale");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.modelCalls).toBe(1);
+      expect(seen.categories).toEqual([null]);
+      expect(result.value.reply.text).toContain("Sunday Bay");
+      expect(retained(result.value.turn_id)?.[0]?.args).toEqual({ expression: "Serena Vale songs" });
+      const row = db.select({ rules: conversationTurns.rules }).from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      expect(JSON.parse(row?.rules ?? "[]")).toContain("websearch.category_ignored:1");
+    } finally {
+      stub.stop();
+      searxng.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("a picture request selects the images category before the model", async () => {
+    const { actor } = await owner();
+    await withCosmoLookupStub(async (seen) => {
+      const result = await runTurn(actor, "chat", "show me a picture of the Cosmo 7 card");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.forced).toBe(0);
+      expect(seen.categories).toContain("images");
+      expect(result.value.media?.kind).toBe("image");
+    });
+  });
+
+  test("a picture follow-up searches the same form and skips the first image", async () => {
+    const { actor } = await owner();
+    await withCosmoLookupStub(async (seen) => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const first = await runTurn(actor, "chat", "show me the movie poster for the Cosmo 7 card", { conversationId: conv.value.id });
+      expect(first.ok).toBe(true);
+      const second = await runTurn(actor, "chat", "show me more", { conversationId: conv.value.id });
+      expect(second.ok).toBe(true);
+      if (!first.ok || !second.ok) return;
+      expect(seen.categories).toEqual(["images", "images"]);
+      expect(first.value.media_items).toHaveLength(1);
+      expect(second.value.media_items).toHaveLength(1);
+      expect(second.value.media_items?.[0]?.url).toBe("https://img.example.com/cosmo-7-alt.jpg");
+      expect(second.value.media_items?.[0]?.url).not.toBe(first.value.media_items?.[0]?.url);
+    });
+  });
 
   test("CHAT-16 (b): a forced Cosmo 7 support lookup returns two sources", async () => {
     const { actor } = await owner();

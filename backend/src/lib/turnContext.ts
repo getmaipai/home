@@ -250,8 +250,16 @@ export interface TurnIntent {
   /** Only for a case-insensitive "in detail", "detailed explanation" or
    * "step by step" (CHAT-12 reads it for the output reserve). */
   explicitDetailedAnswer: boolean;
-  deliverable?: "link" | "picture" | "video";
+  deliverable?: "link" | "video" | PictureDeliverable;
   decided?: { field: string; query: string };
+}
+
+export type PictureForm = "poster" | "cover" | "photo";
+export type PictureCount = 1 | 2 | 3 | 4;
+export interface PictureDeliverable {
+  deliverable: "picture";
+  count: PictureCount;
+  form?: PictureForm;
 }
 
 export const CURRENCY_MARK_RE = /\b(?:new|newest|latest|current|currently|today|tonight|tomorrow|this (?:year|week|month|season|weekend)|still|yet|upcoming|out yet|come out|came out|released?)\b/i;
@@ -367,6 +375,8 @@ export interface TurnContext {
    * utterance named nobody), so a household one stands a lookup down
    * only when the utterance refers back with a pronoun. */
   subjectsCarried?: boolean;
+  /** Finding 60 addendum: URLs already shown by a picture continuation. */
+  pictureExclusions?: readonly string[];
   /** ASK-01: the pronoun family each subject takes, from the entity's
    * stored pronouns or the pronoun the person used for the name this
    * turn, for the guards' pronoun check. */
@@ -403,15 +413,40 @@ export function emptyTimings(): TurnTimings {
 
 const DETAIL_PHRASES = [/\bin detail\b/i, /\bdetailed explanation\b/i, /\bstep by step\b/i];
 export const LINK_DELIVERABLE_PHRASES = [/\ba link\b/i, /\bthe link\b/i, /\blink me\b/i, /\ba url\b/i, /\bthe url\b/i, /\bthe page\b/i, /\bthe support page\b/i, /\bthe source\b/i, /\bwhere did you read that\b/i, /\bwhere can i (?:read|watch|buy|find|see) (?:it|that|this|more)\b/i, /\bsend me the (?:page|link|article)\b/i];
-export const PICTURE_DELIVERABLE_PHRASES = [/\ba picture\b/i, /\ba photo\b/i, /\bgot a photo\b/i, /\ban image\b/i, /\bshow me (?:it|what it looks like)\b/i, /\bwhat does (?:it|he|she) look like\b/i];
+const PICTURE_FOLLOWUP_RE = /\b(?:show me more|show me others|any others|more like that|different ones)\b/i;
+// First classifier candidate under the org rule: keep every picture form in
+// this one typed reader; its first labels are the visual-artifact phrasings
+// named by the brief. A second list in routing would let them drift apart.
+export const PICTURE_DELIVERABLE_PHRASES = [/\b(?:pictures?|photos?|images?)\b/i, /\b(?:movie\s+)?posters?\b/i, /\balbum\s+covers?\b/i, /\bartwork\b/i, /\bshow me (?:it|what it looks like)\b/i, /\bwhat does (?:it|he|she) look like\b/i, PICTURE_FOLLOWUP_RE];
 export const VIDEO_DELIVERABLE_PHRASES = [/\ba video\b/i, /\bany video\b/i, /\bthe trailer\b/i, /\ba clip\b/i, /\bsend me the video\b/i, /\bshow me the video\b/i];
 
-export function deliverableQuery(deliverable: "link" | "picture" | "video", subjects: readonly SubjectRef[], utterance: string): string {
+export function isPictureFollowup(utterance: string): boolean {
+  return PICTURE_FOLLOWUP_RE.test(utterance);
+}
+
+function pictureDeliverableFor(utterance: string): PictureDeliverable | undefined {
+  const form: PictureForm | undefined = /(?:movie\s+)?posters?/i.test(utterance) ? "poster" : /album\s+covers?|artwork/i.test(utterance) ? "cover" : /photo/i.test(utterance) ? "photo" : undefined;
+  const counted = utterance.match(/\b([2-9])\s+(?:pictures?|photos?|images?)\b/i);
+  const count: PictureCount = counted
+    ? Math.min(4, Number(counted[1])) as PictureCount
+    : /\ba few\s+(?:pictures?|photos?|images?)\b/i.test(utterance)
+      ? 3
+      : /\b(?:multiple|several|different|all)\b|\bthe various\b/i.test(utterance)
+        ? 4
+        : 1;
+  if (!PICTURE_DELIVERABLE_PHRASES.some((re) => re.test(utterance))) return undefined;
+  return { deliverable: "picture", count, ...(form ? { form } : {}) };
+}
+
+export function deliverableQuery(deliverable: "link" | "picture" | "video" | PictureDeliverable, subjects: readonly SubjectRef[], utterance: string): string {
   const subject = subjects[0];
   const name = subject?.type === "world" ? subject.display_name : subject?.type === "unresolved" ? subject.surface_form : undefined;
   const fallback = utterance.toLowerCase().replace(/\b(where(?:'s| is)?|what(?:'s| is)?|how|can|i|me|a|an|the|got|any|please|show|send|link|url|page|source|picture|photo|image|video|trailer|clip|of|it|that|this|for|does|look|like)\b/gi, " ").replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
   const base = name ?? fallback;
-  return `${base}${deliverable === "link" ? /\bsupport\b/i.test(utterance) ? " support page" : " official page" : deliverable === "picture" ? " photos" : " video"}`.trim();
+  const kind = typeof deliverable === "string" ? deliverable : deliverable.deliverable;
+  const pictureForm = typeof deliverable === "object" ? deliverable.form : undefined;
+  const pictureSuffix = pictureForm === "poster" ? " movie poster" : pictureForm === "cover" ? " album cover" : pictureForm === "photo" ? " photo" : " photos";
+  return `${base}${kind === "link" ? /\bsupport\b/i.test(utterance) ? " support page" : " official page" : kind === "picture" ? pictureSuffix : " video"}`.trim();
 }
 
 export function deliverableInDenial(sentence: string): "link" | "picture" | "video" {
@@ -422,7 +457,8 @@ export function deliverableInDenial(sentence: string): "link" | "picture" | "vid
 
 export function intentFor(utterance: string, signal: TurnSignal): TurnIntent {
   const shape = shapeOf(signal, utterance);
-  const deliverable = VIDEO_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "video" : PICTURE_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "picture" : LINK_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "link" : undefined;
+  const picture = pictureDeliverableFor(utterance);
+  const deliverable = VIDEO_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "video" : picture ?? (LINK_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "link" : undefined);
   return {
     kind: shape === "question" ? "lookup" : shape === "command" ? "action" : "chat",
     query: utterance,

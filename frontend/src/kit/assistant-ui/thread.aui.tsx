@@ -528,7 +528,7 @@ const AssistantMessage: FC = () => {
   // MemoryUpdatedChip already do, tolerant of `sources` being absent (both
   // adapters carry it forward when present; nothing here requires it).
   const sources = useAuiState((s) => (s.message.metadata?.custom as TurnWithSources | undefined)?.sources);
-  const media = useAuiState((s) => (s.message.metadata?.custom as TurnWithMedia | undefined)?.media);
+  const mediaMetadata = useAuiState((s) => s.message.metadata?.custom as TurnWithMedia | undefined);
   const citationComponents = useMemo(() => createCitationComponents(sources), [sources]);
   const markCitationsIn = useMemo(() => (text: string) => markCitations(text, sources), [sources]);
   // Lane 11 item 1: the same existing pending affordance below (the
@@ -628,7 +628,7 @@ const AssistantMessage: FC = () => {
         <MessageError />
         <ChatSourceCaption />
         <ChatTurnStats />
-        <ChatMedia media={media} sources={sources} />
+        <ChatMedia media={mediaMetadata?.media} media_items={mediaMetadata?.media_items} sources={sources} />
         {!running && <SourcesCard sources={sources} />}
         <MemoryUpdatedChip />
       </div>

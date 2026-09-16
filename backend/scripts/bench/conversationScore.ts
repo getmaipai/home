@@ -63,6 +63,10 @@ export interface TurnObserved {
   /** URLs that reached the model in this turn's completions, outside
    * the system prompt (a lookup's evidence). */
   sourceUrls: readonly string[];
+  /** Finding 60: the delivered turn's inline picture payload. */
+  mediaPresent?: boolean;
+  mediaItems?: number;
+  mediaDisjointFromPrevious?: boolean;
   /** The interrupted turn's upstream completion: true when the abort
    * cancelled it before it finished; null when no completion was made. */
   inferenceStopped: boolean | null;
@@ -192,6 +196,9 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.jobScheduled) parts.push(`job ${e.jobScheduled} pending`);
   if (e.homeCalls) parts.push(`${e.homeCalls.service} called ${e.homeCalls.count}x`);
   if (e.lookupWithSource) parts.push("lookup with a source");
+  if (e.mediaPresent) parts.push("media present");
+  if (e.mediaItems !== undefined) parts.push(`${e.mediaItems} media item(s)`);
+  if (e.mediaDisjointFromPrevious) parts.push("media disjoint from previous");
   if (e.inferenceStopped) parts.push("inference stopped");
   if (e.reconciled) parts.push("reconciled");
   if (e.delivered) parts.push(`${e.delivered.notification} delivered within ${e.delivered.withinMs} ms`);
@@ -347,6 +354,9 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     checks.push({ name: "sources non-empty", pass, detail: pass ? `${observed.sourceUrls.length} source(s)` : "no sources on the delivered turn" });
   }
   if (e.sourcesEmpty) checks.push({ name: "sources empty", pass: observed.sourceUrls.length === 0, detail: observed.sourceUrls.length === 0 ? "no sources" : `${observed.sourceUrls.length} source(s)` });
+  if (e.mediaPresent) checks.push({ name: "media present", pass: observed.mediaPresent === true, detail: observed.mediaPresent ? `${observed.mediaItems ?? 0} picture item(s)` : "no media on the delivered turn" });
+  if (e.mediaItems !== undefined) checks.push({ name: "media items", pass: observed.mediaItems === e.mediaItems, detail: `${observed.mediaItems ?? 0} item(s), expected ${e.mediaItems}` });
+  if (e.mediaDisjointFromPrevious) checks.push({ name: "media disjoint", pass: observed.mediaDisjointFromPrevious === true, detail: observed.mediaDisjointFromPrevious ? "no image URL repeated" : "an image URL repeated or no prior media" });
   if (e.inferenceStopped) checks.push({ name: "inference stopped", pass: observed.inferenceStopped === true, detail: observed.inferenceStopped === null ? "no completion was made" : observed.inferenceStopped ? "the upstream completion was cancelled" : "the upstream completion ran to its end" });
   if (e.reconciled) checks.push({ name: "reconciled", pass: observed.reconciledRow, detail: observed.reconciledRow ? "a turn row holds what was delivered" : "no turn row for the interrupted turn" });
   if (e.delivered) {

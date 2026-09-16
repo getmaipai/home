@@ -4,7 +4,7 @@ import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { messageText } from "@/apps/chat/chatMessageText";
-import type { TurnWithSources } from "@/apps/chat/chatCitations";
+import type { TurnWithMedia, TurnWithSources } from "@/apps/chat/chatCitations";
 import { CURRENT_LOCAL_VISION_CAPABILITY, IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 
@@ -402,6 +402,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   // emits them with no adapter change needed then.
                   sources: (event.value as TurnWithSources).sources,
                   media: event.value.media,
+                  media_items: (event.value as TurnWithMedia).media_items,
                   stats: event.value.stats,
                 },
               },

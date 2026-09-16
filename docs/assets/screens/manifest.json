@@ -1013,5 +1013,26 @@
     "theme": "light",
     "capturedAt": "2026-09-16T19:18:25.893Z",
     "captureScript": "scripts/screenshot.ts --chat-continue-review"
+  },
+  "chat-picture-poster-desktop-light.png": {
+    "route": "chat-picture-poster",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-16T15:51:39.399Z",
+    "captureScript": "scripts/screenshot.ts --picture-review"
+  },
+  "chat-picture-follow-up-desktop-light.png": {
+    "route": "chat-picture-follow-up",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-16T15:51:39.399Z",
+    "captureScript": "scripts/screenshot.ts --picture-review"
+  },
+  "chat-three-pictures-desktop-light.png": {
+    "route": "chat-three-pictures",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-16T15:51:39.399Z",
+    "captureScript": "scripts/screenshot.ts --picture-review"
   }
 }

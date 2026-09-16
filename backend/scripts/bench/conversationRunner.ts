@@ -166,15 +166,34 @@ export function startFakeSearxng(): FakeSearxng {
       // check a real fact fail as they did with no search at all.
       // ASK-02: the film's cast row names Serena Vale (the hub-named
       // subject), and a query about her answers with her own facts.
-      const results = /serena vale/i.test(q)
+      const results = /serena vale/i.test(q) && /photo|picture|image/i.test(q)
         ? [
+            { title: "Serena Vale portrait", url: `https://example.com/${slug}/portrait`, content: "A portrait of Serena Vale.", img_src: "https://images.example.com/serena-vale-portrait.jpg", thumbnail_src: "https://images.example.com/thumbs/serena-vale-portrait.jpg" },
+            { title: "Serena Vale on stage", url: `https://example.com/${slug}/stage`, content: "A stage photo of Serena Vale.", img_src: "https://images.example.com/serena-vale-stage.jpg", thumbnail_src: "https://images.example.com/thumbs/serena-vale-stage.jpg" },
+            { title: "Serena Vale at the premiere", url: `https://example.com/${slug}/premiere`, content: "A premiere photo of Serena Vale.", img_src: "https://images.example.com/serena-vale-premiere.jpg", thumbnail_src: "https://images.example.com/thumbs/serena-vale-premiere.jpg" },
+            { title: "Serena Vale archive", url: `https://example.com/${slug}/archive`, content: "An archive photo of Serena Vale.", img_src: "https://images.example.com/serena-vale-archive.jpg", thumbnail_src: "https://images.example.com/thumbs/serena-vale-archive.jpg" },
+          ]
+        : /marsh lantern/i.test(q) && /poster|cover|artwork/i.test(q)
+          ? [
+              { title: "Marsh Lantern movie poster", url: `https://example.com/${slug}`, content: "The official Marsh Lantern movie poster.", img_src: "https://images.example.com/marsh-lantern-poster.jpg", thumbnail_src: "https://images.example.com/thumbs/marsh-lantern-poster.jpg" },
+              { title: "Marsh Lantern alternate poster", url: `https://example.com/${slug}/alternate`, content: "An alternate Marsh Lantern poster.", img_src: "https://images.example.com/marsh-lantern-poster-alt.jpg", thumbnail_src: "https://images.example.com/thumbs/marsh-lantern-poster-alt.jpg" },
+              { title: "Marsh Lantern festival poster", url: `https://example.com/${slug}/festival`, content: "A festival poster for Marsh Lantern.", img_src: "https://images.example.com/marsh-lantern-poster-festival.jpg", thumbnail_src: "https://images.example.com/thumbs/marsh-lantern-poster-festival.jpg" },
+              { title: "Marsh Lantern archive poster", url: `https://example.com/${slug}/archive`, content: "An archive poster for Marsh Lantern.", img_src: "https://images.example.com/marsh-lantern-poster-archive.jpg", thumbnail_src: "https://images.example.com/thumbs/marsh-lantern-poster-archive.jpg" },
+            ]
+        : /serena vale/i.test(q) && /song|music|hit/i.test(q)
+        ? [
+            { title: "Sunday Bay - Serena Vale", url: `https://example.com/${slug}`, content: "Sunday Bay is one of Serena Vale's songs; her other hits include Lantern Bay and Northern Light." },
+            { title: "Serena Vale songs", url: `https://example.com/${slug}/songs`, content: "Serena Vale's music includes Sunday Bay, Lantern Bay, and Northern Light." },
+          ]
+        : /serena vale/i.test(q)
+          ? [
             { title: "Serena Vale (actress)", url: `https://example.com/${slug}`, content: "Serena Vale is an actress; she plays the lighthouse keeper in the new Marsh Lantern film and won a stage award last year." },
             // The public-figure row's raising turn asks what happened to her
             // (the set's read: the recipe's summary said the results did not
             // say, rightly, until the fixture carried it).
             { title: "Serena Vale found safe after a week missing", url: `https://example.com/${slug}/news`, content: "What happened to Serena Vale: the actress was found safe after a week missing; she had been filming in secret on a closed shoot for the Marsh Lantern film." },
           ]
-        : /marsh lantern/i.test(q) && /film|movie|cast|stars?|about|who/i.test(q)
+          : /marsh lantern/i.test(q) && /film|movie|cast|stars?|about|who/i.test(q)
           ? [
               { title: "Marsh Lantern (film): cast and plot", url: `https://example.com/${slug}`, content: "The new Marsh Lantern film follows a lighthouse keeper on a rock through one winter; it stars Serena Vale as the keeper and Vincent Marlow as her brother, and it is out in October." },
               { title: "Marsh Lantern film reviews", url: `https://example.com/${slug}/reviews`, content: "Reviews call it slow and beautiful; Serena Vale's performance carries it." },
@@ -600,6 +619,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
   // REP-01: the hub's last delivered reply per conversation, for the
   // "not the same reply again" read.
   const previousReplies: Record<string, string> = {};
+  const previousMediaUrls: Record<string, string[]> = {};
   for (let i = 0; i < conv.turns.length; i++) {
     const turn = conv.turns[i]!;
     const speaker: Speaker = turn.as ?? "owner";
@@ -647,6 +667,9 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     // The turn's own completions: the interrupted one is the first
     // (a summary refresh may follow it on the same proxy).
     const own = requests[0];
+    const currentMediaUrls = (driven.value?.media_items ?? (driven.value?.media ? [driven.value.media] : [])).map((item) => item.url);
+    const previousUrls = previousMediaUrls[conversationId] ?? [];
+    const mediaDisjointFromPrevious = previousUrls.length > 0 && currentMediaUrls.length > 0 && currentMediaUrls.every((url) => !previousUrls.includes(url));
     const observed: TurnObserved = {
       reply: driven.value?.reply.text ?? driven.text,
       source: driven.value?.source ?? row?.source ?? null,
@@ -689,6 +712,9 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       jobs,
       homeCalls: homeCallsSince(),
       sourceUrls: requests.flatMap((r) => r.sourceUrls),
+      mediaPresent: Boolean(driven.value?.media_items?.length ?? driven.value?.media),
+      mediaItems: driven.value?.media_items?.length ?? (driven.value?.media ? 1 : 0),
+      mediaDisjointFromPrevious,
       inferenceStopped: own ? own.aborted && !own.completed : null,
       reconciledRow: row !== undefined && row.replyText.trim().length > 0,
       deliveries,
@@ -713,6 +739,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
         .map((r) => r.text),
     };
     previousReplies[conversationId] = observed.reply;
+    previousMediaUrls[conversationId] = currentMediaUrls;
     if (driven.error) observed.reply = `[error: ${driven.error}]`;
     scores.push(scoreTurn(conv, i, turn, observed));
   }

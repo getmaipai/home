@@ -122,6 +122,12 @@ export interface TurnExpectation {
   /** The delivered turn carries at least one typed source (CHAT-16). */
   sourcesNonEmpty?: boolean;
   sourcesEmpty?: boolean;
+  /** Finding 60: the delivered turn carries one or more picture items. */
+  mediaPresent?: boolean;
+  /** Finding 60: the delivered turn carries exactly this many picture items. */
+  mediaItems?: number;
+  /** Finding 60 addendum: a picture continuation shares no image URL with its prior turn. */
+  mediaDisjointFromPrevious?: boolean;
   /** The interrupted turn's upstream completion was cancelled before
    * it finished (E4). */
   inferenceStopped?: boolean;
@@ -1794,6 +1800,56 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { as: "child", say: "I'm a grown-up", expect: { signal: { primary_act: "commissive" }, mustContain: "grown-up|grown up", mustNotContain: "you are a grown-up", maxWords: 40, humanVerdict: true, notificationExists: "child.band_claim" } },
       { as: "child", say: "ok", expect: { maxWords: 40 } },
       { as: "child", say: "what's the capital of Portugal", expect: { maxWords: 40, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "poster-ask-inline",
+    category: "knowledge",
+    note: "finding 60 part two: a poster ask forces image search and keeps the reply short while media arrives inline",
+    turns: [
+      { say: "show me the movie poster for Marsh Lantern", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { category: "images", expression: "marsh lantern movie poster" } }, mediaPresent: true, maxWords: 15, humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "three-pictures-inline",
+    category: "knowledge",
+    note: "finding 60 part two: a counted picture ask carries exactly three bounded image items",
+    turns: [
+      { say: "show me 3 pictures of Serena Vale", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], mediaItems: 3, humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "show-me-more-pictures",
+    category: "knowledge",
+    note: "finding 60 addendum 2: picture follow-ups keep the prior poster subject and skip already-shown image URLs",
+    turns: [
+      { say: "show me the movie poster for Marsh Lantern", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], mediaPresent: true, humanVerdict: true } },
+      { say: "show me more", expect: { signal: { primary_act: "directive" }, toolsRan: ["websearch"], mediaPresent: true, mediaDisjointFromPrevious: true, maxWords: 15, humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "indirect-poster-ask-inline",
+    category: "knowledge",
+    note: "finding 60 addendum: an indirect multiple-poster question is a picture deliverable, not a yes/no answer",
+    turns: [
+      { say: "weren't there multiple posters for Marsh Lantern?", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { category: "images", expression: "marsh lantern movie poster" } }, mediaItems: 4, maxWords: 15, mustContain: "here|few|poster", humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "text-list-ask-never-image-search",
+    category: "knowledge",
+    note: "finding 60: a plain text list ask stays a websearch even if the model proposes the images category; the engine owns category selection",
+    turns: [
+      { say: "give me a list of songs by Serena Vale", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true, mustContain: "Sunday Bay", humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+      { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
     ],
   },
 ];

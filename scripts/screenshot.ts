@@ -214,6 +214,30 @@ const chatStatsReview = process.argv.includes("--chat-stats-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
 const settingsReview = process.argv.includes("--settings-review");
 const conversationsReview = process.argv.includes("--conversations-review");
+const pictureReview = process.argv.includes("--picture-review");
+let pictureSearchServer: ReturnType<typeof Bun.serve> | undefined;
+
+function startPictureSearchFixture(): void {
+  pictureSearchServer = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch(req) {
+      const url = new URL(req.url);
+      if (url.pathname.startsWith("/image/")) {
+        const label = url.pathname.slice("/image/".length).replace(/[-_]/g, " ");
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="640" height="400" fill="#17324d"/><text x="320" y="210" fill="#f6e7c1" font-family="sans-serif" font-size="30" text-anchor="middle">${label}</text></svg>`;
+        return new Response(svg, { headers: { "Content-Type": "image/svg+xml" } });
+      }
+      if (url.pathname !== "/search") return new Response("not found", { status: 404 });
+      const q = url.searchParams.get("q") ?? "";
+      const base = `http://127.0.0.1:${pictureSearchServer!.port}`;
+      const rows = /marsh lantern/i.test(q)
+        ? ["marsh-lantern-poster-official", "marsh-lantern-poster-alt", "marsh-lantern-poster-festival", "marsh-lantern-poster-archive"]
+        : ["serena-vale-portrait", "serena-vale-stage", "serena-vale-premiere", "serena-vale-archive"];
+      return Response.json({ results: rows.map((label) => ({ title: label, url: `https://example.com/canned/${label}`, content: `Canned image result for ${label}.`, img_src: `${base}/image/${label}`, thumbnail_src: `${base}/image/${label}-thumb` })) });
+    },
+  });
+}
 // Lane 15: judges the bell popover's own "Dismiss all" and the history
 // page's multi-select in one throwaway run, the same shape chatReview/
 // settingsReview already use - not part of the full matrix (nothing in
@@ -848,6 +872,49 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   if (await page.getByRole("button", { name: "Help me choose a book", exact: true }).count()) throw new Error("Deleted chat returned after reload");
   await page.getByRole("button", { name: "Hide threads" }).click();
   await page.getByText("And some herbs for cooking", { exact: true }).waitFor();
+}
+
+/** Finding 60: the picture rows are served by this throwaway SearXNG
+ * fixture so the screenshots exercise the real search, media payload and
+ * thumbnail row rather than a fabricated browser state. */
+async function capturePictureReview(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  const page = await context.newPage();
+  page.setDefaultTimeout(90000);
+  const send = async (text: string) => {
+    await page.getByRole("textbox", { name: "Message input" }).fill(text);
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "hidden" });
+    await page.getByRole("button", { name: "Refresh", exact: true }).last().waitFor();
+    await settleAnimations(page);
+  };
+  try {
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor();
+    const cleared = await page.request.post(`${BASE_URL}/api/conversations/clear`, { data: {} });
+    if (!cleared.ok()) throw new Error("Could not reset demo chats for picture review");
+    await page.reload();
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    await send("show me the movie poster for Marsh Lantern");
+    await page.locator('img[alt^="From "]').first().waitFor();
+    const poster = "chat-picture-poster-desktop-light.png";
+    await page.screenshot({ path: join(SCREENS_DIR, poster), fullPage: true });
+    dedicatedScreenshots.push({ file: poster, route: "chat-picture-poster", viewport: viewport.slug, theme });
+    await send("show me more");
+    await page.locator('img[alt^="From "]').nth(1).waitFor();
+    const more = "chat-picture-follow-up-desktop-light.png";
+    await page.screenshot({ path: join(SCREENS_DIR, more), fullPage: true });
+    dedicatedScreenshots.push({ file: more, route: "chat-picture-follow-up", viewport: viewport.slug, theme });
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await send("show me 3 pictures of Serena Vale");
+    await page.locator('img[alt^="From "]').nth(2).waitFor();
+    const three = "chat-three-pictures-desktop-light.png";
+    await page.screenshot({ path: join(SCREENS_DIR, three), fullPage: true });
+    dedicatedScreenshots.push({ file: three, route: "chat-three-pictures", viewport: viewport.slug, theme });
+  } finally {
+    await page.close();
+    await context.close();
+  }
 }
 
 /** Lane 9 item 2's own acceptance: "screenshot of the open palette on
@@ -1551,7 +1618,7 @@ interface ManifestEntry {
 }
 function writeScreenshotManifest(results: RunResult[], captureScript: string): void {
   const withFiles = results.filter((r): r is RunResult & { screenshotFile: string } => r.screenshotFile !== undefined);
-  if (withFiles.length === 0) return;
+  if (withFiles.length === 0 && dedicatedScreenshots.length === 0) return;
   const manifestPath = join(SCREENS_DIR, "manifest.json");
   const existing: Record<string, ManifestEntry> = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf-8")) : {};
   const capturedAt = new Date().toISOString();
@@ -1757,9 +1824,22 @@ async function main() {
   try {
     await waitForHealth();
     const sessionValue = await seedHousehold();
+    if (pictureReview) {
+      startPictureSearchFixture();
+      const searchSetting = await fetch(`${BASE_URL}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+        body: JSON.stringify({ scope: "household", key: "search.searxng_url", value: `http://127.0.0.1:${pictureSearchServer!.port}` }),
+      });
+      if (!searchSetting.ok) throw new Error(`seed picture search fixture failed: ${searchSetting.status}`);
+    }
 
     const launchedBrowser = await (useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
+    if (!a11yOnly && pictureReview) {
+      const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+      await capturePictureReview(browser, sessionValue, desktop, "light");
+    }
 
     // A review caught this guard as only `if (notificationsReview)`,
     // not mutually exclusive with chatReview/settingsReview the way
@@ -1793,7 +1873,7 @@ async function main() {
 
     if (!a11yOnly && chatContinueReview) await captureChatContinueReview(browser, sessionValue);
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !notificationsReview && !conversationsReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !notificationsReview && !conversationsReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -1824,7 +1904,7 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview
+    const combos = notificationsReview || pictureReview
       ? []
       : conversationsReview
         ? A11Y_ONLY_COMBOS
@@ -1895,7 +1975,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !conversationsReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !conversationsReview && !pictureReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
@@ -1947,6 +2027,7 @@ async function main() {
     await browser?.close();
     backend.kill();
     chatModel.stop();
+    pictureSearchServer?.stop(true);
     repairSeedListener.stop(true);
     await backend.exited;
     rmSync(DATA_DIR, { recursive: true, force: true });

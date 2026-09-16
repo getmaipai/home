@@ -141,6 +141,7 @@ export function rowsToBranchableMessages(
           documentAvailable: Boolean(row.document),
           sources: row.sources,
           media: row.media,
+          media_items: row.media_items,
           stats: row.stats,
         },
       },

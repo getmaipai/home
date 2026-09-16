@@ -215,8 +215,8 @@ describe("intentFor(): the provisional intent", () => {
   test("classifies link, picture and video deliverables", () => {
     expect(intentFor("send me a link", signalFor("send me a link")).deliverable).toBe("link");
     expect(intentFor("where did you read that", signalFor("where did you read that")).deliverable).toBe("link");
-    expect(intentFor("a picture please", signalFor("a picture please")).deliverable).toBe("picture");
-    expect(intentFor("got a photo", signalFor("got a photo")).deliverable).toBe("picture");
+    expect(intentFor("a picture please", signalFor("a picture please")).deliverable).toEqual({ deliverable: "picture", count: 1 });
+    expect(intentFor("got a photo", signalFor("got a photo")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "photo" });
     expect(intentFor("a video please", signalFor("a video please")).deliverable).toBe("video");
     expect(intentFor("any video of it", signalFor("any video of it")).deliverable).toBe("video");
     expect(intentFor("what's the capital of Portugal", signalFor("what's the capital of Portugal")).deliverable).toBeUndefined();
@@ -224,6 +224,32 @@ describe("intentFor(): the provisional intent", () => {
 
   test("builds a deliverable query from the live world subject", () => {
     expect(deliverableQuery("link", [{ type: "world", kind: "thing", display_name: "Cosmo 7", year: null, source_kind: null, stable_key: null, recency: "unknown", carried_question: null }], "where's the maker's support page for the Cosmo 7 card")).toBe("Cosmo 7 support page");
+  });
+
+  test("picture classifier accepts plural and counted requests", () => {
+    expect(intentFor("show me pictures of Serena Vale", signalFor("show me pictures of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 1 });
+    expect(intentFor("show me 3 pictures of Serena Vale", signalFor("show me 3 pictures of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 3 });
+    expect(intentFor("show me a few images of Serena Vale", signalFor("show me a few images of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 3 });
+  });
+
+  test("picture forms are typed once and become query words", () => {
+    const subject = [{ type: "world" as const, kind: "film", display_name: "Marsh Lantern", year: null, source_kind: null, stable_key: null, recency: "unknown" as const, carried_question: null }];
+    expect(intentFor("show me the movie poster for Marsh Lantern", signalFor("show me the movie poster for Marsh Lantern")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "poster" });
+    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "poster" }, subject, "show me the movie poster for Marsh Lantern")).toBe("Marsh Lantern movie poster");
+    expect(intentFor("show me the album cover for Marsh Lantern", signalFor("show me the album cover for Marsh Lantern")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "cover" });
+    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "cover" }, subject, "show me the album cover for Marsh Lantern")).toBe("Marsh Lantern album cover");
+    expect(intentFor("show me a photo of Serena Vale", signalFor("show me a photo of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "photo" });
+    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "photo" }, subject, "show me a photo of Marsh Lantern")).toBe("Marsh Lantern photo");
+    expect(intentFor("show me the artwork for Marsh Lantern", signalFor("show me the artwork for Marsh Lantern")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "cover" });
+  });
+
+  test("the picture reader treats indirect multiples and named follow-ups as pictures", () => {
+    expect(intentFor("Weren't there multiple posters for Marsh Lantern?", signalFor("Weren't there multiple posters for Marsh Lantern?")).deliverable).toEqual({ deliverable: "picture", count: 4, form: "poster" });
+    expect(intentFor("show me more", signalFor("show me more")).deliverable).toEqual({ deliverable: "picture", count: 1 });
+    expect(intentFor("show me others", signalFor("show me others")).deliverable).toEqual({ deliverable: "picture", count: 1 });
+    expect(intentFor("any others", signalFor("any others")).deliverable).toEqual({ deliverable: "picture", count: 1 });
+    expect(intentFor("more like that", signalFor("more like that")).deliverable).toEqual({ deliverable: "picture", count: 1 });
+    expect(intentFor("different ones", signalFor("different ones")).deliverable).toEqual({ deliverable: "picture", count: 4 });
   });
 
   test("kind reads the shape and defaults to chat; query is the utterance", () => {

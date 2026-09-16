@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -65,6 +65,7 @@ import {
   routingStats,
   resolveSupersedes,
   lastTurnSubjects,
+  lastTurnMedia,
   lastTwoTurnsSubjects,
   lastTurnIds,
   nextOpenQuestionFor,
@@ -95,7 +96,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 // can import the real shape through the @maipai/home-backend workspace
 // dependency instead of a hand-duplicated mirror); re-exported here since
 // this is where callers already look for them.
-import type { TurnValue } from "@/wire";
+import type { Media, TurnValue } from "@/wire";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 export type { TurnReply, TurnValue } from "@/wire";
@@ -2096,12 +2097,13 @@ export async function resolvePendingAsk(
       const searchable = loaded.some(({ id, manifest }) => id === "websearch" && manifest.kind === "plugin" && meetsMinRole(actor.role, manifest.min_role)) && !(opts.inCrisis ?? conversationInCrisis(conversation.id));
       if (pending.carriedQuestion && searchable) {
         const expression = worldAnswerQuery(subject, pending.carriedQuestion, name);
-        const result = await runPlugin("websearch", actor, { expression }, turnId);
+        const searchArgs = engineWebsearchArgs(expression);
+        const result = await runPlugin("websearch", actor, searchArgs, turnId);
         outcomes.push(
           outcomeOf(
             result.ok
-              ? { callId: `${turnId}:who`, packageId: "websearch", status: "succeeded", args: { expression }, via: "forced", result: result.value }
-              : { callId: `${turnId}:who`, packageId: "websearch", status: "failed", args: { expression }, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
+              ? { callId: `${turnId}:who`, packageId: "websearch", status: "succeeded", args: searchArgs, via: "forced", result: result.value }
+              : { callId: `${turnId}:who`, packageId: "websearch", status: "failed", args: searchArgs, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
           ),
         );
         if (result.ok) { const outcome = outcomes[outcomes.length - 1]!; return { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: "websearch", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) }; }
@@ -3085,6 +3087,14 @@ async function prepareTurn(
     subjectsCarried: carried.length > 0,
     subjectPronouns,
   };
+  // Finding 60 addendum: the picture reader owns the follow-up labels;
+  // this small continuation read only carries the prior typed form and
+  // excludes URLs already shown, so "show me more" is not a fresh image.
+  const pictureFollowup = pictureContinuationFor(conversation.id, text);
+  if (pictureFollowup && deliverableKind(turnContext.intent.deliverable) === "picture") {
+    turnContext.intent.deliverable = { deliverable: "picture", count: pictureFollowup.count, ...(pictureFollowup.form ? { form: pictureFollowup.form } : {}) };
+    turnContext.pictureExclusions = pictureFollowup.exclusions;
+  }
   const householdSubject = householdSubjectTurn(text, turnContext);
   if (!continuation && asksHowKnown(text) && !householdSubject) {
     const prior = outcomesForConversation(conversation.id).slice().reverse().flatMap((row) => row.outcomes.map((outcome) => ({ row, outcome }))).find(({ outcome }) => outcome.status === "succeeded" && (outcome.source?.kind === "model_knowledge" || outcome.sources?.length));
@@ -3136,7 +3146,7 @@ async function prepareTurn(
     if (decided && answered) fired("lookup.answered_recently");
     if (decided && !answered) { fired("lookup.decided"); turnContext.intent.decided = decided; }
   }
-  const deliverable = turnContext.intent.deliverable;
+  const deliverable = deliverableKind(turnContext.intent.deliverable);
   const backReference = deliverable === "link" && /^(?:\s*(?:where did you read that|link me|the source|send me the page)(?:\s*(?:,|and)\s*(?:where did you read that|link me|the source|send me the page))?\s*[?.!]?)$/i.test(text);
   if (deliverable) fired(`deliverable.${deliverable}`);
   if (backReference && !composeDirect && !continuation) {
@@ -3417,7 +3427,8 @@ export async function resolveToolCalls(
   utterance?: string,
   // LOOKUP-02: the forced lookup's calls carry `via: forced` and, for
   // the search, the engine's own query in place of the model's.
-  lookup?: { via: "forced"; expression?: string | null },
+  lookup?: { via: "forced"; expression?: string | null; category?: "images" },
+  onIgnoredModelArg?: (name: "category") => void,
 ): Promise<TurnValue | null> {
   // CHAT-15: the outcomes this batch adds are retained in model order,
   // however early a refusal was known (the whole batch is checked
@@ -3425,7 +3436,18 @@ export async function resolveToolCalls(
   const startAt = outcomes.length;
   const order = new Map<ToolExecutionOutcome, number>();
   const settleWithheld: { current: (() => void) | null } = { current: null };
-  const shaped = lookup?.expression ? calls.map((c) => (c.tool === "websearch" ? { ...c, args: { ...(typeof c.args === "object" && c.args ? c.args : {}), expression: lookup.expression } } : c)) : calls;
+  const sanitized = calls.map((c) => {
+    if (c.tool !== "websearch" || !c.args || typeof c.args !== "object" || Array.isArray(c.args) || !("category" in c.args)) return c;
+    onIgnoredModelArg?.("category");
+    const args = { ...(c.args as Record<string, unknown>) };
+    delete args.category;
+    return { ...c, args };
+  });
+  const shaped = sanitized.map((c) => {
+    if (c.tool !== "websearch") return c;
+    const args = { ...(c.args as Record<string, unknown> | undefined), ...(lookup?.category ? { category: lookup.category } : {}) };
+    return lookup?.expression ? { ...c, args: { ...args, expression: lookup.expression } } : { ...c, args };
+  });
   try {
     return await resolveToolCallsInOrder(shaped, offeredIds, ranked, actor, conversationId, turnId, safety, crisisResources, outcomes, utterance, order, settleWithheld, lookup?.via ?? "tool_call");
   } finally {
@@ -3957,7 +3979,9 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
 async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: PersonRow, conversationId: string, text: string, read: Pick<LookupRead, "shape" | "sentence">, thinking: boolean | undefined, queryOverride?: string): Promise<TurnValue | null> {
   const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
   const history = prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content);
-  const denialDeliverable = read.shape === "denial" ? (prepared.turnContext.intent.deliverable ?? deliverableInDenial(read.sentence)) : undefined;
+  const denialDeliverable = read.shape === "denial" ? (deliverableKind(prepared.turnContext.intent.deliverable) ?? deliverableInDenial(read.sentence)) : undefined;
+  const searchDeliverable = deliverableKind(prepared.turnContext.intent.deliverable) ?? denialDeliverable;
+  const pictureCount = pictureCountOf(prepared.turnContext.intent.deliverable);
   const expression = queryOverride ?? (denialDeliverable ? deliverableQuery(denialDeliverable, prepared.turnContext.subjects, text) : lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape }));
   const outcomes = prepared.turnContext.outcomes;
   prepared.machine?.enter("executing");
@@ -3978,30 +4002,37 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
     const forced = await complete("chat", prepared.messages, { thinking, tools: prepared.lookupTools, tool_choice: "required" });
     resolved =
       forced.ok && forced.value.tool_calls && forced.value.tool_calls.length > 0
-        ? await resolveToolCalls(forced.value.tool_calls, lookupIds, prepared.ranked, actor, conversationId, prepared.turnId, prepared.safety, prepared.crisisResources, outcomes, text, { via: "forced", expression })
+        ? await resolveToolCalls(forced.value.tool_calls, lookupIds, prepared.ranked, actor, conversationId, prepared.turnId, prepared.safety, prepared.crisisResources, outcomes, text, { via: "forced", expression, ...(searchDeliverable === "picture" ? { category: "images" as const } : {}) }, (name) => { if (name === "category") noteIgnoredModelWebsearchCategory(prepared.rules); })
         : null;
   }
   const searched = outcomes.some((o) => o.packageId === "websearch" && o.via === "forced");
   if (!resolved && lookupIds.has("websearch") && !searched && expression) {
     console.log(searchDirect ? `[turn] the forced lookup on turn ${prepared.turnId} is the search with the engine's query (${prepared.lookupTools.length === 1 ? "the only lookup tool" : "the budget's last call is the composition's"})` : `[turn] the forced lookup's first rung answered nothing on turn ${prepared.turnId}; the search runs next`);
-    const result = await runPlugin("websearch", actor, { expression, ...(denialDeliverable === "picture" ? { category: "images" } : {}) }, prepared.turnId);
+    const searchArgs = engineWebsearchArgs(expression, searchDeliverable);
+    const result = await runPlugin("websearch", actor, searchArgs, prepared.turnId);
     outcomes.push(
       outcomeOf(
         result.ok
-          ? { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "succeeded", args: { expression }, via: "forced", result: result.value }
-          : { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "failed", args: { expression }, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
+          ? { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "succeeded", args: searchArgs, via: "forced", result: result.value }
+          : { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "failed", args: searchArgs, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
       ),
     );
-    if (result.ok) { const rows = result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined; const sources = sourcesFromRows(rows); const first = Array.isArray(rows) ? rows.find((row) => row && typeof row === "object" && typeof (row as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null } | undefined : undefined; resolved = { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}), ...(first && denialDeliverable === "picture" ? { media: { kind: "image" as const, url: first.image, thumbnail: first.thumbnail ?? null, source: new URL(sources[0]!.url).host } } : {}) }; }
+    if (result.ok) { const rows = result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined; const sources = sourcesFromRows(rows); const first = Array.isArray(rows) ? rows.find((row) => row && typeof row === "object" && typeof (row as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null; url?: string } | undefined : undefined; resolved = { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}), ...(first && searchDeliverable === "picture" ? { media: { kind: "image" as const, url: first.image, thumbnail: first.thumbnail ?? null, source: first.url ? new URL(first.url).host : new URL(sources[0]!.url).host, ...(first.url ? { source_url: first.url } : {}) } } : {}) }; }
   }
   if (resolved) prepared.lookupExpression = expression;
-  if (resolved && denialDeliverable === "picture" && !resolved.media) {
+  if (resolved && searchDeliverable === "picture" && !resolved.media) {
     const outcome = [...outcomes].reverse().find((item) => item.packageId === "websearch" && item.status === "succeeded");
     const rows = outcome?.result?.data && typeof outcome.result.data === "object" ? (outcome.result.data as { rows?: unknown }).rows : undefined;
     const row = Array.isArray(rows) ? rows.find((item) => item && typeof item === "object" && typeof (item as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null } | undefined : undefined;
-    if (row && resolved.sources?.[0]) resolved = { ...resolved, media: { kind: "image", url: row.image, thumbnail: row.thumbnail ?? null, source: new URL(resolved.sources[0].url).host } };
+    if (row && resolved.sources?.[0]) resolved = { ...resolved, media: { kind: "image", url: row.image, thumbnail: row.thumbnail ?? null, source: new URL(resolved.sources[0].url).host, source_url: resolved.sources[0].url } };
   }
-  return resolved && denialDeliverable ? composeDeliverable(resolved, denialDeliverable, prepared.turnContext.ageBand, prepared.surface) : resolved;
+  if (resolved && searchDeliverable === "picture") {
+    const outcome = [...outcomes].reverse().find((item) => item.packageId === "websearch" && item.status === "succeeded");
+    const rows = outcome?.result?.data && typeof outcome.result.data === "object" ? (outcome.result.data as { rows?: unknown }).rows : undefined;
+    const mediaItems = mediaItemsFromRows(rows, pictureCount, prepared.turnContext.pictureExclusions);
+    if (mediaItems.length > 0) resolved = { ...resolved, media: mediaItems[0], media_items: mediaItems };
+  }
+  return resolved && denialDeliverable ? composeDeliverable(resolved, denialDeliverable, prepared.turnContext.ageBand, prepared.surface, pictureCount) : resolved;
 }
 
 function composeDeliverable(
@@ -4009,10 +4040,12 @@ function composeDeliverable(
   deliverable: "link" | "picture" | "video",
   ageBand: string,
   surface: Surface,
+  pictureCount = 1,
 ): TurnValue {
   const child = ageBand === "child";
-  const line = child ? "A grown-up can open that for you; ask them." : surface === "robot" ? deliverable === "link" ? "The link's on your phone." : deliverable === "picture" ? "The page with the picture is on your phone." : "The video link's on your phone." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? resolved.media ? "Here's a picture; the page it's from is below." : "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
-  const value: TurnValue = { ...resolved, reply: { text: line }, ...(child ? { sources: [], media: undefined } : {}) };
+  const pictureLine = pictureCount > 1 ? "There were a few, here they are." : resolved.media ? "Here's a picture; the page it's from is below." : "I can't show the picture here yet; the page with it is below.";
+  const line = child ? "A grown-up can open that for you; ask them." : surface === "robot" ? deliverable === "link" ? "The link's on your phone." : deliverable === "picture" ? "The page with the picture is on your phone." : "The video link's on your phone." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? pictureLine : "Here's a video, the link's below.";
+  const value: TurnValue = { ...resolved, reply: { text: line }, ...(child ? { sources: [], media: undefined, media_items: [] } : {}) };
   deliverableLines.add(value);
   return value;
 }
@@ -4044,6 +4077,92 @@ function composerInputFor(prepared: Extract<PreparedTurn, { kind: "model" }>, co
  * forced lookup), onto the prepared turn's list, once. */
 function ruleFired(prepared: Pick<Extract<PreparedTurn, { kind: "model" }>, "rules">, rule: RuleName): void {
   if (!prepared.rules.includes(rule)) prepared.rules.push(rule);
+}
+
+/** Finding 60: websearch's category is an engine decision from the
+ * deliverable, never a model tool argument. SearXNG's image category is
+ * the only category the host currently supports; video keeps K7's plain
+ * search behavior until its own host category exists. */
+function deliverableKind(deliverable: TurnIntent["deliverable"]): "link" | "picture" | "video" | undefined {
+  return typeof deliverable === "object" ? deliverable.deliverable : deliverable;
+}
+
+function pictureCountOf(deliverable: TurnIntent["deliverable"]): 1 | 2 | 3 | 4 {
+  return typeof deliverable === "object" ? deliverable.count : 1;
+}
+
+function engineWebsearchArgs(expression: string, deliverable?: "link" | "picture" | "video"): Record<string, unknown> {
+  return { expression, ...(deliverable === "picture" ? { category: "images" } : {}) };
+}
+
+function pictureImageKey(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (!/^https?:$/.test(parsed.protocol)) return null;
+    parsed.username = "";
+    parsed.password = "";
+    parsed.hash = "";
+    return `${parsed.host}${parsed.pathname}`;
+  } catch {
+    return null;
+  }
+}
+
+function pictureContinuationFor(conversationId: string, utterance: string): { count: 1 | 2 | 3 | 4; form?: "poster" | "cover" | "photo"; exclusions: string[] } | null {
+  if (!isPictureFollowup(utterance)) return null;
+  const prior = lastTurnMedia(conversationId);
+  const items = prior.media_items ?? (prior.media ? [prior.media] : []);
+  if (items.length === 0) return null;
+  const priorOutcome = outcomesForConversation(conversationId)
+    .slice()
+    .reverse()
+    .flatMap((row) => row.outcomes)
+    .find((outcome) => outcome.packageId === "websearch" && outcome.status === "succeeded" && typeof outcome.args?.expression === "string");
+  const expression = typeof priorOutcome?.args?.expression === "string" ? priorOutcome.args.expression : "";
+  const form = /(?:movie\s+)?poster/i.test(expression) ? "poster" : /album\s+cover|artwork/i.test(expression) ? "cover" : /\bphoto\b/i.test(expression) ? "photo" : undefined;
+  const count = Math.min(4, Math.max(1, items.length)) as 1 | 2 | 3 | 4;
+  return { count, ...(form ? { form } : {}), exclusions: items.map((item) => pictureImageKey(item.url)).filter((key): key is string => key !== null) };
+}
+
+function mediaItemsFromRows(rows: unknown, count: 1 | 2 | 3 | 4, exclusions: readonly string[] = []): Media[] {
+  if (!Array.isArray(rows)) return [];
+  const seen = new Set(exclusions);
+  const selected: Media[] = [];
+  return rows.flatMap((raw): Media[] => {
+    if (selected.length >= count || !raw || typeof raw !== "object") return [];
+    const row = raw as { image?: unknown; thumbnail?: unknown; url?: unknown };
+    if (typeof row.image !== "string" || typeof row.url !== "string") return [];
+    try {
+      const image = new URL(row.image);
+      const source = new URL(row.url);
+      if (!/^https?:$/.test(image.protocol) || !/^https?:$/.test(source.protocol)) return [];
+      image.username = "";
+      image.password = "";
+      image.hash = "";
+      const key = pictureImageKey(image.toString());
+      if (key === null) return [];
+      if (seen.has(key)) return [];
+      seen.add(key);
+      const item = { kind: "image" as const, url: image.toString(), thumbnail: typeof row.thumbnail === "string" ? row.thumbnail : null, source: source.host, source_url: source.toString() };
+      selected.push(item);
+      return [item];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** Keep the operational counter on the persisted [turn] line when a
+ * model proposes the category the engine owns. */
+function noteIgnoredModelWebsearchCategory(rules: string[]): void {
+  const prefix = "websearch.category_ignored";
+  const index = rules.findIndex((rule) => rule.startsWith(`${prefix}:`));
+  if (index === -1) {
+    rules.push(`${prefix}:1`);
+    return;
+  }
+  const count = Number(rules[index]!.slice(prefix.length + 1)) + 1;
+  rules[index] = `${prefix}:${count}`;
 }
 
 /** The `[turn]` line's composed record, with K6's last phase. */
@@ -4261,12 +4380,13 @@ async function runTurnHoldingLease(
     const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, prepared.turnContext.intent.decided.query);
     value = resolved ? await composeBlocking(resolved, prepared.turnContext.outcomes.slice(before)) : { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
   } else if (prepared.turnContext.intent.deliverable) {
-    const deliverable = prepared.turnContext.intent.deliverable;
-    const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverable, prepared.turnContext.subjects, text));
+    const deliverableValue = prepared.turnContext.intent.deliverable;
+    const deliverable = deliverableKind(deliverableValue)!;
+    const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverableValue, prepared.turnContext.subjects, text));
     const sources = resolved?.sources ?? [];
     if (!sources.length) value = resolved ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
     else {
-      value = composeDeliverable(resolved!, deliverable, prepared.turnContext.ageBand, prepared.surface);
+      value = composeDeliverable(resolved!, deliverable, prepared.turnContext.ageBand, prepared.surface, pictureCountOf(deliverableValue));
     }
   } else {
     // OUT-01: the model's text meets the well-formed rule before the
@@ -4323,7 +4443,7 @@ async function runTurnHoldingLease(
     // one 8-argument call instead of repeating it, per that review's
     // own duplication finding.
     const resolveOffered = (calls: ToolCall[], ids: ReadonlySet<string>) =>
-      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources, prepared.turnContext.outcomes, text);
+      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources, prepared.turnContext.outcomes, text, undefined, (name) => { if (name === "category") noteIgnoredModelWebsearchCategory(prepared.rules); });
 
     if (offeringTools && completion.value.tool_calls && completion.value.tool_calls.length > 0) {
       prepared.machine!.enter("executing");
@@ -5748,11 +5868,13 @@ async function runTurnStreamHoldingLease(
   }
 
   if (modelTurn.turnContext.intent.deliverable) {
-    const deliverable = modelTurn.turnContext.intent.deliverable;
+    const deliverable = deliverableKind(modelTurn.turnContext.intent.deliverable);
+    if (!deliverable) return buildStreamResult((async function* (): AsyncGenerator<string, undefined, void> { return undefined; })());
     async function* deliverableStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
       status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
-      const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverable, modelTurn.turnContext.subjects, text));
-      if (resolved?.sources?.length) return { resolved: composeDeliverable(resolved, deliverable, modelTurn.turnContext.ageBand, modelTurn.surface) };
+      const deliverableValue = modelTurn.turnContext.intent.deliverable!;
+      const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverableValue, modelTurn.turnContext.subjects, text));
+      if (resolved?.sources?.length) return { resolved: composeDeliverable(resolved, deliverable!, modelTurn.turnContext.ageBand, modelTurn.surface, pictureCountOf(deliverableValue)) };
       yield `${LOOKUP_FAILED_LINE} `;
       return undefined;
     }
@@ -5786,7 +5908,7 @@ async function runTurnStreamHoldingLease(
         status.emit({ type: "status", text: "On it.", stage: "tool" });
         modelTurn.machine?.enter("executing");
         const before = modelPrepared.turnContext.outcomes.length;
-        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes, text);
+        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes, text, undefined, (name) => { if (name === "category") noteIgnoredModelWebsearchCategory(modelPrepared.rules); });
         if (resolved) {
           // The package answered. CHAT-16: the composer decides whether
           // it is handed back whole, past both gates (finalize() logs it

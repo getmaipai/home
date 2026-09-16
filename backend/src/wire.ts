@@ -98,7 +98,9 @@ export interface TurnValue {
   /** CHAT-16 part 4 rule 1: lookup sources carried additively on the wire. */
   sources?: Source[];
   /** CHAT-16 K7: the first inline picture result from the household search. */
-  media?: { kind: "image"; url: string; thumbnail: string | null; source: string };
+  media?: Media;
+  /** Finding 60 part two: the bounded image set behind `media`, in result order. */
+  media_items?: Media[];
   /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
    * the wire and on the turn row. */
   rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
@@ -129,7 +131,8 @@ export interface ConversationSummary {
 /** GET /api/conversations/:id/turns' per-turn shape (step 3's contract):
  * the turn plus which memory records trace their provenance to it -
  * empty until the judge (step 6) or an in-turn `remember` writes one. */
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats"> & { sources?: Source[]; media?: TurnValue["media"]; stats?: TurnStats; memory_ids: string[] };
+export interface Media { kind: "image"; url: string; thumbnail: string | null; source: string; source_url?: string }
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; stats?: TurnStats; memory_ids: string[] };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own
