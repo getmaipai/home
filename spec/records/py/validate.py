@@ -13,8 +13,8 @@ from gen.py.grant_schema import Grant
 from gen.py.list_schema import List
 from gen.py.memory_record_schema import MemoryRecord
 from gen.py.open_question_schema import OpenQuestion
-from gen.py.reply_constraint_schema import ReplyConstraint
 from gen.py.relationship_schema import Relationship
+from gen.py.reply_constraint_schema import ReplyConstraint
 from gen.py.turn_signal_schema import TurnSignal
 
 Problems = list[str]

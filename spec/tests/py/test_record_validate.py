@@ -15,8 +15,8 @@ from gen.py.grant_schema import Grant
 from gen.py.list_schema import List
 from gen.py.memory_record_schema import MemoryRecord, RetrievalFeedback
 from gen.py.open_question_schema import OpenQuestion
-from gen.py.reply_constraint_schema import ReplyConstraint
 from gen.py.relationship_schema import Relationship
+from gen.py.reply_constraint_schema import ReplyConstraint
 from gen.py.subject_ref_schema import Household, Unresolved, World
 from gen.py.turn_signal_schema import TurnSignal
 from records.py.validate import (
@@ -26,9 +26,9 @@ from records.py.validate import (
     validate_list,
     validate_memory_record,
     validate_open_question,
-    validate_reply_constraint,
     validate_relationship,
     validate_relationship_endpoints,
+    validate_reply_constraint,
     validate_subject_ref,
     validate_turn_signal,
 )
@@ -193,7 +193,6 @@ def test_a_person_scoped_entity_names_its_person():
 
 
 def test_a_due_at_is_only_meaningful_on_a_todo_list_item():
-    shopping = shopping_list()
     bad = shopping_list()
     bad.items[0].due_at = "2026-09-08T17:00:00Z"
     assert any(
