@@ -80,6 +80,7 @@ export const HLC_BEARING_TABLES = [
   "lists",
   "open_questions",
   "reply_constraints",
+  "reply_feedback",
 ] as const;
 
 /** Seeds from every hlc already on disk, across every table that stamps

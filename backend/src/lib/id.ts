@@ -32,6 +32,11 @@ export function newConversationTurnId(): string {
   return `turn-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/reply-feedback.schema.json's `^rf-[a-z0-9]{6,}$`. */
+export function newReplyFeedbackId(): string {
+  return `rf-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/conversation.schema.json's `^conv-[a-z0-9]{6,}$`
  * (session-a-intelligence.md step 3: the conversation THREAD is a real
  * spec-shaped record, unlike the turn id above). */

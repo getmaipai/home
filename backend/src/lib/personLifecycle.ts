@@ -223,6 +223,8 @@ export interface ErasureCounts {
   conversations: number;
   /** MEM-03: the verbatim episode rows (two per turn) deleted with the turns. */
   episodes: number;
+  /** FEED-01: labels authored by this person or attached to their turns. */
+  feedback: number;
   /** Session A step 3: conversation THREADS (the `conversations` table),
    * distinct from `conversations` above (conversation_turns, the
    * existing field name here since before threads existed - kept as-is
@@ -309,6 +311,12 @@ export function erasePersonData(personId: string): ErasureCounts {
   // they quote are deleted outright right below.
   const episodeCount = (sqlite.query("SELECT count(*) AS n FROM episodes WHERE person_id = ?").get(personId) as { n: number }).n;
   deleteEpisodesForPerson(personId);
+  // FEED-01: feedback authored by this person and feedback about their
+  // turns both have to go before the turns themselves. The latter matters
+  // when another visible household member rated one of this person's turns.
+  const feedback = sqlite
+    .query("DELETE FROM reply_feedback WHERE person_id = ? OR turn_id IN (SELECT id FROM conversation_turns WHERE person_id = ?)")
+    .run(personId, personId).changes;
   const conversations = sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(personId).changes;
   // The thread record itself (step 3's `conversations` table), not just
   // its turns: left alone, this table's own person_id column would keep
@@ -381,6 +389,7 @@ export function erasePersonData(personId: string): ErasureCounts {
   return {
     memories,
     episodes: episodeCount,
+    feedback,
     conversations,
     conversationThreads,
     settings,

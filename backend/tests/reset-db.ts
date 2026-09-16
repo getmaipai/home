@@ -41,6 +41,7 @@ import {
   entities,
   openQuestions,
   replyConstraints,
+  replyFeedback,
   grants,
   approvals,
   routingEmbeddings,
@@ -92,6 +93,7 @@ export function resetDb(): void {
   db.delete(grants).run();
   db.delete(openQuestions).run(); // ASK-01: references people
   db.delete(replyConstraints).run(); // CONS-01: conversation-scoped constraints
+  db.delete(replyFeedback).run(); // FEED-01: references people and turns
   db.delete(relationships).run();
   db.delete(entities).run();
   db.delete(receivedBackups).run();

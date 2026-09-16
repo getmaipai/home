@@ -6409,7 +6409,7 @@ approvals are still real, unstarted work for a future session.
       for the chips. Out of scope: any change to the reply from a
       rating (that is the classifier's job, RVW-2). Exit:
       `bash scripts/check.sh`, the screenshot of the reason row opened.
-      - [ ] **FEED-01a: feedback table and migration** (mechanical). Add
+      - [x] **FEED-01a: feedback table and migration** (mechanical). Add
             `reply_feedback` and its migration, mirroring the nearest
             person-scoped write table and its schema-version test. Acceptance:
             one row per person and turn upserts safely; exit: targeted backend

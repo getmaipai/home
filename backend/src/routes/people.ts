@@ -390,6 +390,7 @@ const deleteRoute = createRoute({
               memories: z.number(),
               conversations: z.number(),
               episodes: z.number(),
+              feedback: z.number(),
               conversationThreads: z.number(),
               settings: z.number(),
               clonedVoices: z.number(),

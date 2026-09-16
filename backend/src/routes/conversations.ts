@@ -2,7 +2,14 @@ import { type Context } from "hono";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
+import { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import { requireAuth } from "@/middleware/auth";
+import { db } from "@/db";
+import { conversationTurns, replyFeedback } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { canAccessPerson } from "@/lib/access";
+import { nextHlc } from "@/lib/hlc";
+import { newReplyFeedbackId } from "@/lib/id";
 import {
   list,
   exportPerson,
@@ -19,7 +26,7 @@ import {
 } from "@/lib/conversationHistory";
 import { recallEpisodes } from "@/lib/episodes";
 import { embedQueryForRecall } from "@/lib/memory";
-import type { AppEnv } from "@/types";
+import type { AppEnv, PersonRow } from "@/types";
 import type { Surface } from "@/lib/turnEngine";
 
 export const conversationsRoutes = apiRouter();
@@ -97,6 +104,124 @@ conversationsRoutes.post("/clear", requireAuth, async (c) => {
 const SearchQuerySchema = z.object({
   q: z.string().min(1).describe("Search query"),
   limit: z.coerce.number().int().min(1).max(20).default(5).describe("Results to return"),
+});
+
+const FeedbackBodySchema = ReplyFeedback.pick({ verdict: true, reason: true });
+
+function toReplyFeedback(row: typeof replyFeedback.$inferSelect) {
+  return ReplyFeedback.parse({
+    id: row.id,
+    turn_id: row.turnId,
+    person_id: row.personId,
+    verdict: row.verdict,
+    reason: row.reason,
+    source: row.source,
+    created_at: row.createdAt,
+    hlc: row.hlc,
+  });
+}
+
+const feedbackRouteRequest = {
+  params: idParamSchema("id", "turn-example123"),
+  body: { content: { "application/json": { schema: FeedbackBodySchema } } },
+};
+
+const feedbackResponses = {
+  200: { content: { "application/json": { schema: ReplyFeedback.nullable() } }, description: "The current person's label, or null when this turn has not been rated." },
+  ...errorResponses({ 400: "Invalid feedback, or a child supplied a reason", 401: "Sign in first", 404: "Turn not found or not visible" }),
+};
+
+const getFeedbackRoute = createRoute({
+  method: "get",
+  path: "/turns/{id}/feedback",
+  tags: ["Conversations"],
+  summary: "Read my label for an assistant turn",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "turn-example123") },
+  responses: feedbackResponses,
+});
+
+const postFeedbackRoute = createRoute({
+  method: "post",
+  path: "/turns/{id}/feedback",
+  tags: ["Conversations"],
+  summary: "Label an assistant turn",
+  middleware: [requireAuth] as const,
+  request: feedbackRouteRequest,
+  responses: feedbackResponses,
+});
+
+function visibleTurn(actor: PersonRow, id: string) {
+  const turn = db.select().from(conversationTurns).where(eq(conversationTurns.id, id)).get();
+  if (!turn || !canAccessPerson(actor, turn.personId)) return null;
+  return turn;
+}
+
+conversationsRoutes.openapi(getFeedbackRoute, (c) => {
+  const actor = c.get("person");
+  const turn = visibleTurn(actor, c.req.valid("param").id);
+  if (!turn) return c.json({ error: "turn not found" }, 404);
+  const row = db
+    .select()
+    .from(replyFeedback)
+    .where(and(eq(replyFeedback.turnId, turn.id), eq(replyFeedback.personId, actor.id)))
+    .get();
+  return c.json(row ? toReplyFeedback(row) : null, 200);
+});
+
+conversationsRoutes.openapi(postFeedbackRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const turn = visibleTurn(actor, id);
+  if (!turn) return c.json({ error: "turn not found" }, 404);
+  const body = c.req.valid("json");
+  if (actor.role === "child" && body.reason !== null) {
+    return c.json({ error: "child-band feedback cannot include a reason" }, 400);
+  }
+  const existing = db
+    .select({ id: replyFeedback.id })
+    .from(replyFeedback)
+    .where(and(eq(replyFeedback.turnId, id), eq(replyFeedback.personId, actor.id)))
+    .get();
+  const now = new Date().toISOString();
+  const parsed = ReplyFeedback.parse({
+    id: existing?.id ?? newReplyFeedbackId(),
+    turn_id: id,
+    person_id: actor.id,
+    verdict: body.verdict,
+    reason: body.reason,
+    source: `api:${actor.id}`,
+    created_at: now,
+    hlc: nextHlc(),
+  });
+  db.insert(replyFeedback)
+    .values({
+      id: parsed.id,
+      turnId: parsed.turn_id,
+      personId: parsed.person_id,
+      verdict: parsed.verdict,
+      reason: parsed.reason,
+      source: parsed.source,
+      createdAt: parsed.created_at,
+      hlc: parsed.hlc,
+    })
+    .onConflictDoUpdate({
+      target: [replyFeedback.turnId, replyFeedback.personId],
+      set: {
+        verdict: parsed.verdict,
+        reason: parsed.reason,
+        source: parsed.source,
+        createdAt: parsed.created_at,
+        hlc: parsed.hlc,
+      },
+    })
+    .run();
+  const saved = db
+    .select()
+    .from(replyFeedback)
+    .where(and(eq(replyFeedback.turnId, id), eq(replyFeedback.personId, actor.id)))
+    .get()!;
+  return c.json(toReplyFeedback(saved), 200);
 });
 
 const EpisodeSchema = z.object({

@@ -993,6 +993,9 @@ export function deleteConversationById(actor: PersonRow, id: string): Conversati
     .set({ status: "deleted", title: null, summary: null, summaryThroughTurn: null, updatedAt: now, hlc: nextHlc() })
     .where(eq(conversations.id, id))
     .run();
+  sqlite
+    .query("DELETE FROM reply_feedback WHERE turn_id IN (SELECT id FROM conversation_turns WHERE conversation_id = ?)")
+    .run(id);
   sqlite.query("DELETE FROM conversation_turns WHERE conversation_id = ?").run(id);
   return { ok: true, value: true };
 }
@@ -1570,6 +1573,12 @@ export function runRetention(): { deleted: number } {
   // conversations retention actually touched, not every open one in the
   // household.
   const affectedConversationIds = [...new Set(expiring.map((t) => t.conversationId).filter((id): id is string => id !== null))];
+
+  sqlite
+    .query(
+      "DELETE FROM reply_feedback WHERE turn_id IN (SELECT id FROM conversation_turns WHERE NOT (safety_flagged = 1 AND minor_speaker = 1) AND created_at < ?) OR turn_id IN (SELECT id FROM conversation_turns WHERE safety_flagged = 1 AND minor_speaker = 1 AND created_at < ?)",
+    )
+    .run(generalCutoff, flaggedMinorCutoff);
 
   // Delete episodes for expiring turns before deleting the turns themselves.
   deleteEpisodesForTurns(expiring.map((t) => t.id));

@@ -463,6 +463,28 @@ export const conversationTurns = sqliteTable(
   ],
 );
 
+// FEED-01: one person's label for one assistant turn. The record is
+// person-scoped even when an owner or admin is rating a child's visible
+// conversation, so the same turn can carry one independent label per
+// household person. The composite unique key makes a later tap update the
+// existing label rather than create a second one.
+export const replyFeedback = sqliteTable("reply_feedback", {
+  id: text("id").primaryKey(),
+  turnId: text("turn_id")
+    .notNull()
+    .references(() => conversationTurns.id),
+  personId: text("person_id")
+    .notNull()
+    .references(() => people.id),
+  verdict: text("verdict").notNull(),
+  reason: text("reason"),
+  source: text("source").notNull(),
+  createdAt: text("created_at").notNull(),
+  hlc: text("hlc").notNull(),
+}, (table) => [
+  uniqueIndex("reply_feedback_turn_person_unique").on(table.turnId, table.personId),
+]);
+
 // The model-provisioning download-job queue (4.11's deferred "download
 // queue" gap, spec/llm/README.md): one row per catalog model id a
 // household has ever chosen, tracking a real multi-phase job (fetch the
