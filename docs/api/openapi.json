@@ -2038,6 +2038,108 @@
         }
       }
     },
+    "/api/safety/check": {
+      "post": {
+        "tags": [
+          "Safety"
+        ],
+        "summary": "Check a person's own text against the safety layer",
+        "description": "Checks the signed-in person's own text in their own speaker context. No turn engine needed: this is a direct safety check surface.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The safety layer's verdict on the submitted text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "flagged": {
+                      "type": "boolean",
+                      "description": "Whether any category matched. False means every field below is empty/allow."
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "self_harm",
+                          "harmful_request",
+                          "credible_threat",
+                          "csam",
+                          "grooming",
+                          "pii_extraction",
+                          "prompt_injection",
+                          "jailbreak"
+                        ]
+                      },
+                      "description": "Which of the floor's categories matched (4.3). Empty when not flagged."
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "allow_with_resources",
+                        "refuse"
+                      ],
+                      "description": "allow_with_resources is self-harm's floor behavior: crisis resources are offered, never blocking (CLAUDE.md > Safety invariants). Every other flagged category is refuse; a category never lowers this."
+                    },
+                    "notify_parent": {
+                      "type": "boolean",
+                      "description": "True when the speaker is a minor and a category flagged (4.3: \"Safety-flagged turns raise an immediate notification to a parent for minors\"). Delivery through the notification system (2.6) is a later hub release; this field is the fact that a caller wires up once it exists."
+                    },
+                    "matched_signals": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Internal detector ids that fired (e.g. \"self_harm.direct_intent_phrase\"), for audit logging. Never a verbatim excerpt of the checked text."
+                    },
+                    "checked_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "flagged",
+                    "categories",
+                    "action",
+                    "notify_parent",
+                    "matched_signals",
+                    "checked_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "The safety layer's verdict on one piece of text (a turn, or a generation prompt), before any model runs and again on every streamed sentence. See platform plan 4.3. Deliberately abstract: `matched_signals` names which detectors fired, never the text that triggered them, so a SafetyResult can be logged and used in a notification without ever carrying a transcript (4.3: \"logged with the fact, never the transcript\")."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "text is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/memory/batch-forget": {
       "post": {
         "tags": [
@@ -3321,6 +3423,194 @@
           },
           "500": {
             "description": "dismissMany() failed unexpectedly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduler/jobs": {
+      "get": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "List scheduled jobs",
+        "description": "Owner/admin see every job; anyone else sees only their own.",
+        "responses": {
+          "200": {
+            "description": "The caller's jobs (all jobs for owner/admin).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "packageId": {
+                        "type": "string"
+                      },
+                      "job": {
+                        "type": "string"
+                      },
+                      "personId": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "inputs": {
+                        "type": "string"
+                      },
+                      "when": {
+                        "type": "string"
+                      },
+                      "recurring": {
+                        "type": "boolean"
+                      },
+                      "nextRunAt": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "lastRunAt": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "lastError": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "packageId",
+                      "job",
+                      "personId",
+                      "inputs",
+                      "when",
+                      "recurring",
+                      "nextRunAt",
+                      "status",
+                      "createdAt",
+                      "lastRunAt",
+                      "lastError"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduler/jobs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Cancel a scheduled job",
+        "description": "Stops a pending job from running. Only the job's owner or an owner/admin can cancel it.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job was cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cannot cancel another person's job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduler/run-due": {
+      "post": {
+        "tags": [
+          "Scheduler"
+        ],
+        "summary": "Run all due jobs now",
+        "description": "Owner/admin only: fires every job whose time has come, without waiting for the interval timer.",
+        "responses": {
+          "200": {
+            "description": "The count of jobs that ran and the count that errored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ran": {
+                      "type": "number"
+                    },
+                    "errors": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "ran",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
             "content": {
               "application/json": {
                 "schema": {
