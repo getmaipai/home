@@ -1154,6 +1154,26 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "how do you know that", expect: { toolRan: null, mustContain: "looked|link|found|just know", mustNotContain: "I think|I believe", humanVerdict: true } },
     ],
   },
+  {
+    id: "lookup-source-explained",
+    category: "knowledge",
+    note: "K3: after a looked-up fact, the follow-up explains that the answer came from a lookup",
+    turns: [
+      { say: "what is the capital of France", expect: { signal: { primary_act: "question" }, outcomeKind: "lookup", lookupWithSource: true, mustContain: "Paris" } },
+      { say: "how do you know that", expect: { signal: { primary_act: "question" }, outcomeKind: "lookup", toolRan: null, mustContain: "looked|link|found", mustNotContain: "I think|I believe", humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "model-knowledge-source-explained",
+    category: "knowledge",
+    note: "K3: a stable fact answered from the model is marked model_knowledge, and its source is explained without inventing a lookup",
+    turns: [
+      { say: "how many days are in a week", expect: { signal: { primary_act: "question" }, outcomeKind: "model_knowledge", toolRan: null, mustContain: "7|seven" } },
+      { say: "how do you know that", expect: { signal: { primary_act: "question" }, outcomeKind: "model_knowledge", toolRan: null, mustContain: "just know|knowledge|learned", mustNotContain: "looked|link|found", humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
   // LOOKUP-02 (dev.md section 16 parts 1 and 2): the seeded reply is
   // the model's next draft through the recording proxy, so it meets the
   // reply boundary like any draft (the read, the forced lookup as a
