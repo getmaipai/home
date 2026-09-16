@@ -699,7 +699,22 @@ The turn log tells the story without the words.
     composed from the subject stack (the decade, the theme, the named
     titles), not from the utterance. Row: `lookup-query-from-stack`.
 
-Design of 53 to 59 is Session A's (chat-gap design is reserved). Every
+60. Two of the four searches ran as image searches. The `[turn]`
+    outcomes show the model's tool call chose `category: "images"` for
+    "give me a list of movies" and "search for the artist's hits", and
+    SearXNG answered with icon files and a painting; the person saw
+    junk and read it as "it cannot search". K7 (2026-09-15) exposed
+    `category` in the websearch tool's `args` so the model could ask
+    for pictures; the model reaches for it on plain text asks. The
+    category is the engine's to set from the intent's deliverable
+    (`turnContext.ts:253`, `picture` and `video`), never the model's:
+    the arg leaves the tool schema, the engine passes it. Mechanical,
+    a regression, fixed today with its row (`text-ask-never-image-search`).
+    The third search, a forced ladder, took the stop-word-stripped
+    utterance as its query ("how know <name>, show proof") and searched
+    a regulator's filing system; that is finding 59's case.
+
+Design of 53 to 59 is Session A's; 60 is mechanical (chat-gap design is reserved). Every
 row above is written red first, with roster names and invented titles.
 
 What worked, for the record: every forced or explicit search answered
