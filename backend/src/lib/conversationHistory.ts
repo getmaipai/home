@@ -97,6 +97,18 @@ function outcomeForRow(o: ToolExecutionOutcome): ToolExecutionOutcome {
   };
   let slim = redactDeep(o) as ToolExecutionOutcome;
   if (slim.result) slim = { ...slim, result: { ...slim.result, actions: [] } };
+  // CHAT-16: a composed result (the search's rows, no reply) keeps its
+  // rows when trimming them fits the budget (eight rows, short
+  // snippets), since the rows are what the result says; the whole
+  // `data` goes only when even that is too wide.
+  if (JSON.stringify(slim).length > OUTCOME_ROW_BUDGET && slim.result?.data && typeof slim.result.data === "object" && Array.isArray((slim.result.data as { rows?: unknown }).rows)) {
+    const rows = ((slim.result.data as { rows: unknown[] }).rows).slice(0, 8).map((row) => {
+      if (!row || typeof row !== "object") return row;
+      const { snippet, ...rest } = row as { snippet?: unknown };
+      return typeof snippet === "string" ? { ...rest, snippet: snippet.slice(0, 240) } : row;
+    });
+    slim = { ...slim, result: { ...slim.result, data: { ...(slim.result.data as Record<string, unknown>), rows } } };
+  }
   if (JSON.stringify(slim).length > OUTCOME_ROW_BUDGET && slim.result?.data !== undefined) {
     const { data: _dropped, ...rest } = slim.result;
     slim = { ...slim, result: rest };
@@ -321,6 +333,19 @@ export function recentTurnSafety(conversationId: string, limit: number): { safet
     .where(eq(conversationTurns.conversationId, conversationId))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(limit)
+    .all();
+}
+
+/** CHAT-16: the named turn rows' id, source and reply text, so a
+ * composed package reply (source `plugin`, its text on the row and not
+ * in the retained result) can be read back for the turns whose
+ * outcomes were read. */
+export function turnRowsById(ids: readonly string[]): { id: string; source: string; replyText: string }[] {
+  if (ids.length === 0) return [];
+  return db
+    .select({ id: conversationTurns.id, source: conversationTurns.source, replyText: conversationTurns.replyText })
+    .from(conversationTurns)
+    .where(inArray(conversationTurns.id, [...ids]))
     .all();
 }
 

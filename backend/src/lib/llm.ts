@@ -18,6 +18,7 @@ import { getEmbedClient } from "@/lib/embedSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
 import type { ChatRole, ChatCompletionRequest, ToolDefinition, ToolCallWire } from "@maipai/spec/llm/ts/types.js";
+import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
 import { seedFields } from "@/lib/benchSampling";
 
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
@@ -67,6 +68,12 @@ const IMPLEMENTED_ROLES: ReadonlySet<LlmRole> = new Set(["chat"]);
 export interface LlmMessage {
   role: ChatRole;
   content: string;
+  /** CHAT-16 (K1's wire): a `tool` message names the assistant tool
+   * call it answers; the composer sends one per retained outcome. */
+  tool_call_id?: string;
+  /** The tool calls an assistant message made, retained so the tool
+   * messages after it can answer them by id. */
+  tool_calls?: ToolCallWire[];
 }
 
 export interface LlmCompleteOptions {
@@ -164,7 +171,7 @@ export type LlmOpResult =
   | { ok: true; value: LlmCompleteValue }
   | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string };
 
-const VALID_MESSAGE_ROLES: ReadonlySet<string> = new Set(["system", "user", "assistant"]);
+const VALID_MESSAGE_ROLES: ReadonlySet<string> = new Set(["system", "user", "assistant", "tool"]);
 
 type LlmValidationError = Extract<LlmOpResult, { ok: false }>;
 
@@ -190,10 +197,15 @@ function validate(role: LlmRole, messages: LlmMessage[]): LlmValidationError | n
         ok: false,
         status: 400,
         code: "invalid_input",
-        error: "every message needs role in system|user|assistant and a string content",
+        error: "every message needs role in system|user|assistant|tool and a string content",
       };
     }
   }
+  // CHAT-16: a tool message answers a preceding assistant tool call by
+  // id (the spec client's own rule, checked here so the failure is a 400
+  // and not a thrown client error).
+  const toolSequence = validateToolMessages(messages);
+  if (toolSequence) return { ok: false, status: 400, code: "invalid_input", error: toolSequence };
   return null;
 }
 

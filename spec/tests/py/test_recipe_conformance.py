@@ -44,6 +44,9 @@ async def test_recipe_conformance(fixture_path: Path):
     # fixture expects it: a number has to arrive as a number.
     if "data" in fixture["expected"]:
         assert result.get("data") == fixture["expected"]["data"]
+    # CHAT-16: a format step's hint reaches the result verbatim, or not
+    # at all.
+    assert result.get("synthesis_hint") == fixture["expected"].get("synthesis_hint")
     assert [
         {"when": j["when"], "job": j["job"], "inputs": j["inputs"]}
         for j in host.scheduled_jobs

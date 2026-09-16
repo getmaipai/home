@@ -5260,8 +5260,13 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
 
   /** A stub whose plain reply is `draft`, whose forced lookup (tool_choice
    * "required") calls websearch when `forcedCall` is set, and whose
-   * llm_complete step (the websearch recipe's summary) answers
-   * SEARCH_ANSWER; a fake SearXNG behind the real websearch recipe. */
+   * composition (CHAT-16's composer phrasing the rows: the request that
+   * carries `role: "tool"` messages) answers SEARCH_ANSWER; a fake
+   * SearXNG behind the real websearch recipe. `seen.forced` counts the
+   * model's rung under `tool_choice: required`, which CHAT-16 (K2)
+   * skips when the search is the only lookup tool ranked (the case on
+   * every turn here): the search runs with the engine's query at once,
+   * seen in `seen.queries` and the retained forced outcome. */
   async function withLookupStub<T>(opts: { draft: string | ((request: ChatCompletionRequest) => string); forcedCall?: boolean; searxng?: boolean; twoSources?: boolean }, fn: (seen: { forced: number; queries: string[] }) => Promise<T>): Promise<T> {
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
@@ -5273,7 +5278,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
         return opts.forcedCall === false ? undefined : [{ id: "call-lookup", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "when the new album is out" }) } }];
       },
       scriptedChatReply: (request) => {
-        if (request.messages.some((m) => typeof m.content === "string" && m.content.includes("BEGIN SEARCH RESULTS"))) return SEARCH_ANSWER;
+        if (request.messages.some((m) => m.role === "tool")) return SEARCH_ANSWER;
         return typeof opts.draft === "function" ? opts.draft(request) : opts.draft;
       },
     });
@@ -5306,7 +5311,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const before = seen.forced;
       const res = await client.post("/api/turn", { text: "how many tracks" });
       expect(res.status).toBe(200);
-      expect(seen.forced - before).toBe(1);
+      expect(seen.forced - before).toBe(0);
       expect(seen.queries.some((q) => /marsh lantern/i.test(q) && /tracks/i.test(q))).toBe(true);
       expect(((await res.json()) as { sources?: unknown[] }).sources?.length).toBeGreaterThan(0);
     });
@@ -5410,7 +5415,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const result = await runTurn(actor, "chat", "when is the new album out");
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       // LOOKUP-02: the engine's query, never the model's (the stub
       // proposed "when the new album is out"; the built one ran).
       expect(seen.queries).toEqual(["new album out"]);
@@ -5481,12 +5486,14 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     await withLookupStub({ draft: "Hmm... let me check that for you. It should be soon." }, async (seen) => {
       const result = await runTurn(actor, "chat", "when is the new album out");
       expect(result.ok && result.value.reply.text).toBe(SEARCH_ANSWER);
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "status", "done"]);
-      expect(seen.forced).toBe(2);
-      expect((events[3]!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
+      // CHAT-16 (K6): the lookup's status, the composing status ahead of
+      // the composition's first delta, the deltas, then done.
+      expect(events.map((e) => e.type).filter((t) => t !== "delta")).toEqual(["turn_meta", "signal", "status", "status", "done"]);
+      expect(seen.forced).toBe(0);
+      expect((events.find((e) => e.type === "done")!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
     });
   });
 
@@ -5507,7 +5514,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     await withLookupStub({ draft: "<think>Let me see if I remember.</think>Let me check that for you. It should be soon." }, async (seen) => {
       const res = await client.post("/api/turn/stream", { text: "when is the new album out", thinking: true });
       const events = await readNdjson(res);
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       const deltas = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
       expect(deltas).not.toContain("Let me check that for you.");
       expect((events.find((e) => e.type === "done")!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
@@ -5521,7 +5528,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const result = await runTurn(actor, "chat", "when is the new album out");
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       // The ladder: the model named no rung, the search ran with the
       // engine's own query, and its outcome says so.
       expect(seen.queries).toEqual(["new album out"]);
@@ -5533,7 +5540,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const result = await runTurn(actor, "chat", "when is the new album out");
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       expect(result.value.source).toBe("model");
       expect(result.value.reply.text).toBe("It's the band you played last week.");
     });
@@ -5559,7 +5566,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
         if (called++ === 0 && request.tools?.some((t) => t.function.name === "websearch")) return [{ id: "call-1", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "when the new album is out" }) } }];
         return undefined;
       },
-      scriptedChatReply: (request) => (request.messages.some((m) => typeof m.content === "string" && m.content.includes("BEGIN SEARCH RESULTS")) ? SEARCH_ANSWER : "Let me check that for you."),
+      scriptedChatReply: (request) => (request.messages.some((m) => m.role === "tool") ? SEARCH_ANSWER : "Let me check that for you."),
     });
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     const searxng = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "The new album", url: "https://example.com/album", content: "Out on September 22." }] }) });
@@ -5585,9 +5592,13 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
       expect(res.status).toBe(200);
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "status", "done"]);
-      expect(seen.forced).toBe(1);
-      const value = events[3]!.value as { source: string; plugin_id?: string; reply: { text: string }; conversation_id: string; turn_id: string };
+      // CHAT-16 (K6): the composition streams as deltas after the
+      // `composing` status line; the done value is the package's.
+      expect(events.map((e) => e.type).filter((t) => t !== "delta")).toEqual(["turn_meta", "signal", "status", "status", "done"]);
+      expect(events.filter((e) => e.type === "status").map((e) => (e as { stage?: string }).stage)).toEqual(["lookup", "composing"]);
+      expect(events.filter((e) => e.type === "delta").map((e) => e.text).join("").trim()).toBe(SEARCH_ANSWER);
+      expect(seen.forced).toBe(0);
+      const value = events.find((e) => e.type === "done")!.value as { source: string; plugin_id?: string; reply: { text: string }; conversation_id: string; turn_id: string };
       expect(value.source).toBe("plugin");
       expect(value.plugin_id).toBe("websearch");
       expect(value.reply.text).toBe(SEARCH_ANSWER);
@@ -5604,8 +5615,8 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const res = await client.post("/api/turn/stream", { text: "how many tracks" });
       expect(res.status).toBe(200);
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "status", "done"]);
-      expect(seen.forced - before).toBe(1);
+      expect(events.map((e) => e.type).filter((t) => t !== "delta")).toEqual(["turn_meta", "signal", "status", "status", "done"]);
+      expect(seen.forced - before).toBe(0);
       expect(seen.queries.some((q) => /marsh lantern/i.test(q) && /tracks/i.test(q))).toBe(true);
       const value = events.find((e) => e.type === "done")!.value as { source: string; plugin_id?: string; reply: { text: string }; sources?: unknown[] };
       expect(value.source).toBe("plugin");
@@ -5621,7 +5632,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     await withLookupStub({ draft: "Let me look that up for you.", forcedCall: false, searxng: false }, async (seen) => {
       const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
       const events = await readNdjson(res);
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       const text = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
       expect(text.trim()).toBe(LOOKUP_FAILED_LINE);
       const value = events.find((e) => e.type === "done")!.value as { source: string; reply: { text: string } };
@@ -5749,7 +5760,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       scriptedChatReply: (request) => {
         const text = request.messages.map((m) => typeof m.content === "string" ? m.content : "").join(" ");
         if (text.includes("got a photo of it")) return "A grown-up can open that for you; ask them.";
-        if (text.includes("BEGIN SEARCH RESULTS")) return "Here's the page, the link's below.";
+        if (request.messages.some((m) => m.role === "tool")) return "Here's the page, the link's below.";
         return "Let me check that for you.";
       },
     });
@@ -5781,7 +5792,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const result = await runTurn(actor, "chat", "where's the maker's support page for the Cosmo 7 card");
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       expect(seen.queries[0]).toContain("support page");
       expect(result.value.reply.text).toBe("Here's the page, the link's below.");
       expect(result.value.sources).toHaveLength(2);
@@ -5799,7 +5810,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const second = await runTurn(actor, "chat", "where did you read that, link me", { conversationId: conv.value.id });
       expect(second.ok).toBe(true);
       if (!second.ok) return;
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       expect(retained(second.value.turn_id)).toBeNull();
       expect(second.value.sources).toHaveLength(2);
     });
@@ -5831,7 +5842,7 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       const res = await client.post("/api/turn/stream", { text: "where's the maker's support page for the Cosmo 7 card" });
       const events = await readNdjson(res);
       const done = events.find((event) => event.type === "done");
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       expect((done?.value as { sources?: unknown[] }).sources).toHaveLength(2);
     });
   });
@@ -5855,7 +5866,7 @@ describe("CHAT-13 chunk C2: the last succeeded lookup is a stack source", () => 
         return opts.forcedCall === false ? undefined : [{ id: "call-lookup", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "when the new album is out" }) } }];
       },
       scriptedChatReply: (request) => {
-        if (request.messages.some((m) => typeof m.content === "string" && m.content.includes("BEGIN SEARCH RESULTS"))) return SEARCH_ANSWER;
+        if (request.messages.some((m) => m.role === "tool")) return SEARCH_ANSWER;
         return typeof opts.draft === "function" ? opts.draft(request) : opts.draft;
       },
     });

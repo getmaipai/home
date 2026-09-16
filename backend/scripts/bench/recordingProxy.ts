@@ -14,11 +14,11 @@ export interface RecordedRequest {
    * content, or the non-streamed message), before any guard: what a
    * replaced reply actually said. */
   responseText: string;
-  /** URLs in a one-shot completion with no system message (a recipe's
-   * own `llm_complete`, the shape the websearch package uses to read
-   * its results): a lookup's evidence reaching the model, never a URL
-   * the person typed into the turn's own prompt (the effect standard's
-   * C2 row). */
+  /** URLs in the tool-result messages of a composition (CHAT-16's
+   * composer phrasing a lookup's rows), or in a one-shot completion
+   * with no system message (a recipe's own `llm_complete`): a lookup's
+   * evidence reaching the model, never a URL the person typed into the
+   * turn's own prompt (the effect standard's C2 row). */
   sourceUrls: string[];
   /** The upstream reply was read to its end (its stream flushed). */
   completed: boolean;
@@ -97,9 +97,11 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
             tools: (parsed.tools ?? []).map((t) => t.function?.name ?? "?"),
             messages: parsed.messages?.length ?? 0,
             responseText: "",
-            sourceUrls: (parsed.messages ?? []).some((m) => m.role === "system")
-              ? []
-              : (parsed.messages ?? []).filter((m) => typeof m.content === "string").flatMap((m) => m.content.match(/https?:\/\/[^\s"'<>)\]]+/g) ?? []),
+            sourceUrls: (parsed.messages ?? []).some((m) => m.role === "tool")
+              ? (parsed.messages ?? []).filter((m) => m.role === "tool" && typeof m.content === "string").flatMap((m) => m.content.match(/https?:\/\/[^\s"'<>)\]\\]+/g) ?? [])
+              : (parsed.messages ?? []).some((m) => m.role === "system")
+                ? []
+                : (parsed.messages ?? []).filter((m) => typeof m.content === "string").flatMap((m) => m.content.match(/https?:\/\/[^\s"'<>)\]]+/g) ?? []),
             completed: false,
             aborted: false,
           };
@@ -112,7 +114,9 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
       // streamed or not as the request asked, recorded like a reply.
       // The turn's own completion, never a post-turn summary refresh or
       // a judge call (those carry no live user turn last; a review).
-      const isTurn = (parsedBody?.messages ?? []).length > 0 && parsedBody!.messages![parsedBody!.messages!.length - 1]!.role === "user";
+      // CHAT-16: a composition (tool-result messages before its last
+      // user-role instruction) is never the seeded draft's request.
+      const isTurn = (parsedBody?.messages ?? []).length > 0 && parsedBody!.messages![parsedBody!.messages!.length - 1]!.role === "user" && !parsedBody!.messages!.some((m) => m.role === "tool");
       if (recorded && scripted !== null && parsedBody && parsedBody.tool_choice !== "required" && isTurn) {
         const text = scripted;
         scripted = null;

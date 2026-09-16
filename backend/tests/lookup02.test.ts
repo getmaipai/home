@@ -46,8 +46,12 @@ const SEARCH_ANSWER = "The support page is on the maker's site, with the manual 
 /** The stub answers every plain completion with `draft`; a forced
  * completion (tool_choice required) calls the tool named by `forced`
  * (websearch with the model's own guess of a query, or knowledge, or
- * none); the fake SearXNG counts queries and answers unless `searxng`
- * is false. */
+ * none); the composition (CHAT-16, the request carrying `role: "tool"`
+ * messages) answers SEARCH_ANSWER; the fake SearXNG counts queries and
+ * answers unless `searxng` is false. CHAT-16 (K2) skips the model's rung
+ * when the search is the only lookup tool ranked (every turn here), so
+ * `seen.forced` stays 0 and the search's run shows in `seen.queries`
+ * and the retained forced outcome. */
 async function withLookup<T>(opts: { draft: string | ((r: ChatCompletionRequest) => string); forced?: "websearch" | "knowledge" | "none"; searxng?: boolean }, fn: (seen: { forced: number; queries: string[]; requests: ChatCompletionRequest[] }) => Promise<T>): Promise<T> {
   __resetLlmSupervisorForTests();
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
@@ -63,7 +67,7 @@ async function withLookup<T>(opts: { draft: string | ((r: ChatCompletionRequest)
     },
     scriptedChatReply: (request) => {
       seen.requests.push(request);
-      if (request.messages.some((m) => typeof m.content === "string" && m.content.includes("BEGIN SEARCH RESULTS"))) return SEARCH_ANSWER;
+      if (request.messages.some((m) => m.role === "tool")) return SEARCH_ANSWER;
       return typeof opts.draft === "function" ? opts.draft(request) : opts.draft;
     },
   });
@@ -183,7 +187,7 @@ describe("the engine: the read on both paths, the ladder, the binding, the conse
     await withLookup({ draft: "I can't open pages myself, but I can help you find it. Let me look it up for you." }, async (seen) => {
       const result = await runTurn(actor, "chat", "where's the maker's support page for the Cosmo 7 card");
       if (!result.ok) throw new Error(result.error);
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       expect(seen.queries).toEqual(["maker support page for Cosmo 7 card"]);
       expect(result.value.source).toBe("plugin");
       expect(result.value.reply.text).toBe(SEARCH_ANSWER);
@@ -205,7 +209,7 @@ describe("the engine: the read on both paths, the ladder, the binding, the conse
         // lookup decision before the model): the hedged draft is the read.
         const result = await runTurn(actor, "chat", "which connector is the Cosmo 7 card");
         if (!result.ok) throw new Error(result.error);
-        expect(seen.forced).toBe(1);
+        expect(seen.forced).toBe(0);
         expect(seen.queries).toEqual(["connector Cosmo 7 card"]);
         expect(result.value.reply.text).toBe(SEARCH_ANSWER);
         expect(lines.some((l) => l.startsWith("[turn] {") && l.includes('"lookup_shape":"hedged_fact"'))).toBe(true);
@@ -256,7 +260,7 @@ describe("the engine: the read on both paths, the ladder, the binding, the conse
         // is not the household's, whatever is carried (a review).
         const third = await runTurn(actor, "chat", "what's the release date of the new Cosmo 7 card", { conversationId: first.value.conversation_id });
         if (!third.ok) throw new Error(third.error);
-        expect(seen.forced).toBe(1);
+        expect(seen.forced).toBe(0);
         expect(third.value.source).toBe("plugin");
         // An expletive "it" refers to nothing: the weather question right
         // after the dishwasher (a fresh conversation, the dishwasher
@@ -265,7 +269,7 @@ describe("the engine: the read on both paths, the ladder, the binding, the conse
         if (!again.ok) throw new Error(again.error);
         const fourth = await runTurn(actor, "chat", "is it going to rain tomorrow", { conversationId: again.value.conversation_id });
         if (!fourth.ok) throw new Error(fourth.error);
-        expect(seen.forced).toBe(2);
+        expect(seen.forced).toBe(0);
         expect(fourth.value.source).toBe("plugin");
       } finally {
         console.log = original;
@@ -300,7 +304,7 @@ describe("the engine: the read on both paths, the ladder, the binding, the conse
     await withLookup({ draft: "Let me check that for you.", forced: "knowledge" }, async (seen) => {
       const result = await runTurn(actor, "chat", "what's the new Marsh Lantern film actually about");
       if (!result.ok) throw new Error(result.error);
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       expect(seen.queries).toEqual(["new Marsh Lantern film actually about new"].map(() => seen.queries[0]!));
       expect(seen.queries[0]).toMatch(/marsh lantern/i);
       expect(result.value.source).toBe("plugin");
@@ -359,7 +363,7 @@ describe("the engine: the read on both paths, the ladder, the binding, the conse
     await withLookup({ draft: "I can't open pages myself, but I can help you find it. Let me look it up for you." }, async (seen) => {
       const res = await client.post("/api/turn/stream", { text: "where's the maker's support page for the Cosmo 7 card" });
       const events = await readNdjson(res);
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       expect(events.filter((e) => e.type === "delta").map((e) => e.text).join("")).not.toContain("can't open");
       const done = events.find((e) => e.type === "done")!.value as { source: string; reply: { text: string }; turn_id: string };
       expect(done.source).toBe("plugin");

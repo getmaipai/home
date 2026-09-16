@@ -13,6 +13,10 @@ export interface PluginResult {
   /** Named fields beside the reply (a `format` step's `data`): what a
    * composer phrases from, typed as the recipe bound them. */
   data?: Record<string, unknown>;
+  /** CHAT-16: a `format` step's literal hint that `data` answers the
+   * question and needs phrasing; the composer always composes a result
+   * carrying it, and a step that gives it may omit its `text`. */
+  synthesis_hint?: string;
   actions: { kind: string; payload?: unknown }[];
   ask?: { prompt: string; expects?: string };
   /** Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident"
@@ -41,7 +45,7 @@ type RecipeStep =
   | { op: "fetch"; as: string; url: string; method?: "GET" | "POST"; headers?: Record<string, string>; body?: unknown }
   | { op: "pick"; as: string; from: string; path?: string }
   | { op: "lookup"; as: string; from: string; table: Record<string, string>; default?: string }
-  | { op: "format"; as: string; text: string; speech?: string; data?: Record<string, string> }
+  | { op: "format"; as: string; text?: string; speech?: string; data?: Record<string, string>; synthesis_hint?: string }
   | { op: "home.call_service"; domain: string; service: string; target: Record<string, unknown>; data?: Record<string, unknown> }
   | { op: "action"; kind: string; payload?: Record<string, unknown> }
   | { op: "remember"; text: string; category?: string; scope?: string }
@@ -127,6 +131,7 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
   const actions: { kind: string; payload?: unknown }[] = [];
   let reply: { text: string; speech?: string } | undefined;
   let data: Record<string, unknown> | undefined;
+  let synthesisHint: string | undefined;
   let ask: { prompt: string; expects?: string } | undefined;
 
   for (const step of recipe.steps as RecipeStep[]) {
@@ -149,10 +154,20 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         break;
       }
       case "format": {
-        const text = interpolate(step.text, scope);
-        const speech = step.speech ? interpolate(step.speech, scope) : text;
-        scope[step.as] = { text, speech };
-        reply = { text, speech };
+        // CHAT-16: a step with a `synthesis_hint` and no `text` binds no
+        // reply: the result is its `data` and the hint, phrased by the
+        // composer (recipe.schema.json requires one of the two).
+        if (step.text === undefined) {
+          if (step.synthesis_hint === undefined) throw new Error("a format step needs text or synthesis_hint");
+          reply = undefined;
+          scope[step.as] = null;
+        } else {
+          const text = interpolate(step.text, scope);
+          const speech = step.speech ? interpolate(step.speech, scope) : text;
+          scope[step.as] = { text, speech };
+          reply = { text, speech };
+        }
+        synthesisHint = step.synthesis_hint;
         // Named fields beside the text (result.schema.json's `data`): a
         // template that is exactly one {variable} keeps the variable's
         // own type, so a temperature stays a number for whoever phrases
@@ -298,5 +313,5 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
     }
   }
 
-  return { reply, actions, ...(ask ? { ask } : {}), ...(data ? { data } : {}) };
+  return { reply, actions, ...(ask ? { ask } : {}), ...(data ? { data } : {}), ...(synthesisHint !== undefined ? { synthesis_hint: synthesisHint } : {}) };
 }

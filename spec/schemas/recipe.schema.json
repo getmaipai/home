@@ -84,17 +84,19 @@
     "format_step": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["op", "as", "text"],
+      "required": ["op", "as"],
+      "anyOf": [{ "required": ["text"] }, { "required": ["synthesis_hint"] }],
       "properties": {
         "op": { "const": "format" },
         "as": { "type": "string" },
-        "text": { "type": "string", "description": "A template with {variable} interpolation for the on-screen reply." },
+        "text": { "type": "string", "description": "A template with {variable} interpolation for the on-screen reply. May be omitted when `synthesis_hint` is given: the result then carries `data` and the hint and no reply, and the composer (CHAT-16) phrases the answer." },
         "speech": { "type": "string", "description": "A template for the spoken form. Falls back to text if omitted." },
         "data": {
           "type": "object",
           "additionalProperties": { "type": "string" },
           "description": "Named fields for the result's `data` (result.schema.json): each value is a template; a template that is exactly one {variable} keeps that variable's own type (a number stays a number), anything else is interpolated text. What a composer (CHAT-16) phrases from, beside the reply text."
-        }
+        },
+        "synthesis_hint": { "type": "string", "description": "The result's `synthesis_hint` (result.schema.json), a literal line for the composer (CHAT-16): the `data` answers the person's question and needs phrasing. A result carrying it is always composed, never delivered as its `text`." }
       }
     },
     "lookup_step": {

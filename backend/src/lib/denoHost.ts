@@ -264,6 +264,10 @@ function parseHandleResult(result: { content: unknown; isError?: boolean }): Plu
     actions: parsed.actions ?? [],
     ...(parsed.ask ? { ask: parsed.ask } : {}),
     ...(parsed.error ? { error: parsed.error } : {}),
+    // CHAT-16: a handler's typed fields for the composer ride through as
+    // a recipe's do (result.schema.json's `data` and `synthesis_hint`).
+    ...(parsed.data !== undefined && parsed.data !== null && typeof parsed.data === "object" ? { data: parsed.data as Record<string, unknown> } : {}),
+    ...(typeof parsed.synthesis_hint === "string" ? { synthesis_hint: parsed.synthesis_hint } : {}),
   };
 }
 

@@ -126,7 +126,7 @@ export type TurnStreamEvent =
   | { type: "signal"; signal: TurnSignal }
   | { type: "delta"; text: string }
   /** CHAT-16: frontend chatTurnActivity.ts transient activity contract. */
-  | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" }
+  | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" | "composing" }
   | { type: "spoken_cue"; text: string }
   | { type: "done"; value: TurnValue }
   // `code` (step 9, session-a-intelligence.md: "emit error with the

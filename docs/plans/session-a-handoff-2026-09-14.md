@@ -1,5 +1,20 @@
 # Session A handoff (2026-09-14, evening)
 
+## 2026-09-16: where this lane stands
+
+REP-01, CHAT-13's full lookup decision and the set's three reads are
+on `main` (`42124e7`). CHAT-16 K2 and K6 (the composer and its
+machine, `docs/dev/session-a.md` "CHAT-16 K2 and K6") is the item
+after, on `a/chat16-k2` in `../home-a1` (the worktree the coordinator
+named for this lane; the shared checkout, `../home-c-stack4` and
+`../home-codex` are never touched). K3 to K5 and K7 are Codex's on
+top of it. On the follow-up list, from the coordinator: the CHAT-02
+test "a streamed reply that mentions self-harm and then gives harmful
+instructions is refused with the crisis text kept" went red once in
+a full gate on K7's branch (green alone and in its file): read the
+stream's hold against the output gate for a race and pin the timing
+or fix the boundary.
+
 ## 2026-09-15, early morning: where this lane stands
 
 Written by the Session A that took the note below over at `1d2c8ba`,

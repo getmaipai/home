@@ -143,6 +143,49 @@ export function outcomeOf(partial: Omit<ToolExecutionOutcome, "at" | "source"> &
   return { ...partial, at: partial.at ?? new Date().toISOString(), ...(source ? { source } : {}), ...(sources.length ? { sources } : {}) };
 }
 
+/** CHAT-16 (K2): what a retained result says, as one text: its reply,
+ * its rows' titles and snippets, its other data fields. The composer's
+ * tool message carries the same content as JSON; this is the text the
+ * guards ground a composed reply on. */
+export function outcomeText(outcome: Pick<ToolExecutionOutcome, "result" | "userMessage">): string {
+  const parts: string[] = [];
+  if (outcome.result?.reply?.text) parts.push(outcome.result.reply.text);
+  const data = outcome.result?.data;
+  if (data && typeof data === "object") {
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      if (key === "rows" && Array.isArray(value)) {
+        for (const row of value.slice(0, 8)) {
+          if (!row || typeof row !== "object") continue;
+          const { title, snippet } = row as { title?: unknown; snippet?: unknown };
+          if (typeof title === "string") parts.push(title);
+          if (typeof snippet === "string") parts.push(snippet);
+        }
+      } else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        parts.push(`${key}: ${value}`);
+      }
+    }
+  }
+  if (outcome.userMessage) parts.push(outcome.userMessage);
+  return parts.join(" ");
+}
+
+/** CHAT-16 (K2): the outcomes a composition phrases join the turn's
+ * evidence as `package_result`, included, before the composed text is
+ * guarded: a composed line that says what the rows say is grounded, as
+ * a package's own reply always was by skipping the guards. Once per
+ * call id. */
+export function groundOutcomes(ctx: TurnContext, outcomes: readonly ToolExecutionOutcome[]): void {
+  for (const o of outcomes) {
+    if (o.status !== "succeeded") continue;
+    const id = `package:${o.callId}`;
+    if (ctx.evidence.some((e) => e.id === id)) continue;
+    const text = outcomeText(o);
+    if (!text) continue;
+    ctx.evidence.push({ id, kind: "package_result", text, rendered: text, entityIds: [] });
+    if (!ctx.includedEvidenceIds.includes(id)) ctx.includedEvidenceIds.push(id);
+  }
+}
+
 export function sourcesFromRows(rows: unknown): Source[] {
   if (!Array.isArray(rows)) return [];
   return rows.slice(0, 8).flatMap((raw): Source[] => {
@@ -377,9 +420,13 @@ export function includedEvidence(ctx: TurnContext): TurnEvidence[] {
 }
 
 /** The guard input, from the included evidence alone. `sources` are the
- * memory lines and package results (the `unrelated_recall` candidates);
- * `episodes` the recalled lines the prompt showed; `grounding` the
- * profile, summary, roster and clock facts the prompt showed; `history`
+ * memory lines (the `unrelated_recall` candidates); `episodes` the
+ * recalled lines the prompt showed; `grounding` the profile, summary,
+ * roster and clock facts the prompt showed and, CHAT-16, the package
+ * results a composition phrases (a composed line restates what the
+ * rows say for the question the search ran on, so it grounds and is
+ * never an `unrelated_recall` candidate: that guard is for a memory
+ * line copied to the wrong question); `history`
  * the window's user lines; `outcomes` the turn's tool outcomes, package
  * id and status, so an action claim is matched to the package family its
  * verb names (CHAT-04; a summary is a lossy aid, never proof of an
@@ -390,9 +437,9 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
   return {
     utterance: ctx.utterance,
     history: ctx.history.filter((m) => m.role === "user").map((m) => m.content),
-    sources: ofKind("memory", "package_result"),
+    sources: ofKind("memory"),
     episodes: ofKind("episode"),
-    grounding: ofKind("profile", "summary", "household", "clock"),
+    grounding: ofKind("profile", "summary", "household", "clock", "package_result"),
     outcomes: ctx.outcomes.map((o) => ({ packageId: o.packageId, status: o.status, ...(o.reason ? { reason: o.reason } : {}) })),
     personaExamples: ctx.persona.examples,
     roster: ctx.roster,

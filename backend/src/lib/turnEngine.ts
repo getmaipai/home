@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -41,10 +41,10 @@ import { asBackchannelOnLiveSubject, classifyTurnSignal, fallbackSignal, freezeD
 export const STATEMENT_RETRY_NOTE = "Nothing was asked; respond to what they said.";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
-import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor } from "@/lib/replyConstraints";
-import { constraintsFor } from "@/lib/replyConstraints";
+import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor, constraintsFor } from "@/lib/replyConstraints";
 import { planFor, planLine } from "@/lib/register";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
+import { planComposition, composedText, composedLog, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, type ComposedTurn, type ComposerInput } from "@/lib/composer";
 import { promptNow } from "@/lib/benchSampling";
 import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
@@ -57,6 +57,7 @@ import {
   getPendingAsk,
   setPendingAsk,
   recentTurnSafety,
+  turnRowsById,
   routingStats,
   resolveSupersedes,
   lastTurnSubjects,
@@ -185,9 +186,14 @@ interface TurnLogRecord {
   /** LOOKUP-02: what the draft confessed (a promise, an offer, a
    * hedged fact, a denial), when it did. */
   lookup_shape?: LookupShape;
+  /** CHAT-16 (K2): the composer's decision for a turn that turned tool
+   * outcomes into a reply (`<mode> calls=<n>`, the budget and fallback
+   * marks), and K6's last phase. */
+  composed?: string;
+  phase?: string;
 }
 
-function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape, plan?: ReplyPlan): void {
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape, plan?: ReplyPlan, composed?: ComposedRecord): void {
   // ASK-02: the world kind, or the kinds an unresolved name hinted.
   const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form, ...(s.type === "world" ? { kind: s.kind } : s.type === "unresolved" && s.candidate_kinds.length > 0 ? { kind: s.candidate_kinds.join("/") } : {}) }));
   const record: TurnLogRecord = {
@@ -214,6 +220,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     ...(value.source === "model" || (timings?.first_token_ms ?? null) !== null ? { engine: formatEngineIdentity(getChatEngineIdentity()) } : {}),
     ...(named.length > 0 ? { subjects: named, subject: named[0]!.name } : {}),
     ...(lookupShape ? { lookup_shape: lookupShape } : {}),
+    ...(composed ? { composed: composedLog(composed), phase: composed.phase } : {}),
   };
   const line = `[turn] ${JSON.stringify(record)}`;
   // One writer (#73): the hub's console mirror (lib/log.ts, installed
@@ -235,6 +242,9 @@ export function judgeStatusAtInsert(value: Pick<TurnValue, "source">, signal: Tu
   if (value.source === "safety_refuse" || value.source === "policy") return "skipped";
   return hasEligibleClause(signal) ? null : "skipped";
 }
+/** CHAT-16: what the `[turn]` line says about a composed turn. */
+export type ComposedRecord = Pick<ComposedTurn, "mode" | "model_calls" | "budget_spent" | "fell_back" | "synthetic_ids"> & { phase: string };
+
 export type SpeakerEvidence = { person: string | null; basis: "signed_in" | "voice" | "face" | "voice_and_face" | "claimed" | "unknown"; level: "confirmed" | "tentative" | "unknown" };
 export type PresentPerson = SpeakerEvidence;
 
@@ -243,7 +253,7 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): void {
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
@@ -276,7 +286,7 @@ function logTurnSafely(
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
   }
-  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan);
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan, meta.composed);
   if (meta.ephemeral) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
@@ -1636,6 +1646,20 @@ type PreparedTurn =
       /** LOOKUP-02: the engine's query for the turn's lookup, once one
        * ran or an offer was bound. */
       lookupExpression?: string | null;
+      /** CHAT-16 (K2): the turn's model-call counter, the one place the
+       * budget is read (composer.ts's COMPOSER_MAX_CALLS): every
+       * completion the turn starts, on either path, counts here. */
+      modelCalls: number;
+      /** CHAT-16: a direct route (a pattern winner, an answered ask)
+       * whose result needs the composer: its literal reply, the
+       * fallback, with the outcomes already on `turnContext.outcomes`;
+       * the run functions compose it before anything else. */
+      compose?: TurnValue;
+      /** CHAT-16: the composer's decision on this turn, for the log. */
+      composed?: ComposedRecord;
+      /** K6: the turn's phases; created by the run function that owns
+       * the abort signal. */
+      machine?: TurnMachine;
     };
 
 // Session C step 2: a plain word-list, not a model call - a pendingAsk
@@ -2017,7 +2041,7 @@ export async function resolvePendingAsk(
               : { callId: `${turnId}:who`, packageId: "websearch", status: "failed", args: { expression }, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
           ),
         );
-        if (result.ok) { const outcome = outcomes[outcomes.length - 1]!; return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) }; }
+        if (result.ok) { const outcome = outcomes[outcomes.length - 1]!; return { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: "websearch", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) }; }
         return { reply: { text: `Got it, ${subject.display_name}. ${LOOKUP_FAILED_LINE}` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
       }
       return { reply: { text: `Got it, ${subject.display_name}.` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
@@ -2069,7 +2093,7 @@ export async function resolvePendingAsk(
       );
       if (result.ok) {
         const outcome = outcomes[outcomes.length - 1]!;
-        return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
+        return { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
       }
       // Fix B (docs/dev.md's "Chat reliability" B2): the same 502 ->
       // fallback_reply treatment as prepareTurn()'s own Tier 0/1 branch
@@ -2131,7 +2155,7 @@ export async function resolvePendingAsk(
     protocol.answer = { kind: "lookup", answer: "affirmative" };
     if (result.ok) {
       const outcome = outcomes[outcomes.length - 1]!;
-      return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
+      return { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
     }
     // The package's own honest line on a 502 (Fix B2, as the confirm
     // branch above), the lookup family's otherwise (a review).
@@ -2180,7 +2204,7 @@ export async function resolvePendingAsk(
   if (!result.ok) return null; // the continuation attempt failed - fall through rather than report a confusing error for an utterance that wasn't really about this
   protocol.answer = { kind: "ask", answer: "value" }; // ACT-01: only a consumed answer is the protocol layer's (a review)
   const outcome = outcomes[outcomes.length - 1]!;
-  return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
+  return { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
 }
 
 /** Safety-first routing and the deterministic plugin floor (4.5), shared
@@ -2244,13 +2268,24 @@ function resolveTurnSubjects(input: {
   for (const m of window.messages.filter((m) => m.role === "assistant").slice(-2)) {
     for (const n of properNounsIn(m.content, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: "reply", sourceKind: null, person: n.person });
   }
-  for (const row of outcomesForConversation(conversationId, 10)) {
-    for (const o of row.outcomes) {
-      const replyText = o.status === "succeeded" ? (o.result?.reply?.text ?? "") : "";
-      if (!replyText) continue;
-      const sourceKind = o.packageId === "websearch" ? "web" : o.packageId === "weather" ? "weather" : o.packageId === "knowledge" ? "wikipedia" : "package";
-      for (const n of properNounsIn(replyText, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: o.packageId, sourceKind, person: n.person });
-    }
+  // CHAT-16: a result the composer phrased binds no reply of its own;
+  // the names the person heard are in the composed reply on the turn
+  // row (a plugin-source turn enters the window as a note, never as an
+  // assistant message), read here beside a package's own reply, and
+  // never from rows the person never heard.
+  const outcomeRows = outcomesForConversation(conversationId, 10);
+  const pluginReplies = new Map(turnRowsById(outcomeRows.map((r) => r.turnId)).filter((t) => t.source === "plugin").map((t) => [t.id, t.replyText]));
+  for (const row of outcomeRows) {
+    const replyText = pluginReplies.get(row.turnId);
+    if (!replyText) continue;
+    // What the person heard on that turn, once: the delivered text (a
+    // package's own reply, or the composition of several), attributed to
+    // the turn's succeeded packages, the search first.
+    const packages = row.outcomes.filter((o) => o.status === "succeeded").map((o) => o.packageId);
+    const packageId = packages.find((id) => id === "websearch") ?? packages[0];
+    if (!packageId) continue;
+    const sourceKind = packageId === "websearch" ? "web" : packageId === "weather" ? "weather" : packageId === "knowledge" ? "wikipedia" : "package";
+    for (const n of properNounsIn(replyText, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: packageId, sourceKind, person: n.person });
   }
   const recent = window.messages.filter((m) => m.role === "user").slice(-3).map((m) => m.content);
   const resolved = resolveNames(
@@ -2504,7 +2539,15 @@ async function prepareTurn(
   // answer; the re-ask ("Yes or no?") keeps the rule signal, since the
   // person said something else.
   if (protocol.answer && pendingAskValue) signal = classifyTurnSignal({ text, protocol: protocol.answer, ageBand });
-  if (pendingAskValue) return { kind: "immediate", surface, value: pendingAskValue, turnId, outcomes: directOutcomes, signal, plan: planFor({ signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: ageBand, deferred: false, disclosureWithheld: false }), timings, ...(protocol.subjectId ? { subjects: [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] } : protocol.subject ? { subjects: [protocol.subject] } : {}) };
+  // CHAT-16 (K2): a direct route whose result needs the composer (a
+  // data-only result, a `synthesis_hint`: the search a consent or a
+  // who-answer ran) is not returned as it is. The turn goes on to build
+  // the model context (the persona, the window, the clock; no routing,
+  // no command) and the run functions compose the reply from the
+  // outcomes already on the context, the literal value the fallback.
+  const directSubjects: SubjectRef[] = protocol.subjectId ? [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] : protocol.subject ? [protocol.subject] : [];
+  let composeDirect: TurnValue | null = pendingAskValue && directNeedsComposer(pendingAskValue, directOutcomes) ? pendingAskValue : null;
+  if (pendingAskValue && !composeDirect) return { kind: "immediate", surface, value: pendingAskValue, turnId, outcomes: directOutcomes, signal, plan: planFor({ signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: ageBand, deferred: false, disclosureWithheld: false }), timings, ...(directSubjects.length > 0 ? { subjects: directSubjects } : {}) };
 
   // ASK-01 part 4: a question the judge queued but has not asked yet
   // ("Who's Juniper?", pending) can be answered before it is put: "he's
@@ -2516,7 +2559,7 @@ async function prepareTurn(
   // The same in-play selection as the appended ask (the set's read):
   // the answer goes to the question about the name in play, never the
   // oldest one about somebody else.
-  const openPending = nextOpenQuestionInPlay(actor.id, text, { history: [], subjects: lastTurnSubjects(conversation.id) });
+  const openPending = composeDirect ? null : nextOpenQuestionInPlay(actor.id, text, { history: [], subjects: lastTurnSubjects(conversation.id) });
   if (openPending && openPending.kind === "who" && openPending.subjectId) {
     const about = openQuestionName(openPending);
     // Only a question this conversation raised, or one about the
@@ -2545,7 +2588,7 @@ async function prepareTurn(
   // The model never gets to say "Got it." to a forget. After the pending
   // ask above on purpose: "forget it" to "Add what to the list?" is the
   // ask's own cancel, not a memory command.
-  const forget = parseForgetCommand(text);
+  const forget = composeDirect ? null : parseForgetCommand(text);
   if (forget) {
     const outcome = forgetFromConversation(actor, conversation.id, forget.topic, turnId);
     console.log(`[turn] forget: ${outcome.forgotten.length} record(s) tombstoned, ${outcome.skippedTurnIds.length} turn(s) skipped`);
@@ -2559,7 +2602,7 @@ async function prepareTurn(
   // bundled package shipped with. A household member customizing "tell
   // me a joke" with their own command is exactly that: a deliberate
   // override, not a collision to prevent.
-  const matchedCommand = matchCommand(text, actor);
+  const matchedCommand = composeDirect ? null : matchCommand(text, actor);
   if (matchedCommand) {
     const result = await runCommand(matchedCommand);
     // CHAT-15: a household command is a package call too (a reply, or a
@@ -2636,6 +2679,10 @@ async function prepareTurn(
   if (replyConstraint) { setReplyConstraint({ conversationId: conversation.id, person: actor.id, ...replyConstraint, setByTurn: turnId }); console.log(`[turn] constraint: ${replyConstraint.kind} ${replyConstraint.value}`); }
   const subjectsStart = performance.now();
   const { subjects, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
+  // CHAT-16: an answered ask's own subject (the entity a `who` answer
+  // made, the world subject it named) is the turn's, as the immediate
+  // return records it.
+  if (composeDirect && directSubjects.length > 0) subjects.splice(0, subjects.length, ...directSubjects);
   const worrySubjects = [...subjects, ...household.map((person) => ({ type: "unresolved" as const, surface_form: person.displayName, candidate_kinds: ["person" as const], provenance: "roster", confidence: 1, carried_question: null, role: person.role, utterance: text }))];
   if (worryingConversation(signal, worrySubjects, safety) && !safety.notify_parent && turnId && !notifiedThisTurn.has(`${turnId}:worrying`)) {
     notifiedThisTurn.add(`${turnId}:worrying`);
@@ -2652,7 +2699,7 @@ async function prepareTurn(
     const value = outcome?.args?.term ?? outcome?.args?.referent;
     if (typeof value === "string" && value.trim()) { carriedAlmanacTerm = value; break; }
   }
-  if (!inCrisis) {
+  if (!inCrisis && !composeDirect) {
     const question = parseDateQuestion(text, carriedAlmanacTerm);
     if (question) {
       const matchedTerm = question.kind === "next_clock" || question.kind === "date_of_next_clock"
@@ -2671,13 +2718,13 @@ async function prepareTurn(
   }
   // SAFETY-01: in the crisis state nothing routes to a package; the
   // embed still runs for recall.
-  const shortComment = !inCrisis && isShortCommentOnLiveSubject(text, subjects, signal);
+  const shortComment = !inCrisis && !composeDirect && isShortCommentOnLiveSubject(text, subjects, signal);
   if (shortComment) signal = asBackchannelOnLiveSubject(signal);
-  let { winner: routed, ranked }: RouteResult = inCrisis || shortComment ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
+  let { winner: routed, ranked }: RouteResult = inCrisis || shortComment || composeDirect ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
   // ACT-01: a literal-pattern win is a directive by construction, frozen
   // on the signal before the package runs.
   if (routed?.viaPattern) signal = freezeDirective(signal);
-  if (!routed && !inCrisis && !shortComment) {
+  if (!routed && !inCrisis && !shortComment && !composeDirect) {
     utteranceVector = await embedUtterance(text);
     ({ winner: routed, ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
   }
@@ -2754,9 +2801,10 @@ async function prepareTurn(
       if (pending) {
         return immediate({ reply: { text: pending.prompt }, source: "confirm", plugin_id: routed.id, safety, crisis_resources: crisisResources });
       }
-      const reply = result.value.reply ?? { text: "Done." };
-      return immediate({
-        reply,
+      const floorValue = immediate({
+        // CHAT-16: a result with no reply is composed, never "Done."; the
+        // line here is the literal the composer falls back to.
+        reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE },
         source: "plugin",
         plugin_id: routed.id,
         safety,
@@ -2764,6 +2812,13 @@ async function prepareTurn(
         routing: { tier: routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", score: routed.score },
         ...(floorOutcome.sources?.length ? { sources: floorOutcome.sources } : {}),
       }, subjects);
+      // CHAT-16 (K2): a floor winner whose result needs the composer (the
+      // search's rows and hint) goes on to the model context below, as
+      // an answered ask does; `ranked` is emptied so no tool is offered
+      // on a turn the floor already resolved.
+      if (!needsComposition(result.value)) return floorValue;
+      composeDirect = (floorValue as Extract<PreparedTurn, { kind: "immediate" }>).value;
+      ranked = [];
     } else {
     // Two real, different reasons runPlugin() can fail here. Fix B
     // (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
@@ -2970,7 +3025,7 @@ async function prepareTurn(
   }
   const deliverable = turnContext.intent.deliverable;
   const backReference = deliverable === "link" && /^(?:\s*(?:where did you read that|link me|the source|send me the page)(?:\s*(?:,|and)\s*(?:where did you read that|link me|the source|send me the page))?\s*[?.!]?)$/i.test(text);
-  if (backReference) {
+  if (backReference && !composeDirect) {
     const prior = outcomesForConversation(conversation.id).slice(-3).reverse().flatMap((turn) => turn.outcomes).find((o) => o.status === "succeeded" && o.sources?.length);
     if (prior?.sources?.length) {
       return immediate({ reply: { text: "The link's below." }, source: "plugin", plugin_id: prior.packageId, safety, crisis_resources: crisisResources, sources: prior.sources }, subjects);
@@ -3063,7 +3118,17 @@ async function prepareTurn(
   // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
   // seen on both paths.
   timings.prompt_ms = Math.round(performance.now() - promptStart);
-  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, plan, timings, unknownAsk };
+  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, plan, timings, unknownAsk, modelCalls: 0, ...(composeDirect ? { compose: composeDirect } : {}) };
+}
+
+/** CHAT-16 (K2): whether a direct route's plugin reply is one the
+ * composer phrases (its last outcome succeeded with a data-only result
+ * or a `synthesis_hint`), so prepareTurn() builds the model context
+ * for it instead of returning it as it is. */
+function directNeedsComposer(value: TurnValue, outcomes: readonly ToolExecutionOutcome[]): boolean {
+  if (value.source !== "plugin") return false;
+  const last = outcomes[outcomes.length - 1];
+  return !!last && last.status === "succeeded" && needsComposition(last.result);
 }
 
 /** ASK-01: the name an open question is about, from its subject (an
@@ -3499,7 +3564,7 @@ async function resolveToolCallsInOrder(
       return { reply: { text }, source: "confirm", plugin_id: withPending.call.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
     }
   }
-  const replyText = oks.map((r) => r.result.value.reply?.text ?? "Done.").join(" ");
+  const replyText = oks.map((r) => r.result.value.reply?.text ?? COMPOSE_FALLBACK_LINE).join(" ");
   const pluginIds = oks.map((r) => r.call.tool).join("+");
   const bestScore = Math.max(...oks.map((r) => rankedById.get(r.call.tool)?.score ?? 0));
   const pluginSources = outcomes.filter((o) => o.status === "succeeded" && o.sources?.length).flatMap((o) => o.sources!);
@@ -3776,14 +3841,29 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
   const denialDeliverable = read.shape === "denial" ? (prepared.turnContext.intent.deliverable ?? deliverableInDenial(read.sentence)) : undefined;
   const expression = queryOverride ?? (denialDeliverable ? deliverableQuery(denialDeliverable, prepared.turnContext.subjects, text) : lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape }));
   const outcomes = prepared.turnContext.outcomes;
-  const forced = await complete("chat", prepared.messages, { thinking, tools: prepared.lookupTools, tool_choice: "required" });
-  let resolved =
-    forced.ok && forced.value.tool_calls && forced.value.tool_calls.length > 0
-      ? await resolveToolCalls(forced.value.tool_calls, lookupIds, prepared.ranked, actor, conversationId, prepared.turnId, prepared.safety, prepared.crisisResources, outcomes, text, { via: "forced", expression })
-      : null;
+  prepared.machine?.enter("executing");
+  // CHAT-16 (K2): the model's rung runs only when it has a choice to
+  // make and the turn can still afford the composition after it. With
+  // the search the only lookup tool ranked and the query the engine's,
+  // a `tool_choice: required` completion could only call the search
+  // with that query; and on a turn whose draft already spent the first
+  // call, the rung would spend the second, leaving the search's rows
+  // with no call to phrase them (the fallback line). The search rung
+  // below runs at once instead, via forced as before; on a decided turn
+  // (no draft) with another lookup tool ranked the rung picks first.
+  const searchDirect = !!expression && lookupIds.has("websearch") && (prepared.lookupTools.length === 1 || prepared.modelCalls >= COMPOSER_MAX_CALLS - 1);
+  let resolved: TurnValue | null = null;
+  if (!searchDirect) {
+    prepared.modelCalls++;
+    const forced = await complete("chat", prepared.messages, { thinking, tools: prepared.lookupTools, tool_choice: "required" });
+    resolved =
+      forced.ok && forced.value.tool_calls && forced.value.tool_calls.length > 0
+        ? await resolveToolCalls(forced.value.tool_calls, lookupIds, prepared.ranked, actor, conversationId, prepared.turnId, prepared.safety, prepared.crisisResources, outcomes, text, { via: "forced", expression })
+        : null;
+  }
   const searched = outcomes.some((o) => o.packageId === "websearch" && o.via === "forced");
   if (!resolved && lookupIds.has("websearch") && !searched && expression) {
-    console.log(`[turn] the forced lookup's first rung answered nothing on turn ${prepared.turnId}; the search runs next`);
+    console.log(searchDirect ? `[turn] the forced lookup on turn ${prepared.turnId} is the search with the engine's query (${prepared.lookupTools.length === 1 ? "the only lookup tool" : "the budget's last call is the composition's"})` : `[turn] the forced lookup's first rung answered nothing on turn ${prepared.turnId}; the search runs next`);
     const result = await runPlugin("websearch", actor, { expression, ...(denialDeliverable === "picture" ? { category: "images" } : {}) }, prepared.turnId);
     outcomes.push(
       outcomeOf(
@@ -3792,7 +3872,7 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
           : { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "failed", args: { expression }, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
       ),
     );
-    if (result.ok) { const rows = result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined; const sources = sourcesFromRows(rows); const first = Array.isArray(rows) ? rows.find((row) => row && typeof row === "object" && typeof (row as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null } | undefined : undefined; resolved = { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}), ...(first && denialDeliverable === "picture" ? { media: { kind: "image" as const, url: first.image, thumbnail: first.thumbnail ?? null, source: new URL(sources[0]!.url).host } } : {}) }; }
+    if (result.ok) { const rows = result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined; const sources = sourcesFromRows(rows); const first = Array.isArray(rows) ? rows.find((row) => row && typeof row === "object" && typeof (row as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null } | undefined : undefined; resolved = { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}), ...(first && denialDeliverable === "picture" ? { media: { kind: "image" as const, url: first.image, thumbnail: first.thumbnail ?? null, source: new URL(sources[0]!.url).host } } : {}) }; }
   }
   if (resolved) prepared.lookupExpression = expression;
   if (resolved && denialDeliverable === "picture" && !resolved.media) {
@@ -3812,7 +3892,37 @@ function composeDeliverable(
 ): TurnValue {
   const child = ageBand === "child";
   const line = child ? "A grown-up can open that for you; ask them." : surface === "robot" ? deliverable === "link" ? "The link's on your phone." : deliverable === "picture" ? "The page with the picture is on your phone." : "The video link's on your phone." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? resolved.media ? "Here's a picture; the page it's from is below." : "I can't show the picture here yet; the page with it is below." : "Here's a video, the link's below.";
-  return { ...resolved, reply: { text: line }, ...(child ? { sources: [], media: undefined } : {}) };
+  const value: TurnValue = { ...resolved, reply: { text: line }, ...(child ? { sources: [], media: undefined } : {}) };
+  deliverableLines.add(value);
+  return value;
+}
+
+/** CHAT-16: the deliverable lines composeDeliverable() built, which the
+ * composer never rephrases (the brief's "not composed" list). */
+const deliverableLines = new WeakSet<TurnValue>();
+
+/** CHAT-16 (K2): the composer's input for one resolution on a model
+ * turn: the outcomes that resolution produced, the turn's own messages,
+ * CONS-01's constraints, the band, the surface and the budget counter. */
+function composerInputFor(prepared: Extract<PreparedTurn, { kind: "model" }>, conversationId: string, outcomes: readonly ToolExecutionOutcome[], direct = false): ComposerInput {
+  return {
+    outcomes,
+    // A direct route's composition names the question the search
+    // answered (the person's last message was a consent word or a
+    // who-answer); elsewhere the person's last message is the question.
+    ...(direct ? { question: questionOf(outcomes) } : {}),
+    messages: prepared.messages,
+    constraints: constraintsFor(conversationId).flatMap((c) => (c.kind === "banned_phrase" || c.kind === "shape" || c.kind === "length" ? [{ kind: c.kind, value: c.value }] : [])),
+    ageBand: prepared.turnContext.ageBand,
+    surface: prepared.surface,
+    budget: { spent: prepared.modelCalls },
+  };
+}
+
+/** The `[turn]` line's composed record, with K6's last phase. */
+function composedRecordOf(prepared: PreparedTurn): ComposedRecord | undefined {
+  if (prepared.kind !== "model" || !prepared.composed) return undefined;
+  return { ...prepared.composed, phase: prepared.machine?.phase ?? prepared.composed.phase };
 }
 
 function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface = "chat", trace?: ReplyTrace): TurnValue {
@@ -3919,10 +4029,110 @@ async function runTurnHoldingLease(
   // getmaipai/home#78: whether the reply the household got is a guard's
   // own line (stored on the turn row) rather than the model's words.
   let guardReplaced = false;
+  // The model turn's view, for the closures below (TS does not carry
+  // the union's narrowing into them); read only on the model branches.
+  const modelPrepared = prepared as Extract<PreparedTurn, { kind: "model" }>;
+  // K6: the turn's phases; the blocking path has no abort signal.
+  if (prepared.kind === "model") prepared.machine = new TurnMachine();
+  // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
+  // run "again on every streamed sentence") applied to this function's
+  // non-streaming twin: a completed reply here always arrives as one
+  // atomic block, so a single whole-text check is exactly as strong as
+  // per-sentence checking and needs no chunker at all. Shared by both
+  // the ordinary reply and Fix E's own retry-without-tools path below
+  // (a tool_calls reply that produced no successful call still needs
+  // this exact same safety/guard treatment for the plain-text answer
+  // that replaces it) - one definition, not two copies drifting apart.
+  // CHAT-16: a composed package answer is exempt from the repeat family
+  // (REP-01's own exemption for a package's deterministic answer: the
+  // same question asked again gets the same answer, never the loop
+  // line), so its guard context carries no previous replies.
+  const answerWithSafetyAndGuards = (text: string, composed = false): TurnValue => {
+    const outputSafety = forOutput(evaluateSafety(text, speakerAgeBand(actor, new Date())));
+    notifyOncePerTurn(actor, outputSafety, modelPrepared.turnId, "[turn]");
+    if (outputSafety.action === "refuse") {
+      // A non-streaming reply is atomic - nothing was ever shown to
+      // the caller before this point, so replacing the WHOLE reply
+      // with a canned refusal (finalizeReply()'s own existing
+      // "safety_refuse" handling, unchanged) is exactly as clean
+      // here as it is for an input-side refusal, unlike
+      // runTurnStream()'s own partial-delivery case above.
+      return {
+        reply: { text: "" },
+        source: "safety_refuse",
+        safety: outputSafety,
+        // CHAT-02: the output's own self-harm category keeps its crisis
+        // text on a refusal, the same as the streaming path's finalize().
+        crisis_resources: deriveCrisisResources(outputSafety) ?? modelPrepared.crisisResources,
+        conversation_id: conversation.id,
+        turn_id: modelPrepared.turnId,
+      };
+    }
+    // Session C step 3: guards run AFTER the safety floor, never
+    // instead of it - a refused reply above never reaches this
+    // branch at all, and nothing here can turn a safe reply back
+    // into a refusal (guards.ts's own reasons are all honesty
+    // fixes, never a safety category).
+    // CHAT-01: derived now, not at prepare time, so an outcome pushed by
+    // resolveToolCalls() above reaches the guards' `outcomes` (a code review).
+    const guarded = guardReply(text, { ...guardContextFrom(modelPrepared.turnContext), personId: actor.id, ...(composed ? { previousReplies: [] } : {}) });
+    if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
+    if (guarded.replaced) guardReplaced = true;
+    emptiedBySkips = guarded.emptied === true;
+    return {
+      reply: { text: guarded.reply },
+      source: "model",
+      safety: outputSafety.flagged ? outputSafety : modelPrepared.safety,
+      crisis_resources: outputSafety.flagged ? deriveCrisisResources(outputSafety) : modelPrepared.crisisResources,
+      conversation_id: conversation.id,
+      turn_id: modelPrepared.turnId,
+    };
+  };
+
+  // CHAT-16 (K2): the composer on the blocking path. The literal value
+  // a resolution assembled (a package's own reply, "Done." for a
+  // data-only result) is the fallback; the plan decides; a composition
+  // is one completion, thinking off, its text through the same safety
+  // floor and guards as a model draft, the plugin's own source, id and
+  // sources kept on the value. The deliverable line is never composed.
+  const composeBlocking = async (resolved: TurnValue, resolutionOutcomes: readonly ToolExecutionOutcome[], direct = false): Promise<TurnValue> => {
+    if (resolved.source !== "plugin" || deliverableLines.has(resolved)) return resolved;
+    const machine = modelPrepared.machine!;
+    const plan = planComposition(composerInputFor(modelPrepared, conversation.id, resolutionOutcomes, direct));
+    const sources = plan.sources.length > 0 ? plan.sources : resolved.sources;
+    if (plan.mode !== "composition") {
+      modelPrepared.composed = { mode: plan.mode, model_calls: 0, ...(plan.budget_spent ? { budget_spent: true } : {}), phase: machine.phase };
+      return { ...resolved, reply: plan.reply, ...(sources?.length ? { sources } : {}) };
+    }
+    machine.enter("composing");
+    modelPrepared.modelCalls++;
+    const answer = await complete("chat", plan.messages, { thinking: false });
+    generationDone = Date.now();
+    const composed = answer.ok ? composedText(answer.value.text) : null;
+    if (composed === null) {
+      console.log(`[turn] the composition on turn ${modelPrepared.turnId} ${answer.ok ? "answered nothing usable" : `failed: ${answer.error}`}; the direct replies stand`);
+      modelPrepared.composed = { mode: "composition", model_calls: 1, fell_back: true, ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
+      return { ...resolved, reply: plan.fallback, ...(sources?.length ? { sources } : {}) };
+    }
+    modelPrepared.composed = { mode: "composition", model_calls: 1, ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
+    groundOutcomes(modelPrepared.turnContext, resolutionOutcomes);
+    const guarded = answerWithSafetyAndGuards(composed, true);
+    if (guarded.source === "safety_refuse") return guarded;
+    // The opener's case, as the stream's sentenceCaseStream() and the
+    // model turn's finalizeReply() give it (a plugin-source value skips
+    // that there).
+    return { ...resolved, reply: { ...guarded.reply, text: sentenceCaseOpener(guarded.reply.text) }, safety: guarded.safety, crisis_resources: guarded.crisis_resources, ...(sources?.length ? { sources } : {}) };
+  };
   if (prepared.kind === "immediate") {
     value = prepared.value;
+  } else if (prepared.compose) {
+    // CHAT-16: a direct route's result the composer phrases (its outcome
+    // is the last on the context); no initial call was spent.
+    value = await composeBlocking(prepared.compose, prepared.turnContext.outcomes.slice(-1), true);
   } else if (prepared.turnContext.intent.decided) {
-    value = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, prepared.turnContext.intent.decided.query) ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
+    const before = prepared.turnContext.outcomes.length;
+    const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, prepared.turnContext.intent.decided.query);
+    value = resolved ? await composeBlocking(resolved, prepared.turnContext.outcomes.slice(before)) : { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
   } else if (prepared.turnContext.intent.deliverable) {
     const deliverable = prepared.turnContext.intent.deliverable;
     const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverable, prepared.turnContext.subjects, text));
@@ -3932,57 +4142,6 @@ async function runTurnHoldingLease(
       value = composeDeliverable(resolved!, deliverable, prepared.turnContext.ageBand, prepared.surface);
     }
   } else {
-    // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
-    // run "again on every streamed sentence") applied to this function's
-    // non-streaming twin: a completed reply here always arrives as one
-    // atomic block, so a single whole-text check is exactly as strong as
-    // per-sentence checking and needs no chunker at all. Shared by both
-    // the ordinary reply and Fix E's own retry-without-tools path below
-    // (a tool_calls reply that produced no successful call still needs
-    // this exact same safety/guard treatment for the plain-text answer
-    // that replaces it) - one definition, not two copies drifting apart.
-    const answerWithSafetyAndGuards = (text: string): TurnValue => {
-      const outputSafety = forOutput(evaluateSafety(text, speakerAgeBand(actor, new Date())));
-      notifyOncePerTurn(actor, outputSafety, prepared.turnId, "[turn]");
-      if (outputSafety.action === "refuse") {
-        // A non-streaming reply is atomic - nothing was ever shown to
-        // the caller before this point, so replacing the WHOLE reply
-        // with a canned refusal (finalizeReply()'s own existing
-        // "safety_refuse" handling, unchanged) is exactly as clean
-        // here as it is for an input-side refusal, unlike
-        // runTurnStream()'s own partial-delivery case above.
-        return {
-          reply: { text: "" },
-          source: "safety_refuse",
-          safety: outputSafety,
-          // CHAT-02: the output's own self-harm category keeps its crisis
-          // text on a refusal, the same as the streaming path's finalize().
-          crisis_resources: deriveCrisisResources(outputSafety) ?? prepared.crisisResources,
-          conversation_id: conversation.id,
-          turn_id: prepared.turnId,
-        };
-      }
-      // Session C step 3: guards run AFTER the safety floor, never
-      // instead of it - a refused reply above never reaches this
-      // branch at all, and nothing here can turn a safe reply back
-      // into a refusal (guards.ts's own reasons are all honesty
-      // fixes, never a safety category).
-      // CHAT-01: derived now, not at prepare time, so an outcome pushed by
-      // resolveToolCalls() above reaches the guards' `outcomes` (a code review).
-      const guarded = guardReply(text, { ...guardContextFrom(prepared.turnContext), personId: actor.id });
-      if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
-      if (guarded.replaced) guardReplaced = true;
-      emptiedBySkips = guarded.emptied === true;
-      return {
-        reply: { text: guarded.reply },
-        source: "model",
-        safety: outputSafety.flagged ? outputSafety : prepared.safety,
-        crisis_resources: outputSafety.flagged ? deriveCrisisResources(outputSafety) : prepared.crisisResources,
-        conversation_id: conversation.id,
-        turn_id: prepared.turnId,
-      };
-    };
-
     // OUT-01: the model's text meets the well-formed rule before the
     // guards read it (a fragment cannot be judged for invention). The
     // repair first; a short output that is still not a sentence gets
@@ -3999,6 +4158,7 @@ async function runTurnHoldingLease(
       // Thinking off for the regeneration: under the cap a think block
       // would be the whole output, and its tags travel to the client.
       prepared.timings.retries++;
+      prepared.modelCalls++;
       const again = await complete("chat", prepared.messages, { thinking: false, max_tokens: RETRY_TOKEN_CAP });
       generationDone = Date.now();
       if (!again.ok) return repaired;
@@ -4016,6 +4176,7 @@ async function runTurnHoldingLease(
     // check).
     const offeringTools = prepared.tools.length > 0;
     const offeredIds = new Set(prepared.tools.map((t) => t.id));
+    prepared.modelCalls++;
     const completion = await complete("chat", prepared.messages, {
       thinking: opts.thinking,
       // CHAT-12 reserve plus the ACT-03 plan's word budget.
@@ -4038,15 +4199,18 @@ async function runTurnHoldingLease(
       resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources, prepared.turnContext.outcomes, text);
 
     if (offeringTools && completion.value.tool_calls && completion.value.tool_calls.length > 0) {
+      prepared.machine!.enter("executing");
+      const before = prepared.turnContext.outcomes.length;
       const resolved = await resolveOffered(completion.value.tool_calls, offeredIds);
       if (resolved) {
-        value = resolved;
+        value = await composeBlocking(resolved, prepared.turnContext.outcomes.slice(before));
       } else {
         // Every proposed call failed (bad args, a real runtime error, or
         // named a tool that wasn't actually offered) - the exact "ask
         // again, never a silent drop" contract: one retry, this time
         // without tools, answered as an ordinary reply.
         prepared.timings.retries++;
+        prepared.modelCalls++;
         const retry = await complete("chat", prepared.messages, { thinking: opts.thinking });
         generationDone = Date.now();
         if (!retry.ok) {
@@ -4162,6 +4326,7 @@ async function runTurnHoldingLease(
       if (offeringTools && ((looksInvented && !householdSubject) || promisesLookup) && prepared.lookupTools.length > 0) {
         if (read) console.log(`[turn] a ${read.shape} on turn ${prepared.turnId} (${read.sentence.length} chars); the forced lookup runs`);
         prepared.timings.retries++;
+        const before = prepared.turnContext.outcomes.length;
         const resolved = await runForcedLookup(prepared, actor, conversation.id, text, read ?? { shape: "promise", sentence: "" }, opts.thinking);
         generationDone = Date.now();
         // Only the WINNING side ever reaches answerWithSafetyAndGuards()/
@@ -4171,7 +4336,7 @@ async function runTurnHoldingLease(
         // every other plugin reply in this function.
         // A confession whose lookup answered nothing keeps the rest of
         // the draft without it, or the lookup family's honest line.
-        value = resolved ? resolved : answerWithSafetyAndGuards(read ? `${thinkingPrefix(rawText)}${withoutSentences(visibleReply, [read.index, ...read.denials])}` : rawText);
+        value = resolved ? await composeBlocking(resolved, prepared.turnContext.outcomes.slice(before)) : answerWithSafetyAndGuards(read ? `${thinkingPrefix(rawText)}${withoutSentences(visibleReply, [read.index, ...read.denials])}` : rawText);
       } else {
         value = answerWithSafetyAndGuards(rawText);
         // REG-01, rule 1: every sentence of a reply to a statement was
@@ -4186,6 +4351,7 @@ async function runTurnHoldingLease(
           // REP-01: a repeat or a self-assertion emptied it: the note says
           // so, and carries the objection when there was one.
           const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
+          prepared.modelCalls++;
           const again = await complete("chat", [...prepared.messages, { role: "system", content: note }], { thinking: false });
           generationDone = Date.now();
           if (again.ok) {
@@ -4224,7 +4390,8 @@ async function runTurnHoldingLease(
     if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
   }
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, speakerEvidence: opts.speakerEvidence, present: opts.present });
+  if (prepared.kind === "model") prepared.machine?.enter("finished");
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, composed: composedRecordOf(prepared), speakerEvidence: opts.speakerEvidence, present: opts.present });
   return { ok: true, value };
 }
 
@@ -4834,6 +5001,8 @@ async function runTurnStreamHoldingLease(
   // the fetch is what stops the engine. The caller's signal forwards,
   // an already-aborted one at once.
   const modelTurn = prepared as Extract<typeof prepared, { kind: "model" }>;
+  // K6: the turn's phases, cancelled from any phase by the route's abort.
+  modelTurn.machine = new TurnMachine(opts.signal);
   const draftAbort = new AbortController();
   if (opts.signal?.aborted) draftAbort.abort();
   else opts.signal?.addEventListener("abort", () => draftAbort.abort(), { once: true });
@@ -4847,6 +5016,92 @@ async function runTurnStreamHoldingLease(
   // through this one closure rather than three copies of the same
   // gateGuards()/finalize() wiring.
   const status = new StatusChannel();
+  // CHAT-16 (K2, K6): set when the composition's own deltas are the
+  // stream (the composing phase): the resolution's value whose reply
+  // the composed text becomes, read by finalize() and the ask stage.
+  let composedFrom: TurnValue | null = null;
+  // CHAT-16 (K2, K6): the composer on the streaming path. The literal
+  // value a resolution assembled is the fallback; a plan that needs
+  // no call hands the value back whole (as a package reply always
+  // was); a composition streams its own deltas sentence by sentence
+  // through the gates below, after a `composing` status line, and
+  // finalize() builds the value from the resolution and the text.
+  // The deliverable line is never composed.
+  async function* composeOrResolve(resolved: TurnValue, resolutionOutcomes: readonly ToolExecutionOutcome[], direct = false): AsyncGenerator<string, { resolved: TurnValue } | undefined, void> {
+    if (resolved.source !== "plugin" || deliverableLines.has(resolved)) return { resolved: finalizeReply(actor, resolved, modelTurn.surface, resolvedTrace) };
+    const machine = modelTurn.machine!;
+    const plan = planComposition(composerInputFor(modelTurn, conversation.id, resolutionOutcomes, direct));
+    const sources = plan.sources.length > 0 ? plan.sources : resolved.sources;
+    const withSources: TurnValue = { ...resolved, ...(sources?.length ? { sources } : {}) };
+    if (plan.mode !== "composition") {
+      modelTurn.composed = { mode: plan.mode, model_calls: 0, ...(plan.budget_spent ? { budget_spent: true } : {}), phase: machine.phase };
+      return { resolved: finalizeReply(actor, { ...withSources, reply: plan.reply }, modelTurn.surface, resolvedTrace) };
+    }
+    machine.enter("composing");
+    status.emit({ type: "status", text: COMPOSING_STATUS_TEXT, stage: "composing" });
+    modelTurn.modelCalls++;
+    groundOutcomes(modelTurn.turnContext, resolutionOutcomes);
+    composedFrom = withSources;
+    const record = (fellBack: boolean) => {
+      modelTurn.composed = { mode: "composition", model_calls: 1, ...(fellBack ? { fell_back: true } : {}), ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
+    };
+    const started = await startCompleteStream("chat", plan.messages, { thinking: false }, opts.signal);
+    if (!started.ok) {
+      console.log(`[turn] the composition on turn ${modelTurn.turnId} failed to start: ${started.error}; the direct replies stand`);
+      record(true);
+      yield `${plan.fallback.text} `;
+      return undefined;
+    }
+    // The composition's own opening hold (OUT-01's rule, in one place
+    // for both paths: the promise path's composition runs inside the
+    // lookup hold, past holdOpening()): the first chunk is held until it
+    // carries two words or a sentence boundary, so a composition that
+    // ends inside the hold is known to be a fragment before anything is
+    // on the wire, and the direct replies stand for it.
+    let sent = "";
+    let buffer = "";
+    let released = false;
+    try {
+      for await (const delta of started.tokens) {
+        sent += delta;
+        if (released) {
+          yield delta;
+          continue;
+        }
+        buffer += delta;
+        if (openingReleases(buffer)) {
+          released = true;
+          yield buffer;
+        }
+      }
+    } catch (err) {
+      // Nothing on the wire yet: the direct replies stand, as on the
+      // blocking path; after a delta the failure is the stream's.
+      if (visibleText(sent).trim().length > 0 || opts.signal?.aborted) throw err;
+      console.log(`[turn] the composition on turn ${modelTurn.turnId} failed before any text: ${(err as Error).message}; the direct replies stand`);
+      record(true);
+      yield `${plan.fallback.text} `;
+      return undefined;
+    }
+    if (visibleText(sent).trim().length === 0) {
+      console.log(`[turn] the composition on turn ${modelTurn.turnId} answered nothing; the direct replies stand`);
+      record(true);
+      yield `${plan.fallback.text} `;
+      return undefined;
+    }
+    if (!released) {
+      const repaired = repairReply(buffer);
+      if (assessReply(repaired) !== null) {
+        console.log(`[turn] the composition on turn ${modelTurn.turnId} came back as a fragment; the direct replies stand`);
+        record(true);
+        yield `${plan.fallback.text} `;
+        return undefined;
+      }
+      yield repaired;
+    }
+    record(false);
+    return undefined;
+  }
   const buildStreamResult = (tokens: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>): TurnStreamResult => {
     // Fix A4: collected by gateGuards()'s own onGuardHit callback as the
     // stream runs, read back once finalize() builds the log line below -
@@ -4939,6 +5194,13 @@ async function runTurnStreamHoldingLease(
             continue;
           }
         }
+        // CHAT-16: a composition's deltas (the peek resolved the calls
+        // and the composer is phrasing the results) are never read for
+        // a promise: the lookup already ran.
+        if (composedFrom) {
+          yield buffer;
+          return yield* iterator;
+        }
         const visible = visibleText(buffer);
         // LOOKUP-02: the first two real sentences, complete (a
         // hesitation fragment ahead of them is not one, a review), or
@@ -4983,8 +5245,9 @@ async function runTurnStreamHoldingLease(
         generations++;
         prepared.timings.retries = generations - 1;
         status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
+        const before = modelTurn.turnContext.outcomes.length;
         const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, read, opts.thinking);
-        if (resolved) return { resolved: finalizeReply(actor, resolved, modelTurn.surface, resolvedTrace) };
+        if (resolved) return yield* composeOrResolve(resolved, modelTurn.turnContext.outcomes.slice(before));
         console.log(`[turn] a ${shape}'s lookup for turn ${modelTurn.turnId} ran and found nothing; the honest line stands`);
         yield `${LOOKUP_FAILED_LINE} `;
         return undefined;
@@ -5046,8 +5309,12 @@ async function runTurnStreamHoldingLease(
         yield repaired;
         return outcome;
       }
-      if (mayRetry && generations < 2) {
+      // CHAT-16: a composition is never regenerated from the model
+      // turn's own prompt (composeOrResolve() holds its own opening and
+      // falls back to the direct replies on a fragment).
+      if (mayRetry && generations < 2 && !composedFrom) {
         generations++;
+        modelTurn.modelCalls++;
         const again = await startCompleteStream("chat", modelMessages, { thinking: false, max_tokens: RETRY_TOKEN_CAP }, opts.signal);
         if (again.ok) {
           // A regeneration that fails before it has put anything on the
@@ -5091,6 +5358,9 @@ async function runTurnStreamHoldingLease(
       const outcome = step.value;
       if (outcome && "resolved" in outcome) return outcome;
       if (outcome?.action === "refuse") return outcome;
+      // CHAT-16: a composed package reply appends no ask, as a package
+      // reply never did.
+      if (composedFrom) return outcome;
       const ask = appendedAsk(modelTurn, actor, conversation.id, spoken, text, opts.ephemeral === true);
       if (ask.append) yield ask.append;
       // On the wire now: the delivered text is what was spoken plus
@@ -5113,7 +5383,9 @@ async function runTurnStreamHoldingLease(
         sentenceCaseStream(
           gateGuards(
             gateOutputSafety(guardFirstStep(holdForLookup(holdOpening(tokens, true))), actor, prepared.turnId),
-            () => guardContextFrom(prepared.turnContext),
+            // CHAT-16: a composed package answer is exempt from the
+            // repeat family (REP-01's exemption for a package's answer).
+            () => (composedFrom ? { ...guardContextFrom(prepared.turnContext), previousReplies: [] } : guardContextFrom(prepared.turnContext)),
             actor.id,
             (reason, replaced) => {
               // The reason that replaced is the one the row records
@@ -5130,8 +5402,13 @@ async function runTurnStreamHoldingLease(
             // REG-01: the statement-turn retry, within the turn's two
             // generations; thinking off, like OUT-01's hold.
             async () => {
+              // CHAT-16: a composed package reply is never regenerated
+              // from the model turn's own prompt (the answer is the
+              // package's, not the model's).
+              if (composedFrom) return null;
               if (generations >= 2) return null;
               generations++;
+              modelTurn.modelCalls++;
               const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => modelMessages.some((m) => m.content.toLowerCase().includes(p.toLowerCase()))) : null;
               const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
               const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: note }], { thinking: false }, opts.signal);
@@ -5150,6 +5427,7 @@ async function runTurnStreamHoldingLease(
         // generations this turn spent.
         const finalizeStart = Date.now();
         prepared.timings.retries = generations - 1;
+        modelTurn.machine?.enter("finished");
         // CHAT-18: idempotent; normally already released by the
         // generator's own exhaustion, this covers a consumer that
         // finalizes without draining.
@@ -5162,8 +5440,20 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, speakerEvidence: opts.speakerEvidence, present: opts.present });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), speakerEvidence: opts.speakerEvidence, present: opts.present });
           return outcome.resolved;
+        }
+        // CHAT-16 (K2, K6): the composition's deltas were the stream:
+        // the value is the resolution's (the package's source, id,
+        // routing and sources) with the text the gates approved; an
+        // output-safety cut is the model turn's own case below.
+        if (composedFrom && !(outcome?.action === "refuse")) {
+          const trace: ReplyTrace = { hits: guardHits, replaced: guardReplaced, delivered: true };
+          const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace);
+          finalized = composedValue;
+          prepared.timings.finalize_ms = Date.now() - finalizeStart;
+          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), speakerEvidence: opts.speakerEvidence, present: opts.present });
+          return composedValue;
         }
         const outputSafety = outcome;
         // A safety cut with nothing safe delivered before it (the very
@@ -5222,6 +5512,9 @@ async function runTurnStreamHoldingLease(
         const value: TurnValue = finalizeReply(
           actor,
           {
+            // CHAT-16: a composition cut by the output gate after some
+            // text keeps the package's id, routing and sources on the row.
+            ...(composedFrom && !refusedWithNothingDelivered ? { ...(composedFrom.plugin_id ? { plugin_id: composedFrom.plugin_id } : {}), ...(composedFrom.routing ? { routing: composedFrom.routing } : {}), ...(composedFrom.sources?.length ? { sources: composedFrom.sources } : {}) } : {}),
             reply: { text: finalText },
             source: refusedWithNothingDelivered ? "safety_refuse" : "model",
             safety: outputSafety ?? prepared.safety,
@@ -5245,7 +5538,7 @@ async function runTurnStreamHoldingLease(
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
         }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, speakerEvidence: opts.speakerEvidence, present: opts.present });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), speakerEvidence: opts.speakerEvidence, present: opts.present });
         return value;
       },
     };
@@ -5253,7 +5546,18 @@ async function runTurnStreamHoldingLease(
 
   const offeringTools = prepared.tools.length > 0;
   const offeredIds = new Set(prepared.tools.map((t) => t.id));
+  // CHAT-16 (K2): a direct route's result the composer phrases: no
+  // initial call was spent; the composition is the turn's first.
+  if (modelTurn.compose) {
+    const direct = modelTurn.compose;
+    async function* directComposeStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
+      return yield* composeOrResolve(direct, modelTurn.turnContext.outcomes.slice(-1), true);
+    }
+    return buildStreamResult(directComposeStream());
+  }
+
   if (!offeringTools) {
+    modelTurn.modelCalls++;
     const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
     if (!started.ok) {
       // An engine-down failure here is still a real, finished turn; the
@@ -5295,8 +5599,10 @@ async function runTurnStreamHoldingLease(
   if (modelTurn.turnContext.intent.decided) {
     async function* decidedLookupStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
       status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
+      const before = modelTurn.turnContext.outcomes.length;
       const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, modelTurn.turnContext.intent.decided!.query);
-      return { resolved: resolved ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: modelTurn.safety, crisis_resources: modelTurn.crisisResources, conversation_id: conversation.id, turn_id: modelTurn.turnId } };
+      if (resolved) return yield* composeOrResolve(resolved, modelTurn.turnContext.outcomes.slice(before));
+      return { resolved: { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: modelTurn.safety, crisis_resources: modelTurn.crisisResources, conversation_id: conversation.id, turn_id: modelTurn.turnId } };
     }
     return buildStreamResult(decidedLookupStream());
   }
@@ -5317,6 +5623,7 @@ async function runTurnStreamHoldingLease(
   // `startResult`'s (ok: true) into a nested generator's body, hence
   // the two casts.
   const modelPrepared = modelTurn;
+  modelTurn.modelCalls++;
   const startResult = await startCompleteStream(
     "chat",
     modelPrepared.messages,
@@ -5336,20 +5643,24 @@ async function runTurnStreamHoldingLease(
       const rawCalls = first.value ?? [];
       if (rawCalls.length > 0) {
         status.emit({ type: "status", text: "On it.", stage: "tool" });
+        modelTurn.machine?.enter("executing");
+        const before = modelPrepared.turnContext.outcomes.length;
         const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes, text);
         if (resolved) {
-          // The package answered. Handed back whole, past both gates;
-          // buildStreamResult()'s finalize() logs it and marks the turn
-          // finished, so neither happens here.
+          // The package answered. CHAT-16: the composer decides whether
+          // it is handed back whole, past both gates (finalize() logs it
+          // and marks the turn finished), or phrased by a composition
+          // whose deltas stream through them.
           // OUT-01: a package line that fails the rule is replaced and
           // logged loudly by the boundary; finalize() logs the trace.
-          return { resolved: finalizeReply(actor, resolved, modelPrepared.surface, resolvedTrace) };
+          return yield* composeOrResolve(resolved, modelPrepared.turnContext.outcomes.slice(before));
         }
         // Every proposed call failed - the exact "ask again, never a
         // silent drop" contract: a genuinely second completion, this time
         // without tools, streamed normally through the SAME gate every
         // ordinary reply goes through.
         generations++; // OUT-01: the opening hold may not regenerate after this
+        modelTurn.modelCalls++;
         const retry = await startCompleteStream("chat", modelPrepared.messages, { thinking: opts.thinking }, opts.signal);
         // buildStreamResult()'s guardFirstStep() catches this (nothing
         // has been yielded yet) and marks the turn finished.

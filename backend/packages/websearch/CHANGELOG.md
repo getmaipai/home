@@ -2,6 +2,16 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.0] - 2026-09-15
+
+### Changed
+
+- The recipe no longer builds the answer itself: it returns the search
+  rows and a `synthesis_hint`, and the hub's composer (CHAT-16) phrases
+  the answer in the same completion it uses for every other tool result,
+  so a search costs one composition and never a third model call in the
+  turn. The rows still carry the sources shown under the reply.
+
 ## [0.1.0] - 2026-09-06
 
 ### Added

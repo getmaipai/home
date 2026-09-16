@@ -187,7 +187,7 @@ async function withLookup<T>(opts: { draft: (r: ChatCompletionRequest) => string
       return [{ id: "call-s", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "the model's own guess" }) } }];
     },
     scriptedChatReply: (request) => {
-      if (request.messages.some((m) => typeof m.content === "string" && m.content.includes("BEGIN SEARCH RESULTS"))) return SEARCH_ANSWER;
+      if (request.messages.some((m) => m.role === "tool")) return SEARCH_ANSWER;
       return opts.draft(request);
     },
   });
@@ -233,7 +233,7 @@ describe("the flows", () => {
       const first = await runTurn(actor, "chat", "who's in the new Marsh Lantern film");
       if (!first.ok) throw new Error(first.error);
       expect(first.value.source).toBe("plugin");
-      expect(seen.forced).toBe(1);
+      expect(seen.forced).toBe(0);
       const lines = await turnLines(async () => {
         const second = await runTurn(actor, "chat", "who's Serena Vale", { conversationId: first.value.conversation_id });
         if (!second.ok) throw new Error(second.error);

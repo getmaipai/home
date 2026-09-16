@@ -121,6 +121,7 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
     reply: dict[str, str] | None = None
     ask: dict[str, Any] | None = None
     data: dict[str, Any] | None = None
+    synthesis_hint: str | None = None
 
     for step in recipe.steps:
         op = step.op
@@ -141,10 +142,20 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
                 key, step.default if step.default is not None else key
             )
         elif op == "format":
-            text = interpolate(step.text, scope)
-            speech = interpolate(step.speech, scope) if step.speech else text
-            scope[step.as_] = {"text": text, "speech": speech}
-            reply = {"text": text, "speech": speech}
+            # CHAT-16: a step with a `synthesis_hint` and no `text` binds
+            # no reply: the result is its `data` and the hint, phrased by
+            # the composer (recipe.schema.json requires one of the two).
+            if step.text is None:
+                if step.synthesis_hint is None:
+                    raise ValueError("a format step needs text or synthesis_hint")
+                reply = None
+                scope[step.as_] = None
+            else:
+                text = interpolate(step.text, scope)
+                speech = interpolate(step.speech, scope) if step.speech else text
+                scope[step.as_] = {"text": text, "speech": speech}
+                reply = {"text": text, "speech": speech}
+            synthesis_hint = step.synthesis_hint
             # Named fields beside the text (result.schema.json's `data`): a
             # template that is exactly one {variable} keeps the variable's
             # own type; anything else is interpolated text.
@@ -248,4 +259,6 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
         result["data"] = data
     if ask is not None:
         result["ask"] = ask
+    if synthesis_hint is not None:
+        result["synthesis_hint"] = synthesis_hint
     return result

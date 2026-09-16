@@ -60,7 +60,7 @@ class PickStep(BaseModel):
     )
 
 
-class FormatStep(BaseModel):
+class FormatStep1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -68,7 +68,7 @@ class FormatStep(BaseModel):
     as_: str = Field(..., alias='as')
     text: str = Field(
         ...,
-        description='A template with {variable} interpolation for the on-screen reply.',
+        description='A template with {variable} interpolation for the on-screen reply. May be omitted when `synthesis_hint` is given: the result then carries `data` and the hint and no reply, and the composer (CHAT-16) phrases the answer.',
     )
     speech: str | None = Field(
         None,
@@ -77,6 +77,34 @@ class FormatStep(BaseModel):
     data: dict[str, str] | None = Field(
         None,
         description="Named fields for the result's `data` (result.schema.json): each value is a template; a template that is exactly one {variable} keeps that variable's own type (a number stays a number), anything else is interpolated text. What a composer (CHAT-16) phrases from, beside the reply text.",
+    )
+    synthesis_hint: str | None = Field(
+        None,
+        description="The result's `synthesis_hint` (result.schema.json), a literal line for the composer (CHAT-16): the `data` answers the person's question and needs phrasing. A result carrying it is always composed, never delivered as its `text`.",
+    )
+
+
+class FormatStep2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['format']
+    as_: str = Field(..., alias='as')
+    text: str | None = Field(
+        None,
+        description='A template with {variable} interpolation for the on-screen reply. May be omitted when `synthesis_hint` is given: the result then carries `data` and the hint and no reply, and the composer (CHAT-16) phrases the answer.',
+    )
+    speech: str | None = Field(
+        None,
+        description='A template for the spoken form. Falls back to text if omitted.',
+    )
+    data: dict[str, str] | None = Field(
+        None,
+        description="Named fields for the result's `data` (result.schema.json): each value is a template; a template that is exactly one {variable} keeps that variable's own type (a number stays a number), anything else is interpolated text. What a composer (CHAT-16) phrases from, beside the reply text.",
+    )
+    synthesis_hint: str = Field(
+        ...,
+        description="The result's `synthesis_hint` (result.schema.json), a literal line for the composer (CHAT-16): the `data` answers the person's question and needs phrasing. A result carrying it is always composed, never delivered as its `text`.",
     )
 
 
@@ -372,7 +400,6 @@ class Recipe(BaseModel):
         FetchStep
         | PickStep
         | LookupStep
-        | FormatStep
         | HomeCallServiceStep
         | ActionStep
         | RememberStep
@@ -386,4 +413,6 @@ class Recipe(BaseModel):
         | RemindStep
         | TimerStep
         | AskStep
+        | FormatStep1
+        | FormatStep2
     ] = Field(..., min_length=1)

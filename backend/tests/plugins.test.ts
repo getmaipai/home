@@ -446,11 +446,12 @@ describe("POST /api/plugins/websearch/run", () => {
   // A real local SearXNG stand-in (Bun.serve) plus the stub chat backend
   // (no real engine configured in tests) - proves the real recipe chain
   // end to end: integration.call("searxng", "search", ...) -> the real
-  // formatted-string binding -> llm_complete interpolating it into a
-  // prompt -> pick -> format. Not real search or answer quality (that
-  // needs a real SearXNG instance and a real model, see this package's
-  // own quality_scale.yaml).
-  test("runs the recipe end to end: integration.call through to llm_complete, stub chat backend", async () => {
+  // rows binding -> pick -> format with a synthesis_hint and no text
+  // (CHAT-16: the composer phrases the rows in the turn; run directly,
+  // the package returns the rows, the hint and no reply). Not real
+  // search or answer quality (that needs a real SearXNG instance and a
+  // real model, see this package's own quality_scale.yaml).
+  test("runs the recipe end to end: integration.call through to the rows and the synthesis_hint, no reply", async () => {
     const server = Bun.serve({
       port: 0,
       fetch: () =>
@@ -463,9 +464,11 @@ describe("POST /api/plugins/websearch/run", () => {
       const client = await owner();
       const res = await client.post("/api/plugins/websearch/run", { expression: "the tallest mountain" });
       expect(res.status).toBe(200);
-      const body = (await res.json()) as { reply?: { text: string } };
-      expect(body.reply?.text).toContain("[stub model: no real model loaded, this is a canned reply]");
-      expect(body.reply?.text).toContain("Mount Everest");
+      const body = (await res.json()) as { reply?: { text: string }; data?: { rows?: { title: string; url: string }[]; query?: string }; synthesis_hint?: string };
+      expect(body.reply).toBeUndefined();
+      expect(body.synthesis_hint).toContain("answer the question from these search results");
+      expect(body.data?.rows?.map((r) => r.title)).toEqual(["Mount Everest"]);
+      expect(body.data?.query).toBe("the tallest mountain");
     } finally {
       server.stop(true);
     }

@@ -22,8 +22,8 @@ setting one up.
 Your search query goes to your own SearXNG instance, which is
 configured to reach whichever search engines you choose. MaiPai never
 talks to a search engine directly. The search results and your question
-then go to the household's own local chat model to build an answer -
-nothing leaves the house for that part.
+then go to the household's own local chat model, which puts the answer
+into words - nothing leaves the house for that part.
 
 ## Offline
 

@@ -1,6 +1,6 @@
 {
   "id": "websearch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",

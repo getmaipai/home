@@ -28,6 +28,8 @@ interface ConformanceFixture {
     home_calls: { domain: string; service: string; target: unknown; data: unknown }[];
     memory_added: { text: string; category?: string; scope?: string }[];
     ask?: { prompt: string; expects?: string } | null;
+    data?: unknown;
+    synthesis_hint?: string;
   };
 }
 
@@ -61,6 +63,9 @@ describe("recipe conformance", () => {
       // `data` (a format step's named fields) is compared whole when the
       // fixture expects it: a number has to arrive as a number.
       if (fixture.expected.data !== undefined) expect(result.data).toEqual(fixture.expected.data);
+      // CHAT-16: a format step's hint reaches the result verbatim, or
+      // not at all.
+      expect(result.synthesis_hint).toEqual(fixture.expected.synthesis_hint);
       expect(host.scheduledJobs.map(({ when, job, inputs }) => ({ when, job, inputs }))).toEqual(
         fixture.expected.scheduled_jobs,
       );

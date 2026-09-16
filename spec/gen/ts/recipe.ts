@@ -103,12 +103,13 @@ export const Recipe = z
               .object({
                 op: z.literal("format"),
                 as: z.string(),
-                /**A template with {variable} interpolation for the on-screen reply.*/
+                /**A template with {variable} interpolation for the on-screen reply. May be omitted when `synthesis_hint` is given: the result then carries `data` and the hint and no reply, and the composer (CHAT-16) phrases the answer.*/
                 text: z
                   .string()
                   .describe(
-                    "A template with {variable} interpolation for the on-screen reply.",
-                  ),
+                    "A template with {variable} interpolation for the on-screen reply. May be omitted when `synthesis_hint` is given: the result then carries `data` and the hint and no reply, and the composer (CHAT-16) phrases the answer.",
+                  )
+                  .optional(),
                 /**A template for the spoken form. Falls back to text if omitted.*/
                 speech: z
                   .string()
@@ -123,8 +124,16 @@ export const Recipe = z
                     "Named fields for the result's `data` (result.schema.json): each value is a template; a template that is exactly one {variable} keeps that variable's own type (a number stays a number), anything else is interpolated text. What a composer (CHAT-16) phrases from, beside the reply text.",
                   )
                   .optional(),
+                /**The result's `synthesis_hint` (result.schema.json), a literal line for the composer (CHAT-16): the `data` answers the person's question and needs phrasing. A result carrying it is always composed, never delivered as its `text`.*/
+                synthesis_hint: z
+                  .string()
+                  .describe(
+                    "The result's `synthesis_hint` (result.schema.json), a literal line for the composer (CHAT-16): the `data` answers the person's question and needs phrasing. A result carrying it is always composed, never delivered as its `text`.",
+                  )
+                  .optional(),
               })
-              .strict(),
+              .strict()
+              .and(z.union([z.any(), z.any()])),
             z
               .object({
                 op: z.literal("home.call_service"),

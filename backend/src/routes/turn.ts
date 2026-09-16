@@ -141,25 +141,42 @@ export async function* streamTurnEvents(
     // Only one `.next()` call is ever made for the first step - racing a
     // timer against it means racing which one gets AWAITED first, never
     // calling `.next()` a second time (which would skip a real token).
-    const waitStatus = () => result.status.next().then((event) => event ?? new Promise<never>(() => {}));
-    let pendingStatus = waitStatus();
+    // The status channel wakes the race when a line is queued; the
+    // lines themselves are drained synchronously, so a status emitted
+    // before a delta (the `composing` line before the composition's
+    // first token, K6) goes out ahead of it whatever the two promises'
+    // settling order. A wake with nothing queued (the close) yields
+    // nothing.
+    // A closed channel never wakes the race again (its wait() would
+    // resolve at once, forever); its last lines are drained below.
+    const statusWake = () => (result.status.closed ? new Promise<never>(() => {}) : result.status.wait().then(() => "status" as const));
+    let pendingStatus = statusWake();
     const firstStep = iterator.next();
     const timer = delay(remainingDelayMs);
     const race = await Promise.race([firstStep, pendingStatus, timer.promise]);
     timer.cancel();
-    if (race !== "timeout" && "type" in race && race.type === "status") { yield race; pendingStatus = waitStatus(); }
+    if (race === "status") { for (const status of result.status.drain()) yield status; pendingStatus = statusWake(); }
     if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: cue }; }
-    let current = race === "timeout" || ("type" in race && race.type === "status") ? await firstStep : race;
+    let current = race === "timeout" || race === "status" ? await firstStep : race;
 
-    while (current !== null && !("type" in current) && !current.done) {
+    while (!current.done) {
+      for (const status of result.status.drain()) yield status;
       fullText += current.value;
       yield { type: "delta", text: current.value };
       const nextToken = iterator.next();
-      const next = await Promise.race([nextToken, pendingStatus]);
-      if ("type" in next && next.type === "status") { yield next; pendingStatus = waitStatus(); current = await nextToken; }
-      else current = next === null ? await nextToken : next;
+      let next = await Promise.race([nextToken, pendingStatus]);
+      while (next === "status") {
+        for (const status of result.status.drain()) yield status;
+        pendingStatus = statusWake();
+        next = await Promise.race([nextToken, pendingStatus]);
+      }
+      current = next;
     }
-    while (true) { const status = await result.status.next(); if (!status) break; yield status; }
+    while (true) {
+      for (const status of result.status.drain()) yield status;
+      if (result.status.closed) break;
+      await result.status.wait();
+    }
     // `current.value` here is the generator's own RETURN value (step 9),
     // not a yielded delta: a StreamOutcome (turnEngine.ts). Either the
     // most recently flagged, non-refuse SafetyResult gateOutputSafety()

@@ -16,7 +16,7 @@
 // against a hand-built PluginResult.
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { db } from "@/db";
-import { people, memoryRecords } from "@/db/schema";
+import { people, memoryRecords, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -669,14 +669,15 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
   // this fix exists to catch.
   test("runTurn(): the invention pre-check computes replyHasQuestion the same way guardReply() will, so an accepted-sounding opener with a real fabrication still triggers the retry", async () => {
     const { actor } = await owner();
-    let sawForcedAttempt = false;
+    // CHAT-16 (K2): with the search the only lookup tool ranked, the
+    // forced lookup skips the model's rung and runs the search with the
+    // engine's query at once; the retained forced outcome is the proof
+    // the retry ran (a `tool_choice: required` completion was the proof
+    // before the composer took that call).
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0, {
-      scriptedToolCalls: (request) => {
-        if (request.tool_choice === "required") sawForcedAttempt = true;
-        return undefined;
-      },
+      scriptedToolCalls: () => undefined,
       // Sentence 0 ("Sure, ...") matches ACCEPTS_RE with no "?" of its
       // own; sentence 1 carries the "?" that guardReply() uses to exempt
       // it. The attributed quote ("your brother said", grounded nowhere)
@@ -690,11 +691,14 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
       // REQUEST_RE-matching ("can you ...") so guardCapabilityClaim's
       // OTHER gate (ctx.outcomes/utterance check) doesn't already
       // exempt sentence 0 on its own, independent of replyHasQuestion.
-      await runTurn(actor, "chat", "can you look up the odyssey's rating");
+      const result = await runTurn(actor, "chat", "can you look up the odyssey's rating");
+      if (!result.ok) throw new Error(result.error);
+      const row = db.select({ outcomes: conversationTurns.outcomes }).from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes) as { packageId: string; via?: string }[]) : [];
+      expect(outcomes.some((o) => o.packageId === "websearch" && o.via === "forced")).toBe(true);
     } finally {
       stub.stop();
     }
-    expect(sawForcedAttempt).toBe(true);
   });
 
   test("runTurn(): a forced call to a tool that isn't a lookup candidate is rejected, never run - no fact gets written on the model's own say-so", async () => {

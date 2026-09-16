@@ -1,0 +1,42 @@
+{
+  "description": "CHAT-16: a format step with a synthesis_hint and no text binds no reply; the result is its data and the hint, for the composer to phrase (the websearch package's own shape once its private llm_complete step went).",
+  "recipe": {
+    "id": "search-rows",
+    "inputs": [{ "name": "expression", "selector": "text" }],
+    "steps": [
+      {
+        "op": "fetch",
+        "as": "raw",
+        "url": "https://search.example.com/?q={expression}",
+        "method": "GET"
+      },
+      { "op": "pick", "as": "rows", "from": "raw", "path": "results" },
+      {
+        "op": "format",
+        "as": "reply",
+        "synthesis_hint": "answer from these results",
+        "data": { "rows": "{rows}", "query": "{expression}" }
+      }
+    ]
+  },
+  "inputs": { "expression": "lantern bay cartoon horse" },
+  "host_setup": {
+    "fetch": {
+      "https://search.example.com/?q=lantern bay cartoon horse": {
+        "results": [{ "title": "Lantern Bay (cartoon)", "url": "https://example.com/lantern-bay", "snippet": "The horse is called Marlow." }]
+      }
+    }
+  },
+  "expected": {
+    "reply": null,
+    "data": {
+      "rows": [{ "title": "Lantern Bay (cartoon)", "url": "https://example.com/lantern-bay", "snippet": "The horse is called Marlow." }],
+      "query": "lantern bay cartoon horse"
+    },
+    "synthesis_hint": "answer from these results",
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

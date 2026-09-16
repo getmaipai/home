@@ -751,11 +751,23 @@ not permission to expand scope.
     grown-up can open it and gets no chip (fcbb315, 68b570c, 85e3848);
     a denied deliverable takes the same path (chunk c). Bench:
     `link-is-the-answer`, `link-child-band`, `false-capability-cut`.
-    Open, the core below: the composer itself (the decision table, the
-    native tool-result messages, the two-completion budget, the
-    requested shape on a plugin reply, the `status` events), which
-    needs its own chunking pass before a coder takes it. The voice line
-    of part 4 rule 5 waits for a voice surface.
+    Progress 2026-09-16 (K2 and K6, docs/dev/session-a.md "CHAT-16 K2
+    and K6"): `backend/src/lib/composer.ts` is the one decision for
+    every site that turns outcomes into a reply on both paths (the
+    table as designed, the native tool-result messages on K1's wire,
+    the two-call budget read from the prepared turn's counter, the
+    constraints line, the `shape` for K4, ACT-03's moves as a
+    parameter); the websearch recipe returns rows and a
+    `synthesis_hint` (the spec's `format` step gains the field, `text`
+    optional with it) and no prose; the direct routes compose too; the
+    machine owns the phases, the composition streams through the
+    gates after a `composing` status the route orders ahead of its
+    first delta; the `[turn]` line says `composed: <mode> calls=<n>`.
+    Open: K3 (`model_knowledge`), K4 (the shape rendered from rows),
+    K5 (typed dates), K7 (pictures inline), the `search_voice` family,
+    the ladder by claim type, the 512-token projection, the band's
+    ceiling on the evidence. The voice line of part 4 rule 5 waits for
+    a voice surface.
 
     Depends on: CHAT-02, CHAT-12, CHAT-15. Files:
     `spec/llm/ts/types.ts`, `client.ts`, native client tests,

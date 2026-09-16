@@ -156,7 +156,7 @@ const REMEMBER_CONFIRM_CONSTANT = "Got it, I'll remember that.";
 
 const KNOWN_CONSTANT_POOLS: ReadonlyMap<string, readonly string[]> = new Map([
   ["Sorry, I couldn't do that.", PLUGIN_ERROR_VARIANTS], // turnEngine.ts's own plugin_error fallback
-  ["Done.", PLUGIN_DONE_VARIANTS], // turnEngine.ts's own no-reply plugin fallback
+  ["Done.", PLUGIN_DONE_VARIANTS], // a home_call_service command's own success text; CHAT-16 (K2) took the engine's no-reply plugin fallback to the composer, which never says it
   ["I don't remember anything about that.", RECALL_NOTHING_VARIANTS], // spec/interpreters/{ts,py}/recipe-interpreter's NOTHING_RECALLED
   [REMEMBER_CONFIRM_CONSTANT, REMEMBER_CONFIRM_VARIANTS],
 ]);
