@@ -69,6 +69,38 @@ export interface LabelRow {
   rules: string | null;
   outcomes: string | null;
   correctedNextTurn: number | null;
+  feedbackVerdict: "up" | "down" | null;
+  feedbackReason: string | null;
+}
+
+export interface FeedbackRating {
+  id: string;
+  verdict: "up" | "down";
+  reason: string | null;
+  createdAt: string;
+  hlc: string;
+}
+
+export interface FeedbackRow extends FeedbackRating {
+  turnId: string;
+}
+
+export interface FeedbackSummary {
+  verdict: "up" | "down" | null;
+  reason: string | null;
+}
+
+/** Aggregates the per-person labels for one turn without changing the turn. */
+export function summarizeFeedback(rows: readonly FeedbackRating[]): FeedbackSummary {
+  const down = rows.filter((row) => row.verdict === "down").sort((a, b) => {
+    const byTime = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+    return byTime || a.hlc.localeCompare(b.hlc) || a.id.localeCompare(b.id);
+  });
+  if (down.length > 0) {
+    const latest = down[down.length - 1]!;
+    return { verdict: "down", reason: latest.reason };
+  }
+  return rows.length > 0 ? { verdict: "up", reason: null } : { verdict: null, reason: null };
 }
 
 export interface Label {
@@ -83,6 +115,8 @@ export interface Label {
   forced_lookup: boolean;
   corrected_next_turn: boolean;
   rules: string[];
+  feedback_verdict: "up" | "down" | null;
+  feedback_reason: string | null;
 }
 
 /** A row's label; null for a credential turn, which is never exported. */
@@ -105,6 +139,8 @@ export function labelOf(row: LabelRow, householdNames: readonly string[]): Label
     forced_lookup: outcomes.some((o) => o.via === "forced"),
     corrected_next_turn: row.correctedNextTurn === 1,
     rules,
+    feedback_verdict: row.feedbackVerdict,
+    feedback_reason: row.feedbackReason,
   };
 }
 
@@ -185,8 +221,8 @@ function sinceFromArgv(argv: readonly string[]): string {
 async function main(): Promise<void> {
   const since = sinceFromArgv(process.argv);
   const { db } = await import("@/db");
-  const { conversationTurns, entities } = await import("@/db/schema");
-  const { gte, asc } = await import("drizzle-orm");
+  const { conversationTurns, entities, replyFeedback } = await import("@/db/schema");
+  const { gte, asc, inArray } = await import("drizzle-orm");
   const { listActivePeople } = await import("@/lib/access");
   const { dataDir } = await import("@/lib/paths");
   const rows = db
@@ -200,7 +236,25 @@ async function main(): Promise<void> {
   const people = listActivePeople().map((p) => p.displayName);
   const registry = db.select({ name: entities.name, aliases: entities.aliases, kind: entities.kind }).from(entities).all().filter((e) => e.kind === "person" || e.kind === "pet").flatMap((e) => [e.name, ...(JSON.parse(e.aliases) as string[])]);
   const householdNames = [...people, ...registry];
-  const labels = rows.map((row) => labelOf(row, householdNames)).filter((l): l is Label => l !== null);
+  const feedbackRows = rows.length > 0
+    ? (db
+        .select({ id: replyFeedback.id, turnId: replyFeedback.turnId, verdict: replyFeedback.verdict, reason: replyFeedback.reason, createdAt: replyFeedback.createdAt, hlc: replyFeedback.hlc })
+        .from(replyFeedback)
+        .where(inArray(replyFeedback.turnId, rows.map((row) => row.id)))
+        .all() as FeedbackRow[])
+    : [];
+  const feedbackByTurn = new Map<string, FeedbackRating[]>();
+  for (const feedback of feedbackRows) {
+    const forTurn = feedbackByTurn.get(feedback.turnId) ?? [];
+    forTurn.push(feedback);
+    feedbackByTurn.set(feedback.turnId, forTurn);
+  }
+  const labels = rows
+    .map((row) => {
+      const summary = summarizeFeedback(feedbackByTurn.get(row.id) ?? []);
+      return labelOf({ ...row, feedbackVerdict: summary.verdict, feedbackReason: summary.reason }, householdNames);
+    })
+    .filter((l): l is Label => l !== null);
   const outDir = join(dataDir, "labels");
   const reports = exportLabels(labels, outDir);
   console.log(`[labels] ${labels.length} turn(s) since ${since} (${rows.length - labels.length} credential turn(s) skipped) into ${outDir}`);

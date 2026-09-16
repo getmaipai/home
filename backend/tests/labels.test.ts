@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CREDENTIAL_REDACTION } from "@/lib/memoryContentPolicy";
-import { toRosterForm, weekKey, labelOf, exportLabels, weeklyReport, formatReport, knownRules, type LabelRow } from "../scripts/bench/labels";
+import { toRosterForm, weekKey, labelOf, exportLabels, weeklyReport, formatReport, knownRules, summarizeFeedback, type LabelRow } from "../scripts/bench/labels";
 
 const signal = (act: string, source = "rule", stance = "asserted") => JSON.stringify({ primary_act: act, expressed_emotion: "neutral", emotion_intensity: "none", source, clauses: [{ stance }] });
 
@@ -18,6 +18,8 @@ const row = (partial: Partial<LabelRow> & Pick<LabelRow, "id" | "userText">): La
   rules: JSON.stringify(["signal.rule"]),
   outcomes: null,
   correctedNextTurn: null,
+  feedbackVerdict: null,
+  feedbackReason: null,
   ...partial,
 });
 
@@ -37,11 +39,25 @@ describe("the roster form", () => {
 });
 
 describe("the export", () => {
+  test("joins feedback by turn, preferring down and the most recent down reason", () => {
+    expect(summarizeFeedback([
+      { id: "rf-up", verdict: "up", reason: null, createdAt: "2026-09-16T12:00:00.000Z", hlc: "1:0:nodeaaa" },
+      { id: "rf-wrong", verdict: "down", reason: "wrong", createdAt: "2026-09-16T12:01:00.000Z", hlc: "2:0:nodeaaa" },
+      { id: "rf-long", verdict: "down", reason: "too_long", createdAt: "2026-09-16T12:02:00.000Z", hlc: "3:0:nodeaaa" },
+    ])).toEqual({ verdict: "down", reason: "too_long" });
+    expect(summarizeFeedback([{ id: "rf-up", verdict: "up", reason: null, createdAt: "2026-09-16T12:00:00.000Z", hlc: "1:0:nodeaaa" }])).toEqual({ verdict: "up", reason: null });
+    expect(summarizeFeedback([
+      { id: "rf-early", verdict: "down", reason: "wrong", createdAt: "2026-09-16T07:00:00-05:00", hlc: "4:0:nodeaaa" },
+      { id: "rf-late", verdict: "down", reason: "off", createdAt: "2026-09-16T12:30:00Z", hlc: "5:0:nodeaaa" },
+    ])).toEqual({ verdict: "down", reason: "off" });
+  });
+
   test("writes one line per turn with the text in roster form, skips a credential turn, and the report names a rule with zero hits", () => {
     const dir = mkdtempSync(join(tmpdir(), "maipai-labels-"));
     try {
+      const ratedFixture = { row: row({ id: "t1", userText: "when is the new album out", source: "plugin", signal: signal("question"), rung: "search", rules: JSON.stringify(["signal.rule", "lookup.read.promise", "lookup.forced"]), outcomes: JSON.stringify([{ packageId: "websearch", status: "succeeded", via: "forced" }]), correctedNextTurn: 1, feedbackVerdict: "down", feedbackReason: "wrong" }), replyText: "the original assistant reply" };
       const rows: LabelRow[] = [
-        row({ id: "t1", userText: "when is the new album out", source: "plugin", signal: signal("question"), rung: "search", rules: JSON.stringify(["signal.rule", "lookup.read.promise", "lookup.forced"]), outcomes: JSON.stringify([{ packageId: "websearch", status: "succeeded", via: "forced" }]), correctedNextTurn: 1 }),
+        ratedFixture.row,
         row({ id: "t2", userText: "you're not listening, Jo asked what time", signal: signal("inform", "rule", "asserted"), rules: JSON.stringify(["signal.rule", "guard.repeat_reply"]), guardReason: "repeat_reply" }),
         row({ id: "t3", userText: `my wifi password is ${CREDENTIAL_REDACTION}`, source: "policy", rules: JSON.stringify(["credential"]) }),
         row({ id: "t4", userText: "Biscuit is asleep", createdAt: "2026-09-21T12:00:00.000Z", signal: signal("inform", "protocol") }),
@@ -52,7 +68,9 @@ describe("the export", () => {
       expect(reports.map((r) => r.week)).toEqual(["2026-W38", "2026-W39"]);
       const lines = readFileSync(join(dir, "2026-W38.jsonl"), "utf-8").trim().split("\n").map((l) => JSON.parse(l));
       expect(lines.length).toBe(2);
-      expect(lines[0]).toMatchObject({ turn_id: "t1", rung: "search", forced_lookup: true, corrected_next_turn: true, signal: { act: "question", stance: "asserted", source: "rule" }, rules: ["signal.rule", "lookup.read.promise", "lookup.forced"] });
+      expect(lines[0]).toMatchObject({ turn_id: "t1", rung: "search", forced_lookup: true, corrected_next_turn: true, feedback_verdict: "down", feedback_reason: "wrong", signal: { act: "question", stance: "asserted", source: "rule" }, rules: ["signal.rule", "lookup.read.promise", "lookup.forced"] });
+      expect(ratedFixture.replyText).toBe("the original assistant reply");
+      expect(lines[0]).not.toHaveProperty("reply_text");
       expect(lines[1]).toMatchObject({ turn_id: "t2", text: "you're not listening, Alfred asked what time", guard_hits: ["repeat_reply"], forced_lookup: false, corrected_next_turn: false });
       expect(readFileSync(join(dir, "2026-W39.jsonl"), "utf-8")).toContain('"text":"Astro is asleep"');
       const report = weeklyReport("2026-W38", labels.slice(0, 2) as NonNullable<(typeof labels)[number]>[]);

@@ -6420,7 +6420,7 @@ approvals are still real, unstarted work for a future session.
             `chatMemoryActions.ts` and `chatMemoryChip`. Acceptance: down opens
             the five chips and reload preserves the selected state; exit:
             chat tests and the reason-row screenshot.
-      - [ ] **FEED-01c: feedback export join** (mechanical). Extend
+      - [x] **FEED-01c: feedback export join** (mechanical). Extend
             `scripts/bench/labels.ts`'s RVW-1 row query and tests, mirroring
             `labelOf()` and `exportLabels()`. Acceptance: weekly JSONL places
             verdict and reason beside rung and rules by `turn_id`; exit:
