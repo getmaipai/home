@@ -6349,6 +6349,50 @@ approvals are still real, unstarted work for a future session.
       rename, delete the second, reload again. Out of scope: persistent
       branches, attachments, and continuous voice. Exit checks:
       `bash scripts/check.sh`, `bun run screenshots --chat-review`.
+- [ ] **FEED-01: Thumbs up and down on a reply, as labels** (M, spec
+      first, 2026-09-16). Objective: the household rates a reply with
+      one tap and the rating becomes a human label for the review
+      program, never a hidden counter. Spec first:
+      `spec/schemas/reply-feedback.schema.json` (turn id, person id,
+      `verdict: up | down`, an optional one-tap `reason` from a fixed
+      list: `wrong`, `too_long`, `did_not_listen`, `off`, `unsafe`, the
+      clock stamp, provenance), fixture and bindings. Backend: a
+      `reply_feedback` table and migration, `POST /api/conversations/
+      turns/:id/feedback` and its read (Zod, OpenAPI), and the row joins
+      RVW-1's weekly label export (`docs/BACKLOG.md` "RVW-1") with the
+      turn's rung and fired rules, so a thumbs down is a labeled failure
+      with its causes beside it. Frontend: the installed assistant-ui
+      (0.15.18) already ships `ActionBarPrimitive.FeedbackPositive` /
+      `FeedbackNegative` and a `FeedbackAdapter`; wire that adapter to
+      the route in `frontend/src/apps/chat/chatActionBar.tsx` beside
+      Listen and Remember, a down tap opening the five-reason chip row.
+      Child band: the two buttons only, no reason row. Acceptance: tap
+      down on a reply, pick "wrong", reload, the state persists per
+      person, and the week's export lists the turn with its rules.
+      Mirror `chatMemoryActions.ts` for the call and `chatMemoryChip`
+      for the chips. Out of scope: any change to the reply from a
+      rating (that is the classifier's job, RVW-2). Exit:
+      `bash scripts/check.sh`, the screenshot of the reason row opened.
+- [ ] **ATT-01: Attachments in chat: a document, a photo, "summarize
+      this"** (L, design pass first, 2026-09-16). What exists: nothing
+      on the input side; K7 renders pictures the model found, not ones
+      the person sent. What the library gives: assistant-ui's
+      `AttachmentAdapter`, `SimpleImageAttachmentAdapter` and
+      `SimpleTextAttachmentAdapter` (composer chips, previews, the
+      message part shape), so the UI half is prebuilt. The design has
+      to decide, in this order: where a sent file lives (per-person,
+      under the household's data directory, with the retention rule the
+      privacy page states); text extraction (PDF and office documents
+      through one maintained library, chosen by the prebuilt rule, with
+      `host.ocr.read`'s RapidOCR for scans); how a document reaches the
+      composer (a `document` outcome kind on the turn, chunked to the
+      context budget, cited back by page like a lookup source) so
+      "summarize this" and "what does page 3 say" are the same path as
+      a lookup; images need a vision-capable engine (a decision beside
+      the GPU layout note, not assumed); and the child band's rule
+      (images from a child go through the same content ceiling as
+      anything shown to one). Depends on COMP-01 for the long answer's
+      home. Out of scope until designed: any code.
 - [ ] **Chat stream reconnection and persistent message branches** (M) -
       `chatModelAdapter.ts`, `chatHistoryAdapter.ts`, and the turn API.
       Markdown, multiline input, stop, copy, suggestions, timestamps,
