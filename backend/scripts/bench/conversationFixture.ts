@@ -1857,6 +1857,27 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     ],
   },
   {
+    id: "world-fact-router",
+    category: "knowledge",
+    note: "RVW-3 finding 53: checkable world facts about a named subject use the lookup rung for names, closing songs, singers and lists of works",
+    turns: [
+      { say: "what is the lead character's name in the Marsh Lantern film", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true } },
+      { say: "what song closes the Marsh Lantern film", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true } },
+      { say: "who sings Sunday Bay", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true } },
+      { say: "what are Serena Vale's biggest hits", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true } },
+    ],
+  },
+  {
+    id: "forced-lookup-never-restates",
+    category: "knowledge",
+    note: "finding 54: a forced lookup composes from its rows or says nothing was found, never repeating the rejected model line",
+    turns: [
+      { say: "what happens at the end of the Marsh Lantern film", seedReply: "The Marsh Lantern ends with the lighthouse exploding.", expect: { signal: { primary_act: "question" }, guard: null } },
+      { say: "you made that up, search it", seedReply: "The Marsh Lantern ends with the lighthouse exploding.", expect: { signal: { primary_act: "inform" }, toolsRan: ["websearch"], lookupWithSource: true, mustNotContain: "lighthouse exploding", guard: null } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
     id: "indirect-poster-ask-inline",
     category: "knowledge",
     note: "finding 60 addendum: an indirect multiple-poster question is a picture deliverable, not a yes/no answer",
@@ -1874,6 +1895,56 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "give me a list of songs by Serena Vale", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true, mustContain: "Sunday Bay", humanVerdict: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
       { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "promise-runs-the-lookup",
+    category: "knowledge",
+    note: "finding 55: a promise is backed by a lookup, and a bare do-it runs that pending lookup instead of producing another promise",
+    turns: [
+      { say: "what is the release date for the Marsh Lantern film", seedReply: "Let me look that up.", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true, mustNotContain: "let me look|let me get that right|double-check" } },
+      { say: "do it", seedReply: "Let me get that right.", expect: { signal: { primary_act: "directive" }, toolsRan: ["websearch"], lookupWithSource: true, mustNotContain: "let me look|let me get that right|double-check" } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "same-line-three-turns-later",
+    category: "knowledge",
+    note: "finding 56: the repeat guard compares recent replies, so a line repeated after an intervening correction still gets retried",
+    turns: [
+      { say: "when does Marsh Lantern open", seedReply: "Marsh Lantern opens Friday.", expect: { signal: { primary_act: "question" }, guard: null } },
+      { say: "no, I meant the weekday", seedReply: "It opens Friday.", expect: { signal: { primary_act: "inform" }, humanVerdict: true } },
+      { say: "what day is that", seedReply: "Marsh Lantern opens Friday.", expect: { signal: { primary_act: "question" }, retries: 1, guardHits: ["repeat_reply"], distinctFromPrevious: true, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "list-cut-is-whole-items",
+    category: "knowledge",
+    note: "finding 57: a list constraint cuts between whole items and appends an and-N-more summary, never a stray final digit",
+    turns: [
+      { say: "who are the main characters in Marsh Lantern", seedReply: "The main characters are Pippa, Rover, and Bramble.", expect: { signal: { primary_act: "question" }, guard: null } },
+      { say: "give me the list", seedReply: "1. Lantern Bay\n2. Sunday Bay\n3. Marsh Lantern\n4. Pippa\n5. Rover\n6.", expect: { signal: { primary_act: "question" }, mustContain: "and [0-9]+ more", mustNotContain: "\\b6\\.?$", guard: null } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "world-correction-no-apology",
+    category: "correction",
+    note: "finding 58: a world-fact correction takes the correction without apology theater or rationalisation",
+    turns: [
+      { say: "who sings Sunday Bay", seedReply: "It is sung by Pippa.", expect: { signal: { primary_act: "question" }, guard: null } },
+      { say: "no, that's wrong, it's Serena Vale", seedReply: "You're absolutely right. Sorry about that. Serena Vale sings it.", expect: { signal: { primary_act: "inform" }, mustNotContain: "you're absolutely right|sorry about that|i messed up|because", guard: null } },
+      { say: "what was the song called", seedReply: "Sunday Bay.", expect: { signal: { primary_act: "question" }, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "lookup-query-from-stack",
+    category: "knowledge",
+    note: "finding 59: a follow-up lookup query carries the subject stack's film, decade and theme, not just the latest utterance",
+    turns: [
+      { say: "the Marsh Lantern film is about a lighthouse mystery", seedReply: "Got it.", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
+      { say: "I was thinking about October", seedReply: "Got it.", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
+      { say: "what other movies like that during that time", seedReply: "Let me look that up.", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true, outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "(?=.*marsh lantern)(?=.*october)(?=.*lighthouse)" } }, mustNotContain: "let me look", guard: null } },
     ],
   },
 ];
