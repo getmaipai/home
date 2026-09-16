@@ -1,0 +1,30 @@
+package: pal
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: companion package with no external data source; no network fetch to test
+  routing_examples:
+    met: true
+    note: companion package; routing defined in manifest.json's companion.examples
+  privacy_row_per_data_source:
+    met: true
+    note: no data_sources; no network calls
+  offline_behavior_stated:
+    met: true
+    note: "offline: full - no network needed"
+  smoke_test:
+    met: true
+    note: companion package; no external fetch to smoke
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth or external service to diagnose
+gold:
+  real_service_verified:
+    met: false
+    note: no external service to verify
