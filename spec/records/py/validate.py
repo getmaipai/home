@@ -139,7 +139,9 @@ def validate_entity(entity: Entity) -> Problems:
                 "a place must say whether it is a `map` place or an `area` inside one"
             )
     elif entity.place_kind:
-        problems.append(f"place_kind is only meaningful on a place, not on a {entity.kind}")
+        problems.append(
+            f"place_kind is only meaningful on a place, not on a {entity.kind}"
+        )
 
     if entity.kind != "person" and entity.account_person_id:
         problems.append(f"only a person can hold an account; this is a {entity.kind}")
@@ -203,7 +205,9 @@ def validate_relationship(rel: Relationship) -> Problems:
             )
     else:
         if rel.confidence is not None:
-            problems.append("only an inferred relationship has a confidence; a person said this one")
+            problems.append(
+                "only an inferred relationship has a confidence; a person said this one"
+            )
         if len(rel.evidence) > 0:
             problems.append("evidence belongs to an inferred relationship")
         if rel.source == "stated" and not rel.stated_by_person_id:
@@ -224,15 +228,23 @@ def validate_relationship_endpoints(
         return [f"unknown relationship type: {rel.type}"]
     problems: Problems = []
     if from_entity.id != rel.from_id:
-        problems.append(f'the "from" entity {from_entity.id} is not this relationship\'s from_id')
+        problems.append(
+            f'the "from" entity {from_entity.id} is not this relationship\'s from_id'
+        )
     if to_entity.id != rel.to_id:
-        problems.append(f'the "to" entity {to_entity.id} is not this relationship\'s to_id')
+        problems.append(
+            f'the "to" entity {to_entity.id} is not this relationship\'s to_id'
+        )
     if problems:
         return problems
     if from_entity.kind not in type["from"]:
-        problems.append(f'{rel.type} cannot start at a {from_entity.kind} (allowed: {", ".join(type["from"])})')
+        problems.append(
+            f"{rel.type} cannot start at a {from_entity.kind} (allowed: {', '.join(type['from'])})"
+        )
     if to_entity.kind not in type["to"]:
-        problems.append(f'{rel.type} cannot point at a {to_entity.kind} (allowed: {", ".join(type["to"])})')
+        problems.append(
+            f"{rel.type} cannot point at a {to_entity.kind} (allowed: {', '.join(type['to'])})"
+        )
     return problems
 
 

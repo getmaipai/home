@@ -149,26 +149,19 @@ def test_a_place_must_say_which_kind_of_place_it_is():
 def test_only_a_place_carries_a_place_kind():
     bad = pet()
     bad.place_kind = "map"
-    assert any(
-        "only meaningful on a place" in p for p in validate_entity(bad)
-    )
+    assert any("only meaningful on a place" in p for p in validate_entity(bad))
 
 
 def test_only_a_person_can_hold_an_account():
     bad = pet()
     bad.account_person_id = "person-a1b2c3"
-    assert any(
-        "only a person can hold an account" in p
-        for p in validate_entity(bad)
-    )
+    assert any("only a person can hold an account" in p for p in validate_entity(bad))
 
 
 def test_containment_is_physical_so_only_places_contain():
     bad = pet()
     bad.parent_id = "ent-g7h8i9"
-    assert any(
-        "physical containment" in p for p in validate_entity(bad)
-    )
+    assert any("physical containment" in p for p in validate_entity(bad))
 
 
 def test_an_entity_cannot_contain_itself():
@@ -195,10 +188,7 @@ def test_a_person_scoped_entity_names_its_person():
 def test_a_due_at_is_only_meaningful_on_a_todo_list_item():
     bad = shopping_list()
     bad.items[0].due_at = "2026-09-08T17:00:00Z"
-    assert any(
-        "only meaningful on a todo list item" in p
-        for p in validate_list(bad)
-    )
+    assert any("only meaningful on a todo list item" in p for p in validate_list(bad))
 
 
 def test_a_person_scoped_list_names_its_person():
@@ -242,9 +232,7 @@ def test_a_relationship_cannot_join_an_entity_to_itself():
     r = stated_rel()
     bad = stated_rel()
     bad.to_id = r.from_id
-    assert any(
-        "join an entity to itself" in p for p in validate_relationship(bad)
-    )
+    assert any("join an entity to itself" in p for p in validate_relationship(bad))
 
 
 def test_dates_that_run_backwards_are_rejected():
@@ -260,14 +248,10 @@ def test_dates_that_run_backwards_are_rejected():
 def test_a_guess_must_carry_a_confidence_and_its_evidence():
     bad = inferred_rel()
     bad.confidence = None
-    assert any(
-        "must carry a confidence" in p for p in validate_relationship(bad)
-    )
+    assert any("must carry a confidence" in p for p in validate_relationship(bad))
     bad2 = inferred_rel()
     bad2.evidence = []
-    assert any(
-        "cannot be reviewed" in p for p in validate_relationship(bad2)
-    )
+    assert any("cannot be reviewed" in p for p in validate_relationship(bad2))
 
 
 def test_an_unconfirmed_guess_cannot_be_household_scoped():
@@ -313,9 +297,12 @@ def edge_between(type_id: str, from_ent: Entity, to_ent: Entity) -> Relationship
 
 
 def test_a_type_refuses_kinds_it_cannot_join():
-    assert validate_relationship_endpoints(
-        edge_between("lives_at", pet(), place()), pet(), place()
-    ) == []
+    assert (
+        validate_relationship_endpoints(
+            edge_between("lives_at", pet(), place()), pet(), place()
+        )
+        == []
+    )
     problems = validate_relationship_endpoints(
         edge_between("lives_at", place(), person()), place(), person()
     )
@@ -323,9 +310,12 @@ def test_a_type_refuses_kinds_it_cannot_join():
 
 
 def test_ownership_reaches_pets_and_things_never_a_person():
-    assert validate_relationship_endpoints(
-        edge_between("owns", person(), pet()), person(), pet()
-    ) == []
+    assert (
+        validate_relationship_endpoints(
+            edge_between("owns", person(), pet()), person(), pet()
+        )
+        == []
+    )
     other = person()
     other.id = "ent-z9y8x7"
     assert any(
@@ -407,17 +397,13 @@ def test_unrestricted_mode_cannot_be_granted_without_the_adults_acknowledgment()
     g.effect = "allow"
     g.acknowledged_at = None
     g.acknowledged_by_person_id = None
-    assert any(
-        "one-time acknowledgment" in p for p in validate_grant(g)
-    )
+    assert any("one-time acknowledgment" in p for p in validate_grant(g))
     g2 = grant()
     g2.action = "chat.unrestricted"
     g2.effect = "allow"
     g2.acknowledged_at = "2026-09-05T12:00:00Z"
     g2.acknowledged_by_person_id = None
-    assert any(
-        "one-time acknowledgment" in p for p in validate_grant(g2)
-    )
+    assert any("one-time acknowledgment" in p for p in validate_grant(g2))
     g3 = grant()
     g3.action = "chat.unrestricted"
     g3.effect = "allow"
@@ -432,9 +418,7 @@ def test_one_adult_cannot_acknowledge_unrestricted_mode_on_another_bealf():
     bad.effect = "allow"
     bad.acknowledged_at = "2026-09-05T12:00:00Z"
     bad.acknowledged_by_person_id = "person-someoneelse"
-    assert any(
-        "not on their behalf" in p for p in validate_grant(bad)
-    )
+    assert any("not on their behalf" in p for p in validate_grant(bad))
 
 
 def test_denying_unrestricted_mode_needs_no_acknowledgment():
@@ -487,8 +471,7 @@ def test_companion_scope_needs_companion_id():
 def test_companion_id_only_on_companion_scope():
     bad = memory_record(scope="person", companion_id="comp-marlow")
     assert any(
-        "only meaningful on companion scope" in p
-        for p in validate_memory_record(bad)
+        "only meaningful on companion scope" in p for p in validate_memory_record(bad)
     )
 
 
@@ -550,8 +533,7 @@ def test_fact_confidence_required_for_memory_kind():
 def test_fact_confidence_forbidden_outside_memory_kind():
     bad = memory_record(record_kind="entity", fact_confidence=0.9)
     assert any(
-        "only meaningful on a memory record" in p
-        for p in validate_memory_record(bad)
+        "only meaningful on a memory record" in p for p in validate_memory_record(bad)
     )
 
 
@@ -589,8 +571,7 @@ def test_source_head_needs_classifier_id():
 def test_classifier_id_only_meaningful_for_head():
     bad = turn_signal(source="rule", classifier_id="act-head-v1")
     assert any(
-        "only meaningful when source is head" in p
-        for p in validate_turn_signal(bad)
+        "only meaningful when source is head" in p for p in validate_turn_signal(bad)
     )
 
 
@@ -698,7 +679,8 @@ def test_length_constraint_must_carry_positive_integer_budget():
     )
     zero = reply_constraint(kind="length", value="0")
     assert any(
-        "positive integer character budget" in p for p in validate_reply_constraint(zero)
+        "positive integer character budget" in p
+        for p in validate_reply_constraint(zero)
     )
 
 
