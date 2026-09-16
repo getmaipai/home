@@ -1141,6 +1141,18 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "okay thanks", as: "child", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
+  {
+    id: "checkable-fact",
+    category: "knowledge",
+    note: "section 16 part 1 rule 1 (the lookup decision) and rule 7 (model_knowledge): checkable facts are looked up, a stable question is answered from the model and 'how do you know' reads the outcome; the last two turns are red until K3 lands (the coordinator, 2026-09-16)",
+    turns: [
+      { say: "how many power pins does the Cosmo 7 card take", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustContain: "\\b8\\b|eight", mustNotContain: "typically|usually|check the manual|I recommend" } },
+      { say: "what's an open-box Cosmo 7 going for these days", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustContain: "3[0-9]{2}", mustNotContain: "typically|usually|probably|around|roughly|I think|I believe" } },
+      { say: "what's the horse called in the old Lantern Bay cartoon", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustContain: "Copper", guard: null } },
+      { say: "why is the sky blue", expect: { signal: { primary_act: "question" }, toolRan: null, mustNotContain: "search results|according to", humanVerdict: true } },
+      { say: "how do you know that", expect: { toolRan: null, mustContain: "looked|link|found|just know", mustNotContain: "I think|I believe", humanVerdict: true } },
+    ],
+  },
   // LOOKUP-02 (dev.md section 16 parts 1 and 2): the seeded reply is
   // the model's next draft through the recording proxy, so it meets the
   // reply boundary like any draft (the read, the forced lookup as a

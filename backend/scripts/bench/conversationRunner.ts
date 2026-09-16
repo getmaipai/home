@@ -184,7 +184,19 @@ export function startFakeSearxng(): FakeSearxng {
                 { title: "Marsh Lantern: the new album (release details)", url: `https://example.com/${slug}`, content: "The new Marsh Lantern album is out on September 22 with 12 tracks; the first single is already out and a spring tour is announced." },
                 { title: "Marsh Lantern album reviews", url: `https://example.com/${slug}/reviews`, content: "Reviews call it their strongest record in years; the drumming on the second track stands out." },
               ]
-            : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
+            : /cosmo 7/i.test(q) && /pin|power|connector/i.test(q)
+              ? [
+                  { title: "Cosmo 7 card: specifications", url: `https://example.com/${slug}`, content: "The Cosmo 7 card takes one 8-pin power connector (8 pins) and draws 220 watts." },
+                ]
+              : /cosmo 7/i.test(q) && /open.?box|price|going for|used/i.test(q)
+                ? [
+                    { title: "Open-box Cosmo 7 listings", url: `https://example.com/${slug}`, content: "Open-box Cosmo 7 cards are listed between 340 and 380 dollars this week." },
+                  ]
+                : /lantern bay/i.test(q)
+                  ? [
+                      { title: "Lantern Bay (cartoon)", url: `https://example.com/${slug}`, content: "The old Lantern Bay cartoon's horse is called Copper; the show ran for six seasons." },
+                    ]
+                  : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
       return Response.json({ query: q, results });
     },
   });
