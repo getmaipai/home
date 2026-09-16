@@ -635,6 +635,73 @@ three log paths. The single-run failures are variance and stay listed
 there. Design of 50 to 52 is Session A's (chat-gap design is reserved);
 49 is a fixture fix any lane can take.
 
+## Findings from live use, 2026-09-16 afternoon (on b61d198: the composer and the parity landings)
+
+The owner's retest: a half-hour chat about films of one decade and the
+people behind them. It opened well (a personal question answered
+warmly, a follow-up that used what was said) and got worse each turn.
+The turn log tells the story without the words.
+
+53. Checkable world facts answered from the weights, wrong, four times
+    in a row: a character's name in a named film, the closing song of
+    that film, the singer, the artist's hits. Each turn's rung was
+    `model_knowledge`; each was a question with a named world subject
+    and a factual field (a name, a title, a list of works). The lookup
+    rule's narrowed slice (2026-09-15, the full rule to Session A)
+    covers the "checkable fact" shape only for some fields; "what was
+    the X's name", "who did the Y", "what were their hits" are the
+    commonest forms and none fired. This is RVW-3's case: a router on
+    the subject and field, not more patterns.
+
+54. "You made that up, search it" ran the search and the reply
+    repeated the previous wrong answer word for word. The forced
+    lookup produced rows (or none) and the composition fell back to the
+    prior model line instead of composing from the rows or saying the
+    rows had nothing. A forced lookup's reply is composed from rows or
+    it says the search found nothing; it never restates the line the
+    person just rejected. Row: `forced-lookup-never-restates`.
+
+55. Promises without action, three times: "let me look that up",
+    "let me get that right", "let me double-check", each followed by
+    no lookup, and "do it" answered with another promise. The composer
+    may not emit a promise line unless the plan holds the lookup that
+    keeps it; a bare "do it" after a promise runs the pending lookup
+    (the `pending-ask-lookup` row is red on exactly this). Row:
+    `promise-runs-the-lookup`.
+
+56. The identical sentence delivered twice, three turns apart, after a
+    correction. The same-line guard compares against the previous
+    reply only; ACT-03's `repeat: forbidden` after an objection did not
+    hold because the objection turn sat between. The check is against
+    the conversation's recent replies, not the last one. Row:
+    `same-line-three-turns-later`.
+
+57. A list truncated mid-item: "give me the list" got five titles and
+    the last one cut to a stray digit, twice. The length constraint
+    cut the composed text at a character budget inside a list item.
+    K4's list shape must own the cut (whole items, "and N more"), and
+    a length constraint never truncates inside a token or a list item.
+    Row: `list-cut-is-whole-items`.
+
+58. Apology theater on every correction: "you're absolutely right",
+    "sorry about that", "I messed up again", and once a rationalisation
+    of an invented film-to-topic link. REG-01's register bans the
+    pattern for memory corrections; it does not cover world-fact
+    corrections, and the composer's correction move carries no
+    constraint against it. One banned-phrase family on the correction
+    move plus the plan line "take it, no apology". Row:
+    `world-correction-no-apology`.
+
+59. A search built from the turn alone: "what other movies like that
+    during that time" became a query without the decade or the theme
+    that the previous eight turns established, and the results were
+    generic. The query for a lookup that follows a conversation is
+    composed from the subject stack (the decade, the theme, the named
+    titles), not from the utterance. Row: `lookup-query-from-stack`.
+
+Design of 53 to 59 is Session A's (chat-gap design is reserved). Every
+row above is written red first, with roster names and invented titles.
+
 What worked, for the record: every forced or explicit search answered
 right (a release date, a cast, an OS release, a cartoon's sidekick,
 a used price); the almanac answered time and date; a correction was
