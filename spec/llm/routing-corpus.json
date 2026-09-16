@@ -1,135 +1,856 @@
 [
-  { "utterance": "what does curious mean", "expect": "define", "must_not": [] },
-  { "utterance": "define ambiguous", "expect": "define", "must_not": [] },
-  { "utterance": "what's the definition of ephemeral", "expect": "define", "must_not": [] },
-  { "utterance": "what does the word ubiquitous mean", "expect": "define", "must_not": [] },
-  { "utterance": "what does gregarious mean", "expect": "define", "must_not": [] },
-
-  { "utterance": "I could use a good laugh right now", "expect": "joke", "must_not": [] },
-  { "utterance": "tell me a dad joke", "expect": "joke", "must_not": [] },
-  { "utterance": "got any jokes", "expect": "joke", "must_not": [] },
-  { "utterance": "make me laugh", "expect": "joke", "must_not": [] },
-  { "utterance": "know any good jokes", "expect": "joke", "must_not": [] },
-
-  { "utterance": "what do you remember about the wifi password", "expect": "recall", "must_not": ["remember"] },
-  { "utterance": "do you remember what I said about my allergies", "expect": "recall", "must_not": ["remember"] },
-  { "utterance": "remember that I take my medicine at 8am", "expect": "remember", "must_not": ["recall"] },
-  { "utterance": "remember I'm allergic to peanuts", "expect": "remember", "must_not": ["recall"] },
-  { "utterance": "remember that Friday is pizza night", "expect": "remember", "must_not": ["recall"] },
-
-  { "utterance": "what have I told you to remember about pizza night", "expect": null, "must_not": ["remember"], "noiseFloorExempt": true, "note": "recall's own routing.example, but it captures no `topic` for recall's required arg without matching one of its own patterns literally - Tier 1 alone can never bind it (deterministicArgs' documented gap); a real Tier 2 tool call (step 2) is what should eventually route this, not Tier 1. noiseFloorExempt (Fix D): deliberately scores near 1.0 by design - a real near-miss meant for Tier 2, not ordinary conversational noise - so scripts/bench/routing.ts excludes it from the null-row noise-floor stat used to set TIER1_THRESHOLD/TIER2_AMBIGUOUS_FLOOR." },
-  { "utterance": "what do you know about my dentist appointment", "expect": null, "must_not": ["remember"], "noiseFloorExempt": true, "note": "same gap as above" },
-  { "utterance": "remind me what I said about the school schedule", "expect": "remind", "must_not": [], "note": "step 8's own remind package (added 2026-09-06) made this a real, different gap than the one this row used to document: \"remind me *\" is a literal pattern (a required-arg package can only ever route that way) and wins immediately over the model, so this genuinely ambiguous phrase - recall-flavored, not really a new-reminder request - now goes to remind, which will 400 (no time phrase found) rather than reach recall or the model. The underlying fix is Tier 2 native tool calling disambiguating this properly, already tracked in turnEngine.ts's own \"not built this pass\" list, not something remind's own pattern choice can solve." },
-  { "utterance": "please remember our wifi password is on the fridge", "expect": null, "must_not": ["recall"], "noiseFloorExempt": true, "note": "remember's own routing.example that doesn't literally start with \"remember\" - same required-arg gap, `fact` this time" },
-  { "utterance": "can you remember I have a dentist appointment next week", "expect": null, "must_not": ["recall"], "noiseFloorExempt": true, "note": "same gap as above" },
-
-  { "utterance": "tell me a bedtime story", "expect": "storytime-style", "must_not": ["joke"] },
-  { "utterance": "tell a story for my kid", "expect": "storytime-style", "must_not": ["joke"] },
-  { "utterance": "can you tell a story", "expect": "storytime-style", "must_not": ["joke"] },
-  { "utterance": "make up a story about a dragon", "expect": "storytime-style", "must_not": ["joke"] },
-  { "utterance": "tell a short story before bed", "expect": "storytime-style", "must_not": ["joke"] },
-
-  { "utterance": "give me a trivia question", "expect": "trivia", "must_not": [] },
-  { "utterance": "ask me a trivia question", "expect": "trivia", "must_not": [] },
-  { "utterance": "tell me some trivia", "expect": "trivia", "must_not": [] },
-  { "utterance": "quiz me", "expect": "trivia", "must_not": [] },
-  { "utterance": "got any trivia", "expect": "trivia", "must_not": [] },
-
-  { "utterance": "what's the weather in Seattle", "expect": "weather", "args": { "place": "Seattle" }, "must_not": [] },
-  { "utterance": "how's the weather in Chicago", "expect": "weather", "args": { "place": "Chicago" }, "must_not": [] },
-  { "utterance": "what's the weather like in Portland", "expect": "weather", "args": { "place": "Portland" }, "must_not": [] },
-  { "utterance": "weather in Denver", "expect": "weather", "args": { "place": "Denver" }, "must_not": [] },
-  { "utterance": "how's the weather in Miami today", "expect": "weather", "must_not": [] },
-
-  { "utterance": "tell me a bedtime story about a fox", "expect": "storytime-style", "must_not": ["joke"] },
-  { "utterance": "tell me a joke", "expect": "joke", "must_not": [] },
-
-  { "utterance": "I GOT THE JOB!!! they just called me this morning", "expect": null, "must_not": ["remember", "recall"] },
-  { "utterance": "we're engaged!", "expect": null, "must_not": ["remember", "recall"] },
-  { "utterance": "I got promoted at work today", "expect": null, "must_not": ["remember", "recall"] },
-
-  { "utterance": "do you know who Marlow is", "expect": null, "must_not": ["recall", "remember"] },
-  { "utterance": "do you know who my sister is", "expect": null, "must_not": ["recall", "remember"] },
-
-  { "utterance": "do you remember when we first met", "expect": "recall", "must_not": ["remember"], "note": "matches recall's own \"do you remember *\" pattern - a real Tier 0 fire, and the correct fix for the legacy 'recall question stored as junk memory' bug: it now retrieves, never stores." },
-  { "utterance": "can you remember our first conversation", "expect": null, "must_not": ["remember"] },
-
-  { "utterance": "what's my son's name", "expect": null, "must_not": ["remember", "recall", "almanac-date", "almanac-time"], "note": "a real false positive found live: the real embedding model scored this ~0.68 against almanac-date's own routing.examples before they were revised - kept as a permanent regression guard, not just a note in a commit message." },
-  { "utterance": "what's my address", "expect": null, "must_not": ["remember", "recall", "almanac-date", "almanac-time"] },
-
-  { "utterance": "how are you feeling today", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
-  { "utterance": "good morning", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
-
-  { "utterance": "what's today's date", "expect": "almanac-date", "must_not": [] },
-  { "utterance": "what day of the week is it", "expect": "almanac-date", "must_not": [] },
-  { "utterance": "what time is it", "expect": "almanac-time", "must_not": [] },
-  { "utterance": "what's the next holiday", "expect": "almanac-holiday", "must_not": [] },
-  { "utterance": "is there a holiday coming up", "expect": "almanac-holiday", "must_not": [] },
-  { "utterance": "what phase is the moon in", "expect": "almanac-moon", "must_not": [] },
-  { "utterance": "what happened on this day in history", "expect": "almanac-onthisday", "must_not": [] },
-
-  { "utterance": "calculate 15 * 12", "expect": "math", "must_not": [], "note": "math has a required arg (expression), so it can only ever fire via a literal routing.patterns wildcard capture, never fuzzy scoring - this is that path." },
-  { "utterance": "compute 2^10", "expect": "math", "must_not": [] },
-  { "utterance": "what does 20 / 4 equal", "expect": "math", "must_not": [] },
-
-  { "utterance": "convert 5 miles to km", "expect": "convert", "must_not": [], "note": "convert also has a required arg, so only the literal 'convert *' pattern can fire it." },
-  { "utterance": "convert 100 fahrenheit to celsius", "expect": "convert", "must_not": [] },
-
-  { "utterance": "what's the news", "expect": "news", "must_not": [] },
-  { "utterance": "read me the headlines", "expect": "news", "must_not": [] },
-
-  { "utterance": "what's the score", "expect": "sports", "must_not": [] },
-  { "utterance": "how are the games going", "expect": "sports", "must_not": [] },
-
-  { "utterance": "exchange 100 dollars to euros", "expect": "currency", "must_not": [] },
-  { "utterance": "exchange 50 usd for gbp", "expect": "currency", "must_not": [] },
-  { "utterance": "convert 5 dollars to euros", "expect": "convert", "must_not": ["currency"], "note": "a real, documented limitation: convert already owns the literal 'convert *' pattern, so this phrasing routes to convert (then fails at runtime: dollars/euros aren't mathjs units), never to currency - currency answers to 'exchange' instead. This guards the routing decision itself against a future change that silently sends this phrasing to currency without also updating the README/CHANGELOG that describe the boundary." },
-
-  { "utterance": "who is the singer Radiohead", "expect": "music", "must_not": [] },
-  { "utterance": "look up the artist Radiohead", "expect": "music", "must_not": [] },
-  { "utterance": "who is the artist behind this painting", "expect": null, "must_not": ["music"], "note": "a real risk code review found: 'who is the artist *' was dropped from music's own routing.patterns for exactly this reason - a literal pattern match wins immediately over the model, and 'artist' alone is overloaded outside music. Kept as a permanent regression guard against re-adding that pattern." },
-  { "utterance": "tell me about the band Radiohead", "expect": "knowledge", "must_not": ["music"], "note": "a real, documented collision: knowledge's own 'tell me about *' pattern sorts before music's own patterns (loadAllManifests() is id-sorted, k before m) and a literal pattern match wins immediately - music dropped this phrasing from its own routing.patterns entirely since it could never actually fire behind knowledge's." },
-
-  { "utterance": "translate hello to spanish", "expect": "translate", "must_not": [] },
-  { "utterance": "translate good morning into french", "expect": "translate", "must_not": [] },
-
-  { "utterance": "search the web for the tallest mountain", "expect": "websearch", "must_not": [] },
-  { "utterance": "search online for today's headlines", "expect": "websearch", "must_not": [] },
-  { "utterance": "look up the artist Radiohead online", "expect": "music", "must_not": ["websearch"], "note": "a real, confirmed collision code review found: websearch's own routing.patterns originally included 'look up * online', which matches this utterance too - music's 'look up the artist *' wins the tie (sorts first by id) and captures 'Radiohead online' as a polluted artist name. Dropped 'look up * online' from websearch entirely rather than accept the collision; kept as a permanent regression guard." },
-
-  { "utterance": "add milk to the shopping list", "expect": "list-add", "must_not": [] },
-  { "utterance": "put bread on the shopping list", "expect": "list-add", "must_not": [] },
-  { "utterance": "what's on my shopping list", "expect": "list-view", "must_not": [] },
-  { "utterance": "what do I need to buy", "expect": "list-view", "must_not": [] },
-
-  { "utterance": "remind me at 6 to call Nadia", "expect": "remind", "must_not": [] },
-  { "utterance": "remind me tomorrow at noon to walk the dog", "expect": "remind", "must_not": [] },
-
-  { "utterance": "set a timer for ten minutes", "expect": "timer", "must_not": [] },
-  { "utterance": "set a timer for an hour", "expect": "timer", "must_not": [] },
-
-  { "utterance": "turn on the living room light", "expect": "lights-on", "must_not": [] },
-  { "utterance": "turn off the kitchen light", "expect": "lights-off", "must_not": [] },
-  { "utterance": "lock the front door", "expect": null, "must_not": ["lock-doors"], "noiseFloorExempt": true, "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (backend/tests/turnEngine.test.ts has the direct route()-level proof, including that it still appears as a real Tier 2 candidate); this corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side. noiseFloorExempt (Fix D): a consequential package's own trigger phrase deliberately scores near 1.0 - excluded from scripts/bench/routing.ts's null-row noise-floor stat for the same reason the remember/recall near-misses above are." },
-
-  { "utterance": "how are you doing", "expect": null, "must_not": [], "note": "Fix D (docs/dev.md's 2026-09-07 incident note): conversational negatives from real household chit-chat, starting here (the corpus already had one 'good morning' row above - not duplicated). Not paraphrases of any package's own routing.examples - this corpus doubles as routingCorpus.test.ts's stub-embedder regression suite (bag-of-words, no real semantic generalization), so a row here has to hold under BOTH the stub and the real embedder; a true paraphrase (sharing little vocabulary with the intended package's own examples) only ever passes under the real model and belongs in a live bench probe, not this file - see docs/dev/session-c.md for the real-embedder numbers these negatives were chosen against." },
-  { "utterance": "I had a long day", "expect": null, "must_not": [] },
-  { "utterance": "should I dye my hair black", "expect": null, "must_not": [], "note": "getmaipai/home#62's own live incident - Tier 2 picked music for this at score 0.49." },
-  { "utterance": "I might go see the new Spiderman movie", "expect": null, "must_not": [] },
-  { "utterance": "what's the latest Stephen king novel", "expect": null, "must_not": [] },
-  { "utterance": "what's for dinner tonight", "expect": null, "must_not": [] },
-  { "utterance": "can you help me with my homework", "expect": null, "must_not": [] },
-  { "utterance": "I got a new job today", "expect": null, "must_not": ["remember", "recall"] },
-  { "utterance": "I'm feeling kind of down", "expect": null, "must_not": [] },
-  { "utterance": "I just got back from vacation", "expect": null, "must_not": [] },
-  { "utterance": "my brother is coming to visit this weekend", "expect": null, "must_not": ["remember", "recall"] },
-  { "utterance": "I think I'm getting sick", "expect": null, "must_not": [] },
-  { "utterance": "what should I make for breakfast", "expect": null, "must_not": [] },
-  { "utterance": "I can't decide what to wear today", "expect": null, "must_not": [] },
-  { "utterance": "I'm bored", "expect": null, "must_not": [] },
-  { "utterance": "what's a good book to read", "expect": null, "must_not": [] },
-  { "utterance": "do you ever get tired", "expect": null, "must_not": [] },
-  { "utterance": "I miss my old job", "expect": null, "must_not": [] },
-  { "utterance": "what's the best way to fall asleep faster", "expect": null, "must_not": [] },
-  { "utterance": "I'm nervous about my interview tomorrow", "expect": null, "must_not": [] }
+  {
+    "utterance": "what's today's calendar date",
+    "expect": "almanac-date",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the date today",
+    "expect": "almanac-date",
+    "must_not": []
+  },
+  {
+    "utterance": "what day of the week is today",
+    "expect": "almanac-date",
+    "must_not": []
+  },
+  {
+    "utterance": "tell me today's date",
+    "expect": "almanac-date",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the current date",
+    "expect": "almanac-date",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the next holiday",
+    "expect": "almanac-holiday",
+    "must_not": []
+  },
+  {
+    "utterance": "is there a holiday coming up",
+    "expect": "almanac-holiday",
+    "must_not": []
+  },
+  {
+    "utterance": "when's the next public holiday",
+    "expect": "almanac-holiday",
+    "must_not": []
+  },
+  {
+    "utterance": "what holiday is coming up next",
+    "expect": "almanac-holiday",
+    "must_not": []
+  },
+  {
+    "utterance": "is there a day off coming up",
+    "expect": "almanac-holiday",
+    "must_not": []
+  },
+  {
+    "utterance": "what phase is the moon in",
+    "expect": "almanac-moon",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the moon phase tonight",
+    "expect": "almanac-moon",
+    "must_not": []
+  },
+  {
+    "utterance": "is it a full moon",
+    "expect": "almanac-moon",
+    "must_not": []
+  },
+  {
+    "utterance": "tell me the moon phase",
+    "expect": "almanac-moon",
+    "must_not": []
+  },
+  {
+    "utterance": "what happened on this day in history",
+    "expect": "almanac-onthisday",
+    "must_not": []
+  },
+  {
+    "utterance": "what happened today in history",
+    "expect": "almanac-onthisday",
+    "must_not": []
+  },
+  {
+    "utterance": "tell me something that happened on this day",
+    "expect": "almanac-onthisday",
+    "must_not": []
+  },
+  {
+    "utterance": "this day in history",
+    "expect": "almanac-onthisday",
+    "must_not": []
+  },
+  {
+    "utterance": "what's special about today in history",
+    "expect": "almanac-onthisday",
+    "must_not": []
+  },
+  {
+    "utterance": "what time is it",
+    "expect": "almanac-time",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the time",
+    "expect": "almanac-time",
+    "must_not": []
+  },
+  {
+    "utterance": "do you know what time it is",
+    "expect": "almanac-time",
+    "must_not": []
+  },
+  {
+    "utterance": "tell me the time",
+    "expect": "almanac-time",
+    "must_not": []
+  },
+  {
+    "utterance": "what time is it right now",
+    "expect": "almanac-time",
+    "must_not": []
+  },
+  {
+    "utterance": "convert 5 miles to km",
+    "expect": "convert",
+    "must_not": [],
+    "note": "convert also has a required arg, so only the literal 'convert *' pattern can fire it."
+  },
+  {
+    "utterance": "convert 100 fahrenheit to celsius",
+    "expect": "convert",
+    "must_not": []
+  },
+  {
+    "utterance": "convert 2 cups to ml",
+    "expect": "convert",
+    "must_not": []
+  },
+  {
+    "utterance": "convert 10 kg to lbs",
+    "expect": "convert",
+    "must_not": []
+  },
+  {
+    "utterance": "convert 3 feet to meters",
+    "expect": "convert",
+    "must_not": []
+  },
+  {
+    "utterance": "exchange 100 dollars to euros",
+    "expect": "currency",
+    "must_not": []
+  },
+  {
+    "utterance": "exchange 50 usd for gbp",
+    "expect": "currency",
+    "must_not": []
+  },
+  {
+    "utterance": "exchange 20 euros to dollars",
+    "expect": "currency",
+    "must_not": []
+  },
+  {
+    "utterance": "exchange 10 pounds to yen",
+    "expect": "currency",
+    "must_not": []
+  },
+  {
+    "utterance": "exchange 5 dollars for euros",
+    "expect": "currency",
+    "must_not": []
+  },
+  {
+    "utterance": "what does curious mean",
+    "expect": "define",
+    "must_not": []
+  },
+  {
+    "utterance": "define ambiguous",
+    "expect": "define",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the definition of ephemeral",
+    "expect": "define",
+    "must_not": []
+  },
+  {
+    "utterance": "what does the word ubiquitous mean",
+    "expect": "define",
+    "must_not": []
+  },
+  {
+    "utterance": "what does gregarious mean",
+    "expect": "define",
+    "must_not": []
+  },
+  {
+    "utterance": "I could use a good laugh right now",
+    "expect": "joke",
+    "must_not": []
+  },
+  {
+    "utterance": "tell me a dad joke",
+    "expect": "joke",
+    "must_not": []
+  },
+  {
+    "utterance": "got any jokes",
+    "expect": "joke",
+    "must_not": []
+  },
+  {
+    "utterance": "make me laugh",
+    "expect": "joke",
+    "must_not": []
+  },
+  {
+    "utterance": "know any good jokes",
+    "expect": "joke",
+    "must_not": []
+  },
+  {
+    "utterance": "who was Marie Curie",
+    "expect": "knowledge",
+    "must_not": []
+  },
+  {
+    "utterance": "what is photosynthesis",
+    "expect": "knowledge",
+    "must_not": []
+  },
+  {
+    "utterance": "tell me about the Eiffel Tower",
+    "expect": "knowledge",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the capital of Australia",
+    "expect": "knowledge",
+    "must_not": []
+  },
+  {
+    "utterance": "who invented the telephone",
+    "expect": "knowledge",
+    "must_not": []
+  },
+  {
+    "utterance": "turn off the living room light",
+    "expect": "lights-off",
+    "must_not": []
+  },
+  {
+    "utterance": "turn off the kitchen light",
+    "expect": "lights-off",
+    "must_not": []
+  },
+  {
+    "utterance": "turn off the bedroom lights",
+    "expect": "lights-off",
+    "must_not": []
+  },
+  {
+    "utterance": "turn off the porch light",
+    "expect": "lights-off",
+    "must_not": []
+  },
+  {
+    "utterance": "turn off the hallway lights",
+    "expect": "lights-off",
+    "must_not": []
+  },
+  {
+    "utterance": "turn on the living room light",
+    "expect": "lights-on",
+    "must_not": []
+  },
+  {
+    "utterance": "turn on the kitchen light",
+    "expect": "lights-on",
+    "must_not": []
+  },
+  {
+    "utterance": "turn on the bedroom lights",
+    "expect": "lights-on",
+    "must_not": []
+  },
+  {
+    "utterance": "turn on the porch light",
+    "expect": "lights-on",
+    "must_not": []
+  },
+  {
+    "utterance": "turn on the hallway lights",
+    "expect": "lights-on",
+    "must_not": []
+  },
+  {
+    "utterance": "add milk to the shopping list",
+    "expect": "list-add",
+    "must_not": []
+  },
+  {
+    "utterance": "add eggs to my shopping list",
+    "expect": "list-add",
+    "must_not": []
+  },
+  {
+    "utterance": "put bread on the shopping list",
+    "expect": "list-add",
+    "must_not": []
+  },
+  {
+    "utterance": "add paper towels to the shopping list",
+    "expect": "list-add",
+    "must_not": []
+  },
+  {
+    "utterance": "add dog food to the shopping list",
+    "expect": "list-add",
+    "must_not": []
+  },
+  {
+    "utterance": "what's on my shopping list",
+    "expect": "list-view",
+    "must_not": []
+  },
+  {
+    "utterance": "what's on the shopping list",
+    "expect": "list-view",
+    "must_not": []
+  },
+  {
+    "utterance": "what do I need to buy",
+    "expect": "list-view",
+    "must_not": []
+  },
+  {
+    "utterance": "read me the shopping list",
+    "expect": "list-view",
+    "must_not": []
+  },
+  {
+    "utterance": "what's on my shopping list today",
+    "expect": "list-view",
+    "must_not": []
+  },
+  {
+    "utterance": "lock the front door",
+    "expect": null,
+    "must_not": [
+      "lock-doors"
+    ],
+    "noiseFloorExempt": true,
+    "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (backend/tests/turnEngine.test.ts has the direct route()-level proof, including that it still appears as a real Tier 2 candidate); this corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side. noiseFloorExempt (Fix D): a consequential package's own trigger phrase deliberately scores near 1.0 - excluded from scripts/bench/routing.ts's null-row noise-floor stat for the same reason the remember/recall near-misses above are."
+  },
+  {
+    "utterance": "lock the door",
+    "expect": null,
+    "must_not": [
+      "lock-doors"
+    ],
+    "noiseFloorExempt": true,
+    "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (see turnEngine.test.ts's direct route() proof; it still appears as a real Tier 2 candidate). This corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side."
+  },
+  {
+    "utterance": "lock up the house",
+    "expect": null,
+    "must_not": [
+      "lock-doors"
+    ],
+    "noiseFloorExempt": true,
+    "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (see turnEngine.test.ts's direct route() proof; it still appears as a real Tier 2 candidate). This corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side."
+  },
+  {
+    "utterance": "make sure the front door is locked",
+    "expect": null,
+    "must_not": [
+      "lock-doors"
+    ],
+    "noiseFloorExempt": true,
+    "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (see turnEngine.test.ts's direct route() proof; it still appears as a real Tier 2 candidate). This corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side."
+  },
+  {
+    "utterance": "can you lock the front door",
+    "expect": null,
+    "must_not": [
+      "lock-doors"
+    ],
+    "noiseFloorExempt": true,
+    "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (see turnEngine.test.ts's direct route() proof; it still appears as a real Tier 2 candidate). This corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side."
+  },
+  {
+    "utterance": "calculate 15 * 12",
+    "expect": "math",
+    "must_not": [],
+    "note": "math has a required arg (expression), so it can only ever fire via a literal routing.patterns wildcard capture, never fuzzy scoring - this is that path."
+  },
+  {
+    "utterance": "compute 2^10",
+    "expect": "math",
+    "must_not": []
+  },
+  {
+    "utterance": "calculate sqrt(144)",
+    "expect": "math",
+    "must_not": []
+  },
+  {
+    "utterance": "what does 15 * 12 equal",
+    "expect": "math",
+    "must_not": []
+  },
+  {
+    "utterance": "compute (15 + 5) * 2",
+    "expect": "math",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the runtime of Cobra",
+    "expect": "media-lookup",
+    "must_not": [],
+    "note": "media-lookup's routing.patterns ('what's the runtime of *', 'who directed *', 'is * any good', 'when did * come out', 'who's in *') match these utterances as literals; the earlier 'expect: knowledge' guess was wrong - knowledge's broad 'what is *' pattern does not match any of these phrasings, and routeLiteral returns media-lookup on a fresh row."
+  },
+  {
+    "utterance": "who directed Cobra",
+    "expect": "media-lookup",
+    "must_not": [],
+    "note": "media-lookup's routing.patterns ('what's the runtime of *', 'who directed *', 'is * any good', 'when did * come out', 'who's in *') match these utterances as literals; the earlier 'expect: knowledge' guess was wrong - knowledge's broad 'what is *' pattern does not match any of these phrasings, and routeLiteral returns media-lookup on a fresh row."
+  },
+  {
+    "utterance": "what is Cobra about",
+    "expect": "knowledge",
+    "must_not": [],
+    "note": "CHAT-13 (commit 3d13e30): routeLiteral only reorders loaded so media-lookup comes first when the turn's live subject is a world head of a media kind; a fresh one-turn corpus row has no world head, so knowledge's broad 'what is *' / 'tell me about *' patterns still match first in the alphabetical pass - the genuine, documented winner here (session-a.md:1906, baseline-fixes-2026-09-13.md:22)."
+  },
+  {
+    "utterance": "is Cobra any good",
+    "expect": "media-lookup",
+    "must_not": [],
+    "note": "media-lookup's routing.patterns ('what's the runtime of *', 'who directed *', 'is * any good', 'when did * come out', 'who's in *') match these utterances as literals; the earlier 'expect: knowledge' guess was wrong - knowledge's broad 'what is *' pattern does not match any of these phrasings, and routeLiteral returns media-lookup on a fresh row."
+  },
+  {
+    "utterance": "when did Cobra come out",
+    "expect": "media-lookup",
+    "must_not": [],
+    "note": "media-lookup's routing.patterns ('what's the runtime of *', 'who directed *', 'is * any good', 'when did * come out', 'who's in *') match these utterances as literals; the earlier 'expect: knowledge' guess was wrong - knowledge's broad 'what is *' pattern does not match any of these phrasings, and routeLiteral returns media-lookup on a fresh row."
+  },
+  {
+    "utterance": "who's in Cobra",
+    "expect": "media-lookup",
+    "must_not": [],
+    "note": "media-lookup's routing.patterns ('what's the runtime of *', 'who directed *', 'is * any good', 'when did * come out', 'who's in *') match these utterances as literals; the earlier 'expect: knowledge' guess was wrong - knowledge's broad 'what is *' pattern does not match any of these phrasings, and routeLiteral returns media-lookup on a fresh row."
+  },
+  {
+    "utterance": "what is Cobra rated",
+    "expect": "knowledge",
+    "must_not": [],
+    "note": "CHAT-13 (commit 3d13e30): routeLiteral only reorders loaded so media-lookup comes first when the turn's live subject is a world head of a media kind; a fresh one-turn corpus row has no world head, so knowledge's broad 'what is *' / 'tell me about *' patterns still match first in the alphabetical pass - the genuine, documented winner here (session-a.md:1906, baseline-fixes-2026-09-13.md:22)."
+  },
+  {
+    "utterance": "tell me about the movie Cobra",
+    "expect": "knowledge",
+    "must_not": [],
+    "note": "CHAT-13 (commit 3d13e30): routeLiteral only reorders loaded so media-lookup comes first when the turn's live subject is a world head of a media kind; a fresh one-turn corpus row has no world head, so knowledge's broad 'what is *' / 'tell me about *' patterns still match first in the alphabetical pass - the genuine, documented winner here (session-a.md:1906, baseline-fixes-2026-09-13.md:22)."
+  },
+  {
+    "utterance": "look up the artist Radiohead",
+    "expect": "music",
+    "must_not": []
+  },
+  {
+    "utterance": "look up the artist Adele",
+    "expect": "music",
+    "must_not": []
+  },
+  {
+    "utterance": "who is the singer Prince",
+    "expect": "music",
+    "must_not": []
+  },
+  {
+    "utterance": "who is the singer Adele",
+    "expect": "music",
+    "must_not": []
+  },
+  {
+    "utterance": "who is the singer in Radiohead",
+    "expect": "music",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the news",
+    "expect": "news",
+    "must_not": []
+  },
+  {
+    "utterance": "what's in the news today",
+    "expect": "news",
+    "must_not": []
+  },
+  {
+    "utterance": "give me the news headlines",
+    "expect": "news",
+    "must_not": []
+  },
+  {
+    "utterance": "read me the headlines",
+    "expect": "news",
+    "must_not": []
+  },
+  {
+    "utterance": "what's happening in the news",
+    "expect": "news",
+    "must_not": []
+  },
+  {
+    "utterance": "what do you remember about the wifi password",
+    "expect": "recall",
+    "must_not": [
+      "remember"
+    ]
+  },
+  {
+    "utterance": "do you remember what I said about my allergies",
+    "expect": "recall",
+    "must_not": [
+      "remember"
+    ]
+  },
+  {
+    "utterance": "what have I told you to remember about pizza night",
+    "expect": null,
+    "must_not": [
+      "remember"
+    ],
+    "noiseFloorExempt": true,
+    "note": "recall's own routing.example, but it captures no `topic` for recall's required arg without matching one of its own patterns literally - Tier 1 alone can never bind it (deterministicArgs' documented gap); a real Tier 2 tool call (step 2) is what should eventually route this, not Tier 1. noiseFloorExempt (Fix D): deliberately scores near 1.0 by design - a real near-miss meant for Tier 2, not ordinary conversational noise - so scripts/bench/routing.ts excludes it from the null-row noise-floor stat used to set TIER1_THRESHOLD/TIER2_AMBIGUOUS_FLOOR."
+  },
+  {
+    "utterance": "what do you know about my dentist appointment",
+    "expect": null,
+    "must_not": [
+      "remember"
+    ],
+    "noiseFloorExempt": true,
+    "note": "same gap as above"
+  },
+  {
+    "utterance": "remind me what I said about the school schedule",
+    "expect": "remind",
+    "must_not": [],
+    "note": "step 8's own remind package (added 2026-09-06) made this a real, different gap than the one this row used to document: \"remind me *\" is a literal pattern (a required-arg package can only ever route that way) and wins immediately over the model, so this genuinely ambiguous phrase - recall-flavored, not really a new-reminder request - now goes to remind, which will 400 (no time phrase found) rather than reach recall or the model. The underlying fix is Tier 2 native tool calling disambiguating this properly, already tracked in turnEngine.ts's own \"not built this pass\" list, not something remind's own pattern choice can solve."
+  },
+  {
+    "utterance": "remember that I take my medicine at 8am",
+    "expect": "remember",
+    "must_not": [
+      "recall"
+    ]
+  },
+  {
+    "utterance": "remember I'm allergic to peanuts",
+    "expect": "remember",
+    "must_not": [
+      "recall"
+    ]
+  },
+  {
+    "utterance": "please remember our wifi password is on the fridge",
+    "expect": null,
+    "must_not": [
+      "recall"
+    ],
+    "noiseFloorExempt": true,
+    "note": "remember's own routing.example that doesn't literally start with \"remember\" - same required-arg gap, `fact` this time"
+  },
+  {
+    "utterance": "remember that Friday is pizza night",
+    "expect": "remember",
+    "must_not": [
+      "recall"
+    ]
+  },
+  {
+    "utterance": "can you remember I have a dentist appointment next week",
+    "expect": null,
+    "must_not": [
+      "recall"
+    ],
+    "noiseFloorExempt": true,
+    "note": "same gap as above"
+  },
+  {
+    "utterance": "remind me at 6 to call Nadia",
+    "expect": "remind",
+    "must_not": []
+  },
+  {
+    "utterance": "remind me tomorrow at noon to walk the dog",
+    "expect": "remind",
+    "must_not": []
+  },
+  {
+    "utterance": "remind me tonight at 8 to take out the trash",
+    "expect": "remind",
+    "must_not": []
+  },
+  {
+    "utterance": "remind me in an hour to check the oven",
+    "expect": "remind",
+    "must_not": []
+  },
+  {
+    "utterance": "remind me at 9am to leave for work",
+    "expect": "remind",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the score",
+    "expect": "sports",
+    "must_not": []
+  },
+  {
+    "utterance": "any scores today",
+    "expect": "sports",
+    "must_not": []
+  },
+  {
+    "utterance": "how are the games going",
+    "expect": "sports",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the baseball score",
+    "expect": "sports",
+    "must_not": []
+  },
+  {
+    "utterance": "give me today's scores",
+    "expect": "sports",
+    "must_not": []
+  },
+  {
+    "utterance": "tell me a bedtime story",
+    "expect": "storytime-style",
+    "must_not": [
+      "joke"
+    ]
+  },
+  {
+    "utterance": "tell a story for my kid",
+    "expect": "storytime-style",
+    "must_not": [
+      "joke"
+    ]
+  },
+  {
+    "utterance": "can you tell a story",
+    "expect": "storytime-style",
+    "must_not": [
+      "joke"
+    ]
+  },
+  {
+    "utterance": "make up a story about a dragon",
+    "expect": "storytime-style",
+    "must_not": [
+      "joke"
+    ]
+  },
+  {
+    "utterance": "tell a short story before bed",
+    "expect": "storytime-style",
+    "must_not": [
+      "joke"
+    ]
+  },
+  {
+    "utterance": "set a timer for ten minutes",
+    "expect": "timer",
+    "must_not": []
+  },
+  {
+    "utterance": "set a timer for 5 minutes",
+    "expect": "timer",
+    "must_not": []
+  },
+  {
+    "utterance": "set a timer for an hour",
+    "expect": "timer",
+    "must_not": []
+  },
+  {
+    "utterance": "set a timer for 30 seconds",
+    "expect": "timer",
+    "must_not": []
+  },
+  {
+    "utterance": "set a timer for 2 hours",
+    "expect": "timer",
+    "must_not": []
+  },
+  {
+    "utterance": "translate hello to spanish",
+    "expect": "translate",
+    "must_not": []
+  },
+  {
+    "utterance": "translate happy birthday into french",
+    "expect": "translate",
+    "must_not": []
+  },
+  {
+    "utterance": "translate thank you to japanese",
+    "expect": "translate",
+    "must_not": []
+  },
+  {
+    "utterance": "translate excuse me into german",
+    "expect": "translate",
+    "must_not": []
+  },
+  {
+    "utterance": "translate congratulations to italian",
+    "expect": "translate",
+    "must_not": []
+  },
+  {
+    "utterance": "give me a trivia question",
+    "expect": "trivia",
+    "must_not": []
+  },
+  {
+    "utterance": "ask me a trivia question",
+    "expect": "trivia",
+    "must_not": []
+  },
+  {
+    "utterance": "tell me some trivia",
+    "expect": "trivia",
+    "must_not": []
+  },
+  {
+    "utterance": "quiz me",
+    "expect": "trivia",
+    "must_not": []
+  },
+  {
+    "utterance": "got any trivia",
+    "expect": "trivia",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the weather in Seattle",
+    "expect": "weather",
+    "args": {
+      "place": "Seattle"
+    },
+    "must_not": []
+  },
+  {
+    "utterance": "how's the weather in Chicago",
+    "expect": "weather",
+    "args": {
+      "place": "Chicago"
+    },
+    "must_not": []
+  },
+  {
+    "utterance": "what's the weather like in Portland",
+    "expect": "weather",
+    "args": {
+      "place": "Portland"
+    },
+    "must_not": []
+  },
+  {
+    "utterance": "weather in Denver",
+    "expect": "weather",
+    "args": {
+      "place": "Denver"
+    },
+    "must_not": []
+  },
+  {
+    "utterance": "how's the weather in Miami today",
+    "expect": "weather",
+    "must_not": []
+  },
+  {
+    "utterance": "is it going to rain in Portland today",
+    "expect": "weather",
+    "must_not": []
+  },
+  {
+    "utterance": "search the web for the tallest mountain",
+    "expect": "websearch",
+    "must_not": []
+  },
+  {
+    "utterance": "search online for tonight's game score",
+    "expect": "websearch",
+    "must_not": []
+  },
+  {
+    "utterance": "search the web for the weather forecast",
+    "expect": "websearch",
+    "must_not": []
+  },
+  {
+    "utterance": "search the web for the closest pharmacy",
+    "expect": "websearch",
+    "must_not": []
+  },
+  {
+    "utterance": "search online for today's headlines",
+    "expect": "websearch",
+    "must_not": []
+  },
+  {
+    "utterance": "what's the latest book by my favorite author",
+    "expect": null,
+    "must_not": [],
+    "noiseFloorExempt": true,
+    "note": "websearch's examples are Tier 2 material: the package is always_offer (native tool calling, offered to the model, never the deterministic winner from an example alone) and none of these utterances match its only two routing.patterns; the stub embedder can't score them above TIER1_THRESHOLD. Excluded from the null-row noise-floor stat the same way the lock-doors row is."
+  },
+  {
+    "utterance": "when does the new season come out",
+    "expect": null,
+    "must_not": [],
+    "noiseFloorExempt": true,
+    "note": "websearch's examples are Tier 2 material: the package is always_offer (native tool calling, offered to the model, never the deterministic winner from an example alone) and none of these utterances match its only two routing.patterns; the stub embedder can't score them above TIER1_THRESHOLD. Excluded from the null-row noise-floor stat the same way the lock-doors row is."
+  },
+  {
+    "utterance": "is the hardware store open right now",
+    "expect": null,
+    "must_not": [],
+    "noiseFloorExempt": true,
+    "note": "websearch's examples are Tier 2 material: the package is always_offer (native tool calling, offered to the model, never the deterministic winner from an example alone) and none of these utterances match its only two routing.patterns; the stub embedder can't score them above TIER1_THRESHOLD. Excluded from the null-row noise-floor stat the same way the lock-doors row is."
+  },
+  {
+    "utterance": "what's the current price of that",
+    "expect": null,
+    "must_not": [],
+    "noiseFloorExempt": true,
+    "note": "websearch's examples are Tier 2 material: the package is always_offer (native tool calling, offered to the model, never the deterministic winner from an example alone) and none of these utterances match its only two routing.patterns; the stub embedder can't score them above TIER1_THRESHOLD. Excluded from the null-row noise-floor stat the same way the lock-doors row is."
+  },
+  {
+    "utterance": "has there been any news about that lately",
+    "expect": null,
+    "must_not": [],
+    "noiseFloorExempt": true,
+    "note": "websearch's examples are Tier 2 material: the package is always_offer (native tool calling, offered to the model, never the deterministic winner from an example alone) and none of these utterances match its only two routing.patterns; the stub embedder can't score them above TIER1_THRESHOLD. Excluded from the null-row noise-floor stat the same way the lock-doors row is."
+  }
 ]

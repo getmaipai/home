@@ -13,15 +13,23 @@
       "what phase is the moon in",
       "what's the moon phase tonight",
       "is it a full moon",
-      "what does the moon look like tonight",
+      "tell me the moon phase",
+      "what does the moon look like tonight"
+    ],
+    "patterns": [
+      "what phase is the moon in",
+      "what's the moon phase tonight",
       "tell me the moon phase"
     ],
-    "patterns": ["what phase is the moon in", "what's the moon phase tonight", "tell me the moon phase"],
-    "answers": ["relative_date"]
+    "answers": [
+      "relative_date"
+    ]
   },
   "requires": [],
   "optional": [],
-  "platforms": ["home"],
+  "platforms": [
+    "home"
+  ],
   "min_role": "child",
   "consequential": false,
   "offline": "full",
@@ -36,5 +44,7 @@
   "timeout_ms": 8000,
   "tier": 1,
   "quality_scale": "bronze",
-  "smoke": { "kind": "deno_test" }
+  "smoke": {
+    "kind": "deno_test"
+  }
 }
