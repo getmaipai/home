@@ -13834,6 +13834,93 @@ additive) with a toggle in the chat header: the pane stays open, the
 document streams after the line, the line takes the shorter budget.
 The bubble is never an article in either mode.
 
+### ATT-01: attachments
+
+ATT-01 is the design pass for a file a person sends in chat. The
+attachment record is spec-first (`spec/schemas/attachment.schema.json`),
+because storage ownership, retention and the turn reference must be the
+same shape on Home and on a future robot or phone client. It is immutable:
+the bytes are verified by `sha256`, the path is relative to the household
+data directory, and the record captures `owner_person_id`,
+`conversation_id` and `turn_id` at upload time.
+
+**1. Storage and retention.** Store bytes below the household data
+directory at `people/{owner_person_id}/attachments/{id}`. The database
+record stores only the normalized relative path, MIME type, byte count,
+digest and provenance. `retention: conversation` follows
+`household.conversation_retention_days` from `backend/src/settings/coreKeys.ts`
+and `backend/src/lib/scheduler.ts`: 7 to 365 days, 90 by default, deleted
+with the owning turn. `host.data.forget(person)` deletes the record and
+bytes immediately. A separate attachment archive, export cache or
+indefinite retention class is rejected because it would contradict
+`docs/user/privacy.md`'s promise that household data stays local and the
+existing conversation retention rule in this file. The storage path is
+validated as relative and traversal-free before any filesystem call.
+
+**2. Text extraction.** Use Apache Tika as the one maintained local
+prebuilt parser for PDF and office documents. It covers both families
+through one parser surface, is Apache-2.0 licensed (the project's
+[release page](https://tika.apache.org/download) and
+[LICENSE.txt](https://github.com/apache/tika/blob/main/LICENSE.txt) were
+checked), and Apache-2.0 is an AGPL-3.0-compatible dependency under
+`../.github/CLAUDE.md`'s licensing rule and
+`../.github/docs/ENGINEERING.md`. Pin the Tika release and checksum when
+the binary or package is added; run it locally with bounded input and no
+network access. A hand-written PDF parser, one converter per office format,
+`textract`-style abandoned glue, or a cloud document API is rejected.
+Scanned pages use the already-decided local `host.ocr.read` RapidOCR path,
+not a second document parser. The library and licence decision is recorded
+here before implementation; the current parser pipeline remains unbuilt,
+as `docs/BACKLOG.md`'s Vision entry states.
+
+**3. The document path.** The upload adapter mirrors assistant-ui's
+`AttachmentAdapter` contract in
+`frontend/node_modules/@assistant-ui/react/dist/index.d.ts` and the
+`SimpleImageAttachmentAdapter` and `SimpleTextAttachmentAdapter` behavior
+implemented by the package's `@assistant-ui/core` attachment adapter:
+`add` creates pending metadata, `send` creates a completed content part,
+and `remove` is local cleanup. Home's adapter will upload the bytes to the
+local storage path, then retain an attachment id in the user message.
+Extraction produces one typed `document` outcome on the turn with bounded
+chunks `{attachment_id, page, text}`. The composer selects chunks to the
+existing context budget and cites the page in the same source-backed way
+as a lookup. Therefore "summarize this" and "what does page 3 say" share
+one retrieval and citation path. The short chat line and the long answer
+belong in COMP-01's document record, not in a duplicate attachment prose
+store. Persisting a full extracted copy in the attachment record or
+silently sending every page to the model is rejected.
+
+**4. Images and the engine.** Images are stored by the same record and
+adapter path. The vision-capable engine choice stays open beside the GPU
+layout note: no implementation may assume the current text engine accepts
+image parts, and no cloud vision endpoint may be added without a privacy
+page row and explicit consent. Until that decision is made, an image may
+be retained locally and can use RapidOCR when it is a scan, but it is not
+described by a text-only model or silently routed to an external service.
+Face naming, pet recognition and image generation are separate questions
+and remain out of scope. This keeps the open engine decision honest while
+still allowing the prebuilt UI attachment shape to be used later.
+
+**5. Child-band delivery.** The input safety check still runs before any
+extraction or model call. Derived OCR, extracted text, and any future
+vision description enter the same evidence ceiling used for every other
+piece of content, at the child's frozen `effectiveBand` from
+`backend/src/lib/turnContext.ts`. The child band may not receive sources,
+links or a document (`docs/dev.md` section 13, part 1), and the ceiling is
+applied before composition, never as a cosmetic filter after the model
+has seen the content. A child upload is still owned and retained under
+the child's person record; adult access to the original is an
+authorization decision, not a reason to widen the child's reply. The
+ceiling rule, not a new attachment word list or regex family, governs all
+future media descriptions.
+
+Mechanical pickup is split into ATT-01a through ATT-01e in
+`docs/BACKLOG.md`: local storage and retention, extraction and OCR,
+document outcome and composer integration, the vision capability decision
+and image adapter, then child projection plus the integrated landing gate.
+Each follows the existing attachment record and assistant-ui adapter
+shape; the final item proves forget, retention, ceiling and the full gate.
+
 **COMP-03: the companion package's full shape (M, spec first).** The
 manifest's `companion` block gains: `directness` (`direct | conversational`,
 the dial the brief's "MaiPai direct" needs: the point first, short

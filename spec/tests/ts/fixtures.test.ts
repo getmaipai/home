@@ -28,6 +28,7 @@ import { ConversationTurn } from "../../gen/ts/conversation-turn.js";
 import { OpenQuestion } from "../../gen/ts/open-question.js";
 import { ReplyFeedback } from "../../gen/ts/reply-feedback.js";
 import { TurnArtifact } from "../../gen/ts/turn-artifact.js";
+import { Attachment } from "../../gen/ts/attachment.js";
 // ErrorEntry is standards-owned (std-v0.2.0), not generated here; the error
 // catalogue's shape is imported from the sibling .github checkout, the same
 // way spec/schemas/manifest.schema.json imports PrivacyRow by $ref.
@@ -180,6 +181,10 @@ describe("record fixtures validate against their generated Zod models", () => {
       expect(() => TurnArtifact.parse(loadFixture(`turn-artifact.${kind}.example.json`))).not.toThrow();
     });
   }
+
+  test("attachment.example.json", () => {
+    expect(() => Attachment.parse(loadFixture("attachment.example.json"))).not.toThrow();
+  });
 
   test("error catalogue entries", () => {
     const errors = JSON.parse(

@@ -6454,25 +6454,68 @@ approvals are still real, unstarted work for a future session.
             verdict and reason beside rung and rules by `turn_id`; exit:
             labels tests and `bash scripts/check.sh`.
 - [ ] **ATT-01: Attachments in chat: a document, a photo, "summarize
-      this"** (L, design pass first, 2026-09-16). What exists: nothing
-      on the input side; K7 renders pictures the model found, not ones
-      the person sent. What the library gives: assistant-ui's
-      `AttachmentAdapter`, `SimpleImageAttachmentAdapter` and
-      `SimpleTextAttachmentAdapter` (composer chips, previews, the
-      message part shape), so the UI half is prebuilt. The design has
-      to decide, in this order: where a sent file lives (per-person,
-      under the household's data directory, with the retention rule the
-      privacy page states); text extraction (PDF and office documents
-      through one maintained library, chosen by the prebuilt rule, with
-      `host.ocr.read`'s RapidOCR for scans); how a document reaches the
-      composer (a `document` outcome kind on the turn, chunked to the
-      context budget, cited back by page like a lookup source) so
-      "summarize this" and "what does page 3 say" are the same path as
-      a lookup; images need a vision-capable engine (a decision beside
-      the GPU layout note, not assumed); and the child band's rule
-      (images from a child go through the same content ceiling as
-      anything shown to one). Depends on COMP-01 for the long answer's
-      home. Out of scope until designed: any code.
+      this"** (L, design and spec landed 2026-09-16). The design record
+      is `docs/dev.md`'s "ATT-01: attachments" section and the shared
+      record is `spec/schemas/attachment.schema.json`. What exists:
+      nothing on the input side; K7 renders pictures the model found, not
+      ones the person sent. The local record stores a per-person file
+      below the household data directory, follows conversation retention,
+      and carries turn provenance and an integrity digest. Apache Tika is
+      the chosen Apache-2.0 local parser for PDF and office files;
+      `host.ocr.read` stays RapidOCR for scans. A document outcome is
+      chunked to the context budget and cited by page so "summarize this"
+      and "what does page 3 say" share the lookup path. The vision engine
+      remains open beside the GPU layout note. Child-derived content goes
+      through the existing content ceiling, and the child band receives
+      no sources, links or documents. Depends on COMP-01 for the long
+      answer's home. The design pass itself adds no runtime behavior.
+
+      - [ ] **ATT-01a: attachment storage and retention** (mechanical).
+            Add the local upload store and `Attachment` persistence,
+            mirroring the attachment schema's per-person path and the
+            existing conversation retention and `host.data.forget(person)`
+            behavior. Acceptance: bytes and record are written under the
+            household data directory, traversal is refused, the digest and
+            size round-trip, conversation retention removes both, and
+            forget removes both. Exit: targeted attachment/storage tests,
+            then `bash scripts/check.sh`.
+      - [ ] **ATT-01b: document extraction and OCR** (mechanical). Wire
+            bounded local Apache Tika extraction for PDF and office files,
+            mirroring the package-host boundary and `host.ocr.read`'s
+            RapidOCR path for scans. Acceptance: text pages retain page
+            numbers, unsupported or oversized input fails safely, no
+            network call occurs, and OCR failure never sends raw bytes to
+            the model. Exit: extraction and OCR tests, then
+            `bash scripts/check.sh`.
+      - [ ] **ATT-01c: document outcome and composer path** (mechanical).
+            Add the typed `document` outcome, bounded page chunks and
+            source-backed page citations in the turn engine, mirroring
+            retained package outcomes and COMP-01's document record.
+            Acceptance: "summarize this" and a page question use the same
+            outcome path, selection respects the context budget, citations
+            name the page, and the COMP-01 document is revisioned without
+            duplicating extracted prose. Exit: spec, turn-engine and
+            composer tests, then `bash scripts/check.sh`.
+      - [ ] **ATT-01d: image attachment adapter and vision capability**
+            (mechanical, with the engine decision kept explicit). Wire the
+            assistant-ui `AttachmentAdapter` shape and local image record,
+            mirroring `SimpleImageAttachmentAdapter`; gate image parts on
+            the selected local engine capability and use RapidOCR only for
+            scans. Acceptance: image chips preview and send locally,
+            unsupported engines refuse with a safe message, and no cloud
+            vision connection exists without a privacy row. Exit: frontend
+            adapter tests, capability tests and privacy check, then
+            `bash scripts/check.sh`.
+      - [ ] **ATT-01e: child projection and landing gate** (mechanical).
+            Apply the existing `effectiveBand` content ceiling to extracted
+            and image-derived evidence before composition, mirroring
+            `backend/src/lib/turnContext.ts` and COMP-01's child projection.
+            Acceptance: child delivery has no sources, links or document,
+            adult delivery preserves the same attachment evidence, forget
+            and retention are end to end, and the attachment fixtures and
+            screenshots pass. Exit: targeted child, retention and frontend
+            tests, wait for other benches, then `bash scripts/check.sh` as
+            the landing gate.
 - [ ] **Chat stream reconnection and persistent message branches** (M) -
       `chatModelAdapter.ts`, `chatHistoryAdapter.ts`, and the turn API.
       Markdown, multiline input, stop, copy, suggestions, timestamps,

@@ -11,6 +11,7 @@ import pytest
 from _standards import load_standards_module
 from pydantic import ValidationError
 
+from gen.py.attachment_schema import Attachment
 from gen.py.content_ceiling_schema import ContentCeiling
 from gen.py.conversation_schema import Conversation
 from gen.py.conversation_turn_schema import ConversationTurn
@@ -142,6 +143,10 @@ def test_model_capabilities_fixtures(kind):
 
 def test_turn_signal_fixture():
     TurnSignal.model_validate(load_fixture("turn-signal.example.json"))
+
+
+def test_attachment_fixture():
+    Attachment.model_validate(load_fixture("attachment.example.json"))
 
 
 def test_reply_plan_fixture():

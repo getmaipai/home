@@ -12,6 +12,7 @@ export * from "./model-capabilities.js";
 export * from "./entity.js";
 export * from "./person.js";
 export * from "./reply-feedback.js";
+export * from "./attachment.js";
 export * from "./settings-key.js";
 export * from "./safety-result.js";
 export * from "./reply-constraint.js";
