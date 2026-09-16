@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -2985,6 +2985,16 @@ async function prepareTurn(
     subjectPronouns,
   };
   const householdSubject = householdSubjectTurn(text, turnContext);
+  if (asksHowKnown(text) && !householdSubject) {
+    const prior = outcomesForConversation(conversation.id).slice().reverse().flatMap((row) => row.outcomes.map((outcome) => ({ row, outcome }))).find(({ outcome }) => outcome.status === "succeeded" && (outcome.source?.kind === "model_knowledge" || outcome.sources?.length));
+    if (prior?.outcome.source?.kind === "model_knowledge") {
+      const question = prior.outcome.source?.title ?? text;
+      const line = "That one I just know; I didn't look it up. Want me to check?";
+      setPendingAsk(conversation.id, { kind: "lookup", prompt: line, packageId: "websearch", args: { expression: question } });
+      return immediate({ reply: { text: line }, source: "model", safety, crisis_resources: crisisResources }, subjects);
+    }
+    if (prior?.outcome.sources?.length) return immediate({ reply: { text: "I looked it up; the link's below." }, source: "plugin", plugin_id: prior.outcome.packageId, safety, crisis_resources: crisisResources, sources: prior.outcome.sources }, subjects);
+  }
   const deferredSubject = turnContext.subjects.find((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household");
   const deferredSubjectName = deferredSubject ? registryNameById(deferredSubject.entity_id) : null;
   const mayDefer = (ageBand === "child" || ageBand === "teen") && shapeOf(signal, text) === "question" && householdSubject && memoryMatches.withheldForBand > 0 && deferredSubjectName !== null && deferredSubject !== undefined && !memoryMatches.some((match) => match.record.subject_id === deferredSubject.entity_id);
@@ -4339,6 +4349,9 @@ async function runTurnHoldingLease(
         value = resolved ? await composeBlocking(resolved, prepared.turnContext.outcomes.slice(before)) : answerWithSafetyAndGuards(read ? `${thinkingPrefix(rawText)}${withoutSentences(visibleReply, [read.index, ...read.denials])}` : rawText);
       } else {
         value = answerWithSafetyAndGuards(rawText);
+        if (offeringTools && prepared.lookupTools.some((tool) => tool.id === "websearch") && shapeOf(prepared.signal, text) === "question" && !householdSubject && !lookupAnswered(prepared.turnContext.outcomes)) {
+          prepared.turnContext.outcomes.push(outcomeOf({ callId: `${prepared.turnId}:knowledge`, packageId: "model", status: "succeeded", via: "pattern", source: { kind: "model_knowledge", title: text.trim().replace(/[?!.]+$/, "").slice(0, 120) } }));
+        }
         // REG-01, rule 1: every sentence of a reply to a statement was
         // register or an action claim; one retry with the note (the
         // turn's second generation), its own reply guarded the same way;

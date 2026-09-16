@@ -704,7 +704,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       // own retained outcomes, package id, arguments and the path.
       // `rejected` is CHAT-13's slot (a correction's rejected value on
       // the outcome), unread until the correction path retains it.
-      outcomes: turnId ? (outcomesForConversation(conversationId).find((o) => o.turnId === turnId)?.outcomes ?? []).map((o) => ({ packageId: o.packageId, args: o.args ?? {}, via: o.via ?? null, rejected: null })) : [],
+      outcomes: turnId ? (outcomesForConversation(conversationId).find((o) => o.turnId === turnId)?.outcomes ?? []).map((o) => ({ packageId: o.packageId, args: o.args ?? {}, via: o.via ?? null, rejected: null, source: o.source ?? null })) : [],
       assistantEpisodes: db
         .select({ text: episodesTable.text })
         .from(episodesTable)

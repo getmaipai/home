@@ -46,6 +46,7 @@ export type Speaker = "owner" | "child";
 export type Move = keyof ReplyPlan["moves"];
 
 export interface TurnExpectation {
+  outcomeKind?: string;
   notificationExists?: string;
   /** Keyword sets; each must be found in at least one memory record
    * written with this turn as its source (the remember package's row or

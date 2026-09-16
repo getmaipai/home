@@ -3,7 +3,7 @@
 // own rules; tests/turnEngine.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
-import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, exactFieldOf, lookupDecision, sensitiveAllowed, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, exactFieldOf, lookupDecision, sensitiveAllowed, asksHowKnown, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { worryingConversation } from "@/lib/turnContext";
 
@@ -56,6 +56,11 @@ test("sensitiveAllowed(): the robot requires a confirmed speaker who is confirme
   expect(sensitiveAllowed("robot", confirmed, [...present, { person: "unknown", basis: "unknown", level: "tentative" }], owner)).toBe(false);
   expect(sensitiveAllowed("robot", confirmed, [], owner)).toBe(false);
   expect(sensitiveAllowed("robot", confirmed, undefined, owner)).toBe(false);
+});
+
+test("asksHowKnown(): recognizes fixed provenance questions only", () => {
+  for (const text of ["how do you know", "how do you know that", "where did that come from", "are you sure", "did you make that up", "source?"]) expect(asksHowKnown(text)).toBe(true);
+  expect(asksHowKnown("how do I know that?" )).toBe(false);
 });
 
 test("exactFieldOf(): recognizes exact lookup fields and leaves stable questions alone", () => {
