@@ -6241,7 +6241,7 @@
         "description": "Every real file in the kyutai/tts-voices Hugging Face repo, not just the bundled presets. Returns path strings the browser can search and group client-side.",
         "responses": {
           "200": {
-            "description": "The list of voice catalog entry paths.",
+            "description": "The list of voice catalog entries.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6250,7 +6250,19 @@
                     "entries": {
                       "type": "array",
                       "items": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "collection": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "collection"
+                        ]
                       }
                     }
                   },
@@ -6315,13 +6327,57 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "nullable": true
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "nullable": true
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "default",
+                        "package",
+                        "sync"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "help": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": [
+                        "basic",
+                        "advanced",
+                        "expert"
+                      ]
+                    },
+                    "secret": {
+                      "type": "boolean"
+                    },
+                    "isSet": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "source",
+                    "label",
+                    "level",
+                    "secret"
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid or unknown path",
+            "description": "Invalid or unknown path, or unknown settings key",
             "content": {
               "application/json": {
                 "schema": {
@@ -6332,6 +6388,16 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
             "content": {
               "application/json": {
                 "schema": {
@@ -6384,13 +6450,57 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "nullable": true
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "nullable": true
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "default",
+                        "package",
+                        "sync"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "help": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": [
+                        "basic",
+                        "advanced",
+                        "expert"
+                      ]
+                    },
+                    "secret": {
+                      "type": "boolean"
+                    },
+                    "isSet": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "source",
+                    "label",
+                    "level",
+                    "secret"
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Token is required",
+            "description": "Token is required, or unknown settings key",
             "content": {
               "application/json": {
                 "schema": {
@@ -6401,6 +6511,16 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
             "content": {
               "application/json": {
                 "schema": {
@@ -6425,13 +6545,77 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "nullable": true
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "nullable": true
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "default",
+                        "package",
+                        "sync"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "help": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": [
+                        "basic",
+                        "advanced",
+                        "expert"
+                      ]
+                    },
+                    "secret": {
+                      "type": "boolean"
+                    },
+                    "isSet": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "source",
+                    "label",
+                    "level",
+                    "secret"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown settings key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
             "content": {
               "application/json": {
                 "schema": {
@@ -6469,12 +6653,15 @@
                           "label": {
                             "type": "string"
                           },
+                          "creatorId": {
+                            "type": "string"
+                          },
+                          "creatorName": {
+                            "type": "string"
+                          },
                           "bytes": {
                             "type": "integer",
                             "minimum": 0
-                          },
-                          "mimeType": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string"
@@ -6483,8 +6670,9 @@
                         "required": [
                           "id",
                           "label",
+                          "creatorId",
+                          "creatorName",
                           "bytes",
-                          "mimeType",
                           "createdAt"
                         ]
                       }
@@ -6530,7 +6718,36 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "nullable": true
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "creatorId": {
+                      "type": "string"
+                    },
+                    "creatorName": {
+                      "type": "string"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "creatorId",
+                    "creatorName",
+                    "bytes",
+                    "createdAt"
+                  ]
                 }
               }
             }
@@ -6547,6 +6764,26 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown voice",
             "content": {
               "application/json": {
                 "schema": {
@@ -6581,13 +6818,77 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "nullable": true
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "nullable": true
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "default",
+                        "package",
+                        "sync"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "help": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": [
+                        "basic",
+                        "advanced",
+                        "expert"
+                      ]
+                    },
+                    "secret": {
+                      "type": "boolean"
+                    },
+                    "isSet": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "source",
+                    "label",
+                    "level",
+                    "secret"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown settings key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
             "content": {
               "application/json": {
                 "schema": {
@@ -6650,6 +6951,26 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the creator or an owner/admin can delete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cloned voice not found",
             "content": {
               "application/json": {
                 "schema": {

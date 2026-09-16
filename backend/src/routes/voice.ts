@@ -14,6 +14,7 @@ import {
 } from "@/lib/wakewordAssets";
 import { getVoiceCatalog, isVoiceCatalogPath } from "@/lib/voiceCatalog";
 import { setPersonTtsVoiceUnchecked, setValue, resetValue } from "@/lib/settings";
+import { ResolvedSettingSchema } from "@/routes/settings";
 import { restartTtsBackend } from "@/lib/ttsSupervisor";
 import {
   listClonedVoices,
@@ -64,9 +65,10 @@ const wakewordsRoute = createRoute({
 });
 
 voiceRoutes.openapi(wakewordsRoute, async (c) => {
-  return c.json({
-    detectors: [{ id: "hey_jarvis", label: "openWakeWord \"hey jarvis\"", file: WAKEWORD_STOCK_DETECTOR.file }],
-  });
+  return c.json(
+    { detectors: [{ id: "hey_jarvis", label: "openWakeWord \"hey jarvis\"", file: WAKEWORD_STOCK_DETECTOR.file }] },
+    200,
+  );
 });
 
 // A fixed allow-list, never a path built from the request: `:file` only
@@ -108,8 +110,8 @@ voiceRoutes.openapi(wakewordFileRoute, async (c) => {
     return c.json({ error: `wake-word asset unavailable: ${(err as Error).message}` }, 503);
   }
 
-  const bunFile = Bun.file(wakewordAssetPath(asset.file));
-  return new Response(bunFile, { headers: { "content-type": "application/octet-stream" } });
+    const bunFile = Bun.file(wakewordAssetPath(asset.file));
+  return new Response(bunFile, { status: 200, headers: { "content-type": "application/octet-stream" } });
 });
 
 // The full community voice catalog (2026-09-04, item 3 of the Pocket TTS
@@ -131,11 +133,16 @@ const voiceCatalogRoute = createRoute({
       content: {
         "application/json": {
           schema: z.object({
-            entries: z.array(z.string()),
+            entries: z.array(
+              z.object({
+                path: z.string(),
+                collection: z.string(),
+              }),
+            ),
           }),
         },
       },
-      description: "The list of voice catalog entry paths.",
+      description: "The list of voice catalog entries.",
     },
     ...errorResponses({ 401: "Not signed in", 503: "Voice catalog unavailable" }),
   },
@@ -144,7 +151,7 @@ const voiceCatalogRoute = createRoute({
 voiceRoutes.openapi(voiceCatalogRoute, async (c) => {
   try {
     const entries = await getVoiceCatalog();
-    return c.json({ entries });
+    return c.json({ entries }, 200);
   } catch (err) {
     return c.json({ error: `voice catalog unavailable: ${(err as Error).message}` }, 503);
   }
@@ -180,10 +187,10 @@ const catalogSelectRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: z.unknown() } },
+      content: { "application/json": { schema: ResolvedSettingSchema } },
       description: "The updated person record.",
     },
-    ...errorResponses({ 400: "Invalid or unknown path", 401: "Not signed in", 503: "Voice catalog unavailable" }),
+    ...errorResponses({ 400: "Invalid or unknown path, or unknown settings key", 401: "Not signed in", 403: "Not allowed", 503: "Voice catalog unavailable" }),
   },
 });
 
@@ -201,8 +208,10 @@ voiceRoutes.openapi(catalogSelectRoute, async (c) => {
     return c.json({ error: `not a real voice catalog entry: ${path}` }, 400);
   }
   const result = setPersonTtsVoiceUnchecked(actor, `hf://kyutai/tts-voices/${path}`);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
-  return c.json(result.value);
+  if (!result.ok) {
+    return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
+  }
+  return c.json(result.value, 200);
 });
 
 // voice.hf_token has a side effect the generic PUT /api/settings route has
@@ -236,10 +245,10 @@ const hfTokenRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: z.unknown() } },
+      content: { "application/json": { schema: ResolvedSettingSchema } },
       description: "The updated setting record.",
     },
-    ...errorResponses({ 400: "Token is required", 401: "Not signed in" }),
+    ...errorResponses({ 400: "Token is required, or unknown settings key", 401: "Not signed in", 403: "Not allowed" }),
   },
 });
 
@@ -251,9 +260,11 @@ voiceRoutes.openapi(hfTokenRoute, async (c) => {
     return c.json({ error: "token is required" }, 400);
   }
   const result = setValue(actor, "household", "voice.hf_token", token);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) {
+    return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
+  }
   await restartTtsBackend();
-  return c.json(result.value);
+  return c.json(result.value, 200);
 });
 
 const hfTokenRemoveRoute = createRoute({
@@ -266,19 +277,21 @@ const hfTokenRemoveRoute = createRoute({
   middleware: [requireAuth] as const,
   responses: {
     200: {
-      content: { "application/json": { schema: z.unknown() } },
+      content: { "application/json": { schema: ResolvedSettingSchema } },
       description: "The updated setting record.",
     },
-    ...errorResponses({ 401: "Not signed in" }),
+    ...errorResponses({ 400: "Unknown settings key", 401: "Not signed in", 403: "Not allowed" }),
   },
 });
 
 voiceRoutes.openapi(hfTokenRemoveRoute, async (c) => {
   const actor = c.get("person");
   const result = resetValue(actor, "household", "voice.hf_token");
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) {
+    return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
+  }
   await restartTtsBackend();
-  return c.json(result.value);
+  return c.json(result.value, 200);
 });
 
 // Voice cloning (2026-09-04, the follow-up to voice.hf_token): a real
@@ -303,8 +316,9 @@ const clonedListRoute = createRoute({
               z.object({
                 id: z.string(),
                 label: z.string(),
+                creatorId: z.string(),
+                creatorName: z.string(),
                 bytes: z.number().int().nonnegative(),
-                mimeType: z.string(),
                 createdAt: z.string(),
               }),
             ),
@@ -318,7 +332,7 @@ const clonedListRoute = createRoute({
 });
 
 voiceRoutes.openapi(clonedListRoute, async (c) => {
-  return c.json({ voices: listClonedVoices() });
+  return c.json({ voices: listClonedVoices() }, 200);
 });
 
 // bodyLimit rejects an oversized request as its bytes arrive (checking
@@ -354,10 +368,21 @@ const clonedUploadRoute = createRoute({
   },
   responses: {
     201: {
-      content: { "application/json": { schema: z.unknown() } },
+      content: {
+        "application/json": {
+          schema: z.object({
+            id: z.string(),
+            label: z.string(),
+            creatorId: z.string(),
+            creatorName: z.string(),
+            bytes: z.number().int().nonnegative(),
+            createdAt: z.string(),
+          }),
+        },
+      },
       description: "The newly saved cloned voice record.",
     },
-    ...errorResponses({ 400: "Missing file or label", 401: "Not signed in" }),
+    ...errorResponses({ 400: "Missing file or label", 401: "Not signed in", 403: "Not allowed", 404: "Unknown voice" }),
   },
 });
 
@@ -370,7 +395,10 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   if (typeof label !== "string") return c.json({ error: "label is required" }, 400);
   const bytes = new Uint8Array(await file.arrayBuffer());
   const result = saveClonedVoice(actor, label, bytes, file.type);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) {
+    if (result.status === 404) return c.json({ error: result.error }, 404);
+    return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
+  }
   return c.json(result.value, 201);
 });
 
@@ -393,10 +421,10 @@ const clonedSelectRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: z.unknown() } },
+      content: { "application/json": { schema: ResolvedSettingSchema } },
       description: "The updated person record.",
     },
-    ...errorResponses({ 401: "Not signed in", 404: "Cloned voice not found" }),
+    ...errorResponses({ 400: "Unknown settings key", 401: "Not signed in", 403: "Not allowed", 404: "Cloned voice not found" }),
   },
 });
 
@@ -405,8 +433,10 @@ voiceRoutes.openapi(clonedSelectRoute, async (c) => {
   const id = c.req.valid("param").id;
   if (!clonedVoiceExists(id)) return c.json({ error: `cloned voice not found: ${id}` }, 404);
   const result = setPersonTtsVoiceUnchecked(actor, clonedVoiceUrl(id));
-  if (!result.ok) return c.json({ error: result.error }, result.status);
-  return c.json(result.value);
+  if (!result.ok) {
+    return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
+  }
+  return c.json(result.value, 200);
 });
 
 // POST, not DELETE: no route anywhere in this app uses the DELETE verb
@@ -433,7 +463,7 @@ const clonedDeleteRoute = createRoute({
       },
       description: "Confirmation of deletion.",
     },
-    ...errorResponses({ 401: "Not signed in" }),
+    ...errorResponses({ 401: "Not signed in", 403: "Only the creator or an owner/admin can delete", 404: "Cloned voice not found" }),
   },
 });
 
@@ -441,8 +471,11 @@ voiceRoutes.openapi(clonedDeleteRoute, async (c) => {
   const actor = c.get("person");
   const id = c.req.valid("param").id;
   const result = deleteClonedVoice(actor, id);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
-  return c.json({ success: true });
+  if (!result.ok) {
+    if (result.status === 404) return c.json({ error: result.error }, 404);
+    return c.json({ error: result.error }, 403);
+  }
+  return c.json({ success: true } as { success: true }, 200);
 });
 
 // Deliberately NOT behind requireAuth: `pocket-tts serve` is a separate,
@@ -478,5 +511,5 @@ voiceRoutes.openapi(clonedFileRoute, async (c) => {
   const id = c.req.valid("param").id;
   const file = getClonedVoiceFile(id);
   if (!file) return c.json({ error: "not found" }, 404);
-  return new Response(Bun.file(file.path), { headers: { "content-type": file.mimeType } });
+  return new Response(Bun.file(file.path), { status: 200, headers: { "content-type": file.mimeType } });
 });

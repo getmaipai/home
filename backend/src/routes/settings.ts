@@ -12,7 +12,7 @@ export const settingsRoutes = apiRouter();
 // key's selector in the registry, validated at the lib layer, not by
 // this schema) - `z.unknown()` documents that honestly rather than
 // pretending a narrower type.
-const ResolvedSettingSchema = z.object({
+export const ResolvedSettingSchema = z.object({
   key: z.string(),
   value: z.unknown(),
   source: z.enum(["user", "default", "package", "sync"]),
