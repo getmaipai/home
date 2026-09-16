@@ -161,6 +161,34 @@ function orderedDirect(outcomes: readonly ToolExecutionOutcome[]): { text: strin
   return speech === text ? { text } : { text, speech };
 }
 
+function shapedReply(shape: ComposedShape | undefined, outcomes: readonly ToolExecutionOutcome[], fallback: { text: string; speech?: string }): { text: string; speech?: string } {
+  if (!shape) return fallback;
+  const rows = outcomes.flatMap((o) => {
+    if (o.status !== "succeeded") return [];
+    const data = o.result?.data as { rows?: unknown[]; value?: unknown; number?: unknown; count?: unknown } | undefined;
+    return Array.isArray(data?.rows) ? data.rows : [];
+  });
+  const rowText = (row: unknown): string => {
+    if (typeof row === "string" || typeof row === "number") return String(row);
+    if (!row || typeof row !== "object") return "";
+    const value = row as Record<string, unknown>;
+    return [value.title, value.name, value.label, value.text, value.snippet].find((v): v is string | number => typeof v === "string" || typeof v === "number")?.toString() ?? "";
+  };
+  if (shape === "list" && rows.length > 0) {
+    const lines = rows.map(rowText).filter(Boolean);
+    const shown = lines.slice(0, 5);
+    if (lines.length > 5) shown.push(`and ${lines.length - 5} more`);
+    return { text: shown.join("\n") };
+  }
+  if (shape === "number") {
+    const data = outcomes.find((o) => o.status === "succeeded")?.result?.data as { number?: unknown; value?: unknown; count?: unknown } | undefined;
+    const value = [data?.number, data?.value, data?.count].find((v) => typeof v === "number" || typeof v === "string");
+    if (value !== undefined) return { text: String(value) };
+  }
+  if (shape === "one_line") return { text: fallback.text.replace(/\s*\n\s*/g, " ").trim() };
+  return fallback;
+}
+
 function shapeOf(constraints: readonly ComposerConstraint[] | undefined): ComposedShape | undefined {
   const shape = constraints?.find((c) => c.kind === "shape")?.value;
   return shape === "list" || shape === "number" || shape === "one_line" ? shape : undefined;
@@ -306,12 +334,12 @@ export type CompleteFn = (messages: LlmMessage[]) => Promise<{ ok: true; text: s
 export async function composeTurn(input: ComposerInput, complete: CompleteFn): Promise<ComposedTurn> {
   const plan = planComposition(input);
   if (plan.mode !== "composition") {
-    return { reply: plan.reply, sources: plan.sources, mode: plan.mode, model_calls: 0, ...(plan.shape ? { shape: plan.shape } : {}), ...(plan.budget_spent ? { budget_spent: true } : {}) };
+    return { reply: shapedReply(plan.shape, input.outcomes, plan.reply), sources: plan.sources, mode: plan.mode, model_calls: 0, ...(plan.shape ? { shape: plan.shape } : {}), ...(plan.budget_spent ? { budget_spent: true } : {}) };
   }
   const answer = await complete(plan.messages);
   const text = answer.ok ? composedText(answer.text) : null;
   return {
-    reply: text !== null ? { text } : plan.fallback,
+    reply: shapedReply(plan.shape, input.outcomes, text !== null ? { text } : plan.fallback),
     sources: plan.sources,
     mode: "composition",
     model_calls: 1,

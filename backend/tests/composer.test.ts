@@ -171,6 +171,27 @@ describe("a composition that fails", () => {
 });
 
 describe("the constraints and the shape", () => {
+  test("a list shape renders result rows, capped at five with a remainder line", async () => {
+    const rows = Array.from({ length: 7 }, (_, i) => ({ title: `Track ${i + 1}` }));
+    const result = await composeTurn(input([outcome({ callId: "call-list", packageId: "websearch", status: "succeeded", result: { actions: [], data: { rows } } })], { constraints: [{ kind: "shape", value: "list" }] }), scripted("ignored"));
+    expect(result.reply.text).toBe("Track 1\nTrack 2\nTrack 3\nTrack 4\nTrack 5\nand 2 more");
+  });
+
+  test("a number shape renders the number alone", async () => {
+    const result = await composeTurn(input([outcome({ callId: "call-number", packageId: "almanac", status: "succeeded", result: { actions: [], data: { number: 7 } } })], { constraints: [{ kind: "shape", value: "number" }] }), scripted("ignored"));
+    expect(result.reply.text).toBe("7");
+  });
+
+  test("one_line shape removes line breaks", async () => {
+    const result = await composeTurn(input([weatherOutcome()], { constraints: [{ kind: "shape", value: "one_line" }] }), scripted("ignored"));
+    expect(result.reply.text).not.toContain("\n");
+  });
+
+  test("an explicit list shape yields to the sentence budget", async () => {
+    const result = await composeTurn(input([outcome({ callId: "call-list", packageId: "websearch", status: "succeeded", result: { actions: [], data: { rows: [{ title: "One" }, { title: "Two" }] } } })], { constraints: [{ kind: "shape", value: "list" }, { kind: "length", value: "1" }] }), scripted("ignored"));
+    expect(result.reply.text).toBe("One\nTwo");
+  });
+
   test("CONS-01's constraints are one line of the instruction, and the shape rides on the composed turn for K4", async () => {
     const constraints = [
       { kind: "shape" as const, value: "list" },
