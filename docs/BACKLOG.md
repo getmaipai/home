@@ -2122,61 +2122,62 @@ invented for the roster's household, and added to
 
 <a id="engine-host-02"></a>
 
-- [ ] **ENGINE-HOST-02: Roles have a primary and a secondary placement** (M, design pass first, owner's design 2026-09-16)
+- [ ] **ENGINE-HOST-02: Roles degrade gracefully; no secondary placements** (M, design pass first, owner's decision 2026-09-16)
 
-    Objective: every engine role (chat, coding, image, video, judge,
-    embed, speech) declares where it runs first and what happens when
-    that place is gone, so one card, two cards, an eGPU that unplugs,
-    and a robot paired to a hub are the same system with different
-    placement tables. A secondary is one of: another device on this
-    host (the small card, the CPU), a remote engine (the hub, for a
-    robot), or "none, say so". The owner's framing: primary and
-    secondary per service, nothing to notice when it switches, and a switch that is policy,
-    not a button.
+    Decision (owner, 2026-09-16, after a design discussion): the hub
+    does not run backup engines. A primary-and-secondary system per
+    role was designed and rejected: a secondary only works if its
+    space is reserved on another device forever, which spends the
+    small card on a model that is never loaded; without the
+    reservation the backup cannot load at the moment it is needed;
+    and any version with just-in-time sizing or shuffling of engines
+    is the complexity nobody gets right and a parent cannot predict.
+    That road leads to a poor experience and is closed, not deferred.
 
-    Rules the design pass fixes:
-    - **Per role, from a device inventory.** Boot enumerates devices
-      (each card with its VRAM, the CPU, a configured remote) and the
-      install writes the placement table from what it finds; the
-      owner edits it at the advanced disclosure level in settings
-      (`../.github/docs/SETTINGS.md`). On a single card every primary
-      is that card and every secondary is "none". Two cards: chat's
-      secondary is the small card. A robot: local primary, the hub as
-      secondary for what it cannot hold, per platform principle 2.
-    - **A secondary is a different model, and the person is told.**
-      A failed-over role carries "on the backup engine right now" as a
-      plan line in chat (never model prose), a Repairs entry says which
-      role, to what, since when, and one notification fires on the
-      switch and one on the return.
-    - **Embed never fails over.** Switching embedding models silently
-      breaks every stored vector; on an embed outage writes queue and
-      the Repairs entry says so. Judge and speech may fall to CPU.
-    - **No flapping.** A device must answer health for a hold time
-      before roles move back; roles move back on their own, silently
-      except the return notification. A manual "move this role now"
-      lives on the Repairs page for troubleshooting.
-    - **A vanishing device is a state, not a crash.** The supervisors
-      (`backend/src/lib/llmSupervisor.ts`, `embedSupervisor.ts`,
-      `backgroundSupervisor.ts`, `sidecars.ts` `watchEngine`) mark a
-      role down when its device is gone instead of respawning in a
-      loop, and re-place it on the device's return.
+    What we do instead: **a bare minimum the system needs to run as
+    designed, and graceful degradation for everything else.** The
+    install names the roles the household's hardware must carry
+    (chat, embed, judge at least); those engines are up or the hub
+    says plainly what is wrong and how to fix it (Repairs). Every
+    other role (image, video, coding, speech extras) is a feature that
+    is on when its engine answers and off when it does not, with the
+    person told in the product's own words: "Picture making is
+    offline right now" as a plan line in chat (never model prose), the
+    feature's control greyed with the same line, one notification when
+    it goes off and one when it is back, and a Repairs entry naming
+    the device and since when. No engine is ever loaded on the fly to
+    cover for another; a vanishing device is a state the supervisors
+    hold, not a respawn loop, and the role returns by itself when the
+    device does.
 
-    Pointers: the three supervisors and `sidecars.ts`; `lib/hardware.ts`
-    (`detectHardware`); the Repairs page and `notificationTypes.ts`;
-    `docs/plans/gpu-card-layout-2026-09-14.md` (the placement the
-    measurement lane decides; the owner's current decision puts chat
-    and coding on the 16 GB card together, to be reflected there).
-    Spec first if the placement table is a shared record the robot
-    also carries (it is: `spec/` gains the placement shape). Mirror:
-    the lazy-start-once shape the supervisors share. Acceptance: with
-    a scripted device inventory, a role placed on a device that
-    disappears is marked down within the probe interval, its
-    secondary answers with the plan line and the Repairs entry, and
-    the role returns after the hold time with no duplicate engine;
-    embed never switches. Out of scope: any live measurement, and
-    which model is the secondary for chat (the measurement lane's
-    call). Exit: the design section in `docs/dev.md`, the spec shape,
-    then the mechanical items it names, each with `bash scripts/check.sh`.
+    Rules the design pass fixes: the minimum set per install (from
+    the device inventory `detectHardware` reads at boot, and what the
+    setup wizard tells the person if the machine cannot carry it);
+    which roles are features and their exact offline lines (one per
+    role, in the plan, child band included); the probe interval and
+    the hold time before a role is declared back; embed's special
+    case (an embed outage queues memory writes, never swaps models);
+    and the Repairs and notification shapes (`notificationTypes.ts`,
+    the Repairs page). The robot follows the same rule with its own
+    minimum set (platform principle 2).
+
+    Pointers: `backend/src/lib/llmSupervisor.ts`, `embedSupervisor.ts`,
+    `backgroundSupervisor.ts`, `sidecars.ts` (`watchEngine`),
+    `lib/hardware.ts`, `notificationTypes.ts`, the Repairs page,
+    `docs/plans/gpu-card-layout-2026-09-14.md` (the owner's current
+    placement puts chat and coding on the 16 GB card together; the
+    note is to be brought in line). Mirror: the lazy-start-once shape
+    the supervisors share. Acceptance: with a scripted device
+    inventory, a feature role whose device disappears is marked off
+    within the probe interval, the chat line and the greyed control
+    carry its offline line, the Repairs entry and the notification
+    exist, no engine is spawned to replace it, and the role returns
+    after the hold time with no duplicate engine; a minimum role's
+    outage produces the Repairs entry and the fix-it text. Out of
+    scope, permanently: secondary placements, reserved headroom,
+    on-the-fly loading or unloading to make room. Exit: the design
+    section in `docs/dev.md`, then the mechanical items it names,
+    each with `bash scripts/check.sh`.
 
 <a id="mem-06"></a>
 
