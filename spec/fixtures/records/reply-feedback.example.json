@@ -1,0 +1,10 @@
+{
+  "id": "rf-a1b2c3",
+  "turn_id": "turn-a1b2c3d4",
+  "person_id": "person-a1b2c3d4",
+  "verdict": "down",
+  "reason": "wrong",
+  "source": "turn-a1b2c3d4",
+  "created_at": "2026-09-16T12:00:00Z",
+  "hlc": "1770000000000:0:hub001"
+}

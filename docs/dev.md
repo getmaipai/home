@@ -17497,3 +17497,40 @@ lane's scope, a call for whoever picks ACT-02 back up.
 Full per-class tables, confusion matrices and the exact run command are
 in the training script's own commit; this section is the acceptance
 report the item's exit criterion names.
+
+## FEED-01: a rating is a label
+
+`ReplyFeedback` is one record per `(turn_id, person_id)`. Its `turn_id`
+joins the rated assistant turn to RVW-1's weekly label export; the export
+adds `feedback_verdict` and `feedback_reason` beside that turn's `rung` and
+`rules`. `source` preserves the write provenance, while `created_at` and
+`hlc` keep the shared record envelope required by the platform.
+
+A rating is evidence about a reply, not a new instruction for the reply.
+The stored label therefore never edits `reply_text`, re-runs generation,
+or changes the turn's outcomes. RVW-2 may classify the label later; the
+original response remains the immutable thing being reviewed.
+
+Child band: show only the two feedback buttons. Do not show the reason
+chips and do not write a reason for a child-band rating. Adults and teens
+may use the five fixed reason chips on a down verdict.
+
+The mechanical follow-ups are pickup-ready:
+
+- **Table and migration.** Files: `backend/src/db/schema.ts`,
+  `backend/src/db/migrations/` and the schema-version tests. Pattern:
+  mirror the nearest actor-scoped table and migration, including HLC and
+  person-erasure coverage. Acceptance: unique `(turn_id, person_id)`;
+  safe upsert; deleted people leave no feedback rows. Exit: targeted
+  backend tests, schema walk, and `bash scripts/check.sh`.
+- **Action bar wiring.** Files: `frontend/src/apps/chat/chatActionBar.tsx`
+  and its tests. Pattern: mirror `chatMemoryActions.ts` for the call and
+  `chatMemoryChip` for the chips, using assistant-ui's `FeedbackAdapter`.
+  Acceptance: positive and negative taps persist, a down tap opens the five
+  chips, and child band renders buttons only. Exit: frontend tests and the
+  opened reason-row screenshot.
+- **Export join and test.** Files: `backend/scripts/bench/labels.ts` and
+  `backend/tests/labels.test.ts`. Pattern: mirror `labelOf()` and
+  `exportLabels()`'s weekly JSONL path. Acceptance: `turn_id` places
+  verdict and reason beside rung and fired rules, with no reply mutation.
+  Exit: labels tests, a reconciled fixture export, and `bash scripts/check.sh`.

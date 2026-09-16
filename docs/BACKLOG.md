@@ -6378,6 +6378,22 @@ approvals are still real, unstarted work for a future session.
       for the chips. Out of scope: any change to the reply from a
       rating (that is the classifier's job, RVW-2). Exit:
       `bash scripts/check.sh`, the screenshot of the reason row opened.
+      - [ ] **FEED-01a: feedback table and migration** (mechanical). Add
+            `reply_feedback` and its migration, mirroring the nearest
+            person-scoped write table and its schema-version test. Acceptance:
+            one row per person and turn upserts safely; exit: targeted backend
+            tests and `bash scripts/check.sh`.
+      - [ ] **FEED-01b: feedback action bar** (mechanical). Wire
+            `ActionBarPrimitive.FeedbackPositive` and `FeedbackNegative`
+            through assistant-ui's `FeedbackAdapter`, mirroring
+            `chatMemoryActions.ts` and `chatMemoryChip`. Acceptance: down opens
+            the five chips and reload preserves the selected state; exit:
+            chat tests and the reason-row screenshot.
+      - [ ] **FEED-01c: feedback export join** (mechanical). Extend
+            `scripts/bench/labels.ts`'s RVW-1 row query and tests, mirroring
+            `labelOf()` and `exportLabels()`. Acceptance: weekly JSONL places
+            verdict and reason beside rung and rules by `turn_id`; exit:
+            labels tests and `bash scripts/check.sh`.
 - [ ] **ATT-01: Attachments in chat: a document, a photo, "summarize
       this"** (L, design pass first, 2026-09-16). What exists: nothing
       on the input side; K7 renders pictures the model found, not ones

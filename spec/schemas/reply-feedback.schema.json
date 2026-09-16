@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/reply-feedback.schema.json",
+  "title": "ReplyFeedback",
+  "description": "FEED-01: one person's rating of one assistant reply, kept as a human label for the review program. This record joins the conversation turn by turn_id and is per person, so a rating is never a hidden aggregate and never changes the reply it describes. The reason is a one-tap optional label for a down rating; the engine and classifier remain the only writers of reply content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "turn_id",
+    "person_id",
+    "verdict",
+    "source",
+    "created_at",
+    "hlc"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^rf-[a-z0-9]{6,}$",
+      "description": "The feedback record's stable id. A later change to this person's rating updates this record rather than creating a second label."
+    },
+    "turn_id": {
+      "type": "string",
+      "pattern": "^turn-[a-z0-9]{6,}$",
+      "description": "The assistant turn being rated, and the join key into RVW-1's weekly label export."
+    },
+    "person_id": {
+      "type": "string",
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "description": "The household person who supplied the rating. Feedback is private to this actor's label, not a household-wide counter."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["up", "down"],
+      "description": "The person's one-tap verdict on the reply."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "enum": ["wrong", "too_long", "did_not_listen", "off", "unsafe", null],
+      "default": null,
+      "description": "Optional one-tap explanation, selected from FEED-01's fixed five-value list. The child band never exposes or stores a reason."
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Free-text provenance for the write path, matching the source field on sibling records."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this label was written."
+    },
+    "hlc": {
+      "type": "string",
+      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the clock stamp used by every synced record shape."
+    }
+  }
+}
