@@ -13770,6 +13770,64 @@ its provenance (a living document is revisioned, never mutated in
 place), and a subject change closes it. Cost on ordinary chat: none;
 the document is never built until opened.
 
+### COMP-01: the document record
+
+`TurnArtifact` is one immutable document revision for one originating
+`turn_id`. Its envelope carries `id`, `revision`, `evidence_version`,
+the build `provenance`, `sources`, `created_at` and `hlc`. `revision` is
+one-based. When the retained outcome evidence changes, the composer
+writes a new revision and keeps the old record with its own provenance;
+it never edits a revision in place.
+
+The `section` discriminator keeps the document typed and source-backed:
+
+- `lookup` comes from a successful lookup outcome and carries the query
+  plus results of `title`, one source-backed `line` and `source_id`.
+- `card` comes from a typed source outcome and carries the source's
+  structured film, person or place fields, never a prose summary.
+- `procedure` comes from a procedural or recipe outcome and carries
+  ordered instructions plus typed quantities where the evidence has
+  them.
+- `comparison` comes from a comparison outcome and carries named
+  subjects plus attribute rows with one value per subject.
+
+Every citation is a `Source` snapshot in the envelope's `sources`
+array, and section entries point to it by `source_id`. The composer
+builds the section from retained outcome data, so the document and the
+friend's short line are two renderings of the same evidence.
+
+The child band may receive the same typed content only after the same
+content ceiling has been applied. Delivery strips `sources` and source
+links, never the ceiling itself, and never turns withheld evidence into
+adult detail. Voice surfaces do not read the document and direct the
+person to the phone or hub screen.
+
+Mechanical pickup:
+
+- **Document storage.** Files: `backend/src/db/schema.ts`,
+  `backend/src/lib/conversationHistory.ts`, migrations. Mirror the
+  existing `outcomes` JSON column. Acceptance: null remains the stored
+  value for turns without material; a valid `TurnArtifact` round-trips
+  beside outcomes. Exit: migration and conversation-history tests plus
+  `bash scripts/check.sh`.
+- **Route and wire.** Files: `backend/src/routes/conversations.ts`,
+  `backend/src/wire.ts`, OpenAPI output. Mirror `SourcesCard`'s source
+  shape and the existing `createRoute` blocks. Acceptance: the
+  authenticated document GET validates this record and `TurnValue`
+  gains additive `document_available`. Exit: route tests and API-docs
+  regeneration pass.
+- **Composer builders.** Files: `backend/src/lib/composer.ts`,
+  `backend/src/lib/turnEngine.ts`. Mirror `sourcesFromRows()` and the
+  retained `ToolExecutionOutcome.result.data`. Acceptance: each
+  outcome family builds its matching section, chit-chat builds none,
+  and a same-subject evidence change increments revision. Exit:
+  composer and turn-engine tests pass.
+- **Details pane.** Files: `frontend/src/apps/chat/`. Mirror
+  `chatSourcesCard.tsx` and the shell responsive rules in `UI.md`.
+  Acceptance: the Details handle opens a desktop side pane and phone
+  bottom sheet, child delivery has no sources, and voice says where the
+  document is. Exit: frontend tests and judged screenshots pass.
+
 **COMP-02: research mode (S, after COMP-01).** A per-conversation
 preference (`conversations.mode`: `chat | research`, a spec field,
 additive) with a toggle in the chat header: the pane stays open, the

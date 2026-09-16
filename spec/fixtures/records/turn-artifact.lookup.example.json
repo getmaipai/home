@@ -1,0 +1,33 @@
+{
+  "id": "doc-a1b2c3",
+  "turn_id": "turn-a1b2c3",
+  "revision": 1,
+  "evidence_version": "outcome-lookup-01",
+  "section": {
+    "type": "lookup",
+    "query": "Willow Reservoir opening hours",
+    "results": [
+      {
+        "title": "Willow Reservoir visitor center",
+        "line": "The visitor center opens at 8 a.m. on Saturdays.",
+        "source_id": "src-a1b2c3"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "id": "src-a1b2c3",
+      "kind": "web",
+      "title": "Willow Reservoir visitor center",
+      "url": "https://example.com/willow-reservoir",
+      "site": "example.com",
+      "snippet": "Saturday hours begin at 8 a.m.",
+      "source": "turn-a1b2c3",
+      "created_at": "2026-09-16T12:00:00Z",
+      "hlc": "1778976000000:0:hub001"
+    }
+  ],
+  "provenance": "composer:turn-a1b2c3:lookup",
+  "created_at": "2026-09-16T12:00:01Z",
+  "hlc": "1778976001000:0:hub001"
+}

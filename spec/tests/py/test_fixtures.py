@@ -33,6 +33,7 @@ from gen.py.setting_value_schema import SettingValue
 from gen.py.settings_key_schema import SettingsKey
 from gen.py.source_schema import Source
 from gen.py.subject_ref_schema import Household, Unresolved, World
+from gen.py.turn_artifact_schema import TurnArtifact
 from gen.py.turn_signal_schema import TurnSignal
 
 # ErrorEntry is standards-owned (std-v0.2.0), not generated here; loaded
@@ -178,6 +179,11 @@ def test_conversation_turn_fixture():
 
 def test_open_question_fixture():
     OpenQuestion.model_validate(load_fixture("open-question.example.json"))
+
+
+@pytest.mark.parametrize("kind", ["lookup", "card", "procedure", "comparison"])
+def test_turn_artifact_fixtures(kind: str):
+    TurnArtifact.model_validate(load_fixture(f"turn-artifact.{kind}.example.json"))
 
 
 def test_reply_constraint_fixture():

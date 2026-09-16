@@ -18,6 +18,7 @@ export * from "./reply-constraint.js";
 export * from "./grant.js";
 export * from "./memory-record.js";
 export * from "./turn-signal.js";
+export * from "./turn-artifact.js";
 export * from "./open-question.js";
 export * from "./conversation.js";
 export * from "./content-ceiling.js";

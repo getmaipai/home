@@ -2269,6 +2269,37 @@ invented for the roster's household, and added to
     (COMP-02). Exit: the spec suite, backend and frontend suites, the
     screenshot review, `bash scripts/check.sh`.
 
+    - [ ] **COMP-01a: document storage** (mechanical). Add the
+      `document` JSON column and migration in
+      `backend/src/db/schema.ts`, `backend/src/lib/conversationHistory.ts`
+      and the migrations directory. Mirror the existing `outcomes`
+      column and its null behavior. Acceptance: turns without lookup,
+      typed-source or procedural material keep `document` null and a
+      valid `TurnArtifact` round-trips beside outcomes. Exit: targeted
+      migration and history tests, then `bash scripts/check.sh`.
+    - [ ] **COMP-01b: document route and wire** (mechanical). Add the
+      named GET route and additive `document_available` in
+      `backend/src/routes/conversations.ts` and `backend/src/wire.ts`.
+      Mirror `createRoute`, the `SourcesCard` source shape and generated
+      OpenAPI. Acceptance: authenticated GET returns the validated
+      artifact, missing documents stay absent, and API docs regenerate.
+      Exit: route tests and the API-docs check.
+    - [ ] **COMP-01c: composer document builders** (mechanical). Build
+      `lookup`, `card`, `procedure` and `comparison` in
+      `backend/src/lib/composer.ts` and `backend/src/lib/turnEngine.ts`.
+      Mirror `sourcesFromRows()` and retained outcome data. Acceptance:
+      each outcome family produces its typed section, chit-chat produces
+      none, child projection keeps the ceiling and strips sources, and
+      new evidence creates a new revision. Exit: composer and engine
+      tests plus `bash scripts/check.sh`.
+    - [ ] **COMP-01d: details pane** (mechanical). Add the handle and
+      responsive pane under `frontend/src/apps/chat/`. Mirror
+      `chatSourcesCard.tsx` and the shell's `UI.md` responsive rules.
+      Acceptance: desktop uses a side pane, phones use a bottom sheet,
+      the child projection has no sources, and voice directs the person
+      to the phone or hub screen. Exit: frontend tests and judged
+      screenshots.
+
 <a id="comp-02"></a>
 
 - [ ] **COMP-02: Research mode** (S, after COMP-01)

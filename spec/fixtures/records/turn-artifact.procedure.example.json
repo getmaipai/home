@@ -1,0 +1,47 @@
+{
+  "id": "doc-g7h8i9",
+  "turn_id": "turn-g7h8i9",
+  "revision": 1,
+  "evidence_version": "outcome-procedure-01",
+  "section": {
+    "type": "procedure",
+    "title": "Sage's balcony herb plan",
+    "steps": [
+      {
+        "position": 1,
+        "instruction": "Fill a 30-centimeter pot with damp soil and make three shallow holes.",
+        "quantities": [
+          { "amount": 30, "unit": "centimeters", "item": "pot diameter" }
+        ]
+      },
+      {
+        "position": 2,
+        "instruction": "Plant the basil seeds, cover them lightly, and place the pot beside the sunny window.",
+        "quantities": [
+          { "amount": 3, "unit": "seeds", "item": "basil" }
+        ]
+      },
+      {
+        "position": 3,
+        "instruction": "Water until the surface is damp, then check it each morning.",
+        "quantities": []
+      }
+    ]
+  },
+  "sources": [
+    {
+      "id": "src-g7h8i9",
+      "kind": "package",
+      "title": "Balcony herb guide",
+      "url": "https://example.com/balcony-herbs",
+      "site": "example.com",
+      "snippet": "A small-pot basil planting method for a sunny balcony.",
+      "source": "turn-g7h8i9",
+      "created_at": "2026-09-16T12:10:00Z",
+      "hlc": "1778976600000:0:hub001"
+    }
+  ],
+  "provenance": "composer:turn-g7h8i9:procedure",
+  "created_at": "2026-09-16T12:10:01Z",
+  "hlc": "1778976601000:0:hub001"
+}
