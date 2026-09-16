@@ -7,6 +7,28 @@ checklist (`docs/dev.md`); no release has been cut yet.
 
 ## [Unreleased]
 
+### Added
+- The composer and streaming: replies now stream into the chat as they are
+  generated instead of arriving all at once, and an interrupted stream resumes
+  where it left off instead of losing what it already said.
+- "How do you know" on a reply: a fact the model already knew is marked on
+  the outcome, and a person can open the reply and see that source.
+- Thumbs up and thumbs down on a reply, with the feedback kept per person.
+- The details pane on a conversation, the turn artifact behind a reply, and
+  advanced reply stats on the person.
+- Attachments: a person can attach an image or a document to a message; local
+  storage, extraction, and the document outcome path, with child attachment
+  projection.
+- Conversation search and pinning, and research mode on a conversation.
+- The GPU validation bench, a developer-facing check that sizes the engine's
+  validation fill in tokens.
+
+### Changed
+- The OpenAPI document was regenerated to cover the routes added since the
+  last release, including the commands and privacy routes.
+- The default package set gained the missing package README, changelog, and
+  quality scale files for buddy, default, pal, recall, remember, and tutor.
+
 ### Security
 - A 2026-09-06 code review found `POST /api/llm/chat` and `POST /api/llm/embed`
   gave any signed-in person, including a child, raw model access with none
