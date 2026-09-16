@@ -410,8 +410,8 @@ describe("createChatModelAdapter streaming", () => {
       // NAME on function args (argsIgnorePattern), not a for-of binding,
       // hence the inline disable for this one intentionally-discarded value.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      for await (const _ of runAdapter(adapter, options)) {
-        /* drain */
+      for await (const value of runAdapter(adapter, options)) {
+        void value;
       }
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(speakingEvents).toEqual([false, true, false]);
@@ -712,6 +712,40 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
       expect(capturedBody).toMatchObject({ supersedes: "turn-original123" });
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("a continuation carries the stable partial answer and its source turn", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "done", value: { reply: { text: "The rest." }, source: "model", safety: SAFETY, turn_id: "turn-next", conversation_id: "conv-next" } }]),
+    );
+    const adapter = createChatModelAdapter({
+      consumeThinking: () => false,
+      consumeSupersedes: () => undefined,
+      consumeContinuation: () => ({ assistantText: "The answer stopped here.", fromTurnId: "turn-stopped" }),
+      onCrisisResources: () => {},
+      turnSchedulerRef: { current: null },
+    });
+    try {
+      const options = { messages: [fakeUserMessage("Tell me about bicycles")], runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => fakeUserMessage("Tell me about bicycles") } as unknown as ChatModelRunOptions;
+      for await (const value of runAdapter(adapter, options)) {
+        void value;
+      }
+      expect(env.turnBodies[0]).toMatchObject({ text: "Tell me about bicycles", continuation_text: "The answer stopped here.", continuation_of: "turn-stopped" });
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a length-stopped done event leaves the assistant message incomplete", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "done", value: { reply: { text: "Partial answer" }, source: "model", safety: SAFETY, stats: { stop_reason: "length" } } }]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("hi")]);
+      expect(yields.at(-1)?.status).toEqual({ type: "incomplete", reason: "length" });
+    } finally {
+      env.restore();
     }
   });
 

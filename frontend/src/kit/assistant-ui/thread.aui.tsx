@@ -30,6 +30,7 @@ import {
 } from "@/kit/assistant-ui/tool-group.aui";
 import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
 import { ChatFeedbackOpenContext, FeedbackButtons, ForgetThisMenuItem, ListenButton, RememberThisButton, RememberThisMenuItem } from "@/apps/chat/chatActionBar";
+import { setPendingContinuation } from "@/apps/chat/chatContinue";
 import { setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
 import { ChatSourceCaption } from "@/apps/chat/chatSourceCaption";
@@ -39,6 +40,7 @@ import { createCitationComponents } from "@/apps/chat/chatCitationLink";
 import { SourcesCard } from "@/apps/chat/chatSourcesCard";
 import { ChatDocumentHandle } from "@/apps/chat/chatDocumentPane";
 import { ChatTurnStats } from "@/apps/chat/chatTurnStats";
+import { messageText } from "@/apps/chat/chatMessageText";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
 import { api } from "@/lib/api";
 import { Button } from "@/kit/ui/button";
@@ -670,6 +672,7 @@ const AssistantActionBar: FC = () => {
       className="aui-assistant-action-bar-root text-muted-foreground animate-in fade-in col-start-3 row-start-2 -ms-1 flex gap-1 duration-200"
     >
       <MessageCopyButton />
+      <ContinueButton />
       <ActionBarPrimitive.Reload asChild>
         <TooltipIconButton tooltip="Refresh">
           <RefreshCwIcon />
@@ -703,6 +706,27 @@ const AssistantActionBar: FC = () => {
         </ActionBarMorePrimitive.Content>
       </ActionBarMorePrimitive.Root>
     </ActionBarPrimitive.Root>
+  );
+};
+
+/** CHAT-PARITY-04: assistant-ui's reload is the branch primitive we need,
+ * while this click supplies the stopped text the adapter cannot recover
+ * from its normal message list. It is deliberately available for every
+ * incomplete reason; the engine reruns its safety and output boundaries
+ * before delivering the continuation. */
+const ContinueButton: FC = () => {
+  const message = useAuiState((s) => s.message);
+  if (message.role !== "assistant" || message.status.type !== "incomplete") return null;
+  const assistantText = messageText(message);
+  if (!assistantText.trim()) return null;
+  const turnId = typeof message.metadata?.custom?.turnId === "string" ? message.metadata.custom.turnId : undefined;
+  const handleContinue = () => setPendingContinuation({ assistantText, ...(turnId ? { fromTurnId: turnId } : {}) });
+  return (
+    <ActionBarPrimitive.Reload asChild onClick={handleContinue}>
+      <TooltipIconButton tooltip="Continue" aria-label="Continue">
+        <ArrowDownIcon />
+      </TooltipIconButton>
+    </ActionBarPrimitive.Reload>
   );
 };
 

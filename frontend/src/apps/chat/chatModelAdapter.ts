@@ -6,6 +6,7 @@ import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js"
 import { messageText } from "@/apps/chat/chatMessageText";
 import type { TurnWithSources } from "@/apps/chat/chatCitations";
 import { CURRENT_LOCAL_VISION_CAPABILITY, IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
+import type { PendingContinuation } from "@/apps/chat/chatContinue";
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -54,6 +55,7 @@ export interface ChatModelAdapterDeps {
   // already uses - undefined for an ordinary send, never anything else's
   // edit once this one's been read.
   consumeSupersedes(): string | undefined;
+  consumeContinuation?(): PendingContinuation | undefined;
   getConversationId?(): Promise<string>;
   // 4.3: "offer, never block" - a crisis-resources banner rides alongside
   // the reply, not as part of the message content assistant-ui renders.
@@ -233,6 +235,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // leaving a stale edit's turn id sitting in the module-scope ref
       // for a later, unrelated send to inherit.
       const supersedes = deps.consumeSupersedes();
+      const continuation = deps.consumeContinuation?.();
       deps.onReplyState?.("waiting");
       try {
         let conversationId = await deps.getConversationId?.();
@@ -242,6 +245,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             thinking: reconnectAttempts === 0 ? deps.consumeThinking() : undefined,
             conversationId,
             supersedes,
+            continuation,
             resumeToken,
             turnId: resumeTurnId,
             resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
@@ -383,6 +387,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // same as a freshly-created row's real `null`).
             yield {
               content: [{ type: "text", text: finalText }],
+              ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),
               metadata: {
                 custom: {
                   source: event.value.source,

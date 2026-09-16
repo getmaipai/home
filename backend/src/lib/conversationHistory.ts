@@ -268,7 +268,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -293,7 +293,8 @@ export function logTurn(
   // lib/memory.ts's remember() already set. This runs once per completed
   // turn, the app's hottest path.
   const supersedes = resolveSupersedes(opts.supersedes, value.conversation_id);
-  const parentTurnId = branchParentFor(value.conversation_id, supersedes);
+  const branchFrom = resolveSupersedes(opts.branchFrom, value.conversation_id);
+  const parentTurnId = branchParentFor(value.conversation_id, supersedes ?? branchFrom);
   const row: ConversationTurnRow = {
     id: value.turn_id,
     personId: actor.id,
@@ -371,6 +372,7 @@ export function logTurn(
   const storedRow = insertTurnAndBumpConversation(row, value.conversation_id);
   value.parent_turn_id = storedRow.parentTurnId;
   value.branch_chosen = storedRow.branchChosen;
+  if (branchFrom) value.continued_from_turn_id = branchFrom;
   recordEpisodes(storedRow);
   // #88: the replaced turn leaves the current branch; the memories the
   // judge extracted from it are retired (archived, never deleted) so the
@@ -1245,12 +1247,12 @@ function estimateTokens(text: string): number {
  * back in front of it right alongside the real one. `rows` is already
  * bounded (WINDOW_ROW_FETCH_LIMIT), so this is a plain in-memory filter,
  * not a second query. */
-function excludeSupersededRows(rows: readonly ConversationTurnRow[], alsoSuperseded?: string | null): ConversationTurnRow[] {
+function excludeSupersededRows(rows: readonly ConversationTurnRow[], alsoSuperseded?: string | null, alsoExcluded?: string | null): ConversationTurnRow[] {
   const supersededIds = new Set(rows.map((r) => r.supersedes).filter((id): id is string => id !== null));
   // #88: on the edited turn's own run the replacing row does not exist
   // yet, so the caller names the turn it is about to supersede.
   if (alsoSuperseded) supersededIds.add(alsoSuperseded);
-  return rows.filter((r) => !supersededIds.has(r.id));
+  return rows.filter((r) => !supersededIds.has(r.id) && r.id !== alsoExcluded);
 }
 
 export interface ConversationWindow {
@@ -1376,7 +1378,7 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
  * more would exceed it. Whatever's older than what fit is represented by
  * the conversation's own rolling `summary` as one line instead, when one
  * exists. */
-export function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null } = {}): ConversationWindow {
+export function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null } = {}): ConversationWindow {
   // Bounded, not the full history (a code review, 2026-09-05, found this
   // fetching and re-sorting every turn ever logged, on every model-
   // routed turn): WINDOW_ROW_FETCH_LIMIT is far more than the token
@@ -1392,7 +1394,7 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
     .limit(WINDOW_ROW_FETCH_LIMIT)
     .all();
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const liveRows = excludeSupersededRows(rows, opts.supersedes);
+  const liveRows = excludeSupersededRows(rows, opts.supersedes, opts.excludeTurnId);
   if (liveRows.length === 0) return { messages: [], turnIds: [], droppedOlder: false };
 
   const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);

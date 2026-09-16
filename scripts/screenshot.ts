@@ -208,6 +208,7 @@ const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
 const chatFocusReview = process.argv.includes("--chat-focus-review");
 const chatTemporaryReview = process.argv.includes("--chat-temporary-review");
+const chatContinueReview = process.argv.includes("--chat-continue-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview || chatTemporaryReview;
 const chatStatsReview = process.argv.includes("--chat-stats-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
@@ -1092,6 +1093,41 @@ async function captureChatTemporaryReview(browser: Browser, sessionValue: string
   }
 }
 
+/** CHAT-PARITY-04's dedicated review: the browser receives a length-stopped
+ * assistant answer, so the real adapter marks it incomplete and the real
+ * action bar exposes the additive Continue affordance. */
+async function captureChatContinueReview(browser: Browser, sessionValue: string): Promise<void> {
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.route("**/api/turn/stream", (route) => {
+      const value = {
+        reply: { text: "Start with a sunny spot, then choose a few easy plants." },
+        source: "model",
+        safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
+        conversation_id: "conv-continue123",
+        turn_id: "turn-continue123",
+        stats: { stop_reason: "length" },
+      };
+      return route.fulfill({ status: 200, contentType: "application/x-ndjson", body: `${JSON.stringify({ type: "delta", text: value.reply.text })}\n${JSON.stringify({ type: "done", value })}\n` });
+    });
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.getByRole("textbox", { name: "Message input" }).fill("Help me plan a small garden");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByRole("button", { name: "Continue", exact: true }).waitFor();
+    await settleAnimations(page);
+    const screenshot = "chat-continue-desktop-light.png";
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-continue", viewport: viewport.slug, theme: "light" });
+  } finally {
+    await context.close();
+  }
+}
+
 /** Lane 11 item 2's own acceptance: "the screenshot script gains the
  * section (desktop and phone), opened and judged." The route matrix's
  * own /memory capture never sees this section - Radix's Tabs.Content
@@ -1755,7 +1791,9 @@ async function main() {
 
     if (!a11yOnly && chatTemporaryReview) await captureChatTemporaryReview(browser, sessionValue);
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !conversationsReview) {
+    if (!a11yOnly && chatContinueReview) await captureChatContinueReview(browser, sessionValue);
+
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !notificationsReview && !conversationsReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -1790,7 +1828,7 @@ async function main() {
       ? []
       : conversationsReview
         ? A11Y_ONLY_COMBOS
-      : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview
+      : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview
         ? A11Y_ONLY_COMBOS
         : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
 
@@ -1800,14 +1838,14 @@ async function main() {
     // seeded backend - its two combos (`A11Y_ONLY_COMBOS`) would race
     // each other's chat history if run concurrently, so this mode stays
     // sequential (pool size 1). Every other mode only ever reads.
-    const poolSize = chatReview || chatStatsReview || chatResearchReview ? 1 : CONTEXT_POOL_SIZE;
+    const poolSize = chatReview || chatStatsReview || chatResearchReview || chatContinueReview ? 1 : CONTEXT_POOL_SIZE;
     const comboResults = await runPool(combos, poolSize, async (combo): Promise<RunResult[]> => {
       const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
       if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of ((chatReview || chatStatsReview || chatResearchReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : conversationsReview ? ROUTES.filter((entry) => entry.slug === "conversations") : ROUTES)) {
+        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : conversationsReview ? ROUTES.filter((entry) => entry.slug === "conversations") : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its

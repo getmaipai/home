@@ -1006,5 +1006,12 @@
     "theme": "light",
     "capturedAt": "2026-09-16T18:36:03.056Z",
     "captureScript": "scripts/screenshot.ts --chat-temporary-review"
+  },
+  "chat-continue-desktop-light.png": {
+    "route": "chat-continue",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-16T19:18:25.893Z",
+    "captureScript": "scripts/screenshot.ts --chat-continue-review"
   }
 }

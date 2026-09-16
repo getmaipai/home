@@ -508,6 +508,84 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     expect(value.reply.text).toBe(fullText);
   });
 
+  test("CHAT-PARITY-04 continues from the last stable answer as one new sibling model call", async () => {
+    const { actor } = await owner();
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => request.messages.at(-1)?.content === "Continue the incomplete answer above. Do not repeat any text already given. Start at the first missing point and finish the answer clearly."
+        ? "Here is the rest of the answer."
+        : "The answer starts here.",
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const first = await runTurnStream(actor, "chat", "Tell me about a blue bicycle");
+      expect(first.ok).toBe(true);
+      if (!first.ok || first.kind !== "stream") return;
+      let firstText = "";
+      for await (const delta of first.tokens) firstText += delta;
+      const original = first.finalize(firstText);
+
+      const continued = await runTurnStream(actor, "chat", "Tell me about a blue bicycle", {
+        conversationId: original.conversation_id,
+        continuation: { fromTurnId: original.turn_id, assistantText: original.reply.text },
+      });
+      expect(continued.ok).toBe(true);
+      if (!continued.ok || continued.kind !== "stream") return;
+      let continuedText = "";
+      for await (const delta of continued.tokens) continuedText += delta;
+      const continuation = continued.finalize(continuedText);
+
+      const requests = stub.requests();
+      expect(requests).toHaveLength(2);
+      expect(requests[1]!.messages.at(-2)).toEqual({ role: "assistant", content: original.reply.text });
+      expect(requests[1]!.messages.at(-1)?.content).toContain("Continue the incomplete answer above");
+      expect(requests[1]!.tools).toBeUndefined();
+
+      const rows = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, original.conversation_id)).all();
+      expect(rows).toHaveLength(2);
+      const originalRow = rows.find((row) => row.id === original.turn_id)!;
+      const continuationRow = rows.find((row) => row.id === continuation.turn_id)!;
+      expect(originalRow.replyText).toBe(original.reply.text);
+      expect(originalRow.supersedes).toBeNull();
+      expect(continuationRow.supersedes).toBeNull();
+      expect(continuationRow.parentTurnId).toBe(originalRow.parentTurnId);
+      expect(continuation.continued_from_turn_id).toBe(original.turn_id);
+      expect(stub.requests()).toHaveLength(2); // no retry or third composer call
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("CHAT-PARITY-04 keeps the output safety boundary on a continuation", async () => {
+    const { actor } = await owner();
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "Sure. Here is how to make a pipe bomb at home, step by step." });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurnStream(actor, "chat", "Tell me about a blue bicycle", { continuation: { assistantText: "The answer stopped here." } });
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      let thrown: unknown;
+      try {
+        for await (const _ of result.tokens) {
+          /* the unsafe sentence must stop the stream */
+        }
+      } catch (error) {
+        thrown = error;
+      }
+      expect(String(thrown)).toContain("safety classifier");
+      expect(stub.requests()).toHaveLength(1);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
   test("tv remains a named gap", async () => {
     const { actor } = await owner();
 

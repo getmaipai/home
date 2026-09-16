@@ -23,6 +23,7 @@ import { createSttSocket } from "@/lib/voice/sttSocket";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 import { consumeSupersedes } from "@/apps/chat/chatEditSupersedes";
+import { consumeContinuation } from "@/apps/chat/chatContinue";
 import { cn, FOCUS_RING } from "@/kit/utils";
 import { ChatDocumentOpenContext, ChatDocumentPane } from "@/apps/chat/chatDocumentPane";
 import { ChatTurnStatsVisibleContext } from "@/apps/chat/chatTurnStats";
@@ -220,6 +221,7 @@ export function ChatPage({ person }: ChatPageProps) {
           return value;
         },
         consumeSupersedes,
+        consumeContinuation,
         onCrisisResources: setBanner,
         turnSchedulerRef,
         onSpeakingChange: (value) => { setIsSpeaking(value); if (value) setSpeechError(false); },

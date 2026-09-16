@@ -2398,7 +2398,7 @@ stats item text above.
     importing foreign chat formats. Exit: route, serializer, privacy,
     permission, and rendered PDF tests, `bash scripts/check.sh`.
 
-- [ ] **CHAT-PARITY-04: continue a cut-off answer** (M, after CHAT-PARITY-01)
+- [x] **CHAT-PARITY-04: continue a cut-off answer** (M, after CHAT-PARITY-01)
 
     Objective: continue a stopped or truncated assistant answer from its last
     stable message without pretending the missing text was generated. Files:

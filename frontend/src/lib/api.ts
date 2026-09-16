@@ -637,11 +637,11 @@ export const api = {
   streamTurn: (
     text: string,
     signal?: AbortSignal,
-    opts: { thinking?: boolean; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number } = {},
+    opts: { thinking?: boolean; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string } } = {},
   ) =>
     rawStreamPost(
       "/api/turn/stream",
-      { surface: "chat", text, thinking: opts.thinking, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom },
+      { surface: "chat", text, thinking: opts.thinking, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom },
       0,
       undefined,
       signal,

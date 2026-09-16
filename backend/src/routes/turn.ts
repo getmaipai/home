@@ -99,6 +99,8 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     thinking?: boolean;
     conversation_id?: string;
     supersedes?: string;
+    continuation_of?: string;
+    continuation_text?: string;
     speaker_evidence?: unknown;
     present?: unknown;
   };
@@ -416,6 +418,8 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     resume_token?: string;
     resume_from?: number;
     supersedes?: string;
+    continuation_of?: string;
+    continuation_text?: string;
     ephemeral?: boolean;
     speaker_evidence?: unknown;
     present?: unknown;
@@ -462,6 +466,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     thinking: body.thinking,
     conversationId: body.conversation_id,
     supersedes: body.supersedes,
+    continuation: body.continuation_text === undefined ? undefined : { fromTurnId: body.continuation_of, assistantText: body.continuation_text },
     // A widget's own fixed-utterance query (Home's weather card), never a
     // household member's own words: skips logTurnSafely() only, so it
     // never lands in a person's real chat history or the episode store,
