@@ -545,6 +545,101 @@ describe("GET /api/memory (list) and visibility", () => {
     expect(after.uses).toBe(before.uses);
     expect(after.last_used_at).toBe(before.last_used_at);
   });
+
+  // CHAT-08 (b): the route's own `as_of` and `include_superseded` query
+  // params, exercised over HTTP rather than the direct list() call -
+  // the route parses as_of and passes both into list() (asOf and
+  // includeSuperseded are both honoured: a historical read with
+  // include_superseded=true surfaces a superseded record that was valid
+  // at that moment, the way recall() already honours the same flag).
+  test("as_of returns a record within its validity window and hides one past valid_to", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/memory", {
+      text: "the old garden shed from 2019",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      valid_from: "2019-01-01T00:00:00.000Z",
+      valid_to: "2020-01-01T00:00:00.000Z",
+    });
+    expect(created.status).toBe(201);
+
+    const during = ((await (await owner.get("/api/memory?as_of=2019-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    expect(during.some((m) => m.text.includes("garden shed"))).toBe(true);
+
+    const after = ((await (await owner.get("/api/memory?as_of=2020-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    expect(after.some((m) => m.text.includes("garden shed"))).toBe(false);
+  });
+
+  test("as_of hides a record whose valid_from is in the future", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    await owner.post("/api/memory", {
+      text: "the future roof replacement",
+      category: "event",
+      tier: "episodic",
+      scope: "household",
+      source: "test",
+      importance: 0.3,
+      valid_from: "2025-01-01T00:00:00.000Z",
+    });
+
+    const before = ((await (await owner.get("/api/memory?as_of=2024-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    expect(before.some((m) => m.text.includes("roof replacement"))).toBe(false);
+
+    const after = ((await (await owner.get("/api/memory?as_of=2025-06-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    expect(after.some((m) => m.text.includes("roof replacement"))).toBe(true);
+  });
+
+  test("a malformed as_of is a 400", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.get("/api/memory?as_of=not-a-date");
+    expect(res.status).toBe(400);
+  });
+
+  test("include_superseded with as_of returns the superseded record; without it, not", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/memory", {
+      text: "the house we used to live in on Cedar Street",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      valid_from: "2019-01-01T00:00:00.000Z",
+      valid_to: "2021-01-01T00:00:00.000Z",
+    });
+    expect(created.status).toBe(201);
+    const old = (await created.json()) as MemoryRecord;
+
+    const sup = await owner.post(`/api/memory/${old.id}/supersede`, {
+      text: "the house we live in on Birch Street",
+      category: "fact",
+      tier: "durable",
+      importance: 0.5,
+    });
+    expect(sup.status).toBe(200);
+
+    const current = ((await (await owner.get("/api/memory")).json()) as MemoryRecord[]);
+    expect(current.some((m) => m.text.includes("Cedar"))).toBe(false);
+    expect(current.some((m) => m.text.includes("Birch"))).toBe(true);
+
+    const historicalNoSuperseded = ((await (await owner.get("/api/memory?as_of=2020-01-01T00:00:00.000Z")).json()) as MemoryRecord[]);
+    expect(historicalNoSuperseded.some((m) => m.text.includes("Cedar"))).toBe(false);
+    expect(historicalNoSuperseded.some((m) => m.text.includes("Birch"))).toBe(true);
+
+    const historical = ((await (await owner.get("/api/memory?as_of=2020-01-01T00:00:00.000Z&include_superseded=true")).json()) as MemoryRecord[]);
+    expect(historical.some((m) => m.text.includes("Cedar"))).toBe(true);
+    expect(historical.some((m) => m.text.includes("Birch"))).toBe(true);
+
+    const includeOnly = ((await (await owner.get("/api/memory?include_superseded=true")).json()) as MemoryRecord[]);
+    expect(includeOnly.some((m) => m.text.includes("Cedar"))).toBe(false);
+  });
 });
 
 describe("POST /api/memory/recall", () => {

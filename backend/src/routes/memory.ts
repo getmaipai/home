@@ -18,7 +18,8 @@ import {
   type ListOptions,
 } from "@/lib/memory";
 import { runLegacyImport, LegacyImportError } from "@/lib/legacyImport";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
+import { apiRouter, errorResponses, ErrorSchema } from "@/lib/openapi";
 import { isOwnerOrAdmin } from "@/lib/access";
 import type { AppEnv, PersonRow } from "@/types";
 
@@ -141,10 +142,46 @@ memoryRoutes.post("/", requireAuth, async (c) => {
   return c.json(result.value, 201);
 });
 
-memoryRoutes.get("/", requireAuth, async (c) => {
+// CHAT-08 (b): a memory read as of a given moment. `as_of` is an ISO
+// date-time; `include_superseded` (only honoured when `as_of` is present)
+// includes records already retired by a later supersession, so a
+// historical read can show what the record looked like before it was
+// replaced - a current read (no `as_of`) never shows superseded records.
+const MemoryListQuerySchema = z.object({
+  scope: z.enum(["household", "person", "self"]).optional(),
+  person: z.string().optional(),
+  as_of: z.string().optional(),
+  include_superseded: z.enum(["true", "false"]).optional(),
+});
+const memoryListRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["Memory"],
+  summary: "List this person's memory records, optionally as of a given moment",
+  middleware: [requireAuth] as const,
+  request: { query: MemoryListQuerySchema },
+  responses: {
+    200: { content: { "application/json": { schema: z.array(MemoryRecord) } }, description: "The visible memory records, in the usual list shape." },
+    400: { content: { "application/json": { schema: ErrorSchema } }, description: "as_of must be an ISO date-time" },
+    401: { content: { "application/json": { schema: ErrorSchema } }, description: "Not signed in" },
+  },
+});
+memoryRoutes.openapi(memoryListRoute, (c): ReturnType<typeof memoryListRoute extends never ? never : any> => {
   const actor = c.get("person");
-  const opts = parseListOptions(new URL(c.req.url).searchParams);
-  return c.json(list(actor, opts));
+  const { scope, person, as_of, include_superseded } = c.req.valid("query");
+  const opts: ListOptions = {};
+  if (scope) opts.scope = scope;
+  if (person) opts.person = person;
+  let asOf: Date | undefined;
+  if (as_of !== undefined) {
+    const parsed = Date.parse(as_of);
+    if (Number.isNaN(parsed)) {
+      return c.json({ error: "as_of must be an ISO date-time" }, 400) as any;
+    }
+    asOf = new Date(parsed);
+  }
+  if (asOf !== undefined && include_superseded === "true") opts.includeSuperseded = true;
+  return c.json(list(actor, { ...opts, asOf })) as any;
 });
 
 // POST, not GET: recall has a real side effect (it bumps uses/

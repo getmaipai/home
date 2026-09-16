@@ -418,8 +418,15 @@ export interface ListOptions {
    * bounds (validAt() above). Defaults to "now" (the calling moment)
    * when omitted, which is what a bare list/recall read means today: a
    * record already past its valid_to is out of range, one whose
-   * valid_from hasn't started yet isn't in range yet either. */
-  asOf?: Date;
+    * valid_from hasn't started yet isn't in range yet either. */
+   asOf?: Date;
+  /** CHAT-08 (b): true only for an explicit historical read (`asOf`
+   * present): superseded records that were valid at that moment surface
+   * alongside the active ones. A current read (no `asOf`) never shows
+   * a superseded record, the same rule recall() already applies - see
+   * RecallOptions.includeSuperseded, honoured here in list() the way
+   * recall() honours it. */
+  includeSuperseded?: boolean;
 }
 
 /** Browsing: sorted, filtered, but never touches uses/last_used_at (that's
@@ -427,7 +434,10 @@ export interface ListOptions {
 export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
   const roleOf = rolesById();
   const asOf = opts.asOf ?? new Date();
-  let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+  let rows = db.select().from(memoryRecords)
+    .where(opts.includeSuperseded
+      ? or(eq(memoryRecords.status, "active"), eq(memoryRecords.status, "superseded"))
+      : eq(memoryRecords.status, "active")).all();
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   rows = rows.filter((r) => validAt(r, asOf));
