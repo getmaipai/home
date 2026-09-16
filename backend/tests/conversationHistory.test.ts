@@ -13,6 +13,7 @@ import {
   summarizeBeforeDelete,
   logTurn,
   resolveOrCreateConversation,
+  createConversation,
   getConversation,
   updateConversationTitle,
   listConversationTurns,
@@ -695,10 +696,51 @@ describe("GET /api/conversations (step 3: now lists conversation THREADS, not tu
     await client.post("/api/turn", { text: "good morning" });
     const res = await client.get("/api/conversations");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Array<{ id: string; surface: string; turn_count: number }>;
+    const body = (await res.json()) as Array<{ id: string; surface: string; turn_count: number; pinned: boolean }>;
     expect(body.length).toBe(1);
     expect(body[0]!.surface).toBe("chat");
     expect(body[0]!.turn_count).toBe(1);
+    expect(body[0]!.pinned).toBe(false);
+  });
+
+  test("searches titles and turn text without crossing person boundaries", async () => {
+    const { client, actor } = await owner();
+    const own = resolveOrCreateConversation(actor, "chat");
+    if (!own.ok) throw new Error(own.error);
+    logTurn(actor, "chat", "our garden plans", { reply: { text: "herbs for dinner" }, source: "model", safety: SAFE, conversation_id: own.value.id, turn_id: "turn-search-own" });
+    const titled = updateConversationTitle(actor, own.value.id, "Garden plans");
+    expect(titled.ok).toBe(true);
+    const other = await addPerson(client, "Bramble", "adult");
+    const otherConversation = resolveOrCreateConversation(other, "chat");
+    if (!otherConversation.ok) throw new Error(otherConversation.error);
+    logTurn(other, "chat", "private garden plans", { reply: { text: "private answer" }, source: "model", safety: SAFE, conversation_id: otherConversation.value.id, turn_id: "turn-search-other" });
+
+    const titleResults = await client.get("/api/conversations?q=Garden");
+    expect(titleResults.status).toBe(200);
+    expect(((await titleResults.json()) as Array<{ id: string }>).map((row) => row.id)).toEqual([own.value.id]);
+    const textResults = await client.get("/api/conversations?q=herbs");
+    expect(((await textResults.json()) as Array<{ id: string }>).map((row) => row.id)).toEqual([own.value.id]);
+    const privateResults = await client.get("/api/conversations?q=private");
+    expect(await privateResults.json()).toEqual([]);
+  });
+
+  test("pins through PATCH and keeps pinned conversations first", async () => {
+    const { client, actor } = await owner();
+    const first = resolveOrCreateConversation(actor, "chat");
+    if (!first.ok) throw new Error(first.error);
+    logTurn(actor, "chat", "first", { reply: { text: "first" }, source: "model", safety: SAFE, conversation_id: first.value.id, turn_id: "turn-pin-first" });
+    const titled = updateConversationTitle(actor, first.value.id, "First conversation");
+    expect(titled.ok).toBe(true);
+    const second = createConversation(actor, { surface: "chat" });
+    if (!second.ok) throw new Error(second.error);
+    logTurn(actor, "chat", "second", { reply: { text: "second" }, source: "model", safety: SAFE, conversation_id: second.value.id, turn_id: "turn-pin-second" });
+    const pin = await client.request(`/api/conversations/${first.value.id}`, { method: "PATCH", body: { pinned: true } });
+    expect(pin.status).toBe(200);
+    const listResult = await client.get("/api/conversations");
+    const rows = (await listResult.json()) as Array<{ id: string; pinned: boolean; title: string | null }>;
+    expect(rows.map((row) => row.id)).toEqual([first.value.id, second.value.id]);
+    expect(rows[0]!.pinned).toBe(true);
+    expect(rows[0]!.title).toBe("First conversation");
   });
 });
 

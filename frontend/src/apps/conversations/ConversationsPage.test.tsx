@@ -53,6 +53,7 @@ function conversation(overrides: Partial<ConversationSummary> = {}): Conversatio
     surface: "chat",
     companion_id: null,
     title: "Weekend plans",
+    pinned: false,
     turn_count: 3,
     last_turn_at: "2026-09-05T12:00:00.000Z",
     created_at: "2026-09-01T00:00:00.000Z",
@@ -129,6 +130,40 @@ describe("ConversationsPage", () => {
       fireEvent.change(input, { target: { value: "New title" } });
       fireEvent.click(await findByRole("button", { name: "Save" }));
       await waitFor(() => expect(calls).toEqual([{ method: "PATCH", body: { title: "New title" } }]));
+    } finally {
+      restore();
+    }
+  });
+
+  test("searches by title or message text", async () => {
+    const urls: string[] = [];
+    const restore = stubApi({
+      onAction: (method, url) => {
+        if (method === "GET" && url.includes("/api/conversations")) urls.push(url);
+      },
+    });
+    try {
+      const { findByRole } = renderPage(actor("owner"));
+      const input = await findByRole("searchbox", { name: "Search conversations" });
+      fireEvent.change(input, { target: { value: "garden" } });
+      await waitFor(() => expect(urls.some((url) => url.endsWith("/api/conversations?q=garden"))).toBe(true));
+    } finally {
+      restore();
+    }
+  });
+
+  test("pinning a conversation sends its new pinned state", async () => {
+    const calls: Array<{ method: string; body: unknown }> = [];
+    const restore = stubApi({
+      conversations: [conversation({ id: "conv-1", title: "Keep close" })],
+      onAction: (method, url, body) => {
+        if (url.endsWith("/api/conversations/conv-1")) calls.push({ method, body });
+      },
+    });
+    try {
+      const { findByRole } = renderPage(actor("owner"));
+      fireEvent.click(await findByRole("button", { name: "Pin Keep close" }));
+      await waitFor(() => expect(calls).toContainEqual({ method: "PATCH", body: { title: "Keep close", pinned: true } }));
     } finally {
       restore();
     }

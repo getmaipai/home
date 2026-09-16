@@ -11,6 +11,7 @@ import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
 import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
 import { api, ApiError, isOwnerOrAdminRole, type ConversationSummary, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { cn, FOCUS_RING } from "@/kit/utils";
+import { getIcon } from "@/kit/icons";
 
 interface ConversationsPageProps {
   person: Roster;
@@ -21,6 +22,7 @@ function whenText(iso: string | null): string {
 }
 
 const ME = "me";
+const PinIcon = getIcon("pin");
 
 // Session E step 5: "the list with rename, delete, batch delete,
 // clear-all" over GET /api/conversations (backend/src/lib/
@@ -51,6 +53,7 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
   // invented here without a real contract to build it against.
   const [viewing, setViewing] = useState<string>(ME);
   const viewingSelf = viewing === ME;
+  const [query, setQuery] = useState("");
 
   const peopleQuery = useQuery<PersonRosterEntry[]>({
     queryKey: ["people"],
@@ -59,8 +62,8 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
   });
 
   const listQuery = useQuery<ConversationSummary[]>({
-    queryKey: ["conversations-list", viewingSelf ? null : viewing],
-    queryFn: () => api.conversationList(viewingSelf ? undefined : viewing),
+    queryKey: ["conversations-list", viewingSelf ? null : viewing, query.trim()],
+    queryFn: () => api.conversationList(viewingSelf ? undefined : viewing, query.trim() || undefined),
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -99,6 +102,19 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
       await invalidateList();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not rename that conversation.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleTogglePin(conversation: ConversationSummary) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await api.renameConversation(conversation.id, conversation.title, !conversation.pinned);
+      await invalidateList();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not update that conversation.");
     } finally {
       setBusy(false);
     }
@@ -165,6 +181,16 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
 
         {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
+        <div className="relative">
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Search conversations"
+            placeholder="Search conversations by title or message…"
+          />
+        </div>
+
         {viewingSelf ? (
           <div className="flex flex-wrap items-center gap-2">
             {selectMode ? (
@@ -216,7 +242,7 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
           errorMessage={listQuery.error instanceof ApiError ? listQuery.error.message : "Could not load conversations."}
           isEmpty={(rows) => rows.length === 0}
           emptyIcon="message-circle"
-          emptyText={viewingSelf ? "No conversations yet." : "Nothing to show here."}
+          emptyText={query.trim() ? "No matching conversations." : viewingSelf ? "No conversations yet." : "Nothing to show here."}
           loadingLabel="Loading conversations"
         >
           {(conversations) => (
@@ -260,7 +286,7 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
                           growing the visible text. */}
                       {viewingSelf && !selectMode && c.surface === "chat" ? <a href={`/chat?conversation=${encodeURIComponent(c.id)}`} className={cn("relative truncate rounded text-base before:absolute before:-inset-y-3 before:content-[''] hover:underline", FOCUS_RING)}>{c.title ?? "Untitled conversation"}</a> : <span className="truncate text-base">{c.title ?? "Untitled conversation"}</span>}
                       <span className="text-sm text-muted-foreground">
-                        {c.turn_count} {c.turn_count === 1 ? "message" : "messages"} · {whenText(c.last_turn_at)}
+                        {c.turn_count} {c.turn_count === 1 ? "message" : "messages"} · {whenText(c.last_turn_at)}{c.pinned ? " · Pinned" : ""}
                       </span>
                     </div>
                   </div>
@@ -296,6 +322,16 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
                       if (selectMode) return null;
                       return (
                         <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`${c.pinned ? "Unpin" : "Pin"} ${c.title ?? "untitled conversation"}`}
+                            aria-pressed={c.pinned}
+                            onClick={() => handleTogglePin(c)}
+                            disabled={busy}
+                          >
+                            <PinIcon aria-hidden className="size-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             aria-label={`Rename ${c.title ?? "untitled conversation"}`}

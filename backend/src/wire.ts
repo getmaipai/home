@@ -117,6 +117,7 @@ export interface ConversationSummary {
   surface: string;
   companion_id: string | null;
   title: string | null;
+  pinned: boolean;
   turn_count: number;
   last_turn_at: string | null;
   created_at: string;

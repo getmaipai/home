@@ -33,6 +33,10 @@ class Conversation(BaseModel):
         None,
         description='Household-editable; null until set (PATCH /api/conversations/:id).',
     )
+    pinned: bool | None = Field(
+        False,
+        description="Whether this conversation stays at the top of its person's list.",
+    )
     status: Literal['open', 'closed', 'deleted'] = Field(
         ...,
         description='Open is active for this person and surface. Closed is inactive and requires an explicit resume before another turn. Deleted is terminal. Resuming closes other open conversations on that surface and clears stale pending confirmations; reading never resumes.',

@@ -58,6 +58,13 @@ export const Conversation = z
         "Household-editable; null until set (PATCH /api/conversations/:id).",
       )
       .default(null),
+    /**Whether this conversation stays at the top of its person's list.*/
+    pinned: z
+      .boolean()
+      .describe(
+        "Whether this conversation stays at the top of its person's list.",
+      )
+      .default(false),
     /**Open is active for this person and surface. Closed is inactive and requires an explicit resume before another turn. Deleted is terminal. Resuming closes other open conversations on that surface and clears stale pending confirmations; reading never resumes.*/
     status: z
       .enum(["open", "closed", "deleted"])

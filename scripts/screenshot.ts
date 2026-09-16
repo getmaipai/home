@@ -210,6 +210,7 @@ const chatFocusReview = process.argv.includes("--chat-focus-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview;
 const chatStatsReview = process.argv.includes("--chat-stats-review");
 const settingsReview = process.argv.includes("--settings-review");
+const conversationsReview = process.argv.includes("--conversations-review");
 // Lane 15: judges the bell popover's own "Dismiss all" and the history
 // page's multi-select in one throwaway run, the same shape chatReview/
 // settingsReview already use - not part of the full matrix (nothing in
@@ -1023,6 +1024,46 @@ async function capturePeopleAndThings(browser: Browser, sessionValue: string, vi
   }
 }
 
+/** The conversations feature's judged capture: seed one real conversation,
+ * give it a household title, search for a word in its turn, and capture the
+ * result. This stays in data-scratch because it proves the interaction
+ * without changing the ordinary route matrix's baseline content. */
+async function captureConversationsSearch(browser: Browser, sessionValue: string): Promise<void> {
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const turn = await fetch(`${BASE_URL}/api/turn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ surface: "chat", text: "Help me plan a garden" }),
+  });
+  if (!turn.ok) throw new Error(`captureConversationsSearch: seed turn failed: ${turn.status}`);
+  const listed = await fetch(`${BASE_URL}/api/conversations`, { headers: cookie });
+  if (!listed.ok) throw new Error(`captureConversationsSearch: conversation list failed: ${listed.status}`);
+  const conversation = ((await listed.json()) as Array<{ id: string }>)[0];
+  if (!conversation) throw new Error("captureConversationsSearch: seed turn created no conversation");
+  const renamed = await fetch(`${BASE_URL}/api/conversations/${encodeURIComponent(conversation.id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ title: "Autumn garden plans" }),
+  });
+  if (!renamed.ok) throw new Error(`captureConversationsSearch: title update failed: ${renamed.status}`);
+
+  const context = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "light", sessionValue);
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/conversations`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.getByRole("searchbox", { name: "Search conversations" }).fill("garden");
+    await page.getByText("Autumn garden plans", { exact: true }).waitFor();
+    await settleAnimations(page);
+    await page.screenshot({ path: join(outDir, "conversations-search-desktop-light.png"), fullPage: true });
+    console.log(`Wrote ${join(outDir, "conversations-search-desktop-light.png")}`);
+  } finally {
+    await context.close();
+  }
+}
+
 /** Lane 10 item 2's own acceptance: "the loading state between chunks
  * must be the kit's own skeleton, never a blank screen: take one shot
  * mid-load if the script can." Two things stack against catching it
@@ -1572,8 +1613,12 @@ async function main() {
     // and combining them would sign in as Marlow and fire two real
     // safety-flagged turns underneath a chat/settings run that never
     // asked for that.
-    if (notificationsReview && !chatReview && !settingsReview) {
+    if (notificationsReview && !chatReview && !settingsReview && !conversationsReview) {
       await captureNotificationsReview(browser, sessionValue);
+    }
+
+    if (conversationsReview && !chatReview && !settingsReview && !notificationsReview) {
+      await captureConversationsSearch(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {
@@ -1586,7 +1631,7 @@ async function main() {
 
     if (!a11yOnly && chatStatsReview) await captureChatStatsReview(browser, sessionValue);
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !notificationsReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !notificationsReview && !conversationsReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -1619,6 +1664,8 @@ async function main() {
     // browser contexts that would only ever iterate zero routes below.
     const combos = notificationsReview
       ? []
+      : conversationsReview
+        ? A11Y_ONLY_COMBOS
       : a11yOnly || settingsReview || chatReview || chatStatsReview
         ? A11Y_ONLY_COMBOS
         : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
@@ -1636,7 +1683,7 @@ async function main() {
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of ((chatReview || chatStatsReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
+        for (const route of ((chatReview || chatStatsReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : conversationsReview ? ROUTES.filter((entry) => entry.slug === "conversations") : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -1686,7 +1733,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !notificationsReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !notificationsReview && !conversationsReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);

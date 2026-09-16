@@ -31,7 +31,7 @@
 // best-effort upgrade on top of it, not a precondition. See
 // summarizeBeforeDelete()'s own comment for exactly what that means
 // when no real model is running yet.
-import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc } from "drizzle-orm";
+import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc, like } from "drizzle-orm";
 import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
@@ -559,6 +559,7 @@ function toConversationRecord(row: ConversationRow): Conversation {
     surface: row.surface,
     companion_id: row.companionId,
     title: row.title,
+    pinned: row.pinned,
     status: row.status,
     summary: row.summary,
     summary_through_turn: row.summaryThroughTurn,
@@ -576,6 +577,7 @@ function conversationToDbValues(c: Conversation) {
     surface: c.surface,
     companionId: c.companion_id,
     title: c.title,
+    pinned: c.pinned,
     status: c.status,
     summary: c.summary,
     summaryThroughTurn: c.summary_through_turn,
@@ -606,6 +608,7 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
     surface,
     companion_id: resolvedCompanionId,
     title: null,
+    pinned: false,
     status: "open",
     summary: null,
     summary_through_turn: null,
@@ -930,6 +933,7 @@ function toConversationSummary(row: ConversationRow, turnCount: number, lastTurn
     surface: row.surface,
     companion_id: row.companionId,
     title: row.title,
+    pinned: row.pinned,
     turn_count: turnCount,
     last_turn_at: lastTurnAt,
     created_at: row.createdAt,
@@ -942,16 +946,47 @@ function toConversationSummary(row: ConversationRow, turnCount: number, lastTurn
  * conversation never appears (its own tombstone, not just hidden from
  * this one listing). Newest-active-first (updated_at, bumped by every
  * real logTurn() and by createConversation()'s own close-the-old-one
- * step), not creation order. */
-export function listConversations(actor: PersonRow, personId?: string): ConversationSummary[] {
+ * step), with pinned conversations first and updated_at descending within
+ * each pin state. */
+export function listConversations(actor: PersonRow, personId?: string, query?: string): ConversationSummary[] {
   const target = personId ?? actor.id;
   if (!canAccessPerson(actor, target)) return [];
-  const rows = db
+  let rows = db
     .select()
     .from(conversations)
     .where(and(eq(conversations.personId, target), not(eq(conversations.status, "deleted"))))
     .all();
-  rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const normalizedQuery = query?.trim() ?? "";
+  if (normalizedQuery) {
+    const pattern = `%${normalizedQuery}%`;
+    const matchingTitleIds = db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.personId, target),
+          not(eq(conversations.status, "deleted")),
+          like(conversations.title, pattern),
+        ),
+      )
+      .all()
+      .map((conversation) => conversation.id);
+    const matchingTurnIds = db
+      .select({ conversationId: conversationTurns.conversationId })
+      .from(conversationTurns)
+      .where(
+        and(
+          eq(conversationTurns.personId, target),
+          or(like(conversationTurns.userText, pattern), like(conversationTurns.replyText, pattern)),
+        ),
+      )
+      .all()
+      .map((turn) => turn.conversationId)
+      .filter((id): id is string => id !== null);
+    const matchingConversationIds = new Set([...matchingTitleIds, ...matchingTurnIds]);
+    rows = rows.filter((row) => matchingConversationIds.has(row.id));
+  }
+  rows.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
   if (rows.length === 0) return [];
 
   const ids = rows.map((r) => r.id);
@@ -1057,10 +1092,11 @@ export function listConversationTurns(
   return { ok: true, value: rows.map((r) => ({ ...r, sources: r.sources ? JSON.parse(r.sources) : undefined, media: r.media ? JSON.parse(r.media) : undefined, stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] })) };
 }
 
-/** PATCH /api/conversations/:id: title only (step 3's contract). Same
+/** PATCH /api/conversations/:id: title and pin state (step 3's contract
+ * extended additively). Same
  * access rule as getConversation() - an owner/admin may rename a
  * child's the same way they can already view it. */
-export function updateConversationTitle(actor: PersonRow, id: string, title: string | null): ConversationOpResult<Conversation> {
+export function updateConversationTitle(actor: PersonRow, id: string, title: string | null | undefined, pinned?: boolean): ConversationOpResult<Conversation> {
   const found = getConversation(actor, id);
   if (!found.ok) return found;
   const now = new Date().toISOString();
@@ -1071,11 +1107,16 @@ export function updateConversationTitle(actor: PersonRow, id: string, title: str
   // rejected by anything else that later validates the row for real).
   // safeParse, not parse: a bad title (too long) is a real 400 from the
   // caller's own input, not an internal bug worth throwing over.
-  const parsed = Conversation.safeParse({ ...found.value, title, updated_at: now, hlc: newHlc });
+  const nextTitle = title === undefined ? found.value.title : title;
+  const nextPinned = pinned ?? found.value.pinned;
+  if (typeof nextPinned !== "boolean") {
+    return { ok: false, status: 400, error: "pinned must be a boolean" };
+  }
+  const parsed = Conversation.safeParse({ ...found.value, title: nextTitle, pinned: nextPinned, updated_at: now, hlc: newHlc });
   if (!parsed.success) {
     return { ok: false, status: 400, error: parsed.error.issues.map((i) => i.message).join("; ") };
   }
-  db.update(conversations).set({ title, updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
+  db.update(conversations).set({ title: nextTitle, pinned: nextPinned, updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
   return { ok: true, value: parsed.data };
 }
 

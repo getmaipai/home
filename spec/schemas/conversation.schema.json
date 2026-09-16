@@ -32,6 +32,11 @@
       "default": null,
       "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
     },
+    "pinned": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this conversation stays at the top of its person's list."
+    },
     "status": {
       "type": "string",
       "enum": ["open", "closed", "deleted"],

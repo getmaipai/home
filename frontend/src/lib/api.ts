@@ -320,8 +320,13 @@ export const api = {
   // `person` for the parental view (an owner/admin listing a child's own
   // threads; the route's own list() enforces that access check server-
   // side and returns an empty list for anyone it denies, never a 403).
-  conversationList: (person?: string) =>
-    request<ConversationSummary[]>(`/api/conversations${person ? `?person=${encodeURIComponent(person)}` : ""}`),
+  conversationList: (person?: string, query?: string) => {
+    const params = new URLSearchParams();
+    if (person) params.set("person", person);
+    if (query) params.set("q", query);
+    const suffix = params.toString();
+    return request<ConversationSummary[]>(`/api/conversations${suffix ? `?${suffix}` : ""}`);
+  },
   createConversation: () => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat" }) }),
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
@@ -335,10 +340,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ verdict, reason }),
     }),
-  renameConversation: (id: string, title: string | null) =>
+  renameConversation: (id: string, title: string | null, pinned?: boolean) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, ...(pinned === undefined ? {} : { pinned }) }),
     }),
   deleteConversation: (id: string) =>
     request<{ ok: true }>(`/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" }),

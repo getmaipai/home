@@ -62,7 +62,8 @@ function fail(c: Context<AppEnv>, result: Extract<ConversationOpResult<unknown>,
 conversationsRoutes.get("/", requireAuth, async (c) => {
   const actor = c.get("person");
   const person = c.req.query("person");
-  return c.json(listConversations(actor, person));
+  const query = c.req.query("q");
+  return c.json(listConversations(actor, query ? undefined : person, query));
 });
 
 conversationsRoutes.get("/turns", requireAuth, async (c) => {
@@ -331,8 +332,8 @@ conversationsRoutes.get("/:id/turns", requireAuth, async (c) => {
 
 conversationsRoutes.patch("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null };
-  const result = updateConversationTitle(actor, c.req.param("id"), body.title ?? null);
+  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null; pinned?: boolean };
+  const result = updateConversationTitle(actor, c.req.param("id"), body.title, body.pinned);
   if (!result.ok) return fail(c, result);
   return c.json(result.value);
 });

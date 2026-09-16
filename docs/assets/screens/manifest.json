@@ -143,8 +143,8 @@
     "route": "conversations",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-16T12:57:31.281Z",
+    "captureScript": "scripts/screenshot.ts --conversations-review"
   },
   "search-phone-dark.png": {
     "route": "search",
@@ -500,8 +500,8 @@
     "route": "conversations",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-16T12:57:31.281Z",
+    "captureScript": "scripts/screenshot.ts --conversations-review"
   },
   "search-desktop-light.png": {
     "route": "search",

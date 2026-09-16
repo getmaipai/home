@@ -17837,3 +17837,9 @@ produces nulls without `NaN`. A model turn's `[turn]` log and `done`
 value agree. The adult toggle is off by default and persists per person;
 when on, the one-line readout and full list are visible. Child band
 renders neither. One desktop screenshot shows the full list open.
+
+## Conversations: search, pin, group
+
+Verdict: search is a per-person query over the conversation titles and turn text the hub already holds; pin is one boolean on the spec conversation record; groups remain an open design question because folders, tags, and projects each imply different ownership and nesting semantics, so no grouping model is built here.
+
+The S half uses SQLite `LIKE` because the schema has no conversation FTS table. Search is always scoped to the authenticated person's own conversations, and pinning is an additive field on the existing conversation record and PATCH route. Grouping is intentionally left at the design question: folders provide hierarchy, tags provide many-to-many labels, and projects provide a richer container model, so choosing one without a household use case would harden the wrong contract.
