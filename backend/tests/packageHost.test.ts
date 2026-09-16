@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, type AttemptResult } from "@/lib/packageHost";
+import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@/lib/ssrfGuard";
@@ -975,6 +975,23 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
 });
 
 describe("formatSearxngResults", () => {
+  test("reads one scripted page into bounded text, sections, and three sanitized links", () => {
+    const page = parseReadablePage(`
+      <html><head><title>Vendor support</title></head><body><article>
+        <h1>Vendor support</h1><p>Support information for the household.</p>
+        <h2>Download</h2><p>Get the latest driver from this section.</p>
+        <p><a href="/downloads/latest-driver#setup" rel="nofollow">Download latest game driver</a></p>
+        <p><a href="/support/fixes">Support and fixes</a></p>
+        <p><a href="https://example.com/price">Pricing</a></p>
+      </article></body></html>
+    `, "https://example.com/support");
+    expect(page.type).toBe("document");
+    expect(page.text).toContain("latest driver");
+    expect(page.sections).toContainEqual({ heading: "Download", text: "Get the latest driver from this section." });
+    expect(page.links).toHaveLength(3);
+    expect(page.links[0]).toMatchObject({ title: "Download latest game driver", href: "https://example.com/downloads/latest-driver", rel: "nofollow" });
+  });
+
   test("an image search requests the images category and maps img_src to image", async () => {
     let seenUrl = new URL("http://placeholder.invalid");
     const server = Bun.serve({

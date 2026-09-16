@@ -28,7 +28,9 @@
     "type": "object",
     "required": ["expression"],
     "properties": {
-      "expression": { "type": "string", "minLength": 1 }
+      "expression": { "type": "string", "minLength": 1 },
+      "category": { "type": "string", "enum": ["images"] },
+      "read_page": { "type": "boolean" }
     }
   },
   "requires": [],
@@ -47,6 +49,15 @@
       "who": "whichever search engines the household's own SearXNG instance is configured to use",
       "opt_in": true,
       "retention": "controlled entirely by the household's own SearXNG instance"
+    },
+    {
+      "id": "page",
+      "destination": "the page URL named by the household's request",
+      "when": "the household asks what a page says or asks for a link, price, fix, download, or driver on that page",
+      "what": "that one page URL",
+      "who": "the site serving the requested page",
+      "opt_in": true,
+      "retention": "controlled entirely by that site"
     }
   ],
   "permissions": ["integration:searxng", "llm:complete"],

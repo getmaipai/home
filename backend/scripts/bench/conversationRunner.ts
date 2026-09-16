@@ -32,6 +32,7 @@ import { findEntityByName } from "@/lib/subjects";
 import { createRelationship, updateRelationship } from "@/lib/relationships";
 import { listJobs, runDueJobs } from "@/lib/scheduler";
 import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
+import { __setPageReaderForTests, type PageReadResult } from "@/lib/packageHost";
 import { listPending } from "@/lib/notifications";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
@@ -224,9 +225,28 @@ export function startFakeSearxng(): FakeSearxng {
     },
   });
   const url = `http://127.0.0.1:${server.port}`;
+  const page: PageReadResult = {
+    type: "document",
+    attachment_id: "att-page-fake001",
+    url: "https://example.com/page",
+    title: "Vendor support page",
+    text: "The latest driver fix is in the download section. The current price is 349 dollars.",
+    chunks: [{ attachment_id: "att-page-fake001", page: 1, text: "The latest driver fix is in the download section. The current price is 349 dollars." }],
+    links: [
+      { title: "Download latest game driver", href: "https://example.com/downloads/latest-driver", rel: "nofollow", surrounding_text: "Download latest game driver" },
+      { title: "Support and fixes", href: "https://example.com/support/fixes", rel: null, surrounding_text: "Support and fixes" },
+      { title: "Pricing", href: "https://example.com/price", rel: null, surrounding_text: "Current price: 349 dollars" },
+    ],
+    sections: [
+      { heading: "Download", text: "The latest driver fix is in the download section." },
+      { heading: "Support", text: "Support and fixes are listed here." },
+      { heading: "Pricing", text: "The current price is 349 dollars." },
+    ],
+  };
+  __setPageReaderForTests(async (pageUrl) => ({ ...page, url: pageUrl }));
   const set = setHouseholdSettingValue("search.searxng_url", url);
   if (!set.ok) throw new Error(`the fake SearXNG could not set search.searxng_url: ${set.error}`);
-  return { url, queries, stop: () => server.stop(true) };
+  return { url, queries, stop: () => { __setPageReaderForTests(null); server.stop(true); } };
 }
 
 export function startFakeHomeAssistant(): FakeHomeAssistant {

@@ -3466,6 +3466,36 @@ export async function resolveToolCalls(
   }
 }
 
+function pageReadRequested(utterance: string | undefined): boolean {
+  return !!utterance && (/\b(?:page|support|download|driver|price|fix)\b/i.test(utterance) || /\b(?:who|what)\s+is\b/i.test(utterance));
+}
+
+export function selectPageLinkFor(page: unknown, expression: string): { title: string; href: string; surrounding_text: string | null } | null {
+  if (!page || typeof page !== "object" || !Array.isArray((page as { links?: unknown }).links)) return null;
+  const stopWords = new Set(["the", "a", "an", "for", "on", "that", "page", "official", "please", "what", "does", "say", "is"]);
+  const fieldWords = expression.toLowerCase().match(/[a-z0-9]+/g)?.filter((word) => !stopWords.has(word) && word.length > 2) ?? [];
+  const links = (page as { links: unknown[] }).links.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const link = raw as { title?: unknown; href?: unknown; surrounding_text?: unknown };
+    if (typeof link.title !== "string" || typeof link.href !== "string") return [];
+    const haystack = `${link.title} ${link.href} ${typeof link.surrounding_text === "string" ? link.surrounding_text : ""}`.toLowerCase();
+    const score = fieldWords.reduce((total, word) => total + (haystack.includes(word) ? 1 : 0), 0);
+    return score > 0 ? [{ link: { title: link.title, href: link.href, surrounding_text: typeof link.surrounding_text === "string" ? link.surrounding_text : null }, score }] : [];
+  });
+  links.sort((a, b) => b.score - a.score);
+  return links[0]?.link ?? null;
+}
+
+const pageLinkFor = selectPageLinkFor;
+
+function pageSource(page: unknown): ReturnType<typeof sourcesFromRows> {
+  if (!page || typeof page !== "object") return [];
+  const value = page as { title?: unknown; url?: unknown; text?: unknown };
+  return typeof value.title === "string" && typeof value.url === "string"
+    ? sourcesFromRows([{ title: value.title, url: value.url, snippet: typeof value.text === "string" ? value.text.slice(0, 300) : null }])
+    : [];
+}
+
 async function resolveToolCallsInOrder(
   calls: ToolCall[],
   // The exact candidates actually SENT to the model as `tools`
@@ -3636,7 +3666,13 @@ async function resolveToolCallsInOrder(
   // Two independent calls, run in parallel - never chained (a result
   // feeding another is a recipe, not this step's job).
   const ran = await Promise.all(
-    runnable.map(async (c) => ({ call: c, result: await runPlugin(c.tool, actor, (c.args ?? {}) as Record<string, unknown>, turnId) })),
+    runnable.map(async (c) => ({
+      call: c,
+      result: await runPlugin(c.tool, actor, {
+        ...((c.args ?? {}) as Record<string, unknown>),
+        ...(c.tool === "websearch" && pageReadRequested(utterance) ? { read_page: true } : {}),
+      }, turnId),
+    })),
   );
   // #93: a recall the MODEL asked for that found nothing is a miss, not
   // an answer. The recipe language has no conditional, so the recall
@@ -4016,7 +4052,7 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
   const searched = outcomes.some((o) => o.packageId === "websearch" && o.via === "forced");
   if (!resolved && lookupIds.has("websearch") && !searched && expression) {
     console.log(searchDirect ? `[turn] the forced lookup on turn ${prepared.turnId} is the search with the engine's query (${prepared.lookupTools.length === 1 ? "the only lookup tool" : "the budget's last call is the composition's"})` : `[turn] the forced lookup's first rung answered nothing on turn ${prepared.turnId}; the search runs next`);
-    const searchArgs = engineWebsearchArgs(expression, searchDeliverable);
+    const searchArgs = { ...engineWebsearchArgs(expression, searchDeliverable), ...(pageReadRequested(text) ? { read_page: true } : {}) };
     const result = await runPlugin("websearch", actor, searchArgs, prepared.turnId);
     outcomes.push(
       outcomeOf(
@@ -4025,7 +4061,17 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
           : { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "failed", args: searchArgs, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
       ),
     );
-    if (result.ok) { const rows = result.value.data && typeof result.value.data === "object" ? (result.value.data as { rows?: unknown }).rows : undefined; const sources = sourcesFromRows(rows); const first = Array.isArray(rows) ? rows.find((row) => row && typeof row === "object" && typeof (row as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null; url?: string } | undefined : undefined; resolved = { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}), ...(first && searchDeliverable === "picture" ? { media: { kind: "image" as const, url: first.image, thumbnail: first.thumbnail ?? null, source: first.url ? new URL(first.url).host : new URL(sources[0]!.url).host, ...(first.url ? { source_url: first.url } : {}) } } : {}) }; }
+    if (result.ok) {
+      const data = result.value.data && typeof result.value.data === "object" ? result.value.data as { rows?: unknown; page?: unknown } : {};
+      const rows = data.rows;
+      const page = data.page;
+      const selectedLink = denialDeliverable === "link" ? pageLinkFor(page, expression) : null;
+      const linkSources = selectedLink ? sourcesFromRows([{ title: selectedLink.title, url: selectedLink.href, snippet: selectedLink.surrounding_text }]) : [];
+      const sources = [...linkSources, ...sourcesFromRows(rows), ...pageSource(page)];
+      const first = Array.isArray(rows) ? rows.find((row) => row && typeof row === "object" && typeof (row as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null; url?: string } | undefined : undefined;
+      const reply = denialDeliverable === "link" && page && !selectedLink && prepared.turnContext.ageBand !== "child" ? { text: "The page does not have that." } : result.value.reply ?? { text: COMPOSE_FALLBACK_LINE };
+      resolved = { reply, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}), ...(first && searchDeliverable === "picture" && sources[0] ? { media: { kind: "image" as const, url: first.image, thumbnail: first.thumbnail ?? null, source: first.url ? new URL(first.url).host : new URL(sources[0]!.url).host, ...(first.url ? { source_url: first.url } : {}) } } : {}) };
+    }
   }
   if (resolved) prepared.lookupExpression = expression;
   if (resolved && searchDeliverable === "picture" && !resolved.media) {

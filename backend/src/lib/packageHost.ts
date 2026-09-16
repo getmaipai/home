@@ -68,6 +68,9 @@ import { cachedFetch } from "@/lib/packageCache";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
+import { createHash } from "node:crypto";
+import { parseHTML } from "linkedom";
+import { Readability } from "@mozilla/readability";
 
 // host.fetch's real network I/O settings (2026-09-05). Rate limit: "a
 // page every few seconds, not dozens a second" (.github/CLAUDE.md) - a
@@ -617,8 +620,8 @@ export function formatSearxngResults(data: unknown, count = 5): string {
  * (a real API answering plain text is not a fetch failure); and Wikipedia
  * answers a direct-topic query via `infoboxes`, not `results` (see
  * `formatSearxngResults`). */
-export async function searxngSearch(args: unknown): Promise<{ text: string; rows: { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null }[] }> {
-  const input = args as { query?: unknown; category?: unknown } | undefined;
+export async function searxngSearch(args: unknown): Promise<{ text: string; rows: { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null }[]; page?: PageReadResult }> {
+  const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
   const query = input?.query;
   if (typeof query !== "string" || query.length === 0) {
     throw new HostError("invalid_input", `searxng search needs a string "query" argument`);
@@ -647,9 +650,165 @@ export async function searxngSearch(args: unknown): Promise<{ text: string; rows
       if (typeof row.title !== "string" || typeof row.url !== "string") return [];
       try { const parsed = new URL(row.url); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return []; parsed.username = ""; parsed.password = ""; parsed.hash = ""; const safeUrl = (value: unknown) => { if (typeof value !== "string") return null; try { const parsed = new URL(value); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null; parsed.username = ""; parsed.password = ""; parsed.hash = ""; return parsed.toString(); } catch { return null; } }; return [{ title: row.title, url: parsed.toString(), snippet: typeof row.content === "string" ? row.content : null, ...(input?.category === "images" ? { image: safeUrl(row.img_src), thumbnail: safeUrl(row.thumbnail_src) } : {}) }]; } catch { return []; }
     }) : [];
-    return { text: formatSearxngResults(value), rows };
+    const page = input?.read_page === true && rows[0] ? await searxngPageRead({ url: rows[0].url }) : undefined;
+    return { text: formatSearxngResults(value), rows, ...(page ? { page } : {}) };
   }
   throw result.error;
+}
+
+export interface PageReadLink {
+  title: string;
+  href: string;
+  rel: string | null;
+  surrounding_text: string | null;
+}
+
+export interface PageReadSection {
+  heading: string;
+  text: string;
+}
+
+export interface PageReadResult {
+  type: "document";
+  attachment_id: string;
+  url: string;
+  title: string;
+  text: string;
+  chunks: { attachment_id: string; page: number; text: string }[];
+  links: PageReadLink[];
+  sections: PageReadSection[];
+}
+
+let pageReaderForTests: ((url: string) => Promise<PageReadResult>) | null = null;
+
+export function __setPageReaderForTests(reader: ((url: string) => Promise<PageReadResult>) | null): void {
+  pageReaderForTests = reader;
+}
+
+function pageAttachmentId(url: string): string {
+  return `att-page-${createHash("sha256").update(url).digest("hex").slice(0, 12)}`;
+}
+
+async function validatePublicPageUrl(value: string): Promise<void> {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new HostError("invalid_input", "page.read needs a valid URL");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new HostError("invalid_input", "page.read only supports http and https URLs");
+  try {
+    await assertNotPrivateHost(parsed.hostname);
+  } catch (err) {
+    if (err instanceof SsrfBlockedError) throw new HostError("invalid_input", err.message);
+    throw new HostError("network_unreachable", `could not resolve ${parsed.hostname}`);
+  }
+}
+
+function robotsAllows(robots: string, target: URL): boolean {
+  let applies = false;
+  let allowed = true;
+  for (const rawLine of robots.split(/\r?\n/)) {
+    const line = rawLine.replace(/#.*/, "").trim();
+    const separator = line.indexOf(":");
+    if (separator < 0) continue;
+    const name = line.slice(0, separator).trim().toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    if (name === "user-agent") applies = value === "*";
+    else if (applies && name === "disallow" && value && target.pathname.startsWith(value)) allowed = false;
+    else if (applies && name === "allow" && value && target.pathname.startsWith(value)) allowed = true;
+  }
+  return allowed;
+}
+
+async function pageFetch(url: string): Promise<AttemptResult> {
+  if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
+  await validatePublicPageUrl(url);
+  return attemptHttpFetch(
+    url,
+    "GET",
+    { accept: "text/html,application/xhtml+xml" },
+    undefined,
+    SEARXNG_TIMEOUT_MS,
+    async (hopUrl) => validatePublicPageUrl(hopUrl),
+  );
+}
+
+function pageFailure(result: AttemptResult, url: string): never {
+  if (result.status === 403 || result.status === 429) throw new HostError("network_unreachable", `The site declined the page request for ${url}.`);
+  throw result.error ?? new HostError("network_unreachable", `could not reach ${url}`);
+}
+
+/** Parse one fetched page without making another network request. Kept
+ * separate so the bounded document and link contract can be tested with a
+ * scripted page, independent of DNS and the public-host guard. */
+export function parseReadablePage(html: string, url: string): PageReadResult {
+  const sourceDocument = parseHTML(html).document as any;
+  const article = new Readability(sourceDocument).parse();
+  const readableDocument = article?.content ? parseHTML(article.content).document as any : sourceDocument;
+  const attachmentId = pageAttachmentId(url);
+  const text = String(article?.textContent ?? readableDocument.body?.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 32_000);
+  if (!text) throw new HostError("network_unreachable", `The page at ${url} did not contain readable text.`);
+  const links: PageReadLink[] = Array.from(readableDocument.querySelectorAll("a")).slice(0, 64).flatMap((node: any) => {
+    const rawHref = node.getAttribute("href");
+    const title = String(node.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (!rawHref || !title) return [];
+    try {
+      const href = new URL(rawHref, url);
+      if (href.protocol !== "http:" && href.protocol !== "https:") return [];
+      href.username = "";
+      href.password = "";
+      href.hash = "";
+      const parentText = String(node.parentElement?.textContent ?? "").replace(/\s+/g, " ").trim();
+      return [{ title: title.slice(0, 300), href: href.toString(), rel: node.getAttribute("rel"), surrounding_text: parentText ? parentText.slice(0, 500) : null }];
+    } catch {
+      return [];
+    }
+  });
+  const sections: PageReadSection[] = Array.from(readableDocument.querySelectorAll("h1,h2,h3")).slice(0, 8).flatMap((node: any) => {
+    const heading = String(node.textContent ?? "").replace(/\s+/g, " ").trim();
+    let sibling = node.nextElementSibling;
+    while (sibling && !String(sibling.textContent ?? "").trim()) sibling = sibling.nextElementSibling;
+    const sectionText = String(sibling?.querySelector?.("p")?.textContent ?? sibling?.textContent ?? "").replace(/\s+/g, " ").trim();
+    return heading && sectionText ? [{ heading: heading.slice(0, 300), text: sectionText.slice(0, 1200) }] : [];
+  });
+  return {
+    type: "document",
+    attachment_id: attachmentId,
+    url,
+    title: String(article?.title ?? sourceDocument.title ?? url).trim().slice(0, 300),
+    text,
+    chunks: [{ attachment_id: attachmentId, page: 1, text: text.slice(0, 4_000) }],
+    links,
+    sections,
+  };
+}
+
+/** Read one user-requested page through the same SearXNG service budget.
+ * Linkedom is ISC-licensed and Mozilla Readability is Apache-2.0, both
+ * compatible with this AGPL-3.0 package. Cheerio plus an HTML-to-text
+ * helper was rejected because it would leave article extraction as a
+ * second parser surface. */
+export async function searxngPageRead(args: unknown): Promise<PageReadResult> {
+  const url = (args as { url?: unknown } | undefined)?.url;
+  if (typeof url !== "string" || url.length === 0) throw new HostError("invalid_input", "page.read needs a string \"url\" argument");
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new HostError("invalid_input", "page.read needs a valid URL");
+  }
+  if (pageReaderForTests) return pageReaderForTests(url);
+  const origin = parsedUrl.origin;
+  const robotsResult = await pageFetch(`${origin}/robots.txt`);
+  if (!robotsResult.ok && robotsResult.status !== 404) pageFailure(robotsResult, `${origin}/robots.txt`);
+  if (robotsResult.ok && typeof robotsResult.value === "string" && !robotsAllows(robotsResult.value, parsedUrl)) {
+    throw new HostError("network_unreachable", `The site's robots.txt declined the page request for ${url}.`);
+  }
+  const result = await pageFetch(url);
+  if (!result.ok) pageFailure(result, url);
+  if (typeof result.value !== "string") throw new HostError("network_unreachable", `The site did not return readable HTML for ${url}.`);
+  return parseReadablePage(result.value, url);
 }
 
 /** The settings lookup, rate limit, and real call shared by every real
@@ -934,6 +1093,9 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         }
         if (id === "searxng" && method === "search") {
           return searxngSearch(args);
+        }
+        if (id === "searxng" && method === "page.read") {
+          return searxngPageRead(args);
         }
         notImplemented("integration.call");
       },

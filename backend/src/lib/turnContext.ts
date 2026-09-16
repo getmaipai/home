@@ -187,6 +187,19 @@ export function outcomeText(outcome: Pick<ToolExecutionOutcome, "result" | "user
           if (typeof title === "string") parts.push(title);
           if (typeof snippet === "string") parts.push(snippet);
         }
+      } else if (key === "page" && value && typeof value === "object") {
+        const page = value as { title?: unknown; text?: unknown; sections?: unknown };
+        if (typeof page.title === "string") parts.push(page.title);
+        if (typeof page.text === "string") parts.push(page.text.slice(0, 8_000));
+        if (Array.isArray(page.sections)) {
+          for (const section of page.sections.slice(0, 8)) {
+            if (!section || typeof section !== "object") continue;
+            const heading = (section as { heading?: unknown }).heading;
+            const text = (section as { text?: unknown }).text;
+            if (typeof heading === "string") parts.push(heading);
+            if (typeof text === "string") parts.push(text);
+          }
+        }
       } else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
         parts.push(`${key}: ${value}`);
       }
@@ -412,12 +425,12 @@ export function emptyTimings(): TurnTimings {
 }
 
 const DETAIL_PHRASES = [/\bin detail\b/i, /\bdetailed explanation\b/i, /\bstep by step\b/i];
-export const LINK_DELIVERABLE_PHRASES = [/\ba link\b/i, /\bthe link\b/i, /\blink me\b/i, /\ba url\b/i, /\bthe url\b/i, /\bthe page\b/i, /\bthe support page\b/i, /\bthe source\b/i, /\bwhere did you read that\b/i, /\bwhere can i (?:read|watch|buy|find|see) (?:it|that|this|more)\b/i, /\bsend me the (?:page|link|article)\b/i];
+export const LINK_DELIVERABLE_PHRASES = [/\ba link\b/i, /\bthe link\b/i, /\bdownload link\b/i, /\blink me\b/i, /\ba url\b/i, /\bthe url\b/i, /\bthe page\b/i, /\bthe support page\b/i, /\bthe source\b/i, /\bwhere did you read that\b/i, /\bwhere can i (?:read|watch|buy|find|see) (?:it|that|this|more)\b/i, /\bsend me the (?:page|link|article)\b/i];
 const PICTURE_FOLLOWUP_RE = /\b(?:show me more|show me others|any others|more like that|different ones)\b/i;
 // First classifier candidate under the org rule: keep every picture form in
 // this one typed reader; its first labels are the visual-artifact phrasings
 // named by the brief. A second list in routing would let them drift apart.
-export const PICTURE_DELIVERABLE_PHRASES = [/\b(?:pictures?|photos?|images?)\b/i, /\b(?:movie\s+)?posters?\b/i, /\balbum\s+covers?\b/i, /\bartwork\b/i, /\bshow me (?:it|what it looks like)\b/i, /\bwhat does (?:it|he|she) look like\b/i, PICTURE_FOLLOWUP_RE];
+export const PICTURE_DELIVERABLE_PHRASES = [/\b(?:pictures?|photos?|images?)\b/i, /\b(?:movie\s+)?posters?\b/i, /\balbum\s+covers?\b/i, /\bartwork\b/i, /\ba picture\b/i, /\ba photo\b/i, /\bgot a photo\b/i, /\ban image\b/i, /\bshow me (?:it|what it looks like)\b/i, /\bwhat does (?:it|he|she) look like\b/i, PICTURE_FOLLOWUP_RE];
 export const VIDEO_DELIVERABLE_PHRASES = [/\ba video\b/i, /\bany video\b/i, /\bthe trailer\b/i, /\ba clip\b/i, /\bsend me the video\b/i, /\bshow me the video\b/i];
 
 export function isPictureFollowup(utterance: string): boolean {
@@ -457,8 +470,9 @@ export function deliverableInDenial(sentence: string): "link" | "picture" | "vid
 
 export function intentFor(utterance: string, signal: TurnSignal): TurnIntent {
   const shape = shapeOf(signal, utterance);
+  const asksPageContent = /\b(?:what does|what(?:'s| is)|how much).{0,80}\bpage\b.*\b(?:say|fix|price|cost|value|on)\b/i.test(utterance);
   const picture = pictureDeliverableFor(utterance);
-  const deliverable = VIDEO_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "video" : picture ?? (LINK_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "link" : undefined);
+  const deliverable = asksPageContent ? undefined : VIDEO_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "video" : picture ?? (LINK_DELIVERABLE_PHRASES.some((re) => re.test(utterance)) ? "link" : undefined);
   return {
     kind: shape === "question" ? "lookup" : shape === "command" ? "action" : "chat",
     query: utterance,

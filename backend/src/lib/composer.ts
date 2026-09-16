@@ -271,7 +271,9 @@ export function renderLookupRows(outcomes: readonly ToolExecutionOutcome[], shap
 }
 
 function documentOutcome(outcome: Succeeded): DocumentOutcome | null {
-  const data = recordData(outcome.result?.data);
+  const root = recordData(outcome.result?.data);
+  const page = root && recordData(root.page);
+  const data = root && root.type === "document" ? root : page;
   if (!data || data.type !== "document" || typeof data.attachment_id !== "string" || !/^att-[a-z0-9]{6,}$/.test(data.attachment_id) || !Array.isArray(data.chunks)) return null;
   const chunks: DocumentOutcome["chunks"] = [];
   let total = 0;
@@ -289,12 +291,16 @@ function documentOutcome(outcome: Succeeded): DocumentOutcome | null {
 }
 
 function documentSource(outcome: Succeeded, chunk: DocumentOutcome["chunks"][number]): Source {
+  const data = recordData(outcome.result?.data);
+  const page = data && recordData(data.page);
+  const pageUrl = page && typeof page.url === "string" ? page.url : null;
+  const pageTitle = page && typeof page.title === "string" ? page.title : null;
   return {
     id: `src-${randomSuffix(10)}`,
     kind: "package",
-    title: `Document page ${chunk.page}`,
-    url: `attachment://${chunk.attachment_id}/page/${chunk.page}`,
-    site: "MaiPai Home",
+    title: pageTitle ?? `Document page ${chunk.page}`,
+    url: pageUrl ?? `attachment://${chunk.attachment_id}/page/${chunk.page}`,
+    site: pageUrl ? new URL(pageUrl).hostname.replace(/^www\./, "") : "MaiPai Home",
     snippet: chunk.text.slice(0, 300),
     source: outcome.callId,
     created_at: outcome.at ?? new Date().toISOString(),
@@ -359,7 +365,9 @@ function documentSection(outcome: Succeeded, sourceList: readonly Source[]): Ext
   const requestedPage = typeof outcome.args?.page === "number" && Number.isInteger(outcome.args.page) ? outcome.args.page : null;
   const chunks = requestedPage === null ? document.chunks : document.chunks.filter((chunk) => chunk.page === requestedPage);
   const rendered = chunks.flatMap((chunk) => {
-    const url = `attachment://${chunk.attachment_id}/page/${chunk.page}`;
+    const data = recordData(outcome.result?.data);
+    const page = data && recordData(data.page);
+    const url = page && typeof page.url === "string" ? page.url : `attachment://${chunk.attachment_id}/page/${chunk.page}`;
     const source = sourceList.find((candidate) => candidate.url === url);
     return source ? [{ attachment_id: chunk.attachment_id, page: chunk.page, text: chunk.text, source_id: source.id }] : [];
   });

@@ -18,6 +18,7 @@ import {
   StreamSafetyRefusal,
   buildSystemPrompt,
   buildStablePrefix,
+  selectPageLinkFor,
   matchPattern,
   capSection,
   route,
@@ -61,6 +62,27 @@ import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
+
+describe("PAGE-01 page link selection", () => {
+  const page = {
+    links: [
+      { title: "Download latest game driver", href: "https://example.com/downloads/latest-driver", surrounding_text: "Get the current driver here." },
+      { title: "Support and fixes", href: "https://example.com/support/fixes", surrounding_text: "Troubleshooting instructions." },
+      { title: "Pricing", href: "https://example.com/price", surrounding_text: "The current price is listed here." },
+    ],
+  };
+
+  test("download-link-on-page selects the matching href", () => {
+    expect(selectPageLinkFor(page, "the download link for the latest game driver")).toMatchObject({
+      title: "Download latest game driver",
+      href: "https://example.com/downloads/latest-driver",
+    });
+  });
+
+  test("page-without-requested-link returns null for a missing field", () => {
+    expect(selectPageLinkFor(page, "the warranty registration form")).toBeNull();
+  });
+});
 
 // A PersonRow with no DB row behind it, for the buildSystemPrompt() unit
 // tests below that only need a shaped actor to render the speaker block,
