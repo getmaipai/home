@@ -176,7 +176,7 @@ describe("record fixtures validate against their generated Zod models", () => {
     expect(() => ReplyFeedback.parse(loadFixture("reply-feedback.example.json"))).not.toThrow();
   });
 
-  for (const kind of ["lookup", "card", "procedure", "comparison"]) {
+  for (const kind of ["lookup", "card", "procedure", "comparison", "document"]) {
     test(`turn-artifact.${kind}.example.json`, () => {
       expect(() => TurnArtifact.parse(loadFixture(`turn-artifact.${kind}.example.json`))).not.toThrow();
     });

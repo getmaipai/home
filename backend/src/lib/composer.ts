@@ -24,7 +24,7 @@
 // turn's counter and, with the second call spent, composes without a
 // model call: the direct reply when an outcome has one, else the fixed
 // fallback.
-import { sourcesFromRows, type ToolExecutionOutcome } from "@/lib/turnContext";
+import { sourcesFromRows, type DocumentOutcome, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { LlmMessage } from "@/lib/llm";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { ToolCallWire } from "@maipai/spec/llm/ts/types.js";
@@ -113,6 +113,10 @@ type ChildLookup = Omit<Extract<ArtifactSection, { type: "lookup" }>, "results">
 type ChildCard = Omit<Extract<ArtifactSection, { type: "card" }>, "source_id">;
 type ChildSection = ChildLookup | ChildCard | Extract<ArtifactSection, { type: "procedure" }> | Extract<ArtifactSection, { type: "comparison" }>;
 
+const MAX_DOCUMENT_CHUNKS = 32;
+const MAX_DOCUMENT_CHUNK_CHARS = 4000;
+const MAX_DOCUMENT_CONTEXT_CHARS = 32_000;
+
 /** The audience projection used by the child chat. It is intentionally not
  * a TurnArtifact: the spec record requires citations, while child delivery
  * strips the citations and the section links that point at them. */
@@ -141,6 +145,38 @@ function dataCandidates(outcome: Succeeded): RecordData[] {
   if (!data) return [];
   const nested = recordData(data.result) ?? recordData(data.record);
   return nested ? [data, nested] : [data];
+}
+
+function documentOutcome(outcome: Succeeded): DocumentOutcome | null {
+  const data = recordData(outcome.result?.data);
+  if (!data || data.type !== "document" || typeof data.attachment_id !== "string" || !/^att-[a-z0-9]{6,}$/.test(data.attachment_id) || !Array.isArray(data.chunks)) return null;
+  const chunks: DocumentOutcome["chunks"] = [];
+  let total = 0;
+  for (const raw of data.chunks.slice(0, MAX_DOCUMENT_CHUNKS)) {
+    const chunk = recordData(raw);
+    const text = chunk && typeof chunk.text === "string" ? chunk.text.trim() : "";
+    const page = chunk && typeof chunk.page === "number" ? chunk.page : NaN;
+    if (!chunk || chunk.attachment_id !== data.attachment_id || !Number.isInteger(page) || page < 1 || !text) continue;
+    const bounded = text.slice(0, MAX_DOCUMENT_CHUNK_CHARS);
+    if (total + bounded.length > MAX_DOCUMENT_CONTEXT_CHARS) break;
+    chunks.push({ attachment_id: data.attachment_id, page, text: bounded });
+    total += bounded.length;
+  }
+  return chunks.length > 0 ? { type: "document", attachment_id: data.attachment_id, chunks } : null;
+}
+
+function documentSource(outcome: Succeeded, chunk: DocumentOutcome["chunks"][number]): Source {
+  return {
+    id: `src-${randomSuffix(10)}`,
+    kind: "package",
+    title: `Document page ${chunk.page}`,
+    url: `attachment://${chunk.attachment_id}/page/${chunk.page}`,
+    site: "MaiPai Home",
+    snippet: chunk.text.slice(0, 300),
+    source: outcome.callId,
+    created_at: outcome.at ?? new Date().toISOString(),
+    hlc: nextHlc(),
+  };
 }
 
 function textField(record: RecordData, ...keys: string[]): string | null {
@@ -183,6 +219,8 @@ function sourceFromOutcome(outcome: Succeeded): Source | null {
 
 function sourceRows(outcomes: readonly Succeeded[]): Source[] {
   const all = outcomes.flatMap((outcome) => {
+    const document = documentOutcome(outcome);
+    if (document) return document.chunks.map((chunk) => documentSource(outcome, chunk));
     const explicit = outcome.sources ?? [];
     const rows = dataCandidates(outcome).flatMap((data) => Array.isArray(data.rows) ? data.rows : []);
     return explicit.length > 0 ? explicit : [...sourcesFromRows(rows), ...(rows.length === 0 ? [sourceFromOutcome(outcome)] : [])].filter((source): source is Source => source !== null);
@@ -190,6 +228,19 @@ function sourceRows(outcomes: readonly Succeeded[]): Source[] {
   const byUrl = new Map<string, Source>();
   for (const source of all) if (!byUrl.has(source.url)) byUrl.set(source.url, source);
   return [...byUrl.values()];
+}
+
+function documentSection(outcome: Succeeded, sourceList: readonly Source[]): Extract<ArtifactSection, { type: "document" }> | null {
+  const document = documentOutcome(outcome);
+  if (!document) return null;
+  const requestedPage = typeof outcome.args?.page === "number" && Number.isInteger(outcome.args.page) ? outcome.args.page : null;
+  const chunks = requestedPage === null ? document.chunks : document.chunks.filter((chunk) => chunk.page === requestedPage);
+  const rendered = chunks.flatMap((chunk) => {
+    const url = `attachment://${chunk.attachment_id}/page/${chunk.page}`;
+    const source = sourceList.find((candidate) => candidate.url === url);
+    return source ? [{ attachment_id: chunk.attachment_id, page: chunk.page, text: chunk.text, source_id: source.id }] : [];
+  });
+  return rendered.length > 0 ? { type: "document", attachment_id: document.attachment_id, chunks: rendered } : null;
 }
 
 function stringList(value: unknown): string[] {
@@ -323,6 +374,7 @@ export function buildDocument(input: DocumentBuildInput): TurnArtifactValue | nu
   const section = succeeded.map((outcome) => cardSection(outcome, sources)).find((candidate): candidate is Extract<ArtifactSection, { type: "card" }> => candidate !== null)
     ?? succeeded.map(procedureSection).find((candidate): candidate is Extract<ArtifactSection, { type: "procedure" }> => candidate !== null)
     ?? succeeded.map(comparisonSection).find((candidate): candidate is Extract<ArtifactSection, { type: "comparison" }> => candidate !== null)
+    ?? succeeded.map((outcome) => documentSection(outcome, sources)).find((candidate): candidate is Extract<ArtifactSection, { type: "document" }> => candidate !== null)
     ?? succeeded.map((outcome) => lookupSection(outcome, sources)).find((candidate): candidate is Extract<ArtifactSection, { type: "lookup" }> => candidate !== null);
   if (!section) return null;
   const evidenceVersion = documentEvidenceVersion(input.outcomes);
@@ -344,24 +396,28 @@ export function buildDocument(input: DocumentBuildInput): TurnArtifactValue | nu
   return parsed.success ? parsed.data : null;
 }
 
-function withoutSourceLinks(section: ArtifactSection): ChildSection {
+function withoutSourceLinks(section: ArtifactSection): ChildSection | null {
   if (section.type === "lookup") return { type: "lookup", query: section.query, results: section.results.map((result: { title: string; line: string; source_id: string }) => ({ title: result.title, line: result.line })) };
   if (section.type === "card") {
     if (section.kind === "film") return { type: "card", kind: section.kind, name: section.name, year: section.year, director: section.director, genres: section.genres };
     if (section.kind === "person") return { type: "card", kind: section.kind, name: section.name, occupation: section.occupation, known_for: section.known_for };
     return { type: "card", kind: section.kind, name: section.name, region: section.region, country: section.country };
   }
+  if (section.type === "document") return null;
   return section;
 }
 
 /** Projects a document for a child without widening its already-filtered
  * content ceiling. Citations and links are removed from delivery. */
-export function projectDocument(document: TurnArtifactValue, ageBand: AgeBand): TurnArtifactValue | ChildTurnArtifact {
+export function projectDocument(document: TurnArtifactValue, ageBand: AgeBand): TurnArtifactValue | ChildTurnArtifact | null {
   if (ageBand !== "child") return document;
-  return { ...document, sources: [], section: withoutSourceLinks(document.section) };
+  return projectDocumentForChild(document);
 }
 
-export const projectDocumentForChild = (document: TurnArtifactValue): ChildTurnArtifact => projectDocument(document, "child") as ChildTurnArtifact;
+export function projectDocumentForChild(document: TurnArtifactValue): ChildTurnArtifact | null {
+  const section = withoutSourceLinks(document.section);
+  return section ? { ...document, sources: [], section } : null;
+}
 
 /** The decision, made without a model call. A `composition` plan
  * carries the messages to send and the fallback text; everything else

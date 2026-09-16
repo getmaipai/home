@@ -6485,15 +6485,14 @@ approvals are still real, unstarted work for a future session.
             oversized and failed input returns safe typed errors without
             exposing upload bytes. Exit: `backend/tests/
             documentExtraction.test.ts` and `bash scripts/check.sh`.
-      - [ ] **ATT-01c: document outcome and composer path** (mechanical).
-            Add the typed `document` outcome, bounded page chunks and
-            source-backed page citations in the turn engine, mirroring
-            retained package outcomes and COMP-01's document record.
-            Acceptance: "summarize this" and a page question use the same
-            outcome path, selection respects the context budget, citations
-            name the page, and the COMP-01 document is revisioned without
-            duplicating extracted prose. Exit: spec, turn-engine and
-            composer tests, then `bash scripts/check.sh`.
+      - [x] **ATT-01c: document outcome and composer path** (mechanical,
+            landed 2026-09-16). Added the typed `document` artifact section,
+            bounded retained page chunks, local page citations, page
+            selection and same-subject evidence revisioning through the
+            existing COMP-01 builder. Extracted prose stays in the retained
+            outcome input, and child delivery does not expose the document.
+            Exit: spec, turn-engine and composer tests, then
+            `bash scripts/check.sh`.
       - [ ] **ATT-01d: image attachment adapter and vision capability**
             (mechanical, with the engine decision kept explicit). Wire the
             assistant-ui `AttachmentAdapter` shape and local image record,

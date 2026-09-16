@@ -230,6 +230,33 @@ export const TurnArtifact = z
               .min(1),
           })
           .strict(),
+        z
+          .object({
+            type: z.literal("document"),
+            attachment_id: z.string().regex(new RegExp("^att-[a-z0-9]{6,}$")),
+            chunks: z
+              .array(
+                z
+                  .object({
+                    attachment_id: z
+                      .string()
+                      .regex(new RegExp("^att-[a-z0-9]{6,}$")),
+                    page: z.number().int().gte(1),
+                    text: z.string().min(1).max(4000),
+                    /**The id of a citation in the document's top-level sources array.*/
+                    source_id: z
+                      .string()
+                      .regex(new RegExp("^src-[a-z0-9]{6,}$"))
+                      .describe(
+                        "The id of a citation in the document's top-level sources array.",
+                      ),
+                  })
+                  .strict(),
+              )
+              .min(1)
+              .max(32),
+          })
+          .strict(),
       ];
       const { errors, failed } = schemas.reduce<{
         errors: z.core.$ZodIssue[];

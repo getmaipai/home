@@ -6,6 +6,8 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import {
   runTurn,
+  buildDocumentForTurn,
+  projectDocumentForAudience,
   applyOutputBoundary,
   StreamUnavailable,
   runTurnStream,
@@ -95,6 +97,32 @@ describe("CHAT-16 K7 picture lookup output", () => {
     const value: TurnValue = { reply: { text: "Here is the picture." }, source: "plugin", plugin_id: "websearch", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-15T00:00:00Z" }, conversation_id: "conv-k7", turn_id: "turn-k7", media: { kind: "image", url: "https://img.example.com/full.jpg", thumbnail: "https://img.example.com/thumb.jpg", source: "example.com" }, sources: [{ id: "s1", kind: "web", title: "Photo", url: "https://example.com/one", site: "example.com", snippet: null, source: "turn-k7", created_at: "2026-09-15T00:00:00Z", hlc: "1:0:test" }, { id: "s2", kind: "web", title: "Second", url: "https://example.com/two", site: "example.com", snippet: null, source: "turn-k7", created_at: "2026-09-15T00:00:00Z", hlc: "1:0:test" }] };
     expect(applyOutputBoundary(fakeActor(), value).media).toEqual(value.media);
     expect(applyOutputBoundary(fakeActor(), value).sources).toHaveLength(2);
+  });
+});
+
+describe("ATT-01c document outcome delivery", () => {
+  test("the turn engine builds one bounded document and withholds it from child delivery", () => {
+    const outcome = {
+      callId: "call-document",
+      packageId: "documents",
+      status: "succeeded",
+      args: { page: 3 },
+      result: {
+        actions: [],
+        data: {
+          type: "document",
+          attachment_id: "att-document123",
+          chunks: [
+            { attachment_id: "att-document123", page: 1, text: "Page one." },
+            { attachment_id: "att-document123", page: 3, text: "Page three." },
+          ],
+        },
+      },
+    } as ToolExecutionOutcome;
+    const document = buildDocumentForTurn({ turnId: "turn-document123", outcomes: [outcome] });
+    if (!document) throw new Error("expected a document");
+    expect(document.section).toMatchObject({ type: "document", chunks: [{ page: 3, text: "Page three." }] });
+    expect(projectDocumentForAudience(document, "child")).toBeNull();
   });
 });
 

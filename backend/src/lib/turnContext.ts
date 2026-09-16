@@ -141,6 +141,21 @@ export interface ToolExecutionOutcome {
   sources?: Source[];
 }
 
+/** ATT-01c: the bounded, retained input to COMP-01's document builder.
+ * Chunks carry only attachment identity, page and extracted text. The
+ * composer adds a source id when it turns them into a details artifact. */
+export interface DocumentChunk {
+  attachment_id: string;
+  page: number;
+  text: string;
+}
+
+export interface DocumentOutcome {
+  type: "document";
+  attachment_id: string;
+  chunks: DocumentChunk[];
+}
+
 /** Stamps the time and, from a succeeded result, the citation fields,
  * so every producer records the same shape. */
 export function outcomeOf(partial: Omit<ToolExecutionOutcome, "at"> & { at?: string }): ToolExecutionOutcome {
@@ -159,7 +174,13 @@ export function outcomeText(outcome: Pick<ToolExecutionOutcome, "result" | "user
   const data = outcome.result?.data;
   if (data && typeof data === "object") {
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-      if (key === "rows" && Array.isArray(value)) {
+      if (key === "chunks" && Array.isArray(value) && (data as Record<string, unknown>).type === "document") {
+        for (const chunk of value.slice(0, 32)) {
+          if (!chunk || typeof chunk !== "object") continue;
+          const text = (chunk as { text?: unknown }).text;
+          if (typeof text === "string" && text.trim()) parts.push(text.slice(0, 4000));
+        }
+      } else if (key === "rows" && Array.isArray(value)) {
         for (const row of value.slice(0, 8)) {
           if (!row || typeof row !== "object") continue;
           const { title, snippet } = row as { title?: unknown; snippet?: unknown };

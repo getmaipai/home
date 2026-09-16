@@ -263,11 +263,11 @@ describe("COMP-01 typed document builders", () => {
     created_at: "2026-09-16T12:00:00.000Z",
     hlc: "1789550400000:0:hub001",
   });
-  const typedOutcome = (data: Record<string, unknown>, id = "src-document123") => outcome({
+  const typedOutcome = (data: Record<string, unknown>, id = "src-document123", args: Record<string, unknown> = { topic: "document example" }) => outcome({
     callId: `call-${id}`,
     packageId: "typed-package",
     status: "succeeded",
-    args: { topic: "document example" },
+    args,
     result: { actions: [], data },
     sources: [source(id, "Document source")],
   });
@@ -304,6 +304,53 @@ describe("COMP-01 typed document builders", () => {
     expect(document?.section).toMatchObject({ type: "comparison", title: "Bike comparison", subjects: [{ id: "subject-alpha123", name: "Ember" }, { id: "subject-bravo123", name: "River" }], rows: [{ attribute: "range" }] });
   });
 
+  test("a document outcome becomes bounded page chunks with local citations", () => {
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({
+      type: "document",
+      attachment_id: "att-document123",
+      chunks: [
+        { attachment_id: "att-document123", page: 1, text: "The first page says hello." },
+        { attachment_id: "att-document123", page: 3, text: "Page three explains the safe temperature." },
+      ],
+    })] });
+    expect(document?.section).toMatchObject({
+      type: "document",
+      attachment_id: "att-document123",
+      chunks: [
+        { attachment_id: "att-document123", page: 1, text: "The first page says hello." },
+        { attachment_id: "att-document123", page: 3, text: "Page three explains the safe temperature." },
+      ],
+    });
+    expect(document?.sources.map((source) => source.url)).toEqual([
+      "attachment://att-document123/page/1",
+      "attachment://att-document123/page/3",
+    ]);
+  });
+
+  test("a page request selects only that document page and the bounded context is retained", () => {
+    const chunks = Array.from({ length: 40 }, (_, index) => ({ attachment_id: "att-document123", page: index + 1, text: "x".repeat(4001) }));
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ type: "document", attachment_id: "att-document123", chunks }, "src-document456", { topic: "document example" })] });
+    expect(document?.section.type).toBe("document");
+    if (!document || document.section.type !== "document") throw new Error("expected a document section");
+    expect(document.section.chunks).toHaveLength(8);
+    expect(document.section.chunks.every((chunk: { text: string }) => chunk.text.length === 4000)).toBe(true);
+    expect(document.section.chunks.reduce((total: number, chunk: { text: string }) => total + chunk.text.length, 0)).toBeLessThanOrEqual(32000);
+
+    const page = buildDocument({ turnId: "turn-document456", outcomes: [typedOutcome({ type: "document", attachment_id: "att-document123", chunks }, "src-document789", { page: 3 })] });
+    expect(page?.section).toMatchObject({ type: "document", chunks: [{ page: 3 }] });
+  });
+
+  test("a document page request uses the same evidence revision path", () => {
+    const base = { type: "document", attachment_id: "att-document123", chunks: [{ attachment_id: "att-document123", page: 3, text: "The first retained answer." }] };
+    const first = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome(base)] });
+    if (!first) throw new Error("expected the first document");
+    const same = buildDocument({ turnId: "turn-document456", previous: first, outcomes: [typedOutcome({ ...base, chunks: [{ ...base.chunks[0], text: "The first retained answer." }] })] });
+    expect(same?.id).toBe(first.id);
+    const changed = buildDocument({ turnId: "turn-document789", previous: first, outcomes: [typedOutcome({ ...base, chunks: [{ ...base.chunks[0], text: "A changed retained answer." }] })] });
+    expect(changed?.revision).toBe(2);
+    expect(changed?.section).toMatchObject({ type: "document", chunks: [{ page: 3, text: "A changed retained answer." }] });
+  });
+
   test("chit-chat and reply-only outcomes produce no document", () => {
     expect(buildDocument({ turnId: "turn-document123", outcomes: [weatherOutcome()] })).toBeNull();
     expect(documentEvidenceVersion([])).toMatch(/^outcome-[a-f0-9]{16}$/);
@@ -313,8 +360,15 @@ describe("COMP-01 typed document builders", () => {
     const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ query: "Willow hours", rows: [{ title: "Willow visitor center", snippet: "Opens at 8 a.m. on Saturdays." }] })] });
     if (!document) throw new Error("expected a document");
     const child = projectDocumentForChild(document);
+    if (!child) throw new Error("expected a child projection");
     expect(child.sources).toEqual([]);
     expect(child.section).toEqual({ type: "lookup", query: "Willow hours", results: [{ title: "Willow visitor center", line: "Opens at 8 a.m. on Saturdays." }] });
+  });
+
+  test("the child projection does not deliver an attachment document", () => {
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ type: "document", attachment_id: "att-document123", chunks: [{ attachment_id: "att-document123", page: 3, text: "Adult document text." }] })] });
+    if (!document) throw new Error("expected a document");
+    expect(projectDocumentForChild(document)).toBeNull();
   });
 
   test("changed retained evidence creates a new revision", () => {
@@ -338,6 +392,11 @@ describe("the grounding", () => {
     groundOutcomes(ctx, [searchOutcome()]);
     expect(ctx.evidence.map((e) => [e.id, e.kind])).toEqual([["package:call-s", "package_result"], ["package:call-w", "package_result"]]);
     expect(ctx.includedEvidenceIds).toEqual(["package:call-s", "package:call-w"]);
+  });
+
+  test("a document outcome grounds its bounded page text", () => {
+    const document = outcome({ callId: "call-document", packageId: "documents", status: "succeeded", result: { actions: [], data: { type: "document", attachment_id: "att-document123", chunks: [{ attachment_id: "att-document123", page: 3, text: "Page three says the valve is closed." }] } } });
+    expect(outcomeText(document)).toContain("Page three says the valve is closed.");
   });
 
   test("a composed line that says what the rows say passes the invention guard, and is never an unrelated-recall candidate; ungrounded it is cut (the review's repro)", async () => {

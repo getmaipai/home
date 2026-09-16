@@ -186,7 +186,9 @@ def test_open_question_fixture():
     OpenQuestion.model_validate(load_fixture("open-question.example.json"))
 
 
-@pytest.mark.parametrize("kind", ["lookup", "card", "procedure", "comparison"])
+@pytest.mark.parametrize(
+    "kind", ["lookup", "card", "procedure", "comparison", "document"]
+)
 def test_turn_artifact_fixtures(kind: str):
     TurnArtifact.model_validate(load_fixture(f"turn-artifact.{kind}.example.json"))
 

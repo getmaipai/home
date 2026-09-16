@@ -251,6 +251,7 @@ conversationsRoutes.openapi(documentRoute, (c) => {
     // same bounded content after the shared projection removes every source
     // link, so the details pane cannot disclose an external citation.
     const projected = projectDocument(parsed.data, speakerAgeBand(actor, new Date()));
+    if (!projected) return c.json({ error: "document not found" }, 404);
     return c.json(projected as typeof parsed.data, 200);
   } catch {
     return c.json({ error: "document not found" }, 404);

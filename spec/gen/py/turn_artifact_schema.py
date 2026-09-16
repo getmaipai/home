@@ -34,6 +34,28 @@ class ArtifactRow(BaseModel):
     values: list[ArtifactValue] = Field(..., min_length=2)
 
 
+class Chunk(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attachment_id: constr(pattern=r'^att-[a-z0-9]{6,}$')
+    page: conint(ge=1)
+    text: constr(min_length=1, max_length=4000)
+    source_id: constr(pattern=r'^src-[a-z0-9]{6,}$') = Field(
+        ...,
+        description="The id of a citation in the document's top-level sources array.",
+    )
+
+
+class Document(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['document']
+    attachment_id: constr(pattern=r'^att-[a-z0-9]{6,}$')
+    chunks: list[Chunk] = Field(..., max_length=32, min_length=1)
+
+
 class Result(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -167,7 +189,9 @@ class TurnArtifact(BaseModel):
         ...,
         description='Stable version of the retained outcome evidence used to build this revision.',
     )
-    section: Lookup | Procedure | Comparison | FilmCard | PersonCard | PlaceCard
+    section: (
+        Lookup | Procedure | Comparison | Document | FilmCard | PersonCard | PlaceCard
+    )
     sources: list[source_schema.Source] = Field(
         ...,
         description='The citation snapshots available to this document. Child-band delivery strips this list without widening the content ceiling.',
