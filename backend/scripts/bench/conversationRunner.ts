@@ -265,14 +265,14 @@ interface Timings {
 async function driveTurn(
   actor: PersonRow,
   say: string,
-  opts: { conversationId: string; supersedes?: string; interrupt?: boolean },
+  opts: { conversationId: string; supersedes?: string; interrupt?: boolean; surface?: "chat" | "robot" },
 ): Promise<{ value: TurnValue | null; text: string; timings: Timings; error: string | null; interrupted: boolean; spokenCue: string | null }> {
   const t0 = performance.now();
   const controller = new AbortController();
   const elapsed = () => performance.now() - t0;
   let result: TurnStreamResult;
   try {
-    result = await runTurnStream(actor, "chat", say, { conversationId: opts.conversationId, supersedes: opts.supersedes, signal: controller.signal });
+    result = await runTurnStream(actor, opts.surface ?? "chat", say, { conversationId: opts.conversationId, supersedes: opts.supersedes, signal: controller.signal });
   } catch (err) {
     return { value: null, text: "", timings: { firstDeltaMs: null, firstSentenceMs: null, totalMs: elapsed() }, error: (err as Error).message, interrupted: false, spokenCue: null };
   }
@@ -613,7 +613,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     // boundary (the read, the forced lookup, the guards); without one
     // (the stub tests) it is pasted as before.
     if (turn.seedReply !== undefined && deps.proxy) deps.proxy.scriptNextReply(turn.seedReply);
-    const driven = turn.seedReply !== undefined && !deps.proxy ? seedTurn(actor, turn.say, turn.seedReply, conversationId) : await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt });
+    const driven = turn.seedReply !== undefined && !deps.proxy ? seedTurn(actor, turn.say, turn.seedReply, conversationId) : await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt, surface: conv.surface });
     await deps.proxy?.settled(); // the teed reply text lands a tick after the client's read
     // An interrupted turn logs no [turn] line today (nothing is
     // finalized for a reply nobody read); its id is on the [route] line.
