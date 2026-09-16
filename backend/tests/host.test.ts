@@ -69,6 +69,29 @@ describe("GET /api/host/models", () => {
   });
 });
 
+describe("GET /api/host/chat-models", () => {
+  test("returns the compact parent-facing shape without host diagnostics", async () => {
+    const owner = await ownerClient();
+    const res = await owner.get("/api/host/chat-models");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { models: Array<{ id: string; label: string }>; selectedModel: unknown; canSelect: boolean };
+    expect(body.canSelect).toBe(true);
+    expect(body.models.every((model) => Object.keys(model).sort().join(",") === "id,label")).toBe(true);
+  });
+
+  test("a child receives a calm empty shape with no model name", async () => {
+    const owner = await ownerClient();
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child.id });
+
+    const res = await childClient.get("/api/host/chat-models");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ models: [], selectedModel: null, canSelect: false });
+  });
+});
+
 // Only the role gate is exercised here, the same shape as GET /api/host/
 // hardware above: an owner's real call schedules process.exit() (host.ts's
 // own comment explains why a non-zero code is required for systemd/WinSW

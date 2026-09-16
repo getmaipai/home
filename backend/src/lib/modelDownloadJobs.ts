@@ -20,6 +20,7 @@ import { modelsDir, enginesDir } from "@/lib/paths";
 import { downloadUrl } from "@/lib/modelDownload";
 import { extractArchive } from "@/lib/archive";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { CHAT_MODEL_SETTING_KEY } from "@/settings/aiKeys";
 import { getChatClient, restartChatBackend, getLastPostLoadCheck } from "@/lib/llmSupervisor";
 import { trigger } from "@/lib/notifications";
 
@@ -227,7 +228,7 @@ async function runSelectJob(modelId: string): Promise<void> {
     }
 
     upsertJob(modelId, { status: "verifying", phase: "selecting model" });
-    const set = setHouseholdSettingValue("chat.model_id", modelId);
+    const set = setHouseholdSettingValue(CHAT_MODEL_SETTING_KEY, modelId);
     if (!set.ok) throw new Error(set.error);
 
     upsertJob(modelId, { status: "loading", phase: "starting the engine" });

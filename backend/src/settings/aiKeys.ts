@@ -17,6 +17,11 @@
 // it.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
+// The chat picker and the engine supervisor both refer to the same real
+// household selection. Keeping the key name beside its declaration makes a
+// dedicated chat surface less likely to drift into a second setting.
+export const CHAT_MODEL_SETTING_KEY = "chat.model_id" as const;
+
 export const AI_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
     key: "chat.model_id",

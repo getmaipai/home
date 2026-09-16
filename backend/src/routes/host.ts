@@ -1,10 +1,14 @@
 import { Hono } from "hono";
-import { requireRole } from "@/middleware/auth";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { requireAuth, requireRole } from "@/middleware/auth";
 import { detectHardware } from "@/lib/hardware";
 import { recommend, CATALOG } from "@/lib/modelCatalog";
 import { getJob, startSelectJob } from "@/lib/modelDownloadJobs";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { getChatClient, getEngineStatus, restartChatBackend, stopChatBackend } from "@/lib/llmSupervisor";
+import { CHAT_MODEL_SETTING_KEY } from "@/settings/aiKeys";
+import { engineBinaryPath, getChatClient, getEngineStatus, restartChatBackend, stopChatBackend } from "@/lib/llmSupervisor";
+import { modelsDir } from "@/lib/paths";
 import { getEngineStatsSamples } from "@/lib/engineStats";
 import { withTimeout } from "@/lib/withTimeout";
 import { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
@@ -28,12 +32,43 @@ hostRoutes.get("/models", requireRole("owner", "admin"), async (c) => {
   return c.json(recommend(role as (typeof CATALOG)[number]["role"], hw));
 });
 
+// The compact chat-facing list deliberately has a different boundary from
+// the owner diagnostics route above. Adults can see the healthy, implemented
+// chat choices and the current household selection without getting hardware,
+// memory, or engine internals; a child gets the empty safe shape and the
+// chat surface supplies its calm generic label instead. `fits` is the same
+// real reachability check the AI models card uses, while selection remains
+// owner/admin-only because it can download gigabytes and restart the engine.
+hostRoutes.get("/chat-models", requireAuth, async (c) => {
+  const actor = c.get("person");
+  if (actor.role === "child" || actor.role === "teen") {
+    return c.json({ models: [], selectedModel: null, canSelect: false as const });
+  }
+
+  const hw = await detectHardware();
+  const currentId = (getHouseholdSettingValue(CHAT_MODEL_SETTING_KEY) as string) || null;
+  const engineReady = engineBinaryPath(hw) !== null;
+  const fits = recommend("chat", hw).filter((fit) => fit.model.implemented && fit.fits);
+  // Chat's picker is not a download surface. A model is a reachable choice
+  // only when its weights and this computer's pinned engine are already
+  // present; the full AI models page remains the place that downloads one.
+  const models = fits
+    .filter((fit) => engineReady && existsSync(join(modelsDir, `${fit.model.id}.gguf`)))
+    .map((fit) => ({ id: fit.model.id, label: fit.model.label }));
+  const selected = currentId ? CATALOG.find((model) => model.id === currentId && model.role === "chat" && model.implemented) : undefined;
+  return c.json({
+    models,
+    selectedModel: selected ? { id: selected.id, label: selected.label, available: models.some((model) => model.id === selected.id) } : null,
+    canSelect: actor.role === "owner" || actor.role === "admin",
+  });
+});
+
 // Which chat model (if any) the household has actually chosen, for
 // ModelsSection.tsx to know which card to mark "in use" without polling a
 // job that may not exist yet (a freshly-selected model that finished
 // downloading in a previous session has no running job any more).
 hostRoutes.get("/models/selection", requireRole("owner", "admin"), async (c) => {
-  const modelId = (getHouseholdSettingValue("chat.model_id") as string) || null;
+  const modelId = (getHouseholdSettingValue(CHAT_MODEL_SETTING_KEY) as string) || null;
   return c.json({ modelId });
 });
 

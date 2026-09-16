@@ -2359,7 +2359,7 @@ The dated inventory and product decisions are in
 they do not change the completed conversation, attachment, composer, or
 stats item text above.
 
-- [ ] **CHAT-PARITY-01: model picker and current-model caption** (S, after STATS-01)
+- [x] **CHAT-PARITY-01: model picker and current-model caption** (S, after STATS-01)
 
     Objective: let a parent see and choose the available healthy chat model
     without opening owner diagnostics. Files: `frontend/src/apps/chat/`, the

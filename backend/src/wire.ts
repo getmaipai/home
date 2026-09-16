@@ -210,6 +210,19 @@ export interface ModelFit {
   budgetBytes: number;
 }
 
+/** The small, non-diagnostic model shape used by Chat's parent-facing
+ * picker. Hardware fit and engine details stay on the owner settings route. */
+export interface ChatModelOption {
+  id: string;
+  label: string;
+}
+
+export interface ChatModelsResponse {
+  models: ChatModelOption[];
+  selectedModel: (ChatModelOption & { available: boolean }) | null;
+  canSelect: boolean;
+}
+
 // Mirrors modelDownloadJobs.ts's JobRow (hand-copied, same reason as
 // ModelFit/BackupInfo above: that file's own imports aren't
 // alias-free).

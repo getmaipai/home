@@ -20,6 +20,8 @@ import type {
   BackupInfo,
   HardwareInfo,
   ModelFit,
+  ChatModelOption,
+  ChatModelsResponse,
   ModelJob,
   EngineStatus,
   EngineStatsSample,
@@ -55,7 +57,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -576,6 +578,7 @@ export const api = {
   plugins: () => request<PackageManifest[]>("/api/plugins"),
   hardware: () => request<HardwareInfo>("/api/host/hardware"),
   models: (role: string) => request<ModelFit[]>(`/api/host/models?role=${encodeURIComponent(role)}`),
+  chatModels: () => request<ChatModelsResponse>("/api/host/chat-models"),
   modelSelection: () => request<{ modelId: string | null }>("/api/host/models/selection"),
   selectModel: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select`, { method: "POST" }),
   modelSelectStatus: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select-status`),

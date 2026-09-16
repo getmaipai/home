@@ -26,6 +26,7 @@ import { consumeSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { cn, FOCUS_RING } from "@/kit/utils";
 import { ChatDocumentOpenContext, ChatDocumentPane } from "@/apps/chat/chatDocumentPane";
 import { ChatTurnStatsVisibleContext } from "@/apps/chat/chatTurnStats";
+import { ChatModelPicker } from "@/apps/chat/ChatModelPicker";
 import type { Roster } from "@/lib/api";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
@@ -263,9 +264,12 @@ export function ChatPage({ person }: ChatPageProps) {
                   place guaranteed to win. */}
               <ThreadListNew aria-label="New chat" className="relative size-9 justify-center p-0 before:absolute before:-inset-1.5 before:content-['']" labelClassName="sr-only" />
             </div>
+            <div className="flex min-w-0 items-center gap-1">
+            <ChatModelPicker person={person} health={health} />
             <SensesDock health={health} reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError}>
               <WakeWordToggle onStatusChange={onEarStatus} onWakeDetected={() => setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.")} />
             </SensesDock>
+            </div>
                   </div>
                   {banner ? <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div> : null}
                   <div className="relative flex min-h-0 flex-1">

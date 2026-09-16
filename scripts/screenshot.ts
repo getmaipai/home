@@ -945,6 +945,42 @@ async function captureChatDocumentPane(browser: Browser, sessionValue: string, v
   }
 }
 
+/** CHAT-PARITY-01's focused review: the seeded demo machine does not have a
+ * multi-gigabyte model installed, so this capture supplies the compact,
+ * already-reachable model-list response at the browser boundary. The real
+ * ChatModelPicker, responsive header, disclosure, and owner-only naming are
+ * still exercised by the built app; the backend route has its own contract
+ * tests for the unmocked safe/available shapes. */
+async function captureChatModelPicker(browser: Browser, sessionValue: string): Promise<void> {
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.route("**/api/host/chat-models", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        models: [{ id: "qwen3-8b-instruct-q4-k-m", label: "Qwen3 8B Instruct" }],
+        selectedModel: { id: "qwen3-8b-instruct-q4-k-m", label: "Qwen3 8B Instruct", available: true },
+        canSelect: true,
+      }),
+    }));
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    const trigger = page.getByRole("button", { name: "Choose chat model (current: Qwen3 8B Instruct)" });
+    await trigger.waitFor();
+    await trigger.click();
+    await page.getByText("Choose a model that fits this computer.", { exact: true }).waitFor();
+    await settleAnimations(page);
+    const screenshot = "chat-model-picker-desktop-light.png";
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-model-picker", viewport: viewport.slug, theme: "light" });
+  } finally {
+    await context.close();
+  }
+}
+
 /** STATS-01's dedicated review: a real model stream supplies final-chunk
  * telemetry, the signed-in owner enables the persisted preference, and the
  * compact readout is opened from the real assistant reply before capture. */
@@ -1680,6 +1716,7 @@ async function main() {
     }
 
     if (!a11yOnly && chatReview) {
+      if (chatFocusReview) await captureChatModelPicker(browser, sessionValue);
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
         if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
