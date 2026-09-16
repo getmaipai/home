@@ -2300,6 +2300,33 @@ invented for the roster's household, and added to
       to the phone or hub screen. Exit: frontend tests and judged
       screenshots.
 
+- [ ] **PANE-01: The pane as an offer, never a push** (M, design pass first, owner's question 2026-09-16)
+
+    The question: when a person says "that film was fantastic", should
+    the pane show reviews, cast, where to watch, without being asked?
+    The owner is unsure where "useful" ends and "too much" begins; that
+    line is the design, not the code. Principle to design against: the
+    pane is a door, never a billboard. The bubble stays the friend's
+    line and never gains an unasked-for card; what may appear is a
+    small handle naming what the pane could hold ("Reviews", "Cast",
+    "Where to watch"), built only when tapped (COMP-01's rule), so
+    nothing costs a lookup until the person wants it. The design pass
+    decides: which subjects earn a handle (a named world subject with a
+    typed kind: film, album, game, person, place; never a household
+    subject, never a feeling), which handle labels per kind (drawn from
+    the kind's typed fields, the same table LOOKUP-01 uses, never a
+    per-case list), how often (once per subject per conversation, never
+    on consecutive turns, none in the child band, none while an ask is
+    pending), how it is measured (the handle's tap rate per kind in the
+    weekly report; a kind under five percent loses its handle), and
+    the voice rule (a tapped handle's document opens beside the same
+    short line; the line itself never says "see the pane"). Pointers:
+    `docs/dev.md` COMP-01 and COMP-02, `chatDocumentPane.tsx`, the
+    subject stack in `turnContext.ts`. Out of scope: any automatic
+    lookup before a tap. Exit: the design section, the rows for "handle
+    offered", "handle not offered on a household subject", "handle not
+    offered twice", then the mechanical items it names.
+
 <a id="comp-02"></a>
 
 - [x] **COMP-02: Research mode** (S, after COMP-01, landed 2026-09-16)
