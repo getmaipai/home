@@ -2189,6 +2189,20 @@ invented for the roster's household, and added to
     watcher sends is facts first, the model's diagnosis only when
     chat answers, as above.
 
+    **They watch each other.** The hub monitors the watcher the same
+    way: the watcher exposes its own health (a heartbeat file or a
+    local endpoint, alive since, last probe, last alert sent) and the
+    hub's own monitor reads it on the same interval; when the
+    heartbeat stops or the watcher reports it could not send (a
+    channel refused, a credential expired), the hub alerts through its
+    own notification path, "the watcher is not running since <time>",
+    with a Repairs entry and the fix. Both sides keep their alerting;
+    neither is the only one. The design pass sets the two intervals
+    so a single missed beat is not an alert (a hold, as with roles),
+    and states what happens on the double failure (hub and watcher
+    both down): nothing local can alert, and that is the case the
+    outside watcher (a robot or pod) covers when the household has one.
+
     Rules the design pass fixes: the minimum set per install (from
     the device inventory `detectHardware` reads at boot, and what the
     setup wizard tells the person if the machine cannot carry it);
