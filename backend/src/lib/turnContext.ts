@@ -99,10 +99,16 @@ export type RejectedReason = "not_offered" | "over_cap" | "duplicate" | "malform
  * carries a title (its `data` or `article`); a lookup with no page
  * (the weather) has none and cites its package by id. */
 export interface OutcomeSource {
+  kind?: "web" | "model_knowledge";
   title: string;
   url?: string;
   site?: string;
   snippet?: string | null;
+}
+
+/** CHAT-16 K3: fixed provenance questions are answered from retained outcomes. */
+export function asksHowKnown(utterance: string): boolean {
+  return /^(?:\s*)(?:how do you know(?: that)?|where did that come from|are you sure|did you make that up|source\?)\s*[.!?]*\s*$/i.test(utterance);
 }
 
 /** CHAT-15: one record per package call a turn proposed, ran, parked
@@ -137,8 +143,8 @@ export interface ToolExecutionOutcome {
 
 /** Stamps the time and, from a succeeded result, the citation fields,
  * so every producer records the same shape. */
-export function outcomeOf(partial: Omit<ToolExecutionOutcome, "at" | "source"> & { at?: string }): ToolExecutionOutcome {
-  const source = partial.status === "succeeded" && partial.result ? sourceFromResult(partial.result) : undefined;
+export function outcomeOf(partial: Omit<ToolExecutionOutcome, "at"> & { at?: string }): ToolExecutionOutcome {
+  const source = partial.source ?? (partial.status === "succeeded" && partial.result ? sourceFromResult(partial.result) : undefined);
   const sources = partial.status === "succeeded" && partial.result ? sourcesFromRows(partial.result.data && typeof partial.result.data === "object" ? (partial.result.data as { rows?: unknown }).rows : undefined) : [];
   return { ...partial, at: partial.at ?? new Date().toISOString(), ...(source ? { source } : {}), ...(sources.length ? { sources } : {}) };
 }

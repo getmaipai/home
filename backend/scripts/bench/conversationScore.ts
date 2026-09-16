@@ -118,7 +118,7 @@ export interface TurnObserved {
   /** CHAT-13's correction path: the outcomes this turn's own row
    * carries, by package, with their named arguments, `via`, and a
    * correction's rejected arguments. */
-  outcomes?: readonly { packageId: string; args: Readonly<Record<string, unknown>>; via: string | null; rejected: Readonly<Record<string, unknown>> | null }[];
+  outcomes?: readonly { packageId: string; args: Readonly<Record<string, unknown>>; via: string | null; rejected: Readonly<Record<string, unknown>> | null; source?: { kind?: string } | null }[];
   /** Section 13 part 2: the per-evidence-id disposition the composer
    * actually applied this turn. */
   evidenceDisposition?: readonly { evidenceId: string; disposition: "full" | "summary" | "withheld"; reason: string | null }[];
@@ -414,6 +414,10 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     const candidates = (observed.outcomes ?? []).filter((o) => o.packageId === want.packageId && (want.via === undefined || o.via === want.via));
     const hit = candidates.find((o) => Object.entries(want.args).every(([k, v]) => typeof o.args[k] === "string" && new RegExp(v, "i").test(o.args[k] as string)));
     checks.push({ name: "outcome args match", pass: hit !== undefined, detail: hit ? `${hit.packageId} args ${JSON.stringify(hit.args)}${hit.via ? ` via ${hit.via}` : ""}` : `no ${want.packageId}${want.via ? ` via ${want.via}` : ""} outcome matching (observed: ${observed.outcomes?.map((o) => `${o.packageId}${o.via ? `/${o.via}` : ""} ${JSON.stringify(o.args)}`).join("; ") || "none"})` });
+  }
+  if (e.outcomeKind) {
+    const hit = observed.outcomes?.some((o) => o.source?.kind === e.outcomeKind);
+    checks.push({ name: "outcome kind", pass: hit === true, detail: hit ? e.outcomeKind : `no ${e.outcomeKind} outcome` });
   }
   if (e.lookupShape) {
     checks.push({ name: "lookup shape", pass: observed.lookupShape === e.lookupShape, detail: observed.lookupShape ? `shape ${observed.lookupShape}` : "no shape on the turn line" });
