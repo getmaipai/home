@@ -7557,6 +7557,9 @@ that owns it.
       item on the bench machine only. Needs real bench hardware (a GPU,
       a downloaded warm model) this dev sandbox doesn't have - Jesse's
       own explicit call to defer it, not a scope guess.
+- [ ] **GPU validation bench** (S, Codex) - `backend/scripts/bench/gpu-validate.ts`
+      validates fill, concurrent throughput, throttling, and a minimum
+      single-stream rate before a household engine moves onto a new card.
 - [ ] **The release ceremony for v0.1.0** (M, F, only when Jesse says so)
       - a security review pass, the clean-clone build, the restore
       drill, the changelog, the tag; `spec-v0.1.0`'s own tag prep (the
