@@ -35,6 +35,7 @@ import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc } from "driz
 import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
+import { deleteAttachmentsForTurns } from "@/lib/attachments";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands, openQuestions, relationships } from "@/db/schema";
 import { TurnArtifact, type TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
@@ -998,6 +999,7 @@ export function deleteConversationById(actor: PersonRow, id: string): Conversati
   const found = getConversation(actor, id);
   if (!found.ok) return found;
   const turns = db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.conversationId, id)).all();
+  deleteAttachmentsForTurns(turns.map((t) => t.id));
   deleteEpisodesForTurns(turns.map((t) => t.id));
   const now = new Date().toISOString();
   db.update(conversations)
@@ -1592,6 +1594,7 @@ export function runRetention(): { deleted: number } {
     .run(generalCutoff, flaggedMinorCutoff);
 
   // Delete episodes for expiring turns before deleting the turns themselves.
+  deleteAttachmentsForTurns(expiring.map((t) => t.id));
   deleteEpisodesForTurns(expiring.map((t) => t.id));
 
   // Raw sqlite for a real affected-row count, not db.delete().run(): the

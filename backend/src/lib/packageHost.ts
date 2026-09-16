@@ -58,6 +58,7 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { tryConsume } from "@/lib/rateLimiter";
 import { assertNotPrivateHost, SsrfBlockedError } from "@/lib/ssrfGuard";
 import * as memory from "@/lib/memory";
+import { deleteAttachmentsForPerson } from "@/lib/attachments";
 import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
@@ -1072,6 +1073,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       forget(person: string): number {
         const result = memory.forget(actor, person);
         if (!result.ok) mapWriteFailure(result.status, result.error);
+        deleteAttachmentsForPerson(person);
         return result.value.deleted;
       },
     },

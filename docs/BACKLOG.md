@@ -6470,15 +6470,14 @@ approvals are still real, unstarted work for a future session.
       no sources, links or documents. Depends on COMP-01 for the long
       answer's home. The design pass itself adds no runtime behavior.
 
-      - [ ] **ATT-01a: attachment storage and retention** (mechanical).
-            Add the local upload store and `Attachment` persistence,
-            mirroring the attachment schema's per-person path and the
-            existing conversation retention and `host.data.forget(person)`
-            behavior. Acceptance: bytes and record are written under the
-            household data directory, traversal is refused, the digest and
-            size round-trip, conversation retention removes both, and
-            forget removes both. Exit: targeted attachment/storage tests,
-            then `bash scripts/check.sh`.
+      - [x] **ATT-01a: attachment storage and retention** (mechanical,
+            landed 2026-09-16). Added the local upload store and immutable
+            `Attachment` persistence under the per-person household path,
+            with normalized-path validation, size and SHA-256 verification,
+            conversation-turn retention cleanup, and `host.data.forget`
+            erasure that leaves other people's files alone. Exit:
+            `backend/tests/attachments.test.ts` and
+            `bash scripts/check.sh`.
       - [ ] **ATT-01b: document extraction and OCR** (mechanical). Wire
             bounded local Apache Tika extraction for PDF and office files,
             mirroring the package-host boundary and `host.ocr.read`'s

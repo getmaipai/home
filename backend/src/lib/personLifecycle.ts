@@ -48,6 +48,7 @@ import { TOMBSTONE_TEXT } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { invalidateScopeCache } from "@/lib/settings";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
+import { deleteAttachmentsForPerson } from "@/lib/attachments";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
 import { roleRequiresCredential, requiresCredential } from "@/lib/personAuthMethods";
@@ -244,6 +245,7 @@ export interface ErasureCounts {
   relationships: number;
   grants: number;
   approvals: number;
+  attachments: number;
 }
 
 /** Everything the household holds about one person, deleted for real.
@@ -258,6 +260,7 @@ export function erasePersonData(personId: string): ErasureCounts {
   // (locked, permissions) leaves a harmless orphan in a directory that
   // is not backed up, exactly the trade lib/clonedVoices.ts already made
   // and for the same reason: never a person who cannot be removed.
+  const attachments = deleteAttachmentsForPerson(personId);
   const voices = db.select().from(clonedVoices).where(eq(clonedVoices.creatorId, personId)).all();
   for (const voice of voices) {
     try {
@@ -400,6 +403,7 @@ export function erasePersonData(personId: string): ErasureCounts {
     relationships: relationshipRows,
     grants: grantRows,
     approvals: approvalRows,
+    attachments,
   };
 }
 

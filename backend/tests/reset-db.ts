@@ -22,6 +22,7 @@ import {
   settingsValues,
   scheduledJobs,
   conversationTurns,
+  attachments,
   conversations,
   clonedVoices,
   commands,
@@ -121,6 +122,7 @@ export function resetDb(): void {
   db.delete(pendingEpisodeEmbeddings).run();
   db.delete(episodeEmbeddings).run();
   db.delete(episodes).run();
+  db.delete(attachments).run();
   db.delete(conversationTurns).run();
   db.delete(conversations).run();
   db.delete(memoryEmbeddings).run();

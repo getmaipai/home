@@ -337,6 +337,13 @@
       "when": 1789551030446,
       "tag": "0047_aspiring_reptil",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1789554717971,
+      "tag": "0048_wooden_ben_grimm",
+      "breakpoints": true
     }
   ]
 }

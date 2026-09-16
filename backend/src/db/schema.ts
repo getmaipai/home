@@ -469,6 +469,39 @@ export const conversationTurns = sqliteTable(
   ],
 );
 
+// ATT-01a: the immutable spec-shaped record for a locally stored upload.
+// The bytes live at storage_path below dataDir; the turn and conversation
+// references make retention able to remove the file before its owning turn
+// is deleted, while owner_person_id keeps the erasure boundary explicit.
+export const attachments = sqliteTable(
+  "attachments",
+  {
+    id: text("id").primaryKey(),
+    ownerPersonId: text("owner_person_id")
+      .notNull()
+      .references(() => people.id),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id),
+    turnId: text("turn_id")
+      .notNull()
+      .references(() => conversationTurns.id),
+    mediaType: text("media_type").notNull(),
+    size: integer("size").notNull(),
+    sha256: text("sha256").notNull(),
+    storagePath: text("storage_path").notNull(),
+    retention: text("retention").notNull().default("conversation"),
+    provenance: text("provenance").notNull(),
+    createdAt: text("created_at").notNull(),
+    hlc: text("hlc").notNull(),
+  },
+  (table) => [
+    index("attachments_owner_person_id_idx").on(table.ownerPersonId),
+    index("attachments_conversation_id_idx").on(table.conversationId),
+    index("attachments_turn_id_idx").on(table.turnId),
+  ],
+);
+
 // FEED-01: one person's label for one assistant turn. The record is
 // person-scoped even when an owner or admin is rating a child's visible
 // conversation, so the same turn can carry one independent label per

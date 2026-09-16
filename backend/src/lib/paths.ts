@@ -151,6 +151,11 @@ export const installStagingDir = (packageId: string): string => resolve(dataDir,
 // VACUUM INTO only covers hub.db, a real documented gap (docs/dev.md).
 export const clonedVoicesDir = resolve(dataDir, "voice", "cloned");
 
+// ATT-01a: local upload bytes, grouped by person below the household data
+// directory. The complete relative path is validated by lib/attachments.ts
+// before it is resolved or used.
+export const attachmentsDir = resolve(dataDir, "people");
+
 // Shared by lib/backup.ts's ensureBackupDir() and lib/clonedVoices.ts's
 // ensureDir(): a code review (2026-09-04) found both had independently
 // hand-rolled the identical "create it, owner-only, if it's not already

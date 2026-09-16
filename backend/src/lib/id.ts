@@ -148,3 +148,8 @@ export function newNasMountId(): string {
 export function newEpisodeId(): string {
   return `ep-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/attachment.schema.json's `^att-[a-z0-9]{6,}$`. */
+export function newAttachmentId(): string {
+  return `att-${randomSuffix(10)}`;
+}
