@@ -25,6 +25,10 @@ class Conversation(BaseModel):
         ...,
         description="Matches turnEngine.ts's Surface (4.5): a person may hold one open conversation per surface at a time.",
     )
+    mode: Literal['chat', 'research'] | None = Field(
+        'chat',
+        description='How this conversation presents world-question answers: chat keeps the ordinary reply; research keeps the details pane open after a short line.',
+    )
     companion_id: str | None = Field(
         None,
         description='The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8).',

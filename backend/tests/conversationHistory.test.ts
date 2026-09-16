@@ -16,6 +16,7 @@ import {
   createConversation,
   getConversation,
   updateConversationTitle,
+  updateConversationMode,
   listConversationTurns,
   buildConversationWindow,
   maybeRefreshConversationSummary,
@@ -1391,9 +1392,34 @@ describe("POST /api/conversations (step 3 CRUD)", () => {
     const { client } = await owner();
     const res = await client.post("/api/conversations", {});
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { id: string; surface: string; status: string };
+    const body = (await res.json()) as { id: string; surface: string; status: string; mode: string };
     expect(body.surface).toBe("chat");
     expect(body.status).toBe("open");
+    expect(body.mode).toBe("chat");
+  });
+
+  test("switches a conversation to research mode and persists it", async () => {
+    const { client } = await owner();
+    const created = await client.post("/api/conversations", {});
+    const id = ((await created.json()) as { id: string }).id;
+    const changed = await client.request(`/api/conversations/${id}`, { method: "PATCH", body: { mode: "research" } });
+    expect(changed.status).toBe(200);
+    const changedBody = (await changed.json()) as { id: string; mode: string };
+    expect(changedBody.id).toBe(id);
+    expect(changedBody.mode).toBe("research");
+    const loaded = await client.get(`/api/conversations/${id}`);
+    expect(((await loaded.json()) as { mode: string }).mode).toBe("research");
+  });
+
+  test("refuses an unknown conversation mode without changing the stored mode", async () => {
+    const { client, actor } = await owner();
+    const created = await client.post("/api/conversations", {});
+    const id = ((await created.json()) as { id: string }).id;
+    const response = await client.request(`/api/conversations/${id}`, { method: "PATCH", body: { mode: "article" } });
+    expect(response.status).toBe(400);
+    const loaded = getConversation(actor, id);
+    if (!loaded.ok) throw new Error(loaded.error);
+    expect(loaded.value.mode).toBe("chat");
   });
 
   test("closes (never deletes) whichever conversation was previously open for the same surface", async () => {
@@ -1418,6 +1444,19 @@ describe("POST /api/conversations (step 3 CRUD)", () => {
     const { client } = await owner();
     const res = await client.post("/api/conversations", { surface: "bogus" });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("updateConversationMode()", () => {
+  test("returns a validated research record and leaves the conversation id unchanged", async () => {
+    const { actor } = await owner();
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error(conversation.error);
+    const changed = updateConversationMode(actor, conversation.value.id, "research");
+    expect(changed.ok).toBe(true);
+    if (!changed.ok) return;
+    expect(changed.value.id).toBe(conversation.value.id);
+    expect(changed.value.mode).toBe("research");
   });
 });
 

@@ -731,6 +731,32 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
     }
   });
 
+  test("a completed document notifies the research-mode pane after the line", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "done", value: { reply: { text: "Short answer." }, source: "model", safety: SAFETY, turn_id: "turn-research456", conversation_id: "conv-research456", document_available: true } }]),
+    );
+    const opened: string[] = [];
+    const adapter = createChatModelAdapter({
+      consumeThinking: () => false,
+      consumeSupersedes: () => undefined,
+      onCrisisResources: () => {},
+      onResearchDocument: (turnId) => opened.push(turnId),
+      turnSchedulerRef: { current: null },
+    });
+    try {
+      const { yields } = await (async () => {
+        const options = { messages: [fakeUserMessage("research this")], runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => fakeUserMessage("research this") } as unknown as ChatModelRunOptions;
+        const values: ChatModelRunResult[] = [];
+        for await (const value of runAdapter(adapter, options)) values.push(value);
+        return { yields: values };
+      })();
+      expect(lastText(yields)).toBe("Short answer.");
+      expect(opened).toEqual(["turn-research456"]);
+    } finally {
+      env.restore();
+    }
+  });
+
   // A code review (2026-09-13) found consumeSupersedes() was called after
   // `await deps.getConversationId?.()` and `abortSignal.throwIfAborted()` -
   // an abort or a getConversationId() failure before that point threw past

@@ -63,6 +63,9 @@ interface ChatPageProps {
 export function ChatPage({ person }: ChatPageProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [documentTurnId, setDocumentTurnId] = useState<string | null>(null);
+  const [conversationMode, setConversationMode] = useState<"chat" | "research">("chat");
+  const conversationModeRef = useRef<"chat" | "research">("chat");
+  conversationModeRef.current = conversationMode;
   const canViewTurnStats = person.role === "owner" || person.role === "admin" || person.role === "adult";
   const [turnStatsVisible, setTurnStatsVisible] = useState(false);
   useEffect(() => {
@@ -80,6 +83,14 @@ export function ChatPage({ person }: ChatPageProps) {
   // should land on a plain empty composer, not replay a stale prompt.
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const conversationId = searchParams.get("conversation");
+  useEffect(() => {
+    setConversationMode("chat");
+    if (!conversationId) return;
+    api.conversation(conversationId).then((conversation) => {
+      setConversationMode(conversation.mode === "research" ? "research" : "chat");
+    }).catch(() => {});
+  }, [conversationId]);
   // CHAT-20: the same conversation id the runtime below uses as its own
   // `threadId` - polling follows whichever conversation is actually open,
   // stopping on its own (chatMemoryState.ts's own cleanup) the moment the
@@ -195,6 +206,9 @@ export function ChatPage({ person }: ChatPageProps) {
         onSpeakingChange: (value) => { setIsSpeaking(value); if (value) setSpeechError(false); },
         onReplyState: (state) => { setReply(state); if (state === "waiting") setSpeechError(false); },
         onSpeechError: () => setSpeechError(true),
+        onResearchDocument: (turnId) => {
+          if (conversationModeRef.current === "research") setDocumentTurnId(turnId);
+        },
       }),
     [aui],
   );
@@ -228,6 +242,13 @@ export function ChatPage({ person }: ChatPageProps) {
                 <HistoryIcon className="size-4" />
               </Button>
               <h2 className="text-base font-semibold">Chat</h2>
+              <Button type="button" variant={conversationMode === "research" ? "secondary" : "ghost"} size="sm" aria-pressed={conversationMode === "research"} aria-label={conversationMode === "research" ? "Turn off research mode" : "Turn on research mode"} disabled={!conversationId} onClick={() => {
+                if (!conversationId) return;
+                const next = conversationMode === "research" ? "chat" : "research";
+                const previous = conversationMode;
+                setConversationMode(next);
+                void api.setConversationMode(conversationId, next).catch(() => setConversationMode(previous));
+              }}>Research</Button>
               {canViewTurnStats ? <Button type="button" variant={turnStatsVisible ? "secondary" : "ghost"} size="sm" aria-pressed={turnStatsVisible} aria-label="Show advanced reply stats" onClick={() => {
                 const next = !turnStatsVisible;
                 setTurnStatsVisible(next);

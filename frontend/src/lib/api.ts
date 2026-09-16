@@ -345,6 +345,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ title, ...(pinned === undefined ? {} : { pinned }) }),
     }),
+  setConversationMode: (id: string, mode: Conversation["mode"]) =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ mode }),
+    }),
   deleteConversation: (id: string) =>
     request<{ ok: true }>(`/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" }),
   batchDeleteConversations: (ids: string[]) =>

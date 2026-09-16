@@ -985,5 +985,12 @@
     "theme": "light",
     "capturedAt": "2026-09-16T09:44:57.072Z",
     "captureScript": "scripts/screenshot.ts --chat-stats-review"
+  },
+  "chat-research-mode-desktop-light.png": {
+    "route": "chat-research-mode",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-16T10:15:24.769Z",
+    "captureScript": "scripts/screenshot.ts --chat-research-review"
   }
 }

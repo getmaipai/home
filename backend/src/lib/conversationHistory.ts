@@ -557,6 +557,7 @@ function toConversationRecord(row: ConversationRow): Conversation {
     id: row.id,
     person: row.personId,
     surface: row.surface,
+    mode: row.mode,
     companion_id: row.companionId,
     title: row.title,
     pinned: row.pinned,
@@ -575,6 +576,7 @@ function conversationToDbValues(c: Conversation) {
     id: c.id,
     personId: c.person,
     surface: c.surface,
+    mode: c.mode ?? "chat",
     companionId: c.companion_id,
     title: c.title,
     pinned: c.pinned,
@@ -606,6 +608,7 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
     id: newConversationId(),
     person: actor.id,
     surface,
+    mode: "chat",
     companion_id: resolvedCompanionId,
     title: null,
     pinned: false,
@@ -1117,6 +1120,21 @@ export function updateConversationTitle(actor: PersonRow, id: string, title: str
     return { ok: false, status: 400, error: parsed.error.issues.map((i) => i.message).join("; ") };
   }
   db.update(conversations).set({ title: nextTitle, pinned: nextPinned, updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
+  return { ok: true, value: parsed.data };
+}
+
+/** COMP-02: switch only the presentation mode of an owned conversation.
+ * This is a preference on the thread, not a person setting: resuming or
+ * returning to this thread restores the choice, while a new conversation
+ * starts in ordinary chat mode. */
+export function updateConversationMode(actor: PersonRow, id: string, mode: "chat" | "research"): ConversationOpResult<Conversation> {
+  const found = getConversation(actor, id);
+  if (!found.ok) return found;
+  const now = new Date().toISOString();
+  const newHlc = nextHlc();
+  const parsed = Conversation.safeParse({ ...found.value, mode, updated_at: now, hlc: newHlc });
+  if (!parsed.success) return { ok: false, status: 400, error: parsed.error.issues.map((i) => i.message).join("; ") };
+  db.update(conversations).set({ mode, updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
   return { ok: true, value: parsed.data };
 }
 

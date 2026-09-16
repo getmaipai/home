@@ -2302,16 +2302,20 @@ invented for the roster's household, and added to
 
 <a id="comp-02"></a>
 
-- [ ] **COMP-02: Research mode** (S, after COMP-01)
+- [x] **COMP-02: Research mode** (S, after COMP-01, landed 2026-09-16)
 
     Objective: a conversation that keeps the pane open and streams the
-    document after the line. Files: `spec/schemas/conversation.schema.json`
-    (`mode: chat | research`, additive, fixtures), `backend/src/lib/
-    conversationHistory.ts`, `routes/conversations.ts`, `frontend/src/
-    apps/chat/ChatPage.tsx` (a header toggle). Acceptance: in research
-    mode the line is under the short budget and the document streams;
-    the bubble never carries an article (the `search_voice` family and
-    `maxWords` hold); screenshots. Exit: the suites, `bash scripts/check.sh`.
+    document after the line. Design: `docs/dev.md` "COMP-02: research
+    mode". Files: `spec/schemas/conversation.schema.json`
+    (`mode: chat | research`, additive, fixtures), the conversations table
+    and migration, `backend/src/lib/conversationHistory.ts`,
+    `routes/conversations.ts`, `backend/src/lib/turnEngine.ts`,
+    `frontend/src/apps/chat/ChatPage.tsx` and `chatModelAdapter.ts` (a
+    header toggle and automatic document handoff). Acceptance: in research
+    mode the line is under the short budget and the document streams after
+    it; the bubble never carries an article (the `search_voice` family and
+    `maxWords` hold); child delivery keeps the existing projection; screenshots.
+    Exit: the suites, `bash scripts/check.sh`.
 
 <a id="stats-01"></a>
 

@@ -298,6 +298,7 @@ export const conversations = sqliteTable(
       .notNull()
       .references(() => people.id),
     surface: text("surface").notNull(),
+    mode: text("mode").notNull().default("chat"), // chat|research
     companionId: text("companion_id"),
     title: text("title"),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),

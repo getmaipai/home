@@ -2986,7 +2986,12 @@ async function prepareTurn(
   const promptStart = performance.now();
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
-  const plan = planFor({ signal, surface, brevity: constraintsFor(conversation.id).some((c) => c.kind === "length" && /short|brief|one line/i.test(c.value)) || /\b(?:just the number(?:s)?|short answer|one line)\b/i.test(text), evidence: { choices: 0, sources: 0, deliverable: Boolean(intentFor(text, signal).deliverable) }, companion: { directness: "diplomatic", engagement: persona.engagement, complexity: persona.complexity }, band: ageBand, deferred: false, disclosureWithheld: memoryMatches.withheldForBand > 0 || Boolean(window.summaryLine) });
+  const basePlan = planFor({ signal, surface, brevity: constraintsFor(conversation.id).some((c) => c.kind === "length" && /short|brief|one line/i.test(c.value)) || /\b(?:just the number(?:s)?|short answer|one line)\b/i.test(text), evidence: { choices: 0, sources: 0, deliverable: Boolean(intentFor(text, signal).deliverable) }, companion: { directness: "diplomatic", engagement: persona.engagement, complexity: persona.complexity }, band: ageBand, deferred: false, disclosureWithheld: memoryMatches.withheldForBand > 0 || Boolean(window.summaryLine) });
+  // COMP-02: research keeps the article in the details document, so the
+  // bubble remains a short handoff. The existing plan still owns all
+  // safety, child-band and search_voice moves; this only lowers the line's
+  // word ceiling for the per-conversation research presentation.
+  const plan = conversation.mode === "research" ? { ...basePlan, max_words: Math.min(basePlan.max_words, 30) } : basePlan;
   if (memoryMatches.withheldForBand > 0) fired("disclosure.withheld");
   const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis }, plan, signal);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was

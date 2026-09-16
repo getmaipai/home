@@ -72,10 +72,11 @@ export interface ChatModelAdapterDeps {
   // a bug), so the button flips back to "Send" while audio for the reply
   // is still going, with nothing left on screen able to stop it. Wired to
   // the scheduler's own onFirstAudio/onEnded so ChatPage.tsx can show a
-  // dedicated "stop speaking" control for exactly that window.
+  // dedicated “stop speaking” control for exactly that window.
   onSpeakingChange?(speaking: boolean): void;
   /** The selected local engine must opt into image parts explicitly. */
   canUseVision?(): LocalVisionCapability;
+  onResearchDocument?(turnId: string): void;
 }
 
 // The real end-to-end streaming adapter (docs/plans/session-b-ui.md step
@@ -359,6 +360,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // in place of it, and never suppressing anything else in the
             // thread.
             if (event.value.crisis_resources) deps.onCrisisResources(event.value.crisis_resources);
+            if (event.value.document_available === true) deps.onResearchDocument?.(event.value.turn_id);
             // Fix B4 (docs/dev.md's "Chat reliability" B4): the same
             // metadata shape chatHistoryAdapter.ts attaches on reload, so
             // chatSourceCaption.tsx renders identically whether a message

@@ -21,6 +21,12 @@
       "enum": ["chat", "overlay", "pod", "robot", "tv", "phone"],
       "description": "Matches turnEngine.ts's Surface (4.5): a person may hold one open conversation per surface at a time."
     },
+    "mode": {
+      "type": "string",
+      "enum": ["chat", "research"],
+      "default": "chat",
+      "description": "How this conversation presents world-question answers: chat keeps the ordinary reply; research keeps the details pane open after a short line."
+    },
     "companion_id": {
       "type": ["string", "null"],
       "default": null,

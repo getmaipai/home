@@ -2,6 +2,7 @@
   "id": "conv-a1b2c3",
   "person": "person-a1b2c3",
   "surface": "chat",
+  "mode": "research",
   "companion_id": null,
   "title": "Weekend plans",
   "status": "open",

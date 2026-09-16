@@ -101,6 +101,38 @@ function stubFetch(options: { ttsCalls?: string[]; brain?: string; settingWrites
 // (chatMemoryActions.test.ts) and the click-through was verified live in
 // the running app instead.
 describe("ChatPage", () => {
+  test("shows the research mode control for a selected conversation and persists its toggle", async () => {
+    const modeWrites: unknown[] = [];
+    const restore = stubFetch();
+    const fallback = globalThis.fetch;
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/conversations/conv-research123" && (!init?.method || init.method === "GET")) return Response.json({ id: "conv-research123", surface: "chat", mode: "chat" });
+      if (url === "/api/conversations/conv-research123" && init?.method === "PATCH") {
+        modeWrites.push(JSON.parse(String(init.body)));
+        return Response.json({ id: "conv-research123", surface: "chat", mode: "research" });
+      }
+      return fallback(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter initialEntries={["/chat?conversation=conv-research123"]}><ChatPage person={makePerson()} /></MemoryRouter>);
+      const toggle = await view.findByRole("button", { name: "Turn on research mode" });
+      fireEvent.click(toggle);
+      await waitFor(() => expect(toggle.getAttribute("aria-pressed")).toBe("true"));
+      expect(modeWrites).toContainEqual({ mode: "research" });
+    } finally { restore(); }
+  });
+
+  test("a child sees the same research control while the existing child projection remains the boundary", async () => {
+    const restore = stubFetch();
+    try {
+      const child = { ...makePerson(), role: "child" as const };
+      const view = renderWithQueryClient(<MemoryRouter initialEntries={["/chat?conversation=conv-child123"]}><ChatPage person={child} /></MemoryRouter>);
+      const toggle = await view.findByRole("button", { name: "Turn on research mode" });
+      expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    } finally { restore(); }
+  });
+
   test("renders the composer once history loads, without crashing", async () => {
     const restore = stubFetch();
     try {

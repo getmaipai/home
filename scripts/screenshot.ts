@@ -209,6 +209,7 @@ const a11yOnly = process.argv.includes("--a11y-only");
 const chatFocusReview = process.argv.includes("--chat-focus-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview;
 const chatStatsReview = process.argv.includes("--chat-stats-review");
+const chatResearchReview = process.argv.includes("--chat-research-review");
 const settingsReview = process.argv.includes("--settings-review");
 const conversationsReview = process.argv.includes("--conversations-review");
 // Lane 15: judges the bell popover's own "Dismiss all" and the history
@@ -479,7 +480,7 @@ async function seedPeopleAndThings(sessionValue: string): Promise<void> {
   if (!owns.ok) throw new Error(`seed relationship owns failed: ${owns.status}`);
 }
 
-const PAGE_VISIT_TIMEOUT_MS = chatReview ? 90000 : 30000;
+const PAGE_VISIT_TIMEOUT_MS = chatReview || chatResearchReview ? 90000 : 30000;
 
 async function newContext(browser: Browser, viewport: ViewportSpec, theme: "light" | "dark", sessionValue: string): Promise<BrowserContext> {
   const context = await browser.newContext({
@@ -968,6 +969,63 @@ async function captureChatStatsReview(browser: Browser, sessionValue: string): P
     const screenshot = "chat-turn-stats-desktop-light.png";
     await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
     dedicatedScreenshots.push({ file: screenshot, route: "chat-turn-stats", viewport: viewport.slug, theme: "light" });
+  } finally {
+    await context.close();
+  }
+}
+
+/** COMP-02's dedicated review: enable the real per-conversation research
+ * control, send a document-bearing turn, and capture the short line with
+ * the details pane opened after the stream finishes. */
+async function captureChatResearchReview(browser: Browser, sessionValue: string): Promise<void> {
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.route("**/api/turn/stream", (route) => {
+      const value = {
+        reply: { text: "Here is the short answer." },
+        source: "model",
+        safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
+        conversation_id: "conv-research123",
+        turn_id: "turn-research123",
+        document_available: true,
+      };
+      return route.fulfill({ status: 200, contentType: "application/x-ndjson", body: `${JSON.stringify({ type: "delta", text: value.reply.text })}\n${JSON.stringify({ type: "done", value })}\n` });
+    });
+    await page.route("**/api/conversations/turns/turn-research123/document", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "doc-research123",
+        turn_id: "turn-research123",
+        revision: 1,
+        evidence_version: "outcome-research123",
+        section: { type: "lookup", query: "research mode", results: [{ title: "Research notes", line: "The details pane holds the longer source-backed answer.", source_id: "src-research123" }] },
+        sources: [{ id: "src-research123", kind: "web", title: "Research notes", url: "https://example.com/research", site: "example.com", snippet: "Research notes", source: "turn-research123", created_at: "2026-09-16T00:00:00.000Z", hlc: "1788000000000:0:example" }],
+        provenance: "composer:turn-research123:lookup",
+        created_at: "2026-09-16T00:00:00.000Z",
+        hlc: "1788000000000:0:example",
+      }),
+    }));
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.getByRole("textbox", { name: "Message input" }).fill("start a chat");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByText("Here is the short answer.", { exact: true }).waitFor();
+    const toggle = page.getByRole("button", { name: "Turn on research mode", exact: true });
+    await toggle.waitFor();
+    await toggle.click();
+    await page.getByRole("button", { name: "Turn off research mode", exact: true }).waitFor();
+    await page.getByRole("textbox", { name: "Message input" }).fill("research this");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByText("Research notes", { exact: true }).waitFor();
+    await settleAnimations(page);
+    const screenshot = "chat-research-mode-desktop-light.png";
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-research-mode", viewport: viewport.slug, theme: "light" });
   } finally {
     await context.close();
   }
@@ -1631,7 +1689,9 @@ async function main() {
 
     if (!a11yOnly && chatStatsReview) await captureChatStatsReview(browser, sessionValue);
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !notificationsReview && !conversationsReview) {
+    if (!a11yOnly && chatResearchReview) await captureChatResearchReview(browser, sessionValue);
+
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !conversationsReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -1666,7 +1726,7 @@ async function main() {
       ? []
       : conversationsReview
         ? A11Y_ONLY_COMBOS
-      : a11yOnly || settingsReview || chatReview || chatStatsReview
+      : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview
         ? A11Y_ONLY_COMBOS
         : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
 
@@ -1676,14 +1736,14 @@ async function main() {
     // seeded backend - its two combos (`A11Y_ONLY_COMBOS`) would race
     // each other's chat history if run concurrently, so this mode stays
     // sequential (pool size 1). Every other mode only ever reads.
-    const poolSize = chatReview || chatStatsReview ? 1 : CONTEXT_POOL_SIZE;
+    const poolSize = chatReview || chatStatsReview || chatResearchReview ? 1 : CONTEXT_POOL_SIZE;
     const comboResults = await runPool(combos, poolSize, async (combo): Promise<RunResult[]> => {
       const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
       if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of ((chatReview || chatStatsReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : conversationsReview ? ROUTES.filter((entry) => entry.slug === "conversations") : ROUTES)) {
+        for (const route of ((chatReview || chatStatsReview || chatResearchReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : conversationsReview ? ROUTES.filter((entry) => entry.slug === "conversations") : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -1733,7 +1793,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !notificationsReview && !conversationsReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !conversationsReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);

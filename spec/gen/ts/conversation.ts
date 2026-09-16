@@ -21,6 +21,13 @@ export const Conversation = z
       .describe(
         "Matches turnEngine.ts's Surface (4.5): a person may hold one open conversation per surface at a time.",
       ),
+    /**How this conversation presents world-question answers: chat keeps the ordinary reply; research keeps the details pane open after a short line.*/
+    mode: z
+      .enum(["chat", "research"])
+      .describe(
+        "How this conversation presents world-question answers: chat keeps the ordinary reply; research keeps the details pane open after a short line.",
+      )
+      .default("chat"),
     /**The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8).*/
     companion_id: z
       .union([
