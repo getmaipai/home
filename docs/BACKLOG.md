@@ -6478,14 +6478,13 @@ approvals are still real, unstarted work for a future session.
             erasure that leaves other people's files alone. Exit:
             `backend/tests/attachments.test.ts` and
             `bash scripts/check.sh`.
-      - [ ] **ATT-01b: document extraction and OCR** (mechanical). Wire
-            bounded local Apache Tika extraction for PDF and office files,
-            mirroring the package-host boundary and `host.ocr.read`'s
-            RapidOCR path for scans. Acceptance: text pages retain page
-            numbers, unsupported or oversized input fails safely, no
-            network call occurs, and OCR failure never sends raw bytes to
-            the model. Exit: extraction and OCR tests, then
-            `bash scripts/check.sh`.
+      - [x] **ATT-01b: document extraction and OCR** (mechanical, landed
+            2026-09-16). Added bounded local Apache Tika extraction for PDF
+            and office files, with a checksum-pinned local JAR boundary, and
+            the permission-gated RapidOCR path for scans. Unsupported,
+            oversized and failed input returns safe typed errors without
+            exposing upload bytes. Exit: `backend/tests/
+            documentExtraction.test.ts` and `bash scripts/check.sh`.
       - [ ] **ATT-01c: document outcome and composer path** (mechanical).
             Add the typed `document` outcome, bounded page chunks and
             source-backed page citations in the turn engine, mirroring

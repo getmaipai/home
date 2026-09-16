@@ -66,6 +66,7 @@ import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import { cachedFetch } from "@/lib/packageCache";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
+import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
 
 // host.fetch's real network I/O settings (2026-09-05). Rate limit: "a
@@ -983,9 +984,14 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     ocr: {
-      read(_image: unknown): string {
+      read(image: unknown): string {
         requirePermission("ocr");
-        notImplemented("ocr.read");
+        const input = image as { bytes?: unknown; media_type?: unknown };
+        const bytes = input instanceof Uint8Array ? input : input?.bytes instanceof Uint8Array ? input.bytes : null;
+        if (!bytes || typeof input?.media_type !== "string") throw new HostError("invalid_input", "host.ocr.read needs image bytes and media_type");
+        const result = runRapidOcr(bytes, input.media_type);
+        if (!result.ok) throw new HostError(result.code, result.error);
+        return result.text;
       },
     },
     config: {
