@@ -5,6 +5,7 @@ import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import type { TurnWithSources } from "@/apps/chat/chatCitations";
+import { CURRENT_LOCAL_VISION_CAPABILITY, IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -73,6 +74,8 @@ export interface ChatModelAdapterDeps {
   // the scheduler's own onFirstAudio/onEnded so ChatPage.tsx can show a
   // dedicated "stop speaking" control for exactly that window.
   onSpeakingChange?(speaking: boolean): void;
+  /** The selected local engine must opt into image parts explicitly. */
+  canUseVision?(): LocalVisionCapability;
 }
 
 // The real end-to-end streaming adapter (docs/plans/session-b-ui.md step
@@ -88,7 +91,19 @@ export interface ChatModelAdapterDeps {
 export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAdapter {
   return {
     async *run({ messages, abortSignal }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
+      const lastMessage = messages[messages.length - 1];
+      const imageAttached = lastMessage?.role === "user" && lastMessage.attachments.some((attachment) => attachment.type === "image");
       const text = lastUserText(messages);
+      if (!text && !imageAttached) return;
+      // A complete attachment can arrive here from a restored or custom
+      // runtime even when the composer adapter was bypassed. Refuse before
+      // conversation resolution or fetch so a text-only engine never sees
+      // an image and no external vision path can be reached accidentally.
+      if (imageAttached && !(deps.canUseVision?.() ?? CURRENT_LOCAL_VISION_CAPABILITY).imageParts) {
+        deps.onReplyState?.("ready");
+        yield { content: [{ type: "text", text: IMAGE_VISION_UNAVAILABLE_MESSAGE }] };
+        return;
+      }
       if (!text) return;
 
       // Stop whatever an earlier live reply was still speaking - never two

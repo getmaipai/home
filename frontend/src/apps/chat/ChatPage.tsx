@@ -12,6 +12,8 @@ import { api } from "@/lib/api";
 import { WakeWordToggle } from "@/apps/chat/WakeWordToggle";
 import { getIcon } from "@/kit/icons";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
+import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
+import { CURRENT_LOCAL_VISION_CAPABILITY } from "@/apps/chat/visionCapability";
 import { ChatChildBandContext, ChatFeedbackOpenContext, ChatFeedbackOpenSetterContext, createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
@@ -142,6 +144,10 @@ export function ChatPage({ person }: ChatPageProps) {
   composerDisabledRef.current = composerDisabledReason;
 
   const suggestionAdapter = useMemo(() => createChatSuggestionAdapter(initialText), [initialText]);
+  const imageAttachmentAdapter = useMemo(
+    () => createLocalImageAttachmentAdapter({ capability: () => CURRENT_LOCAL_VISION_CAPABILITY }),
+    [],
+  );
   // Set by `SttAutoSend` once it mounts inside `AssistantRuntimeProvider`
   // (below); `onFinalReady` below just calls whatever's there.
   const sttAutoSendRef = useRef<(() => void) | null>(null);
@@ -193,7 +199,7 @@ export function ChatPage({ person }: ChatPageProps) {
     [aui],
   );
 
-    return useLocalRuntime(chatModelAdapter, { adapters: { suggestion: suggestionAdapter, dictation: dictationAdapter, feedback: createChatFeedbackAdapter() } });
+    return useLocalRuntime(chatModelAdapter, { adapters: { attachments: imageAttachmentAdapter, suggestion: suggestionAdapter, dictation: dictationAdapter, feedback: createChatFeedbackAdapter() } });
   }
 
   const runtime = useRemoteThreadListRuntime({

@@ -109,6 +109,26 @@ describe("stripThinking", () => {
   });
 });
 
+describe("image capability boundary", () => {
+  test("refuses a complete image before any turn request reaches fetch", async () => {
+    const message = {
+      ...fakeUserMessage("What is in this?") ,
+      attachments: [{
+        id: "att-local-image",
+        type: "image",
+        name: "photo.png",
+        contentType: "image/png",
+        status: { type: "complete" as const },
+        content: [{ type: "image" as const, image: "data:image/png;base64,aGk=" }],
+      }],
+    };
+    const result = await collect([message]);
+
+    expect(result.error).toBeUndefined();
+    expect(lastText(result.yields)).toContain("cannot interpret images yet");
+  });
+});
+
 describe("createChatModelAdapter streaming", () => {
   test("a sent message's reply text streams in and each sentence is spoken automatically", async () => {
     const env = stubEnvironment(

@@ -6493,15 +6493,18 @@ approvals are still real, unstarted work for a future session.
             outcome input, and child delivery does not expose the document.
             Exit: spec, turn-engine and composer tests, then
             `bash scripts/check.sh`.
-      - [ ] **ATT-01d: image attachment adapter and vision capability**
+      - [x] **ATT-01d: image attachment adapter and vision capability**
             (mechanical, with the engine decision kept explicit). Wire the
             assistant-ui `AttachmentAdapter` shape and local image record,
             mirroring `SimpleImageAttachmentAdapter`; gate image parts on
             the selected local engine capability and use RapidOCR only for
             scans. Acceptance: image chips preview and send locally,
             unsupported engines refuse with a safe message, and no cloud
-            vision connection exists without a privacy row. Exit: frontend
-            adapter tests, capability tests and privacy check, then
+            vision connection exists without a privacy row. The current
+            selected text engine declares no image-part capability, so the
+            completed local adapter path is covered for a future local
+            vision role and the live chat path refuses before fetch. Exit:
+            frontend adapter tests, capability tests and privacy check, then
             `bash scripts/check.sh`.
       - [ ] **ATT-01e: child projection and landing gate** (mechanical).
             Apply the existing `effectiveBand` content ceiling to extracted
