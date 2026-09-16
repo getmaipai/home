@@ -3849,6 +3849,24 @@ async function readNdjson(
     .map((line) => JSON.parse(line));
 }
 
+function ndjsonReader(reader: { read: () => Promise<{ done: boolean; value?: Uint8Array }> }): () => Promise<Record<string, unknown>> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  return async () => {
+    for (;;) {
+      const newline = buffer.indexOf("\n");
+      if (newline !== -1) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        if (line.trim()) return JSON.parse(line) as Record<string, unknown>;
+      }
+      const next = await reader.read();
+      if (next.done) throw new Error("stream ended before the requested event");
+      buffer += decoder.decode(next.value, { stream: true });
+    }
+  };
+}
+
 describe("POST /api/turn/stream", () => {
   test("requires a signed-in person", async () => {
     const client = new TestClient();
@@ -3868,6 +3886,7 @@ describe("POST /api/turn/stream", () => {
     expect(events[0]?.type).toBe("turn_meta");
     expect(events[0]?.conversation_id).toBeTruthy();
     expect(events[0]?.turn_id).toBeTruthy();
+    expect((events[0] as { resume_token?: string }).resume_token).toBeTruthy();
     expect(events[1]?.type).toBe("signal");
     expect((events[1] as { signal?: { primary_act?: string } }).signal?.primary_act).toBeTruthy();
     expect(events[2]?.type).toBe("done");
@@ -3892,6 +3911,7 @@ describe("POST /api/turn/stream", () => {
     const deltas = events.filter((e) => e.type === "delta");
     const done = events.filter((e) => e.type === "done");
     expect(deltas.length).toBeGreaterThan(1);
+    expect(deltas.every((event, index) => (event as { sequence?: number }).sequence === index + 1)).toBe(true);
     expect(done).toHaveLength(1);
     // The done event's own reply text must equal every delta concatenated,
     // not just "some text" - the real proof the two paths agree.
@@ -3899,6 +3919,81 @@ describe("POST /api/turn/stream", () => {
     const value = done[0]?.value as { source: string; reply: { text: string } };
     expect(value.reply.text).toBe(concatenated);
     expect(value.source).toBe("model");
+  });
+
+  test("an interrupted stream resumes buffered deltas without starting a second turn", async () => {
+    const { client } = await owner();
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "First sentence. Second sentence. Third sentence." });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const response = await client.post("/api/turn/stream", { text: "resume this answer" });
+      expect(response.status).toBe(200);
+      const reader = response.body!.getReader();
+      const next = ndjsonReader(reader);
+      const meta = await next();
+      expect(meta.type).toBe("turn_meta");
+      expect(typeof meta.resume_token).toBe("string");
+      let firstDelta: Record<string, unknown> | undefined;
+      for (;;) {
+        const event = await next();
+        if (event.type === "delta") {
+          firstDelta = event;
+          break;
+        }
+      }
+      expect(firstDelta?.sequence).toBe(1);
+      await reader.cancel();
+
+      const resumed = await client.post("/api/turn/stream", {
+        conversation_id: meta.conversation_id,
+        turn_id: meta.turn_id,
+        resume_token: meta.resume_token,
+        resume_from: firstDelta.sequence,
+      });
+      expect(resumed.status).toBe(200);
+      const resumedEvents = await readNdjson(resumed);
+      const resumedDeltas = resumedEvents.filter((event) => event.type === "delta");
+      expect(resumedDeltas.every((event) => ((event as { sequence?: number }).sequence ?? 0) > 1)).toBe(true);
+      expect(resumedEvents.filter((event) => event.type === "done")).toHaveLength(1);
+      expect(stub.requests()).toHaveLength(1);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("a malformed or cross-person resume token is typed unavailable", async () => {
+    const { client } = await owner();
+    const response = await client.post("/api/turn/stream", { text: "keep this stream" });
+    const reader = response.body!.getReader();
+    const next = ndjsonReader(reader);
+    const meta = await next();
+    await reader.cancel();
+
+    const malformed = await client.post("/api/turn/stream", {
+      conversation_id: meta.conversation_id,
+      turn_id: meta.turn_id,
+      resume_token: "not-a-real-resume-token",
+      resume_from: 0,
+    });
+    expect(malformed.status).toBe(503);
+    expect(await malformed.json()).toMatchObject({ code: "turn_resume_unavailable" });
+
+    const created = await client.post("/api/people", { displayName: "Resume Child", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child.id });
+    const crossPerson = await childClient.post("/api/turn/stream", {
+      conversation_id: meta.conversation_id,
+      turn_id: meta.turn_id,
+      resume_token: meta.resume_token,
+      resume_from: 0,
+    });
+    expect(crossPerson.status).toBe(503);
+    expect(await crossPerson.json()).toMatchObject({ code: "turn_resume_unavailable" });
   });
 
   describe("WIRE-01: cancel", () => {

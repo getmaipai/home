@@ -150,6 +150,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       let searchFrom = 0;
       let spokenLength = 0;
       let sawTerminalEvent = false;
+      let resumeToken: string | undefined;
+      let resumeTurnId: string | undefined;
+      let lastAcknowledgedSequence = 0;
+      let reconnectAttempts = 0;
+      const MAX_RECONNECT_ATTEMPTS = 3;
       // Lane 11 item 1: true from the moment a `status`/`spoken_cue`
       // event has set the transient activity line (chatTurnActivity.ts)
       // until the next delta clears it - tracked here, not derived from
@@ -229,14 +234,22 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const supersedes = deps.consumeSupersedes();
       deps.onReplyState?.("waiting");
       try {
-        const conversationId = await deps.getConversationId?.();
+        let conversationId = await deps.getConversationId?.();
         abortSignal.throwIfAborted();
-        const response = await api.streamTurn(text, abortSignal, { thinking: deps.consumeThinking(), conversationId, supersedes });
-        // Lane 11 item 1's own forward-compatible cast (chatTurnActivity.ts's
-        // header): `status` isn't a real TurnStreamEvent member on the wire
-        // yet, the same "cast the whole event, not just a field" shape
-        // `TurnWithSources` uses for `sources` on `TurnValue` below.
-        for await (const event of readTurnStream(response)) {
+        while (!sawTerminalEvent) {
+          const response = await api.streamTurn(text, abortSignal, {
+            thinking: reconnectAttempts === 0 ? deps.consumeThinking() : undefined,
+            conversationId,
+            supersedes,
+            resumeToken,
+            turnId: resumeTurnId,
+            resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
+          });
+          // Lane 11 item 1's own forward-compatible cast (chatTurnActivity.ts's
+          // header): `status` isn't a real TurnStreamEvent member on the wire
+          // yet, the same "cast the whole event, not just a field" shape
+          // `TurnWithSources` uses for `sources` on `TurnValue` below.
+          for await (const event of readTurnStream(response)) {
           if (event.type === "turn_meta") {
             // The contract's first line on every turn (routes/turn.ts).
             // Not consumed yet (chatActionBar.tsx's "Remember this" still
@@ -245,10 +258,17 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // non-terminal event, so it must not fall into the generic
             // "else = error" branch below, which every turn would hit
             // otherwise.
+            conversationId = event.conversation_id;
+            resumeToken = event.resume_token;
+            resumeTurnId = event.turn_id;
             continue;
           }
           if (event.type === "signal") continue;
           if (event.type === "delta") {
+            if (event.sequence !== undefined) {
+              if (event.sequence <= lastAcknowledgedSequence) continue;
+              lastAcknowledgedSequence = event.sequence;
+            }
             deps.onReplyState?.("responding");
             raw += event.text;
             resolveRaw();
@@ -388,15 +408,17 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // so error handling can distinguish coded errors from generic ones.
             throw new ApiError(event.error, 503, event.code || "unavailable");
           }
-        }
-        if (!sawTerminalEvent && !abortSignal.aborted) {
-          // A code review (2026-09-04) found that a connection dropped
-          // abnormally (a proxy cutoff, a crash) between deltas and a real
-          // "done"/"error" event left this loop ending silently: no
-          // exception, so the catch below never ran, and the reply bubble
-          // just stopped growing with no banner and no way to tell it
-          // failed rather than finished.
-          throw new ApiError("The connection ended before MaiPai finished replying.", 0, "unavailable");
+          }
+          if (sawTerminalEvent || abortSignal.aborted) break;
+          if (!resumeToken || !resumeTurnId || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            // A code review (2026-09-04) found that a connection dropped
+            // abnormally (a proxy cutoff, a crash) between deltas and a real
+            // "done"/"error" event left this loop ending silently. When the
+            // server supplied a live resume token, retry the same turn; a
+            // legacy or malformed response still gets the old clear error.
+            throw new ApiError("The connection ended before MaiPai finished replying.", 0, "unavailable");
+          }
+          reconnectAttempts++;
         }
       } catch (e) {
         if (abortSignal.aborted) {

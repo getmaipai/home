@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
+import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { pickThinkingCue } from "@/lib/replyVariation";
@@ -11,7 +12,39 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId } from "@/lib/conversationHistory";
 
 export const turnRoutes = apiRouter();
-const inFlightTurns = new Map<string, { controller: AbortController; ownerId: string; cancelled: boolean }>();
+const RESUME_TTL_MS = 60_000;
+
+interface StoredStreamEvent {
+  event: TurnStreamEvent;
+  sequence: number | null;
+  afterSequence: number;
+  terminal: boolean;
+}
+
+interface StreamSubscriber {
+  controller: ReadableStreamDefaultController<Uint8Array>;
+  resumeFrom: number;
+}
+
+interface ResumeSession {
+  token: string;
+  ownerId: string;
+  conversationId: string;
+  turnId: string;
+  controller: AbortController;
+  result: Extract<TurnStreamResult, { ok: true; kind: "stream" }>;
+  events: StoredStreamEvent[];
+  subscribers: Set<StreamSubscriber>;
+  sequence: number;
+  terminal: boolean;
+  terminalDelivered: boolean;
+  cancelled: boolean;
+  expired: boolean;
+  expiryTimer: ReturnType<typeof setTimeout>;
+}
+
+const resumeSessions = new Map<string, ResumeSession>();
+const inFlightTurns = new Map<string, ResumeSession>();
 
 const cancelTurnRoute = createRoute({
   method: "post", path: "/{turn_id}/cancel", tags: ["Turns"],
@@ -30,8 +63,8 @@ turnRoutes.openapi(cancelTurnRoute, (c) => {
   const owner = flight?.ownerId ?? turnOwnerId(c.req.valid("param").turn_id);
   if (owner === null) return c.json({ error: "Turn not found" }, 404);
   if (owner !== c.get("person").id) return c.json({ error: "Cannot cancel another person's turn" }, 403);
-  const wasInFlight = Boolean(flight && !flight.cancelled);
-  if (flight && !flight.cancelled) {
+  const wasInFlight = Boolean(flight && !flight.cancelled && !flight.terminal);
+  if (flight && !flight.cancelled && !flight.terminal) {
     flight.controller.abort();
     flight.cancelled = true;
   }
@@ -87,6 +120,107 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
 const encoder = new TextEncoder();
 function ndjsonLine(event: TurnStreamEvent): Uint8Array {
   return encoder.encode(`${JSON.stringify(event)}\n`);
+}
+
+function newResumeToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+function isTerminalEvent(event: TurnStreamEvent): boolean {
+  return event.type === "done" || event.type === "error";
+}
+
+function shouldDeliver(stored: StoredStreamEvent, resumeFrom: number | null): boolean {
+  if (resumeFrom === null) return true;
+  if (stored.terminal) return true;
+  if (stored.sequence !== null) return stored.sequence > resumeFrom;
+  return stored.afterSequence > resumeFrom;
+}
+
+function detachSubscriber(session: ResumeSession, subscriber: StreamSubscriber): void {
+  session.subscribers.delete(subscriber);
+}
+
+function closeSubscriber(session: ResumeSession, subscriber: StreamSubscriber): void {
+  detachSubscriber(session, subscriber);
+  try {
+    subscriber.controller.close();
+  } catch {
+    // A client can cancel between the last enqueue and close. The session
+    // already has the terminal event buffered, so there is nothing else to
+    // do for this subscriber.
+  }
+}
+
+function appendSessionEvent(session: ResumeSession, event: TurnStreamEvent): void {
+  if (session.terminal) return;
+  const sequence = event.type === "delta" && event.sequence !== undefined ? event.sequence : null;
+  const stored: StoredStreamEvent = { event, sequence, afterSequence: session.sequence, terminal: isTerminalEvent(event) };
+  session.events.push(stored);
+  if (stored.terminal) session.terminal = true;
+  for (const subscriber of [...session.subscribers]) {
+    if (!shouldDeliver(stored, subscriber.resumeFrom)) continue;
+    try {
+      subscriber.controller.enqueue(ndjsonLine(event));
+      if (stored.terminal) {
+        session.terminalDelivered = true;
+        closeSubscriber(session, subscriber);
+      }
+    } catch {
+      detachSubscriber(session, subscriber);
+    }
+  }
+  if (session.terminal && session.expired) {
+    resumeSessions.delete(session.token);
+    inFlightTurns.delete(session.turnId);
+  }
+}
+
+function streamResponse(session: ResumeSession, resumeFrom: number | null): Response {
+  let subscriber: StreamSubscriber | undefined;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      subscriber = { controller, resumeFrom: resumeFrom ?? -1 };
+      session.subscribers.add(subscriber);
+      try {
+        controller.enqueue(ndjsonLine({ type: "turn_meta", conversation_id: session.conversationId, turn_id: session.turnId, resume_token: session.token }));
+        for (const stored of session.events) {
+          if (!shouldDeliver(stored, resumeFrom)) continue;
+          controller.enqueue(ndjsonLine(stored.event));
+          if (stored.terminal) session.terminalDelivered = true;
+        }
+        if (session.terminal) closeSubscriber(session, subscriber);
+      } catch {
+        detachSubscriber(session, subscriber);
+      }
+    },
+    cancel() {
+      if (subscriber) detachSubscriber(session, subscriber);
+      // A dropped body is recoverable. Only the explicit cancel route aborts
+      // the shared generation, so a reconnect can keep using this token.
+    },
+  });
+  return new Response(stream, { headers: { "content-type": "application/x-ndjson" } });
+}
+
+function startResumeSession(session: ResumeSession): void {
+  void (async () => {
+    try {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal)) {
+        const event = rawEvent.type === "delta" ? { ...rawEvent, sequence: ++session.sequence } : rawEvent;
+        appendSessionEvent(session, event);
+      }
+    } catch (err) {
+      // streamTurnEvents() maps generation failures to a terminal event. This
+      // guard keeps the reconnect contract terminal even if a future change
+      // makes an outer iterator failure escape that helper.
+      console.error("[turn/stream] resume session failed:", err);
+      if (!session.terminal) {
+        try { session.result.finalize(""); } catch (finalizeErr) { console.error("[turn/stream] resume finalize failed:", finalizeErr); }
+        appendSessionEvent(session, { type: "error", error: "The turn stream became unavailable.", code: "unavailable" });
+      }
+    }
+  })();
 }
 
 // How long the `chat` model's own time to first token can run before
@@ -278,11 +412,22 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     text?: string;
     thinking?: boolean;
     conversation_id?: string;
+    turn_id?: string;
+    resume_token?: string;
+    resume_from?: number;
     supersedes?: string;
     ephemeral?: boolean;
     speaker_evidence?: unknown;
     present?: unknown;
   };
+  if (body.resume_token !== undefined) {
+    const session = typeof body.resume_token === "string" ? resumeSessions.get(body.resume_token) : undefined;
+    const resumeFrom = body.resume_from;
+    if (!session || session.expired || (session.terminal && session.terminalDelivered) || session.ownerId !== actor.id || body.turn_id !== session.turnId || body.conversation_id !== session.conversationId || !Number.isInteger(resumeFrom) || resumeFrom! < 0 || resumeFrom! > session.sequence) {
+      return c.json({ error: "The turn stream is no longer available.", code: "turn_resume_unavailable" }, 503);
+    }
+    return streamResponse(session, resumeFrom!);
+  }
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn evidence", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
@@ -307,11 +452,11 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   if (ephemeral ? !personWithinEphemeralBudget(actor.id) : !personWithinTurnBudget(actor.id)) {
     return c.json(RATE_LIMIT_RESPONSE, 429);
   }
-  // COR-7 (code review, 2026-09-06): a disconnected client used to leave
-  // generation running with nothing reading it - this controller's
-  // signal reaches all the way to the real fetch (lib/llm.ts's
+  // COR-7 (code review, 2026-09-06): the session controller's signal still
+  // reaches all the way to the real fetch (lib/llm.ts's
   // startCompleteStream, spec/llm/ts/client.ts's chatCompleteStream),
-  // fired from the ReadableStream's own cancel() below.
+  // but a dropped response body only detaches its subscriber. The explicit
+  // cancel route fires this signal when the person really stops the turn.
   const abortController = new AbortController();
   const result = await runTurnStream(actor, surface, body.text ?? "", {
     thinking: body.thinking,
@@ -333,10 +478,11 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   // The contract's first line, either way (step 3): "turn_meta" before
   // anything else, so a client always knows which conversation and turn
   // this reply belongs to even if it never reads past the first line.
+  const resumeToken = newResumeToken();
   const turnMeta: TurnStreamEvent =
     result.kind === "immediate"
-      ? { type: "turn_meta", conversation_id: result.value.conversation_id, turn_id: result.value.turn_id }
-      : { type: "turn_meta", conversation_id: result.conversationId, turn_id: result.turnId };
+      ? { type: "turn_meta", conversation_id: result.value.conversation_id, turn_id: result.value.turn_id, resume_token: resumeToken }
+      : { type: "turn_meta", conversation_id: result.conversationId, turn_id: result.turnId, resume_token: resumeToken };
 
   if (result.kind === "immediate") {
     // A safety refusal or a plugin reply is already complete, deterministic
@@ -348,28 +494,35 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     });
   }
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        controller.enqueue(ndjsonLine(turnMeta));
-        controller.enqueue(ndjsonLine({ type: "signal", signal: result.signal }));
-        inFlightTurns.set(result.turnId, { controller: abortController, ownerId: actor.id, cancelled: false });
-        for await (const event of streamTurnEvents(result, actor.id, THINKING_CUE_DELAY_MS, abortController.signal)) {
-          controller.enqueue(ndjsonLine(event));
-        }
-      } finally {
-        inFlightTurns.delete(result.turnId);
-        controller.close();
+  const session: ResumeSession = {
+    token: resumeToken,
+    ownerId: actor.id,
+    conversationId: result.conversationId,
+    turnId: result.turnId,
+    controller: abortController,
+    result,
+    events: [{ event: { type: "signal", signal: result.signal }, sequence: null, afterSequence: 0, terminal: false }],
+    subscribers: new Set(),
+    sequence: 0,
+    terminal: false,
+    terminalDelivered: false,
+    cancelled: false,
+    expired: false,
+    expiryTimer: setTimeout(() => {
+      if (session.terminal) {
+        resumeSessions.delete(session.token);
+        inFlightTurns.delete(session.turnId);
+        return;
       }
-    },
-    // COR-7: called when the client disconnects mid-stream (a closed
-    // tab, a dropped connection) - without this, streamTurnEvents() kept
-    // pulling from gateOutputSafety()/chatCompleteStream() for a
-    // response nobody would ever read, tying up the engine's one
-    // generation slot for the rest of that reply's length.
-    cancel() {
-      abortController.abort();
-    },
-  });
-  return new Response(stream, { headers: { "content-type": "application/x-ndjson" } });
+      session.expired = true;
+      session.controller.abort();
+    }, RESUME_TTL_MS),
+  };
+  resumeSessions.set(session.token, session);
+  inFlightTurns.set(session.turnId, session);
+  startResumeSession(session);
+  const response = streamResponse(session, null);
+  // The initial response has a signal in its replay buffer, but its meta
+  // event is deliberately sent first and the signal stays immediately next.
+  return response;
 });

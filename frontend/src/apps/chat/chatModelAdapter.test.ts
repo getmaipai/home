@@ -27,15 +27,20 @@ function fakeUserMessage(text: string): ThreadMessage {
   };
 }
 
-function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise<never>)) {
+function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise<never>), additionalStreams: ReadableStream<Uint8Array>[] = []) {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
   const originalFetch = globalThis.fetch;
   const ttsCalls: string[] = [];
+  const turnBodies: unknown[] = [];
+  let turnCalls = 0;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/api/turn/stream")) {
+      turnBodies.push(JSON.parse(String(init?.body ?? "{}")));
       if (typeof streamBody === "function") return streamBody();
-      return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      const call = turnCalls++;
+      const body = call === 0 ? streamBody : additionalStreams[call - 1] ?? streamBody;
+      return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
     }
     if (url.includes("/api/tts")) {
       const body = JSON.parse(String(init?.body ?? "{}")) as { text?: string };
@@ -46,6 +51,7 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   }) as unknown as typeof fetch;
   return {
     ttsCalls,
+    turnBodies,
     restore: () => {
       globalThis.fetch = originalFetch;
     },
@@ -514,6 +520,38 @@ describe("createChatModelAdapter errors", () => {
       const { error } = await collect([fakeUserMessage("hi")]);
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toMatch(/check Household/);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("an interrupted stream reconnects from its sequence without duplicating acknowledged text", async () => {
+    const value = { reply: { text: "Hello world." }, source: "model", safety: SAFETY, turn_id: "turn-resume123", conversation_id: "conv-resume123" };
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "turn_meta", conversation_id: "conv-resume123", turn_id: "turn-resume123", resume_token: "resume-token-test" },
+        { type: "delta", text: "Hello", sequence: 1 },
+      ]),
+      [
+        ndjsonStream([
+          { type: "turn_meta", conversation_id: "conv-resume123", turn_id: "turn-resume123", resume_token: "resume-token-test" },
+          { type: "delta", text: "Hello", sequence: 1 },
+          { type: "delta", text: " world.", sequence: 2 },
+          { type: "done", value },
+        ]),
+      ],
+    );
+    try {
+      const result = await collect([fakeUserMessage("hi")]);
+      expect(result.error).toBeUndefined();
+      expect(lastText(result.yields)).toBe("Hello world.");
+      expect(env.turnBodies).toHaveLength(2);
+      expect(env.turnBodies[1]).toMatchObject({
+        conversation_id: "conv-resume123",
+        turn_id: "turn-resume123",
+        resume_token: "resume-token-test",
+        resume_from: 1,
+      });
     } finally {
       env.restore();
     }
