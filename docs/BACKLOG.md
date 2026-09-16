@@ -687,6 +687,53 @@ not permission to expand scope.
     agent loops or changing package side-effect semantics. Checks: tier2,
     plugins, commands, pending-ask, shared LLM tests and full exit gate.
 
+<a id="review-2026-09-16"></a>
+
+- [ ] **The chat architecture review's six corrections, in order** (program; `docs/plans/chat-architecture-review-2026-09-16.md` section 5)
+
+    The review (fb3a5d0, 159 references) found the shape right (decisions
+    in code, the model writes) and the word lists the wrong ceiling for
+    open-class judgments. The owner accepted the six corrections in the
+    review's order on 2026-09-16. Each is its own item below; the
+    program line is the place the dashboard reads.
+    - [ ] **RVW-1: The label harvest and the per-rule report** (S-M).
+      The turn row and the `[turn]` line gain the answering rung
+      (`typed_source | search | model_knowledge | failed | none`) and a
+      `corrected_next_turn` flag read from the next turn's repair; a
+      `scripts/bench/labels.ts` exports, per week, every guard hit,
+      forced lookup, correction, rung and signal source with the text
+      redacted to the roster form, into the git-ignored data directory;
+      the weekly report prints hits per guard reason and per signal
+      rule. Acceptance: a week of the dev hub exported, the counts
+      reconciled against the log, a rule with zero hits named. First,
+      because RVW-2, RVW-3 and RVW-6 train from it.
+    - [ ] **RVW-2: Human labels for the signal, then a small encoder for
+      the residual** (a person's hours, then M). The 500-turn sheet
+      (`data-scratch/eval/turn-signal-review-sheet.md`) reviewed for act,
+      stance, emotion and intensity; a MiniLM or ModernBERT-class encoder
+      fine-tuned on those labels plus the fixture's turns, calibrated,
+      thresholds on precision, ONNX on CPU under 20 ms warm p95; the
+      rules keep every decision they make today. Acceptance: section
+      12's own 5-point macro-F1 margin over the rules alone, no fixture
+      regression, the fallback rate printed. Blocked on the labeling
+      hours (the owner's, or a frontier session as the labeler with the
+      disagreement rate reported).
+    - [ ] **RVW-3: The lookup router and the logit trigger** (S-M). From
+      RVW-1's rung labels, a router predicts the rung for a world
+      question, with an evergreen feature for currency; llama-server's
+      per-token logprobs feed a hedge trigger beside the hedge words.
+    - [ ] **RVW-4: The companion voice bench** (M). Control vectors
+      trained on each companion's own example lines, one per dial; the
+      dial prose cut to the plan line plus the examples; a per-companion
+      adapter only if several companions must be live at once. Rides
+      with COMP-03.
+    - [ ] **RVW-5: Memory in the reply** (S-M). Typed bullets with
+      category and date, a measured bigger budget, a `recall` move in
+      the plan realized as a reaction or a question and never a
+      recitation, a deterministic supersede rule ahead of the 4B.
+    - [ ] **RVW-6: An encoder grounding check in shadow mode** (S),
+      adopted only if it beats the rule's false-positive rate.
+
 <a id="chat-16"></a>
 
 - [ ] **CHAT-16: Compose contextual package answers through one shared path** (M)
