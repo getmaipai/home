@@ -26,7 +26,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableQuery, deliverableInDenial, markIncluded, guardContextFrom, outcomeOf, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -1750,6 +1750,7 @@ export function lookupQueryFor(input: { subjects: readonly SubjectRef[]; sentenc
   // one that names the subject.
   const questionTurns = [input.utterance, ...[...input.history].reverse()].filter((t) => t.trim().split(/\s+/).length > 1 && !NOT_A_QUESTION_TURN_RE.test(t.trim()) && (/\?\s*$/.test(t.trim()) || /^(?:what|which|how|when|where|who|why|is|are|does|do|did|can|could|would|will|should)\b/i.test(t.trim())));
   const question = subjectName ? questionTurns.find((t) => new RegExp(subjectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").test(t)) : questionTurns[0];
+  const askedField = question ? exactFieldOf(question) : null;
   const currency = [input.utterance, question ?? ""].map((t) => CURRENCY_MARK_RE.exec(t)?.[0]).find((m): m is string => !!m);
   // LOOKUP-02's set: no world or unresolved subject on the stack and a
   // pronoun-only question ("when did it happen" after a turn about the
@@ -1781,6 +1782,7 @@ export function lookupQueryFor(input: { subjects: readonly SubjectRef[]; sentenc
     if (words.length >= 2 && content.length >= 1) return [words.join(" "), currency ?? ""].filter(Boolean).join(" ").trim();
   }
   if (field.length > 0 && subjectName) return [subjectName, field, currency && !field.toLowerCase().includes(currency.toLowerCase()) ? currency : ""].filter(Boolean).join(" ");
+  if (askedField === "synopsis" && subjectName) return `${subjectName} plot summary`;
   // The field the offer named is the query even with no subject on the
   // stack ("I'll check the weather" is "weather tomorrow", not the
   // question's leftovers; a review); the question is the fallback.

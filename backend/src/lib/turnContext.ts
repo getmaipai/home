@@ -196,6 +196,7 @@ export function exactFieldOf(utterance: string): string | null {
   if (/\bwho(?:'s| is) in\b|\bcast\b/i.test(utterance)) return "cast";
   if (/\bhow big\b|\bhow fast\b|\bwhat size\b|\bwhat resolution\b|\bspecs?\b/i.test(utterance)) return "spec";
   if (/\bwhat(?:'s| is) the policy\b|\bis it allowed\b|\bdo they allow\b/i.test(utterance)) return "policy";
+  if (/\bwhat(?:'s| is) it about\b|\bwhat happens in\b|\bthe plot\b|\bthe premise\b|\bthe story of\b|\bwhat(?:'s| is) the story\b/i.test(utterance)) return "synopsis";
   return null;
 }
 
@@ -237,7 +238,7 @@ export function lookupDecision(utterance: string, subjects: readonly SubjectRef[
   // long is the new Marsh Lantern film" asks the length, not the film;
   // a review).
   const fieldNoun = field === "date" && /\bout\b/i.test(utterance) ? "release date" : field === "price" ? "price" : /\bhow long\b/i.test(utterance) ? "length" : /\bhow old\b/i.test(utterance) ? "age" : /\bhow (?:many|much)\b/i.test(utterance) ? (countedNoun(utterance) ? "" : "how many") : field === "count" || field === "who" || field === "name" || field === "cast" ? "" : field;
-  const fieldWords = field === "date" && /\bout\b/i.test(utterance) ? "release date" : [words, words && fieldNoun && !new RegExp(`\\b${fieldNoun}\\b`, "i").test(words) ? fieldNoun : ""].filter(Boolean).join(" ") || fieldNoun || field;
+  const fieldWords = field === "synopsis" ? "plot summary" : field === "date" && /\bout\b/i.test(utterance) ? "release date" : [words, words && fieldNoun && !new RegExp(`\\b${fieldNoun}\\b`, "i").test(words) ? fieldNoun : ""].filter(Boolean).join(" ") || fieldNoun || field;
   // The subject leads and the field follows ("Marsh Lantern release
   // date"). A superlative or a time word rides between them ("Rivet
   // newest phone", "Marsh Lantern showtimes tonight" reads as "Marsh

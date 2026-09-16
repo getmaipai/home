@@ -66,6 +66,8 @@ test("exactFieldOf(): recognizes exact lookup fields and leaves stable questions
   expect(exactFieldOf("who's in it")).toBe("cast");
   expect(exactFieldOf("what resolution is it")).toBe("spec");
   expect(exactFieldOf("what's the policy")).toBe("policy");
+  expect(exactFieldOf("what's it about")).toBe("synopsis");
+  expect(exactFieldOf("is it any good")).toBeNull();
   expect(exactFieldOf("why is the sky blue")).toBeNull();
   expect(exactFieldOf("what does irony mean")).toBeNull();
   expect(exactFieldOf("how do I reset it")).toBeNull();
@@ -96,6 +98,7 @@ test("lookupDecision(): uses a current world subject, rejects dated subjects, an
   expect(lookupDecision("how long is the new Marsh Lantern film", [film], [])?.query).toBe("Marsh Lantern film length");
   expect(lookupDecision("how much is the Rivet phone", [rivet], [])).toEqual({ field: "price", query: "Rivet phone price" });
   expect(lookupDecision("when is the new Marsh Lantern film out", [film], [])?.query).toBe("Marsh Lantern release date");
+  expect(lookupDecision("what's it about", [{ type: "world", kind: "film", display_name: "Marsh Lantern", year: null, source_kind: "web", stable_key: null, recency: "current", carried_question: null }], [])).toEqual({ field: "synopsis", query: "Marsh Lantern plot summary" });
   expect(lookupDecision("how many tracks are on the new Marsh Lantern album", [film], [])?.query).toBe("Marsh Lantern tracks album");
 });
 
