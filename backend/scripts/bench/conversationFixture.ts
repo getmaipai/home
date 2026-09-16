@@ -1701,4 +1701,33 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { as: "child", say: "ok", expect: { maxWords: 40 } },
     ],
   },
+  // K5 (ALM-01 rule 2, dev.md section 16 part 6): a date a lookup
+  // returned reaches the composer with its relation to the frozen
+  // clock; the reply says "yes, today" when the 22nd is today, never
+  // the bare date. Red until K5 lands.
+  {
+    id: "lookup-date-relative",
+    category: "knowledge",
+    clock: "2026-09-22T09:00:00",
+    note: "K5 (ALM-01 rule 2): a lookup's date reaches the composer with its relation to the frozen clock; the reply uses it when the question was about timing ('yes, today', never the bare date); red until K5 lands.",
+    turns: [
+      { say: "is the Rivet OS update out as of today", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustContain: "today|yes", mustNotContain: "September 22|Sept 22|Sep 22", humanVerdict: true } },
+      { say: "how many days until the Marsh Lantern film", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch", "almanac-compute"], lookupWithSource: true, humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, humanVerdict: true } },
+    ],
+  },
+  // K4 (CONS-01 rule 4, dev.md section 16 part 9): a shape or length
+  // constraint renders a list from the result rows; a number-only
+  // answer as the number; max_sentences yields to an explicit shape.
+  // Red until K4 lands.
+  {
+    id: "list-shape-on-lookup",
+    category: "knowledge",
+    note: "K4 (CONS-01 rule 4): a shape or length constraint on a lookup reply renders a list from the result rows (up to five in the bubble), a number-only answer as the number, a one-line answer as one line; max_sentences yields to an explicit shape; red until K4 lands.",
+    turns: [
+      { say: "the new Marsh Lantern album is the one I'm waiting for", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "world", name: "Marsh Lantern", kind: "album" }], guard: null, humanVerdict: true } },
+      { say: "list the tracks", expect: { signal: { primary_act: "question" }, lookupWithSource: true, humanVerdict: true } },
+      { say: "thanks", expect: { signal: { primary_act: "closing" }, humanVerdict: true } },
+    ],
+  },
 ];
