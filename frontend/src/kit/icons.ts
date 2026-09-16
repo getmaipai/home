@@ -37,6 +37,8 @@ import {
   Activity,
   Info,
   SlidersHorizontal,
+  ThumbsUp,
+  ThumbsDown,
   type LucideIcon,
 } from "lucide-react";
 
@@ -83,6 +85,8 @@ const REGISTRY: Record<string, LucideIcon> = {
   activity: Activity,
   info: Info,
   "sliders-horizontal": SlidersHorizontal,
+  "thumbs-up": ThumbsUp,
+  "thumbs-down": ThumbsDown,
 };
 
 export function getIcon(name: string): LucideIcon {

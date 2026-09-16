@@ -1,6 +1,8 @@
 import { ExportedMessageRepository, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
 
+export type FeedbackVerdict = "positive" | "negative";
+
 /** One {message, parentId} pair per turn's user half, in the exact branch
  * shape ExportedMessageRepository.fromBranchableArray() wants. */
 export interface BranchableTurnMessages {
@@ -25,7 +27,12 @@ export interface BranchableTurnMessages {
  * same anchor as the first two, and the running chain always advances to
  * the newest row either way: whichever version was sent most recently is
  * the conversation's real current path, edit or not. */
-export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], selfName: string, conversationId: string): BranchableTurnMessages[] {
+export function rowsToBranchableMessages(
+  rows: ConversationTurnWithMemoryIds[],
+  selfName: string,
+  conversationId: string,
+  feedbackByTurn: ReadonlyMap<string, FeedbackVerdict> = new Map(),
+): BranchableTurnMessages[] {
   const parentByRowId = new Map<string, string | null>();
   let chainTail: string | null = null;
   const out: BranchableTurnMessages[] = [];
@@ -39,6 +46,7 @@ export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], 
     parentByRowId.set(row.id, parentId);
     const userId = `${row.id}-user`;
     const replyId = `${row.id}-reply`;
+    const feedbackType = feedbackByTurn.get(row.id);
     const userMessage: ThreadMessageLike = {
       id: userId,
       role: "user",
@@ -67,6 +75,7 @@ export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], 
       // `source` to tell "not yet judged" from "judged, nothing worth
       // remembering" from "a plugin turn the judge never queues."
       metadata: {
+        ...(feedbackType ? { submittedFeedback: { type: feedbackType } } : {}),
         custom: {
           turnId: row.id,
           conversationId,
@@ -94,7 +103,13 @@ export function createChatHistoryAdapter(selfName: string, getConversationId: ()
     async load() {
       const id = getConversationId();
       const rows = id ? await api.conversationTurns(id) : [];
-      const turns = id ? rowsToBranchableMessages(rows, selfName, id) : [];
+      const feedback = id
+        ? await Promise.all(rows.map(async (row) => [row.id, await api.conversationFeedback(row.id).catch(() => null)] as const))
+        : [];
+      const feedbackByTurn = new Map(
+        feedback.flatMap(([turnId, value]) => (value ? [[turnId, value.verdict === "up" ? "positive" : "negative"] as const] : [])),
+      );
+      const turns = id ? rowsToBranchableMessages(rows, selfName, id, feedbackByTurn) : [];
       const items = turns.flatMap((t) => [t.user, t.reply]);
       const headId = turns.length > 0 ? turns[turns.length - 1]!.reply.message.id : undefined;
       return ExportedMessageRepository.fromBranchableArray(items, { headId });

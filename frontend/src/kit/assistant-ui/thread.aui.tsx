@@ -29,7 +29,7 @@ import {
   ToolGroupTrigger,
 } from "@/kit/assistant-ui/tool-group.aui";
 import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
-import { ForgetThisMenuItem, ListenButton, RememberThisButton, RememberThisMenuItem } from "@/apps/chat/chatActionBar";
+import { ChatFeedbackOpenContext, FeedbackButtons, ForgetThisMenuItem, ListenButton, RememberThisButton, RememberThisMenuItem } from "@/apps/chat/chatActionBar";
 import { setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
 import { ChatSourceCaption } from "@/apps/chat/chatSourceCaption";
@@ -319,6 +319,8 @@ const ThreadMessage: FC = () => {
 };
 
 const ThreadScrollToBottom: FC = () => {
+  const feedbackOpen = useContext(ChatFeedbackOpenContext);
+  if (feedbackOpen) return null;
   return (
     <ThreadPrimitive.ScrollToBottom asChild>
       <TooltipIconButton
@@ -667,6 +669,7 @@ const AssistantActionBar: FC = () => {
         </TooltipIconButton>
       </ActionBarPrimitive.Reload>
       <ListenButton />
+      <FeedbackButtons />
       <ActionBarMorePrimitive.Root>
         <ActionBarMorePrimitive.Trigger asChild>
           <TooltipIconButton

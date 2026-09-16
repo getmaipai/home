@@ -63,6 +63,11 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.metadata!.custom!.sources).toBeUndefined();
   });
 
+  test("a reloaded feedback verdict marks the matching assistant message selected", () => {
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "a reply")], "Nova", "conv-example123", new Map([["row-1", "negative"]])));
+    expect(items[1]!.message.metadata?.submittedFeedback).toEqual({ type: "negative" });
+  });
+
   test("empty history maps to an empty thread", () => {
     expect(rowsToBranchableMessages([], "Nova", "conv-example123")).toEqual([]);
   });
@@ -141,13 +146,19 @@ describe("createChatHistoryAdapter", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (!url.endsWith("/api/conversations/conv-example123/turns")) throw new Error(`unexpected fetch: ${url}`);
-      return Promise.resolve(new Response(JSON.stringify([makeRow("row-1", "a reply")]), { status: 200 }));
+      if (url.endsWith("/api/conversations/conv-example123/turns")) {
+        return Promise.resolve(new Response(JSON.stringify([makeRow("row-1", "a reply")]), { status: 200 }));
+      }
+      if (url.endsWith("/api/conversations/turns/row-1/feedback")) {
+        return Promise.resolve(new Response(JSON.stringify({ id: "rf-abc123", turn_id: "row-1", person_id: "person-abc123", verdict: "up", reason: null, source: "test", created_at: "2026-09-04T00:00:00.000Z", hlc: "1756944000000:0:abc123" }), { status: 200 }));
+      }
+      throw new Error(`unexpected fetch: ${url}`);
     }) as unknown as typeof fetch;
     try {
       const adapter = createChatHistoryAdapter("Nova", () => "conv-example123");
       const repo = await adapter.load();
       expect(repo.messages.map(({ message }) => message.id)).toEqual(["row-1-user", "row-1-reply"]);
+      expect(repo.messages[1]!.message.metadata?.submittedFeedback).toEqual({ type: "positive" });
     } finally {
       globalThis.fetch = originalFetch;
     }

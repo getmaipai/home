@@ -1,7 +1,10 @@
-import { useState } from "react";
-import { ActionBarMorePrimitive, useAuiState } from "@assistant-ui/react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { ActionBarMorePrimitive, ActionBarPrimitive, useAuiState, type FeedbackAdapter } from "@assistant-ui/react";
+import { toast } from "sonner";
 import { getIcon } from "@/kit/icons";
 import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
+import { Button } from "@/kit/ui/button";
+import { api, type ReplyFeedback } from "@/lib/api";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useChatListenStore } from "@/apps/chat/chatListenStore";
 import { forgetMessage, rememberMessage, useChatActorId } from "@/apps/chat/chatMemoryActions";
@@ -11,6 +14,101 @@ const Volume2 = getIcon("volume-2");
 const Loader = getIcon("loader");
 const Brain = getIcon("brain");
 const Archive = getIcon("archive");
+const ThumbsUp = getIcon("thumbs-up");
+const ThumbsDown = getIcon("thumbs-down");
+
+export const ChatChildBandContext = createContext(false);
+export const ChatFeedbackOpenContext = createContext(false);
+export const ChatFeedbackOpenSetterContext = createContext<(open: boolean) => void>(() => {});
+
+const FEEDBACK_REASONS: ReadonlyArray<{ value: NonNullable<ReplyFeedback["reason"]>; label: string }> = [
+  { value: "wrong", label: "Wrong" },
+  { value: "too_long", label: "Too long" },
+  { value: "did_not_listen", label: "Didn't listen" },
+  { value: "off", label: "Off topic" },
+  { value: "unsafe", label: "Unsafe" },
+];
+// Deliberate type-floor exception (docs/UI.md, lane 7 item 3): these are
+// compact rounded-full reason tokens, the same category as chatMemoryChip.
+const REASON_CHIP_CLASS = "h-7 rounded-full px-2 text-xs";
+
+export function createChatFeedbackAdapter(): FeedbackAdapter {
+  return {
+    submit: ({ message, type }) => {
+      const turnId = message.metadata?.custom?.turnId as string | undefined;
+      if (!turnId) return;
+      void api.submitConversationFeedback(turnId, type === "positive" ? "up" : "down").catch(() => {
+        toast.error("Couldn't save feedback - try again.");
+      });
+    },
+  };
+}
+
+function FeedbackReasonRow({ turnId }: { turnId: string }) {
+  const [selected, setSelected] = useState<ReplyFeedback["reason"]>(null);
+  return (
+    <div className="flex flex-wrap items-center gap-1" data-slot="chat-feedback-reasons">
+      {FEEDBACK_REASONS.map((reason) => (
+        <Button
+          key={reason.value}
+          type="button"
+          variant={selected === reason.value ? "default" : "secondary"}
+          size="sm"
+          className={REASON_CHIP_CLASS}
+          aria-pressed={selected === reason.value}
+          onClick={() => {
+            setSelected(reason.value);
+            void api.submitConversationFeedback(turnId, "down", reason.value).catch(() => {});
+          }}
+        >
+          {reason.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+export function FeedbackButtons() {
+  const messageId = useAuiState((s) => s.message.id);
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  const childBand = useContext(ChatChildBandContext);
+  const setFeedbackOpen = useContext(ChatFeedbackOpenSetterContext);
+  const submittedFeedback = useAuiState((s) => s.message.metadata?.submittedFeedback?.type);
+  const [reasonsOpen, setReasonsOpen] = useState(false);
+
+  useEffect(() => {
+    setReasonsOpen(false);
+    setFeedbackOpen(false);
+  }, [messageId, setFeedbackOpen]);
+
+  if (!turnId) return null;
+
+  return (
+    <>
+      <ActionBarPrimitive.FeedbackPositive asChild>
+        <TooltipIconButton
+          tooltip="Helpful"
+          aria-pressed={submittedFeedback === "positive"}
+          className="data-[submitted=true]:bg-accent data-[submitted=true]:text-accent-foreground"
+          onClick={() => { setReasonsOpen(false); setFeedbackOpen(false); }}
+        >
+          <ThumbsUp />
+        </TooltipIconButton>
+      </ActionBarPrimitive.FeedbackPositive>
+      <ActionBarPrimitive.FeedbackNegative asChild>
+        <TooltipIconButton
+          tooltip="Not helpful"
+          aria-pressed={submittedFeedback === "negative"}
+          className="data-[submitted=true]:bg-accent data-[submitted=true]:text-accent-foreground"
+          onClick={() => { setReasonsOpen(!childBand); setFeedbackOpen(!childBand); }}
+        >
+          <ThumbsDown />
+        </TooltipIconButton>
+      </ActionBarPrimitive.FeedbackNegative>
+      {!childBand && reasonsOpen ? <FeedbackReasonRow turnId={turnId} /> : null}
+    </>
+  );
+}
 
 // The manual "Listen" replay (chatListenStore.ts), on every assistant
 // message's action bar - a live reply already speaks itself as it

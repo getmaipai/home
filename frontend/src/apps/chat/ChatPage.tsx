@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { WakeWordToggle } from "@/apps/chat/WakeWordToggle";
 import { getIcon } from "@/kit/icons";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
+import { ChatChildBandContext, ChatFeedbackOpenContext, ChatFeedbackOpenSetterContext, createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
 import { brainBlockReason, useEngineHealth } from "@/apps/chat/useEngineHealth";
@@ -56,6 +57,7 @@ interface ChatPageProps {
 }
 
 export function ChatPage({ person }: ChatPageProps) {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // Home's prompt box and the search palette's "Ask MaiPai" row both
   // navigate here with `state: { initialText }` (step 6) - read once,
   // not kept reactive to `location.state` changing later, since a
@@ -178,7 +180,7 @@ export function ChatPage({ person }: ChatPageProps) {
     [aui],
   );
 
-    return useLocalRuntime(chatModelAdapter, { adapters: { suggestion: suggestionAdapter, dictation: dictationAdapter } });
+    return useLocalRuntime(chatModelAdapter, { adapters: { suggestion: suggestionAdapter, dictation: dictationAdapter, feedback: createChatFeedbackAdapter() } });
   }
 
   const runtime = useRemoteThreadListRuntime({
@@ -193,7 +195,10 @@ export function ChatPage({ person }: ChatPageProps) {
 
   return (
     <ChatActorContext.Provider value={person.id}>
-      <AssistantRuntimeProvider runtime={runtime}>
+      <ChatChildBandContext.Provider value={person.role === "child"}>
+        <ChatFeedbackOpenContext.Provider value={feedbackOpen}>
+          <ChatFeedbackOpenSetterContext.Provider value={setFeedbackOpen}>
+            <AssistantRuntimeProvider runtime={runtime}>
         <SttAutoSend sendRef={sttAutoSendRef} />
         <Page title="Chat" hideTitle>
           <div className="flex items-center justify-between gap-3 px-4 py-2">
@@ -247,7 +252,10 @@ export function ChatPage({ person }: ChatPageProps) {
             </div>
           </div>
         </Page>
-      </AssistantRuntimeProvider>
+            </AssistantRuntimeProvider>
+          </ChatFeedbackOpenSetterContext.Provider>
+        </ChatFeedbackOpenContext.Provider>
+      </ChatChildBandContext.Provider>
     </ChatActorContext.Provider>
   );
 }

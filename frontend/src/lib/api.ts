@@ -5,6 +5,7 @@ import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { Issue } from "@maipai/spec/gen/ts/issue.js";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
+import type { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type {
@@ -54,6 +55,7 @@ export type Role = Person["role"];
 // re-export the types here so the rest of the frontend imports from one
 // place.
 export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry };
+export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
 export type { Relationship };
@@ -323,6 +325,12 @@ export const api = {
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
   conversationTurns: (id: string) => request<ConversationTurnWithMemoryIds[]>(`/api/conversations/${encodeURIComponent(id)}/turns`),
+  conversationFeedback: (id: string) => request<ReplyFeedback | null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`),
+  submitConversationFeedback: (id: string, verdict: ReplyFeedback["verdict"], reason: ReplyFeedback["reason"] = null) =>
+    request<ReplyFeedback>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ verdict, reason }),
+    }),
   renameConversation: (id: string, title: string | null) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "PATCH",

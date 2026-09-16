@@ -6414,7 +6414,7 @@ approvals are still real, unstarted work for a future session.
             person-scoped write table and its schema-version test. Acceptance:
             one row per person and turn upserts safely; exit: targeted backend
             tests and `bash scripts/check.sh`.
-      - [ ] **FEED-01b: feedback action bar** (mechanical). Wire
+      - [x] **FEED-01b: feedback action bar** (mechanical). Wire
             `ActionBarPrimitive.FeedbackPositive` and `FeedbackNegative`
             through assistant-ui's `FeedbackAdapter`, mirroring
             `chatMemoryActions.ts` and `chatMemoryChip`. Acceptance: down opens

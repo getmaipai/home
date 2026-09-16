@@ -199,6 +199,7 @@ async function runPool<T, R>(items: readonly T[], poolSize: number, worker: (ite
 // no `--webkit`) is unaffected by any of this.
 const SCREENS_DIR = useWebkit ? join(ROOT, "docs", "assets", "screens", "webkit") : join(ROOT, "docs", "assets", "screens");
 const HERO_PATH = useWebkit ? join(ROOT, "docs", "assets", "webkit", "hero.png") : join(ROOT, "docs", "assets", "hero.png");
+const dedicatedScreenshots: Array<{ file: string; route: string; viewport: string; theme: string }> = [];
 
 const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
@@ -757,10 +758,21 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   if (chatFocusReview) return;
   await send("Help me plan a small garden");
   await page.getByText("Start with a sunny spot and a few easy plants.", { exact: false }).waitFor();
+  // FEED-01b: capture the real adult action bar with its five fixed reason
+  // chips open. This is a dedicated review shot, not a fabricated row.
+  await page.getByRole("button", { name: "Not helpful", exact: true }).last().click();
+  await page.getByRole("button", { name: "Wrong", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Wrong", exact: true }).click();
+  await settleAnimations(page);
+  const feedbackScreenshot = `chat-feedback-reasons-${viewport.slug}-${theme}.png`;
+  await page.screenshot({ path: join(SCREENS_DIR, feedbackScreenshot) });
+  dedicatedScreenshots.push({ file: feedbackScreenshot, route: "chat-feedback-reasons", viewport: viewport.slug, theme });
   const firstUrl = page.url();
   if (!new URL(firstUrl).searchParams.get("conversation")) throw new Error("Chat did not persist its conversation id in the URL");
   await page.reload();
   await page.locator('[data-role="user"]').getByText("Help me plan a small garden", { exact: true }).waitFor();
+  const persistedFeedback = await page.getByRole("button", { name: "Not helpful", exact: true }).last().getAttribute("data-submitted");
+  if (persistedFeedback !== "true") throw new Error("Feedback verdict did not persist after chat reload");
   await page.getByRole("button", { name: "New chat", exact: true }).click();
   await send("Help me choose a book");
   if (page.url() === firstUrl) throw new Error("New chat reused the previous conversation");
@@ -1236,6 +1248,9 @@ function writeScreenshotManifest(results: RunResult[], captureScript: string): v
   const capturedAt = new Date().toISOString();
   for (const r of withFiles) {
     existing[r.screenshotFile] = { route: r.route, viewport: r.viewport, theme: r.theme, capturedAt, captureScript };
+  }
+  for (const shot of dedicatedScreenshots) {
+    existing[shot.file] = { route: shot.route, viewport: shot.viewport, theme: shot.theme, capturedAt, captureScript };
   }
   mkdirSync(SCREENS_DIR, { recursive: true });
   writeFileSync(manifestPath, JSON.stringify(existing, null, 2) + "\n");
