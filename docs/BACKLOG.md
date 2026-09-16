@@ -2350,6 +2350,152 @@ invented for the roster's household, and added to
     unchanged. Out of scope: any hub code. Exit: the spec suite, `bash
     scripts/check.sh`.
 
+<a id="chat-parity"></a>
+
+### Chat parity program (design pass, 2026-09-16)
+
+The dated inventory and product decisions are in
+`docs/plans/chat-parity-2026-09-16.md`. These items are additive follow-ups;
+they do not change the completed conversation, attachment, composer, or
+stats item text above.
+
+- [ ] **CHAT-PARITY-01: model picker and current-model caption** (S, after STATS-01)
+
+    Objective: let a parent see and choose the available healthy chat model
+    without opening owner diagnostics. Files: `frontend/src/apps/chat/`, the
+    AI settings registry, and the engine model-list route. Pattern: mirror
+    `useEngineHealth`, `SensesDock`, and the role cards in SETTINGS.md.
+    Acceptance: the picker shows only reachable models, the current choice
+    persists for the person or household scope, an unavailable choice has one
+    repair action, and a child sees only the calm default label. Out of scope:
+    model downloads and GPU tuning. Exit: backend and frontend tests,
+    responsive screenshots, `bash scripts/check.sh`.
+
+- [ ] **CHAT-PARITY-02: temporary chat retention** (S, after CHAT-PARITY-01)
+
+    Objective: provide an explicit per-conversation temporary mode that does
+    not enter normal history or memory. Files: conversation schema and
+    migration, `conversationHistory.ts`, conversation routes, `ChatPage.tsx`,
+    and `docs/user/privacy.md`. Pattern: mirror COMP-02's additive
+    conversation mode and the existing retention setting. Acceptance: the
+    mode is visible before the first send, its banner names the retention
+    behavior, temporary turns cannot create durable memory, reload does not
+    restore them into normal history, and child UI exposes no retention
+    internals. Out of scope: remote provider retention promises. Exit: spec,
+    backend, frontend, and privacy tests, `bash scripts/check.sh`.
+
+- [ ] **CHAT-PARITY-03: household share and local export** (M, after CHAT-PARITY-02)
+
+    Objective: let an adult send a conversation to a named household member
+    or save Markdown, PDF, and JSON locally. Files: conversation routes,
+    export serializers, `frontend/src/apps/chat/`, the PDF artifact path, and
+    `docs/user/chat.md`. Pattern: mirror authenticated conversation ownership,
+    sanitized source links, the batch confirmation pattern, and the PDF
+    render-and-verify flow. Acceptance: every export preserves branches,
+    sources, and timestamps; a share names one recipient and creates no public
+    URL; child profiles have no share or export controls; failed files leave no
+    partial artifact. Out of scope: cloud sharing, anonymous links, and
+    importing foreign chat formats. Exit: route, serializer, privacy,
+    permission, and rendered PDF tests, `bash scripts/check.sh`.
+
+- [ ] **CHAT-PARITY-04: continue a cut-off answer** (M, after CHAT-PARITY-01)
+
+    Objective: continue a stopped or truncated assistant answer from its last
+    stable message without pretending the missing text was generated. Files:
+    `backend/src/lib/turnEngine.ts`, `backend/src/wire.ts`,
+    `frontend/src/apps/chat/chatModelAdapter.ts`, `thread.aui.tsx`, and
+    branch tests. Pattern: mirror `chatEditSupersedes.ts`, the existing
+    assistant-ui message metadata, and the two-call composer budget. Acceptance:
+    the action appears only on an incomplete assistant turn, sends a new
+    branch with an explicit continuation instruction, keeps the original
+    immutable, stops cleanly, and never sends a third model call. Out of scope:
+    reconstructing a crashed remote provider response. Exit: stream, branch,
+    guard, and frontend tests, `bash scripts/check.sh`.
+
+- [ ] **CHAT-PARITY-05: continuous voice call controls** (M, after CHAT-PARITY-04)
+
+    Objective: support an adult hands-free voice conversation with visible
+    listening, speaking, mute, and stop states while retaining turn-level
+    safety and history. Files: `chatListenStore.ts`, the STT socket and
+    dictation adapter, sentence speech scheduler, `ChatPage.tsx`, and the
+    voice routes. Pattern: mirror the existing sentence speech and
+    `SensesDock` lifecycle states. Acceptance: one utterance creates one turn,
+    barge-in stops speech, a hard stop closes the microphone, errors return to
+    text chat, child profiles do not enable a continuous microphone, and crisis
+    resources remain an alongside banner. Out of scope: wake-word autonomy
+    and background recording. Exit: voice lifecycle tests, a phone screenshot,
+    safety tests, `bash scripts/check.sh`.
+
+- [ ] **CHAT-PARITY-06: artifacts and canvas design pass** (L, design pass first)
+
+    Objective: decide whether a private document and code workspace belongs in
+    the chat pane or is a separate package, including revision, storage,
+    execution, and child projection contracts. Files: a new design record,
+    `spec/schemas/turn-artifact.schema.json`, `frontend/src/apps/chat/`, the
+    shell pane contract, and the package permission model. Pattern: mirror
+    COMP-01 documents, the UI `DetailPane`, and ATT-01 immutable attachments.
+    Acceptance: the design names the artifact types, local storage and
+    retention, allowed runtimes, permission prompts, revision identity,
+    import/export, adult and child projections, and a testable threat model.
+    Out of scope: implementation, arbitrary code execution, public artifact
+    links, and cloud-hosted artifact apps. Exit: reviewed design and a later
+    implementation brief. No code plan is authorized by this item.
+
+- [ ] **CHAT-PARITY-07: research progress and source timeline** (M, after COMP-02 and PAGE-01)
+
+    Objective: make bounded research legible as it searches and reads sources,
+    then hand off the report to the existing details document. Files:
+    `backend/src/lib/turnEngine.ts`, `turnContext.ts`, websearch and page
+    packages, `ChatPage.tsx`, and notifications. Pattern: mirror COMP-02's
+    research mode, PAGE-01's single-page budget, status events, and the source
+    card. Acceptance: the parent sees plan, progress, source count, and a
+    stop action; the run has a declared ceiling and no linked-page fan-out; a
+    partial run is labeled partial; the final report has citations; children
+    receive the existing short projection. Out of scope: autonomous crawling,
+    hidden provider accounts, and an unbounded agent loop. Exit: bench rows,
+    source and cancellation tests, screenshots, `bash scripts/check.sh`.
+
+- [ ] **CHAT-PARITY-08: two-model comparison** (M, after CHAT-PARITY-01)
+
+    Objective: let an adult ask two selected local models the same prompt and
+    compare separate answers without merging their provenance. Files:
+    `backend/src/lib/turnEngine.ts`, model settings and health routes,
+    `frontend/src/apps/chat/`, and a comparison artifact fixture. Pattern:
+    mirror the composer comparison section, selected model metadata, and
+    `SplitView` in UI.md. Acceptance: both calls share one bounded prompt,
+    each answer has its own model and sources, one failure does not erase the
+    other, cancellation stops both, and child projection returns only the
+    safe short line. Out of scope: hidden voting, ensembles, or more than two
+    foreground model calls. Exit: backend, frontend, budget, and screenshot
+    tests, `bash scripts/check.sh`.
+
+- [ ] **CHAT-PARITY-09: owner repair summary** (S, after STATS-01)
+
+    Objective: turn engine errors into one owner-readable diagnosis and next
+    action. Files: `useEngineHealth.ts`, health and status routes, the
+    platform Repairs page, and `docs/user/fix-a-problem.md`. Pattern: mirror
+    SensesDock states, settings help text, and the existing repair route.
+    Acceptance: a failed turn identifies whether the engine is starting,
+    unreachable, or unhealthy without exposing secrets; the parent gets a
+    short retry line; the owner gets logs and a restart action behind Expert;
+    a child gets neither diagnostics nor provider names. Out of scope: silent
+    restarts and automatic model changes. Exit: route, redaction, UI, and
+    screenshot tests, `bash scripts/check.sh`.
+
+- [ ] **CHAT-PARITY-10: chat backup and restore** (M, after CHAT-PARITY-03)
+
+    Objective: include conversations, branches, attachments, sources, and
+    metadata in the household's local backup and restore path. Files:
+    `backend/src/lib/backup.ts`, conversation and attachment serializers,
+    restore routes, `frontend/src/apps/chat/`, and backup docs. Pattern: mirror
+    the household backup record, JSON export, checksummed attachments, and
+    destructive confirmation. Acceptance: a backup round-trips into a new
+    household data directory, corrupt files are rejected without partial
+    restore, secrets and provider tokens are excluded, the owner sees a
+    restore preview, and children cannot export or restore. Out of scope:
+    third-party sync and automatic cloud copies. Exit: backup fixtures,
+    restore, retention, and UI tests, `bash scripts/check.sh`.
+
 <a id="comp-01"></a>
 
 - [ ] **COMP-01: The details pane and its documents** (M, spec first, after CHAT-16)
