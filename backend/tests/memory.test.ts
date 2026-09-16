@@ -6,11 +6,11 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
-import { recall, remember, supersede, bumpUsage, drainPendingEmbeddings, getProfileParagraph, PROFILE_SOURCE } from "@/lib/memory";
+import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, getProfileParagraph, PROFILE_SOURCE } from "@/lib/memory";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { nextHlc } from "@/lib/hlc";
 import { compareHlc } from "@/lib/hlc";
-import type { PersonRow } from "@/types";
+import type { PersonRow, MemoryRecordRow } from "@/types";
 
 // Test-only mirror of memory.ts's own (unexported) vectorToBuffer: lets
 // these tests inject a known vector directly into memory_embeddings
@@ -1821,5 +1821,188 @@ describe("AGE-01 (b): household record reads by the actor's age band", () => {
     expect(childMatches.some((m) => m.record.text.includes("sensitive"))).toBe(false);
     const ownerMatches = recall(ownerRow, "sensitive household fact", { bumpUsage: false });
     expect(ownerMatches.some((m) => m.record.text.includes("sensitive"))).toBe(true);
+  });
+});
+
+describe("validAt() (CHAT-08, chunk a: a record's own validity as of a moment)", () => {
+  // Hand-built rows so every branch can be pinned down deterministically
+  // without a database at all: validAt() is pure given a row.
+  function row(overrides: Partial<{ validFrom: string | null; validTo: string | null }>) {
+    return {
+      status: "active",
+      validFrom: overrides.validFrom ?? null,
+      validTo: overrides.validTo ?? null,
+    };
+  }
+
+  test("null bounds are open: valid at every moment", () => {
+    expect(validAt(row({}), new Date("2020-01-01T00:00:00Z"))).toBe(true);
+    expect(validAt(row({}), new Date("2030-01-01T00:00:00Z"))).toBe(true);
+  });
+
+  test("valid_from is inclusive, valid_to exclusive", () => {
+    const r = row({ validFrom: "2025-05-01T00:00:00.000Z", validTo: "2025-06-01T00:00:00.000Z" });
+    expect(validAt(r, new Date("2025-04-30T23:59:59.000Z"))).toBe(false);
+    expect(validAt(r, new Date("2025-05-01T00:00:00.000Z"))).toBe(true);
+    expect(validAt(r, new Date("2025-05-31T23:59:59.000Z"))).toBe(true);
+    expect(validAt(r, new Date("2025-06-01T00:00:00.000Z"))).toBe(false);
+    expect(validAt(r, new Date("2025-06-01T00:00:01.000Z"))).toBe(false);
+  });
+
+  test("a bare valid_to ends at the end of its day, not the start of it", () => {
+    const r = row({ validTo: "2025-05-01" });
+    // "valid through May 1" means May 1 still counts; out of range only
+    // from May 2 onward.
+    expect(validAt(r, new Date("2025-04-30T00:00:00Z"))).toBe(true);
+    expect(validAt(r, new Date("2025-05-01T00:00:00Z"))).toBe(true);
+    expect(validAt(r, new Date("2025-05-01T23:59:59Z"))).toBe(true);
+    expect(validAt(r, new Date("2025-05-02T00:00:00Z"))).toBe(false);
+  });
+
+  test("a malformed bound never hides a fact: treated as open", () => {
+    const r1 = row({ validFrom: "not-a-date" });
+    expect(validAt(r1, new Date("2020-01-01T00:00:00Z"))).toBe(true);
+    const r2 = row({ validTo: "not-a-date" });
+    expect(validAt(r2, new Date("2099-01-01T00:00:00Z"))).toBe(true);
+  });
+});
+
+describe("recall() asOf (CHAT-08, chunk a: the one recall reader reads a record as of a moment)", () => {
+  test("a record past its valid_to is out of range at a later moment; inside its window, in", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const created = remember(ownerRow, {
+      text: "the house we lived in in 2020",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.7,
+      valid_from: "2020-01-01T00:00:00.000Z",
+      valid_to: "2021-01-01T00:00:00.000Z",
+    });
+    expect(created.ok).toBe(true);
+
+    const during = recall(ownerRow, "the house we lived in", { asOf: new Date("2020-06-01T00:00:00Z"), bumpUsage: false });
+    expect(during.some((m) => m.record.text.includes("2020"))).toBe(true);
+
+    const after = recall(ownerRow, "the house we lived in", { asOf: new Date("2021-06-01T00:00:00Z"), bumpUsage: false });
+    expect(after.some((m) => m.record.text.includes("2020"))).toBe(false);
+  });
+
+  test("a record not yet started (valid_from in the future of the moment) is not in range yet", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const created = remember(ownerRow, {
+      text: "the move to the new house in 2022",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.7,
+      valid_from: "2022-01-01T00:00:00.000Z",
+    });
+    expect(created.ok).toBe(true);
+
+    const before = recall(ownerRow, "the move to the new house", { asOf: new Date("2021-06-01T00:00:00Z"), bumpUsage: false });
+    expect(before.some((m) => m.record.text.includes("2022"))).toBe(false);
+
+    const after = recall(ownerRow, "the move to the new house", { asOf: new Date("2022-06-01T00:00:00Z"), bumpUsage: false });
+    expect(after.some((m) => m.record.text.includes("2022"))).toBe(true);
+  });
+
+  test("a valid_to at the last second of today, local, is still valid at 23:00 today and not at 00:01 tomorrow", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const validTo = new Date(2023, 4, 1, 23, 59, 59).toISOString();
+    const created = remember(ownerRow, {
+      text: "the old dog, gone in spring 2023",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.7,
+      valid_to: validTo,
+    });
+    expect(created.ok).toBe(true);
+
+    const onTheDay = recall(ownerRow, "the old dog", { asOf: new Date(2023, 4, 1, 23, 0, 0), bumpUsage: false });
+    expect(onTheDay.some((m) => m.record.text.includes("old dog"))).toBe(true);
+
+    const nextDay = recall(ownerRow, "the old dog", { asOf: new Date(2023, 4, 2, 0, 1, 0), bumpUsage: false });
+    expect(nextDay.some((m) => m.record.text.includes("old dog"))).toBe(false);
+  });
+
+  test("includeSuperseded: true surfaces a superseded record valid at the moment; a plain recall never does", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const old = remember(ownerRow, {
+      text: "the house we used to live in on Maple Street",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.7,
+      valid_to: "2099-01-01T00:00:00.000Z",
+    });
+    expect(old.ok).toBe(true);
+    if (!old.ok) return;
+
+    // A plain supersede, no contradiction: valid_to stays as written, so
+    // the old record is valid at the historical moment but no longer
+    // the current fact.
+    const sup = supersede(ownerRow, old.value.id, { text: "the house we live in on Elm Street", source: "test", category: "fact", tier: "durable" });
+    expect(sup.ok).toBe(true);
+
+    // A current read: the superseded record never surfaces, only the
+    // new one.
+    const current = recall(ownerRow, "the house we live in", { bumpUsage: false });
+    expect(current.some((m) => m.record.text.includes("Maple"))).toBe(false);
+    expect(current.some((m) => m.record.text.includes("Elm"))).toBe(true);
+
+    // A historical read at a moment when the old record was still valid:
+    // it surfaces.
+    const historical = recall(ownerRow, "the house we used to live in", { asOf: new Date("2020-01-01T00:00:00Z"), includeSuperseded: true, bumpUsage: false });
+    expect(historical.some((m) => m.record.text.includes("Maple"))).toBe(true);
+  });
+});
+
+describe("list() asOf (CHAT-08, chunk a: the list read reads a record as of a moment)", () => {
+  test("a record past its valid_to is out of the list at a later moment; inside its window, in", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const created = remember(ownerRow, {
+      text: "the old garden shed from 2019",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      valid_from: "2019-01-01T00:00:00.000Z",
+      valid_to: "2020-01-01T00:00:00.000Z",
+    });
+    expect(created.ok).toBe(true);
+
+    const during = list(ownerRow, { asOf: new Date("2019-06-01T00:00:00Z") });
+    expect(during.some((r) => r.text.includes("garden shed"))).toBe(true);
+
+    const after = list(ownerRow, { asOf: new Date("2020-06-01T00:00:00Z") });
+    expect(after.some((r) => r.text.includes("garden shed"))).toBe(false);
+  });
+
+  test("list() stays active-status only: a superseded record is never in the list, even with asOf", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const old = remember(ownerRow, {
+      text: "the house we used to live in on Cedar Street",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      valid_to: "2099-01-01T00:00:00.000Z",
+    });
+    expect(old.ok).toBe(true);
+    if (!old.ok) return;
+    const sup = supersede(ownerRow, old.value.id, { text: "the house we live in on Birch Street", source: "test", category: "fact", tier: "durable" });
+    expect(sup.ok).toBe(true);
+
+    const rows = list(ownerRow, { asOf: new Date("2020-01-01T00:00:00Z") });
+    expect(rows.some((r) => r.text.includes("Cedar"))).toBe(false);
+    expect(rows.some((r) => r.text.includes("Birch"))).toBe(true);
   });
 });

@@ -8,7 +8,7 @@
 // What's built here and what's deferred is documented in
 // docs/dev.md and repeated at the point it matters below; read that
 // before extending this file.
-import { eq, and, ne, lt, isNull, isNotNull, inArray, notInArray } from "drizzle-orm";
+import { eq, and, or, ne, lt, isNull, isNotNull, inArray, notInArray } from "drizzle-orm";
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people, conversationTurns, entities } from "@/db/schema";
@@ -60,6 +60,47 @@ function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, 
   const band = speakerAgeBand(actor, new Date());
   if (band === "child") return record.childDisclosure === "child_ok";
   if (band === "teen") return record.childDisclosure === "child_ok" || record.childDisclosure === "teen_ok";
+  return true;
+}
+
+// CHAT-08 (a): whether a record is valid at a moment, by its own
+// validity bounds, independent of status (status is filtered separately
+// everywhere a read happens - this is about the fact's own time range,
+// not about whether the record is still the current one). `valid_from`
+// is inclusive, `valid_to` exclusive; null bounds are open. A bare
+// date (`valid_to` with no time part, 10 chars, as `remember()` and
+// `supersede()` accept) ends at the END of its day, not its start - the
+// exact convention runMaintenance() already applies when it archives
+// past a bare `valid_to`, so a record "valid through May 1" is read
+// back through May 1, and only from May 2 onward is it out of range.
+// A bound that isn't a real calendar timestamp is treated as open,
+// never as hiding a fact: a malformed `valid_from` can never make a
+// record invisible to a read, and a malformed `valid_to` can never
+// make a record expire - the same "never hide a fact" posture
+// remember() takes on a malformed `valid_from`.
+export function validAt(
+  record: Pick<MemoryRecordRow, "validFrom" | "validTo" | "status">,
+  asOf: Date,
+): boolean {
+  const asOfMs = asOf.getTime();
+  if (record.validFrom) {
+    const fromMs = new Date(record.validFrom).getTime();
+    if (!Number.isNaN(fromMs) && fromMs > asOfMs) return false;
+  }
+  if (record.validTo) {
+    if (record.validTo.length === 10) {
+      // Bare date: the record is valid through and including that day,
+      // i.e. through the END of its local day. Read the three parts and
+      // build local midnight at the end of that day - never
+      // `new Date("YYYY-MM-DD")`, which parses as UTC.
+      const [y = 0, m = 0, d = 0] = record.validTo.split("-").map(Number);
+      const endMs = new Date(y, m - 1, d + 1, 0, 0, 0).getTime();
+      if (asOfMs >= endMs) return false;
+    } else {
+      const toMs = new Date(record.validTo).getTime();
+      if (!Number.isNaN(toMs) && asOfMs >= toMs) return false;
+    }
+  }
   return true;
 }
 
@@ -373,15 +414,23 @@ export interface ListOptions {
   /** See canRead()'s own comment: turn-scoped recall only, never the
    * parental-view routes. */
   selfOnly?: boolean;
+  /** CHAT-08 (a): read a record as of this moment by its own validity
+   * bounds (validAt() above). Defaults to "now" (the calling moment)
+   * when omitted, which is what a bare list/recall read means today: a
+   * record already past its valid_to is out of range, one whose
+   * valid_from hasn't started yet isn't in range yet either. */
+  asOf?: Date;
 }
 
 /** Browsing: sorted, filtered, but never touches uses/last_used_at (that's
  * recall's job, see below: only an actual query "recalls" a memory). */
 export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
   const roleOf = rolesById();
+  const asOf = opts.asOf ?? new Date();
   let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
+  rows = rows.filter((r) => validAt(r, asOf));
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
   rows.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -445,16 +494,24 @@ export interface RecallOptions extends ListOptions {
    * retracted statement's facts are hidden here and archived by
    * logTurn() once the edit is a real row. */
   excludeSource?: string;
-  /** The query's own embedding (step 5), pre-computed by the caller:
-   * recall() itself stays synchronous (pure scoring given a vector it's
-   * handed is CPU work, not I/O), so any caller that can afford the
-   * async embed() round trip (turnEngine.ts's prepareTurn, already
-   * async; packageHost.ts's Host.memory.recall, made async for exactly
-   * this) computes it first. Omitted (or when the embed backend is
-   * down) falls back to keyword overlap for every candidate - the exact
-   * placeholder behavior this step replaces, kept as the real fallback
-   * it always was. */
+   /** The query's own embedding (step 5), pre-computed by the caller:
+    * recall() itself stays synchronous (pure scoring given a vector it's
+    * handed is CPU work, not I/O), so any caller that can afford the
+    * async embed() round trip (turnEngine.ts's prepareTurn, already
+    * async; packageHost.ts's Host.memory.recall, made async for exactly
+    * this) computes it first. Omitted (or when the embed backend is
+    * down) falls back to keyword overlap for every candidate - the exact
+    * placeholder behavior this step replaces, kept as the real fallback
+    * it always was. */
   queryVector?: Float32Array;
+  /** CHAT-08 (a): true only for an explicit historical read (a caller
+   * asking "what was true at this moment"). Superseded records that
+   * were valid at the asOf moment then surface; a current read (asOf
+   * omitted or the turn's frozen now) never does - a superseded record
+   * is no longer the current fact, regardless of what moment it was
+   * valid at. Tombstones, privacy-denied records, and retention
+   * archives stay excluded by canRead()/status, not by this flag. */
+  includeSuperseded?: boolean;
 }
 
 // Legacy's tuned values (ported verbatim, session-a-intelligence.md step
@@ -606,7 +663,15 @@ function activeStatusScopePersonWhere(opts: ListOptions) {
 
 export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}): RecallResult {
   const roleOf = rolesById();
-  let rows = db.select().from(memoryRecords).where(activeStatusScopePersonWhere(opts)).all();
+  const asOf = opts.asOf ?? new Date();
+  const conditions = [
+    opts.includeSuperseded
+      ? or(eq(memoryRecords.status, "active"), eq(memoryRecords.status, "superseded"))
+      : eq(memoryRecords.status, "active"),
+  ];
+  if (opts.scope) conditions.push(eq(memoryRecords.scope, opts.scope));
+  if (opts.person) conditions.push(eq(memoryRecords.person, opts.person));
+  let rows = db.select().from(memoryRecords).where(and(...conditions)).all().filter((r) => validAt(r, asOf));
   // Never the profile paragraph: turnEngine.ts's buildSystemPrompt()
   // already injects it unconditionally via getProfileParagraph(), "not
   // a recall() candidate... never something that competes with other
@@ -773,7 +838,8 @@ export function similarByVector(
   candidateRecordKind: "memory" | "entity" = "memory",
 ): SimilarMatch[] {
   const roleOf = rolesById();
-  let rows = db.select().from(memoryRecords).where(activeStatusScopePersonWhere(opts)).all();
+  const asOf = opts.asOf ?? new Date();
+  let rows = db.select().from(memoryRecords).where(activeStatusScopePersonWhere(opts)).all().filter((r) => validAt(r, asOf));
   // A plain fact ("Rover: a family friend" vs. free-text prose) must
   // never dedupe against an existing entity record - a code review
   // (2026-09-05) found that without this exclusion, a fact whose
