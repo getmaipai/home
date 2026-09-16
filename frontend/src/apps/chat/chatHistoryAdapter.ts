@@ -84,6 +84,7 @@ export function rowsToBranchableMessages(
           source: row.source,
           pluginId: row.pluginId,
           commandId: row.commandId,
+          documentAvailable: Boolean(row.document),
           sources: row.sources,
           media: row.media,
         },

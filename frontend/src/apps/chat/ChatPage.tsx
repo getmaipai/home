@@ -22,6 +22,7 @@ import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 import { consumeSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { cn, FOCUS_RING } from "@/kit/utils";
+import { ChatDocumentOpenContext, ChatDocumentPane } from "@/apps/chat/chatDocumentPane";
 import type { Roster } from "@/lib/api";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
@@ -58,6 +59,7 @@ interface ChatPageProps {
 
 export function ChatPage({ person }: ChatPageProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [documentTurnId, setDocumentTurnId] = useState<string | null>(null);
   // Home's prompt box and the search palette's "Ask MaiPai" row both
   // navigate here with `state: { initialText }` (step 6) - read once,
   // not kept reactive to `location.state` changing later, since a
@@ -198,10 +200,11 @@ export function ChatPage({ person }: ChatPageProps) {
       <ChatChildBandContext.Provider value={person.role === "child"}>
         <ChatFeedbackOpenContext.Provider value={feedbackOpen}>
           <ChatFeedbackOpenSetterContext.Provider value={setFeedbackOpen}>
-            <AssistantRuntimeProvider runtime={runtime}>
-        <SttAutoSend sendRef={sttAutoSendRef} />
-        <Page title="Chat" hideTitle>
-          <div className="flex items-center justify-between gap-3 px-4 py-2">
+            <ChatDocumentOpenContext.Provider value={setDocumentTurnId}>
+              <AssistantRuntimeProvider runtime={runtime}>
+                <SttAutoSend sendRef={sttAutoSendRef} />
+                <Page title="Chat" hideTitle>
+                  <div className="flex items-center justify-between gap-3 px-4 py-2">
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" aria-label={threadsOpen ? "Hide threads" : "Show threads"} aria-expanded={threadsOpen} aria-controls="chat-threads" onClick={() => setThreadsOpen((open) => !open)}>
                 <HistoryIcon className="size-4" />
@@ -219,9 +222,9 @@ export function ChatPage({ person }: ChatPageProps) {
             <SensesDock health={health} reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError}>
               <WakeWordToggle onStatusChange={onEarStatus} onWakeDetected={() => setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.")} />
             </SensesDock>
-          </div>
-          {banner ? <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div> : null}
-          <div className="relative flex min-h-0 flex-1">
+                  </div>
+                  {banner ? <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div> : null}
+                  <div className="relative flex min-h-0 flex-1">
             <aside id="chat-threads" hidden={!threadsOpen}
               // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard-scrollable conversation navigation.
               tabIndex={0}
@@ -250,9 +253,11 @@ export function ChatPage({ person }: ChatPageProps) {
                 </>}
               />
             </div>
-          </div>
-        </Page>
-            </AssistantRuntimeProvider>
+                    <ChatDocumentPane turnId={documentTurnId} onClose={() => setDocumentTurnId(null)} />
+                  </div>
+                </Page>
+              </AssistantRuntimeProvider>
+            </ChatDocumentOpenContext.Provider>
           </ChatFeedbackOpenSetterContext.Provider>
         </ChatFeedbackOpenContext.Provider>
       </ChatChildBandContext.Provider>

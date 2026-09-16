@@ -8,6 +8,7 @@ import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
+import type { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import type {
   Roster,
   TurnValue,
@@ -325,6 +326,7 @@ export const api = {
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
   conversationTurns: (id: string) => request<ConversationTurnWithMemoryIds[]>(`/api/conversations/${encodeURIComponent(id)}/turns`),
+  conversationTurnDocument: (id: string) => request<TurnArtifact>(`/api/conversations/turns/${encodeURIComponent(id)}/document`),
   conversationFeedback: (id: string) => request<ReplyFeedback | null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`),
   submitConversationFeedback: (id: string, verdict: ReplyFeedback["verdict"], reason: ReplyFeedback["reason"] = null) =>
     request<ReplyFeedback>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, {

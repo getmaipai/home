@@ -9,6 +9,8 @@ import { db } from "@/db";
 import { conversationTurns, replyFeedback } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { canAccessPerson } from "@/lib/access";
+import { projectDocument } from "@/lib/composer";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { nextHlc } from "@/lib/hlc";
 import { newReplyFeedbackId } from "@/lib/id";
 import {
@@ -244,7 +246,12 @@ conversationsRoutes.openapi(documentRoute, (c) => {
   if (!turn || !turn.document) return c.json({ error: "document not found" }, 404);
   try {
     const parsed = TurnArtifact.safeParse(JSON.parse(turn.document));
-    return parsed.success && parsed.data.turn_id === turn.id ? c.json(parsed.data, 200) : c.json({ error: "document not found" }, 404);
+    if (!parsed.success || parsed.data.turn_id !== turn.id) return c.json({ error: "document not found" }, 404);
+    // COMP-01d: the stored artifact is the adult document. A child gets the
+    // same bounded content after the shared projection removes every source
+    // link, so the details pane cannot disclose an external citation.
+    const projected = projectDocument(parsed.data, speakerAgeBand(actor, new Date()));
+    return c.json(projected as typeof parsed.data, 200);
   } catch {
     return c.json({ error: "document not found" }, 404);
   }

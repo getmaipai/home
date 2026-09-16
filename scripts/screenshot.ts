@@ -859,6 +859,73 @@ async function capturePaletteOpen(browser: Browser, sessionValue: string, viewpo
   }
 }
 
+/** COMP-01d's dedicated review: the seeded backend has no package call in
+ * the ordinary garden script, so this isolated browser route supplies one
+ * bounded document response without changing the persisted demo household.
+ * The handle, fetch, responsive surface and source projection are still
+ * exercised by the real built chat page and the real document endpoint path. */
+async function captureChatDocumentPane(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.route("**/api/turn/stream", (route) => {
+      const value = {
+        reply: { text: "Here are the saved details." },
+        source: "model",
+        safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
+        conversation_id: "conv-document123",
+        turn_id: "turn-document123",
+        document_available: true,
+      };
+      return route.fulfill({ status: 200, contentType: "application/x-ndjson", body: `${JSON.stringify({ type: "delta", text: value.reply.text })}\n${JSON.stringify({ type: "done", value })}\n` });
+    });
+    await page.route("**/api/conversations/turns/turn-document123/document", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "doc-document123",
+        turn_id: "turn-document123",
+        revision: 1,
+        evidence_version: "outcome-document123",
+        section: {
+          type: "lookup",
+          query: "family hiking trails",
+          results: [{ title: "Greenway Trail", line: "A short trail for families.", source_id: "src-document123" }],
+        },
+        sources: [{
+          id: "src-document123",
+          kind: "web",
+          title: "Greenway Trail guide",
+          url: "https://example.com/greenway",
+          site: "example.com",
+          snippet: "A short trail for families.",
+          source: "turn-document123",
+          created_at: "2026-09-16T00:00:00.000Z",
+          hlc: "1788000000000:0:example",
+        }],
+        provenance: "composer:turn-document123:lookup",
+        created_at: "2026-09-16T00:00:00.000Z",
+        hlc: "1788000000000:0:example",
+      }),
+    }));
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.getByRole("textbox", { name: "Message input" }).fill("show saved details");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByRole("button", { name: "View details", exact: true }).waitFor();
+    await page.getByRole("button", { name: "View details", exact: true }).click();
+    await page.getByText("Greenway Trail", { exact: true }).waitFor();
+    await settleAnimations(page);
+    const screenshot = `chat-document-pane-${viewport.slug}-${theme}.png`;
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-document-pane", viewport: viewport.slug, theme });
+  } finally {
+    await context.close();
+  }
+}
+
 /** Lane 11 item 2's own acceptance: "the screenshot script gains the
  * section (desktop and phone), opened and judged." The route matrix's
  * own /memory capture never sees this section - Radix's Tabs.Content
@@ -1458,6 +1525,14 @@ async function main() {
     // asked for that.
     if (notificationsReview && !chatReview && !settingsReview) {
       await captureNotificationsReview(browser, sessionValue);
+    }
+
+    if (!a11yOnly && chatReview) {
+      for (const combo of A11Y_ONLY_COMBOS) {
+        const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
+        if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
+        await captureChatDocumentPane(browser, sessionValue, viewport, combo.theme);
+      }
     }
 
     if (!a11yOnly && !settingsReview && !chatReview && !notificationsReview) {

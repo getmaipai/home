@@ -37,6 +37,7 @@ import { ChatMedia, markCitations, type TurnWithMedia, type TurnWithSources } fr
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { createCitationComponents } from "@/apps/chat/chatCitationLink";
 import { SourcesCard } from "@/apps/chat/chatSourcesCard";
+import { ChatDocumentHandle } from "@/apps/chat/chatDocumentPane";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
 import { Button } from "@/kit/ui/button";
 import { Skeleton } from "@/kit/ui/skeleton";
@@ -631,6 +632,7 @@ const AssistantMessage: FC = () => {
       >
         <BranchPicker />
         <AssistantActionBar />
+        <ChatDocumentHandle />
         <MessageTimestamp />
       </div>
     </MessagePrimitive.Root>

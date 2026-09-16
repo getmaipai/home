@@ -353,6 +353,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   commandId: event.value.command_id,
                   turnId: event.value.turn_id,
                   conversationId,
+                  documentAvailable: event.value.document_available === true,
                   // Lane 10 item 1: not on TurnValue yet, same
                   // forward-compatible read chatHistoryAdapter.ts uses,
                   // so a live reply carries sources the moment CHAT-16

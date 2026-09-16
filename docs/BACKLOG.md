@@ -2292,7 +2292,7 @@ invented for the roster's household, and added to
       none, child projection keeps the ceiling and strips sources, and
       new evidence creates a new revision. Exit: composer and engine
       tests plus `bash scripts/check.sh`.
-    - [ ] **COMP-01d: details pane** (mechanical). Add the handle and
+    - [x] **COMP-01d: details pane** (mechanical). Add the handle and
       responsive pane under `frontend/src/apps/chat/`. Mirror
       `chatSourcesCard.tsx` and the shell's `UI.md` responsive rules.
       Acceptance: desktop uses a side pane, phones use a bottom sheet,
