@@ -17592,3 +17592,97 @@ The mechanical follow-ups are pickup-ready:
   `exportLabels()`'s weekly JSONL path. Acceptance: `turn_id` places
   verdict and reason beside rung and fired rules, with no reply mutation.
   Exit: labels tests, a reconciled fixture export, and `bash scripts/check.sh`.
+
+## STATS-01: the advanced view
+
+The advanced view answers a narrow adult question: what did the engine do
+while producing this reply? It is operational telemetry attached to the
+reply, not a second transcript and not a model-confidence claim. A child
+band never receives or renders it. An adult gets a compact readout only
+after turning on the per-person `ui.show_turn_stats` setting, which is off
+by default and is deliberately separate from the household's engine
+health page.
+
+### Decision
+
+`TurnStats` is an additive, nullable object on `TurnValue` and on the
+hub-internal conversation-turn row. Every member is nullable because the
+stub engine, an older llama-server, a deterministic package answer, and a
+stream that ends without a final timing frame are all valid states. The
+shape is:
+
+```ts
+interface TurnStats {
+  prompt_tokens: number | null;
+  predicted_tokens: number | null;
+  tokens_per_second: number | null;
+  time_to_first_token_ms: number | null;
+  total_time_ms: number | null;
+  context_tokens: number | null;
+  context_used_percent: number | null;
+  cache_reuse_tokens: number | null;
+  cache_reuse_percent: number | null;
+  engine: string | null;
+  stop_reason: string | null;
+}
+```
+
+The engine-owned values are `prompt_tokens`, `predicted_tokens`,
+`tokens_per_second`, `cache_reuse_tokens`, `cache_reuse_percent`, and
+`stop_reason` when llama-server's final streamed chunk provides its
+`usage` or `timings` fields. `time_to_first_token_ms` is MaiPai's own
+elapsed measurement from the turn start to the first generated delta.
+`total_time_ms` is MaiPai's elapsed measurement through finalization.
+`context_tokens` is the prompt token count, and
+`context_used_percent` is left null until the engine exposes a verified
+context-window size. This avoids presenting a prompt-size estimate as a
+context-capacity fact. `engine` is `formatEngineIdentity()` from
+`lib/engineIdentity.ts`, so it contains only the host label, build, and
+model file name. It never contains a hostname, URL, path, or model hash.
+
+The stream client owns parsing the final chunk and returns a small mutable
+stats carrier beside its token generator. The turn engine combines that
+carrier with `TurnTimings` when it finalizes the reply. Missing or invalid
+numbers become `null`, never `NaN`, `Infinity`, or a fabricated zero.
+`tokens_per_second` uses llama-server's value when present, otherwise it
+is computed only from positive predicted tokens and positive predicted
+milliseconds. Cache percentage is `cache_n / (cache_n + prompt_n)` only
+when that denominator is positive. The `[turn]` log line carries the same
+sanitized object as the route, making a screen readout and an operational
+record agree.
+
+The adult UI places a `Details` toggle in the chat surface and a compact
+one-line stats caption under each assistant reply, in the same placement
+as `ChatSourceCaption`. The toggle state is persisted at person scope,
+off by default. A tap or keyboard activation of the caption opens a kit
+popover with the full list. The message metadata carries the same object
+for live and reloaded turns, so the view does not change after a reload.
+Child-band projection drops the object before rendering, and the child
+band has no toggle, caption, or popover path. Stats are explanatory
+telemetry only: they do not alter routing, safety, budgets, or retention.
+
+### Alternatives rejected
+
+- Put raw llama-server chunks on `TurnValue`: rejected because the raw
+  payload is unstable, can contain fields the UI does not need, and would
+  make the hostname or model path easy to expose accidentally.
+- Require stats on every turn: rejected because deterministic replies and
+  older engines do not have engine timings; additive nullability keeps
+  existing clients and fixtures valid.
+- Derive context percentage from the configured context override:
+  rejected until the active engine confirms that capacity. A prompt count
+  without a verified denominator is shown as a count only.
+- Put the toggle in a household or browser setting: rejected because the
+  advanced view is an adult's preference and must follow that person to
+  their other signed-in device without changing another adult's view.
+- Show any of this in the child band or include engine URLs/hostnames:
+  rejected by the child disclosure and privacy boundaries.
+
+### Acceptance
+
+The backend fixture stream with `usage`, `timings`, and `finish_reason`
+produces the corresponding numbers; the same stream without `timings`
+produces nulls without `NaN`. A model turn's `[turn]` log and `done`
+value agree. The adult toggle is off by default and persists per person;
+when on, the one-line readout and full list are visible. Child band
+renders neither. One desktop screenshot shows the full list open.

@@ -2313,6 +2313,34 @@ invented for the roster's household, and added to
     the bubble never carries an article (the `search_voice` family and
     `maxWords` hold); screenshots. Exit: the suites, `bash scripts/check.sh`.
 
+<a id="stats-01"></a>
+
+- [ ] **STATS-01: The advanced view of a reply** (M, after COMP-01)
+
+    Objective: give an adult an optional, per-person readout of engine
+    work under a reply, with no child disclosure and no engine-host
+    privacy leak. Design: `docs/dev.md#stats-01-the-advanced-view`.
+    Files: `spec/llm/ts/types.ts` and its tests for the final stream
+    `usage` and `timings` payload, `backend/src/wire.ts`,
+    `backend/src/lib/llm.ts`, `backend/src/lib/turnEngine.ts`,
+    `backend/src/lib/conversationHistory.ts`, the migration and generated
+    settings registry for person-scoped `ui.show_turn_stats`,
+    `frontend/src/apps/chat/` and the assistant-ui message, plus the
+    screenshot pipeline. The additive `TurnStats` object is nullable and
+    contains prompt and predicted tokens, speed, first-token and total
+    latency, prompt/context counts, cache reuse, sanitized engine label,
+    and stop reason. `context_used_percent` stays null without a verified
+    engine context capacity.
+    Acceptance: a scripted final chunk fills the numbers; a missing
+    timing chunk yields nulls, never `NaN`; the same stats reach the
+    `done` value, persisted row, and `[turn]` line; adults see a compact
+    caption and full kit popover only after opting in; the preference
+    persists per person and is off by default; child band renders no
+    toggle, caption, or stats; one opened desktop screenshot is judged.
+    Out of scope: changing routing, safety, budgets, context sizing, or
+    engine launch flags. Exit: targeted backend/frontend tests, screenshot
+    review, and `bash scripts/check.sh`.
+
 <a id="comp-03"></a>
 
 - [ ] **COMP-03: The companion package's full shape** (M, spec first)
