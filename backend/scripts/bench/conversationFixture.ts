@@ -1454,7 +1454,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "section 12 part 4: grief gets a careful acknowledgment with no play and no forced question; a closing gets one sentence and no question",
     turns: [
       { say: "Rover has been off his food since Monday", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
-      { say: "Rover died yesterday", expect: { signal: { primary_act: "inform", expressed_emotion: "sadness", emotion_intensity: "high" }, mustContain: "sorry|loss|hard|miss", mustNotContain: "haha|lol|fun|silly|timer|the list|!|" + NO_CLOSER, toolRan: null, guard: null, humanVerdict: true } },
+      { say: "Rover died yesterday", expect: { signal: { primary_act: "inform", expressed_emotion: "sadness", emotion_intensity: "high" }, plan: { requiredMoves: ["care"] }, mustContain: "sorry|loss|hard|miss", mustNotContain: "haha|lol|fun|silly|timer|the list|!|" + NO_CLOSER, toolRan: null, guard: null, humanVerdict: true } },
       { say: "thanks, that's all for tonight", expect: { signal: { primary_act: "closing" }, mustNotContain: "\\?|" + NO_CLOSER, maxWords: 15, toolRan: null, guard: null, humanVerdict: true } },
     ],
   },

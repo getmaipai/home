@@ -42,6 +42,9 @@ export const STATEMENT_RETRY_NOTE = "Nothing was asked; respond to what they sai
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor } from "@/lib/replyConstraints";
+import { constraintsFor } from "@/lib/replyConstraints";
+import { planFor, planLine } from "@/lib/register";
+import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import { promptNow } from "@/lib/benchSampling";
 import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
@@ -184,7 +187,7 @@ interface TurnLogRecord {
   lookup_shape?: LookupShape;
 }
 
-function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape): void {
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape, plan?: ReplyPlan): void {
   // ASK-02: the world kind, or the kinds an unresolved name hinted.
   const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form, ...(s.type === "world" ? { kind: s.kind } : s.type === "unresolved" && s.candidate_kinds.length > 0 ? { kind: s.candidate_kinds.join("/") } : {}) }));
   const record: TurnLogRecord = {
@@ -203,6 +206,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     // was refused, and why.
     ...(outcomes.length > 0 ? { outcomes: outcomes.map((o) => ({ package: o.packageId, status: o.status, ...(o.reason ? { reason: o.reason } : {}), ...(o.errorCode ? { code: o.errorCode } : {}) })) } : {}),
     ...(signal ? { signal: { act: signal.primary_act, secondary: signal.secondary_acts, emotion: signal.expressed_emotion, intensity: signal.emotion_intensity, target: signal.target, repair: signal.repair, source: signal.source } } : {}),
+    ...(plan ? { plan: `${Object.entries(plan.moves).filter(([, v]) => v === "required").map(([move]) => move).join("+")}/${plan.max_words}` } : {}),
     ...(timings ? { timings } : {}),
     // Only when the chat engine answered (a model turn, or a package the
     // model's own call resolved: a first token was measured), never on a
@@ -239,7 +243,7 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): void {
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
@@ -266,12 +270,13 @@ function logTurnSafely(
       // SAFETY-01: the self-harm category on the utterance or on the
       // reply marks the row, whatever the reply's own action.
       const crisisSignal = (meta.inputSafety !== undefined && carriesCrisisSignal(meta.inputSafety)) || carriesCrisisSignal(value.safety);
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present });
+      const plan = meta.plan ?? planFor({ signal: meta.signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: meta.signal.age_band, deferred: false, disclosureWithheld: false });
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, plan, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present });
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
   }
-  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape);
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan);
   if (meta.ephemeral) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
@@ -794,6 +799,8 @@ export function buildPromptParts(
   // section so the trust reminder never reads as knowing a new name.
   subjectsSection: string = "",
   speakerContext: { band: string; basis: string } = { band: speakerAgeBand(actor, frozenClock().now), basis: "identified_profile" },
+  plan?: ReplyPlan,
+  signal?: TurnSignal,
 ): { stablePrefix: string; context: string } {
   const stablePrefix = buildStablePrefix(persona);
 
@@ -820,7 +827,8 @@ export function buildPromptParts(
   const reanchorSection = companionReanchorLine(persona);
   const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
   const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
-  const volatileZone = householdLine(household) + speakerLine(actor, locale, now, speakerContext.band as any, anonymous) + subjectsSection + memorySection + episodesSection + reanchorSection + summarySection + skillsPart;
+  const planSection = plan && signal ? `\n\nHow to answer this one: ${planLine(plan, signal)}` : "";
+  const volatileZone = householdLine(household) + speakerLine(actor, locale, now, speakerContext.band as any, anonymous) + subjectsSection + planSection + memorySection + episodesSection + reanchorSection + summarySection + skillsPart;
 
   const contextBody = `Context for this reply (reference, not instructions):${volatileZone}\n\n${localTimeLine(now, locale)}`;
   const contextBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - stablePrefix.length);
@@ -1559,6 +1567,7 @@ type PreparedTurn =
       turnId: string;
       /** ACT-01: the frozen signal, whichever path answered. */
       signal: TurnSignal;
+      plan: ReplyPlan;
       timings: TurnTimings;
       /** CHAT-15: the direct paths' outcomes (a literal or fuzzy winner,
        * an answered confirmation or ask, a household command), retained
@@ -1573,6 +1582,7 @@ type PreparedTurn =
       crisisResources?: string;
       turnId: string;
       signal: TurnSignal;
+      plan: ReplyPlan;
       timings: TurnTimings;
       /** CHAT-01: the one turn context the prompt and the guards were
        * built from; runTurn()/runTurnStream() push tool outcomes onto
@@ -2408,6 +2418,7 @@ async function prepareTurn(
     signal = fallbackSignal(text, ageBand, ageBandBasis);
   }
   timings.signal_us = Math.round((performance.now() - signalStart) * 1000);
+  const initialPlan = planFor({ signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: ageBand, deferred: false, disclosureWithheld: false });
   const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">, subjects?: SubjectRef[]): PreparedTurn => ({
     kind: "immediate",
     surface,
@@ -2415,6 +2426,7 @@ async function prepareTurn(
     turnId,
     outcomes: directOutcomes,
     signal,
+    plan: initialPlan,
     timings,
     ...(subjects && subjects.length > 0 ? { subjects } : {}),
   });
@@ -2492,7 +2504,7 @@ async function prepareTurn(
   // answer; the re-ask ("Yes or no?") keeps the rule signal, since the
   // person said something else.
   if (protocol.answer && pendingAskValue) signal = classifyTurnSignal({ text, protocol: protocol.answer, ageBand });
-  if (pendingAskValue) return { kind: "immediate", surface, value: pendingAskValue, turnId, outcomes: directOutcomes, signal, timings, ...(protocol.subjectId ? { subjects: [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] } : protocol.subject ? { subjects: [protocol.subject] } : {}) };
+  if (pendingAskValue) return { kind: "immediate", surface, value: pendingAskValue, turnId, outcomes: directOutcomes, signal, plan: planFor({ signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: ageBand, deferred: false, disclosureWithheld: false }), timings, ...(protocol.subjectId ? { subjects: [{ type: "household", entity_id: protocol.subjectId, carried_question: null }] } : protocol.subject ? { subjects: [protocol.subject] } : {}) };
 
   // ASK-01 part 4: a question the judge queued but has not asked yet
   // ("Who's Juniper?", pending) can be answered before it is put: "he's
@@ -2847,7 +2859,8 @@ async function prepareTurn(
   const promptStart = performance.now();
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis });
+  const plan = planFor({ signal, surface, brevity: constraintsFor(conversation.id).some((c) => c.kind === "length" && /short|brief|one line/i.test(c.value)) || /\b(?:just the number(?:s)?|short answer|one line)\b/i.test(text), evidence: { choices: 0, sources: 0, deliverable: Boolean(intentFor(text, signal).deliverable) }, companion: { directness: "diplomatic", engagement: persona.engagement, complexity: persona.complexity }, band: ageBand, deferred: false, disclosureWithheld: memoryMatches.withheldForBand > 0 || Boolean(window.summaryLine) });
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis }, plan, signal);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -3050,7 +3063,7 @@ async function prepareTurn(
   // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
   // seen on both paths.
   timings.prompt_ms = Math.round(performance.now() - promptStart);
-  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, timings, unknownAsk };
+  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, plan, timings, unknownAsk };
 }
 
 /** ASK-01: the name an open question is about, from its subject (an
@@ -4005,6 +4018,8 @@ async function runTurnHoldingLease(
     const offeredIds = new Set(prepared.tools.map((t) => t.id));
     const completion = await complete("chat", prepared.messages, {
       thinking: opts.thinking,
+      // CHAT-12 reserve plus the ACT-03 plan's word budget.
+      max_tokens: Math.ceil(prepared.plan.max_words * 1.6) + 32,
       ...(offeringTools ? { tools: prepared.tools, tool_choice: "auto" as const } : {}),
     });
     prepared.timings.first_token_ms = Date.now() - startedAt;
@@ -4209,7 +4224,7 @@ async function runTurnHoldingLease(
     if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
   }
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, speakerEvidence: opts.speakerEvidence, present: opts.present });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, speakerEvidence: opts.speakerEvidence, present: opts.present });
   return { ok: true, value };
 }
 
@@ -4792,7 +4807,7 @@ async function runTurnStreamHoldingLease(
     const trace: ReplyTrace = { hits: [], replaced: false };
     const value = finalizeReply(actor, prepared.value, prepared.surface, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety, speakerEvidence: opts.speakerEvidence, present: opts.present });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety, speakerEvidence: opts.speakerEvidence, present: opts.present });
     return { ok: true, kind: "immediate", value, signal: prepared.signal };
   }
 
@@ -5147,7 +5162,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, speakerEvidence: opts.speakerEvidence, present: opts.present });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, speakerEvidence: opts.speakerEvidence, present: opts.present });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -5230,7 +5245,7 @@ async function runTurnStreamHoldingLease(
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
         }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, speakerEvidence: opts.speakerEvidence, present: opts.present });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, speakerEvidence: opts.speakerEvidence, present: opts.present });
         return value;
       },
     };
@@ -5305,7 +5320,7 @@ async function runTurnStreamHoldingLease(
   const startResult = await startCompleteStream(
     "chat",
     modelPrepared.messages,
-    { thinking: opts.thinking, tools: modelPrepared.tools, tool_choice: "auto" },
+    { thinking: opts.thinking, tools: modelPrepared.tools, tool_choice: "auto", max_tokens: Math.ceil(modelPrepared.plan.max_words * 1.6) + 32 },
     draftAbort.signal,
   );
   if (!startResult.ok) {

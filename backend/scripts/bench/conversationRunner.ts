@@ -17,7 +17,7 @@ import { pickThinkingCue } from "@/lib/replyVariation";
 import { THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { resolveNames } from "@/lib/unknownNames";
 import { lookupShapeOf } from "@/lib/guards";
-import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation, listOpenQuestions, queueOpenQuestion, resolveOpenQuestionsAbout } from "@/lib/conversationHistory";
+import { createConversation, getPendingAsk, turnSignalOf, turnPlanOf, logTurn, outcomesForConversation, listOpenQuestions, queueOpenQuestion, resolveOpenQuestionsAbout } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety } from "@/lib/safety";
@@ -661,6 +661,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       // and the memory rows in the detail MEM-06's memoryRows expectation
       // reads (category, subject, importance, the valid_to window).
       signal: row ? turnSignalOf(row) : null,
+      plan: row ? turnPlanOf(row) : null,
       memoryRowDetails: memoryRowDetailsFor(actor),
       pendingAsk: getPendingAsk(conversationId)?.kind ?? null,
       pendingAskName: getPendingAsk(conversationId)?.name ?? null,

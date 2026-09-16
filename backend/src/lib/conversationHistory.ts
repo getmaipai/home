@@ -64,6 +64,7 @@ export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { ConversationTurnRow } from "@/wire";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
 import { TurnSignal as TurnSignalSchema, type TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import { ReplyPlan as ReplyPlanSchema, type ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import { SubjectRef as SubjectRefSchema } from "@maipai/spec/gen/ts/subject-ref.js";
 import type { SubjectRef } from "@/lib/unknownNames";
 export type { ConversationTurnRow } from "@/wire";
@@ -185,7 +186,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -259,6 +260,7 @@ export function logTurn(
     // dropped with the rest of the words (a review: "my wifi password
     // Sunshine" named a subject).
     signal: opts.signal ? JSON.stringify(credentialTurn ? withoutNames(opts.signal) : opts.signal) : null,
+    plan: opts.plan ? JSON.stringify(opts.plan) : null,
     // SAFETY-01: the self-harm category on either side of the turn.
     crisisSignal: opts.crisisSignal ?? false,
     // ASK-01: the turn's SubjectRefs; a credential turn keeps none.
@@ -293,6 +295,11 @@ export function turnSignalOf(row: Pick<ConversationTurnRow, "signal">): TurnSign
   } catch {
     return null;
   }
+}
+
+export function turnPlanOf(row: Pick<ConversationTurnRow, "plan">): ReplyPlan | null {
+  if (!row.plan) return null;
+  try { const parsed = ReplyPlanSchema.safeParse(JSON.parse(row.plan)); return parsed.success ? parsed.data : null; } catch { return null; }
 }
 
 export function speakerEvidenceOf(row: Pick<ConversationTurnRow, "speakerEvidence">): SpeakerEvidence | null {

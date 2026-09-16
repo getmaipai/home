@@ -385,6 +385,8 @@ export const conversationTurns = sqliteTable(
     // recomputed, the judge's queue key and REVIEW-01's record of what
     // the engine believed. Null on every row written before ACT-01.
     signal: text("signal"),
+    // ACT-03: the frozen ReplyPlan computed beside the signal.
+    plan: text("plan"),
     // SAFETY-01: the turn carried the self-harm category on its input
     // or its output classification, whatever the reply's own action
     // (a refused reply keeps it). The conversation's crisis state reads
