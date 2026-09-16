@@ -16,6 +16,146 @@
         "required": [
           "error"
         ]
+      },
+      "Command": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "minRole": {
+            "type": "string"
+          },
+          "action": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "speech": {
+                "type": "string"
+              },
+              "domain": {
+                "type": "string"
+              },
+              "service": {
+                "type": "string"
+              },
+              "target": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                }
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                }
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "creatorId",
+          "trigger",
+          "minRole",
+          "action",
+          "createdAt"
+        ]
+      },
+      "PrivacyPageData": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "sourceKind": {
+                  "type": "string",
+                  "enum": [
+                    "plugin",
+                    "platform"
+                  ]
+                },
+                "destination": {
+                  "type": "string"
+                },
+                "when": {
+                  "type": "string"
+                },
+                "what": {
+                  "type": "string"
+                },
+                "who": {
+                  "type": "string"
+                },
+                "optIn": {
+                  "type": "boolean"
+                },
+                "retention": {
+                  "type": "string"
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "outbound",
+                    "inbound"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "source",
+                "sourceKind",
+                "destination",
+                "when",
+                "what",
+                "who",
+                "optIn",
+                "retention",
+                "direction"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "offlinePlugins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "connections",
+          "offlinePlugins"
+        ]
       }
     },
     "parameters": {}
@@ -3379,6 +3519,179 @@
         }
       }
     },
+    "/api/commands": {
+      "get": {
+        "tags": [
+          "Commands"
+        ],
+        "summary": "List household commands",
+        "responses": {
+          "200": {
+            "description": "Household commands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Command"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Commands"
+        ],
+        "summary": "Create a household command",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trigger": {
+                    "type": "string"
+                  },
+                  "minRole": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "trigger",
+                  "minRole"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created command.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Command"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commands/{id}": {
+      "delete": {
+        "tags": [
+          "Commands"
+        ],
+        "summary": "Delete a household command",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted command.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notifications": {
       "get": {
         "tags": [
@@ -4826,6 +5139,36 @@
           },
           "404": {
             "description": "No such backup, or no such living person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/privacy": {
+      "get": {
+        "tags": [
+          "Privacy"
+        ],
+        "summary": "Show what leaves the house",
+        "responses": {
+          "200": {
+            "description": "Privacy connection table.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyPageData"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
