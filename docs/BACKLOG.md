@@ -6516,6 +6516,18 @@ approvals are still real, unstarted work for a future session.
             screenshots pass. Exit: targeted child, retention and frontend
             tests, wait for other benches, then `bash scripts/check.sh` as
             the landing gate.
+      - [ ] **ATT-01f: the extraction runtime** (S, decision first,
+      2026-09-16). ATT-01b runs Apache Tika from a JAR named by
+      `MAIPAI_TIKA_JAR`, which needs a Java runtime the hub neither
+      ships nor downloads, so on a fresh household nothing can read a
+      PDF. Decide between a pinned, checksummed on-demand Tika download
+      plus a bundled JRE (the self-healing download pattern, heavy) and
+      pure-JS parsers behind the same `TextRunner` seam (`pdfjs-dist` or
+      `unpdf` for PDF, `mammoth` for docx, one small sheet reader),
+      record the verdict in `docs/dev.md` under ATT-01, then implement
+      the chosen one so `documentExtraction.ts` works with no env
+      variable set. Exit: an extraction test on a real fixture PDF and
+      `bash scripts/check.sh`.
 - [x] **Chat stream reconnection and persistent message branches** (M) -
       `chatModelAdapter.ts`, `chatHistoryAdapter.ts`, and the turn API.
       Markdown, multiline input, stop, copy, suggestions, timestamps,
