@@ -10,6 +10,7 @@
 // Earth at a given moment.
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js";
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.30.0/server/stdio.js";
+import { z } from "npm:zod@4.5.4";
 
 const REFERENCE_NEW_MOON_MS = Date.UTC(2000, 0, 6, 18, 14);
 const SYNODIC_MONTH_DAYS = 29.530588853;
@@ -43,10 +44,19 @@ export function moonPhase(now: Date = new Date()): { text: string; speech: strin
   return { text, speech: text };
 }
 
+function handlerNow(args: Record<string, unknown>): Date {
+  const value = args.__now;
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+
 if (import.meta.main) {
   const server = new McpServer({ name: "almanac-moon", version: "0.1.0" });
-  server.registerTool("handle", { inputSchema: {} }, async () => {
-    return { content: [{ type: "text", text: JSON.stringify({ reply: moonPhase(), actions: [] }) }] };
+  server.registerTool("handle", { inputSchema: z.object({ __now: z.string().optional() }).passthrough() }, async (args: Record<string, unknown>) => {
+    return { content: [{ type: "text", text: JSON.stringify({ reply: moonPhase(handlerNow(args)), actions: [] }) }] };
   });
   const transport = new StdioServerTransport();
   await server.connect(transport);

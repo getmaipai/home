@@ -33,6 +33,15 @@ export function summarizeOnThisDay(data: unknown): Reply {
   return { text, speech: text };
 }
 
+function handlerNow(args: Record<string, unknown>): Date {
+  const value = args.__now;
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+
 async function hostFetch(
   extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> },
   url: string,
@@ -45,15 +54,15 @@ if (import.meta.main) {
   const server = new McpServer({ name: "almanac-onthisday", version: "0.1.0" });
   server.registerTool(
     "handle",
-    { inputSchema: {} },
-    async (_args: Record<string, never>, extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> }) => {
+    { inputSchema: z.object({ __now: z.string().optional() }).passthrough() },
+    async (args: Record<string, unknown>, extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> }) => {
       // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident
       // and the five fixes"): a real fetch failure is reported as a
       // typed `error`, never a fabricated `reply` - the caller
       // (denoHost.ts's callTier1Handle()) decides the household-facing
       // fallback text (the manifest's own `fallback_reply`).
       try {
-        const now = new Date();
+        const now = handlerNow(args);
         const month = String(now.getMonth() + 1).padStart(2, "0");
         const day = String(now.getDate()).padStart(2, "0");
         const data = await hostFetch(extra, `https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${month}/${day}`);

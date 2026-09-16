@@ -1747,8 +1747,8 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "ALM-01: the engine's prompt clock is pinned to a Monday at 10:43 pm; almanac-time and almanac-compute derive the day of week and the date from it.",
     turns: [
       { say: "what time is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", mustContain: "10:43", humanVerdict: true } },
-      { say: "what day is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", mustContain: "Monday", humanVerdict: true } },
-      { say: "what's the date today", expect: { signal: { primary_act: "question" }, toolRan: "almanac-time", mustContain: "September 14", humanVerdict: true } },
+      { say: "what day is it", expect: { signal: { primary_act: "question" }, toolRan: "almanac-date", mustContain: "Monday", humanVerdict: true } },
+      { say: "what's the date today", expect: { signal: { primary_act: "question" }, toolRan: "almanac-date", mustContain: "September 14", humanVerdict: true } },
       { say: "when is the next Friday", expect: { signal: { primary_act: "question" }, toolRan: "almanac-compute", mustContain: "September 18", humanVerdict: true } },
       { say: "how many days until Friday", expect: { signal: { primary_act: "question" }, toolRan: "almanac-compute", mustContain: "4", humanVerdict: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, humanVerdict: true } },

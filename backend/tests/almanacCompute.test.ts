@@ -60,6 +60,11 @@ describe("parseDateQuestion", () => {
     }
   });
 
+  test("reads a natural next-weekday question and a weekday days-until referent", () => {
+    expect(parseDateQuestion("when is the next Friday")).toEqual({ kind: "relative_weekday", which: "next", weekday: 5 });
+    expect(parseDateQuestion("how many days until Friday")).toEqual({ kind: "days_until", referent: { day: 0, weekday: 5 } });
+  });
+
   test("reads tomorrow", () => {
     const q = parseDateQuestion("tomorrow");
     expect(q).not.toBeNull();
@@ -113,6 +118,12 @@ describe("computeDateAnswer", () => {
     expect(a.text).toContain("September 18");
     expect(a.readings).toBeUndefined();
     expect(a.text).not.toContain("?");
+  });
+
+  test("days-until a weekday gives the upcoming weekday", () => {
+    const q = parseDateQuestion("how many days until Friday");
+    if (!q) throw new Error("expected a question");
+    expect(computeDateAnswer(q, NOW, "how many days until Friday").text).toContain("4 days");
   });
 
   test("next-Friday on a Wednesday clock gives both readings, no ?", () => {

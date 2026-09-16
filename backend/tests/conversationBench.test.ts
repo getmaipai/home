@@ -114,6 +114,17 @@ describe("the fixture", () => {
     expect(d.getMinutes()).toBe(43);
   });
 
+  test("ALM-01: the runner passes the declared clock through the almanac path", async () => {
+    await withStubBench({ reply: () => "Okay." }, async (deps) => {
+      const { scores } = await runConversation(byId("derived-dates"), deps);
+      expect(scores[0]?.pass).toBe(true);
+      expect(scores[1]?.pass).toBe(true);
+      expect(scores[2]?.pass).toBe(true);
+      expect(scores[3]?.pass).toBe(true);
+      expect(scores[4]?.pass).toBe(true);
+    });
+  }, 30_000);
+
   test("RECALL-03: the recall-past-the-window fillers spend the window before turn 1 (the first seeded set's fillers did not)", async () => {
     resetDb();
     const people = createBenchPeople();

@@ -36,6 +36,7 @@ export type DateReferent = {
   day: number;
   month?: number; // 1-12
   year?: number;
+  weekday?: number;
 };
 
 export type DateQuestion =
@@ -75,6 +76,9 @@ function monthIndex(name: string): number {
 
 function parseReferent(text: string): DateReferent | null {
   const t = strip(text);
+
+  const weekday = WEEKDAYS.findIndex((name) => name.toLowerCase() === t);
+  if (weekday >= 0) return { day: 0, weekday };
 
   // Day-first: "the27th", "the27thofjune", "the27thofjune2026", "27th2026"
   const dm = t.match(new RegExp(`(\\d{1,2})(?:st|nd|rd|th)?(?:(?:of)?(${MONTH_RE}))?(?:(?:of)?(\\d{4}))?`));
@@ -157,6 +161,9 @@ function nextClockInstant(hour: number, minute: number, now: Date): Date {
  * occurrence of that day-of-month on or after today (this month if still
  * ahead, else next month). */
 function resolveReferentDate(referent: DateReferent, now: Date): Date {
+  if (referent.weekday !== undefined) {
+    return resolveRelativeWeekday("this", referent.weekday, now);
+  }
   const y = referent.year ?? now.getFullYear();
   const mo = referent.month ?? now.getMonth() + 1;
   const d = new Date(y, mo - 1, referent.day);
@@ -203,11 +210,12 @@ export function parseDateQuestion(
   if (t === "sowhatstodaysdate" || t === "whatsthedate" || t === "whatstodaydate") return null;
   const weekdayNames = WEEKDAYS.map((w) => w.toLowerCase()).join("|");
 
-  // relative_weekday: "nextfriday", "whatsthe datenextfriday", "thismonday", "lastsunday"
-  const rw = t.match(new RegExp(`^(?:whatsthe)?date?(?:next|this|last)(${weekdayNames})$`));
+  // relative_weekday: "nextfriday", "whatsthe datenextfriday",
+  // "when is the next Friday", "thismonday", "lastsunday"
+  const rw = t.match(new RegExp(`^(?:(?:whatsthe)?date|whenis(?:the)?)(next|this|last)(${weekdayNames})$`));
   if (rw) {
-    const w = t.includes("next") ? "next" : t.includes("this") ? "this" : "last";
-    const weekday = WEEKDAYS.findIndex((d) => d.toLowerCase() === (rw[1] ?? ""));
+    const w = rw[1] as "next" | "this" | "last";
+    const weekday = WEEKDAYS.findIndex((d) => d.toLowerCase() === (rw[2] ?? ""));
     if (weekday >= 0) {
       return { kind: "relative_weekday", which: w, weekday };
     }
@@ -372,9 +380,12 @@ export function computeDateAnswer(
     case "days_until": {
       const d = resolveReferentDate(q.referent, now);
       const n = daysBetween(now, d);
+      const label = q.referent.weekday === undefined
+        ? `The ${q.referent.day}th`
+        : WEEKDAYS[q.referent.weekday];
       return {
-        text: `The ${q.referent.day}th is a ${WEEKDAYS[d.getDay()]}, ${n} days from today.`,
-        inputs: { clock, referent: `${q.referent.day}`, term },
+        text: `${label} is a ${WEEKDAYS[d.getDay()]}, ${n} days from today.`,
+        inputs: { clock, referent: q.referent.weekday === undefined ? `${q.referent.day}` : label, term },
       };
     }
 

@@ -28,6 +28,7 @@ import { listActivePeople } from "@/lib/access";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
+import { promptNow } from "@/lib/benchSampling";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -37,6 +38,11 @@ import type { PersonRow } from "@/types";
 // $ref into spec's own dialect), and codegen leaves it typed `z.any()`
 // since it can't be known at generation time.
 const ajv = new Ajv2020({ strict: false });
+
+function localClockInput(now: Date): string {
+  const pad = (value: number, width = 2) => String(value).padStart(width, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}`;
+}
 
 export interface LoadedPackage {
   manifest: PackageManifest;
@@ -302,7 +308,12 @@ export async function runPlugin(
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}` };
 
   if (manifest.tier === 1) {
-    const result = await callTier1Handle(id, manifest, actor, inputs);
+    // ALM-01: the almanac handlers are sandboxed Tier 1 packages, so the
+    // turn's already-frozen clock crosses the MCP boundary as an internal
+    // argument. The production path gets the real current instant from
+    // promptNow(); the bench pins that same source without changing Date.
+    const handlerInputs = id.startsWith("almanac-") ? { ...inputs, __now: localClockInput(promptNow()) } : inputs;
+    const result = await callTier1Handle(id, manifest, actor, handlerInputs);
     if (!result.ok) {
       return { ok: false, status: 502, error: result.message, code: result.code, fallback_reply: result.fallback };
     }
