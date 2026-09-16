@@ -7,6 +7,7 @@ import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor"
 import { runTurn, __setSummaryRefreshDelayForTests } from "@/lib/turnEngine";
 import {
   list,
+  listConversations,
   exportPerson,
   runRetention,
   routingStats,
@@ -21,6 +22,8 @@ import {
   buildConversationWindow,
   maybeRefreshConversationSummary,
   chooseConversationTurn,
+  getPendingAsk,
+  setPendingAsk,
 } from "@/lib/conversationHistory";
 import { createCommand } from "@/lib/commands";
 import { REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
@@ -68,6 +71,28 @@ async function addPerson(ownerClient: TestClient, displayName: string, role: str
 }
 
 describe("logTurn (via runTurn)", () => {
+  test("temporary turns do not enter history, durable memory, or pending asks", async () => {
+    const { actor } = await owner();
+    const conversation = createConversation(actor, { surface: "chat", mode: "temporary" });
+    if (!conversation.ok) throw new Error(conversation.error);
+    expect(listConversations(actor)).toHaveLength(0);
+
+    setPendingAsk(conversation.value.id, { kind: "confirm", prompt: "save it?", packageId: "remember", args: {} });
+    expect(getPendingAsk(conversation.value.id)).toBeNull();
+    const result = await runTurn(actor, "chat", "remember that trash day is Tuesday", { conversationId: conversation.value.id });
+    expect(result.ok).toBe(true);
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, conversation.value.id)).all()).toHaveLength(0);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.person, actor.id)).all()).toHaveLength(0);
+  });
+
+  test("temporary mode is unavailable to child and teen profiles", async () => {
+    const { client } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    const teen = await addPerson(client, "Rowan", "teen");
+    expect(createConversation(child, { mode: "temporary" })).toEqual({ ok: false, status: 403, error: "temporary chat is not available for minors" });
+    expect(createConversation(teen, { mode: "temporary" })).toEqual({ ok: false, status: 403, error: "temporary chat is not available for minors" });
+  });
+
   test("a completed turn writes a real conversation_turns row", async () => {
     const { actor } = await owner();
 

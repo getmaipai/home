@@ -25,9 +25,9 @@ class Conversation(BaseModel):
         ...,
         description="Matches turnEngine.ts's Surface (4.5): a person may hold one open conversation per surface at a time.",
     )
-    mode: Literal['chat', 'research'] | None = Field(
+    mode: Literal['chat', 'research', 'temporary'] | None = Field(
         'chat',
-        description='How this conversation presents world-question answers: chat keeps the ordinary reply; research keeps the details pane open after a short line.',
+        description='How this conversation presents answers: chat keeps the ordinary reply; research keeps the details pane open after a short line; temporary keeps turns out of normal history and durable memory.',
     )
     companion_id: str | None = Field(
         None,

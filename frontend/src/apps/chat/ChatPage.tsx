@@ -61,13 +61,16 @@ interface ChatPageProps {
   person: Roster;
 }
 
+type ChatConversationMode = "chat" | "research" | "temporary";
+
 export function ChatPage({ person }: ChatPageProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [documentTurnId, setDocumentTurnId] = useState<string | null>(null);
-  const [conversationMode, setConversationMode] = useState<"chat" | "research">("chat");
-  const conversationModeRef = useRef<"chat" | "research">("chat");
+  const [conversationMode, setConversationMode] = useState<ChatConversationMode>("chat");
+  const conversationModeRef = useRef<ChatConversationMode>("chat");
   conversationModeRef.current = conversationMode;
   const canViewTurnStats = person.role === "owner" || person.role === "admin" || person.role === "adult";
+  const canViewTemporaryMode = person.role === "owner" || person.role === "admin" || person.role === "adult";
   const [turnStatsVisible, setTurnStatsVisible] = useState(false);
   useEffect(() => {
     setTurnStatsVisible(false);
@@ -89,9 +92,24 @@ export function ChatPage({ person }: ChatPageProps) {
     setConversationMode("chat");
     if (!conversationId) return;
     api.conversation(conversationId).then((conversation) => {
-      setConversationMode(conversation.mode === "research" ? "research" : "chat");
+      setConversationMode(conversation.mode);
     }).catch(() => {});
   }, [conversationId]);
+
+  const toggleTemporaryMode = () => {
+    if (!canViewTemporaryMode) return;
+    if (!conversationId) {
+      void api.createConversation("temporary").then((conversation) => {
+        setConversationMode(conversation.mode);
+        setSearchParams({ conversation: conversation.id });
+      }).catch(() => setBanner("Temporary chat could not be started. Try again."));
+      return;
+    }
+    const next: ChatConversationMode = conversationMode === "temporary" ? "chat" : "temporary";
+    const previous = conversationMode;
+    setConversationMode(next);
+    void api.setConversationMode(conversationId, next).catch(() => setConversationMode(previous));
+  };
   // CHAT-20: the same conversation id the runtime below uses as its own
   // `threadId` - polling follows whichever conversation is actually open,
   // stopping on its own (chatMemoryState.ts's own cleanup) the moment the
@@ -243,13 +261,14 @@ export function ChatPage({ person }: ChatPageProps) {
                 <HistoryIcon className="size-4" />
               </Button>
               <h2 className="text-base font-semibold">Chat</h2>
-              <Button type="button" variant={conversationMode === "research" ? "secondary" : "ghost"} size="sm" aria-pressed={conversationMode === "research"} aria-label={conversationMode === "research" ? "Turn off research mode" : "Turn on research mode"} disabled={!conversationId} onClick={() => {
+              {conversationMode !== "temporary" ? <Button type="button" variant={conversationMode === "research" ? "secondary" : "ghost"} size="sm" aria-pressed={conversationMode === "research"} aria-label={conversationMode === "research" ? "Turn off research mode" : "Turn on research mode"} disabled={!conversationId} onClick={() => {
                 if (!conversationId) return;
                 const next = conversationMode === "research" ? "chat" : "research";
                 const previous = conversationMode;
                 setConversationMode(next);
                 void api.setConversationMode(conversationId, next).catch(() => setConversationMode(previous));
-              }}>Research</Button>
+              }}>Research</Button> : null}
+              {canViewTemporaryMode ? <Button type="button" variant={conversationMode === "temporary" ? "secondary" : "ghost"} size="sm" aria-pressed={conversationMode === "temporary"} aria-label={conversationMode === "temporary" ? "Turn off temporary chat" : conversationId ? "Turn on temporary chat" : "Start temporary chat"} onClick={toggleTemporaryMode}>Temporary</Button> : null}
               {canViewTurnStats ? <Button type="button" variant={turnStatsVisible ? "secondary" : "ghost"} size="sm" aria-pressed={turnStatsVisible} aria-label="Show advanced reply stats" onClick={() => {
                 const next = !turnStatsVisible;
                 setTurnStatsVisible(next);
@@ -271,6 +290,7 @@ export function ChatPage({ person }: ChatPageProps) {
             </SensesDock>
             </div>
                   </div>
+                  {conversationMode === "temporary" ? <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base" role="status">Temporary chat is not saved to normal history or memory. Reloading will not bring these messages back.</div> : null}
                   {banner ? <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div> : null}
                   <div className="relative flex min-h-0 flex-1">
             <aside id="chat-threads" hidden={!threadsOpen}

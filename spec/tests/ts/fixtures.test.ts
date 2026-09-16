@@ -98,6 +98,10 @@ describe("record fixtures validate against their generated Zod models", () => {
     expect(() => Conversation.parse(loadFixture("conversation.example.json"))).not.toThrow();
   });
 
+  test("conversation.temporary.example.json", () => {
+    expect(() => Conversation.parse(loadFixture("conversation.temporary.example.json"))).not.toThrow();
+  });
+
   test("device.example.json", () => {
     expect(() => Device.parse(loadFixture("device.example.json"))).not.toThrow();
   });

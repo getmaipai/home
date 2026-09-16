@@ -5246,10 +5246,11 @@
                       "type": "string",
                       "enum": [
                         "chat",
-                        "research"
+                        "research",
+                        "temporary"
                       ],
                       "default": "chat",
-                      "description": "How this conversation presents world-question answers: chat keeps the ordinary reply; research keeps the details pane open after a short line."
+                      "description": "How this conversation presents answers: chat keeps the ordinary reply; research keeps the details pane open after a short line; temporary keeps turns out of normal history and durable memory."
                     },
                     "companion_id": {
                       "anyOf": [

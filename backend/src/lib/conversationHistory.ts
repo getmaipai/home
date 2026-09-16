@@ -590,7 +590,7 @@ function conversationToDbValues(c: Conversation) {
   };
 }
 
-function insertNewConversation(actor: PersonRow, surface: Surface, companionId?: string | null): Conversation {
+function insertNewConversation(actor: PersonRow, surface: Surface, companionId?: string | null, mode: Conversation["mode"] = "chat"): Conversation {
   const now = new Date().toISOString();
   // Set at creation from the person's own persona pick (the contract:
   // "A conversation's companion_id is set at creation from that
@@ -608,7 +608,7 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
     id: newConversationId(),
     person: actor.id,
     surface,
-    mode: "chat",
+    mode,
     companion_id: resolvedCompanionId,
     title: null,
     pinned: false,
@@ -724,8 +724,8 @@ export interface PendingAsk {
 }
 
 export function getPendingAsk(conversationId: string): PendingAsk | null {
-  const row = db.select({ pendingAsk: conversations.pendingAsk }).from(conversations).where(eq(conversations.id, conversationId)).get();
-  if (!row?.pendingAsk) return null;
+  const row = db.select({ pendingAsk: conversations.pendingAsk, mode: conversations.mode }).from(conversations).where(eq(conversations.id, conversationId)).get();
+  if (!row?.pendingAsk || row.mode === "temporary") return null;
   try {
     return JSON.parse(row.pendingAsk) as PendingAsk;
   } catch {
@@ -737,6 +737,8 @@ export function getPendingAsk(conversationId: string): PendingAsk | null {
  * (matched or not), single-shot per this step's own text ("the NEXT
  * utterance is matched against it"), never left open past one turn. */
 export function setPendingAsk(conversationId: string, ask: PendingAsk | null): void {
+  const conversation = db.select({ mode: conversations.mode }).from(conversations).where(eq(conversations.id, conversationId)).get();
+  if (conversation?.mode === "temporary") return;
   db.update(conversations)
     .set({ pendingAsk: ask ? JSON.stringify(ask) : null, updatedAt: new Date().toISOString(), hlc: nextHlc() })
     .where(eq(conversations.id, conversationId))
@@ -889,12 +891,18 @@ export function resolveOpenQuestionsAbout(personId: string, entityId: string, st
 // validation of a value that - unlike turnEngine.ts's own Surface
 // parameter - arrives here straight from an unchecked request body.
 const VALID_SURFACES = new Set(Conversation.shape.surface.options as readonly string[]);
+// `mode` has a default in the generated schema, so unwrap the default
+// before reading the enum's options (surface has no default and exposes
+// options directly).
+const modeEnum = Conversation.shape.mode.unwrap() as unknown as { options: readonly string[] };
+const VALID_MODES = new Set(modeEnum.options);
 
 export function createConversation(
   actor: PersonRow,
-  opts: { surface?: Surface; companionId?: string | null } = {},
+  opts: { surface?: Surface; companionId?: string | null; mode?: Conversation["mode"] } = {},
 ): ConversationOpResult<Conversation> {
   const surface = opts.surface ?? "chat";
+  const mode = opts.mode ?? "chat";
   // A code review (2026-09-05) found no validation here at all: a bogus
   // surface reached insertNewConversation()'s Conversation.parse() and
   // threw an uncaught ZodError (an unhandled 500) instead of the clean
@@ -904,11 +912,17 @@ export function createConversation(
   if (!VALID_SURFACES.has(surface)) {
     return { ok: false, status: 400, error: `invalid surface: ${surface}` };
   }
+  if (!VALID_MODES.has(mode)) {
+    return { ok: false, status: 400, error: `invalid conversation mode: ${mode}` };
+  }
+  if (mode === "temporary" && actor.role !== "owner" && actor.role !== "admin" && actor.role !== "adult") {
+    return { ok: false, status: 403, error: "temporary chat is not available for minors" };
+  }
   db.update(conversations)
     .set({ status: "closed", updatedAt: new Date().toISOString(), hlc: nextHlc() })
     .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.status, "open")))
     .run();
-  return { ok: true, value: insertNewConversation(actor, surface, opts.companionId) };
+  return { ok: true, value: insertNewConversation(actor, surface, opts.companionId, mode) };
 }
 
 /** Explicitly continue an owned saved conversation. Reading a thread does
@@ -957,7 +971,7 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
   let rows = db
     .select()
     .from(conversations)
-    .where(and(eq(conversations.personId, target), not(eq(conversations.status, "deleted"))))
+    .where(and(eq(conversations.personId, target), not(eq(conversations.status, "deleted")), not(eq(conversations.mode, "temporary"))))
     .all();
   const normalizedQuery = query?.trim() ?? "";
   if (normalizedQuery) {
@@ -969,6 +983,7 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
         and(
           eq(conversations.personId, target),
           not(eq(conversations.status, "deleted")),
+          not(eq(conversations.mode, "temporary")),
           like(conversations.title, pattern),
         ),
       )
@@ -1127,9 +1142,12 @@ export function updateConversationTitle(actor: PersonRow, id: string, title: str
  * This is a preference on the thread, not a person setting: resuming or
  * returning to this thread restores the choice, while a new conversation
  * starts in ordinary chat mode. */
-export function updateConversationMode(actor: PersonRow, id: string, mode: "chat" | "research"): ConversationOpResult<Conversation> {
+export function updateConversationMode(actor: PersonRow, id: string, mode: Conversation["mode"]): ConversationOpResult<Conversation> {
   const found = getConversation(actor, id);
   if (!found.ok) return found;
+  if (mode === "temporary" && actor.role !== "owner" && actor.role !== "admin" && actor.role !== "adult") {
+    return { ok: false, status: 403, error: "temporary chat is not available for minors" };
+  }
   const now = new Date().toISOString();
   const newHlc = nextHlc();
   const parsed = Conversation.safeParse({ ...found.value, mode, updated_at: now, hlc: newHlc });

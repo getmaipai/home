@@ -326,7 +326,10 @@ export const conversations = sqliteTable(
   // clearConversations() all filter by (person_id, surface, status) on
   // every turn - a code review, 2026-09-05, found conversation_turns got
   // its own index in this same diff but this table was missed.
-  (table) => [index("conversations_person_surface_status_idx").on(table.personId, table.surface, table.status)],
+  (table) => [
+    index("conversations_person_surface_status_idx").on(table.personId, table.surface, table.status),
+    index("conversations_mode_idx").on(table.mode),
+  ],
 );
 
 // Conversation history (4.14, split): one row per completed turnEngine

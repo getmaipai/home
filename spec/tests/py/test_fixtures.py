@@ -97,6 +97,10 @@ def test_conversation_fixture():
     Conversation.model_validate(load_fixture("conversation.example.json"))
 
 
+def test_temporary_conversation_fixture():
+    Conversation.model_validate(load_fixture("conversation.temporary.example.json"))
+
+
 def test_source_fixture():
     Source.model_validate(load_fixture("source.example.json"))
 

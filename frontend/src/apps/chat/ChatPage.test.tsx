@@ -101,6 +101,38 @@ function stubFetch(options: { ttsCalls?: string[]; brain?: string; settingWrites
 // (chatMemoryActions.test.ts) and the click-through was verified live in
 // the running app instead.
 describe("ChatPage", () => {
+  test("starts temporary chat before the first send and explains local retention", async () => {
+    const createBodies: unknown[] = [];
+    const restore = stubFetch();
+    const fallback = globalThis.fetch;
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/conversations" && init?.method === "POST") {
+        createBodies.push(JSON.parse(String(init.body)));
+        return Response.json({ id: "conv-temporary123", status: "open", surface: "chat", mode: "temporary" });
+      }
+      return fallback(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+      fireEvent.click(await view.findByRole("button", { name: "Start temporary chat" }));
+      await view.findByRole("button", { name: "Turn off temporary chat" });
+      expect(createBodies).toContainEqual({ surface: "chat", mode: "temporary" });
+      expect(view.getByRole("status")).toHaveTextContent("not saved to normal history or memory");
+    } finally { restore(); }
+  });
+
+  test("a child cannot see the temporary retention control or banner", async () => {
+    const restore = stubFetch();
+    try {
+      const child = { ...makePerson(), role: "child" as const };
+      const view = renderWithQueryClient(<MemoryRouter><ChatPage person={child} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      expect(view.queryByRole("button", { name: /temporary chat/i })).toBeNull();
+      expect(view.queryByText(/not saved to normal history or memory/i)).toBeNull();
+    } finally { restore(); }
+  });
+
   test("shows the research mode control for a selected conversation and persists its toggle", async () => {
     const modeWrites: unknown[] = [];
     const restore = stubFetch();

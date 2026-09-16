@@ -282,7 +282,7 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; streamStats?: ChatCompletionStreamStats },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; temporary?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; streamStats?: ChatCompletionStreamStats },
 ): void {
   // RVW-1: the answering rung, read once here from the delivered value,
   // the retained outcomes and the signal, and the rules that fired (the
@@ -304,7 +304,7 @@ function logTurnSafely(
   // stays unconditional, so an ephemeral turn that fails or runs long is
   // still traceable the same way Fix A4/A5 (docs/dev.md, 2026-09-07
   // incident) made every other turn's failure traceable.
-  if (!meta.ephemeral) {
+  if (!meta.ephemeral && !meta.temporary) {
     try {
       // getmaipai/home#78: the row records the reason only when the guard
       // REPLACED the reply; a cut that kept the model's own prefix leaves
@@ -330,7 +330,7 @@ function logTurnSafely(
     }
   }
   logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan, meta.composed, rung, rules, value.stats);
-  if (meta.ephemeral) return;
+  if (meta.ephemeral || meta.temporary) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
   // Never awaited and never allowed to affect the turn's own outcome,
@@ -2472,6 +2472,13 @@ async function prepareTurn(
   // CHAT-15: every package call a direct path runs, parks or refuses on
   // this turn lands here, and rides out with the immediate return.
   const directOutcomes: ToolExecutionOutcome[] = [];
+  // CHAT-PARITY-02: temporary conversations may answer from existing
+  // household capabilities, but no package that declares memory:write
+  // is routable or offered to the model. This keeps a temporary turn from
+  // creating durable memory while leaving the safety path unchanged.
+  const effectiveLoaded = conversation.mode === "temporary"
+    ? loaded.filter(({ manifest }) => !(manifest.permissions ?? []).includes("memory:write"))
+    : loaded;
   // CHAT-01: one clock per turn, shared by the safety check's age band,
   // the prompt's speaker line and clock line, and the turn context.
   const frozen = frozenClock();
@@ -2498,7 +2505,7 @@ async function prepareTurn(
   try {
     signal = classifyTurnSignal({
       text,
-      commandOpeners: commandOpeners(loaded),
+      commandOpeners: commandOpeners(effectiveLoaded),
       roster: [...rosterNames, ...subjectRoster],
       resolveEntity: (name) => (rosterNames.includes(name) ? null : (findEntityByName(actor, name)?.id ?? null)),
       ageBand, ageBandBasis,
@@ -2593,7 +2600,7 @@ async function prepareTurn(
   // rather than bound to the edited text.
   if (supersedes) setPendingAsk(conversation.id, null);
   const protocol: { answer?: ProtocolAnswer; subjectId?: string; subject?: SubjectRef } = {};
-  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources, directOutcomes, protocol, { inCrisis });
+  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, effectiveLoaded, turnId, safety, crisisResources, directOutcomes, protocol, { inCrisis });
   // RVW-1: the ask rule that read the answer, from the protocol layer.
   if (protocol.answer) {
     const { kind, answer } = protocol.answer;
@@ -2791,13 +2798,13 @@ async function prepareTurn(
   // embed still runs for recall.
   const shortComment = !inCrisis && !composeDirect && isShortCommentOnLiveSubject(text, subjects, signal);
   if (shortComment) { fired("signal.backchannel_on_subject"); signal = asBackchannelOnLiveSubject(signal); }
-  let { winner: routed, ranked }: RouteResult = inCrisis || shortComment || composeDirect ? { winner: null, ranked: [] } : (routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
+  let { winner: routed, ranked }: RouteResult = inCrisis || shortComment || composeDirect ? { winner: null, ranked: [] } : (routeLiteral(text, actor, effectiveLoaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
   // ACT-01: a literal-pattern win is a directive by construction, frozen
   // on the signal before the package runs.
   if (routed?.viaPattern) { fired("signal.directive_freeze"); signal = freezeDirective(signal); }
   if (!routed && !inCrisis && !shortComment && !composeDirect) {
     utteranceVector = await embedUtterance(text);
-    ({ winner: routed, ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
+    ({ winner: routed, ranked } = await routeSemantic(text, actor, effectiveLoaded, utteranceVector));
   }
   if (inCrisis) {
     utteranceVector = await embedUtterance(text);
@@ -2833,7 +2840,7 @@ async function prepareTurn(
     // it to the shopping list" captured "it", and the list gained the
     // word). The package never runs on it; the turn asks for the value
     // through the ask path, and the next utterance binds it.
-    const routedManifest = loaded.find((l) => l.id === routed.id)?.manifest;
+    const routedManifest = effectiveLoaded.find((l) => l.id === routed.id)?.manifest;
     const unspoken = routedManifest && isActionPackage(routedManifest) ? unspokenArgument(routed.args, text) : null;
     if (unspoken) {
       const { [unspoken.name]: _dropped, ...rest } = routed.args;
@@ -2861,7 +2868,7 @@ async function prepareTurn(
     // half-written recipe) and a household package's not_found ("no
     // such list", an unknown entity) keep the plugin_error reply, so a
     // broken install is never silently answered by the model (a review).
-    const missManifest = loaded.find((l) => l.id === routed.id)?.manifest;
+    const missManifest = effectiveLoaded.find((l) => l.id === routed.id)?.manifest;
     const lookupMiss = !result.ok && result.code === "not_found" && routed.viaPattern && missManifest !== undefined && looksOutsideTheHouse(missManifest);
     if (!result.ok && lookupMiss) {
       console.log(`[turn] plugin ${routed.id} found nothing: ${result.error}`);
@@ -2926,7 +2933,7 @@ async function prepareTurn(
     // recall and the Tier 2 ranking, exactly as a miss would have. The
     // package that just missed is not offered again on the same turn.
     utteranceVector = await embedUtterance(text);
-    ({ ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
+    ({ ranked } = await routeSemantic(text, actor, effectiveLoaded, utteranceVector));
     ranked = ranked.filter((r) => r.id !== tier0Miss?.packageId);
   }
   timings.routing_ms = Math.round(performance.now() - routingStart);
@@ -2993,7 +3000,7 @@ async function prepareTurn(
   // word ceiling for the per-conversation research presentation.
   const plan = conversation.mode === "research" ? { ...basePlan, max_words: Math.min(basePlan.max_words, 30) } : basePlan;
   if (memoryMatches.withheldForBand > 0) fired("disclosure.withheld");
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis }, plan, signal);
+  const promptParts = buildPromptParts(actor, text, memoryMatches, effectiveLoaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis }, plan, signal);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -3148,7 +3155,7 @@ async function prepareTurn(
   // comment below is the history of the always-offer set, kept because
   // its reasoning (the offer costs prompt tokens, not a round trip; the
   // model's own judgment is the gate) is what ROUTE-01 generalized.
-  const tools = inCrisis ? [] : selectOfferedTools(ranked, shape, ordinaryToolIdsForInstalled(loaded));
+  const tools = inCrisis ? [] : selectOfferedTools(ranked, shape, ordinaryToolIdsForInstalled(effectiveLoaded));
   logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), outscoredBySkill, literalYielded, tier0Miss?.packageId ?? null);
   // manifest.routing.always_offer (spec/schemas/manifest.schema.json,
   // Fix E's own addition - a code review, 2026-09-07, found the first
@@ -4480,7 +4487,7 @@ async function runTurnHoldingLease(
   }
   // ASK-01: the engine's question about an unknown name, or the
   // person's open question, at the end of the reply.
-  const ask = prepared.kind === "model" && value.source === "model" ? appendedAsk(prepared, actor, conversation.id, value.reply.text, text, false) : NO_ASK;
+  const ask = prepared.kind === "model" && value.source === "model" ? appendedAsk(prepared, actor, conversation.id, value.reply.text, text, conversation.mode === "temporary") : NO_ASK;
   if (ask.append) value = { ...value, reply: { ...value.reply, text: `${value.reply.text.trimEnd()}${ask.append}` } };
   value = finalizeReply(actor, value, prepared.surface, trace);
   // Committed only when the delivered text still carries the question
@@ -4488,14 +4495,14 @@ async function runTurnHoldingLease(
   if (value.source === "model") ask.commitIf(value.reply.text);
   // LOOKUP-01: an offer or a late promise in the reply that went out
   // binds the next consent word to the lookup.
-  if (prepared.kind === "model" && value.source === "model" && !householdSubjectTurn(text, prepared.turnContext)) {
+  if (prepared.kind === "model" && value.source === "model" && conversation.mode !== "temporary" && !householdSubjectTurn(text, prepared.turnContext)) {
     const offered = splitIntoSentences(visibleText(value.reply.text)).find((sentence) => lookupShapeOf(sentence) !== null);
     const expression = offered ? lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: offered, utterance: text, history: prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content), roster: prepared.turnContext.roster, shape: lookupShapeOf(offered) ?? undefined }) : null;
     if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
   }
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
   if (prepared.kind === "model") prepared.machine?.enter("finished");
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, temporary: conversation.mode === "temporary", outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
   return { ok: true, value };
 }
 
@@ -5078,7 +5085,7 @@ async function runTurnStreamHoldingLease(
     const trace: ReplyTrace = { hits: [], replaced: false };
     const value = finalizeReply(actor, prepared.value, prepared.surface, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety, rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety, rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
     return { ok: true, kind: "immediate", value, signal: prepared.signal };
   }
 
@@ -5468,7 +5475,7 @@ async function runTurnStreamHoldingLease(
       // CHAT-16: a composed package reply appends no ask, as a package
       // reply never did.
       if (composedFrom) return outcome;
-      const ask = appendedAsk(modelTurn, actor, conversation.id, spoken, text, opts.ephemeral === true);
+      const ask = appendedAsk(modelTurn, actor, conversation.id, spoken, text, opts.ephemeral === true || conversation.mode === "temporary");
       if (ask.append) yield ask.append;
       // On the wire now: the delivered text is what was spoken plus
       // the question.
@@ -5548,7 +5555,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
           return outcome.resolved;
         }
         // CHAT-16 (K2, K6): the composition's deltas were the stream:
@@ -5560,7 +5567,7 @@ async function runTurnStreamHoldingLease(
           const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace);
           finalized = composedValue;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
+          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
           return composedValue;
         }
         const outputSafety = outcome;
@@ -5640,13 +5647,13 @@ async function runTurnStreamHoldingLease(
         finalized = value;
         // LOOKUP-01: an offer or a late promise that went out on the
         // wire binds the next consent word to the lookup.
-        if (value.source === "model" && !opts.ephemeral && !householdSubjectTurn(text, prepared.turnContext)) {
+        if (value.source === "model" && !opts.ephemeral && conversation.mode !== "temporary" && !householdSubjectTurn(text, prepared.turnContext)) {
           const offered = splitIntoSentences(visibleText(value.reply.text)).find((sentence) => lookupShapeOf(sentence) !== null);
           const expression = offered ? lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: offered, utterance: text, history: prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content), roster: prepared.turnContext.roster, shape: lookupShapeOf(offered) ?? undefined }) : null;
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
         }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
         return value;
       },
     };

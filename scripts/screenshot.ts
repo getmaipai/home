@@ -207,7 +207,8 @@ const dedicatedScreenshots: Array<{ file: string; route: string; viewport: strin
 const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
 const chatFocusReview = process.argv.includes("--chat-focus-review");
-const chatReview = process.argv.includes("--chat-review") || chatFocusReview;
+const chatTemporaryReview = process.argv.includes("--chat-temporary-review");
+const chatReview = process.argv.includes("--chat-review") || chatFocusReview || chatTemporaryReview;
 const chatStatsReview = process.argv.includes("--chat-stats-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
 const settingsReview = process.argv.includes("--settings-review");
@@ -1067,6 +1068,30 @@ async function captureChatResearchReview(browser: Browser, sessionValue: string)
   }
 }
 
+/** CHAT-PARITY-02's dedicated review: start the explicit temporary mode
+ * before a first send and capture the parent-facing retention contract in
+ * the real chat shell. The backend creates the mode, while the route's
+ * normal frontend fetch then confirms it and renders the banner. */
+async function captureChatTemporaryReview(browser: Browser, sessionValue: string): Promise<void> {
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Start temporary chat", exact: true }).click();
+    await page.getByRole("button", { name: "Turn off temporary chat", exact: true }).waitFor();
+    await page.getByRole("status").filter({ hasText: "not saved to normal history or memory" }).waitFor();
+    await settleAnimations(page);
+    const screenshot = "chat-temporary-mode-desktop-light.png";
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-temporary-mode", viewport: viewport.slug, theme: "light" });
+  } finally {
+    await context.close();
+  }
+}
+
 /** Lane 11 item 2's own acceptance: "the screenshot script gains the
  * section (desktop and phone), opened and judged." The route matrix's
  * own /memory capture never sees this section - Radix's Tabs.Content
@@ -1727,6 +1752,8 @@ async function main() {
     if (!a11yOnly && chatStatsReview) await captureChatStatsReview(browser, sessionValue);
 
     if (!a11yOnly && chatResearchReview) await captureChatResearchReview(browser, sessionValue);
+
+    if (!a11yOnly && chatTemporaryReview) await captureChatTemporaryReview(browser, sessionValue);
 
     if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !conversationsReview) {
       await captureHero(browser, sessionValue);

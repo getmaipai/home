@@ -1,0 +1,1 @@
+CREATE INDEX `conversations_mode_idx` ON `conversations` (`mode`);

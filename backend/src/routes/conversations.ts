@@ -89,8 +89,10 @@ conversationsRoutes.get("/export", requireAuth, async (c) => {
 
 conversationsRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { surface?: Surface; companion_id?: string | null };
-  const result = createConversation(actor, { surface: body.surface, companionId: body.companion_id });
+  const body = (await c.req.json().catch(() => ({}))) as { surface?: Surface; companion_id?: string | null; mode?: Conversation["mode"] };
+  const mode = body.mode === undefined ? undefined : Conversation.shape.mode.safeParse(body.mode);
+  if (mode && !mode.success) return c.json({ error: "invalid conversation mode" }, 400);
+  const result = createConversation(actor, { surface: body.surface, companionId: body.companion_id, mode: mode?.data });
   if (!result.ok) return fail(c, result);
   return c.json(result.value, 201);
 });
@@ -333,7 +335,7 @@ conversationsRoutes.get("/:id/turns", requireAuth, async (c) => {
 
 conversationsRoutes.patch("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null; pinned?: boolean; mode?: "chat" | "research" };
+  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null; pinned?: boolean; mode?: Conversation["mode"] };
   if (body.mode !== undefined) {
     const mode = Conversation.shape.mode.safeParse(body.mode);
     if (!mode.success || mode.data === undefined) return c.json({ error: "invalid conversation mode" }, 400);

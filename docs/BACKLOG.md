@@ -2371,7 +2371,7 @@ stats item text above.
     model downloads and GPU tuning. Exit: backend and frontend tests,
     responsive screenshots, `bash scripts/check.sh`.
 
-- [ ] **CHAT-PARITY-02: temporary chat retention** (S, after CHAT-PARITY-01)
+- [x] **CHAT-PARITY-02: temporary chat retention** (S, after CHAT-PARITY-01)
 
     Objective: provide an explicit per-conversation temporary mode that does
     not enter normal history or memory. Files: conversation schema and

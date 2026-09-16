@@ -136,8 +136,8 @@
     "route": "chat",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-16T18:06:11.321Z",
-    "captureScript": "scripts/screenshot.ts --chat-focus-review"
+    "capturedAt": "2026-09-16T18:36:03.056Z",
+    "captureScript": "scripts/screenshot.ts --chat-temporary-review"
   },
   "conversations-phone-dark.png": {
     "route": "conversations",
@@ -493,8 +493,8 @@
     "route": "chat",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-16T18:06:11.321Z",
-    "captureScript": "scripts/screenshot.ts --chat-focus-review"
+    "capturedAt": "2026-09-16T18:36:03.056Z",
+    "captureScript": "scripts/screenshot.ts --chat-temporary-review"
   },
   "conversations-desktop-light.png": {
     "route": "conversations",
@@ -955,29 +955,29 @@
     "route": "chat-feedback-reasons",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-16T12:39:33.136Z",
-    "captureScript": "scripts/screenshot.ts --chat-review"
+    "capturedAt": "2026-09-16T18:36:03.056Z",
+    "captureScript": "scripts/screenshot.ts --chat-temporary-review"
   },
   "chat-feedback-reasons-desktop-light.png": {
     "route": "chat-feedback-reasons",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-16T12:39:33.136Z",
-    "captureScript": "scripts/screenshot.ts --chat-review"
+    "capturedAt": "2026-09-16T18:36:03.056Z",
+    "captureScript": "scripts/screenshot.ts --chat-temporary-review"
   },
   "chat-document-pane-phone-dark.png": {
     "route": "chat-document-pane",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-16T18:06:11.321Z",
-    "captureScript": "scripts/screenshot.ts --chat-focus-review"
+    "capturedAt": "2026-09-16T18:36:03.056Z",
+    "captureScript": "scripts/screenshot.ts --chat-temporary-review"
   },
   "chat-document-pane-desktop-light.png": {
     "route": "chat-document-pane",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-16T18:06:11.321Z",
-    "captureScript": "scripts/screenshot.ts --chat-focus-review"
+    "capturedAt": "2026-09-16T18:36:03.056Z",
+    "captureScript": "scripts/screenshot.ts --chat-temporary-review"
   },
   "chat-turn-stats-desktop-light.png": {
     "route": "chat-turn-stats",
@@ -999,5 +999,12 @@
     "theme": "light",
     "capturedAt": "2026-09-16T18:06:11.321Z",
     "captureScript": "scripts/screenshot.ts --chat-focus-review"
+  },
+  "chat-temporary-mode-desktop-light.png": {
+    "route": "chat-temporary-mode",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-16T18:36:03.056Z",
+    "captureScript": "scripts/screenshot.ts --chat-temporary-review"
   }
 }
