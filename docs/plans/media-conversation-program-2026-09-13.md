@@ -578,6 +578,63 @@ redesigned.
     hedge and offer families; "you made that up, research it": a
     forced outcome whose query names the title and "plot|about").
 
+## Findings from the seeded set of 2026-09-16 morning (on 044b5f7: the composer, FEED-01, COMP-01, ATT-01, CHAT-STREAM)
+
+Three runs, 391 scored turns each, 293, 291 and 298 passed. Against
+the last full set the fixture grew by about ninety turns, most written
+red ahead of their features (the child-band rows, the lookup-explained
+rows, the composer rows), so the pass rate is not comparable with the
+old one; the diff of failing turns is. Three turns regressed, eight
+turns went green, and the rest of the new red is rows ahead of code.
+Every failing turn in the three logs was read; the clusters:
+
+49. The bench clock is not frozen for the almanac rows. `derived-dates`
+    pins "10:43", "Monday" and "September 14" in its expectations, and
+    the live run answered with the real clock ("Wednesday, September
+    16, 2026", correct); fifteen deterministic failures that are a
+    fixture defect, not an engine one. CHAT-08 (c) gave every turn a
+    frozen clock; the live runner has to set it from the fixture's
+    header for rows that name a time (`conversationLive.ts`), or the
+    rows must stop naming one.
+
+50. The invention guard fires on a correct recall phrased with a
+    hedge. `polite-command` turn 3: the model said the birthday is in
+    June (true, from context) "but I couldn't find more specific
+    details through the search", and the guard replaced the whole line
+    with "That's one I don't have yet". Same shape on
+    `pronoun-follow-up` 3 and `disclose-then-recall-later` 3: the three
+    regressions, all the guard, all on replies that carried the right
+    fact. The guard reads phrasing, exactly the ceiling the review
+    named; the fix is not a fourth regex but the guard checking the
+    reply against the retained record (the fact is present, the line
+    stands, the hedge sentence alone is cut) and the case joining the
+    RVW-2 label set.
+
+51. `lookup-date-relative` turn 2 ran websearch and not
+    `almanac-compute`, so K5 had no relation to render ("a few weeks
+    away" from the model's own arithmetic). The plan chains the compute
+    step only when the deliverable is typed as a date; "how many days
+    until" is a duration ask and the intent reader does not type it.
+    K5's unit tests pass because they feed the relation in; the row is
+    the real test.
+
+52. `list-shape-on-lookup` turn 2 ("list the tracks") was signalled as
+    a directive act and no shape constraint was set, so K4 never
+    rendered a list and the model wrote a paragraph. The shape reader
+    keys off "as a list" and "in one sentence"; an imperative "list
+    the X" is the commonest way a person asks for a list and it is not
+    covered. Same rule as 50: a typed ask, not a longer word list.
+
+The remaining deterministic red is rows ahead of features (band-claim
+and the child notification rows, `checkable-fact` and the
+source-explained rows on K3's live path, `unknown-name-pet-lowercase`,
+`link-is-the-answer`, `act-memory-curator`, `subject-before-pattern`,
+`unknown-speaker-shared-device`) and is listed turn by turn in
+`data-scratch/c/queue/done/codex-08c-seeded-set-REPORT.md` with the
+three log paths. The single-run failures are variance and stay listed
+there. Design of 50 to 52 is Session A's (chat-gap design is reserved);
+49 is a fixture fix any lane can take.
+
 What worked, for the record: every forced or explicit search answered
 right (a release date, a cast, an OS release, a cartoon's sidekick,
 a used price); the almanac answered time and date; a correction was
