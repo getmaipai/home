@@ -2284,7 +2284,7 @@ invented for the roster's household, and added to
       OpenAPI. Acceptance: authenticated GET returns the validated
       artifact, missing documents stay absent, and API docs regenerate.
       Exit: route tests and the API-docs check.
-    - [ ] **COMP-01c: composer document builders** (mechanical). Build
+    - [x] **COMP-01c: composer document builders** (mechanical). Build
       `lookup`, `card`, `procedure` and `comparison` in
       `backend/src/lib/composer.ts` and `backend/src/lib/turnEngine.ts`.
       Mirror `sourcesFromRows()` and retained outcome data. Acceptance:

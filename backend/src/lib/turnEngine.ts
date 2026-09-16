@@ -45,7 +45,7 @@ import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor, constraints
 import { planFor, planLine } from "@/lib/register";
 import { rungOf, rulesFired, type Rung, type RuleName } from "@/lib/ruleNames";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
-import { planComposition, composedText, composedLog, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, type ComposedTurn, type ComposerInput } from "@/lib/composer";
+import { buildDocument, projectDocument, planComposition, composedText, composedLog, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
 import { promptNow } from "@/lib/benchSampling";
 import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
@@ -95,6 +95,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 // this is where callers already look for them.
 import type { TurnValue } from "@/wire";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
+import type { TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 export type { TurnReply, TurnValue } from "@/wire";
 
 // 4.5 names six surfaces (chat, overlay, pod, robot, tv, phone), each
@@ -104,6 +105,19 @@ export type { TurnReply, TurnValue } from "@/wire";
 // llm.ts's IMPLEMENTED_ROLES, not silently missing.
 export type Surface = "chat" | "overlay" | "pod" | "robot" | "tv" | "phone";
 const IMPLEMENTED_SURFACES: ReadonlySet<Surface> = new Set(["chat", "robot"]);
+
+/** COMP-01: the engine-owned seam for the details build. The composer owns
+ * the pure section selection and the engine supplies turn identity and any
+ * prior same-subject revision. Ordinary turns do not call this until a
+ * details consumer asks for the document. */
+export function buildDocumentForTurn(input: DocumentBuildInput): TurnArtifactValue | null {
+  return buildDocument(input);
+}
+
+/** COMP-01: apply the audience projection at delivery time. */
+export function projectDocumentForAudience(document: TurnArtifactValue, ageBand: "child" | "teen" | "adult"): TurnArtifactValue | ReturnType<typeof projectDocument> {
+  return projectDocument(document, ageBand);
+}
 
 /** Shared by TurnOpResult and TurnStreamResult: runTurn() and
  * runTurnStream() run the identical validation/safety/plugin-floor logic
@@ -299,7 +313,10 @@ function logTurnSafely(
       // RVW-1: a repair aimed at the hub corrects the previous reply;
       // that row is marked before this one is inserted.
       if (meta.signal.target === "hub" && meta.signal.repair !== "none") markPreviousTurnCorrected(value.conversation_id, value.turn_id);
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, plan, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present, rung, rules });
+      const document = meta.outcomes && meta.outcomes.length > 0
+        ? buildDocumentForTurn({ turnId: value.turn_id, outcomes: meta.outcomes })
+        : null;
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, document, signal: meta.signal, plan, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present, rung, rules });
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }

@@ -28,6 +28,9 @@ import {
   COMPOSE_FALLBACK_LINE,
   COMPOSE_FAILURE_LINE,
   COMPOSER_MAX_CALLS,
+  buildDocument,
+  documentEvidenceVersion,
+  projectDocumentForChild,
   type ComposerInput,
 } from "@/lib/composer";
 
@@ -245,6 +248,84 @@ describe("typed date relations", () => {
   test("a date six weeks out stays a calendar date", async () => {
     const turn = await composeTurn(input([dateOutcome("2026-10-27")], { now: clock, messages: [{ role: "user", content: "when is it" }] }), scripted("The date is October 27."));
     expect(turn.reply.text).toContain("October 27");
+  });
+});
+
+describe("COMP-01 typed document builders", () => {
+  const source = (id: string, title: string) => ({
+    id,
+    kind: "package" as const,
+    title,
+    url: `https://example.com/${id}`,
+    site: "example.com",
+    snippet: `${title} source`,
+    source: "turn-document123",
+    created_at: "2026-09-16T12:00:00.000Z",
+    hlc: "1789550400000:0:hub001",
+  });
+  const typedOutcome = (data: Record<string, unknown>, id = "src-document123") => outcome({
+    callId: `call-${id}`,
+    packageId: "typed-package",
+    status: "succeeded",
+    args: { topic: "document example" },
+    result: { actions: [], data },
+    sources: [source(id, "Document source")],
+  });
+
+  test("a lookup outcome becomes a source-backed results section", () => {
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ query: "Willow hours", rows: [{ title: "Willow visitor center", snippet: "Opens at 8 a.m. on Saturdays." }] })] });
+    expect(document?.section).toMatchObject({ type: "lookup", query: "Willow hours", results: [{ title: "Willow visitor center", line: "Opens at 8 a.m. on Saturdays.", source_id: "src-document123" }] });
+  });
+
+  test("a typed source outcome becomes a card section", () => {
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ kind: "film", title: "Bramble Moon", year: 2024, director: "Quill Arden", genres: ["adventure"] })] });
+    expect(document?.section).toEqual({ type: "card", kind: "film", name: "Bramble Moon", year: 2024, director: "Quill Arden", genres: ["adventure"], source_id: "src-document123" });
+  });
+
+  test("a typed outcome's singular source is promoted to the document citation list", () => {
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [outcome({
+      callId: "call-singular",
+      packageId: "typed-package",
+      status: "succeeded",
+      source: { kind: "web", title: "Person source", url: "https://example.com/person", site: "example.com", snippet: "A source-backed person." },
+      result: { actions: [], data: { kind: "person", name: "Quill Arden", occupation: "Director", known_for: ["Bramble Moon"] } },
+    })] });
+    expect(document?.sources).toHaveLength(1);
+    expect(document?.section).toMatchObject({ type: "card", kind: "person", name: "Quill Arden" });
+  });
+
+  test("a procedure outcome retains ordered instructions and quantities", () => {
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ title: "Herb plan", steps: [{ position: 1, instruction: "Fill the pot.", quantities: [{ amount: 30, unit: "centimeters", item: "pot" }] }] })] });
+    expect(document?.section).toEqual({ type: "procedure", title: "Herb plan", steps: [{ position: 1, instruction: "Fill the pot.", quantities: [{ amount: 30, unit: "centimeters", item: "pot" }] }] });
+  });
+
+  test("a comparison outcome becomes a typed table", () => {
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ title: "Bike comparison", subjects: [{ id: "subject-alpha123", name: "Ember" }, { id: "subject-bravo123", name: "River" }], rows: [{ attribute: "range", values: [{ subject_id: "subject-alpha123", value: "45 km" }, { subject_id: "subject-bravo123", value: "60 km" }] }] })] });
+    expect(document?.section).toMatchObject({ type: "comparison", title: "Bike comparison", subjects: [{ id: "subject-alpha123", name: "Ember" }, { id: "subject-bravo123", name: "River" }], rows: [{ attribute: "range" }] });
+  });
+
+  test("chit-chat and reply-only outcomes produce no document", () => {
+    expect(buildDocument({ turnId: "turn-document123", outcomes: [weatherOutcome()] })).toBeNull();
+    expect(documentEvidenceVersion([])).toMatch(/^outcome-[a-f0-9]{16}$/);
+  });
+
+  test("the child projection keeps typed content but strips every source link", () => {
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ query: "Willow hours", rows: [{ title: "Willow visitor center", snippet: "Opens at 8 a.m. on Saturdays." }] })] });
+    if (!document) throw new Error("expected a document");
+    const child = projectDocumentForChild(document);
+    expect(child.sources).toEqual([]);
+    expect(child.section).toEqual({ type: "lookup", query: "Willow hours", results: [{ title: "Willow visitor center", line: "Opens at 8 a.m. on Saturdays." }] });
+  });
+
+  test("changed retained evidence creates a new revision", () => {
+    const first = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ query: "Willow hours", rows: [{ title: "Willow visitor center", snippet: "Opens at 8 a.m." }] })] });
+    if (!first) throw new Error("expected the first document");
+    const second = buildDocument({ turnId: "turn-document456", previous: first, outcomes: [typedOutcome({ query: "Willow hours", rows: [{ title: "Willow visitor center", snippet: "Opens at 9 a.m." }] })] });
+    expect(second?.revision).toBe(2);
+    expect(second?.turn_id).toBe("turn-document456");
+    expect(second?.evidence_version).not.toBe(first.evidence_version);
+    const freshSubject = buildDocument({ turnId: "turn-document789", previous: first, sameSubject: false, outcomes: [typedOutcome({ query: "Different hours", rows: [{ title: "Another visitor center", snippet: "Opens at 10 a.m." }] })] });
+    expect(freshSubject?.revision).toBe(1);
   });
 });
 

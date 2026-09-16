@@ -24,12 +24,17 @@
 // turn's counter and, with the second call spent, composes without a
 // model call: the direct reply when an outcome has one, else the fixed
 // fallback.
-import type { ToolExecutionOutcome } from "@/lib/turnContext";
+import { sourcesFromRows, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { LlmMessage } from "@/lib/llm";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { ToolCallWire } from "@maipai/spec/llm/ts/types.js";
+import { createHash } from "node:crypto";
 import { repairReply, assessReply, visibleText } from "@/lib/wellFormed";
 import { dateRelation } from "@/lib/almanacCompute";
+import { nextHlc } from "@/lib/hlc";
+import { randomSuffix } from "@/lib/id";
+import { TurnArtifact as TurnArtifactSchema, type TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
+import type { AgeBand } from "@/lib/ageBand";
 
 /** The fixed line for a data-only result the composer could not phrase
  * (the model failed, or the budget was spent with no direct reply). */
@@ -102,6 +107,261 @@ export interface ComposedTurn {
    * deterministic route, the forced ladder), never the model's. */
   synthetic_ids?: boolean;
 }
+
+type ArtifactSection = TurnArtifactValue["section"];
+type ChildLookup = Omit<Extract<ArtifactSection, { type: "lookup" }>, "results"> & { results: Omit<Extract<ArtifactSection, { type: "lookup" }>['results'][number], "source_id">[] };
+type ChildCard = Omit<Extract<ArtifactSection, { type: "card" }>, "source_id">;
+type ChildSection = ChildLookup | ChildCard | Extract<ArtifactSection, { type: "procedure" }> | Extract<ArtifactSection, { type: "comparison" }>;
+
+/** The audience projection used by the child chat. It is intentionally not
+ * a TurnArtifact: the spec record requires citations, while child delivery
+ * strips the citations and the section links that point at them. */
+export type ChildTurnArtifact = Omit<TurnArtifactValue, "sources" | "section"> & {
+  sources: [];
+  section: ChildSection;
+};
+
+export interface DocumentBuildInput {
+  turnId: string;
+  outcomes: readonly ToolExecutionOutcome[];
+  previous?: TurnArtifactValue | null;
+  /** A corrected or unrelated subject starts a fresh living document. */
+  sameSubject?: boolean;
+  now?: Date;
+}
+
+type RecordData = Record<string, unknown>;
+
+function recordData(value: unknown): RecordData | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as RecordData : null;
+}
+
+function dataCandidates(outcome: Succeeded): RecordData[] {
+  const data = recordData(outcome.result?.data);
+  if (!data) return [];
+  const nested = recordData(data.result) ?? recordData(data.record);
+  return nested ? [data, nested] : [data];
+}
+
+function textField(record: RecordData, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function sourceFor(sourceList: readonly Source[], raw: RecordData, fallback = 0): Source | null {
+  const url = textField(raw, "url", "source_url");
+  return sourceList.find((source) => url !== null && source.url === url) ?? sourceList[fallback] ?? null;
+}
+
+function sourceFromOutcome(outcome: Succeeded): Source | null {
+  const source = outcome.source;
+  if (!source || source.kind !== "web" || !source.title.trim() || !source.url || !/^https?:\/\//i.test(source.url)) return null;
+  try {
+    const url = new URL(source.url);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    url.username = "";
+    url.password = "";
+    url.hash = "";
+    return {
+      id: `src-${randomSuffix(10)}`,
+      kind: "web",
+      title: source.title.trim(),
+      url: url.toString(),
+      site: source.site?.trim() || url.hostname.replace(/^www\./, ""),
+      snippet: source.snippet ?? null,
+      source: outcome.packageId,
+      created_at: outcome.at ?? new Date().toISOString(),
+      hlc: nextHlc(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sourceRows(outcomes: readonly Succeeded[]): Source[] {
+  const all = outcomes.flatMap((outcome) => {
+    const explicit = outcome.sources ?? [];
+    const rows = dataCandidates(outcome).flatMap((data) => Array.isArray(data.rows) ? data.rows : []);
+    return explicit.length > 0 ? explicit : [...sourcesFromRows(rows), ...(rows.length === 0 ? [sourceFromOutcome(outcome)] : [])].filter((source): source is Source => source !== null);
+  });
+  const byUrl = new Map<string, Source>();
+  for (const source of all) if (!byUrl.has(source.url)) byUrl.set(source.url, source);
+  return [...byUrl.values()];
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()) : [];
+}
+
+function numberOrString(value: unknown): number | string | null {
+  return typeof value === "number" || (typeof value === "string" && value.trim().length > 0) ? value : null;
+}
+
+function typedRecord(outcome: Succeeded): RecordData | null {
+  for (const data of dataCandidates(outcome)) {
+    const kind = textField(data, "kind", "card_kind", "type");
+    if (kind === "film" || kind === "person" || kind === "place") return data;
+  }
+  return null;
+}
+
+function cardSection(outcome: Succeeded, sourceList: readonly Source[]): Extract<ArtifactSection, { type: "card" }> | null {
+  const data = typedRecord(outcome);
+  const source = data && sourceFor(sourceList, data);
+  const name = data && textField(data, "name", "title");
+  if (!data || !source || !name) return null;
+  const kind = textField(data, "kind", "card_kind", "type");
+  if (kind === "film") {
+    const year = typeof data.year === "number" && Number.isInteger(data.year) && data.year >= 1888 ? data.year : null;
+    return { type: "card", kind, name, year, director: textField(data, "director"), genres: stringList(data.genres), source_id: source.id };
+  }
+  if (kind === "person") return { type: "card", kind, name, occupation: textField(data, "occupation"), known_for: stringList(data.known_for), source_id: source.id };
+  if (kind === "place") return { type: "card", kind, name, region: textField(data, "region"), country: textField(data, "country"), source_id: source.id };
+  return null;
+}
+
+function procedureSection(outcome: Succeeded): Extract<ArtifactSection, { type: "procedure" }> | null {
+  for (const data of dataCandidates(outcome)) {
+    const rawSteps = Array.isArray(data.steps) ? data.steps : Array.isArray(data.instructions) ? data.instructions : null;
+    const title = textField(data, "title", "name", "query") ?? textField(outcome.args ?? {}, "title", "topic");
+    if (!rawSteps || !title) continue;
+    const steps = rawSteps.flatMap((raw, index) => {
+      if (typeof raw === "string" && raw.trim()) return [{ position: index + 1, instruction: raw.trim(), quantities: [] }];
+      const step = recordData(raw);
+      const instruction = step && textField(step, "instruction", "text", "description");
+      if (!step || !instruction) return [];
+      const quantities = Array.isArray(step.quantities) ? step.quantities.flatMap((rawQuantity) => {
+        const quantity = recordData(rawQuantity);
+        const amount = quantity && numberOrString(quantity.amount);
+        const unit = quantity && textField(quantity, "unit");
+        const item = quantity && textField(quantity, "item", "name");
+        return amount !== null && unit && item ? [{ amount, unit, item }] : [];
+      }) : [];
+      const position = typeof step.position === "number" && Number.isInteger(step.position) && step.position >= 1 ? step.position : index + 1;
+      return [{ position, instruction, quantities }];
+    });
+    if (steps.length > 0) return { type: "procedure", title, steps };
+  }
+  return null;
+}
+
+function comparisonSection(outcome: Succeeded): Extract<ArtifactSection, { type: "comparison" }> | null {
+  for (const data of dataCandidates(outcome)) {
+    const title = textField(data, "title", "name", "query");
+    const rawSubjects = Array.isArray(data.subjects) ? data.subjects : [];
+    const subjects = rawSubjects.flatMap((raw, index) => {
+      const subject = recordData(raw);
+      const name = subject && textField(subject, "name", "title");
+      if (!subject || !name) return [];
+      const id = textField(subject, "id") ?? `subject-${createHash("sha256").update(`${name}:${index}`).digest("hex").slice(0, 10)}`;
+      return [{ id, name, index }];
+    });
+    const rawRows = Array.isArray(data.rows) ? data.rows : [];
+    const rows = rawRows.flatMap((raw) => {
+      const row = recordData(raw);
+      const attribute = row && textField(row, "attribute", "name", "label");
+      const values = row && Array.isArray(row.values) ? row.values.flatMap((rawValue) => {
+        const value = recordData(rawValue);
+        const rawId = value && textField(value, "subject_id", "subjectId", "id");
+        const text = value && textField(value, "value", "text");
+        const subject = subjects.find((candidate) => candidate.id === rawId || candidate.name === rawId);
+        return text && subject ? [{ subject_id: subject.id, value: text }] : [];
+      }) : [];
+      return attribute && values.length >= 2 ? [{ attribute, values }] : [];
+    });
+    if (title && subjects.length >= 2 && rows.length > 0) return { type: "comparison", title, subjects: subjects.map(({ id, name }) => ({ id, name })), rows };
+  }
+  return null;
+}
+
+function lookupSection(outcome: Succeeded, sourceList: readonly Source[]): Extract<ArtifactSection, { type: "lookup" }> | null {
+  for (const data of dataCandidates(outcome)) {
+    const rawRows = Array.isArray(data.rows) ? data.rows : [];
+    const query = textField(data, "query", "expression", "topic") ?? textField(outcome.args ?? {}, "expression", "topic", "query");
+    if (!query || rawRows.length === 0 || sourceList.length === 0) continue;
+    const results = rawRows.flatMap((raw) => {
+      const row = recordData(raw);
+      const title = row && textField(row, "title", "name");
+      const line = row && textField(row, "line", "snippet", "description", "text");
+      const source = row && sourceFor(sourceList, row);
+      return title && line && source ? [{ title, line, source_id: source.id }] : [];
+    });
+    if (results.length > 0) return { type: "lookup", query, results };
+  }
+  return null;
+}
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+/** A deterministic fingerprint of the retained evidence, excluding generated
+ * document ids and timestamps so a changed result is what creates a revision. */
+export function documentEvidenceVersion(outcomes: readonly ToolExecutionOutcome[]): string {
+  const retained = outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded").map((outcome) => ({
+    packageId: outcome.packageId,
+    args: outcome.args ?? {},
+    result: outcome.result ?? null,
+    // Citation ids and clocks identify a snapshot, but are not evidence.
+    sources: (outcome.sources ?? []).map(({ kind, title, url, site, snippet, source }) => ({ kind, title, url, site, snippet, source })),
+  }));
+  return `outcome-${createHash("sha256").update(canonical(retained)).digest("hex").slice(0, 16)}`;
+}
+
+/** Builds one immutable typed details document from retained outcomes. Model
+ * prose and outcomes without typed material are deliberately ignored. */
+export function buildDocument(input: DocumentBuildInput): TurnArtifactValue | null {
+  const succeeded = input.outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded");
+  if (succeeded.length === 0) return null;
+  const sources = sourceRows(succeeded);
+  if (sources.length === 0) return null;
+  const section = succeeded.map((outcome) => cardSection(outcome, sources)).find((candidate): candidate is Extract<ArtifactSection, { type: "card" }> => candidate !== null)
+    ?? succeeded.map(procedureSection).find((candidate): candidate is Extract<ArtifactSection, { type: "procedure" }> => candidate !== null)
+    ?? succeeded.map(comparisonSection).find((candidate): candidate is Extract<ArtifactSection, { type: "comparison" }> => candidate !== null)
+    ?? succeeded.map((outcome) => lookupSection(outcome, sources)).find((candidate): candidate is Extract<ArtifactSection, { type: "lookup" }> => candidate !== null);
+  if (!section) return null;
+  const evidenceVersion = documentEvidenceVersion(input.outcomes);
+  if (input.previous && input.sameSubject !== false && input.previous.evidence_version === evidenceVersion) return input.previous;
+  const revision = input.previous && input.sameSubject !== false ? input.previous.revision + 1 : 1;
+  const now = (input.now ?? new Date()).toISOString();
+  const document = {
+    id: `doc-${randomSuffix(10)}`,
+    turn_id: input.turnId,
+    revision,
+    evidence_version: evidenceVersion,
+    section,
+    sources,
+    provenance: `composer:${input.turnId}:${section.type}`,
+    created_at: now,
+    hlc: nextHlc(),
+  };
+  const parsed = TurnArtifactSchema.safeParse(document);
+  return parsed.success ? parsed.data : null;
+}
+
+function withoutSourceLinks(section: ArtifactSection): ChildSection {
+  if (section.type === "lookup") return { type: "lookup", query: section.query, results: section.results.map((result: { title: string; line: string; source_id: string }) => ({ title: result.title, line: result.line })) };
+  if (section.type === "card") {
+    if (section.kind === "film") return { type: "card", kind: section.kind, name: section.name, year: section.year, director: section.director, genres: section.genres };
+    if (section.kind === "person") return { type: "card", kind: section.kind, name: section.name, occupation: section.occupation, known_for: section.known_for };
+    return { type: "card", kind: section.kind, name: section.name, region: section.region, country: section.country };
+  }
+  return section;
+}
+
+/** Projects a document for a child without widening its already-filtered
+ * content ceiling. Citations and links are removed from delivery. */
+export function projectDocument(document: TurnArtifactValue, ageBand: AgeBand): TurnArtifactValue | ChildTurnArtifact {
+  if (ageBand !== "child") return document;
+  return { ...document, sources: [], section: withoutSourceLinks(document.section) };
+}
+
+export const projectDocumentForChild = (document: TurnArtifactValue): ChildTurnArtifact => projectDocument(document, "child") as ChildTurnArtifact;
 
 /** The decision, made without a model call. A `composition` plan
  * carries the messages to send and the fallback text; everything else
