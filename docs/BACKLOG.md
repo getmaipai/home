@@ -2701,6 +2701,26 @@ stats item text above.
     `maxWords` hold); child delivery keeps the existing projection; screenshots.
     Exit: the suites, `bash scripts/check.sh`.
 
+<a id="page-01"></a>
+
+- [x] **PAGE-01: Read a page the person asked about** (M, after COMP-01)
+
+    Objective: let one adult page ask read the returned page and use its
+    bounded article text and links. Design: `docs/dev.md#page-01-reading-a-
+    page-the-person-asked-about`. Files: the SearXNG host integration,
+    websearch recipe and manifest, `backend/src/lib/turnEngine.ts`,
+    `backend/src/lib/turnContext.ts`, `backend/src/lib/composer.ts`, the
+    conversation bench fixture, privacy docs, and parser dependencies.
+    Acceptance: one page fetch uses the same limiter and user agent, checks
+    robots and public redirects, stops on the first 403 or 429, and never
+    prefetches linked pages; a scripted page exposes three links and bounded
+    readable text; `download-link-on-page` selects the matching download
+    href; `value-on-page` grounds a value in the page; a missing field says
+    the page does not have that; and `who-is-builds-a-card-from-the-page`
+    keeps the adult article detail in the document with the child ceiling.
+    The package declares the page data source. Exit: targeted tests and
+    `bash scripts/check.sh`.
+
 <a id="stats-01"></a>
 
 - [x] **STATS-01: The advanced view of a reply** (M, after COMP-01)
