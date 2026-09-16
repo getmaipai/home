@@ -349,7 +349,7 @@ not permission to expand scope.
 
 <a id="chat-08"></a>
 
-- [ ] **CHAT-08: Apply memory validity at read time** (M)
+- [x] **CHAT-08: Apply memory validity at read time** (M)
 
     Depends on: CHAT-06. Files: `backend/src/lib/memory.ts`,
     `memoryJudge.ts`, `routes/memory.ts`, `spec/schemas/memory-record.schema.json`,
@@ -2319,7 +2319,7 @@ invented for the roster's household, and added to
 
 <a id="stats-01"></a>
 
-- [ ] **STATS-01: The advanced view of a reply** (M, after COMP-01)
+- [x] **STATS-01: The advanced view of a reply** (M, after COMP-01)
 
     Objective: give an adult an optional, per-person readout of engine
     work under a reply, with no child disclosure and no engine-host
@@ -6417,7 +6417,7 @@ approvals are still real, unstarted work for a future session.
       rename, delete the second, reload again. Out of scope: persistent
       branches, attachments, and continuous voice. Exit checks:
       `bash scripts/check.sh`, `bun run screenshots --chat-review`.
-- [ ] **FEED-01: Thumbs up and down on a reply, as labels** (M, spec
+- [x] **FEED-01: Thumbs up and down on a reply, as labels** (M, spec
       first, 2026-09-16). Objective: the household rates a reply with
       one tap and the rating becomes a human label for the review
       program, never a hidden counter. Spec first:
@@ -7706,7 +7706,7 @@ that owns it.
       item on the bench machine only. Needs real bench hardware (a GPU,
       a downloaded warm model) this dev sandbox doesn't have - Jesse's
       own explicit call to defer it, not a scope guess.
-- [ ] **GPU validation bench** (S, Codex) - `backend/scripts/bench/gpu-validate.ts`
+- [x] **GPU validation bench** (S, Codex) - `backend/scripts/bench/gpu-validate.ts`
       validates fill, concurrent throughput, throttling, and a minimum
       single-stream rate before a household engine moves onto a new card.
 - [ ] **The release ceremony for v0.1.0** (M, F, only when Jesse says so)
