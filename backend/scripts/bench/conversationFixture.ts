@@ -1,7 +1,7 @@
 // The baseline conversation bench's fixture (docs/plans/measure-first-
 // 2026-09-13.md section 2; design in docs/dev/session-a.md, "the
 // baseline conversation bench" and "the bench's ten weak rows"):
-// thirty-one complete conversations with stable ids, pure data, imported
+// thirty complete conversations with stable ids, pure data, imported
 // by the live runner (conversationLive.ts) and by
 // tests/conversationBench.test.ts. Every expectation is read from the
 // system's own state after the turn (a memory row and its status, the

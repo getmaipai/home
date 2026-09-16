@@ -5223,6 +5223,36 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     });
   });
 
+  test("a decided follow-up about a named film forces a plot lookup and keeps sources", async () => {
+    const { actor } = await owner();
+    await withLookupStub({ draft: "I should check that first.", twoSources: true }, async (seen) => {
+      await runTurn(actor, "chat", "the new Marsh Lantern film is the one I'm counting down to");
+      const result = await runTurn(actor, "chat", "what's it about");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.queries.some((q) => /marsh lantern/i.test(q) && /plot/i.test(q))).toBe(true);
+      expect(result.value.source).toBe("plugin");
+      expect(result.value.plugin_id).toBe("websearch");
+      expect(result.value.sources?.length).toBeGreaterThan(0);
+      expect(retained(result.value.turn_id)?.some((o) => o.packageId === "websearch" && o.via === "forced")).toBe(true);
+    });
+  });
+
+  test("a correction asks for the named film's plot, not the invented draft's details", async () => {
+    const { actor } = await owner();
+    await withLookupStub({ draft: (request) => request.messages.some((m) => typeof m.content === "string" && m.content.includes("what's it about")) ? "The film is a cheerful comedy about a talking lighthouse." : "I should check that first." }, async (seen) => {
+      await runTurn(actor, "chat", "the new Marsh Lantern film is the one I'm counting down to");
+      await runTurn(actor, "chat", "what's it about");
+      const result = await runTurn(actor, "chat", "nope, you made that up, research it");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const query = seen.queries.at(-1) ?? "";
+      expect(query).toMatch(/marsh lantern/i);
+      expect(query).toMatch(/plot/i);
+      expect(query).not.toMatch(/lighthouse|comedy/i);
+    });
+  });
+
   test("lookupShapeOf(): promises, offers, and the phrases that are neither", async () => {
     const { lookupShapeOf } = await import("@/lib/guards");
     for (const promise of ["Let me check that for you.", "I'll look it up.", "I'll look that up for you right now.", "Let me find out.", "Give me a second while I check.", "I'm going to search for that.", "Hold on, let me see what I can find.", "Let me see if I can find that.", "I'll check the weather for you."]) {
