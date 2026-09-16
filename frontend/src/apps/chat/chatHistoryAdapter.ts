@@ -10,6 +10,57 @@ export interface BranchableTurnMessages {
   reply: { message: ThreadMessageLike; parentId: string | null };
 }
 
+function branchKey(parentId: string | null): string {
+  return parentId ?? "<root>";
+}
+
+function compareBranchRows(a: ConversationTurnWithMemoryIds, b: ConversationTurnWithMemoryIds): number {
+  const [aWall = 0, aCounter = 0] = (a.hlc ?? `${a.createdAt}:0:`).split(":").map(Number);
+  const [bWall = 0, bCounter = 0] = (b.hlc ?? `${b.createdAt}:0:`).split(":").map(Number);
+  if (aWall !== bWall) return aWall - bWall;
+  if (aCounter !== bCounter) return aCounter - bCounter;
+  return a.id.localeCompare(b.id);
+}
+
+function normalizedRows(rows: ConversationTurnWithMemoryIds[]): Array<{ row: ConversationTurnWithMemoryIds; parentId: string | null }> {
+  const orderedRows = [...rows].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const parentByRowId = new Map<string, string | null>();
+  let chainTail: string | null = null;
+  return orderedRows.map((row) => {
+    const parentId = row.parentTurnId !== undefined ? row.parentTurnId : row.supersedes && parentByRowId.has(row.supersedes) ? parentByRowId.get(row.supersedes)! : chainTail;
+    parentByRowId.set(row.id, parentId);
+    chainTail = `${row.id}-reply`;
+    return { row, parentId };
+  });
+}
+
+function selectedSibling(rows: Array<{ row: ConversationTurnWithMemoryIds; parentId: string | null }>): { row: ConversationTurnWithMemoryIds; parentId: string | null } | undefined {
+  if (rows.length === 0) return undefined;
+  const explicit = rows.some(({ row }) => row.branchChosen !== undefined);
+  const candidates = explicit ? rows.filter(({ row }) => row.branchChosen !== false) : rows.slice(-1);
+  return [...(candidates.length > 0 ? candidates : rows)].sort((a, b) => compareBranchRows(a.row, b.row)).at(-1);
+}
+
+export function chosenBranchHeadId(rows: ConversationTurnWithMemoryIds[]): string | undefined {
+  const byParent = new Map<string, Array<{ row: ConversationTurnWithMemoryIds; parentId: string | null }>>();
+  for (const normalized of normalizedRows(rows)) {
+    const siblings = byParent.get(branchKey(normalized.parentId)) ?? [];
+    siblings.push(normalized);
+    byParent.set(branchKey(normalized.parentId), siblings);
+  }
+  let parentId: string | null = null;
+  let head: ConversationTurnWithMemoryIds | undefined;
+  const visited = new Set<string>();
+  for (;;) {
+    const selected = selectedSibling(byParent.get(branchKey(parentId)) ?? []);
+    if (!selected || visited.has(selected.row.id)) break;
+    visited.add(selected.row.id);
+    head = selected.row;
+    parentId = selected.row.id;
+  }
+  return head ? `${head.id}-reply` : undefined;
+}
+
 /** getmaipai/home#60: rows come oldest-first (real creation order), and a
  * `supersedes` row is a genuine new database row, never a rewrite of the
  * one it replaces - the old row is untouched, still sitting earlier in
@@ -33,17 +84,13 @@ export function rowsToBranchableMessages(
   conversationId: string,
   feedbackByTurn: ReadonlyMap<string, FeedbackVerdict> = new Map(),
 ): BranchableTurnMessages[] {
-  const parentByRowId = new Map<string, string | null>();
-  let chainTail: string | null = null;
   const out: BranchableTurnMessages[] = [];
-  for (const row of rows) {
+  for (const { row, parentId } of normalizedRows(rows)) {
     const createdAt = new Date(row.createdAt);
     // `?? chainTail` would be wrong here: a row whose OWN parent is
     // genuinely `null` (the conversation's first message) makes
     // parentByRowId.get() return null too, and `null ?? chainTail`
     // can't tell that apart from "not found" - .has() is the real check.
-    const parentId = row.supersedes && parentByRowId.has(row.supersedes) ? parentByRowId.get(row.supersedes)! : chainTail;
-    parentByRowId.set(row.id, parentId);
     const userId = `${row.id}-user`;
     const replyId = `${row.id}-reply`;
     const feedbackType = feedbackByTurn.get(row.id);
@@ -92,7 +139,6 @@ export function rowsToBranchableMessages(
       },
     };
     out.push({ user: { message: userMessage, parentId }, reply: { message: replyMessage, parentId: userId } });
-    chainTail = replyId;
   }
   return out;
 }
@@ -113,7 +159,7 @@ export function createChatHistoryAdapter(selfName: string, getConversationId: ()
       );
       const turns = id ? rowsToBranchableMessages(rows, selfName, id, feedbackByTurn) : [];
       const items = turns.flatMap((t) => [t.user, t.reply]);
-      const headId = turns.length > 0 ? turns[turns.length - 1]!.reply.message.id : undefined;
+      const headId = id ? chosenBranchHeadId(rows) : undefined;
       return ExportedMessageRepository.fromBranchableArray(items, { headId });
     },
     async append() {},

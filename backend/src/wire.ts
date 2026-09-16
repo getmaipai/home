@@ -77,6 +77,11 @@ export interface TurnValue {
    * time a TurnValue exists, never optional. */
   conversation_id: string;
   turn_id: string;
+  /** CHAT-STREAM: the persisted branch relationship, additive on the
+   * completion response. Ephemeral turns may omit these fields because
+   * they do not create a conversation row. */
+  parent_turn_id?: string | null;
+  branch_chosen?: boolean;
   /** Session C step 1: only present for `source: "plugin"` - which tier
    * of route()'s decision fired it and its own score (1.0 for
    * "pattern"; the real cosine, or the keyword-overlap fallback score,

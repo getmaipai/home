@@ -448,6 +448,13 @@ export const conversationTurns = sqliteTable(
     // creates, never on the old one it replaces (the old row is left
     // exactly as it was, still readable as the other branch).
     supersedes: text("supersedes"),
+    // CHAT-STREAM: the explicit synced branch relationship. A normal
+    // follow-up points at the latest chosen turn; an edit or regenerated
+    // alternative points at the replaced turn's parent so its siblings
+    // share one branch slot. Legacy rows use the derived values in the
+    // migration and keep `supersedes` for the hub's existing context logic.
+    parentTurnId: text("parent_turn_id"),
+    branchChosen: integer("branch_chosen", { mode: "boolean" }).notNull().default(true),
     // Step 10: not a spec-shaped record itself (conversation_turns stays
     // hub-internal, see the table's own header above), but the plan's
     // own text still asks for it here so a synced conversation's

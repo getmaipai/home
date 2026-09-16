@@ -40,6 +40,7 @@ import { SourcesCard } from "@/apps/chat/chatSourcesCard";
 import { ChatDocumentHandle } from "@/apps/chat/chatDocumentPane";
 import { ChatTurnStats } from "@/apps/chat/chatTurnStats";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
+import { api } from "@/lib/api";
 import { Button } from "@/kit/ui/button";
 import { Skeleton } from "@/kit/ui/skeleton";
 import { cn } from "@/kit/utils";
@@ -78,6 +79,8 @@ import {
   createContext,
   useContext,
   useMemo,
+  useEffect,
+  useRef,
   type ComponentType,
   type FC,
   type PropsWithChildren,
@@ -821,6 +824,22 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({
   className,
   ...rest
 }) => {
+  const turnId = useAuiState((s) => {
+    const value = s.message.metadata?.custom?.turnId;
+    return typeof value === "string" ? value : undefined;
+  });
+  const branchNumber = useAuiState((s) => s.message.branchNumber);
+  const previousBranch = useRef<string | null>(null);
+  useEffect(() => {
+    const current = turnId ? `${turnId}:${branchNumber}` : null;
+    if (previousBranch.current !== null && current !== previousBranch.current && turnId) {
+      // assistant-ui owns the local branch cursor. Persist the selected
+      // turn after that cursor moves so the next reload starts on the same
+      // sibling and the next follow-up uses it as its parent.
+      void api.chooseConversationTurn(turnId).catch(() => {});
+    }
+    previousBranch.current = current;
+  }, [branchNumber, turnId]);
   return (
     <BranchPickerPrimitive.Root
       hideWhenSingleBranch

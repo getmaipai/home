@@ -49,7 +49,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { recordEpisodes, deleteEpisodesForTurns } from "@/lib/episodes";
 import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
-import { nextHlc } from "@/lib/hlc";
+import { nextHlc, compareHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
 import type { TurnStats } from "@/lib/turnStats";
@@ -177,9 +177,75 @@ export function outcomesForConversation(conversationId: string, limit = 50): { t
 // protection: a crash between the two would log a turn whose parent
 // conversation's own updated_at/hlc never advanced, silently going
 // stale in listConversations()'s "newest first" ordering).
+function sameBranchParent(parentTurnId: string | null) {
+  return parentTurnId === null ? isNull(conversationTurns.parentTurnId) : eq(conversationTurns.parentTurnId, parentTurnId);
+}
+
+function newestBranchRow(rows: ConversationTurnRow[]): ConversationTurnRow | undefined {
+  return [...rows].sort((a, b) => {
+    const hlcOrder = compareHlc(a.hlc, b.hlc);
+    return hlcOrder !== 0 ? hlcOrder : a.id.localeCompare(b.id);
+  }).at(-1);
+}
+
+function selectedBranchChild(conversationId: string, parentTurnId: string | null): ConversationTurnRow | undefined {
+  const siblings = db
+    .select()
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(parentTurnId)))
+    .all();
+  return newestBranchRow(siblings.filter((sibling) => sibling.branchChosen)) ?? newestBranchRow(siblings);
+}
+
+function selectedBranchHead(conversationId: string): string | null {
+  let parentTurnId: string | null = null;
+  let head: string | null = null;
+  const visited = new Set<string>();
+  for (;;) {
+    const child = selectedBranchChild(conversationId, parentTurnId);
+    if (!child || visited.has(child.id)) return head;
+    visited.add(child.id);
+    head = child.id;
+    parentTurnId = child.id;
+  }
+}
+
+function branchParentFor(conversationId: string, supersedes: string | null): string | null {
+  if (supersedes) {
+    return db.select({ parentTurnId: conversationTurns.parentTurnId }).from(conversationTurns).where(eq(conversationTurns.id, supersedes)).get()?.parentTurnId ?? null;
+  }
+  return selectedBranchHead(conversationId);
+}
+
+function branchWinner(rows: Array<{ id: string; hlc: string }>): string | null {
+  return rows.reduce<string | null>((winner, row) => {
+    if (!winner) return row.id;
+    const current = rows.find((candidate) => candidate.id === winner)!;
+    const comparison = compareHlc(row.hlc, current.hlc);
+    return comparison > 0 || (comparison === 0 && row.id.localeCompare(current.id) > 0) ? row.id : winner;
+  }, null);
+}
+
 const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnRow, conversationId: string) => {
-  db.insert(conversationTurns).values(row).run();
+  const siblings = db
+    .select({ id: conversationTurns.id, hlc: conversationTurns.hlc, branchChosen: conversationTurns.branchChosen })
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(row.parentTurnId)))
+    .all();
+  const chosenCandidates = siblings.filter((sibling) => sibling.branchChosen).map(({ id, hlc }) => ({ id, hlc }));
+  if (row.branchChosen) chosenCandidates.push({ id: row.id, hlc: row.hlc });
+  const winner = branchWinner(chosenCandidates);
+  const branchChosen = winner === row.id;
+  if (branchChosen && siblings.length > 0) {
+    db.update(conversationTurns)
+      .set({ branchChosen: false })
+      .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(row.parentTurnId)))
+      .run();
+  }
+  const storedRow = { ...row, branchChosen };
+  db.insert(conversationTurns).values(storedRow).run();
   db.update(conversations).set({ updatedAt: row.createdAt, hlc: nextHlc() }).where(eq(conversations.id, conversationId)).run();
+  return storedRow;
 });
 
 /** getmaipai/home#60: `supersedes` reaches here from `POST /api/turn(/
@@ -227,6 +293,7 @@ export function logTurn(
   // lib/memory.ts's remember() already set. This runs once per completed
   // turn, the app's hottest path.
   const supersedes = resolveSupersedes(opts.supersedes, value.conversation_id);
+  const parentTurnId = branchParentFor(value.conversation_id, supersedes);
   const row: ConversationTurnRow = {
     id: value.turn_id,
     personId: actor.id,
@@ -258,6 +325,8 @@ export function logTurn(
     // an edit-and-resend rather than a fresh message - resolveSupersedes()
     // above already checked it's a real, same-conversation turn.
     supersedes,
+    parentTurnId,
+    branchChosen: true,
     // Every new turn starts unjudged (step 6's own poison-guard state,
     // lib/memoryJudge.ts), unless ACT-01's eligibility read the signal
     // and found no clause the judge may extract from: then the turn is
@@ -299,13 +368,39 @@ export function logTurn(
   // COMP-01: keep the wire response additive and honest about whether this
   // turn has a validated details document stored beside its outcomes.
   value.document_available = Boolean(opts.document);
-  insertTurnAndBumpConversation(row, value.conversation_id);
-  recordEpisodes(row);
+  const storedRow = insertTurnAndBumpConversation(row, value.conversation_id);
+  value.parent_turn_id = storedRow.parentTurnId;
+  value.branch_chosen = storedRow.branchChosen;
+  recordEpisodes(storedRow);
   // #88: the replaced turn leaves the current branch; the memories the
   // judge extracted from it are retired (archived, never deleted) so the
   // corrected statement's own facts are what the judge extracts next.
   if (supersedes) archiveByProvenance(supersedes);
-  return row;
+  return storedRow;
+}
+
+/** Persists the local branch picker choice without rewriting any message
+ * content. The chosen flag is a field on each sibling record so a synced
+ * reload can reconstruct the same path on another device. */
+export function chooseConversationTurn(actor: PersonRow, turnId: string): ConversationOpResult<ConversationTurnRow> {
+  const target = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+  if (!target || !target.conversationId || !canAccessPerson(actor, target.personId)) {
+    return { ok: false, status: 404, error: "Turn not found" };
+  }
+  const siblings = db
+    .select()
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, target.conversationId), sameBranchParent(target.parentTurnId)))
+    .all();
+  sqlite.transaction(() => {
+    for (const sibling of siblings) {
+      db.update(conversationTurns)
+        .set({ branchChosen: sibling.id === target.id, hlc: nextHlc() })
+        .where(eq(conversationTurns.id, sibling.id))
+        .run();
+    }
+  })();
+  return { ok: true, value: db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()! };
 }
 
 /** RVW-1: the newest turn of the conversation before `beforeTurnId`

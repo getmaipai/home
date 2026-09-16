@@ -569,10 +569,12 @@ function importConversations(
         .run();
     }
 
+    let previousTurnId: string | null = null;
     for (const t of turns) {
       const turnId = deterministicTurnId(t.anchorLegacyId);
       if (existingTurnIds.has(turnId)) {
         counts.turnsAlreadyPresent++;
+        previousTurnId = turnId;
         continue;
       }
       if (!dryRun) {
@@ -596,6 +598,8 @@ function importConversations(
             safetyAction: "allow",
             minorSpeaker,
             createdAt: createdIso,
+            parentTurnId: previousTurnId,
+            branchChosen: true,
             routingTier: null,
             routingScore: null,
             judgeStatus: "done",
@@ -605,6 +609,7 @@ function importConversations(
           .run();
       }
       counts.turnsImported++;
+      previousTurnId = turnId;
     }
   }
 }

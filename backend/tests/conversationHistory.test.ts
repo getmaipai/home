@@ -18,6 +18,7 @@ import {
   listConversationTurns,
   buildConversationWindow,
   maybeRefreshConversationSummary,
+  chooseConversationTurn,
 } from "@/lib/conversationHistory";
 import { createCommand } from "@/lib/commands";
 import { REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
@@ -119,6 +120,8 @@ describe("logTurn's supersedes option (getmaipai/home#60)", () => {
 
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-original")).get()!;
     expect(row.supersedes).toBeNull();
+    expect(row.parentTurnId).toBeNull();
+    expect(row.branchChosen).toBe(true);
   });
 
   test("an edit-and-resend writes a new row carrying the old turn's id, leaving the old row untouched", async () => {
@@ -145,11 +148,38 @@ describe("logTurn's supersedes option (getmaipai/home#60)", () => {
     const edited = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-edited")).get()!;
     expect(original.supersedes).toBeNull(); // the replaced row is a real, untouched sibling - never rewritten
     expect(original.userText).toBe("whats the weather");
+    expect(original.parentTurnId).toBeNull();
+    expect(original.branchChosen).toBe(false);
     expect(edited.supersedes).toBe("turn-original");
     expect(edited.userText).toBe("what's the weather tomorrow");
+    expect(edited.parentTurnId).toBeNull();
+    expect(edited.branchChosen).toBe(true);
 
     const rows = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, conv.value.id)).all();
     expect(rows.length).toBe(2); // both branches persist - editing never deletes the original
+  });
+
+  test("a later follow-up points at the selected sibling, and choosing the old sibling persists without rewriting either row", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const value = (turnId: string, text: string): TurnValue => ({ reply: { text }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
+    logTurn(actor, "chat", "first", value("turn-first", "first answer"));
+    logTurn(actor, "chat", "edit", value("turn-edit", "edited answer"), { supersedes: "turn-first" });
+    logTurn(actor, "chat", "follow-up", value("turn-follow", "follow-up answer"));
+
+    const follow = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-follow")).get()!;
+    expect(follow.parentTurnId).toBe("turn-edit");
+    expect(follow.branchChosen).toBe(true);
+    const chosen = chooseConversationTurn(actor, "turn-first");
+    expect(chosen.ok).toBe(true);
+    logTurn(actor, "chat", "next", value("turn-next", "next answer"));
+    const rows = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, conv.value.id)).all();
+    expect(rows.find((row) => row.id === "turn-first")?.branchChosen).toBe(true);
+    expect(rows.find((row) => row.id === "turn-edit")?.branchChosen).toBe(false);
+    expect(rows.find((row) => row.id === "turn-follow")?.parentTurnId).toBe("turn-edit");
+    expect(rows.find((row) => row.id === "turn-next")?.parentTurnId).toBe("turn-first");
+    expect(rows).toHaveLength(4);
   });
 
   // A code review (2026-09-13) found `supersedes` reached the DB straight
@@ -680,6 +710,22 @@ describe("GET /api/conversations/turns (the pre-existing flat-turn-list behaviou
     expect(res.status).toBe(200);
     const body = (await res.json()) as unknown[];
     expect(body.length).toBe(1);
+  });
+});
+
+describe("POST /api/conversations/turns/:id/choose (persisted branch selection)", () => {
+  test("chooses a sibling through the API and returns its persisted branch fields", async () => {
+    const { client, actor } = await owner();
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error(conversation.error);
+    const value = (turnId: string, text: string): TurnValue => ({ reply: { text }, source: "model", safety: SAFE, conversation_id: conversation.value.id, turn_id: turnId });
+    logTurn(actor, "chat", "first", value("turn-api-first", "first answer"));
+    logTurn(actor, "chat", "edited", value("turn-api-edited", "edited answer"), { supersedes: "turn-api-first" });
+
+    const response = await client.post("/api/conversations/turns/turn-api-first/choose");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ turn_id: "turn-api-first", parent_turn_id: null, branch_chosen: true });
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-api-edited")).get()!.branchChosen).toBe(false);
   });
 });
 

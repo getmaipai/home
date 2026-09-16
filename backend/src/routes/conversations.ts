@@ -25,6 +25,7 @@ import {
   deleteConversationById,
   batchDeleteConversations,
   clearConversations,
+  chooseConversationTurn,
   type ConversationOpResult,
 } from "@/lib/conversationHistory";
 import { recallEpisodes } from "@/lib/episodes";
@@ -68,6 +69,12 @@ conversationsRoutes.get("/turns", requireAuth, async (c) => {
   const actor = c.get("person");
   const person = c.req.query("person");
   return c.json(list(actor, person));
+});
+
+conversationsRoutes.post("/turns/:id/choose", requireAuth, async (c) => {
+  const result = chooseConversationTurn(c.get("person"), c.req.param("id"));
+  if (!result.ok) return fail(c, result);
+  return c.json({ turn_id: result.value.id, parent_turn_id: result.value.parentTurnId, branch_chosen: result.value.branchChosen });
 });
 
 conversationsRoutes.get("/export", requireAuth, async (c) => {

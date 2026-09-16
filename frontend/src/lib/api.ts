@@ -326,6 +326,8 @@ export const api = {
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
   conversationTurns: (id: string) => request<ConversationTurnWithMemoryIds[]>(`/api/conversations/${encodeURIComponent(id)}/turns`),
+  chooseConversationTurn: (id: string) =>
+    request<{ turn_id: string; parent_turn_id: string | null; branch_chosen: boolean }>(`/api/conversations/turns/${encodeURIComponent(id)}/choose`, { method: "POST" }),
   conversationTurnDocument: (id: string) => request<TurnArtifact>(`/api/conversations/turns/${encodeURIComponent(id)}/document`),
   conversationFeedback: (id: string) => request<ReplyFeedback | null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`),
   submitConversationFeedback: (id: string, verdict: ReplyFeedback["verdict"], reason: ReplyFeedback["reason"] = null) =>

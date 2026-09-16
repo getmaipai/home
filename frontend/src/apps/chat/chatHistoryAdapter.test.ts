@@ -1,9 +1,9 @@
 import { describe, expect, test, mock } from "bun:test";
-import { createChatHistoryAdapter, rowsToBranchableMessages } from "@/apps/chat/chatHistoryAdapter";
+import { chosenBranchHeadId, createChatHistoryAdapter, rowsToBranchableMessages } from "@/apps/chat/chatHistoryAdapter";
 import type { ConversationTurnWithMemoryIds } from "@/lib/api";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 
-function makeRow(id: string, replyText: string, memoryIds: string[] = [], supersedes: string | null = null): ConversationTurnWithMemoryIds {
+function makeRow(id: string, replyText: string, memoryIds: string[] = [], supersedes: string | null = null, branch: { parentTurnId?: string | null; branchChosen?: boolean; hlc?: string } = {}): ConversationTurnWithMemoryIds {
   return {
     id,
     personId: "person-abc123",
@@ -18,6 +18,7 @@ function makeRow(id: string, replyText: string, memoryIds: string[] = [], supers
     minorSpeaker: false,
     createdAt: "2026-09-04T00:00:00.000Z",
     supersedes,
+    ...branch,
     judgeStatus: null,
     memory_ids: memoryIds,
   } as ConversationTurnWithMemoryIds;
@@ -119,6 +120,31 @@ describe("rowsToBranchableMessages", () => {
     const row1User = items.find(({ message }) => message.id === "row-1-user")!;
     const row3User = items.find(({ message }) => message.id === "row-3-user")!;
     expect(row3User.parentId).toBe(row1User.parentId); // a third sibling under the same original parent
+  });
+
+  test("explicit branch state replays the chosen root-to-head path while retaining every sibling", () => {
+    const rows = [
+      makeRow("row-1", "original reply", [], null, { parentTurnId: null, branchChosen: false, hlc: "100:0:node" }),
+      makeRow("row-2", "edited reply", [], "row-1", { parentTurnId: null, branchChosen: true, hlc: "101:0:node" }),
+      makeRow("row-3", "follow-up reply", [], null, { parentTurnId: "row-2", branchChosen: true, hlc: "102:0:node" }),
+      makeRow("row-4", "old branch follow-up", [], null, { parentTurnId: "row-1", branchChosen: true, hlc: "103:0:node" }),
+    ];
+    const items = flatten(rowsToBranchableMessages(rows, "Nova", "conv-example123"));
+    expect(chosenBranchHeadId(rows)).toBe("row-3-reply");
+    expect(items.map(({ message }) => message.id)).toEqual([
+      "row-1-user", "row-1-reply", "row-2-user", "row-2-reply",
+      "row-3-user", "row-3-reply", "row-4-user", "row-4-reply",
+    ]);
+    expect(items.find(({ message }) => message.id === "row-4-user")!.parentId).toBe("row-1");
+  });
+
+  test("a persisted choice can move the replay head to a retained sibling's descendant", () => {
+    const rows = [
+      makeRow("row-1", "original reply", [], null, { parentTurnId: null, branchChosen: true, hlc: "100:0:node" }),
+      makeRow("row-2", "edited reply", [], "row-1", { parentTurnId: null, branchChosen: false, hlc: "101:0:node" }),
+      makeRow("row-3", "old branch follow-up", [], null, { parentTurnId: "row-1", branchChosen: true, hlc: "102:0:node" }),
+    ];
+    expect(chosenBranchHeadId(rows)).toBe("row-3-reply");
   });
 
   // Lane 11 item 1's own acceptance: "never persisted, never in history."
