@@ -1958,6 +1958,53 @@ describe("buildSystemPrompt() the profile paragraph (step 7)", () => {
   });
 });
 
+describe("CHAT-08 (c): turn recall uses the frozen clock", () => {
+  beforeEach(() => {
+    __setPromptClockForBench(() => new Date("2026-09-14T23:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    __setPromptClockForBench(null);
+  });
+
+  test("omits a future-valid memory before valid_from and includes it after", async () => {
+    const { actor } = await owner();
+    const created = remember(actor, {
+      text: "the blue telescope is in the attic",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+      valid_from: "2026-09-15T00:00:00.000Z",
+    });
+    expect(created.ok).toBe(true);
+
+    let context = "";
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        context = request.messages.map((message) => String(message.content ?? "")).join("\n");
+        return "Okay.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const before = await runTurn(actor, "chat", "where is the blue telescope");
+      expect(before.ok).toBe(true);
+      expect(context).not.toContain("the blue telescope is in the attic");
+
+      __setPromptClockForBench(() => new Date("2026-09-15T00:01:00.000Z"));
+      const after = await runTurn(actor, "chat", "where is the blue telescope");
+      expect(after.ok).toBe(true);
+      expect(context).toContain("the blue telescope is in the attic");
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+  });
+});
+
 describe("buildSystemPrompt() speaker and household (step 1)", () => {
   test("the prompt names the speaker and their role", () => {
     const prompt = buildSystemPrompt(fakeActor({ displayName: "Sage", role: "adult" }), "hi there", []);

@@ -2816,7 +2816,7 @@ async function prepareTurn(
   // as "fall back to keyword overlap" - no separate handling needed here.
   const withholdSensitive = !sensitiveAllowed(surface, speakerEvidence, present, actor.id) || ageBand === "child" || ageBand === "teen";
   const anonymous = ageBandBasis === "unknown_speaker_default";
-  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive, anonymous, withheldSubjectIds: subjects.filter((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household").map((subject) => subject.entity_id) });
+  const memoryMatches = recall(actor, text, { selfOnly: true, asOf: frozen.now, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive, anonymous, withheldSubjectIds: subjects.filter((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household").map((subject) => subject.entity_id) });
   // JOIN-01: what was actually said in earlier conversations (MEM-03's
   // verbatim episodes, MEM-04's hybrid recall), beside the extracted
   // facts. This conversation is excluded whole: its turns are the
@@ -2828,7 +2828,7 @@ async function prepareTurn(
   // person's own side only, unless the question asks what the hub said,
   // and then the hub's side comes as a reported note, never a line.
   const episodeMatches = episodeQueryEligible(text)
-    ? recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, withholdSensitive, anonymous, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
+    ? recallEpisodes(actor, text, utteranceVector, { now: frozen.now, excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, withholdSensitive, anonymous, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
     : [];
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own
@@ -2848,7 +2848,7 @@ async function prepareTurn(
     // #88: an edited-and-resent message's original is off the branch
     // and never recalled here either (a review).
     const excludeTurnIds = supersedes ? [...window.turnIds, supersedes] : window.turnIds;
-    const byFloors = contentTerms(text).length >= 2 && !isBareSocialTurn(text) ? recallEpisodes(actor, text, utteranceVector, { withinConversationId: conversation.id, excludeTurnIds, sides: "user", limit: 2, withholdSensitive, anonymous }) : [];
+    const byFloors = contentTerms(text).length >= 2 && !isBareSocialTurn(text) ? recallEpisodes(actor, text, utteranceVector, { now: frozen.now, withinConversationId: conversation.id, excludeTurnIds, sides: "user", limit: 2, withholdSensitive, anonymous }) : [];
     earlierMatches.push(...byFloors.map((m) => ({ ...m, earlierInThisConversation: true })));
     if (ASKS_ABOUT_START_RE.test(text)) {
       const first = earliestDroppedTurn(actor, conversation.id, excludeTurnIds, supersedes);
