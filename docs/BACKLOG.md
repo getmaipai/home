@@ -6526,6 +6526,21 @@ approvals are still real, unstarted work for a future session.
       reload with the chosen history. Spec-first design before changing
       persisted shapes. Out of scope: projects and attachments. Exit:
       `bash scripts/check.sh` plus new stream/branch regression tests.
+      - [ ] **CHAT-STREAM-01: resumable turn stream** (S, design landed
+            2026-09-16). Add an opaque owner-bound resume token to the
+            initial `turn_meta` event, sequence deltas, and resume an
+            interrupted generation without replaying acknowledged text.
+            Preserve the original safety, routing, guard and ceiling
+            decisions. Exit: backend and frontend interruption tests.
+      - [ ] **CHAT-STREAM-02: persisted branch runtime** (M, spec landed
+            2026-09-16). Use `parent_turn_id` and `branch_chosen` from the
+            ConversationTurn record for edits and regenerated alternatives;
+            reload the chosen path while retaining siblings for
+            assistant-ui's `BranchPickerPrimitive`. Exit: API, history,
+            merge and picker tests.
+      - [ ] **CHAT-STREAM-03: landing gate** (S). Combine stream resume,
+            branch choice and reload coverage; judge the chat screenshots,
+            run the targeted suites, and run `bash scripts/check.sh`.
 - [x] **Conversations as records** (M, spec first) - done, session A step
       3 (backend: a real `Conversation` shape, `GET /api/conversations`
       as a real thread list, rename/delete/batch-delete/clear-all) plus

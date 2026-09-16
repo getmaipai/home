@@ -178,8 +178,9 @@ def test_subject_ref_unresolved_fixture():
     Unresolved.model_validate(load_fixture("subject-ref.unresolved.example.json"))
 
 
-def test_conversation_turn_fixture():
-    ConversationTurn.model_validate(load_fixture("conversation-turn.example.json"))
+@pytest.mark.parametrize("kind", ["conversation-turn", "conversation-turn.branch"])
+def test_conversation_turn_fixtures(kind):
+    ConversationTurn.model_validate(load_fixture(f"{kind}.example.json"))
 
 
 def test_open_question_fixture():

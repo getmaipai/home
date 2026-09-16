@@ -9,6 +9,32 @@ export const ConversationTurn = z
   .object({
     id: z.string().regex(new RegExp("^turn-[a-z0-9]{6,}$")),
     conversation_id: z.string().regex(new RegExp("^conv-[a-z0-9]{6,}$")),
+    /**The chosen turn this record branches from, or null for the conversation's first turn. Sibling alternatives share the same parent; a linear follow-up points at the latest chosen turn.*/
+    parent_turn_id: z
+      .union([
+        z
+          .string()
+          .regex(new RegExp("^turn-[a-z0-9]{6,}$"))
+          .describe(
+            "The chosen turn this record branches from, or null for the conversation's first turn. Sibling alternatives share the same parent; a linear follow-up points at the latest chosen turn.",
+          ),
+        z
+          .null()
+          .describe(
+            "The chosen turn this record branches from, or null for the conversation's first turn. Sibling alternatives share the same parent; a linear follow-up points at the latest chosen turn.",
+          ),
+      ])
+      .describe(
+        "The chosen turn this record branches from, or null for the conversation's first turn. Sibling alternatives share the same parent; a linear follow-up points at the latest chosen turn.",
+      )
+      .default(null),
+    /**Whether this turn is the selected sibling in its branch slot. Exactly one sibling is chosen locally; a merge resolves concurrent choices by the latest HLC.*/
+    branch_chosen: z
+      .boolean()
+      .describe(
+        "Whether this turn is the selected sibling in its branch slot. Exactly one sibling is chosen locally; a merge resolves concurrent choices by the latest HLC.",
+      )
+      .default(true),
     /**Who spoke, captured at write time (a role can change later).*/
     person: z
       .string()

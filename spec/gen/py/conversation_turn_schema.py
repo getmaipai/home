@@ -77,6 +77,14 @@ class ConversationTurn(BaseModel):
     )
     id: constr(pattern=r'^turn-[a-z0-9]{6,}$')
     conversation_id: constr(pattern=r'^conv-[a-z0-9]{6,}$')
+    parent_turn_id: constr(pattern=r'^turn-[a-z0-9]{6,}$') | None = Field(
+        ...,
+        description="The chosen turn this record branches from, or null for the conversation's first turn. Sibling alternatives share the same parent; a linear follow-up points at the latest chosen turn.",
+    )
+    branch_chosen: bool = Field(
+        ...,
+        description='Whether this turn is the selected sibling in its branch slot. Exactly one sibling is chosen locally; a merge resolves concurrent choices by the latest HLC.',
+    )
     person: constr(pattern=r'^person-[a-z0-9]{6,}$') = Field(
         ..., description='Who spoke, captured at write time (a role can change later).'
     )

@@ -164,9 +164,11 @@ describe("record fixtures validate against their generated Zod models", () => {
     expect(() => SubjectRef.parse({ ...world, entity_id: "ent-p7q8r9" })).toThrow();
   });
 
-  test("conversation-turn.example.json", () => {
-    expect(() => ConversationTurn.parse(loadFixture("conversation-turn.example.json"))).not.toThrow();
-  });
+  for (const kind of ["conversation-turn", "conversation-turn.branch"]) {
+    test(`${kind}.example.json`, () => {
+      expect(() => ConversationTurn.parse(loadFixture(`${kind}.example.json`))).not.toThrow();
+    });
+  }
 
   test("open-question.example.json", () => {
     expect(() => OpenQuestion.parse(loadFixture("open-question.example.json"))).not.toThrow();

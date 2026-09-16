@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "id", "conversation_id", "person", "surface", "user_text", "reply_text", "source",
+    "id", "conversation_id", "parent_turn_id", "branch_chosen", "person", "surface", "user_text", "reply_text", "source",
     "signal", "plan", "subjects", "outcomes", "document", "review_id", "notice_ids", "speaker_evidence", "present",
     "created_at", "hlc"
   ],
@@ -49,6 +49,17 @@
   "properties": {
     "id": { "type": "string", "pattern": "^turn-[a-z0-9]{6,}$" },
     "conversation_id": { "type": "string", "pattern": "^conv-[a-z0-9]{6,}$" },
+    "parent_turn_id": {
+      "type": ["string", "null"],
+      "pattern": "^turn-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "The chosen turn this record branches from, or null for the conversation's first turn. Sibling alternatives share the same parent; a linear follow-up points at the latest chosen turn."
+    },
+    "branch_chosen": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this turn is the selected sibling in its branch slot. Exactly one sibling is chosen locally; a merge resolves concurrent choices by the latest HLC."
+    },
     "person": { "type": "string", "pattern": "^person-[a-z0-9]{6,}$", "description": "Who spoke, captured at write time (a role can change later)." },
     "surface": { "type": "string", "enum": ["chat", "overlay", "pod", "robot", "tv", "phone"] },
     "user_text": { "type": "string" },
