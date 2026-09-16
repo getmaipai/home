@@ -58,6 +58,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
+import { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 
 // A PersonRow with no DB row behind it, for the buildSystemPrompt() unit
 // tests below that only need a shaped actor to render the speaker block,
@@ -94,6 +95,47 @@ describe("CHAT-16 K7 picture lookup output", () => {
     const value: TurnValue = { reply: { text: "Here is the picture." }, source: "plugin", plugin_id: "websearch", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-15T00:00:00Z" }, conversation_id: "conv-k7", turn_id: "turn-k7", media: { kind: "image", url: "https://img.example.com/full.jpg", thumbnail: "https://img.example.com/thumb.jpg", source: "example.com" }, sources: [{ id: "s1", kind: "web", title: "Photo", url: "https://example.com/one", site: "example.com", snippet: null, source: "turn-k7", created_at: "2026-09-15T00:00:00Z", hlc: "1:0:test" }, { id: "s2", kind: "web", title: "Second", url: "https://example.com/two", site: "example.com", snippet: null, source: "turn-k7", created_at: "2026-09-15T00:00:00Z", hlc: "1:0:test" }] };
     expect(applyOutputBoundary(fakeActor(), value).media).toEqual(value.media);
     expect(applyOutputBoundary(fakeActor(), value).sources).toHaveLength(2);
+  });
+});
+
+describe("ACT-03 reply plans", () => {
+  test("sad inform context explains that feeling comes first", async () => {
+    const { actor } = await owner();
+    await withChat("I'm sorry that happened.", async () => {
+      const result = await runTurn(actor, "chat", "Rover died yesterday");
+      expect(result.ok).toBe(true);
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  test("stored plans carry closing, length, and child constraints", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    await withChat("Good night.", async () => {
+      const closing = await runTurn(actor, "chat", "thanks, that's all for tonight", { conversationId: conv.value.id });
+      expect(closing.ok).toBe(true);
+      const closingRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, closing.ok ? closing.value.turn_id : "")).get()!;
+      const closingPlan = ReplyPlan.parse(JSON.parse(closingRow.plan!));
+      expect(closingPlan.moves.close).toBe("required");
+      expect(closingPlan.moves.ask_back).toBe("forbidden");
+
+      const { setReplyConstraint } = await import("@/lib/replyConstraints");
+      setReplyConstraint({ conversationId: conv.value.id, person: actor.id, kind: "length", value: "120", setByTurn: null });
+      const constrained = await runTurn(actor, "chat", "tell me something", { conversationId: conv.value.id });
+      const constrainedRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, constrained.ok ? constrained.value.turn_id : "")).get()!;
+      expect(ReplyPlan.parse(JSON.parse(constrainedRow.plan!)).moves.react).toBe("forbidden");
+    });
+
+    const child = { ...actor, role: "child" as const };
+    await withChat("Here is an answer.", async () => {
+      const result = await runTurn(child, "chat", "what is the capital of Portugal");
+      expect(result.ok).toBe(true);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.ok ? result.value.turn_id : "")).get()!;
+      const plan = ReplyPlan.parse(JSON.parse(row.plan!));
+      expect(plan.age_band).toBe("child");
+      expect(plan.moves.point).toBe("forbidden");
+    });
   });
 });
 

@@ -215,7 +215,7 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.noCopiedEpisode) parts.push("no copied episode line");
   if (e.relationshipExists) parts.push(`relationship ${e.relationshipExists.type} ${e.relationshipExists.name} ${e.relationshipExists.source}${e.relationshipExists.confirmed === undefined ? "" : e.relationshipExists.confirmed ? " confirmed" : " unconfirmed"}`);
   if (e.signal) parts.push(`signal ${[e.signal.primary_act, e.signal.expressed_emotion, e.signal.emotion_intensity, e.signal.clauseStance ? `clauses ${e.signal.clauseStance.join(",")}` : undefined].filter(Boolean).join("/")}`);
-  if (e.plan) parts.push(`plan required ${e.plan.requiredMoves?.join("+") ?? "-"}, forbidden ${e.plan.forbiddenMoves?.join("+") ?? "-"}${e.plan.maxSentences !== undefined ? `, at most ${e.plan.maxSentences} sentences` : ""}${e.plan.maxWords !== undefined ? `, at most ${e.plan.maxWords} words` : ""}`);
+  if (e.plan) parts.push(`plan ${Object.entries(e.plan).map(([move, state]) => `${move}:${state}`).join(", ")}`);
   if (e.moves) parts.push(`moves ${e.moves.join("+")}`);
   if (e.subjects) parts.push(`subjects ${e.subjects.map((s) => `${s.type}:${s.name}${s.kind ? ` (${s.kind})` : ""}${s.rejected === undefined ? "" : s.rejected ? " rejected" : " not rejected"}`).join(", ")}`);
   if (e.subjectsAbsent) parts.push(`no ${e.subjectsAbsent.map((s) => `${s.type}${s.name ? `:${s.name}` : ""}`).join(", ")} subject`);
@@ -474,16 +474,13 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     if (!p) {
       checks.push({ name: "plan", pass: false, detail: "no plan observed" });
     } else {
-      if (e.plan.requiredMoves) {
-        const missing = e.plan.requiredMoves.filter((m) => p.moves[m] !== "required");
-        checks.push({ name: "plan required moves", pass: missing.length === 0, detail: missing.length === 0 ? "all required" : `not required: ${missing.join(", ")}` });
+      const wanted = "requiredMoves" in e.plan || "forbiddenMoves" in e.plan ? { ...Object.fromEntries((e.plan.requiredMoves ?? []).map((move) => [move, "required"])), ...Object.fromEntries((e.plan.forbiddenMoves ?? []).map((move) => [move, "forbidden"])) } : e.plan;
+      for (const [move, expected] of Object.entries(wanted)) {
+        const got = p.moves[move as Move];
+        checks.push({ name: "plan", pass: got === expected, detail: `${move}: ${got} (wanted ${expected})` });
       }
-      if (e.plan.forbiddenMoves) {
-        const notForbidden = e.plan.forbiddenMoves.filter((m) => p.moves[m] !== "forbidden");
-        checks.push({ name: "plan forbidden moves", pass: notForbidden.length === 0, detail: notForbidden.length === 0 ? "all forbidden" : `not forbidden: ${notForbidden.join(", ")}` });
-      }
-      if (e.plan.maxSentences !== undefined) checks.push({ name: "plan max sentences", pass: p.max_sentences <= e.plan.maxSentences, detail: `plan allows ${p.max_sentences}` });
-      if (e.plan.maxWords !== undefined) checks.push({ name: "plan max words", pass: p.max_words <= e.plan.maxWords, detail: `plan allows ${p.max_words}` });
+      if ("maxSentences" in e.plan && e.plan.maxSentences !== undefined) checks.push({ name: "plan max sentences", pass: p.max_sentences <= e.plan.maxSentences, detail: `plan allows ${p.max_sentences}` });
+      if ("maxWords" in e.plan && e.plan.maxWords !== undefined) checks.push({ name: "plan max words", pass: p.max_words <= e.plan.maxWords, detail: `plan allows ${p.max_words}` });
     }
   }
   if (e.moves) {

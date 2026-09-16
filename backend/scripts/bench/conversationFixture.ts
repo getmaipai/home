@@ -227,12 +227,7 @@ export interface TurnExpectation {
   /** ACT-03: the turn's own frozen ReplyPlan, checked at the floors a
    * row needs (required and forbidden moves, the two caps), never the
    * whole record. */
-  plan?: {
-    requiredMoves?: readonly Move[];
-    forbiddenMoves?: readonly Move[];
-    maxSentences?: number;
-    maxWords?: number;
-  };
+  plan?: Partial<ReplyPlan["moves"]> | { requiredMoves?: readonly Move[]; forbiddenMoves?: readonly Move[]; maxSentences?: number; maxWords?: number };
   /** ACT-03: every one of these moves appears among the moves the
    * composer actually realized on a composed (non-streamed) turn. Never
    * meaningful on a streamed chat turn, which carries no typed moves by
@@ -1454,7 +1449,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "section 12 part 4: grief gets a careful acknowledgment with no play and no forced question; a closing gets one sentence and no question",
     turns: [
       { say: "Rover has been off his food since Monday", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
-      { say: "Rover died yesterday", expect: { signal: { primary_act: "inform", expressed_emotion: "sadness", emotion_intensity: "high" }, plan: { requiredMoves: ["care"] }, mustContain: "sorry|loss|hard|miss", mustNotContain: "haha|lol|fun|silly|timer|the list|!|" + NO_CLOSER, toolRan: null, guard: null, humanVerdict: true } },
+      { say: "Rover died yesterday", expect: { signal: { primary_act: "inform", expressed_emotion: "sadness", emotion_intensity: "high" }, plan: { care: "required" }, mustContain: "sorry|loss|hard|miss", mustNotContain: "haha|lol|fun|silly|timer|the list|!|" + NO_CLOSER, toolRan: null, guard: null, humanVerdict: true } },
       { say: "thanks, that's all for tonight", expect: { signal: { primary_act: "closing" }, mustNotContain: "\\?|" + NO_CLOSER, maxWords: 15, toolRan: null, guard: null, humanVerdict: true } },
     ],
   },
