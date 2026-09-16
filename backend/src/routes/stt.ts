@@ -2,15 +2,16 @@
 // server half. Any signed-in person, no role gate - the same posture
 // /api/llm/chat and /api/tts already take: transcribing your own voice
 // isn't a privileged action.
-import { Hono } from "hono";
+import { createRoute, z } from "@hono/zod-openapi";
 import { upgradeWebSocket } from "hono/bun";
 import { requireAuth } from "@/middleware/auth";
 import { SttSession, decodeWav } from "@/lib/sttSession";
 import { transcribeUtterance, sttAssetsInstalled, sttAssetInstallStatus, sttRecognizerLoaded } from "@/lib/stt";
 import type { SttStatusResponse, SttTranscribeResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import type { AppEnv } from "@/types";
+import { apiRouter, errorResponses } from "@/lib/openapi";
 
-export const sttRoutes = new Hono<AppEnv>();
+export const sttRoutes = apiRouter();
 
 const SESSION_CONFIG = { sampleRate: 16_000, silenceTimeoutS: 0.8, partialIntervalS: 1.5 };
 
@@ -74,7 +75,28 @@ sttRoutes.get(
 // form with a label field alongside the audio), so there's no second
 // field to carry and a raw `audio/wav` body avoids a multipart parse
 // for what is, on this route, just bytes in and JSON out.
-sttRoutes.post("/transcribe", requireAuth, async (c) => {
+const sttTranscribeRoute = createRoute({
+  method: "post",
+  path: "/transcribe",
+  tags: ["Voice"],
+  summary: "Transcribe a WAV file",
+  description:
+    "One-shot, non-streaming transcription of a complete WAV upload. " +
+    "Takes a raw audio/wav body (not multipart) and returns the transcribed text.",
+  middleware: [requireAuth] as const,
+  request: {
+    body: { content: { "audio/wav": { schema: z.string().openapi({ format: "binary" }) } } },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ text: z.string() }) } },
+      description: "The transcribed text.",
+    },
+    ...errorResponses({ 400: "Not a supported WAV file", 401: "Not signed in", 503: "Transcription unavailable" }),
+  },
+});
+
+sttRoutes.openapi(sttTranscribeRoute, async (c) => {
   const bytes = new Uint8Array(await c.req.arrayBuffer());
   let decoded: { samples: Float32Array; sampleRate: number };
   try {
@@ -84,7 +106,7 @@ sttRoutes.post("/transcribe", requireAuth, async (c) => {
   }
   try {
     const text = await transcribeUtterance(decoded.samples, decoded.sampleRate);
-    return c.json({ text } satisfies SttTranscribeResponse);
+      return c.json({ text } satisfies SttTranscribeResponse, 200);
   } catch (err) {
     return c.json({ error: `transcription unavailable: ${(err as Error).message}` }, 503);
   }
@@ -94,13 +116,41 @@ sttRoutes.post("/transcribe", requireAuth, async (c) => {
 // route this mirrors - GET /api/voice/stt/status, not GET /api/stt/status,
 // so every "what voice capability is available" check lives under one
 // path prefix.
-export const sttStatusRoutes = new Hono<AppEnv>();
-sttStatusRoutes.get("/stt/status", requireAuth, async (c) => {
+export const sttStatusRoutes = apiRouter();
+
+const sttStatusRoute = createRoute({
+  method: "get",
+  path: "/stt/status",
+  tags: ["Voice"],
+  summary: "STT asset install status",
+  description:
+    "Whether the STT assets (Silero VAD, Moonshine recognizer) are installed " +
+    "and the recognizer is loaded in the current process.",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            installed: z.boolean(),
+            sileroInstalled: z.boolean(),
+            moonshineInstalled: z.boolean(),
+            recognizerLoaded: z.boolean(),
+          }),
+        },
+      },
+      description: "Per-asset install and recognizer-load status.",
+    },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+
+sttStatusRoutes.openapi(sttStatusRoute, async (c) => {
   const { sileroInstalled, moonshineInstalled } = sttAssetInstallStatus();
   return c.json({
     installed: sttAssetsInstalled(),
     sileroInstalled,
     moonshineInstalled,
     recognizerLoaded: sttRecognizerLoaded(),
-  } satisfies SttStatusResponse);
+  } satisfies SttStatusResponse, 200);
 });

@@ -3,7 +3,7 @@
 // these are static model bytes and a list of what's available, the same
 // posture /api/llm/chat and /api/tts already take for their own
 // non-privileged reads.
-import { Hono } from "hono";
+import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import { requireAuth } from "@/middleware/auth";
 import {
@@ -25,14 +25,45 @@ import {
   MAX_BYTES as MAX_CLONED_VOICE_BYTES,
 } from "@/lib/clonedVoices";
 import type { AppEnv } from "@/types";
+import { apiRouter, errorResponses } from "@/lib/openapi";
 
-export const voiceRoutes = new Hono<AppEnv>();
+export const voiceRoutes = apiRouter();
 
 // What the browser pipeline should load: the shared stage file names plus
 // every available per-phrase detector, so the frontend registry
 // (frontend/src/lib/voice/wake-word-models.ts) has one real source
 // instead of a second, hand-duplicated copy of this list.
-voiceRoutes.get("/wakewords", requireAuth, async (c) => {
+const wakewordsRoute = createRoute({
+  method: "get",
+  path: "/wakewords",
+  tags: ["Voice"],
+  summary: "List available wake-word detectors",
+  description:
+    "The fixed list of wake-word detectors the browser pipeline can load. " +
+    "Returns the shared stage file names and every available per-phrase detector.",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            detectors: z.array(
+              z.object({
+                id: z.string(),
+                label: z.string(),
+                file: z.string(),
+              }),
+            ),
+          }),
+        },
+      },
+      description: "The list of available wake-word detectors.",
+    },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+
+voiceRoutes.openapi(wakewordsRoute, async (c) => {
   return c.json({
     detectors: [{ id: "hey_jarvis", label: "openWakeWord \"hey jarvis\"", file: WAKEWORD_STOCK_DETECTOR.file }],
   });
@@ -44,8 +75,30 @@ voiceRoutes.get("/wakewords", requireAuth, async (c) => {
 // sends.
 const ASSET_BY_FILE = new Map(WAKEWORD_ALL_ASSETS.map((a) => [a.file, a]));
 
-voiceRoutes.get("/wakeword/:file", requireAuth, async (c) => {
-  const file = c.req.param("file");
+const wakewordFileRoute = createRoute({
+  method: "get",
+  path: "/wakeword/:file",
+  tags: ["Voice"],
+  summary: "Download a wake-word asset file",
+  description:
+    "Serves the bytes of one pinned wake-word asset by file name. " +
+    "`:file` only ever selects one of the fixed assets this module knows about; " +
+    "there is no path-traversal surface.",
+  middleware: [requireAuth] as const,
+  request: {
+    params: z.object({ file: z.string() }),
+  },
+  responses: {
+    200: {
+      content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } },
+      description: "The raw asset file bytes.",
+    },
+    ...errorResponses({ 401: "Not signed in", 404: "Unknown wake-word asset", 503: "Asset unavailable" }),
+  },
+});
+
+voiceRoutes.openapi(wakewordFileRoute, async (c) => {
+  const file = c.req.valid("param").file;
   const asset = ASSET_BY_FILE.get(file);
   if (!asset) return c.json({ error: `unknown wake-word asset: ${file}` }, 404);
 
@@ -64,7 +117,31 @@ voiceRoutes.get("/wakeword/:file", requireAuth, async (c) => {
 // bundled presets. ~2,069 short path strings - small enough to hand back
 // in one response and let the browser search/group client-side rather
 // than build server-side pagination for it.
-voiceRoutes.get("/catalog", requireAuth, async (c) => {
+const voiceCatalogRoute = createRoute({
+  method: "get",
+  path: "/catalog",
+  tags: ["Voice"],
+  summary: "List the community voice catalog",
+  description:
+    "Every real file in the kyutai/tts-voices Hugging Face repo, not just the " +
+    "bundled presets. Returns path strings the browser can search and group client-side.",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            entries: z.array(z.string()),
+          }),
+        },
+      },
+      description: "The list of voice catalog entry paths.",
+    },
+    ...errorResponses({ 401: "Not signed in", 503: "Voice catalog unavailable" }),
+  },
+});
+
+voiceRoutes.openapi(voiceCatalogRoute, async (c) => {
   try {
     const entries = await getVoiceCatalog();
     return c.json({ entries });
@@ -82,13 +159,38 @@ voiceRoutes.get("/catalog", requireAuth, async (c) => {
 // here, not in the generic PUT /api/settings route (which would reject
 // it outright - see lib/settings.ts's setPersonTtsVoiceUnchecked() for
 // why that's deliberate).
-voiceRoutes.post("/catalog/select", requireAuth, async (c) => {
+const catalogSelectRoute = createRoute({
+  method: "post",
+  path: "/catalog/select",
+  tags: ["Voice"],
+  summary: "Select a voice from the community catalog",
+  description:
+    "Sets the signed-in person's own tts.voice_id to a voice picked from the " +
+    "community catalog. The path is validated against the live-fetched catalog " +
+    "before it is written.",
+  middleware: [requireAuth] as const,
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ path: z.string().min(1) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.unknown() } },
+      description: "The updated person record.",
+    },
+    ...errorResponses({ 400: "Invalid or unknown path", 401: "Not signed in", 503: "Voice catalog unavailable" }),
+  },
+});
+
+voiceRoutes.openapi(catalogSelectRoute, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { path?: string };
+  const body = c.req.valid("json");
   const path = body.path;
-  if (!path || typeof path !== "string") {
-    return c.json({ error: "path is required" }, 400);
-  }
   let entries;
   try {
     entries = await getVoiceCatalog();
@@ -114,10 +216,37 @@ voiceRoutes.post("/catalog/select", requireAuth, async (c) => {
 // generic route itself calls, so the owner/admin check for a household
 // key is enforced exactly once, in lib/settings.ts, not re-implemented
 // here as a second requireRole gate that could drift from it.
-voiceRoutes.post("/hf-token", requireAuth, async (c) => {
+const hfTokenRoute = createRoute({
+  method: "post",
+  path: "/hf-token",
+  tags: ["Voice"],
+  summary: "Save a Hugging Face API token",
+  description:
+    "Saves the household's voice.hf_token and restarts the TTS backend so the " +
+    "new token takes effect on the next TTS call.",
+  middleware: [requireAuth] as const,
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ token: z.string().min(1) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.unknown() } },
+      description: "The updated setting record.",
+    },
+    ...errorResponses({ 400: "Token is required", 401: "Not signed in" }),
+  },
+});
+
+voiceRoutes.openapi(hfTokenRoute, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { token?: string };
-  const token = typeof body.token === "string" ? body.token.trim() : "";
+  const body = c.req.valid("json");
+  const token = body.token.trim();
   if (!token) {
     return c.json({ error: "token is required" }, 400);
   }
@@ -127,7 +256,24 @@ voiceRoutes.post("/hf-token", requireAuth, async (c) => {
   return c.json(result.value);
 });
 
-voiceRoutes.post("/hf-token/remove", requireAuth, async (c) => {
+const hfTokenRemoveRoute = createRoute({
+  method: "post",
+  path: "/hf-token/remove",
+  tags: ["Voice"],
+  summary: "Remove the Hugging Face API token",
+  description:
+    "Removes the household's voice.hf_token and restarts the TTS backend.",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.unknown() } },
+      description: "The updated setting record.",
+    },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+
+voiceRoutes.openapi(hfTokenRemoveRoute, async (c) => {
   const actor = c.get("person");
   const result = resetValue(actor, "household", "voice.hf_token");
   if (!result.ok) return c.json({ error: result.error }, result.status);
@@ -139,7 +285,39 @@ voiceRoutes.post("/hf-token/remove", requireAuth, async (c) => {
 // audio sample a household member uploaded, not the community catalog's
 // pre-existing files. Household-wide list, same visibility as the
 // catalog's own selection - see lib/clonedVoices.ts's own comment.
-voiceRoutes.get("/cloned", requireAuth, async (c) => {
+const clonedListRoute = createRoute({
+  method: "get",
+  path: "/cloned",
+  tags: ["Voice"],
+  summary: "List cloned voices",
+  description:
+    "The household-wide list of cloned voices, each with its label, file " +
+    "size, MIME type, and creation timestamp.",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            voices: z.array(
+              z.object({
+                id: z.string(),
+                label: z.string(),
+                bytes: z.number().int().nonnegative(),
+                mimeType: z.string(),
+                createdAt: z.string(),
+              }),
+            ),
+          }),
+        },
+      },
+      description: "The list of cloned voices.",
+    },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+
+voiceRoutes.openapi(clonedListRoute, async (c) => {
   return c.json({ voices: listClonedVoices() });
 });
 
@@ -155,7 +333,35 @@ voiceRoutes.get("/cloned", requireAuth, async (c) => {
 // (multipart boundaries and the label field add a little overhead) so a
 // legitimate MAX_CLONED_VOICE_BYTES file is never rejected here only to
 // pass saveClonedVoice()'s own check moments later.
-voiceRoutes.post("/cloned", requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES + 64 * 1024 }), async (c) => {
+const clonedUploadRoute = createRoute({
+  method: "post",
+  path: "/cloned",
+  tags: ["Voice"],
+  summary: "Upload a cloned voice",
+  description:
+    "Uploads a real audio sample as a new cloned voice. Accepts a multipart " +
+    "form with a file field (the audio) and a label field (a display name). " +
+    "The upload is bounded by bodyLimit to prevent multi-gigabyte memory use.",
+  middleware: [requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES + 64 * 1024 })] as const,
+  request: {
+    body: {
+      content: {
+        "multipart/form-data": {
+          schema: z.unknown(),
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: z.unknown() } },
+      description: "The newly saved cloned voice record.",
+    },
+    ...errorResponses({ 400: "Missing file or label", 401: "Not signed in" }),
+  },
+});
+
+voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   const actor = c.get("person");
   const body = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
   const file = body.file;
@@ -173,9 +379,30 @@ voiceRoutes.post("/cloned", requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_B
 // route uses - `clonedVoiceExists()` is this route's equivalent of that
 // route's live-catalog check, proving the id is real before it's ever
 // written into a person's setting.
-voiceRoutes.post("/cloned/:id/select", requireAuth, async (c) => {
+const clonedSelectRoute = createRoute({
+  method: "post",
+  path: "/cloned/:id/select",
+  tags: ["Voice"],
+  summary: "Select a cloned voice as the person's TTS voice",
+  description:
+    "Sets the signed-in person's own tts.voice_id to the given cloned voice. " +
+    "The voice id must exist in the cloned-voice table.",
+  middleware: [requireAuth] as const,
+  request: {
+    params: z.object({ id: z.string() }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.unknown() } },
+      description: "The updated person record.",
+    },
+    ...errorResponses({ 401: "Not signed in", 404: "Cloned voice not found" }),
+  },
+});
+
+voiceRoutes.openapi(clonedSelectRoute, async (c) => {
   const actor = c.get("person");
-  const id = c.req.param("id");
+  const id = c.req.valid("param").id;
   if (!clonedVoiceExists(id)) return c.json({ error: `cloned voice not found: ${id}` }, 404);
   const result = setPersonTtsVoiceUnchecked(actor, clonedVoiceUrl(id));
   if (!result.ok) return c.json({ error: result.error }, result.status);
@@ -185,9 +412,34 @@ voiceRoutes.post("/cloned/:id/select", requireAuth, async (c) => {
 // POST, not DELETE: no route anywhere in this app uses the DELETE verb
 // (settings' own reset and memory's own archive are both POST too) -
 // matching that rather than introducing the one exception.
-voiceRoutes.post("/cloned/:id/delete", requireAuth, async (c) => {
+const clonedDeleteRoute = createRoute({
+  method: "post",
+  path: "/cloned/:id/delete",
+  tags: ["Voice"],
+  summary: "Delete a cloned voice",
+  description:
+    "Deletes the given cloned voice from the household. Any signed-in person " +
+    "can delete any cloned voice (same posture as the list and select routes).",
+  middleware: [requireAuth] as const,
+  request: {
+    params: z.object({ id: z.string() }),
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({ success: z.literal(true) }),
+        },
+      },
+      description: "Confirmation of deletion.",
+    },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+
+voiceRoutes.openapi(clonedDeleteRoute, async (c) => {
   const actor = c.get("person");
-  const id = c.req.param("id");
+  const id = c.req.valid("param").id;
   const result = deleteClonedVoice(actor, id);
   if (!result.ok) return c.json({ error: result.error }, result.status);
   return c.json({ success: true });
@@ -200,8 +452,30 @@ voiceRoutes.post("/cloned/:id/delete", requireAuth, async (c) => {
 // (lib/id.ts's newClonedVoiceId()) checked against the real table, the
 // same "unguessable, not merely hidden" posture session tokens use for
 // the identical problem (an unauthenticated bearer of a capability).
-voiceRoutes.get("/cloned/:id/file", async (c) => {
-  const id = c.req.param("id");
+const clonedFileRoute = createRoute({
+  method: "get",
+  path: "/cloned/:id/file",
+  tags: ["Voice"],
+  summary: "Download a cloned voice file",
+  description:
+    "Serves the raw audio file of a cloned voice. Deliberately NOT behind " +
+    "requireAuth: the pocket-tts serve process fetches voice_url by plain " +
+    "HTTP GET with no session cookie. Safe because the id is an unguessable " +
+    "83-bit token.",
+  request: {
+    params: z.object({ id: z.string() }),
+  },
+  responses: {
+    200: {
+      content: { "audio/wav": { schema: z.string().openapi({ format: "binary" }) } },
+      description: "The raw cloned voice audio file.",
+    },
+    ...errorResponses({ 404: "Cloned voice not found" }),
+  },
+});
+
+voiceRoutes.openapi(clonedFileRoute, async (c) => {
+  const id = c.req.valid("param").id;
   const file = getClonedVoiceFile(id);
   if (!file) return c.json({ error: "not found" }, 404);
   return new Response(Bun.file(file.path), { headers: { "content-type": file.mimeType } });
