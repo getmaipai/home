@@ -1,5 +1,16 @@
 # GPU card layout: the 16 GB eGPU (2026-09-14)
 
+> **Superseded 2026-09-17.** The 16 GB card in the enclosure fell off
+> the laptop's Thunderbolt link five times across four cables (power,
+> heat and cable ruled out; the laptop's Thunderbolt path is the
+> fault). The owner's decision: one machine for the whole hub, a Mac
+> Studio with 128 GB of unified memory; the card is returned. The
+> measurements below (the 27B at 33.7 tok/s and 879 tok/s prompt on
+> the card alone, the 8B at 78.7) stand as the record of what the
+> card did while it was up. The engine plan now lives in
+> ENGINE-HOST-02 (`docs/BACKLOG.md`): a minimum set on the Studio,
+> graceful degradation for the generators, one watcher.
+
 The coordinator's analysis of how the hub's engines fit once the
 laptop's eGPU RTX 3070 8 GB is replaced by an RTX 5060 Ti 16 GB, with
 the internal RTX 2070 Super 8 GB staying. Decided the same evening: the
