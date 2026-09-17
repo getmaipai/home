@@ -744,7 +744,38 @@ The turn log tells the story without the words.
     shadow later; the containment check ships now. Rows:
     `lookup-reply-only-rows`, `lookup-empty-rows-says-so`.
 
-Design of 53 to 59 is Session A's; 60 and 61 are mechanical (chat-gap design is reserved). Every
+62. The picture reader binds the stack's subject over the one the
+    sentence names (the owner's retest, 2026-09-17 morning, on the
+    build with 45b). "Show me the poster for the movie <title>" was
+    searched as "<the person from three turns ago> movie poster", and
+    the correction "your results have nothing to do with <title>" as
+    "<person> poster for <title> show", with a rationalisation invented
+    to fit. An explicit subject in the utterance always beats the
+    stack; the stack fills in only when the sentence has none. Rows:
+    `poster-explicit-subject-beats-stack`, `correction-rebinds-subject`.
+
+63. Junk image rows pass through to the bubble. A picture ask with no
+    bound subject searched for "photos" and showed an SVG icon from a
+    JavaScript package host; the poster ask showed another. The image
+    path takes the first image row whatever it is. Rows are filtered
+    before any is shown: no SVG, no icon or package CDNs, a minimum
+    pixel size, a photo or media host; when nothing survives, the
+    fixed "found nothing" line, never an icon. Row: `image-rows-filtered`.
+
+64. A media claim without media. After a page read that built the
+    person's card, the composed line said "Here's a picture of <the
+    person> from his official website" with no picture attached. The
+    grounding check (finding 61) covers titles, names, years and
+    quoted values; it must also treat "here is a picture/photo/poster"
+    as a claim grounded only by an attached image, else replaced by
+    the rows' rendering. Row: `media-claim-needs-media`.
+
+65. "No, of him" after a picture ask went out as "no hime photos":
+    the pronoun (finding 59) plus a missing rule that "of him / of
+    <name>" after a picture ask is a rebind of the picture's subject
+    and a repeat of the same ask. Row: `of-him-rebinds-picture-subject`.
+
+Design of 53 to 59 is Session A's; 60 to 65 are mechanical, 65's pronoun half with 59 (chat-gap design is reserved). Every
 row above is written red first, with roster names and invented titles.
 
 What worked, for the record: every forced or explicit search answered
