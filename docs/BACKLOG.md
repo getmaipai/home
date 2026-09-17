@@ -1651,6 +1651,25 @@ invented for the roster's household, and added to
     companion's register itself (COMP-03, EVAL-03). Exit: the named
     tests, `bash scripts/check.sh`.
 
+<a id="reg-02"></a>
+
+- [ ] **REG-02: Composer-owned voice disfluencies and nonverbal cues** (M)
+
+    Objective: a companion can request a natural hesitation or nonverbal
+    sound without making the screen or transcript noisy, and a voice model
+    never invents those cues on its own. Keep `reply.text` clean and put the
+    selected model's accepted tags in `reply.speech` before phrase-level TTS.
+    Add companion dials for expressiveness, disfluency, humour, nonverbal
+    frequency, and pace; they drive the plan line, example lines, and a
+    measured steering vector, not prompt prose. Record each candidate's tag
+    vocabulary and time to first audio. Acceptance: the top-two bench has a
+    first-day line with a hesitation and a laugh, the tag output is verified
+    by listening, and the composer leaves clean speech untouched. Out of
+    scope: a separate performance-director model before measurement shows it
+    is needed. Exit: the tag vocabulary and bench are recorded, the companion
+    record owns the dials, and the named voice/register tests plus
+    `bash scripts/check.sh` pass.
+
 <a id="exp-01"></a>
 
 - [x] **EXP-01: Experience and plan claims** (S)

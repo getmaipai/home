@@ -1853,6 +1853,58 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       already set - building the real `tts` role is a separate, real
       slice of work, deliberately not started tonight given how much
       this session had already covered.
+
+### Voice output disfluency design, 2026-09-17
+
+The voice bar is not only intelligible text. On request, a companion must be
+able to say a natural disfluency such as "um" or "let me think", or render a
+throat clear, chuckle, or sigh. The first-day test is one sentence containing
+a hesitation and a laugh, with time to first audio measured.
+
+Decision: the composer owns this performance choice. `reply.text` stays clean
+for the screen and transcript; `reply.speech` is the internal speech
+representation, carrying the model-specific nonverbal tags that the selected
+TTS accepts. The existing sentence scheduler can begin phrase-level TTS before
+the reply is complete. The companion's expressiveness, disfluency, humour,
+nonverbal frequency, and pace are dials. They shape the plan line, example
+lines, and a measured steering vector, never a prose paragraph in the prompt.
+The voice model must not invent disfluencies in clean speech, and a separate
+performance-director model is out of scope unless measurement proves the
+composer and TTS controls insufficient.
+
+Evidence and candidate rule: [Orpheus-TTS's official
+README](https://github.com/canopyai/Orpheus-TTS) lists `<laugh>`, `<chuckle>`,
+`<sigh>`, and `<cough>`. [Dia's official
+README](https://github.com/nari-labs/dia) lists `(laughs)`, `(coughs)`,
+`(clears throat)`, and `(sighs)`. [OpenAudio S1's project
+README](https://github.com/fishaudio/fish-speech) documents emotional, tone,
+and special markers. [Eleven v3's official documentation](https://elevenlabs.io/docs/help-center/product/core-capabilities/text-to-speech/how-do-audio-tags-work-with-eleven-v3-alpha)
+is the reference behavior for `[laughs]`, `[clears throat]`, and `[sighs]`.
+[Qwen3-TTS's official repository](https://github.com/QwenLM/Qwen3-TTS) and
+model card document voice cloning and natural-language voice control, but do
+not document an inline nonverbal-tag vocabulary. Qwen therefore remains a
+quality and cloning candidate, not a passing tag candidate, until a direct
+probe demonstrates the required behavior.
+
+Alternatives rejected: passing clean `reply.text` to TTS and hoping for
+natural mannerisms; letting the TTS model sprinkle cues; treating a general
+style instruction as deterministic tag support; and adding a performance
+director before the composer and model controls have been measured. Pocket
+TTS remains the current speed and quality winner from the live decision, but
+its written cue test failed and it has no inline tag syntax, so it does not
+meet this criterion by itself.
+
+Benchmark status: the prior live Chatterbox Turbo run on this Mac measured
+1.4 to 1.6x real-time, no streaming, and more than five silent seconds before
+audio for a 66-character reply. The prior Orpheus Metal run measured 1.26 to
+1.53x real-time, about two seconds to the first chunk, and real progressive
+streaming. A fresh top-two rerun was not possible for this docs slice because
+the machine has neither the runtimes nor the model files installed. These are
+recorded prior measurements, not a new benchmark result.
+
+The follow-up is recorded as REG-02 in `docs/BACKLOG.md`: benchmark the
+candidate tag vocabularies and time to first audio, add the companion dials,
+and enforce the composer-owned register rule for disfluencies.
 - [x] **The `tts` role, real end to end: "I don't think chat works with
       voice on the web for me to test" (2026-09-04, same session as the
       decision above).** `spec/voice/` (new, mirrors `spec/llm/`'s wire-

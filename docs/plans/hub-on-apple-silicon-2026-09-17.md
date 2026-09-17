@@ -128,6 +128,52 @@ Sources: [Qwen3-TTS report](https://arxiv.org/abs/2601.15621),
 [Qwen3-TTS model card](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice),
 and [Kokoro](https://github.com/hexgrad/kokoro).
 
+### Voice output criterion: natural disfluencies and nonverbal sounds
+
+The owner wants voice output to produce a natural disfluency or nonverbal
+sound on request: "um", "let me think", a throat clear, a chuckle, or a sigh.
+The first-day test is one line with a hesitation and a laugh, timed to first
+audio. The screen keeps the clean `reply.text`; the composer writes the
+model-specific markup into `reply.speech`, which the sentence scheduler can
+send phrase by phrase before the reply finishes.
+
+The candidate must accept nonverbal tags in the text. [Orpheus-TTS's official
+README](https://github.com/canopyai/Orpheus-TTS) lists tags such as
+`<laugh>`, `<chuckle>`, `<sigh>`, and `<cough>`. [Dia's official
+README](https://github.com/nari-labs/dia) documents `(laughs)`, `(coughs)`,
+`(clears throat)`, `(sighs)`, and related markers. [OpenAudio S1's project
+README](https://github.com/fishaudio/fish-speech) documents emotional, tone,
+and special markers. [Eleven v3's official documentation](https://elevenlabs.io/docs/help-center/product/core-capabilities/text-to-speech/how-do-audio-tags-work-with-eleven-v3-alpha)
+is the reference behavior, including `[laughs]`, `[clears throat]`, and
+`[sighs]`.
+
+Qwen3-TTS remains a cloning and quality candidate, but its [official
+repository](https://github.com/QwenLM/Qwen3-TTS) documents natural-language
+voice control rather than an inline nonverbal-tag vocabulary. Treat tag
+support as unverified until a model probe passes; do not silently count an
+instruction prompt as tag support.
+
+The words and markers are the composer's register decision for the companion,
+using the register rules in `docs/dev.md`. The voice model never sprinkles
+disfluencies into otherwise clean speech. Expressiveness, disfluency,
+humour, nonverbal frequency, and pace are companion dials that drive the plan
+line, example lines, and a measured steering vector, not a prose paragraph in
+the prompt. A child companion may be expressive; a crisp assistant may have
+near-zero disfluency. Do not add a separate performance-director model unless
+measurement shows that the composer and model controls are insufficient.
+
+The top-two benchmark remains Chatterbox Turbo and Orpheus. Existing live
+measurements in `docs/dev.md` record Chatterbox at 1.4 to 1.6x real-time with
+no streaming and more than five silent seconds before audio for a 66-character
+reply; Orpheus on Metal at 1.26 to 1.53x real-time with about two seconds to
+the first chunk and real streaming. A fresh rerun was not possible in this
+docs slice because neither runtime nor model files are installed on the
+machine. Those numbers are prior measurements, not a new pass claim.
+
+Follow-up: add a model tag vocabulary and time-to-first-audio bench, put the
+dials on the companion record, and enforce the composer-owned disfluency rule
+under the register backlog item.
+
 ### Image generation and editing
 
 The image bar is one 1024 px image, with a LoRA loaded, in single-digit
