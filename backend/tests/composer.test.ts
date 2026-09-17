@@ -394,6 +394,13 @@ describe("the grounding", () => {
     expect(groundedIn("Marsh Lantern is 12 miles away.", rows)).toBeNull();
   });
 
+  test("a picture claim needs an attached image", () => {
+    const rows = [{ title: "Marsh Lantern film", url: "https://example.com/marsh-lantern", snippet: "The official page." }];
+    expect(groundedIn("Here's a picture of Marsh Lantern.", rows)).toBe("Here's a picture");
+    expect(groundedIn("Here they are.", rows, "show me pictures of Marsh Lantern")).toBe("Here they are");
+    expect(groundedIn("Here's a picture of Marsh Lantern.", rows, "", { kind: "image", url: "https://images.example.com/marsh.jpg" })).toBeNull();
+  });
+
   test("a lookup composition falls back to rows, and an empty lookup never calls the model", async () => {
     const lookup = searchOutcome();
     const fallback = await composeTurn(input([lookup]), scripted("The horse is named Invented Meadow in the Invented Chronicle (2024)."));

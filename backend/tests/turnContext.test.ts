@@ -226,6 +226,15 @@ describe("intentFor(): the provisional intent", () => {
     expect(deliverableQuery("link", [{ type: "world", kind: "thing", display_name: "Cosmo 7", year: null, source_kind: null, stable_key: null, recency: "unknown", carried_question: null }], "where's the maker's support page for the Cosmo 7 card")).toBe("Cosmo 7 support page");
   });
 
+  test("an explicit deliverable subject beats an older stack subject", () => {
+    const stack = [
+      { type: "world" as const, kind: "person", display_name: "Earlier Person", year: null, source_kind: null, stable_key: null, recency: "unknown" as const, carried_question: null },
+      { type: "unresolved" as const, surface_form: "Marsh Lantern", candidate_kinds: ["organization" as const], provenance: "turn", confidence: 0.4, carried_question: null },
+    ];
+    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "poster" }, stack, "show me the poster for the movie Marsh Lantern")).toBe("Marsh Lantern movie poster");
+    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "poster" }, stack, "your results have nothing to do with Marsh Lantern")).toBe("Marsh Lantern movie poster");
+  });
+
   test("picture classifier accepts plural and counted requests", () => {
     expect(intentFor("show me pictures of Serena Vale", signalFor("show me pictures of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 1 });
     expect(intentFor("show me 3 pictures of Serena Vale", signalFor("show me 3 pictures of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 3 });

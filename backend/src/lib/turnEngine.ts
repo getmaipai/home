@@ -47,7 +47,7 @@ import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor, constraints
 import { planFor, planLine } from "@/lib/register";
 import { rungOf, rulesFired, type Rung, type RuleName } from "@/lib/ruleNames";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
-import { buildDocument, projectDocument, planComposition, composedText, composedLog, groundedIn, renderLookupRows, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
+import { buildDocument, projectDocument, planComposition, composedText, composedLog, groundedIn, renderLookupRows, emptyLookupLine, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
 import { promptNow } from "@/lib/benchSampling";
 import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
@@ -3096,6 +3096,10 @@ async function prepareTurn(
     turnContext.intent.deliverable = { deliverable: "picture", count: pictureFollowup.count, ...(pictureFollowup.form ? { form: pictureFollowup.form } : {}) };
     turnContext.pictureExclusions = pictureFollowup.exclusions;
   }
+  const pictureRebind = pictureRebindFor(conversation.id, text);
+  if (pictureRebind) {
+    turnContext.intent.deliverable = { deliverable: "picture", count: pictureRebind.count, ...(pictureRebind.form ? { form: pictureRebind.form } : {}) };
+  }
   const householdSubject = householdSubjectTurn(text, turnContext);
   if (!continuation && asksHowKnown(text) && !householdSubject) {
     const prior = outcomesForConversation(conversation.id).slice().reverse().flatMap((row) => row.outcomes.map((outcome) => ({ row, outcome }))).find(({ outcome }) => outcome.status === "succeeded" && (outcome.source?.kind === "model_knowledge" || outcome.sources?.length));
@@ -3152,9 +3156,12 @@ async function prepareTurn(
   if (deliverable) fired(`deliverable.${deliverable}`);
   if (backReference && !composeDirect && !continuation) {
     fired("deliverable.back_reference");
-    const prior = outcomesForConversation(conversation.id).slice(-3).reverse().flatMap((turn) => turn.outcomes).find((o) => o.status === "succeeded" && o.sources?.length);
-    if (prior?.sources?.length) {
-      return immediate({ reply: { text: "The link's below." }, source: "plugin", plugin_id: prior.packageId, safety, crisis_resources: crisisResources, sources: prior.sources }, subjects);
+    const recentTurns = outcomesForConversation(conversation.id).slice(-3).reverse();
+    const prior = recentTurns.flatMap((turn) => turn.outcomes).find((o) => o.status === "succeeded" && o.packageId === "websearch");
+    const priorRows = prior?.result?.data && typeof prior.result.data === "object" ? (prior.result.data as { rows?: unknown }).rows : undefined;
+    const priorSources = prior?.sources?.length ? prior.sources : sourcesFromRows(priorRows);
+    if (prior && priorSources.length > 0) {
+      return immediate({ reply: { text: "The link's below." }, source: "plugin", plugin_id: prior.packageId, safety, crisis_resources: crisisResources, sources: priorSources }, subjects);
     }
   }
   markIncluded(turnContext, promptParts.context);
@@ -4068,23 +4075,30 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
       const selectedLink = denialDeliverable === "link" ? pageLinkFor(page, expression) : null;
       const linkSources = selectedLink ? sourcesFromRows([{ title: selectedLink.title, url: selectedLink.href, snippet: selectedLink.surrounding_text }]) : [];
       const sources = [...linkSources, ...sourcesFromRows(rows), ...pageSource(page)];
-      const first = Array.isArray(rows) ? rows.find((row) => row && typeof row === "object" && typeof (row as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null; url?: string } | undefined : undefined;
+      const filteredPictures = searchDeliverable === "picture" ? filterImageRows(rows) : { rows: [], dropped: 0 };
       const reply = denialDeliverable === "link" && page && !selectedLink && prepared.turnContext.ageBand !== "child" ? { text: "The page does not have that." } : result.value.reply ?? { text: COMPOSE_FALLBACK_LINE };
-      resolved = { reply, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}), ...(first && searchDeliverable === "picture" && sources[0] ? { media: { kind: "image" as const, url: first.image, thumbnail: first.thumbnail ?? null, source: first.url ? new URL(first.url).host : new URL(sources[0]!.url).host, ...(first.url ? { source_url: first.url } : {}) } } : {}) };
+      resolved = { reply, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}) };
+      if (searchDeliverable === "picture" && filteredPictures.rows.length === 0) {
+        resolved = { ...resolved, reply: { text: emptyLookupLine(outcomes) }, sources: [], media: undefined, media_items: [] };
+      }
     }
   }
-  if (resolved) prepared.lookupExpression = expression;
-  if (resolved && searchDeliverable === "picture" && !resolved.media) {
-    const outcome = [...outcomes].reverse().find((item) => item.packageId === "websearch" && item.status === "succeeded");
-    const rows = outcome?.result?.data && typeof outcome.result.data === "object" ? (outcome.result.data as { rows?: unknown }).rows : undefined;
-    const row = Array.isArray(rows) ? rows.find((item) => item && typeof item === "object" && typeof (item as { image?: unknown }).image === "string") as { image: string; thumbnail?: string | null } | undefined : undefined;
-    if (row && resolved.sources?.[0]) resolved = { ...resolved, media: { kind: "image", url: row.image, thumbnail: row.thumbnail ?? null, source: new URL(resolved.sources[0].url).host, source_url: resolved.sources[0].url } };
+  if (resolved && !resolved.sources?.length) {
+    const sourceOutcome = [...outcomes].reverse().find((item) => item.packageId === "websearch" && item.status === "succeeded");
+    const sourceRows = sourceOutcome?.result?.data && typeof sourceOutcome.result.data === "object" ? (sourceOutcome.result.data as { rows?: unknown }).rows : undefined;
+    const fallbackSources = sourceOutcome?.sources?.length ? sourceOutcome.sources : sourcesFromRows(sourceRows);
+    if (fallbackSources.length > 0) resolved = { ...resolved, sources: fallbackSources };
   }
+  if (resolved) prepared.lookupExpression = expression;
   if (resolved && searchDeliverable === "picture") {
     const outcome = [...outcomes].reverse().find((item) => item.packageId === "websearch" && item.status === "succeeded");
     const rows = outcome?.result?.data && typeof outcome.result.data === "object" ? (outcome.result.data as { rows?: unknown }).rows : undefined;
-    const mediaItems = mediaItemsFromRows(rows, pictureCount, prepared.turnContext.pictureExclusions);
+    const filteredPictures = filterImageRows(rows);
+    if (filteredPictures.dropped > 0) noteFilteredImageRows(prepared, filteredPictures.dropped);
+    const mediaItems = mediaItemsFromRows(filteredPictures.rows, pictureCount, prepared.turnContext.pictureExclusions);
     if (mediaItems.length > 0) resolved = { ...resolved, media: mediaItems[0], media_items: mediaItems };
+    else if (hasImageCandidateRows(rows) || !Array.isArray(rows) || rows.length === 0) resolved = { ...resolved, reply: { text: emptyLookupLine(outcomes) }, sources: [], media: undefined, media_items: [] };
+    else resolved = { ...resolved, media: undefined, media_items: [] };
   }
   return resolved && denialDeliverable ? composeDeliverable(resolved, denialDeliverable, prepared.turnContext.ageBand, prepared.surface, pictureCount) : resolved;
 }
@@ -4178,6 +4192,68 @@ function pictureContinuationFor(conversationId: string, utterance: string): { co
   return { count, ...(form ? { form } : {}), exclusions: items.map((item) => pictureImageKey(item.url)).filter((key): key is string => key !== null) };
 }
 
+function pictureRebindFor(conversationId: string, utterance: string): { count: 1 | 2 | 3 | 4; form?: "poster" | "cover" | "photo" } | null {
+  if (!/^\s*(?:no\s*,\s*)?of\s+(?:him|her|them|[\p{L}\p{N}][\p{L}\p{N}' -]{0,80})\s*[?.!]?\s*$/iu.test(utterance)) return null;
+  const prior = lastTurnMedia(conversationId);
+  const items = prior.media_items ?? (prior.media ? [prior.media] : []);
+  if (items.length === 0) return null;
+  const priorOutcome = outcomesForConversation(conversationId)
+    .slice()
+    .reverse()
+    .flatMap((row) => row.outcomes)
+    .find((outcome) => outcome.packageId === "websearch" && outcome.status === "succeeded" && typeof outcome.args?.expression === "string");
+  const expression = typeof priorOutcome?.args?.expression === "string" ? priorOutcome.args.expression : "";
+  const form = /(?:movie\s+)?poster/i.test(expression) ? "poster" : /album\s+cover|artwork/i.test(expression) ? "cover" : /\bphoto\b/i.test(expression) ? "photo" : undefined;
+  const count = Math.min(4, Math.max(1, items.length)) as 1 | 2 | 3 | 4;
+  return { count, ...(form ? { form } : {}) };
+}
+
+const IMAGE_RASTER_RE = /\.(?:avif|bmp|gif|jpe?g|png|tiff?|webp)(?:$|[?#])/i;
+const IMAGE_PACKAGE_HOST_RE = /(?:^|\.)(?:cdnjs\.cloudflare\.com|cdnjs\.com|esm\.sh|jsdelivr\.net|npmjs\.com|skypack\.dev|unpkg\.com)$/i;
+const IMAGE_ICON_PATH_RE = /(?:^|[\/_-])(?:avatar|emoji|favicon|icon|logo|placeholder|sprite)(?:[\/_\-.]|$)/i;
+const IMAGE_PHOTO_HOST_RE = /(?:^|\.)(?:img|image|images|media|photo|photos|picture|pictures|pics)(?:\.|$)/i;
+const IMAGE_MIN_WIDTH = 120;
+const IMAGE_MIN_HEIGHT = 120;
+
+function dimensionsOf(row: Record<string, unknown>): { width: number; height: number } | null {
+  const nested = row.dimensions && typeof row.dimensions === "object" ? row.dimensions as Record<string, unknown> : null;
+  const width = [row.width, row.image_width, nested?.width].find((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const height = [row.height, row.image_height, nested?.height].find((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return width !== undefined && height !== undefined ? { width, height } : null;
+}
+
+function hasImageCandidateRows(rows: unknown): boolean {
+  return Array.isArray(rows) && rows.some((raw) => raw !== null && typeof raw === "object" && typeof (raw as Record<string, unknown>).image === "string");
+}
+
+/** Keep only plausible user-facing photos or media images. The source
+ * page can remain a citation, but an image row has to pass this gate
+ * before it reaches the inline media payload. */
+export function filterImageRows(rows: unknown): { rows: unknown[]; dropped: number } {
+  if (!Array.isArray(rows)) return { rows: [], dropped: 0 };
+  let dropped = 0;
+  const kept = rows.filter((raw) => {
+    if (!raw || typeof raw !== "object") { dropped++; return false; }
+    const row = raw as Record<string, unknown>;
+    if (typeof row.image !== "string" || typeof row.url !== "string") { dropped++; return false; }
+    try {
+      const image = new URL(row.image);
+      const source = new URL(row.url);
+      if (!/^https?:$/.test(image.protocol) || !/^https?:$/.test(source.protocol)) { dropped++; return false; }
+      if (IMAGE_PACKAGE_HOST_RE.test(image.hostname) || IMAGE_PACKAGE_HOST_RE.test(source.hostname)) { dropped++; return false; }
+      if (image.pathname.toLowerCase().endsWith(".svg") || IMAGE_ICON_PATH_RE.test(image.pathname)) { dropped++; return false; }
+      const dimensions = dimensionsOf(row);
+      if (dimensions && (dimensions.width < IMAGE_MIN_WIDTH || dimensions.height < IMAGE_MIN_HEIGHT)) { dropped++; return false; }
+      if (!IMAGE_PHOTO_HOST_RE.test(image.hostname) && !IMAGE_PHOTO_HOST_RE.test(source.hostname) && !IMAGE_RASTER_RE.test(image.pathname) && !IMAGE_RASTER_RE.test(image.href)) { dropped++; return false; }
+      return true;
+    } catch {
+      dropped++;
+      return false;
+    }
+  });
+  return { rows: kept, dropped };
+}
+
 function mediaItemsFromRows(rows: unknown, count: 1 | 2 | 3 | 4, exclusions: readonly string[] = []): Media[] {
   if (!Array.isArray(rows)) return [];
   const seen = new Set(exclusions);
@@ -4217,6 +4293,17 @@ function noteIgnoredModelWebsearchCategory(rules: string[]): void {
   }
   const count = Number(rules[index]!.slice(prefix.length + 1)) + 1;
   rules[index] = `${prefix}:${count}`;
+}
+
+function noteFilteredImageRows(prepared: Pick<Extract<PreparedTurn, { kind: "model" }>, "rules">, count: number): void {
+  const prefix = "media.image_filtered";
+  const index = prepared.rules.findIndex((rule) => rule.startsWith(`${prefix}:`));
+  if (index === -1) {
+    prepared.rules.push(`${prefix}:${count}`);
+    return;
+  }
+  const previous = Number(prepared.rules[index]!.slice(prefix.length + 1));
+  prepared.rules[index] = `${prefix}:${previous + count}`;
 }
 
 /** The `[turn]` line's composed record, with K6's last phase. */
@@ -4416,7 +4503,7 @@ async function runTurnHoldingLease(
       return { ...resolved, reply: plan.fallback, ...(sources?.length ? { sources } : {}) };
     }
     const ungrounded = hasLookupOutcome(resolutionOutcomes)
-      ? groundedIn(composed, resolutionOutcomes, [composerInputFor(modelPrepared, conversation.id, resolutionOutcomes, direct).question ?? "", modelPrepared.messages.filter((message) => message.role === "user").at(-1)?.content ?? ""].join(" "))
+      ? groundedIn(composed, resolutionOutcomes, [composerInputFor(modelPrepared, conversation.id, resolutionOutcomes, direct).question ?? "", modelPrepared.messages.filter((message) => message.role === "user").at(-1)?.content ?? ""].join(" "), resolved.media ?? resolved.media_items)
       : null;
     if (ungrounded !== null) {
       ruleFired(modelPrepared, "composition.grounded_fallback");

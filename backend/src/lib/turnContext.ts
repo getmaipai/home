@@ -452,7 +452,12 @@ function pictureDeliverableFor(utterance: string): PictureDeliverable | undefine
 }
 
 export function deliverableQuery(deliverable: "link" | "picture" | "video" | PictureDeliverable, subjects: readonly SubjectRef[], utterance: string): string {
-  const subject = subjects[0];
+  const subjectCandidates = subjects.filter((candidate): candidate is Extract<SubjectRef, { type: "world" | "unresolved" }> => candidate.type === "world" || candidate.type === "unresolved");
+  const explicitSubject = subjectCandidates.find((candidate) => {
+    const name = candidate.type === "world" ? candidate.display_name : candidate.surface_form;
+    return new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(utterance);
+  });
+  const subject = explicitSubject ?? subjectCandidates[0];
   const name = subject?.type === "world" ? subject.display_name : subject?.type === "unresolved" ? subject.surface_form : undefined;
   const fallback = utterance.toLowerCase().replace(/\b(where(?:'s| is)?|what(?:'s| is)?|how|can|i|me|a|an|the|got|any|please|show|send|link|url|page|source|picture|photo|image|video|trailer|clip|of|it|that|this|for|does|look|like)\b/gi, " ").replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
   const base = name ?? fallback;

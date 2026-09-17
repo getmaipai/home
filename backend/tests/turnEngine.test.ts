@@ -29,6 +29,7 @@ import {
   answersAllow,
   PROMPT_SYSTEM_CHAR_BUDGET,
   MAX_TURN_TEXT_LENGTH,
+  filterImageRows,
   confirmPromptFor,
   type TurnStreamResult,
 } from "@/lib/turnEngine";
@@ -6079,6 +6080,33 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
       expect(second.value.media_items).toHaveLength(1);
       expect(second.value.media_items?.[0]?.url).toBe("https://img.example.com/cosmo-7-alt.jpg");
       expect(second.value.media_items?.[0]?.url).not.toBe(first.value.media_items?.[0]?.url);
+    });
+  });
+
+  test("picture rows drop package icons, SVGs, data URLs, and tiny images", () => {
+    const filtered = filterImageRows([
+      { title: "package icon", url: "https://example.com/icon", image: "https://cdn.jsdelivr.net/npm/pkg/icon.svg", width: 1024, height: 1024 },
+      { title: "favicon", url: "https://example.com/favicon", image: "https://assets.example.com/favicon.png", width: 32, height: 32 },
+      { title: "data image", url: "https://example.com/data", image: "data:image/png;base64,AAAA" },
+      { title: "real photo", url: "https://photo.example.com/story", image: "https://photo.example.com/story-image", width: 900, height: 600 },
+    ]);
+    expect(filtered.dropped).toBe(3);
+    expect(filtered.rows).toHaveLength(1);
+    expect((filtered.rows[0] as { title: string }).title).toBe("real photo");
+  });
+
+  test("an of-him picture correction repeats the prior picture ask", async () => {
+    const { actor } = await owner();
+    await withCosmoLookupStub(async (seen) => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const first = await runTurn(actor, "chat", "show me a photo of the Cosmo 7 card", { conversationId: conv.value.id });
+      const second = await runTurn(actor, "chat", "No, of him", { conversationId: conv.value.id });
+      expect(first.ok && second.ok).toBe(true);
+      if (!first.ok || !second.ok) return;
+      expect(seen.queries).toHaveLength(2);
+      expect(seen.queries[1]).toBe("Cosmo 7 photo");
+      expect(second.value.media?.kind).toBe("image");
     });
   });
 

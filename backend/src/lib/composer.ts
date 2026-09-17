@@ -193,6 +193,22 @@ function groundingEvidence(rows: GroundingRows): string[] {
   return evidence.map(normalizedGrounding).filter(Boolean);
 }
 
+function hasAttachedMedia(value: unknown, depth = 0): boolean {
+  if (depth > 5 || !value || typeof value !== "object") return false;
+  if (Array.isArray(value)) return value.some((item) => hasAttachedMedia(item, depth + 1));
+  if ((value as { kind?: unknown }).kind === "image" && typeof (value as { url?: unknown }).url === "string") return true;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (key === "media" && child && typeof child === "object" && typeof (child as { url?: unknown }).url === "string") return true;
+    if (key === "media_items" && Array.isArray(child) && child.some((item) => item && typeof item === "object" && typeof (item as { url?: unknown }).url === "string")) return true;
+    if (hasAttachedMedia(child, depth + 1)) return true;
+  }
+  return false;
+}
+
+function mediaClaimIn(text: string): string | null {
+  return text.match(/\b(?:here(?:['’]s|\s+is)\s+(?:(?:a|the|your|this|these)\s+)?(?:pictures?|photos?|posters?|images?)|here\s+they\s+are)\b/iu)?.[0]?.trim() ?? null;
+}
+
 function groundingSpans(text: string): { text: string; index: number }[] {
   const spans: { text: string; index: number }[] = [];
   const collect = (pattern: RegExp, transform: (match: RegExpExecArray) => string = (match) => match[0]) => {
@@ -217,7 +233,9 @@ function groundingSpans(text: string): { text: string; index: number }[] {
 /** Returns the first title, quote, year, or number-with-unit in `text`
  * that cannot be found in the lookup rows or the optional allowed words.
  * Matching ignores punctuation and case, but keeps word boundaries. */
-export function groundedIn(text: string, rows: GroundingRows, allowedText = ""): string | null {
+export function groundedIn(text: string, rows: GroundingRows, allowedText = "", attachedMedia?: unknown): string | null {
+  const mediaClaim = mediaClaimIn(text);
+  if (mediaClaim && !hasAttachedMedia(rows) && !hasAttachedMedia(attachedMedia)) return mediaClaim;
   const evidence = [...groundingEvidence(rows), normalizedGrounding(allowedText)].filter(Boolean).map((item) => ` ${item} `);
   return groundingSpans(text).find((span) => {
     const wanted = normalizedGrounding(span.text);
