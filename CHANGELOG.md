@@ -22,12 +22,30 @@ checklist (`docs/dev.md`); no release has been cut yet.
 - Conversation search and pinning, and research mode on a conversation.
 - The GPU validation bench, a developer-facing check that sizes the engine's
   validation fill in tokens.
+- Pictures in a reply: typed picture results from a search appear inline,
+  and a follow-up prompt lets a person ask about a picture directly.
+- Grounded replies: a composed lookup reply now cites the search rows that
+  produced it, so a person can see where each claim came from.
+- A link answer: when a lookup returns a page to open, the reply carries
+  the link directly and an article card beside it.
+- Page reading: when a person asks about a specific page, MaiPai reads it
+  and grounds the answer in that page, showing an article card with the
+  source.
+- A model picker beside the Chat title: a parent sees the available models,
+  the one in use, and one repair action if a model is unreachable.
+- Temporary chat: a per-conversation mode that keeps messages out of history
+  and memory for the duration of that session.
+- Continue: a control under a cut-off reply that picks up where the answer
+  stopped, without altering the original.
 
 ### Changed
 - The OpenAPI document was regenerated to cover the routes added since the
   last release, including the commands and privacy routes.
 - The default package set gained the missing package README, changelog, and
   quality scale files for buddy, default, pal, recall, remember, and tutor.
+- The voice, STT, and TTS routes are now documented in the OpenAPI file.
+- Helper tests for shape and throttle validation were added to the backend
+  test suite.
 
 ### Security
 - A 2026-09-06 code review found `POST /api/llm/chat` and `POST /api/llm/embed`
@@ -220,8 +238,10 @@ checklist (`docs/dev.md`); no release has been cut yet.
   second review pass on the fix diff itself, before committing, caught
   two regressions the first pass introduced (an over-broad CSAM
   false-positive fix, a dropped obfuscation-resistance check) plus four
-  smaller gaps; all fixed in the same commit. Full list with fix-site
+   smaller gaps; all fixed in the same commit. Full list with fix-site
   details in `docs/dev.md`'s "Code review pass, 2026-09-04" section.
+- The chat header, message actions, and reply stats visibility were
+  corrected so they render and toggle as intended.
 
 ### Added
 - Settings (platform plan 4.6), the fourth slice of hub core: the store,
