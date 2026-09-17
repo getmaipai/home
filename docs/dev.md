@@ -33,6 +33,20 @@ the box is under pressure. No backup model, eGPU, or Thunderbolt engine path
 is part of the design. ENGINE-HOST-02 remains the graceful-degradation rule;
 ENGINE-HOST-03 through MEDIA-HOST-02 are the mechanical follow-ups.
 
+Later the same day the engine layer became its own product: MaiPai
+Stack (`getmaipai/stack`, design in its `docs/dev.md`, the decision in
+`.github/docs/DECISIONS.md` 2026-09-17). The Stack owns the engine
+catalog, downloads and checksums, the supervisors, the governor, model
+identity and updates, and serves every role at one address; it knows
+clients, not people, and Home is its first client. ENGINE-HOST-03 (the
+first-day bench) still runs here because the Studio arrives before the
+Stack has code; ENGINE-HOST-04 through -06 and MEDIA-HOST-01 and -02
+are the Stack's milestone 0 and are reserved in the backlog, and
+STACK-16 in this repo is the migration, which starts only after the
+Stack has proven the hub's residency profile on the Studio. The host
+table in the Apple silicon plan gained LocalAI, Harbor, mlx-serve and
+oMLX rows from the survey that decided this.
+
 The alternatives rejected are a two-card layout, because there is no second
 card; a static memory reservation, because it wastes idle unified memory;
 CUDA-only MTP, because it is not a verified Metal dependency on the pinned

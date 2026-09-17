@@ -2270,9 +2270,36 @@ invented for the roster's household, and added to
     Out of scope: changing defaults, adding a second placement, or running
     a cloud model. Exit: the isolated bench and `bash scripts/check.sh`.
 
+<a id="stack-16"></a>
+
+- [ ] **STACK-16: Home runs on the Stack** (L, after the Stack's STACK-14; design pass in `docs/dev.md` first)
+
+    Objective: register Home as a Stack client, call every role by name
+    at the Stack's address, read identity from its headers, bridge its
+    event feed into Home's notifications, render Admin's engine facts
+    as a view of the Stack's API, and delete the hub's own supervisors
+    (the file list in `stack/docs/dev.md`, "What moves out of Home,
+    later"). Files: the supervisors and `engineCatalog.ts`,
+    `modelDownload.ts`, `resourceGovernor.ts`, `engineIdentity.ts`, the
+    `llm`, `openai`, `stt`, `tts` and `host` routes, Admin's engine
+    pages, the privacy page. Mirror the robot's RUNTIME-01 port shape
+    for the engine adapter. Acceptance: the hub in family use on the
+    Stack for a week with no supervisor code left in `backend/src/lib`,
+    the identity check green on every role, one Repairs entry when the
+    Stack is stopped, and `git grep llama-server backend/src/lib` empty.
+    Out of scope: any Stack feature (those are Stack items). Exit:
+    `bash scripts/check.sh`, the chat replay, and the screenshot set.
+
+    **Reserved, 2026-09-17:** ENGINE-HOST-04, -05, -06 and MEDIA-HOST-01,
+    -02 below describe work the Stack's milestone 0 does (STACK-03
+    through STACK-15 in `stack/docs/BACKLOG.md`). They stay listed so
+    the dashboard shows the gap, and a session does not start them in
+    this repo without the owner saying so; the Stack's item is picked
+    instead. ENGINE-HOST-03, the first-day bench, is not reserved.
+
 <a id="engine-host-04"></a>
 
-- [ ] **ENGINE-HOST-04: Add Metal and MLX engine entries under one URL contract** (M, after ENGINE-HOST-03)
+- [ ] **ENGINE-HOST-04: Add Metal and MLX engine entries under one URL contract** (M, after ENGINE-HOST-03; reserved for the Stack, see STACK-16)
 
     Objective: let `engineCatalog.ts` describe the verified llama.cpp Metal
     binary and a pinned `mlx-lm` launcher, with one client contract for
@@ -2289,7 +2316,7 @@ invented for the roster's household, and added to
 
 <a id="engine-host-05"></a>
 
-- [ ] **ENGINE-HOST-05: Provision the measured one-box resident roles** (M, after ENGINE-HOST-04)
+- [ ] **ENGINE-HOST-05: Provision the measured one-box resident roles** (M, after ENGINE-HOST-04; reserved for the Stack, see STACK-16)
 
     Objective: provision one selected intelligence or chat model, the
     current 27B coder, and the minimum embed, background judge, Moonshine,
@@ -2306,7 +2333,7 @@ invented for the roster's household, and added to
 
 <a id="engine-host-06"></a>
 
-- [ ] **ENGINE-HOST-06: Standalone one-box watcher and telemetry** (M, after ENGINE-HOST-05)
+- [ ] **ENGINE-HOST-06: Standalone one-box watcher and telemetry** (M, after ENGINE-HOST-05; reserved for the Stack, see STACK-16)
 
     Objective: implement WATCH-01 as the independent launchd watcher for
     the Studio. Files: the watcher process and launchd service, health and
@@ -2322,7 +2349,7 @@ invented for the roster's household, and added to
 
 <a id="media-host-01"></a>
 
-- [ ] **MEDIA-HOST-01: Supervised local image generation on MPS** (M, after ENGINE-HOST-05)
+- [ ] **MEDIA-HOST-01: Supervised local image generation on MPS** (M, after ENGINE-HOST-05; reserved for the Stack, see STACK-16)
 
     Objective: run ComfyUI as a local supervised sidecar with FLUX.2 Klein
     and Juggernaut XL, with image safety before display or persistence. Files:
@@ -2336,7 +2363,7 @@ invented for the roster's household, and added to
 
 <a id="media-host-02"></a>
 
-- [ ] **MEDIA-HOST-02: Wan video on MPS with measured degradation** (L, after MEDIA-HOST-01)
+- [ ] **MEDIA-HOST-02: Wan video on MPS with measured degradation** (L, after MEDIA-HOST-01; reserved for the Stack, see STACK-16)
 
     Objective: run Wan2.2 TI2V-5B through the local ComfyUI path at 720p,
     measure five- and ten-second clips, and expose it as an on-demand
