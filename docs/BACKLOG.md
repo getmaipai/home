@@ -5075,11 +5075,64 @@ alongside the first sourced skill, not before it.
 
 ## Generation (image, video)
 
-- [ ] Image generation (L) - deliberately not started. The org's
-      non-removable child-safety invariants for generation features (see
-      `getmaipai/.github` > Safety invariants) mean this needs real design
-      attention before any code, not a quick slice.
-- [ ] Video generation (L) - same posture, same reason.
+- [ ] **ENGINE-HOST-03: Choose one foreground model for chat, intelligence,
+      and coding** (S) - run the owner-ordered conversation, Session C coding,
+      and speed bench on Qwen3-Next-80B-A3B, GPT-OSS-120B, GLM-4.5-Air, and
+      the rejected-fit Qwen3-235B-A22B control. Measure 4k/16k/32k prompt
+      speed, decode, first token, two 64k slots, tool calls, safety, and peak
+      memory on the target M5 Max. Out of scope: a permanent second coding
+      model. Files: `backend/scripts/bench/memory-eval.ts` and the conversation
+      bench. Acceptance: one selected model with a recorded licence, revision,
+      checksum, and measured resident profile. Check: the named benches and
+      `bash scripts/check.sh`.
+- [ ] **ENGINE-HOST-04: Add the MLX and managed-host engine contract** (M) -
+      add `managedBy` beside `url`, `spawned`, and `stub`, with health,
+      identity, memory, offline, and expected-revision fields. Keep Home's
+      guards, URL contract, and provenance. Out of scope: cloud routing and
+      host-owned safety. Files: `backend/src/lib/engineCatalog.ts`, the
+      supervisor, and engine tests. Acceptance: llama.cpp and MLX pass the
+      same tool, safety, identity, and restart fixtures. Check: backend engine
+      tests, `tsc --noEmit`, and the full gate.
+- [ ] **ENGINE-HOST-05: Provision the measured resident roles** (M) - keep one
+      foreground model, a dedicated 8B to 14B judge or the Qwen3-4B floor,
+      embed, Moonshine, and the measured Qwen3-TTS/Kokoro choice. Surface peak
+      memory and offline state in Repairs and the model page. Out of scope: a
+      second always-resident coder or automatic model shuffling. Check: the
+      resident-profile soak from ENGINE-HOST-03 and the full gate.
+- [ ] **ENGINE-HOST-06: Run the one-box watcher under launchd** (M) - add the
+      health and resource samples, pressure hold, facts-first alert, and
+      hub-to-watcher heartbeat described in the Apple Silicon plan. Out of
+      scope: solving simultaneous power loss. Check: watcher tests and the
+      full gate.
+- [ ] **MEDIA-HOST-01: Supervise local image generation and editing** (M) -
+      install a pinned ComfyUI sidecar with a local queue, health endpoint,
+      output directory, FLUX.2 Klein/Qwen Image Edit workflows, LoRA loading,
+      child-safety evaluation, provenance, and consent. Measure warm and cold
+      1024 px image and edit times. Out of scope: identifiable non-members in
+      household pictures. Check: the first-day media bench and full gate.
+- [ ] **MEDIA-HOST-02: Generate animated and photorealistic video locally**
+      (L) - benchmark LTX on the MLX Apple path and Wan2.2 TI2V-5B on MPS,
+      then add progress, cancel, notification, shot-list assembly, titles,
+      and the LTX upscaler. Out of scope: a hidden hosted video fallback.
+      Check: five-second clip timings, peaks, and the full gate.
+- [ ] **MEDIA-HOST-03: Generate music with licence-aware export** (M) -
+      benchmark ACE-Step 1.5 and the selected Stability model for one minute
+      of audio, store model/prompt/seed/source provenance, and block a
+      monetized export when the model or data terms are not cleared. Check:
+      the fixed audio bench and full gate.
+- [ ] **CHAT-MEDIA-01: Put image, edit, video, and music jobs in chat** (L) -
+      attach or generate thread assets, resolve plain-word references, keep
+      originals, add undo and variations, show progress, notify on completion,
+      and record the per-person generation consent shape from the Apple plan.
+      Child profiles cannot grant or invoke the people path. Out of scope: a
+      separate generation app. Check: chat attachment, safety, consent, and
+      provenance tests plus the full gate.
+- [ ] Image generation (L) - the design and model/licence bar now live in
+      `docs/plans/hub-on-apple-silicon-2026-09-17.md`; do not start code before
+      MEDIA-HOST-01's safety and first-day measurement are ready.
+- [ ] Video generation (L) - the design now distinguishes animated LTX and
+      photorealistic Wan; do not start code before MEDIA-HOST-02's Metal
+      timing and memory result is recorded.
 
 ## Advanced tool calling (Tier 2)
 

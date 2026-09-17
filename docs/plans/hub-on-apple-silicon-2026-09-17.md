@@ -2,330 +2,416 @@
 
 Owner decision, 2026-09-17. The whole hub moves to one Mac Studio M5 Max
 with 128 GB unified memory and 2 TB SSD. The eGPU path is closed. The old
-two-card note remains a record of measurements, but it is not an installation
-plan. The priorities are a ChatGPT-class experience, coding, then video.
+two-card note remains a record of measurements, not an installation plan. The
+priorities are chat with intelligence, coding, images, then video.
 
 The Studio configuration used here is the M5 Max with an 18-core CPU, a
 40-core GPU, and 614 GB/s memory bandwidth. Apple lists 128 GB as the maximum
-unified-memory configuration for that chip and 2 TB as an available SSD size.
-Source: [Apple Mac Studio technical specifications](https://www.apple.com/mac-studio/specs/).
+unified-memory configuration for that chip. Source: [Apple Mac Studio
+technical specifications](https://www.apple.com/mac-studio/specs/).
 
 ## 1. Runtime per role
 
 ### The two runtime families
 
-| Runtime | Chat and coding behavior on this box | Serving and cache behavior | Decision |
+| Runtime | Chat and coding behavior | Serving and cache behavior | Decision |
 |---|---|---|---|
-| llama.cpp with Metal | The existing `llama-server` path is already exercised by Home. The pinned b10797 macOS arm64 binary is verified in `backend/src/lib/engineCatalog.ts`. | OpenAI-compatible `/v1/chat/completions`, `cache_prompt`, explicit `id_slot`, and parallel slots are already part of Home's client contract. The pinned engine treats MTP as CUDA-only for this plan. | Production baseline for chat and coding until an MLX adapter passes the same tool, safety, health, and restart checks. |
-| MLX with `mlx-lm` | Native Apple Silicon execution and the only practical path in this comparison for the 122B-A10B candidate. The Apple project describes its shared-memory device model directly. | `mlx_lm.server` exposes an OpenAI-like HTTP API, prompt-cache files, decode and prompt concurrency, and a `draft_model` for speculative decoding. Quantized KV cache saves memory but disables batching. The upstream server warns that its security checks are basic. | First-class `intelligence` engine candidate. It may become the fixed `chat` engine only after the Studio bench proves tool-call correctness and operational behavior. |
+| llama.cpp with Metal | The existing `llama-server` path is exercised by Home. The pinned macOS arm64 binary is verified in `backend/src/lib/engineCatalog.ts`. | OpenAI-compatible `/v1/chat/completions`, `cache_prompt`, explicit slots, and parallel slots are already part of Home's client contract. | Production baseline until another engine passes the same tool, safety, health, and restart checks. |
+| MLX with `mlx-lm` | Native Apple Silicon execution and a practical path for the large MoE candidates. | `mlx_lm.server` exposes an OpenAI-like API, prompt caches, prompt and decode concurrency, and a `draft_model` for speculative decoding. Its own documentation says its security checks are basic. | First-class candidate for the selected large model. It becomes the fixed chat engine only after the Studio bench. |
 
 Sources: [MLX documentation](https://ml-explore.github.io/mlx/build/html/index.html),
-[MLX LM server documentation](https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md),
-and the [llama-server options](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
+[MLX LM server](https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md),
+and [llama-server options](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
 
-Both runtimes must preserve one contract at the Home boundary. A role has one
-selected engine URL, one model identity, one health probe, and one supervisor.
-The URL may be `http://127.0.0.1:<port>` for a child process or a configured
-local URL for an already-running process. No runtime failover is introduced.
+Both runtimes preserve one Home boundary. A role has one selected engine URL,
+one model identity, one health probe, and one supervisor. The URL may be a
+local child process or a configured local URL for an already-running service.
+No automatic cross-engine failover is introduced.
 
 ### What is measured and what is not
 
-The superseded GPU layout measured Qwen3.8-27B on an RTX 5060 Ti at 33.7
-decode tokens per second and 879 prompt tokens per second. Its Qwen3-8B run
-reached 78.7 decode tokens per second. Those are useful workload numbers, not
-Apple Silicon numbers.
+The old GPU layout measured Qwen3.8-27B on an RTX 5060 Ti at 33.7 decode
+tokens per second and 879 prompt tokens per second. Those are workload
+numbers, not Apple Silicon numbers. A public M4 Pro MLX report measured
+Qwen3.5-27B int4 at 11.8 tokens per second and 22.1 GiB peak at a 4096-token
+prompt. Source: the [MLX coding benchmark report](https://github.com/weklund/mlx-coding-bench/blob/main/measurements/llm_benchmarks/Apple_M4_Pro_10P%2B4E%2B20GPU_64GB/2026-03-06__19:47:24/REPORT.md).
 
-The public MLX benchmark that is closest to this machine used an M4 Pro with
-20 GPU cores and 64 GB unified memory. It reports Qwen3.5-27B int4 at 11.8
-tokens per second, 22.1 GiB peak at a 4096-token prompt, and 36.57 seconds to
-the first token for that prompt. It reports Qwen3.5-35B-A3B int4 at 25.6
-tokens per second and 23.7 GiB peak. Source: the [MLX coding benchmark
-report](https://github.com/weklund/mlx-coding-bench/blob/main/measurements/llm_benchmarks/Apple_M4_Pro_10P%2B4E%2B20GPU_64GB/2026-03-06__19:47:24/REPORT.md).
-
-For the 100B-class MoE, Qwen3.5-122B-A10B is the candidate. A public MLX
-benchmark reports 42.5 tokens per second and 69.62 GB on disk, but its target
-hardware and test method are not sufficiently documented for a placement
-decision, so both numbers are marked `(?)`. There is no trusted, repeatable
-M5 Max result for its decode or prompt speed in this record. The first-day
-bench below supplies those numbers.
-
-For prompt processing, the only directly usable numbers are the 879 tokens
-per second 5060 Ti result and the M4 Pro MLX report's 4096-token first-token
-time, approximately 112 prompt tokens per second if treated as pure prefill
-`(?)`. The 122B prompt rate is unknown `(?)` and must be measured at 4k, 16k,
-and 32k.
+There is no trusted, repeatable M5 result for the large candidates in this
+record. The first-day bench below owns the decode, prompt, first-token,
+two-slot, memory, and tool-call numbers.
 
 ### Speculative decoding and slots
 
-The pinned llama.cpp engine is treated as having no usable MTP on Metal. A
-CUDA-only MTP choice must never be enabled by an Apple Silicon catalog entry.
-The current upstream server documentation lists several speculative-decoding
-types, and recent upstream discussions show Metal experiments, but that is not
-enough to make MTP a Home dependency on the pinned build. A later engine pin
-can change this only after a real Metal bench.
-
-MLX offers a smaller draft model through `mlx_lm.server --draft-model` and a
-`num_draft_tokens` setting. That is a real option, but it is not a free win:
-the MLX server's quantized KV mode cannot batch, and a draft model consumes
-unified memory and bandwidth. The first implementation should use one slot
-for the 122B intelligence role. The existing llama.cpp chat role keeps two
-slots and prefix reuse. A two-slot MLX configuration is a measured follow-up,
-not an assumption.
+The pinned llama.cpp engine is treated as having no usable Metal MTP dependency.
+A CUDA-only choice must never be enabled by an Apple catalog entry. MLX's
+`draft_model` is a real option, but it consumes unified memory and its
+quantized KV mode cannot batch. Start the selected large model with two slots
+and no draft model. Add a draft only after a measured speed win that does not
+change tool-call or safety behavior.
 
 ### Recommendation
 
-Use llama.cpp Metal as the production chat and coding baseline now. It is the
-only path already connected to Home's guards, tool calls, identity reporting,
-prefix caching, two-slot serving, and auto-heal. Add an MLX engine entry and a
-shared OpenAI-compatible URL adapter for the intelligence role. Test the
-122B-A10B MLX model as the first large reasoning candidate. If the first-day
-bench and the ChatGPT-class conversation fixture pass, the owner may select
-that MLX engine for `chat`; this is a selection change, not a live fallback.
+Use llama.cpp Metal as the production baseline now. Add an MLX engine entry and
+a shared OpenAI-compatible URL adapter for the selected large model. Keep the
+guards, memory rules, turn engine, identity checks, and restart semantics in
+Home. A model host may own loading, but it may not bypass those boundaries.
 
-`engineCatalog` needs a `mlx-lm` entry with a pinned environment or launcher,
-model format, URL port, health probe, and verification status. The supervisor
-needs the same lazy-start-once state, generation guard, identity read, process
-watch, graceful stop, and memory-pressure integration as
-`llmSupervisor.ts`. The client contract must remain the same URL contract,
-with an adapter for MLX's model-list health response if it has no `/health`
-endpoint. `backgroundSupervisor.ts` remains a separate small llama-server
-role unless measurement proves that moving it to MLX improves the total
-resident set without delaying chat.
+`engineCatalog` needs a pinned MLX environment or launcher, model format, URL
+port, health probe, and verification status. The supervisor needs the same
+generation guard, identity read, process watch, and memory-pressure handling
+as `llmSupervisor.ts`. A managed external service is probed and identified but
+not spawned or killed by Home.
 
 ## 2. Models per role
 
 Memory figures are binary GiB when the source says GiB and decimal GB when the
-source says GB. A model file is not a process peak. The latter includes KV,
-compute buffers, tokenizer, and runtime allocations. `(?)` means the figure is
-an estimate or a result whose hardware or measurement method is incomplete.
+source says GB. A weight-file size is not a process peak. The latter includes
+KV, compute buffers, tokenizer, and runtime allocations. `(?)` means an
+estimate or an unverified Apple result.
 
-### Chat, intelligence, and coding
+### One model for chat, intelligence, and coding
 
-| Role and candidate | 4-bit memory | 8-bit memory | Full precision | Placement and decision |
-|---|---:|---:|---:|---|
-| Qwen3.5-122B-A10B MLX, 122B total and 10B active | 69.6 GB weights; about 65.5 GB peak in a public MLX run `(?)` | about 139 GB `(?)` | about 279 GB `(?)` | One selected `chat` or `intelligence` role, never both copies resident. Best large-model candidate, subject to the Studio bench. |
-| Qwen3.5-27B dense MLX | 22.1 GiB peak at 4096 tokens in the M4 Pro report | 35.5 GiB peak at 4096 tokens in the M4 Pro report | about 57 GiB `(?)` | Compact ChatGPT-class candidate. The 4-bit version fits beside the rest and is the safe chat candidate if 122B latency or tool behavior misses the bar. |
-| Qwen3.8-27B coder, the current GGUF with MTP head | about 15.4 GB at 64k q8 KV, using the old layout note | about 30 GB `(?)` | about 55 to 60 GB `(?)` | Fixed coding role on llama.cpp Metal. A larger coder is not worth its memory until a coding bench shows a clear quality gain at an acceptable first token. |
+The owner decision is one foreground model. There is no permanent 27B coding
+copy beside an intelligence model. The first-day bench runs each candidate in
+the owner's order: conversation quality, coding on Session C briefs, then
+speed. The model must hold two 64k slots without pushing macOS into pressure.
 
-The dense 27B figures come from the [published MLX benchmark
-report](https://github.com/weklund/mlx-coding-bench/blob/main/measurements/llm_benchmarks/Apple_M4_Pro_10P%2B4E%2B20GPU_64GB/2026-03-06__19:47:24/REPORT.md).
-The 122B candidate's model card and configuration are in the
-[MLX Community repository](https://huggingface.co/mlx-community/Qwen3.5-122B-A10B-4bit).
-The existing coder numbers and the 5060 Ti measurements are in
-`docs/plans/gpu-card-layout-2026-09-14.md`.
+| Candidate | 4-bit weights plus 64k KV | 8-bit weights plus 64k KV | Coding and chat evidence | Apple path and verdict |
+|---|---:|---:|---|---|
+| Qwen3-Next-80B-A3B | about 43 to 50 GB `(?)` | about 83 to 95 GB `(?)` | Qwen reports 80B total and 3B active, strong long-context and reasoning results against Qwen3-235B; no Session C score is published. | MLX-community and llama.cpp conversions exist `(?)`; first candidate to bench. Apache 2.0. |
+| GPT-OSS-120B | about 67 to 78 GB `(?)` | about 125 to 145 GB `(?)` | OpenAI reports 117B total and 5.1B active, tool use, structured outputs, and published reasoning and coding evaluations. | Apache 2.0 plus the OpenAI usage policy. MLX and llama.cpp ports are available `(?)`; runner-up if Qwen misses. |
+| GLM-4.5-Air | about 61 to 72 GB `(?)` | about 116 to 132 GB `(?)` | The model card reports 106B total, 12B active, 128k context, and SWE-bench results. | MIT. MLX and llama.cpp conversions are community paths `(?)`; likely slower because 12B is active. Bench, but do not assume 35 to 45 tok/s. |
+| Qwen3-235B-A22B | about 126 to 145 GB `(?)` | over 240 GB `(?)` | Qwen reports 235B total and 22B active, with strong reasoning and coding results. | Apache 2.0, but it cannot fit with 64k KV and macOS on a 128 GB Studio at 4-bit. Reject for this box. |
+| Qwen3-Coder-Next-80B-A3B | about 43 to 50 GB `(?)` | about 83 to 95 GB `(?)` | Its technical report targets coding with 80B total and 3B active. Chat quality is not the owner's primary evidence. | Apache 2.0, MLX/Metal path `(?)`. Keep as a fallback second slot only if every one-model candidate misses the coding speed floor. |
+
+The arithmetic is a bound, not a benchmark. At 614 GB/s, a 4-bit model with
+`N` active parameters has a best-case weight-streaming ceiling of
+`614 / (0.5N)` tokens/s: about 123 tok/s for 10B active, 102 for 12B, 241
+for 5.1B, and 410 for 3B. Routing, attention, KV reads, kernels, and memory
+reuse lower that number. The first target is 35 tok/s decode and 500 tok/s
+prompt processing at 4k. A winner may miss that target only if its
+conversation and coding scores are materially better and the owner accepts
+the wait. All numbers above remain estimates until the M5 bench.
+
+Sources: [Qwen3-Next model card](https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct),
+[GPT-OSS model card](https://openai.com/index/gpt-oss-model-card/),
+[GPT-OSS model page](https://developers.openai.com/api/docs/models/gpt-oss-120b),
+[GLM-4.5-Air](https://glmmodel.com/models/glm-4-5-air),
+[Qwen3-Coder-Next report](https://arxiv.org/abs/2603.00729), and
+[Apple Mac Studio specifications](https://www.apple.com/mac-studio/specs/).
 
 ### Judge, embed, and speech
 
-| Role | 4-bit or existing memory | 8-bit or full precision | Decision |
-|---|---:|---:|---|
-| Background judge, Qwen3-4B Q4_K_M | 2.50 GB file; about 4.4 GB loaded `(?)` | about 7.5 GB at 8-bit and 14 GB at bf16 `(?)` | Keep separate from foreground chat. The current `backgroundSupervisor.ts` runs it with reasoning off and no prompt cache. |
-| Embed, `nomic-embed-text-v1.5.Q4_K_M.gguf` | 84 MB file; about 0.4 GB resident | about 0.8 GB at 8-bit and 1.6 GB full precision `(?)` | Unchanged. Keep it always available so recall does not wait on a generator. |
-| STT, Moonshine tiny-en int8 plus Silero VAD | 108 MB Moonshine archive plus VAD `(?)` | about 0.2 GB for a higher-precision speech model `(?)` | Keep the existing in-process Moonshine path. Whisper.cpp and MLX Whisper are alternatives for a later quality or language decision, not a reason to add a second resident stack now. |
-| TTS, Kyutai Pocket TTS | 100M model, about 0.3 to 1 GB process working set `(?)` | no useful 8-bit or full-precision resident number measured | Keep the existing CPU process and streaming route. An MLX port is not needed for this machine's minimum set. |
+The memory-eval bench compares three judge placements: a third slot of the
+foreground model, a dedicated 8B to 14B judge kept warm, and Qwen3-4B as the
+floor. Try the dedicated judge first. The third-slot option is allowed only if
+it wins the judge score and the foreground run stays above 35 tok/s with two
+slots. Qwen3-4B remains the fallback because it is small and already wired to
+the background supervisor.
 
-### Image generation
+| Role | Estimated live memory | Decision |
+|---|---:|---|
+| Judge, dedicated Qwen3-8B or Qwen3-14B | about 5 to 9 GB `(?)` | First trial. One warm judge avoids spending a second KV cache on every foreground request. |
+| Judge, third foreground slot | another 64k KV and concurrent decode `(?)` | Only if `backend/scripts/bench/memory-eval.ts` shows a quality win and the throughput condition holds. |
+| Judge floor, Qwen3-4B Q4 | about 4.4 GB `(?)` | Keep as the memory-safe fallback. |
+| Embed, `nomic-embed-text-v1.5.Q4_K_M.gguf` | about 0.4 GB `(?)` | Always available so recall does not wait on a generator. |
+| Speech in, Moonshine tiny-en plus Silero VAD | about 0.2 GB `(?)` | Keep the current in-process path; Whisper.cpp and MLX Whisper stay alternatives. |
+| Speech out, Qwen3-TTS 1.7B | about 2 to 4 GB at 4-bit `(?)` | Quality and cloned voices. The technical report describes three-second voice cloning and Apache 2.0 weights. Measure time to first audio. |
+| Speech out, Kokoro 82M | about 0.2 to 0.5 GB `(?)` | Latency floor. Keep when its first audio arrives sooner and the sentence quality floor passes; it has voices, not Qwen-style reference cloning. Apache 2.0. |
 
-Use ComfyUI as a supervised sidecar, with one queue and one workflow at a
-time. The repository's catalog picks FLUX.2 [klein] 4B over Juggernaut XL
-when sharper output matters, while keeping Juggernaut XL as the larger-LoRA
-alternative. ComfyUI officially lists macOS, Apple Silicon, FLUX.2, and Wan
-2.2 support, and it supports offline local execution. Sources: the
-[ComfyUI repository](https://github.com/Comfy-Org/ComfyUI) and the existing
-`backend/src/lib/modelCatalog.ts` decision.
+The deciding number for speech is time to first audio for one sentence, not
+full-utterance throughput. Use Qwen3-TTS for a consented cloned voice or when
+quality wins. Use Kokoro for short ordinary replies when its measured TTFA is
+at least 2x faster `(?)` and the voice is acceptable.
 
-On Apple Silicon, an MLX 4-bit FLUX.2 Klein path is the preferred first
-measurement. A community M4 run reports roughly 4.3 GB of Klein weights and
-about 11 GB peak at 1024 by 1024. Its bf16 MPS path reports about 15 GB peak.
-These are implementation measurements, not a Home catalog guarantee. Plan
-for 11 to 16 GB at 4-bit, 8-bit, or bf16 depending on the chosen pipeline,
-then replace that estimate with a full-pipeline peak from the Studio bench.
+Sources: [Qwen3-TTS report](https://arxiv.org/abs/2601.15621),
+[Qwen3-TTS model card](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice),
+and [Kokoro](https://github.com/hexgrad/kokoro).
 
-Expected 1024 by 1024 image time is 30 to 60 seconds warm and 45 to 90
-seconds cold `(?)` for a four-step distilled Klein workflow. The estimate
-comes from the M4 report of roughly 12 seconds per step and adds model-load
-and M5 variance. The UI must say that this is an on-demand job, not imply a
-chat-latency promise. MPS FP8 failures are a known path in current PyTorch
-ComfyUI usage, so use an MLX quant or convert to bf16 until the exact M5
-software stack proves native FP8.
+### Image generation and editing
+
+The image bar is one 1024 px image, with a LoRA loaded, in single-digit
+seconds. The number is a target, not a claim that the Studio already meets it.
+ComfyUI is the supervised workflow sidecar; MLX or DiffusionKit is preferred
+when it is the faster Apple path. If no local workflow meets the bar after the
+bench, the CUDA sidecar is the fallback. The model and adapter licences are
+recorded separately before a workflow becomes a catalog choice.
+
+| Candidate | Apple path and LoRA | Memory | 1024 px timing on M5 Max | Licence and verdict |
+|---|---|---:|---:|---|
+| FLUX.2 Klein 4B distilled | MLX or ComfyUI MPS `(?)`; unified text-to-image and multi-reference edit; LoRA training is documented for the family. | 8 to 14 GB `(?)` | 3 to 9 s warm with four steps `(?)`; 10 to 20 s cold `(?)` | Apache 2.0. First image and edit candidate. It meets the bar only if the M5 measurement is at the low end. |
+| Qwen-Image-Lightning 4-step | ComfyUI MPS; LightX2V supplies a 4-step LoRA for generation and Qwen Image Edit. | 12 to 24 GB `(?)` | 5 to 12 s `(?)` | Qwen base is Apache 2.0; verify the Lightning adapter notice before distribution. Adopt with a timing and licence gate. |
+| SDXL-Lightning 2 or 4-step | ComfyUI MPS, DiffusionKit, and Draw Things; full UNet or LoRA checkpoint. | 8 to 12 GB `(?)` | 3 to 8 s `(?)` | OpenRAIL++ and SDXL base terms apply. Fast fallback, but commercial terms need a catalog review. |
+| FLUX.2 Klein 9B or full Qwen Image Edit | ComfyUI MPS or MLX conversion `(?)`; reference editing and LoRA where the selected base supports it. | 18 to 30 GB `(?)` | 15 to 40 s `(?)` | Klein 9B is non-commercial; Qwen Image Edit is Apache 2.0. Quality path, not the speed-bar path. |
+| RMBG-2.0 | Small segmentation worker on MPS or Core ML `(?)`; no generation LoRA needed. | under 1 GB `(?)` | under 1 s `(?)` | CC BY-NC 4.0 weights. Use only for non-commercial previews, or replace it with a commercially cleared segmenter. |
+
+Official references: [FLUX.2 Klein](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B),
+[FLUX.2 training and LoRA](https://docs.bfl.ml/flux_2/flux2_klein_training),
+[Qwen Image Edit](https://huggingface.co/Qwen/Qwen-Image-Edit),
+[Qwen Image Lightning](https://github.com/ModelTC/LightX2V-Qwen-Image-Lightning),
+[SDXL-Lightning](https://huggingface.co/ByteDance/SDXL-Lightning), and
+[RMBG-2.0](https://huggingface.co/briaai/RMBG-2.0). Published Apple timings
+are not available for this Studio, so every timing above is `(?)`.
 
 ### Video generation
 
-The nearest practical local model is Wan2.2 TI2V-5B. Its official card says
-that it supports text-to-video and image-to-video at 720p and reports under
-nine minutes for a five-second 720p clip on a single consumer GPU without
-special optimization. It does not publish an Apple MPS result. Source:
-[Wan2.2-TI2V-5B](https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B).
+"Somewhat fast" means minutes, not tens of minutes: the bar is at most five
+minutes for a five-second animated clip and at most ten minutes for a
+five-second photorealistic clip, including a warm local run `(?)`. The UI
+shows progress, an honest estimate, and a notification when the clip is ready.
 
-For the Studio, budget 12 to 20 GB for a 4-bit or offloaded 5B workflow,
-20 to 32 GB for 8-bit, and 35 to 50 GB for full precision `(?)`. A realistic
-first product expectation is 8 to 20 minutes for a five-second 720p clip and
-15 to 40 minutes for ten seconds `(?)`, including load and decode. The first
-bench must measure the exact workflow, resolution, frame rate, steps, peak
-resident memory, and total wall time.
+| Kind | Model and Metal path | 5-second clip on M5 Max | Licence and verdict |
+|---|---|---:|---|
+| Animated children's video | LTX-2 distilled, or its compatible current revision, through the community MLX Apple-Silicon port; the model produces synchronized audio and accepts LoRAs. | 1 to 5 minutes at 540p or 720p `(?)` | LTX-2 community licence. Adopt first if the local licence review permits the planned household use and the M5 timing meets the bar. |
+| Photorealistic trailer | Wan2.2 TI2V-5B through ComfyUI/PyTorch MPS. It supports text-to-video and image-to-video at 720p. | 5 to 10 minutes at 720p `(?)` | Apache 2.0 weights. Adopt as the quality path, subject to the MPS bench. |
 
-The owner's Hailuo-class target is not the same as Wan. Hailuo-02 is a
-hosted MiniMax service, not a local checkpoint with a Home-compatible Metal
-runtime. The missing pieces are downloadable weights, a supported local
-inference implementation, Metal kernels, and a safe supervised API boundary.
-MiniMax H3 is a separate open model and ComfyUI now lists it, but it is not a
-substitute for Hailuo-02 and its Apple performance and operational maturity
-are unmeasured `(?)`. Do not add a cloud Hailuo connection to Home as a silent
-substitute. Wan2.2 TI2V-5B on MPS is the nearest model that has a realistic
-local path.
+The LTX repository publishes distilled checkpoints, LoRA training, and spatial
+and temporal upscalers. The [LTX-2 model card](https://huggingface.co/Lightricks/LTX-2)
+and [LTX-2 repository](https://github.com/Lightricks/LTX-2) support that plan;
+the [community MLX port](https://github.com/baisampayans/ltx-mlx) is an Apple
+path, not an upstream performance guarantee. The [Wan2.2 card](https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B)
+supplies the 720p and licence facts. Run the LTX spatial upscaler or a
+separately verified Real-ESRGAN MPS workflow after generation, never as an
+unmeasured promise.
+
+Each multi-shot piece stays in chat: the request becomes a shot list, each
+shot is generated and accepted or retried, then a local assembler joins shots,
+adds titles, lays in the approved music track, and stores the shot list and
+source ids. LTX is the animated path because it can carry a voice and sound
+track. Wan is the photorealistic path, with music and narration added in the
+assembly step.
+
+### Music generation
+
+The music request, result, variation, and provenance stay in the chat thread.
+The hub records the model, prompt, seed, duration, source audio if any,
+licence, and video ids that use the track. The weights licence is not a promise
+about every training-data or platform claim, so a monetized export requires a
+catalogue licence check to pass.
+
+| Candidate | Apple path | One minute of audio on M5 Max | Video-use decision |
+|---|---|---:|---|
+| ACE-Step 1.5 | MLX or PyTorch MPS port `(?)`; reference audio and style controls. | 20 to 60 s `(?)` | MIT model and code according to the project. First candidate for monetized household videos, pending the exact weight and data notice. |
+| Stable Audio 3.0 Small or Medium | PyTorch MPS `(?)`; current Stability open-weight audio path. | 10 to 45 s `(?)` | Community licence allows commercial use for organisations under $1M revenue; larger or unrestricted commercial use needs the stated Stability agreement. Adopt with that gate. |
+| Stable Audio Open 1.0 | PyTorch MPS `(?)`. | 20 to 90 s `(?)` | Community licence and revenue limits apply. Do not mark clean for an unknown future commercial use. |
+| MusicGen | PyTorch MPS `(?)`. | 10 to 40 s `(?)` | The model weights are non-commercial. Reject for videos that may earn money. |
+
+Sources: [ACE-Step 1.5](https://ace-step.github.io/ACE-Step-1.5/en/),
+[Stable Audio 3.0 licensing](https://stability.ai/license),
+[Stable Audio core models](https://stability.ai/core-models),
+[Stable Audio Open research](https://stability.ai/news-updates/stable-audio-open-research-paper),
+and the [MusicGen repository](https://github.com/facebookresearch/audiocraft).
+The Apple timings are estimates `(?)` until MEDIA-HOST-03 measures a fixed
+60-second prompt, seed, sample rate, and export format.
 
 ## 3. The residency budget
 
-The 128 GB number is shared by the operating system, the desktop, the hub,
-the sidecars, and model allocations. It is not a 128 GB VRAM pool. The
-governor remains dynamic and watches memory pressure rather than enforcing a
-static household reservation.
+The 128 GB number is shared by macOS, the desktop, the hub, sidecars, and
+model allocations. It is not a 128 GB VRAM pool. The governor watches memory
+pressure and observed process peaks rather than enforcing a static reservation.
 
-The following totals show the two useful foreground profiles. They include
-the background judge, embedder, STT, and TTS, but not an image or video job.
+| Resident profile | Estimated live set | Headroom before a generator | Decision |
+|---|---:|---:|---|
+| Qwen3-Next-80B-A3B, two 64k slots, dedicated judge, embed, STT, TTS | 62 to 78 GB `(?)` | 30 to 50 GB `(?)` | Preferred one-model profile if the first-day bench passes. |
+| GPT-OSS-120B, two 64k slots, dedicated judge, embed, STT, TTS | 78 to 96 GB `(?)` | 12 to 30 GB `(?)` | Fits only with strict generator admission and measured KV. |
+| GLM-4.5-Air, two 64k slots, dedicated judge, embed, STT, TTS | 72 to 90 GB `(?)` | 18 to 36 GB `(?)` | Fits, but its active-parameter speed estimate is weaker. |
+| Qwen3-235B-A22B at 4-bit | over 128 GB with KV `(?)` | none | Reject. |
 
-| Resident profile | 4-bit total | 8-bit total | Full precision total | Against 128 GB |
-|---|---:|---:|---:|---|
-| 122B intelligence + background + embed + speech | about 71 GB | about 149 GB `(?)` | about 297 GB `(?)` | 4-bit fits; 8-bit and full precision do not. |
-| 27B chat + 27B coder + background + embed + speech | about 43 GB | about 75 GB `(?)` | about 145 GB `(?)` | 4-bit and 8-bit fit; full precision leaves no honest operating margin. |
-
-An image job adds roughly 12 to 20 GB `(?)`. A Wan job adds roughly 16 to
-32 GB `(?)`. The 122B 4-bit profile can therefore remain loaded while one
-generator runs in principle, but the governor may take the generator offline
-when macOS reports pressure or the observed process peak leaves too little
-room. The compact profile is more comfortable for coding plus one generator.
-
-The minimum resident set is chat or intelligence, embed, judge/background,
-STT, and TTS. Coding, image, and video are features. They are loaded only
-when selected and when the one-box governor says the observed memory state can
-carry them. Image and video never run simultaneously, and neither is loaded
-to replace another role. A request that cannot fit is queued or receives the
-role's exact offline line from ENGINE-HOST-02. A generator that disappears
-stays off until its health probe and hold time say it is back. No secondary
-placement, just-in-time model shuffle, or permanent reserved backup is added.
+An image job adds 8 to 30 GB `(?)`. LTX or Wan adds 20 to 45 GB `(?)`.
+Only one generator may run, and the governor can stop or queue it when the
+observed pressure level leaves less than 20 GB of working margin `(?)`. The
+judge, embedder, STT, and selected TTS remain the minimum resident set. There
+is no second permanent coding model and no model shuffle that pretends the
+full set fits.
 
 ## 4. What the Studio changes in the design
 
 The old two-card assumptions go away. There is no internal GPU for chat, no
 work card for coding, no display-card penalty to compare, no Thunderbolt link
-to put in the engine path, and no placement decision between the RTX 2070
-Super and the eGPU. A single `HardwareInfo` record reports Apple Silicon and
-unified memory. The supervisor records a role's local process and URL, not a
-GPU index. Memory pressure and process RSS are the important live signals.
+in the engine path, and no placement decision between the RTX 2070 Super and
+the eGPU. A single `HardwareInfo` record reports Apple Silicon and unified
+memory. The supervisor records a role's local process and URL, not a GPU
+index. Memory pressure and process RSS are the important live signals.
 
 The hub monitor samples every 15 seconds for health and every 30 seconds for
-resource state. On macOS it records `memory_pressure -Q`, `vm_stat` free and
-speculative pages, process RSS for every supervised child, and the thermal
-state from `pmset -g therm`. A numeric SoC temperature from `powermetrics`
-is not required `(?)` because it may need extra permission and is not a safe
-requirement for an unattended service. Each sample carries the command
-source, timestamp, role, pid, memory bytes, pressure level, thermal state,
-and whether the value was unavailable. The existing `engineStats.ts` 60-second
-in-memory ring remains useful for the UI, but it is not the external
-watcher's health record.
+resource state. On macOS it records `memory_pressure -Q`, `vm_stat`, process
+RSS for every supervised child, and thermal state from `pmset -g therm`.
+Each sample carries command source, timestamp, role, pid, memory bytes,
+pressure level, thermal state, and whether a value was unavailable.
 
-ComfyUI is a sidecar process on `127.0.0.1`, with a fixed local port, a
-versioned Python environment, a health URL, a queue endpoint, and an explicit
-output directory. The hub supervises its lifecycle and sends only local
-workflow requests. It does not enable ComfyUI API nodes or any remote model
-provider. Its child process is watched like the existing engine children and
-is subject to the same graceful-degradation and memory-pressure rules.
+ComfyUI is a sidecar on `127.0.0.1`, with a fixed local port, a versioned
+Python environment, a health URL, a queue endpoint, and an explicit output
+directory. The hub supervises its lifecycle and sends only local workflow
+requests. It does not enable remote API nodes or remote model providers.
 
-The migration is a backup and restore, not a live dual-master period.
+The migration is a backup and restore, not a live dual-master period:
 
-- Take a final encrypted Home backup from the Mac Pro development copy and
-  the laptop's current hub data before the cutover. Restore the household
-  SQLite state into the Studio through the existing staging and restore path.
-- Move source, launch configuration, package state, settings, people,
-  conversations, memories, and notification configuration. Recreate paths
-  on the Studio rather than carrying laptop-specific absolute paths.
-- Re-download the macOS arm64 engine binary and model assets through their
-  checksum-verified download jobs. The 2 TB SSD is enough for the selected
-  122B 4-bit model, the compact coding model, ComfyUI assets, and working
-  caches, but caches are not a backup contract.
-- Do not copy Windows or CUDA engine artifacts into the Studio. Do not copy
-  the old laptop's eGPU layout or its Thunderbolt assumptions.
-- Home backups cover the encrypted `hub.db` snapshot and its recorded
-  household state. They do not back up `data/models`, `data/engines`, logs,
-  or other re-downloadable runtime caches. The current code also documents
-  cloned voice files as a backup gap. That gap must be closed before a
-  household voice upload is treated as protected by the migration.
-- The keystore and backup key remain platform-owned secrets. The emergency
-  kit is the recovery path. A raw copy of the keystore or an unencrypted
-  database is not a migration artifact.
+- Take a final encrypted Home backup from the development copy and current
+  laptop data before cutover.
+- Restore household SQLite state through the existing staging and restore
+  path. Recreate paths on the Studio rather than copying laptop-specific
+  absolute paths.
+- Re-download macOS arm64 engine binaries and model assets through checksum-
+  verified download jobs. Caches are not a backup contract.
+- Do not copy Windows or CUDA artifacts into the Studio, and do not copy the
+  old eGPU layout or its Thunderbolt assumptions.
+- Close the cloned-voice backup gap before a household voice upload is called
+  protected by migration.
 
 The external WATCH-01 process starts with the hub through launchd, survives a
-hub crash, reads the same protected settings and credential store, and sends
-the one plain-facts alert when the hub is down. The hub watches the watcher's
-heartbeat when it is up. Neither side claims to solve a simultaneous power
+hub crash, reads protected settings and credentials, and sends one plain-facts
+alert when the hub is down. Neither side claims to solve a simultaneous power
 failure.
 
 ## 5. The program
 
-The following backlog items are in owner priority order. The first item is a
-first-day measurement, not a promise derived from a vendor page. The
-mechanical queue candidates are ENGINE-HOST-03 through MEDIA-HOST-02.
-
-1. **ENGINE-HOST-03, S, first-day Metal validation.** Record the exact
-   identity from `system_profiler` and the engine's `--version`; fill the
-   model's 4-bit weights and baseline runtime; measure 27B and 122B decode,
-   prompt throughput at 4k, 16k, and 32k, first-token latency, cold load,
-   warm cache reuse, and two-slot behavior; then soak each resident profile
-   for two hours while sampling memory pressure, RSS, thermal state, and
-   output correctness. This mirrors the old GPU validation bench with
-   identity, fill, throughput, and soak, replacing `nvidia-smi` with Apple
-   Silicon process and system samples.
-2. **ENGINE-HOST-04, M, Metal and MLX engine catalog.** Add the verified
+1. **ENGINE-HOST-03, S, first-day model and Metal validation.** Record the
+   exact hardware and engine identity. For each one-model candidate measure
+   conversation-fixture score, Session C coding score, 4k/16k/32k prompt
+   throughput, decode speed, first-token latency, cold load, warm cache reuse,
+   two slots, tool calls, safety, and peak memory. Run the winning resident
+   profile for two hours.
+2. **ENGINE-HOST-04, M, engine catalog and host contract.** Add verified
    llama.cpp Metal and MLX launcher entries, a common OpenAI URL adapter,
    health and identity probes, pinned environments, and supervisor tests.
-   Queue candidate after ENGINE-HOST-03.
-3. **ENGINE-HOST-05, M, resident role provisioning.** Add the selected
-   122B or dense 27B intelligence model, keep the current 27B coder,
-   preserve the judge, embed, Moonshine, and Pocket TTS minimum set, and
-   expose measured memory and offline state in Repairs and the model page.
-   Queue candidate after ENGINE-HOST-04.
-4. **ENGINE-HOST-06, M, standalone one-box watcher.** Implement WATCH-01
-   as a launchd-managed process with `/api/health` and engine probes, the
-   15-second health hold, 30-second resource samples, Telegram's existing
-   privacy-page row, facts-first alerts, and hub-to-watcher heartbeat checks.
-   Queue candidate after ENGINE-HOST-05.
-5. **MEDIA-HOST-01, M, supervised image generation.** Install ComfyUI in a
-   pinned local environment, add the local queue and health contract, run
-   FLUX.2 Klein and Juggernaut XL through the child-safety boundary, and
-   measure warm and cold 1024-pixel image times and peak memory. Queue
-   candidate after ENGINE-HOST-05.
-6. **MEDIA-HOST-02, L, measured local video.** Run Wan2.2 TI2V-5B on MPS
-   at the supported 720p shape, record five- and ten-second clip times and
-   peaks, add the on-demand UI and graceful offline state, and keep Hailuo
-   hosted models out of the local engine path. Queue candidate after
-   MEDIA-HOST-01.
+3. **ENGINE-HOST-05, M, resident roles.** Select the one foreground model,
+   keep the dedicated judge or Qwen3-4B floor, embed, Moonshine, and the
+   measured TTS choice. Expose memory and offline state in Repairs and the
+   model page.
+4. **ENGINE-HOST-06, M, standalone watcher.** Implement WATCH-01 as a
+   launchd-managed process with health and engine probes, pressure samples,
+   facts-first alerts, and hub-to-watcher heartbeat checks.
+5. **MEDIA-HOST-01, M, supervised images and edits.** Install ComfyUI in a
+   pinned local environment, add the local queue and health contract, run the
+   chosen 4-step image and edit workflows with a LoRA, and measure warm/cold
+   1024 px times and peak memory.
+6. **MEDIA-HOST-02, L, local video.** Run LTX animated and Wan photorealistic
+   workflows on Metal, record five-second times and peaks, add progress and
+   notification state, and keep hosted video services out of the local path.
+7. **MEDIA-HOST-03, M, local music.** Benchmark one minute of audio for
+   ACE-Step and the selected Stability model, record licences and provenance,
+   and block monetized export when the weights or terms are not cleared.
+8. **CHAT-MEDIA-01, L, generation in chat.** Add attachments, references,
+   edits, undo, variations, provenance, progress, and the household consent
+   check without creating a separate generation surface.
 
-No follow-up changes safety, consent, or child-band rules. Image and video
-must pass the same non-removable safety floor before a generated asset is
-shown or saved.
+No follow-up changes safety, consent, or child-band rules. Image, video, and
+music pass the same non-removable safety floor before an asset is shown or
+saved.
 
-## 6. What we will not do
+## 6. Pictures and video in chat
 
-- Keep a CUDA-only path alive on the Studio. CUDA artifacts remain for the
-  Windows catalog only.
-- Buy or attach an eGPU for the hub.
-- Put Thunderbolt in the engine path.
-- Run a hidden cloud Hailuo substitute when a local video role is offline.
-- Use MTP as an Apple Silicon dependency before a real Metal validation.
-- Keep a second model resident as an automatic backup or shuffle models on
-  demand to make a full set appear to fit.
+Generation is a ChatGPT-class chat action. An attached image, an image from
+ATT-01, or a generated result becomes a thread asset. "Make this sunnier",
+"remove the background", "make the car red", "this one", and "the last
+picture" resolve against the thread's asset ids. The original remains, the
+result appears beside it, undo is one tap, and "more like this" and "try
+again" create follow-up jobs. Provenance stores model, prompt, seed, adapter,
+source image id, consent decision, and licence review. It is not a visible
+watermark on a household image unless the owner enables one.
+
+### Household people and consent
+
+The narrowed rule permits an identifiable household member only in the
+household's own picture, with consent recorded once. The setting is a
+per-person record with this shape:
+
+`{ person_id, kind: "generation_people", scope: "own_household_photos", status: "granted" | "revoked", granted_by_person_id, recorded_at, source_turn_id, policy_version }`
+
+An adult grants for themselves. A parent grants for a child. A child profile
+cannot grant, request, or operate this path. Revocation blocks new jobs and
+does not erase already-owned originals; the hub retains the provenance record.
+The edit model receives the member's reference image id plus the target image
+and a plain instruction. FLUX.2 Klein multi-reference editing and Qwen Image
+Edit are the reference paths. Identity consistency and 20 to 90 seconds per
+edit on the Studio are estimates `(?)`, so the first-day edit bench decides
+whether this is an acceptable household feature.
+
+The detector is the same classifier rule used elsewhere, not a word list. Its
+first fixtures cover a named member, a pronoun resolved to a member, and a
+reference image whose subject is a member. A request involving a non-member
+is answered in chat with: "I can edit a household member's picture when they
+have consented. I can change the background, lighting, or objects instead."
+There is no path for adding a non-member to a picture.
+
+Anything outside the child ceiling gets the grown-up line. The safety floor
+remains before display, persistence, or export.
+
+### Video jobs and two kinds of story
+
+The chat request may be a prompt or a picture. The thread shows queued,
+loading, rendering, assembling, and ready states, with a cancel action and a
+notification when a long job completes. An animated children's story uses
+LTX for stylized characters, a voice track, and short clips. A photorealistic
+trailer uses Wan for shots and cuts, then adds titles, narration, and cleared
+music. The chat creates the shot list, each shot is accepted or retried, and
+the local assembler creates the final piece. No separate generation app is
+required.
+
+## 7. The model host
+
+The host decision is split. One platform for language models and image/video
+workflows would add more moving parts than it removes.
+
+| Candidate | Licence and source | Engines and operations | Privacy and verdict |
+|---|---|---|---|
+| llama.cpp `llama-server` | MIT, upstream source. | Metal, OpenAI-compatible API, slots, prompt reuse, health and identity are already in Home. Home owns download, checksum, pin, supervision, and swap. | Passes the zero-phone-home rule when Home controls the binary and network. Adopt as language baseline. |
+| `mlx-lm` server | Open source Apple project. | MLX, OpenAI-like API, prompt cache, concurrency, adapters, draft model. It has no complete model catalogue or supervisor and warns that its security checks are basic. | Local URL, no required cloud path. Adopt as a Home-managed engine candidate, not as the whole platform. |
+| Ollama | Open-source server and model tooling. | llama.cpp-based local serving, model pull/import, local API, and model switching. Cloud can be disabled with `OLLAMA_NO_CLOUD=1` or `disable_ollama_cloud`. | Passes only in local-only mode with outbound network blocked for the service. Optional developer host, not the production identity or checksum authority. Sources: [Ollama FAQ](https://github.com/ollama/ollama/blob/main/docs/faq.mdx) and [import guide](https://github.com/ollama/ollama/blob/main/docs/import.mdx). |
+| LM Studio and `llmster` | Closed app and daemon. | llama.cpp and MLX runtimes, model download and pinning, OpenAI-compatible API, JIT load/unload, headless service, and multiple loaded models. | Its privacy page names update checks and model searches/downloads as outbound events, but no named setting makes all of them opt-in. Reject as a product dependency, though a user may point Home at a separately installed local server. Sources: [offline operation](https://lmstudio.ai/docs/app/offline), [headless service](https://lmstudio.ai/docs/developer/core/headless), and [privacy](https://lmstudio.ai/app-privacy). |
+| ComfyUI | GPLv3 application. | Apple Silicon/MPS, image and video workflows, local API, queue, custom nodes, and model folders. | Passes as a separately installed local sidecar with remote nodes disabled. Adopt for image, edit, and video generation. Source: [ComfyUI](https://github.com/Comfy-Org/ComfyUI). |
+| Draw Things | GPLv3 code. | Metal image generation, LoRAs, scripts, and a local API. | Good interactive Apple worker, but GUI-first and not the Home supervisor. Optional user-installed sidecar, not the catalog host. Sources: [Draw Things docs](https://docs.drawthings.ai/) and [community licence](https://github.com/drawthingsai/draw-things-community). |
+| DiffusionKit and MLX image tools | Open-source libraries with separate model terms. | Core ML and MLX Apple image pipelines. No common multi-model service, queue, or launchd contract. | Use as first-party workers when a workflow beats ComfyUI. Not a platform. Source: [DiffusionKit](https://github.com/argmaxinc/DiffusionKit). |
+| whisper.cpp, MLX Whisper, existing Moonshine | Separate open-source speech runtimes. | STT workers, but no single model manager or shared media queue. | Keep Moonshine in-process and add Qwen3-TTS/Kokoro through the existing speech supervisor. Do not add a second host just for speech. |
+
+Home keeps the guards, memory governor, turn engine, consent, provenance,
+model identity, checksum records, and stable URL contract. Home drops child
+process spawning and killing only for an explicitly external host. It does not
+drop health checks, request filtering, safety evaluation, or offline state.
+Host-managed downloads do not silently become trusted: a model has to carry
+its source, revision, licence, checksum, and host identity before selection.
+
+The catalog shape gains a `managedBy` value beside `url`, `spawned`, and
+`stub`, for example `managedBy: "ollama"`, `managedBy: "mlx-lm"`, or
+`managedBy: "comfyui"`. A managed entry has no Home launcher, but it has a
+health probe, identity probe, memory report, expected model revision, and an
+explicit `offline_reason` when the host is unavailable. The supervisor starts
+and stops only `spawned` entries. This is the migration order:
+
+1. Keep the current llama.cpp URL contract and add MLX as a measured candidate.
+2. Add managed language-host entries and prove tool calls, safety, identity,
+   memory, and restart behavior against a local test service.
+3. Move image, edit, video, and music jobs behind the supervised ComfyUI queue.
+4. Add user-facing host settings and the outbound-connection table. Every
+   update, catalogue, and download action is opt-in and local data never goes
+   to a MaiPai service.
+
+## 8. What the Studio changes in the program
+
+- Keep a CUDA-only path for the Windows catalogue, not for the Studio.
+- Do not buy or attach an eGPU, or put Thunderbolt in the engine path.
+- Do not substitute a hosted video service when a local role is offline.
+- Do not make speculative decoding an Apple dependency before a Metal bench.
+- Do not keep a second model resident as an automatic backup.
 
 ## Sources and uncertainty
 
 Sources checked 2026-09-17: [Apple Mac Studio specifications](https://www.apple.com/mac-studio/specs/),
-[llama-server documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md),
-[MLX documentation](https://ml-explore.github.io/mlx/build/html/index.html),
-[MLX LM server documentation](https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md),
-[MLX coding benchmark report](https://github.com/weklund/mlx-coding-bench/blob/main/measurements/llm_benchmarks/Apple_M4_Pro_10P%2B4E%2B20GPU_64GB/2026-03-06__19:47:24/REPORT.md),
-[ComfyUI](https://github.com/Comfy-Org/ComfyUI), and
-[Wan2.2-TI2V-5B](https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B).
+[llama-server](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md),
+[MLX LM server](https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md),
+[Qwen3-Next](https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct),
+[GPT-OSS](https://openai.com/index/gpt-oss-model-card/),
+[ComfyUI](https://github.com/Comfy-Org/ComfyUI),
+[FLUX.2 Klein](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B),
+[Qwen Image Edit](https://huggingface.co/Qwen/Qwen-Image-Edit),
+[LTX-2](https://huggingface.co/Lightricks/LTX-2),
+[Wan2.2 TI2V-5B](https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B),
+[ACE-Step 1.5](https://ace-step.github.io/ACE-Step-1.5/en/),
+[Stable Audio licence](https://stability.ai/license),
+[Qwen3-TTS](https://arxiv.org/abs/2601.15621), and
+[Kokoro](https://github.com/hexgrad/kokoro).
 
-The three least certain points are the 122B MLX speed and peak because the
-public benchmark's target hardware is unclear `(?)`; the exact M5 MPS
-behavior and wall time of ComfyUI's FP8 or bf16 video and image pipelines
-`(?)`; and whether current upstream llama.cpp Metal speculative decoding can
-be safely promoted from an experiment to a verified Home engine `(?)`.
+The three least certain points are the M5 speed and peak-memory numbers for
+the large one-model candidates; the Apple timings and licence notices for the
+new image, video, and music combinations; and whether the community MLX video
+port can meet the animated-video bar at the required resolution `(?)`.
