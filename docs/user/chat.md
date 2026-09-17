@@ -111,6 +111,24 @@ Beside the **Chat** title, tap **Research** to turn on research mode for that co
 
 ![Research mode on, with the details pane open for the reply.](../assets/screens/chat-research-mode-desktop-light.png)
 
+## Choose the model
+
+A model picker sits beside the **Chat** title. It shows the models you can use. The one in use is under the title, so a parent can see it right away. If a model is out of reach, the picker has one fix button. Children see a plain label, not model names.
+
+![The model picker open beside the Chat title.](../assets/screens/chat-model-picker-desktop-light.png)
+
+## Temporary chat
+
+Before you send your first message, turn on temporary mode. A banner above the chat says it's on. Those messages aren't saved, and reloading won't bring them back. The chat lasts for that session only, then it's gone.
+
+![A chat in temporary mode with its banner.](../assets/screens/chat-temporary-mode-desktop-light.png)
+
+## Continue a cut-off reply
+
+If a reply cut off early, a **Continue** button appears under it. Tap it and MaiPai picks up where it stopped. The original reply stays the same. One tap makes one more call, then it's done.
+
+![The Continue button under a cut-off reply.](../assets/screens/chat-continue-desktop-light.png)
+
 ## Still need help?
 
 If Chat won't send a message or load a reply, see [Fix a problem](fix-a-problem.md).
