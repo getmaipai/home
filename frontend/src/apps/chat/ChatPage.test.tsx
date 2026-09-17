@@ -33,7 +33,6 @@ function makePerson(): Roster {
 }
 
 const SAFETY = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" };
-
 function stubFetch(options: { ttsCalls?: string[]; brain?: string; settingWrites?: unknown[] } = {}): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -177,6 +176,19 @@ describe("ChatPage", () => {
     } finally {
       restore();
     }
+  });
+
+  test("keeps the opaque chat header in flow above the scroll viewport", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+      await view.findByRole("heading", { level: 2, name: "Chat" });
+      const header = view.container.querySelector('[data-slot="aui_chat-header"]');
+      const viewport = view.container.querySelector('[data-slot="aui_thread-viewport"]');
+      expect(header?.className).toContain("shrink-0");
+      expect(header?.className).toContain("bg-background");
+      expect(viewport?.className).toContain("min-h-0");
+    } finally { restore(); }
   });
 
   test("Listen on a sent reply calls /api/tts with that reply's text", async () => {
@@ -352,6 +364,7 @@ test("Copy on a household member's own message writes exactly what they typed to
     await view.findByText("A canned reply.");
 
     const userMessage = view.container.querySelector('[data-slot="aui_user-message-root"]')!;
+    expect(within(userMessage as HTMLElement).queryByRole("button", { name: "Copy" })).toBeNull();
     fireEvent.mouseEnter(userMessage);
     // The assistant's own reply carries an identically-named "Copy"
     // button (AssistantActionBar) - scoped to the user message's own

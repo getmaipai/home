@@ -41,7 +41,7 @@ function replyMessage(): ThreadMessageLike {
 }
 
 describe("ChatTurnStats (STATS-01)", () => {
-  test("is off by default and renders nothing while the adult toggle is off", () => {
+  test("a newly streamed reply stays hidden while the details setting is off or loading", () => {
     const { queryByRole } = renderWithQueryClient(<StatsUnderTest visible={false} message={replyMessage()} />);
     expect(queryByRole("button", { name: "View reply stats" })).toBeNull();
   });

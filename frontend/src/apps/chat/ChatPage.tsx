@@ -72,14 +72,23 @@ export function ChatPage({ person }: ChatPageProps) {
   conversationModeRef.current = conversationMode;
   const canViewTurnStats = person.role === "owner" || person.role === "admin" || person.role === "adult";
   const canViewTemporaryMode = person.role === "owner" || person.role === "admin" || person.role === "adult";
-  const [turnStatsVisible, setTurnStatsVisible] = useState(false);
+  // `null` is the loading state, not permission to show telemetry. A fresh
+  // reply can arrive before this request settles, so the projection below
+  // must stay false until the persisted preference explicitly says true.
+  const [turnStatsVisible, setTurnStatsVisible] = useState<boolean | null>(null);
   useEffect(() => {
-    setTurnStatsVisible(false);
-    if (!canViewTurnStats) return;
+    let active = true;
+    setTurnStatsVisible(null);
+    if (!canViewTurnStats) {
+      setTurnStatsVisible(false);
+      return () => { active = false; };
+    }
     api.settingsValues(`person:${person.id}`).then((values) => {
+      if (!active) return;
       const setting = values.find((value) => value.key === "ui.show_turn_stats");
       setTurnStatsVisible(setting?.value === true);
     }).catch(() => {});
+    return () => { active = false; };
   }, [canViewTurnStats, person.id]);
   // Home's prompt box and the search palette's "Ask MaiPai" row both
   // navigate here with `state: { initialText }` (step 6) - read once,
@@ -250,14 +259,19 @@ export function ChatPage({ person }: ChatPageProps) {
   return (
     <ChatActorContext.Provider value={person.id}>
       <ChatChildBandContext.Provider value={person.role === "child"}>
-        <ChatTurnStatsVisibleContext.Provider value={canViewTurnStats && turnStatsVisible}>
+        <ChatTurnStatsVisibleContext.Provider value={canViewTurnStats && turnStatsVisible === true}>
         <ChatFeedbackOpenContext.Provider value={feedbackOpen}>
           <ChatFeedbackOpenSetterContext.Provider value={setFeedbackOpen}>
             <ChatDocumentOpenContext.Provider value={setDocumentTurnId}>
               <AssistantRuntimeProvider runtime={runtime}>
                 <SttAutoSend sendRef={sttAutoSendRef} />
                 <Page title="Chat" hideTitle>
-                  <div className="flex items-center justify-between gap-3 px-4 py-2">
+                  {/* Keep the chat controls in normal flow above the thread.
+                      The opaque, non-shrinking header is deliberately not a
+                      layer over the viewport, so a bottom-anchored reply's
+                      action row cannot paint through it at short heights. */}
+                  <div data-slot="aui_chat-header" className="relative z-20 shrink-0 border-b border-border/60 bg-background px-4 py-2">
+                    <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" aria-label={threadsOpen ? "Hide threads" : "Show threads"} aria-expanded={threadsOpen} aria-controls="chat-threads" onClick={() => setThreadsOpen((open) => !open)}>
                 <HistoryIcon className="size-4" />
@@ -271,8 +285,8 @@ export function ChatPage({ person }: ChatPageProps) {
                 void api.setConversationMode(conversationId, next).catch(() => setConversationMode(previous));
               }}>Research</Button> : null}
               {canViewTemporaryMode ? <Button type="button" variant={conversationMode === "temporary" ? "secondary" : "ghost"} size="sm" aria-pressed={conversationMode === "temporary"} aria-label={conversationMode === "temporary" ? "Turn off temporary chat" : conversationId ? "Turn on temporary chat" : "Start temporary chat"} onClick={toggleTemporaryMode}>Temporary</Button> : null}
-              {canViewTurnStats ? <Button type="button" variant={turnStatsVisible ? "secondary" : "ghost"} size="sm" aria-pressed={turnStatsVisible} aria-label="Show advanced reply stats" onClick={() => {
-                const next = !turnStatsVisible;
+              {canViewTurnStats ? <Button type="button" variant={turnStatsVisible === true ? "secondary" : "ghost"} size="sm" aria-pressed={turnStatsVisible === true} aria-label="Show advanced reply stats" onClick={() => {
+                const next = turnStatsVisible !== true;
                 setTurnStatsVisible(next);
                 void api.setSetting(`person:${person.id}`, "ui.show_turn_stats", next).catch(() => {});
               }}>Details</Button> : null}
@@ -291,6 +305,7 @@ export function ChatPage({ person }: ChatPageProps) {
               <WakeWordToggle onStatusChange={onEarStatus} onWakeDetected={() => setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.")} />
             </SensesDock>
             </div>
+                    </div>
                   </div>
                   {conversationMode === "temporary" ? <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base" role="status">Temporary chat is not saved to normal history or memory. Reloading will not bring these messages back.</div> : null}
                   {banner ? <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div> : null}
@@ -301,7 +316,7 @@ export function ChatPage({ person }: ChatPageProps) {
               className={cn("absolute inset-y-0 start-0 z-20 w-full shrink-0 overflow-y-auto border-e border-border/60 bg-background p-2 sm:static sm:w-60", !threadsOpen && "hidden", FOCUS_RING)}>
               <ThreadList />
             </aside>
-            <div className="min-w-0 flex-1">
+            <div className="min-h-0 min-w-0 flex-1">
               <Thread composerDisabled={composerDisabledReason !== undefined} composerDisabledReason={composerDisabledReason}
                 composerToolbar={<>
                   <Popover.Root>

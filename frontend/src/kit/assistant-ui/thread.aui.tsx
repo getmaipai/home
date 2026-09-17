@@ -200,7 +200,7 @@ const ThreadRoot: FC<{
 
   return (
     <ThreadPrimitive.Root
-      className="aui-root aui-thread-root bg-background @container flex h-full flex-col"
+      className="aui-root aui-thread-root min-h-0 bg-background @container flex h-full flex-col"
       style={{
         ["--thread-max-width" as string]: "44rem",
         ["--composer-bg" as string]: "var(--color-card)",
@@ -211,7 +211,7 @@ const ThreadRoot: FC<{
       <ThreadPrimitive.Viewport
         turnAnchor="top"
         data-slot="aui_thread-viewport"
-        className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth"
+        className="relative flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth"
       >
         <div
           className={cn("mx-auto flex w-full max-w-(--thread-max-width) flex-1 flex-col px-4 pt-4", isEmpty && "sm:justify-center")}
@@ -757,9 +757,10 @@ const UserMessage: FC = () => {
             components={{ File: UserFilePart, Image: UserImagePart }}
           />
         </div>
-        <div className="aui-user-action-bar-wrapper absolute start-0 top-1/2 -translate-x-full -translate-y-1/2 pe-2 peer-empty:hidden rtl:translate-x-full">
-          <UserActionBar />
-        </div>
+      </div>
+
+      <div className="aui-user-action-bar-wrapper col-start-2 flex items-center justify-end gap-1 peer-empty:hidden">
+        <UserActionBar />
       </div>
 
       <div className="col-span-full col-start-1 row-start-3 flex items-center justify-end gap-2">
@@ -775,7 +776,7 @@ const UserActionBar: FC = () => {
     <ActionBarPrimitive.Root
       hideWhenRunning
       autohide="not-last"
-      className="aui-user-action-bar-root flex flex-col items-end"
+      className="aui-user-action-bar-root text-muted-foreground animate-in flex gap-1 duration-200"
     >
       <MessageCopyButton className="aui-user-action-copy" />
       <ActionBarPrimitive.Edit asChild>
