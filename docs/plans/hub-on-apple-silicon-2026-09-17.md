@@ -10,6 +10,31 @@ The Studio configuration used here is the M5 Max with an 18-core CPU, a
 unified-memory configuration for that chip. Source: [Apple Mac Studio
 technical specifications](https://www.apple.com/mac-studio/specs/).
 
+## Summary
+
+| Area | Wording |
+|---|---|
+| Chat and reasoning | benchmark GLM-4.5-Air, GPT-OSS-120B and current Qwen alternatives; roughly 45 to 70 GB depending on model and quantization; target 20 to 60 tok/s (?) depending on model, context and quantization. Strong general conversation, writing and tool use; frontier cloud reasoning models remain substantially stronger on the hardest reasoning and long agentic tasks. |
+| Coding | use the strongest resident general or coding model that fits the latency target rather than assuming the chat winner is the coding winner. Large open models handle well-specified implementation, debugging, tests and refactors well; Claude and GPT-class coding agents keep an advantage on difficult architecture, ambiguous repositories and long autonomous tasks. Benchmark on MaiPai's own repositories rather than translating SWE-bench scores. |
+| Memory | a separate dedicated memory judge runs asynchronously after every completed conversational turn so memory work never competes with foreground response latency. Start with a 4B model and increase to 8B to 14B only if the memory evaluation benchmark requires it, about 3 to 9 GB depending on model and quantization. Every extracted memory must be grounded in what the speaker actually said; the judge may extract, update, merge or reject candidates but may not invent facts. Memories remain visible, editable and deletable. |
+| Voice in | Whisper large-v3-turbo, about 1.5 GB, several times faster than real time (?). |
+| Voice out | Chatterbox Turbo 350M first; compare Orpheus 3B; Qwen3-TTS 1.7B MLX as the Mac-native alternative; about 1 to 4 GB. Natural expressive speech, short-sample voice cloning, generated laughs, sighs, coughs, throat clears, breaths and natural disfluencies. The conversational model inserts hidden performance cues according to each companion's personality dials; the person never supplies them. Phrase-level streaming of completed clauses to TTS while generation continues; first audible speech around 0.5 to 1.0 s (?); immediate cancellation when the person starts speaking (barge-in). |
+| Pictures, instant | FLUX.2 Klein 4B or an SDXL Lightning-class model, about 1 to 10 s (?) at 1024 px, LoRA support; for rapid iteration rather than maximum adherence. |
+| Pictures and edits, everyday | Qwen-Image-Edit with Lightning and FLUX.2 or Kontext editing models, about 5 to 20 s (?). Natural-language edits such as "make it sunnier", "change the car to red" and "remove that person", preserving unaffected portions of the image. Reference-person composition and identity-preserving edits are restricted to permitted household members with consent and are unavailable from child profiles. LoRA and reference identity support required. |
+| Pictures, quality | Full Qwen-Image or an advanced editing model, or a FLUX Dev and Kontext-class pipeline, about 20 to 90 s (?), for adherence, identity preservation, typography and complex composition. |
+| Video, fast | LTX-family distilled or Turbo models, about 10 to 60 s (?) for a 5 s clip at 540p to 720p, then upscaling; for children's animation, previews, storyboards and iteration. |
+| Video, quality | Wan-class large models, minutes per short clip; MiniMax and Hunyuan-class large models may need tens of minutes on Apple silicon; all timings benchmark-dependent; Sora and Veo-class systems remain ahead on difficult motion, physical consistency and long-shot coherence. |
+| Music | ACE-Step-family song generation for complete songs with lyrics, vocals, structure and genre conditioning; Stable Audio-class models for beds, effects and stings; full-song time (?) until measured; verify each checkpoint's licence before commercial distribution. |
+| Resident all day | the main model, embeddings and retrieval, STT, the primary TTS and the judge; substantial headroom for KV cache, runtime allocations and temporary buffers; image, video and music generators on demand; simultaneous residency decided from measured peak memory, not file sizes. |
+
+Published anchors for the unmarked model size are the [Whisper large-v3-turbo
+model card](https://huggingface.co/openai/whisper-large-v3-turbo), the
+[Chatterbox repository](https://github.com/resemble-ai/chatterbox), the
+[Orpheus-TTS repository](https://github.com/canopyai/Orpheus-TTS), and the
+[Qwen3-TTS report](https://arxiv.org/abs/2601.15621). Every value marked `(?)`
+is an estimate or an unverified Apple result until the relevant bench records
+it.
+
 ## 1. Runtime per role
 
 ### The two runtime families
