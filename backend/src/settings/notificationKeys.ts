@@ -127,4 +127,47 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.notifications",
     honoured_by: ["home"],
   }),
+  // HOME-STACK-03: lib/notificationTypes.ts's four "engines.*" types, one
+  // per person, matching the dotted-id rule above (the type id goes
+  // between "notifications." and ".telegram" byte-for-byte).
+  SettingsKey.parse({
+    key: "notifications.engines.update_available.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when a Stack engine has an update available",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "notifications.engines.update_applied.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when a Stack engine updates",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "notifications.engines.update_failed.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when a Stack engine fails to update",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "notifications.engines.problem.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when a Stack engine reports an open warning or critical problem",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
 ];

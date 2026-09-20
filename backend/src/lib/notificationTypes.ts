@@ -213,6 +213,55 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  // HOME-STACK-03: the Stack event bridge (lib/stack/events.ts) fires these
+  // for the four feed ids that mean something to a person. The Stack's own
+  // docs say "the one thing the stack does is notify" is Home's job, and
+  // this is the declaration side of that: `engines.` namespace keeps them
+  // apart from `updates.` (Home's own updater) while both are engine
+  // health. All four are `time_sensitive`: a Stack that updated, failed to
+  // update, or has an open warning/critical item is something an admin
+  // should see soon, but none is urgent the way a safety flag or a
+  // failing backup is, and none is `immediate`. All `adults` audience:
+  // engine state is a household-admin concern, no one else in the house
+  // acts on it. All `configurable: true` so a household that finds them
+  // noisy can turn them off - unlike safety.flagged_turn, there is no
+  // invariant here that requires them stay on.
+  {
+    id: "engines.update_available",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "The {name} engine has an update available: {version}.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
+  {
+    id: "engines.update_applied",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "The {name} engine updated to {tag}.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
+  {
+    id: "engines.update_failed",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "The {name} engine failed to update: {reason}.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
+  {
+    id: "engines.problem",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "Engine problem: {title}. {fix}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
 ] as const;
 
 // session-d-packages-and-store.md step 2: a package's own manifest
