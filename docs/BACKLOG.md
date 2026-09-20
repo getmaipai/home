@@ -7616,6 +7616,29 @@ on a spec tag that was never cut.
 
 ## Voice / robot
 
+- [ ] **VOICE-BROWSER-01: the voice browser** (M, owner request
+      2026-09-20). Objective: wherever a person picks a voice (Settings,
+      Voice; a companion's voice; a person's own voice preference), the
+      picker is a things page over every voice the Stack can render,
+      and every row shows the voice's friendly name, a one-tap preview
+      (a fixed sample sentence rendered through the Stack's `tts` route
+      and cached per voice), a one-line description, its language and
+      country as a flag-free text pair, and its gender, with the filter
+      column filtering by language, country, gender and source (preset,
+      community, cloned). A voice the Stack does not hold yet shows
+      "Download" instead of a preview and fetches on tap through the
+      Stack's own downloader (never the engine's own fetch). Files:
+      `frontend/src/apps/settings/` (the voice section),
+      `frontend/src/apps/chat/` (the companion voice control), the
+      Stack client's `voices()` call (HOME-STACK-02a), `docs/user/settings.md`.
+      Mirror: the Apps page's things table (HOME-UI-02). Depends on:
+      stack STACK-101 (the voices route with metadata and a preview).
+      Acceptance: captures at 1440 and 390 with the filters applied and a
+      preview playing (the play state visible); a test that a voice with
+      no metadata still lists with "unknown" values rather than being
+      dropped. Out of scope: voice cloning's own flow. Exit:
+      `bash scripts/check.sh` and the captures opened.
+
 - [ ] Wake word past phase 1 (L) - mic capture + inference exists
       in-browser; everything else (barge-in in this repo, satellite mode,
       robot-side wiring) isn't built here.
