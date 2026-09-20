@@ -11,8 +11,9 @@ cd "$(dirname "$0")/.."
 
 DOCS_ONLY=0; if [ "${1:-}" = "--docs" ]; then DOCS_ONLY=1; fi
 
-STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
-STANDARDS_DIR="$(cd "$STANDARDS_DIR" && pwd)"
+STANDARDS_REPO="${MAIPAI_STANDARDS_DIR:-../.github}"
+STD_TAG="std-v0.3.0"
+STANDARDS_DIR="$(bash "$STANDARDS_REPO/standards/bin/ensure-tag.sh" "$STD_TAG")"
 export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 
 # The @maipai/core, @maipai/ui and @maipai/spec pins, each a full commons
@@ -147,12 +148,12 @@ echo "== docs: reading-level lint"
 bun install --silent
 bun run scripts/reading-level.ts
 
-if [ ! -d "$STANDARDS_DIR/standards" ]; then
-  echo "missing @maipai/standards checkout at $STANDARDS_DIR (pin std-v0.2.0)"
+if [ "$(cat "$STANDARDS_DIR/standards/VERSION")" != "${STD_TAG#std-v}" ]; then
+  echo "@maipai/standards at $STANDARDS_DIR is $(cat "$STANDARDS_DIR/standards/VERSION"), but the tag is $STD_TAG"
   exit 1
 fi
 
-echo "== standards core (std-v0.2.0)"
+echo "== standards core ($STD_TAG)"
 bash "$STANDARDS_DIR/standards/bin/check-core.sh" "$(pwd)"
 
 echo "== all checks passed"

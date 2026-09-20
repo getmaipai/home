@@ -8082,6 +8082,7 @@ otherwise be lost with the mirror.
   containing them (see "Legacy: copy, re-examine, record").
 - **`catalog`** (public package store) - repo scaffolding only
   (LICENSE/NOTICE/README, standards pin).
+- [x] the standards pin resolves through a per-tag worktree, std-v0.3.0 (verified at this commit)
 - **`go`** (Apple TV/iPhone client) - marketing copy only, no real app yet.
 
 ## Wave 2 additions (2026-09-06)
