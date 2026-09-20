@@ -48,6 +48,7 @@ import { getEngineStatus, __resetLlmSupervisorForTests } from "@/lib/llmSupervis
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
 import { embedUtterance, utteranceShape } from "@/lib/routing";
+import { SPEC_DIR } from "@/lib/specDir";
 import { buildPromptParts, commandOpeners, loadAllManifests, ordinaryToolIds, routeSemantic, selectOfferedTools } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
 
@@ -57,7 +58,7 @@ interface ToolCallCorpusRow {
 }
 
 const corpus: ToolCallCorpusRow[] = JSON.parse(
-  readFileSync(join(import.meta.dir, "..", "..", "..", "spec", "llm", "tool-call-corpus.json"), "utf-8"),
+  readFileSync(join(SPEC_DIR, "llm", "tool-call-corpus.json"), "utf-8"),
 );
 
 // The same four bundled packages the corpus names, loaded from their own

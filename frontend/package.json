@@ -19,7 +19,7 @@
     "@lingui/core": "6.6.0",
     "@lingui/react": "6.6.0",
     "@maipai/home-backend": "workspace:*",
-    "@maipai/spec": "workspace:*",
+    "@maipai/spec": "file:../../shared/spec",
     "@maipai/ui": "file:../../shared/ui",
     "@radix-ui/react-popover": "^1.1.23",
     "@tanstack/react-query": "5.102.8",

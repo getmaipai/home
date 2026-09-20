@@ -36,7 +36,10 @@
 // advanced reply-details popover open, plus the normal chat accessibility
 // checks; it is intentionally separate from the ordinary matrix shots.
 import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
-import { startStubLlmServer } from "../spec/llm/ts/stubServer";
+// A repo-root script, not a workspace member, so it can't resolve the
+// @maipai/spec package (only backend/ and frontend/ have it installed);
+// spec-v0.1.0 moved this file to the sibling getmaipai/shared checkout.
+import { startStubLlmServer } from "../../shared/spec/llm/ts/stubServer";
 import AxeBuilder from "@axe-core/playwright";
 import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";

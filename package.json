@@ -18,7 +18,6 @@
     "text-readability": "^1.1.1"
   },
   "workspaces": [
-    "spec",
     "backend",
     "frontend"
   ]

@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { guardReply, type GuardContext, type GuardReason } from "@/lib/guards";
 import { gateGuards } from "@/lib/turnEngine";
+import { SPEC_DIR } from "@/lib/specDir";
 
 interface CorpusRow {
   id: string;
@@ -51,7 +52,7 @@ interface CorpusRow {
   note?: string;
 }
 
-const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "spec", "llm", "guard-corpus.json"), "utf-8"));
+const corpus: CorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "guard-corpus.json"), "utf-8"));
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
   return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, previousReplies: row.previousReplies, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };

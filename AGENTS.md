@@ -18,22 +18,36 @@ preserved locally as `legacy-backups/home-legacy.git`, reference only for
 hard-won logic, never a requirement of feature scope.
 
 Layout: `backend/` (Bun, Hono, Zod, Drizzle/SQLite), `frontend/` (React,
-Vite), `spec/` (the shared record shapes, interpreters, and fixtures that
-`bot` also pins as `maipai-spec`). Full stack standard:
+Vite). The shared record shapes, interpreters, and fixtures live in
+`getmaipai/shared`'s `spec/` workspace (`@maipai/spec`, pinned by tag -
+see "Pinning" below); `bot` pins the same tag. Full stack standard:
 [STACK.md](https://github.com/getmaipai/.github/blob/main/STACK.md) in
 `.github`.
+
+**Pinning `getmaipai/shared`:** this repo resolves `@maipai/core`,
+`@maipai/ui` and `@maipai/spec` from a sibling `getmaipai/shared`
+checkout (`../shared` by default, override with `MAIPAI_SHARED_DIR`),
+each pinned to a tag stated in `backend/package.json` /
+`frontend/package.json` and checked by `scripts/check.sh`. Bumping a
+pin: check out the new tag in the sibling `shared/` checkout, update the
+pin in this repo's `package.json` files and in `scripts/check.sh`, then
+`bun install --force` in `backend/` and `frontend/` (a plain `bun
+install` doesn't refresh a `file:` dependency's snapshot in bun's
+content-addressed store).
 
 Commands: from the repo root (the `home/` folder containing `package.json`),
 `bun start` builds and starts the local app in the background and prints
 its URLs; `bun stop` stops it; `bun restart` calls stop, then start.
 See README.md for folder and command examples.
 `bun run dev` in `backend/` or `frontend/` runs a local dev
-server; `bun test` in `backend/`, `frontend/`, or `spec/` for that
+server; `bun test` in `backend/` or `frontend/` for that
 package's own tests; `tsc --noEmit` (backend) or `tsc --noEmit && eslint
 .` (frontend) to lint. `bash scripts/check.sh` from the repo root is the
 full pre-commit gate: it needs a sibling `getmaipai/.github` checkout
 (`../.github` by default, override with `MAIPAI_STANDARDS_DIR`, which may be
 relative to the repo root) with its
-own `gen/ts` and `gen/py` already generated, or the spec step fails with
-a "missing or empty" error that looks unrelated to what you changed.
+own `gen/ts` and `gen/py` already generated, and a sibling
+`getmaipai/shared` checkout at the pinned tags (see "Pinning" above), or
+the gate fails with a "missing" error that looks unrelated to what you
+changed.
 A commit that touches only docs runs `bash scripts/check.sh --docs` instead (the reading-level lint plus the standards core, seconds not minutes).

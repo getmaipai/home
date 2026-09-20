@@ -1,7 +1,7 @@
 // The bronze completeness check docs/PACKAGES.md and
 // session-d-packages-and-store.md step 1 both ask for: "the release
 // skill's 'refuse below bronze' check has something to read." This is
-// that something - it walks every bundled package under `home`'s own
+// that something - it walks every bundled package under this repo's own
 // backend/packages/ (the only bundled set that exists today; the
 // catalog repo will carry the same shape once step 6 moves the default
 // set there) and proves the definition of done in docs/PACKAGES.md is
@@ -17,17 +17,18 @@
 // checks the parts that are otherwise just convention: routing examples,
 // privacy rows, offline behavior (already schema-required), a
 // quality_scale.yaml stating bronze is met, a smoke declaration, and a
-// README/CHANGELOG. A spec/ file reading into `home`'s backend/packages/
-// is a one-way dependency (home depends on spec, never the reverse) so
-// this never runs against the `bot` repo reusing spec/ - it is scoped
-// explicitly to the one directory that exists today, not a generic path.
+// README/CHANGELOG. Moved here from spec/tests/ts/ at spec-v0.1.0 (that
+// workspace moved to shared/spec and can't carry a test that reads a
+// specific product's bundled directory - "shared imports no product",
+// shared/docs/dev.md); imports now come from the installed @maipai/spec
+// package like every other spec-typed file in this repo.
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { PackageManifest } from "../../gen/ts/manifest.js";
-import { lintSpeechTemplate } from "../../voice/ts/normalizeForSpeech.js";
+import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import { lintSpeechTemplate } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 
-const PACKAGES_DIR = join(import.meta.dir, "..", "..", "..", "backend", "packages");
+const PACKAGES_DIR = join(import.meta.dir, "..", "packages");
 
 // Session C step 6 (session-c-brain-and-voice.md): "the speech lint on
 // every package `speech` string" (docs/PACKAGES.md's own definition-of-

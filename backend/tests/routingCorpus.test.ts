@@ -16,6 +16,7 @@ import { resetDb } from "./reset-db";
 import { route, matchingSkills, loadAllManifests } from "@/lib/turnEngine";
 import { loadAllSkills } from "@/lib/skills";
 import type { PersonRow } from "@/types";
+import { SPEC_DIR } from "@/lib/specDir";
 
 beforeEach(() => {
   resetDb();
@@ -29,7 +30,7 @@ interface CorpusRow {
   note?: string;
 }
 
-const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "spec", "llm", "routing-corpus.json"), "utf-8"));
+const corpus: CorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "routing-corpus.json"), "utf-8"));
 
 function fakeActor(): PersonRow {
   return {

@@ -1,4 +1,4 @@
-import lifeEvents from "../../../spec/vocab/life-events.json" with { type: "json" };
+import lifeEvents from "@maipai/spec/vocab/life-events.json" with { type: "json" };
 
 type Disclosure = "child_ok" | "adult_only";
 

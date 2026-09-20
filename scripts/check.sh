@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# MaiPai Home pre-commit gate. Runs the spec package's checks, then the
-# backend's, then the pinned @maipai/standards core. See docs/dev.md.
+# MaiPai Home pre-commit gate. Checks the @maipai/core, @maipai/ui and
+# @maipai/spec pins against getmaipai/shared, runs the backend's checks
+# (including the settings registry drift check against shared/spec),
+# then the frontend's, then the pinned @maipai/standards core. See
+# docs/dev.md. @maipai/spec's own checks (lint, tests, codegen drift)
+# run in shared's own check.sh, not here - this repo just pins a tag.
 # With --docs it runs only the reading-level lint and the standards core, the gate for a commit that touches only Markdown.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,7 +24,14 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 if [ "$DOCS_ONLY" = 0 ]; then
   CORE_PIN="0.1.0"
   UI_PIN="0.2.4"
+  SPEC_PIN="0.1.1"
   SHARED_DIR="${MAIPAI_SHARED_DIR:-../shared}"
+  if [ ! -d "$SHARED_DIR" ]; then
+    echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."
+    exit 1
+  fi
+  SHARED_DIR="$(cd "$SHARED_DIR" && pwd)"
+  export MAIPAI_SHARED_DIR="$SHARED_DIR"
   if [ ! -f "$SHARED_DIR/core/package.json" ]; then
     echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); backend imports @maipai/core from its core/ workspace."
     exit 1
@@ -39,44 +50,15 @@ if [ "$DOCS_ONLY" = 0 ]; then
     echo "@maipai/ui at $SHARED_DIR/ui is version $UI_VERSION; this repo pins ui-v$UI_PIN. Check out the tag there or move the pin here."
     exit 1
   fi
-fi
-
-if [ "$DOCS_ONLY" = 0 ] && [ -d spec/schemas ]; then
-  # spec/README.md: "standards/gen/ts/ and standards/gen/py/ (in the
-  # sibling .github checkout) need to already be generated before home's
-  # codegen runs" - a schema here $ref's a standards schema by bare
-  # filename, so gen:ts/gen-py.sh silently produce a broken import if the
-  # sibling checkout's own gen/ output is missing or stale, and nothing
-  # caught that until now.
-  echo "== spec: standards gen/ presence"
-  for lang in ts py; do
-    dir="$STANDARDS_DIR/standards/gen/$lang"
-    if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
-      echo "missing or empty $dir - generate the sibling @maipai/standards checkout's own gen/ output first (its own gen:ts / gen-py.sh)."
-      exit 1
-    fi
-  done
-
-  echo "== spec: regenerate and check for drift"
-  (cd spec && bun run gen:ts >/dev/null)
-  (cd spec && bash scripts/gen-py.sh >/dev/null)
-  if ! git diff --quiet -- spec/gen; then
-    echo "spec/gen/ is out of date with spec/schemas/. Run the gen scripts and commit the result."
-    git --no-pager diff --stat -- spec/gen
+  if [ ! -f "$SHARED_DIR/spec/package.json" ]; then
+    echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); backend and frontend import @maipai/spec from its spec/ workspace."
     exit 1
   fi
-
-  echo "== spec: typecheck"
-  (cd spec && bun install --silent && bunx tsc --noEmit)
-
-  echo "== spec: bun test"
-  (cd spec && bun install --silent && bun test)
-
-  echo "== spec: ruff"
-  (cd spec && uv run ruff check . && uv run ruff format --check .)
-
-  echo "== spec: pytest"
-  (cd spec && uv run pytest tests/py -q)
+  SPEC_VERSION="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$SHARED_DIR/spec/package.json")"
+  if [ "$SPEC_VERSION" != "$SPEC_PIN" ]; then
+    echo "@maipai/spec at $SHARED_DIR/spec is version $SPEC_VERSION; this repo pins spec-v$SPEC_PIN. Check out the tag there or move the pin here."
+    exit 1
+  fi
 fi
 
 if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
@@ -85,9 +67,9 @@ if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
 
   echo "== backend: settings registry, regenerate and check for drift"
   (cd backend && bun run gen:settings >/dev/null)
-  if ! git diff --quiet -- spec/settings/keys.json; then
-    echo "spec/settings/keys.json is out of date with backend/src/settings/coreKeys.ts. Run 'bun run gen:settings' in backend/ and commit the result."
-    git --no-pager diff --stat -- spec/settings/keys.json
+  if ! git -C "$SHARED_DIR" diff --quiet -- spec/settings/keys.json; then
+    echo "$SHARED_DIR/spec/settings/keys.json is out of date with backend/src/settings/coreKeys.ts. Run 'bun run gen:settings' in backend/ and commit the result in getmaipai/shared."
+    git -C "$SHARED_DIR" --no-pager diff --stat -- spec/settings/keys.json
     exit 1
   fi
 

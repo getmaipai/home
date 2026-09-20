@@ -23,6 +23,7 @@ import { getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embed
 import { embedUtterance } from "@/lib/routing";
 import type { PersonRow } from "@/types";
 import { percentile } from "./stats";
+import { SPEC_DIR } from "@/lib/specDir";
 
 interface CorpusRow {
   utterance: string;
@@ -43,7 +44,7 @@ interface CorpusRow {
 }
 
 const corpus: CorpusRow[] = JSON.parse(
-  readFileSync(join(import.meta.dir, "..", "..", "..", "spec", "llm", "routing-corpus.json"), "utf-8"),
+  readFileSync(join(SPEC_DIR, "llm", "routing-corpus.json"), "utf-8"),
 );
 
 function benchActor(): PersonRow {

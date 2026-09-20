@@ -36,6 +36,7 @@ import { getEngineStatus } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import type { PersonRow } from "@/types";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
+import { SPEC_DIR } from "@/lib/specDir";
 
 interface CorpusRow {
   id: string;
@@ -48,7 +49,7 @@ interface CorpusRow {
   note: string;
 }
 
-const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "..", "spec", "llm", "naturalness-corpus.json"), "utf-8"));
+const corpus: CorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "naturalness-corpus.json"), "utf-8"));
 
 const testPersonId = newPersonId();
 

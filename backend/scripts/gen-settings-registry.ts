@@ -1,9 +1,13 @@
-// Regenerates spec/settings/keys.json from declarations (spec/settings/
-// README.md: "not a placeholder to fill in by hand"). Today's only
-// source is core's own CORE_SETTINGS_KEYS; a package's manifest config[]
-// becomes a second source once the package host (4.9) and catalog exist,
-// at which point this script grows a step that scans installed package
-// manifests too, still writing the same one file.
+// Regenerates shared/spec/settings/keys.json from declarations
+// (spec/settings/README.md: "not a placeholder to fill in by hand").
+// Today's only source is core's own CORE_SETTINGS_KEYS; a package's
+// manifest config[] becomes a second source once the package host (4.9)
+// and catalog exist, at which point this script grows a step that scans
+// installed package manifests too, still writing the same one file.
+// Writes to the sibling getmaipai/shared checkout directly (spec-v0.1.0
+// moved the registry out of this repo), never through the installed
+// @maipai/spec package - that's a file: snapshot in node_modules, not a
+// live link back to the source.
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CORE_SETTINGS_KEYS } from "../src/settings/coreKeys.js";
@@ -18,7 +22,8 @@ import { UI_SETTINGS_KEYS } from "../src/settings/uiKeys.js";
 import { ALLOWANCE_SETTINGS_KEYS } from "../src/settings/allowanceKeys.js";
 import { STORAGE_SETTINGS_KEYS } from "../src/settings/storageKeys.js";
 
-const outPath = join(import.meta.dir, "..", "..", "spec", "settings", "keys.json");
+const SHARED_DIR = process.env.MAIPAI_SHARED_DIR ?? join(import.meta.dir, "..", "..", "..", "shared");
+const outPath = join(SHARED_DIR, "spec", "settings", "keys.json");
 
 const sorted = [
   ...CORE_SETTINGS_KEYS,

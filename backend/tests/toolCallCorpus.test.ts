@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { complete, type ToolSpec } from "@/lib/llm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+import { SPEC_DIR } from "@/lib/specDir";
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -26,7 +27,7 @@ interface ToolCallCorpusRow {
   expect_calls: string[];
 }
 
-const corpus: ToolCallCorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "spec", "llm", "tool-call-corpus.json"), "utf-8"));
+const corpus: ToolCallCorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "tool-call-corpus.json"), "utf-8"));
 // Only the positive (multi-call) rows: a negative row scripted to return
 // no calls would trivially "pass" regardless of whether the wire
 // plumbing under test works at all - see this file's own header for why

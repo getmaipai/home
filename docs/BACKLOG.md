@@ -7434,8 +7434,18 @@ on a spec tag that was never cut.
       household's "when I say X" command must work on a standalone robot
       (principle 2). Promote turns, jobs and commands now; record why
       the other three stay local.
-- [ ] **Cut `spec-v0.1.0`** (S, Jesse's call: it is a release) - the bot
+- [x] **Cut `spec-v0.1.0`** (S, Jesse's call: it is a release) - the bot
       repo pins a tag that does not exist. One tag unblocks Robot v0.1.
+      Landed differently than written here: the refocus (2026-09-20)
+      moved `spec/` out of this repo to `getmaipai/shared` before this
+      item was reached, so the tag exists there
+      (`getmaipai/shared@spec-v0.1.0`, commit `2c87009`, corrected same
+      day to `spec-v0.1.1`/`1aee790` - stale `home/spec` references the
+      move left behind), not on `home`, and landed through the same
+      routine workspace-tag flow as `core-v0.1.0`/`ui-v0.1.0` (no
+      separate release ceremony), accepted by COORDINATOR. Bot's own pin
+      URL changes accordingly - see `shared/spec/README.md`, "How the
+      robot pins this".
 - [ ] **Mark `weather`, `define`, `joke`, `trivia` `platforms: ["home",
       "bot"]`** (S) - nothing in them is hub-specific; the robot needs
       weather offline-capable per plan 5.4.
