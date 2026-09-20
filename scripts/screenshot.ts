@@ -223,6 +223,7 @@ const chatResearchReview = process.argv.includes("--chat-research-review");
 // existing dedicated capture (sources card + memory chip + image
 // attachment together, a streaming reply, the engine-not-ready state).
 const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
+const shellRailReview = process.argv.includes("--shell-rail-review");
 const settingsReview = process.argv.includes("--settings-review");
 const conversationsReview = process.argv.includes("--conversations-review");
 const pictureReview = process.argv.includes("--picture-review");
@@ -1551,6 +1552,65 @@ async function captureLazyRouteSkeleton(browser: Browser, sessionValue: string):
   }
 }
 
+/** getmaipai/home step 5b's own restart-verification: shared/ui's Shell
+ * (`ui/src/Shell.tsx`) owns the left rail, its collapse toggle
+ * ("Toggle Sidebar", `SidebarTrigger`), and its `localStorage`
+ * persistence (`railStorageKey`) - none of it changed by this step, but
+ * an owner report of a stale pre-kit-adoption build looking broken
+ * ("the left column is a disaster with its collapsed state and its
+ * toggle") made this worth a real, interactive check rather than
+ * trusting the static per-route matrix, which never exercises the
+ * toggle at all. Desktop only (the trigger is `sm:hidden` below 640px
+ * in Shell.tsx - phone gets a bottom tab bar instead, already covered
+ * by every phone-viewport route capture in the plain matrix). */
+async function captureShellRail(browser: Browser, sessionValue: string, theme: "light" | "dark"): Promise<void> {
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.goto(`${BASE_URL}/`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    const trigger = page.getByRole("button", { name: "Toggle Sidebar", exact: true });
+    await trigger.waitFor();
+    // Expanded is the default (no prior localStorage preference) -
+    // spec.md "Application shell standards": the brand wordmark, the
+    // nav group labels, and each item's own label text are all visible.
+    await page.getByText("MaiPai Home", { exact: false }).waitFor();
+    await settleAnimations(page);
+    await page.screenshot({ path: join(SCREENS_DIR, `shell-rail-expanded-desktop-${theme}.png`) });
+    dedicatedScreenshots.push({ file: `shell-rail-expanded-desktop-${theme}.png`, route: "shell-rail-expanded", viewport: "desktop", theme });
+
+    await trigger.click();
+    // Collapsed: the wordmark's text (not the icon) hides via
+    // `group-data-[collapsible=icon]:hidden` (AppShell.tsx's own
+    // Brand()) - waiting for it to actually leave the accessibility
+    // tree is the real assertion, not just a fixed delay.
+    await page.getByText("MaiPai Home", { exact: false }).waitFor({ state: "hidden" });
+    await settleAnimations(page);
+    await page.screenshot({ path: join(SCREENS_DIR, `shell-rail-collapsed-desktop-${theme}.png`) });
+    dedicatedScreenshots.push({ file: `shell-rail-collapsed-desktop-${theme}.png`, route: "shell-rail-collapsed", viewport: "desktop", theme });
+
+    // Persistence: Shell.tsx's own `railStorageKey` - a reload must keep
+    // the collapsed choice, not silently reset to expanded. `isVisible()`,
+    // not `.count()`: the brand text stays in the DOM even collapsed
+    // (Tailwind's `group-data-[collapsible=icon]:hidden`, CSS-only, not
+    // unmounted) - `.count()` doesn't respect visibility and false-
+    // positived here on the first version of this check.
+    await page.reload();
+    await trigger.waitFor();
+    if (await page.getByText("MaiPai Home", { exact: false }).isVisible().catch(() => false)) {
+      throw new Error("Shell rail's collapsed preference did not survive a reload");
+    }
+
+    await trigger.click();
+    await page.getByText("MaiPai Home", { exact: false }).waitFor();
+  } finally {
+    await context.close();
+  }
+}
+
 async function captureHero(browser: Browser, sessionValue: string): Promise<void> {
   const context = await newContext(browser, { slug: "desktop", width: 1280, height: 800 }, "dark", sessionValue);
   try {
@@ -2106,7 +2166,12 @@ async function main() {
       }
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !notificationsReview && !conversationsReview && !pictureReview) {
+    if (!a11yOnly && shellRailReview) {
+      await captureShellRail(browser, sessionValue, "light");
+      await captureShellRail(browser, sessionValue, "dark");
+    }
+
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !notificationsReview && !conversationsReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;

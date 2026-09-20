@@ -84,7 +84,12 @@ function FooterNavItem({ to, icon, label }: { to: string; icon: string; label: s
       <SidebarMenuButton asChild isActive={isActiveNavPath(location.pathname, to)} tooltip={label}>
         <Link to={to} aria-label={label}>
           <Icon aria-hidden />
-          <span>{label}</span>
+          {/* group-data-[collapsible=icon]:hidden - the same fix nav-
+              main.tsx's own row needed (shared/ui, this step): without
+              it, sidebar.tsx's `[&>span:last-child]:truncate` clips this
+              label to a stray single letter once the rail collapses,
+              instead of hiding it. */}
+          <span className="group-data-[collapsible=icon]:hidden">{label}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
