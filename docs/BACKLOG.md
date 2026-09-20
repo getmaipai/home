@@ -6218,23 +6218,19 @@ approvals are still real, unstarted work for a future session.
 
 ## UI / shell
 
-- [ ] **Fix SettingsPage's content squeeze at the kit's real 960px
+- [x] **Fix SettingsPage's content squeeze at the kit's real 960px
       breakpoint, then drop the `--breakpoint-lg` override** (S) - step
       5a (2026-09-20) restored `--breakpoint-lg` to 1024px in
       `frontend/src/shell/tokens.css` rather than let the kit's own
       960px reopen a real squeeze bug in `SettingsPage.tsx`'s own
       `lg:hidden`/`lg:flex` split (the shell's rail plus the settings
       tree sidebar crowding the content column below ~1024px, first
-      found 2026-09-05). A breakpoint is a structural kit token, not a
-      product color choice (docs/UI.md), so a product-side override is
-      a second definition that should not outlive its bug - fix the
-      actual squeeze (a narrower settings sidebar, a different
-      collapse point, or `SettingsPage.tsx`'s own layout, not another
-      token override) so the page holds up at the kit's real 960px, then
-      delete `--breakpoint-lg` from `tokens.css`. Needs a real viewport
-      between 960 and 1024px exercised (nothing in
-      `scripts/screenshot.ts`'s `VIEWPORTS` - 820/1440/1920 - straddles
-      this gap; add one or check manually) before calling it fixed.
+      found 2026-09-05). Fixed 2026-09-20 (lane c, item 91): the
+      settings tree sidebar narrowed from `w-52` (208px) to `w-44`
+      (176px) so at the kit's own 960px `--breakpoint-lg` it clears the
+      shell rail with room to spare; `--breakpoint-lg` deleted from
+      `frontend/src/shell/tokens.css`; a 1000px `squeeze` viewport added
+      to `scripts/screenshot.ts`'s `VIEWPORTS` to exercise the gap.
       Exit check: `home/scripts/check.sh` green with `--breakpoint-lg`
       gone, a screenshot at ~1000px width showing no squeeze.
 - [ ] **Chat's empty state and message turns don't yet match

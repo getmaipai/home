@@ -286,11 +286,13 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               place of the activity bar). Scrolls the content pane to a
               section rather than owning a second copy of it. `lg`, not
               `md`: the tree plus the shell's own global sidebar leaves the
-              content column badly squeezed below ~1024px (found live at
+              content column badly squeezed below ~960px (found live at
               an 800px viewport - a settings row wrapped into a near-
-              vertical stack of single words). Below that width, the tree
+              vertical stack of single words). At 960px the w-44 (176px)
+              tree clears the shell rail (~240px) with room to spare.
+              Below that width, the tree
               hides and the content gets the full column back. */}
-          <aside aria-label="Settings navigation" className="hidden w-52 shrink-0 flex-col gap-1 overflow-y-auto pe-2 lg:flex">
+          <aside aria-label="Settings navigation" className="hidden w-44 shrink-0 flex-col gap-1 overflow-y-auto pe-2 lg:flex">
             {tree.map((entry, index) => {
               const Icon = getIcon(entry.icon);
               // A routed entry (`to`) is active by URL match, not scroll
