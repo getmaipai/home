@@ -1,0 +1,151 @@
+/* Home's own token overlay (docs/UI.md > Themes: tokens are part of the
+ * kit). @maipai/ui's own tokens.css is the base for every surface, border,
+ * text tier, type scale, radius and pill, both themes - Home no longer
+ * keeps a second, hand-picked neutral scale beside it. Only what actually
+ * carries Home's own product identity is overridden here, each with its
+ * own reason, so a reviewer never has to diff this file against the kit's
+ * to find out what's actually different. */
+@import "@maipai/ui/src/tokens.css";
+
+/* Tailwind v4's automatic content detection never scans node_modules
+ * (its own documented default) - `@maipai/ui`'s own source (subpath-
+ * imported directly, no dist build, so ITS OWN classNames need Home's
+ * own Tailwind to generate CSS for them) is reached through
+ * `node_modules/@maipai/ui`, so without this it silently generates NO
+ * rule at all for any class that appears only there. `h-svh` was the
+ * one that gave it away: a class Home's own kit/ui/sidebar.tsx used to
+ * carry too, until step 5 deleted that file and Tailwind quietly
+ * stopped emitting the rule the moment shared/ui's copy became the
+ * only place it was written - found live building step 5, a real
+ * conversation's composer landing 2000+ px below the fold because the
+ * shell's own height clamp had silently become `height: auto`. */
+@source "../../../../shared/ui/src";
+
+@theme {
+  /* 1024px, not the kit's own 960px (its spec's responsive tiers):
+   * SettingsPage.tsx's own `lg:hidden`/`lg:flex` split was tuned
+   * specifically to 1024px by a 2026-09-05 live review (its own
+   * comments: "content column badly squeezed below ~1024px" with the
+   * shell's own rail also on screen) - Home's pre-adoption tokens.css
+   * carried this same override for the same reason. Nothing in the
+   * kit's own sidebar/dashboard blocks needs `lg` any earlier than this
+   * (their own `lg:` usages are cosmetic - a header label showing,
+   * a filter row hiding - not survival-critical the way this one is),
+   * so raising it back doesn't cost the kit's own layouts anything a
+   * screenshot would catch, at any of Home's own viewports (820/1440,
+   * neither near the 960-1024 gap this affects).
+   */
+  --breakpoint-lg: 1024px;
+}
+
+:root {
+  /* Home's brand accent is cyan, not the kit's electric blue
+   * (brand/README.md's per-product accent table). 26%, not the
+   * pre-adoption 29%: that value was tuned against Home's own pure-white
+   * surfaces and measured white text at ~5:1, but the approved light
+   * theme's own --sidebar and --muted are a faint blue-gray, not pure
+   * white, and this same value used as text (the Brand link's "Home")
+   * measured only 4.34:1 against --sidebar (Home step 5a, 2026-09-20),
+   * under WCAG AA's 4.5:1 floor. 26% clears every surface text-primary
+   * renders on today (--sidebar 5.16:1, --muted 4.89:1, --background
+   * 5.51:1, white 5.92:1) with real margin, not just the one that
+   * happened to fail first. `--ring`/`--sidebar-primary*` follow
+   * `--primary` to the same value rather than diverging from it (org
+   * standard 1: one definition); the kit's own `--hue-blue` and
+   * `--cat-*` tokens reference `var(--primary)` directly, so they follow
+   * this override automatically and need no separate line here. */
+  --primary: hsl(189 94% 26%);
+  --primary-foreground: hsl(0 0% 100%);
+  --ring: hsl(189 94% 26%);
+  --sidebar-primary: hsl(189 94% 26%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-ring: hsl(189 94% 26%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    /* Same accent, dark theme's own pairing: a near-black foreground on
+     * a brighter, 55%-lightness cyan, measured ~10:1 (2026-09-05 audit). */
+    --primary: hsl(189 84% 55%);
+    --primary-foreground: hsl(240 10% 6%);
+    --ring: hsl(189 84% 55%);
+    --sidebar-primary: hsl(189 84% 55%);
+    --sidebar-primary-foreground: hsl(240 10% 6%);
+    --sidebar-ring: hsl(189 84% 55%);
+  }
+}
+
+.dark {
+  --primary: hsl(189 84% 55%);
+  --primary-foreground: hsl(240 10% 6%);
+  --ring: hsl(189 84% 55%);
+  --sidebar-primary: hsl(189 84% 55%);
+  --sidebar-primary-foreground: hsl(240 10% 6%);
+  --sidebar-ring: hsl(189 84% 55%);
+}
+
+/* The kit's own `--destructive` (#ff4b62, one value for both themes) is
+ * tuned for its own dark reference theme; measured live against the
+ * light theme's own white card/badge surfaces at 3.26:1 (Home step 5a,
+ * 2026-09-20), under WCAG AA's 4.5:1 floor for the kit's default solid-
+ * bg-plus-white-text Button/Badge "destructive" treatment. A product-
+ * level color choice, not a kit change (getmaipai/home#122's own root
+ * cause was the same split): Home keeps its own two already-audited
+ * destructive values instead, one per theme, matching what use each
+ * theme actually gets below. */
+:root {
+  /* 38%, not the kit's #ff4b62: white text on this solid background
+   * measures ~7.5:1 (2026-09-05 accessibility audit, carried forward
+   * unchanged from Home's pre-adoption tokens.css). */
+  --destructive: hsl(0 72% 38%);
+  --destructive-foreground: hsl(0 0% 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    /* Lightened, not darkened: this value is used as TEXT color over a
+     * translucent tint (the override block below), never as a solid
+     * background, so it needs to read well against this theme's own
+     * dark surfaces instead of holding white text on top of it. 72%,
+     * not the pre-adoption 65%: RepairsSection's own severity Badge
+     * (a real seeded issue, not a synthetic one) measured only 4.11:1
+     * on phone (Home step 5a, 2026-09-20) - the tint's actual composited
+     * background varies with whatever real surface sits behind it, so
+     * 72% clears the one that measured worst rather than the one
+     * originally audited against a flat --background. */
+    --destructive: hsl(0 72% 72%);
+  }
+}
+.dark {
+  --destructive: hsl(0 72% 72%);
+}
+
+/* The kit's own "destructive" Button/Badge variant pairs a solid
+ * `--destructive` background with white text (@maipai/ui's own visual
+ * language). That solid-bg-plus-white-text pairing fails contrast in
+ * dark mode even at Home's own lightened `--destructive` value above
+ * (axe `color-contrast`, serious; found live by the far/TV a11y sweep on
+ * RepairsSection's own destructive Badge, getmaipai/home#122) -
+ * reasserting Home's own tinted destructive treatment here, scoped to
+ * dark mode only (light mode's darkened value above already passes as a
+ * solid background). */
+/* The tint formula lives in exactly one place (`--destructive-tint-bg`,
+ * unconditional - it already varies correctly by theme purely because
+ * `--destructive` itself does), so the explicit-`.dark`-class and
+ * system-preference selector blocks below can never drift out of sync
+ * with each other the way two copies of the same `color-mix()` call
+ * could. */
+:root {
+  --destructive-tint-bg: color-mix(in oklch, var(--destructive) 15%, transparent);
+}
+.dark [data-slot="badge"][data-variant="destructive"],
+.dark [data-slot="button"][data-variant="destructive"] {
+  background-color: var(--destructive-tint-bg);
+  color: var(--destructive);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) [data-slot="badge"][data-variant="destructive"],
+  :root:not(.light) [data-slot="button"][data-variant="destructive"] {
+    background-color: var(--destructive-tint-bg);
+    color: var(--destructive);
+  }
+}

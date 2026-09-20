@@ -68,7 +68,8 @@ export function DayDivider() {
   return (
     // BACKLOG.md's "still open" note (2026-09-05): this divider used
     // `text-xs` (12px), under the kit's own 16px hard floor
-    // (`kit/tokens.css`, docs/UI.md - "the kit refuses to go below").
+    // (@maipai/ui's tokens.css, docs/UI.md - "the kit refuses to go
+    // below").
     // `text-base` is that floor exactly (`html { font-size: 16px }` makes
     // Tailwind's 1rem default land there), the same class every other
     // body-weight text in the kit already uses to stay compliant.

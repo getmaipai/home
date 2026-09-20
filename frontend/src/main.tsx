@@ -2,7 +2,7 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "@/App";
 import { installReloadOnceOnNewServiceWorker, installStaleChunkRetry, runBootWatchdog } from "@/lib/pwaBoot";
-import "@/kit/tokens.css";
+import "@/shell/tokens.css";
 
 installStaleChunkRetry(window, sessionStorage);
 if ("serviceWorker" in navigator) {
