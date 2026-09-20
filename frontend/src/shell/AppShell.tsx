@@ -9,6 +9,7 @@ import { NAV_ENTRIES } from "@/shell/nav";
 import { APP_CATALOG } from "@/shell/appCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useAppearance } from "@/shell/useAppearance";
+import { useLook } from "@/shell/useLook";
 import { ThemeToggle } from "@/shell/ThemeToggle";
 import { ModelPicker } from "@/shell/ModelPicker";
 import { NotificationBell } from "@/shell/NotificationBell";
@@ -63,23 +64,31 @@ function PinToggle({ person }: { person: Roster }) {
 // brand mark is the product's own art).
 function Brand() {
   return (
-    // min-h-12/min-w-12 (48px): docs/UI.md's touch-target floor - this is
-    // a real link home, whose row is otherwise only as tall as its
-    // content, and whose parent SidebarMenuButton goes `flex-none`
-    // (shrinks to just the icon's own width) once the rail collapses to
-    // icons - min-w-12 keeps the link itself a real 48px square there
-    // instead of a 32px-wide sliver (found by the tablet a11y sweep,
-    // whose rail collapses to icons by default).
-    <Link to="/" aria-label="MaiPai Home" className="flex min-h-12 min-w-12 flex-1 items-center gap-2.5">
+    // min-h-12/min-w-12 (48px): docs/UI.md's touch-target floor, kept
+    // for collapsed too (owner finding, "The collapsed rail,"
+    // 2026-09-20) - measured live at 63x40 without it (the sidebar's
+    // own hit-area pseudo-element, real for every plain nav row, never
+    // credited here; this Link carries its own width/flex classes
+    // SidebarMenuButton's merge doesn't fully clear). A 48px real link
+    // around the 40px visual tile reads identically to a 40px link with
+    // the sidebar's own invisible hit-area extension - same centered
+    // icon, same footprint - so this is just a more direct way to the
+    // same floor for the one row that has its own competing classes.
+    <Link to="/" aria-label="MaiPai Home" className="flex min-h-12 min-w-12 flex-1 items-center gap-2.5 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:justify-center">
+      {/* borderRadius: var(--tile-radius), same token IconTile.tsx draws
+          every other tile through - the reference's own gradient product
+          tile (owner ruling, "Two looks, one setting": "the logo on a
+          40px gradient tile... 12px radius") in Studio, the circle that
+          shipped in Calm. */}
       <span
-        className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-1.5"
-        style={{ boxShadow: "0 0 16px color-mix(in srgb, var(--hue-violet) 25%, transparent)" }}
+        className="flex size-10 shrink-0 items-center justify-center bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-1.5"
+        style={{ borderRadius: "var(--tile-radius)", boxShadow: "0 0 16px color-mix(in srgb, var(--hue-violet) 25%, transparent)" }}
       >
         <img src="/brand/maipai-home-icon-light.png" alt="" className="size-full object-contain brand-logo-light" />
         <img src="/brand/maipai-home-icon-dark.png" alt="" className="size-full object-contain brand-logo-dark" />
       </span>
       <span className="min-w-0 group-data-[collapsible=icon]:hidden">
-        <span className="block truncate text-base font-semibold tracking-tight">
+        <span className="block truncate text-base font-semibold tracking-tight studio:text-lg">
           MaiPai <span className="text-primary">Home</span>
         </span>
         {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3): a
@@ -124,6 +133,7 @@ function navGroup(label: string, paths: readonly string[]): NavGroup {
  */
 export function AppShell({ person, onSignOut, onPersonChange, children }: AppShellProps) {
   const { setAppearance } = useAppearance(person.id);
+  useLook(person.id);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -154,14 +164,25 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
       footer={<HomeFooterBar person={person} />}
       headerTitle={
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold sm:text-xl">{title}</h1>
-          {subtitle ? <p className="hidden truncate text-sm text-muted-foreground sm:block">{subtitle}</p> : null}
+          {/* Studio (owner ruling, "Two looks, one setting"): "the page
+              title at 32px semibold with the subtitle at 14px directly
+              under it" - the reference's own larger scale. Calm keeps
+              the size that shipped. */}
+          <h1 className="truncate text-lg font-semibold sm:text-xl studio:text-[32px]">{title}</h1>
+          {subtitle ? <p className="hidden truncate text-sm text-muted-foreground sm:block studio:text-sm">{subtitle}</p> : null}
         </div>
       }
       headerActions={
         <>
           <PinToggle person={person} />
           <ModelPicker person={person} />
+          {/* The reference's own "three equal controls... separated by a
+              hairline between the toggle and the bell" (owner ruling) -
+              Home keeps its own five controls (PinToggle and ModelPicker
+              are Home's, not the reference's), so the hairline lands
+              where Home's own theme toggle sits, the same relative
+              position the reference's own cluster uses. */}
+          <span aria-hidden className="hidden studio:mx-1 studio:block studio:h-6 studio:w-px studio:bg-border" />
           <ThemeToggle setAppearance={setAppearance} />
           <NotificationBell />
           <ProfileSwitcher person={person} onSwitched={onPersonChange} onSignOut={onSignOut} />

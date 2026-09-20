@@ -1606,8 +1606,11 @@ async function captureLazyRouteSkeleton(browser: Browser, sessionValue: string):
 
 /** getmaipai/home step 5b's own restart-verification: shared/ui's Shell
  * (`ui/src/Shell.tsx`) owns the left rail, its collapse toggle
- * ("Toggle Sidebar", `SidebarTrigger`), and its `localStorage`
- * persistence (`railStorageKey`) - none of it changed by this step, but
+ * (`SidebarTrigger`, its accessible name "Collapse navigation"/"Expand
+ * navigation" since the owner's "The collapsed rail" finding gave it
+ * the removed RailToggle's own state-aware label), and its
+ * `localStorage` persistence (`railStorageKey`) - none of it changed
+ * by this step, but
  * an owner report of a stale pre-kit-adoption build looking broken
  * ("the left column is a disaster with its collapsed state and its
  * toggle") made this worth a real, interactive check rather than
@@ -1624,12 +1627,12 @@ async function captureShellRail(browser: Browser, sessionValue: string, theme: "
     await page.goto(`${BASE_URL}/`);
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
     await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
-    const trigger = page.getByRole("button", { name: "Toggle Sidebar", exact: true });
+    const trigger = page.getByRole("button", { name: /collapse navigation|expand navigation/i });
     await trigger.waitFor();
     // Expanded is the default (no prior localStorage preference) -
     // spec.md "Application shell standards": the brand wordmark, the
     // nav group labels, and each item's own label text are all visible.
-    await page.getByText("MaiPai Home", { exact: false }).waitFor();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByText("MaiPai Home", { exact: false }).waitFor();
     await settleAnimations(page);
     await page.screenshot({ path: join(SCREENS_DIR, `shell-rail-expanded-desktop-${theme}.png`) });
     dedicatedScreenshots.push({ file: `shell-rail-expanded-desktop-${theme}.png`, route: "shell-rail-expanded", viewport: "desktop", theme });
@@ -1639,7 +1642,7 @@ async function captureShellRail(browser: Browser, sessionValue: string, theme: "
     // `group-data-[collapsible=icon]:hidden` (AppShell.tsx's own
     // Brand()) - waiting for it to actually leave the accessibility
     // tree is the real assertion, not just a fixed delay.
-    await page.getByText("MaiPai Home", { exact: false }).waitFor({ state: "hidden" });
+    await page.getByRole("navigation", { name: "Main navigation" }).getByText("MaiPai Home", { exact: false }).waitFor({ state: "hidden" });
     await settleAnimations(page);
     await page.screenshot({ path: join(SCREENS_DIR, `shell-rail-collapsed-desktop-${theme}.png`) });
     dedicatedScreenshots.push({ file: `shell-rail-collapsed-desktop-${theme}.png`, route: "shell-rail-collapsed", viewport: "desktop", theme });
@@ -1652,12 +1655,12 @@ async function captureShellRail(browser: Browser, sessionValue: string, theme: "
     // positived here on the first version of this check.
     await page.reload();
     await trigger.waitFor();
-    if (await page.getByText("MaiPai Home", { exact: false }).isVisible().catch(() => false)) {
+    if (await page.getByRole("navigation", { name: "Main navigation" }).getByText("MaiPai Home", { exact: false }).isVisible().catch(() => false)) {
       throw new Error("Shell rail's collapsed preference did not survive a reload");
     }
 
     await trigger.click();
-    await page.getByText("MaiPai Home", { exact: false }).waitFor();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByText("MaiPai Home", { exact: false }).waitFor();
   } finally {
     await context.close();
   }

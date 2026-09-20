@@ -356,8 +356,14 @@ export function HomePage({ person }: HomePageProps) {
   // one here would be exactly the duplicate header that rule forbids.
   return (
     <Page title="Home" hideTitle>
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
-      <div tabIndex={0} className={cn("mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-8", FOCUS_RING)}>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
+          Studio (owner ruling, "Two looks, one setting"): "the content
+          area fills the pane edge to edge with a 24px gutter and no
+          max-width column" plus the reference's own subtle canvas
+          gradient - the dashboard's own wrapper, not every page's,
+          since the ruling's acceptance judges this one route. Calm
+          keeps the centered column that shipped. */}
+      <div tabIndex={0} style={{ background: "var(--canvas-background)" }} className={cn("mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-8 studio:max-w-none studio:px-6", FOCUS_RING)}>
         <MetricRow person={person} />
 
         <div className="grid gap-3 lg:grid-cols-2">

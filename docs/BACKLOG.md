@@ -6258,6 +6258,31 @@ approvals are still real, unstarted work for a future session.
       Full account in [dev.md](dev.md)'s own entry. Exit check: `bunx
       tsc --noEmit` and `bun test` clean on both repos, screenshots
       opened (desktop/phone, light/dark, plus the pane open).
+- [x] **HOME-UI-02c: two looks, one setting, and the collapsed rail
+      fix** (M, 2026-09-20) - the owner's "Two looks, one setting" and
+      "The collapsed rail" rulings
+      ([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md)).
+      A person picks "Look" (Settings > Me > Appearance): Studio
+      matches the reference exactly and is the hub's own default, Calm
+      is the softer look HOME-UI-01/02 shipped first - `ui-v0.4.0`
+      carries the mechanism (`data-look` on `<html>`, a `studio:`
+      Tailwind variant, `--tile-radius`/`--canvas-background` tokens),
+      Home's own `useLook.ts` reads the new `ui.look` settings key
+      (`spec-v0.1.2`) and applies it live from the same TanStack Query
+      cache entry the Settings page's own renderer writes to. Same
+      commit fixes the collapsed rail in both looks: one toggle (the
+      in-rail `RailToggle` deleted), 64px width, every row a real
+      40x40 centered target with its touch target still floored at
+      48px, the active item's collapsed fill gradient-in-Studio/flat-
+      in-Calm, the hub card a real icon tile instead of a lone status
+      dot. `ActionTile`/`MetricCard`'s label truncation fixed in both
+      looks. Full account in `shared`'s own `docs/dev.md` and
+      `CHANGELOG.md`. Exit check: `bash scripts/check.sh` green on
+      both repos; `scripts/screenshot.ts --shell-rail-review` run with
+      a household forced to Calm and again at the real Studio default,
+      both 180 pages/0 violations; the four `shell-rail-{expanded,
+      collapsed}-desktop-{light,dark}.png` captures opened and judged
+      against the owner's own checklist.
 - [ ] **STORE-01: a real GET route to browse a trusted catalog index,
       and the settings it needs** (S/M) - the gap HOME-UI-02 found and
       deliberately did not build around: "the store is the same page

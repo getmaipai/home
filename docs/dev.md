@@ -18494,3 +18494,137 @@ backend and frontend test/lint/build, the `a11y` step exercising the
 new dynamic stub-server import, standards core) with the new pin
 resolution live - not just typechecked. The `spec` tag worktree
 confirmed clean (`git status --short`) before and after the run.
+
+## Two looks, one setting, and the collapsed rail fix (HOME-UI-02c, ui-v0.4.0/spec-v0.1.2, 2026-09-20)
+
+The owner placed Home beside the reference and judged it "nice, not a
+match" - his ruling, "Two looks, one setting"
+([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md)):
+keep what shipped as one look, **Calm**, and build a second, **Studio**,
+that matches the reference exactly; a person picks the look in Settings
+> Me > Appearance ("Look": Calm or Studio, per person, remembered), the
+hub's own default is Studio. Both looks are the same components - the
+difference is a theme, never a second component. Same day, a second
+finding, "The collapsed rail" (both looks): the collapsed rail as
+shipped had a second toggle inside it, an oversized circular product
+mark, off-center icons, an active fill wider than the icon column, and
+a hub card reduced to a lone dot.
+
+### The mechanism: `data-look`, a `studio:` variant, look-scoped tokens
+
+`shared/ui` (`ui-v0.4.0`): a `data-look` attribute on `<html>`, applied
+the same way `.dark`/`.light` already are - `@custom-variant studio
+(&:is([data-look="studio"] *))` in `tokens.css`, so any component can
+write `studio:` prefixed classes; `--tile-radius` (999px/circle at the
+zero-attribute default, matching what `IconTile` already rendered via
+`--radius-xl`'s own emergent math - 12px rounded square under
+`[data-look="studio"]`) and `--canvas-background` (the dashboard's own
+page background, a flat color in Calm, the reference's subtle radial
+wash in Studio) as look-scoped tokens independent of light/dark, so a
+person's look and theme choices combine freely. `IconTile` and Home's
+own product-mark tile draw their radius through the token instead of a
+fixed `rounded-xl`. `ActionTile` and `MetricCard`'s label stopped
+truncating (owner finding: "nothing inside a card ever truncates" -
+found live as "Add a pers…"/"Open Repa…" on the dashboard's own quick
+actions, a defect in both looks, fixed in both).
+
+A handful of the rail's own look-conditional rules (the collapsed
+active item's gradient-in-Studio/flat-in-Calm fill, the group label's
+Studio-only 11px size, the expanded divider) ended up as plain
+attribute-selector CSS against the kit's own stable `data-slot`/
+`data-collapsible`/`data-active` attributes, not `studio:`/`group-
+data-[collapsible=icon]:` Tailwind classes - two different, unrelated
+causes, both worth recording since they cost real time:
+
+1. Several classes appeared to compile to nothing mid-session
+   (confirmed missing from the built `dist/assets/*.css`, present
+   neighbors on the same class string). The actual cause: `shared` is
+   a `file:` link, and `bun install --force` snapshots its source into
+   bun's content-addressed store at install time - a consumer's build
+   silently keeps building an *older* snapshot of `shared` until
+   reinstalled, and several rounds of edits landed between installs.
+   Fixed by reinstalling before trusting a build again.
+2. A real one, caught by a code review: `sidebarMenuButtonVariants`
+   merges its classes through `cn()` (tailwind-merge) at every call
+   site, which collapses same-utility conflicts and does not reliably
+   read `group-data-[collapsible=icon]:` as scoping `overflow-visible`
+   away from the base `overflow-hidden` it would otherwise conflict
+   with - the override was winning everywhere, not just when
+   collapsed. Plain CSS never goes through that merge, so it was kept
+   even once cause 1 stopped being a live risk.
+
+### The collapsed rail fix
+
+`RailToggle` deleted - the header's own `SidebarTrigger` is the rail's
+one and only toggle now (it gained the deleted component's own
+`aria-expanded`/state-aware label, caught missing by the same review).
+`SIDEBAR_WIDTH_ICON` 72px → 64px. Every collapsed nav row a true 40x40
+centered target (`size-10`, not the 48px `size-12` this used to force;
+`justify-center` and a 20px icon, both `group-data-[collapsible=icon]`-
+scoped so the expanded row is untouched) - `hitArea(1)` (the kit's own
+touch-target helper, `button.tsx`/`toggle.tsx`/`HubCard.tsx`'s own
+pattern, not a hand-copy of its three classes) still floors the real
+tappable region at 48px, `overflow: visible` (see cause 2 above)
+making that extension actually hit-testable rather than clipped by the
+row's own `overflow-hidden`. The active item's collapsed fill: a flat
+`background-color` under everything, a Studio-only gradient
+`background-image` layered over it - two different CSS properties, so
+Studio's gradient always paints over Calm's flat color with nothing to
+override. `HubCard`'s collapsed state: a 40px tile with the hub icon
+and the status dot at its corner (the same `right-0 bottom-0`/`ring-2`
+geometry `ui/avatar.tsx`'s own `AvatarBadge` uses, not that component
+directly - its sizing is scoped to a `group/avatar` ancestor this tile
+doesn't have, a real generalization for another day) plus a real
+tooltip, not a lone dot in a circle. The collapsed divider (a short,
+centered 24px hairline, replacing the expanded full-width one once
+labels disappear) is gated on `state === "collapsed" && !isMobile`, not
+`state` alone - a review caught the desktop-only `state` leaking a
+stray divider into the full-label mobile Sheet drawer, since that
+branch never sets `data-collapsible` at all.
+
+### `ui.look`, and Home's own `useLook.ts`
+
+`spec-v0.1.2` adds `ui.look` (person scope, `select`, options `studio`/
+`calm`, default `studio`) to the settings registry - regenerated via
+`bun run gen:settings` with `MAIPAI_SHARED_DIR` pointed at the kit
+worktree, diffed additive-only against the prior tag before tagging.
+Discovered live: the backend validates every `PUT /api/settings`
+against this generated `spec/settings/keys.json`, not
+`uiKeys.ts` directly - writing `ui.look` 400'd with "unknown settings
+key" until the registry was actually regenerated and re-tagged, which
+is why this landing needed a `spec` bump at all, not just `ui`.
+
+`frontend/src/shell/useLook.ts` mirrors `useAppearance.ts`'s own shape
+(read `ui.look`, apply a live attribute) but through `useQuery` on the
+exact same `["settings-values", "person:<id>"]` cache entry
+`SettingsRenderer` and `HomePage.tsx`'s own `useHouseholdSettings`
+already share, rather than a one-shot fetch of its own: `ui.appearance`
+has its own dedicated header control (`ThemeToggle.tsx`) and doesn't
+need to react to a change made anywhere else, but `ui.look` has no
+second control outside Settings > Me > Appearance, so editing it there
+has to apply live, in the same session, with no reload.
+
+### Verification
+
+`shared`'s own `bun test` (358 pass) and `bun run lint` green, both
+before and after a code review (medium, then one fix-hunk re-review -
+the real findings above, all fixed and reverified; a lighter fix for a
+`HubCard`/`AvatarBadge` geometry-drift note). Home's frontend `tsc
+--noEmit`, `eslint`, and full `bun test` (493 pass) green against the
+pinned install. `scripts/screenshot.ts --shell-rail-review` run twice -
+once with a household forced to `ui.look: calm` (the seed line removed
+before commit; Studio is the real default), once at the real default -
+both runs 180 pages checked, 0 violations, 0 overflow.
+`shell-rail-{expanded,collapsed}-desktop-{light,dark}.png` opened and
+judged both times against the owner's own checklist: rounded-square
+tiles and the gradient product tile in Studio, circles in Calm; the
+reference's own larger title and 11px small-cap group labels with
+dividers in Studio; no dead side margins on the dashboard in Studio;
+the quick-action tiles' truncation fixed in both; the collapsed rail's
+one toggle, 64px width, centered 40x40 targets, and the active item's
+gradient-in-Studio/flat-in-Calm collapsed fill, in both looks and both
+themes. Full `bash scripts/check.sh` green after rebasing onto
+SHARED-PIN-01 (B's pin-form migration, landed underneath this work
+mid-session) and moving `UI_PIN`/`SPEC_PIN` to `0.4.0`/`0.1.2`: 3525
+backend tests, 493 frontend tests, build, `a11y-only`, docs
+reading-level, and the standards core all green.

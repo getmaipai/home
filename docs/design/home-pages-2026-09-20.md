@@ -195,3 +195,87 @@ header; metric cards and panels with icon tiles, headers and links;
 type badges and status pills where the reference uses them; 12 px
 gaps and 16 px padding; nothing hand-drawn outside the kit's blocks.
 A page that looks like the old Home page with new colors fails.
+
+### Two looks, one setting (owner ruling, 2026-09-20 15:40)
+
+After HOME-UI-01 and 02 the owner placed Home beside the reference
+and judged it "nice, not a match". His ruling: keep what shipped as
+one look, **Calm**, and build a second look, **Studio**, that matches
+the reference image exactly; a person picks the look in Appearance
+(Settings, "Look": Calm or Studio, per person, remembered), and the
+hub's default is Studio. Both are the same components; the
+difference is a theme, so every item below is a token or a variant
+the kit already owns, never a second component:
+
+- **Icon tiles.** Studio: rounded squares (12 px radius, 40 px;
+  32 px in rows) with the tinted fill, the border and the glow of
+  "The style, exactly". Calm: the circles that shipped. Token:
+  `--tile-radius`.
+- **Product mark.** Studio: the logo on a 40 px gradient tile (blue
+  to violet, 12 px radius) beside a bold 18 px product name and the
+  tagline in secondary text, exactly the reference's top-left. Calm:
+  as shipped.
+- **Rail.** Studio: group labels 11 px uppercase, letter-spaced,
+  secondary text, weight 600, with a hairline divider above each group
+  (the reference's "System", "Resources", "MANAGE" lines); 40 px items
+  with 8 px vertical rhythm and 20 px icons; the active item filled
+  with the violet-to-deeper-violet gradient, 10 px radius, inset 12 px
+  from the rail edge, white text and icon. The rail background one
+  step lighter than the canvas. Calm: as shipped.
+- **Header.** Studio: the page title at 32 px semibold with the
+  subtitle at 14 px directly under it; the right cluster is three
+  equal 40 px controls (theme toggle, bell with its red count, the
+  avatar) separated by a 1 px vertical hairline between the toggle
+  and the bell, exactly the reference; the search field 400 px wide
+  between title and cluster. Calm: as shipped.
+- **Canvas and content width.** Studio: the content area fills the
+  pane edge to edge with a 24 px gutter and no max-width column (the
+  reference has no dead margins left or right); the canvas carries the
+  reference's subtle radial gradient (lighter navy at the top left
+  fading to the canvas color) instead of a flat fill. Calm: the
+  centered column that shipped.
+- **Cards.** Studio: 16 px radius, 1 px border at the border token,
+  16 px padding, 12 px gaps, the panel shadow; metric cards lay the
+  tile left and the number and label right on one line with the
+  status line under, at the reference's sizes (number 28 px); nothing
+  inside a card ever truncates: a tile that cannot fit its label at
+  the current width drops to the next row (the quick-action tiles
+  "Add a pers..." and "Open Repa..." are a defect in both looks and
+  are fixed in both). Calm: as shipped except the truncation fix.
+- **Type.** Studio: the reference's family (Aptos Display for titles
+  where installed, the kit's fallback stack otherwise), semibold
+  titles, 13 to 14 px rows, tabular numbers. Calm: as shipped.
+- **Footer, pane header, pills, badges, bars.** Studio: exactly "The
+  style, exactly". Calm: as shipped.
+
+Acceptance for Studio: the dashboard capture at 1440 placed beside
+the reference and judged by the owner's own list (small-cap group
+labels with dividers, rounded-square tiles, gradient product tile,
+gradient active item, larger title, no dead side margins, equal
+header controls with a divider, gradient canvas, no truncated text,
+even spacing inside cards); a reader must not be able to tell which
+product's console they are looking at from the chrome alone. Calm
+stays green on its existing captures. The look is one setting,
+declared once, rendered by the settings renderer, applied by the
+theme provider the kit already has for light and dark.
+
+### The collapsed rail (owner finding, 2026-09-20 15:53; both looks)
+
+The collapsed rail as shipped is wrong in both looks: a second
+expand toggle inside the rail, the product mark as an oversized
+circle, icons neither centered nor on one vertical rhythm, the active
+item's fill wider than the icon column, the hub card collapsed to a
+lone dot in a circle. The rule: the collapsed rail is 64 px wide;
+there is exactly one toggle for it, the one in the header (the
+header's rail icon expands and collapses; nothing inside the rail
+does); the product mark is the 40 px tile centered at the top; each
+item is a 40 by 40 px centered target with its 20 px icon centered,
+items on a 48 px vertical rhythm, a tooltip with the label on hover
+and focus; the active item is the same 40 by 40 rounded square
+(gradient in Studio, flat violet in Calm) centered under the icon,
+never wider than the item; each group boundary is a 24 px hairline
+centered; the hub card collapses to a 40 px tile with the hub icon
+and the status dot at its corner, tooltip with the status text. On
+the phone the rail does not exist (the tab bar). Acceptance: the
+collapsed rail captured at 1440 in both looks and both themes, every
+element centered on the same vertical axis.
