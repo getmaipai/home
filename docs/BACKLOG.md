@@ -6845,7 +6845,11 @@ approvals are still real, unstarted work for a future session.
       (the manifest hook, data route, and a real card-size slider -
       "skills as home-screen widgets" below stays its own item on
       purpose, for the density/opt-in design questions it still has
-      open); the pinned-apps strip, reading the sidebar's own
+      open; the grid itself was merged into the "Your apps" strip below
+      on 2026-09-20, HOME-UI-01 - COORDINATOR's own ruling that a
+      pinned app and an installed package are one tile shape, not two
+      stacked sections - this paragraph otherwise describes what shipped
+      on 2026-09-13, unedited); the pinned-apps strip, reading the sidebar's own
       `pinnedIds` (one definition, `usePinnedApps`); the prompt box,
       now real search-and-chat for typing (apps, people, memories,
       conversations, settings, commands - the same shared query lane 9

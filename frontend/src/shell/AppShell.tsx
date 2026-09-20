@@ -82,8 +82,13 @@ function Brand() {
         <span className="block truncate text-base font-semibold tracking-tight">
           MaiPai <span className="text-primary">Home</span>
         </span>
-        {/* text-base, not text-xs: the type floor (docs/UI.md). */}
-        <span className="block truncate text-base text-muted-foreground">Your AI. On your terms.</span>
+        {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3): a
+            compact secondary label under the wordmark, the same category
+            as a nav group heading (11px uppercase secondary) or a badge -
+            never truncated with an ellipsis (COORDINATOR, 2026-09-20: "the
+            tagline wraps to a second line... nothing in the rail is ever
+            cut"), wraps onto its own second line instead. */}
+        <span className="block text-xs text-muted-foreground">Your AI. On your terms.</span>
       </span>
     </Link>
   );

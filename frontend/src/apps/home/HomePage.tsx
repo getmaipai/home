@@ -13,20 +13,11 @@ import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import type { IconName } from "@maipai/ui/src/icons";
 import { CardSizeSlider, useCardSize, cardSizeStyle } from "@maipai/ui/src/primitives/CardSizeSlider";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
-import { NodeRenderer } from "@maipai/ui/src/schema/NodeRenderer";
-import type { WidgetCardNode } from "@maipai/ui/src/schema/types";
-import { api, ApiError, type Roster, type PersonRosterEntry, type ResolvedSetting, type MemoryRecord, type ConversationSummary } from "@/lib/api";
+import { api, ApiError, type Roster, type PersonRosterEntry, type ResolvedSetting, type MemoryRecord, type ConversationSummary, type WidgetDescriptor } from "@/lib/api";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useHubStatus, updateAvailable } from "@/shell/useHubStatus";
 import { weatherCardQuestion } from "@maipai/home-backend/src/homeCardQuestions";
-
-// The one widget_card instance Home mounts (docs/plans/session-e-ui-and-
-// docs.md step 2). Home is still hand-written React, not a JSON page, so
-// this is mounted directly rather than through a page document's `body` -
-// the same way ExternallyMountedNodeView's two cases are reached by
-// their own page components, not through a page render.
-const PACKAGE_WIDGET_CARDS: WidgetCardNode = { type: "widget_card", bind: { source: "route", path: "/api/widgets", stream: false } };
 
 interface HomePageProps {
   person: Roster;
@@ -171,22 +162,41 @@ function TodayPanel() {
   );
 }
 
-interface CardSizeProps {
-  cardSize: number;
-  setCardSize: (next: number) => void;
+// One strip, one tile shape, two real sources (COORDINATOR, 2026-09-20:
+// "pinned apps and installed packages together as tiles... one empty
+// state... no second heading" - the section's own "Your apps" line
+// never asked for a second "Your packages" section, and the live-data
+// widget cards that used to render there belong on their own package
+// pages, not duplicated here). An app tile is a pin state, not a
+// separate list; a package tile is just its installed identity
+// (WidgetDescriptor has no live value worth a compact tile - that
+// detail lives in the widget's own bigger card, wherever it ends up).
+interface AppStripTile {
+  kind: "app";
+  key: string;
+  to: string;
+  icon: IconName;
+  label: string;
 }
+interface PackageStripTile {
+  kind: "package";
+  key: string;
+  title: string;
+}
+type StripTile = AppStripTile | PackageStripTile;
 
-// The density control (spec "The dashboard": "the card-size slider
-// stays as the strip's density control") is one shared setting, not one
-// per strip - it applied to both "Your apps" and "Your packages" before
-// this page's rewrite, and still does: lifted to HomePage so both keep
-// reading the same `["home"]` localStorage key instead of Your apps
-// getting its own independent copy while Your packages silently lost
-// its control (a code review caught exactly that regression).
-function YourAppsPanel({ person, cardSize, setCardSize }: { person: Roster } & CardSizeProps) {
+function YourAppsPanel({ person }: { person: Roster }) {
   const navigate = useNavigate();
   const { pinned } = usePinnedApps(person.id);
-  const entries = favoriteApps(pinned);
+  // The density control (spec "The dashboard": "the card-size slider
+  // stays as the strip's density control") - this strip's own setting,
+  // not shared with anything else now that "Your packages" is merged
+  // into it rather than a second consumer (COORDINATOR, 2026-09-20).
+  const [cardSize, setCardSize] = useCardSize("home");
+  const appTiles: StripTile[] = favoriteApps(pinned).map((e) => ({ kind: "app", key: `app-${e.to}`, to: e.to, icon: e.icon as IconName, label: e.label }));
+  const widgetsQuery = useQuery<WidgetDescriptor[]>({ queryKey: ["widgets"], queryFn: () => api.widgets() });
+  const packageTiles: StripTile[] = (widgetsQuery.data ?? []).map((w) => ({ kind: "package", key: `pkg-${w.package}-${w.id}`, title: w.title }));
+  const tiles = [...appTiles, ...packageTiles];
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
@@ -202,15 +212,15 @@ function YourAppsPanel({ person, cardSize, setCardSize }: { person: Roster } & C
       <div className="mt-3" style={cardSizeStyle(cardSize)}>
         <CardGrid
           label="Your apps"
-          items={entries}
-          getKey={(e) => e.to}
-          getLabel={(e) => e.label}
-          onSelect={(e) => navigate(e.to)}
+          items={tiles}
+          getKey={(t) => t.key}
+          getLabel={(t) => (t.kind === "app" ? t.label : t.title)}
+          onSelect={(t) => navigate(t.kind === "app" ? t.to : "/apps")}
           emptyState={{ icon: "pin", text: "Pin your go-to apps from the app library." }}
-          renderItem={(e) => (
+          renderItem={(t) => (
             <div className="flex flex-col items-center gap-2 p-4">
-              <IconTile icon={e.icon as IconName} hue="--hue-blue" />
-              <span className="text-sm">{e.label}</span>
+              <IconTile icon={t.kind === "app" ? t.icon : "package"} hue={t.kind === "app" ? "--hue-blue" : "--hue-teal"} />
+              <span className="text-sm">{t.kind === "app" ? t.label : t.title}</span>
             </div>
           )}
         />
@@ -340,8 +350,6 @@ function QuickActionsPanel({ person }: { person: Roster }) {
 }
 
 export function HomePage({ person }: HomePageProps) {
-  // Shared with "Your packages" below - see YourAppsPanel's own comment.
-  const [cardSize, setCardSize] = useCardSize("home");
   // hideTitle: the fixed header (spec "Current destination header
   // rule") now owns the destination's title and subtitle, including the
   // signed-in person's own greeting (shell/routeHeader.ts) - a second
@@ -357,14 +365,7 @@ export function HomePage({ person }: HomePageProps) {
           <RecentMemoriesPanel />
         </div>
 
-        <YourAppsPanel person={person} cardSize={cardSize} setCardSize={setCardSize} />
-
-        <div>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Your packages</h3>
-          <div style={cardSizeStyle(cardSize)}>
-            <NodeRenderer node={PACKAGE_WIDGET_CARDS} />
-          </div>
-        </div>
+        <YourAppsPanel person={person} />
 
         <div className="grid gap-3 lg:grid-cols-3">
           <PeoplePanel selfId={person.id} />

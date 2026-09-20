@@ -51,6 +51,7 @@ function stubFetch(options: {
   conversations?: unknown[];
   pinnedApps?: string[];
   repairs?: unknown[];
+  widgets?: unknown[];
   requestedUrls?: string[];
 }): () => void {
   const original = globalThis.fetch;
@@ -59,7 +60,7 @@ function stubFetch(options: {
     options.requestedUrls?.push(url);
     if (url.includes("/api/people")) return Promise.resolve(Response.json(options.people ?? []));
     if (url.includes("/api/memory")) return Promise.resolve(Response.json(options.memories ?? []));
-    if (url.includes("/api/widgets")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/widgets")) return Promise.resolve(Response.json(options.widgets ?? []));
     if (url.includes("/api/conversations")) return Promise.resolve(Response.json(options.conversations ?? []));
     if (url.includes("/api/repairs")) return Promise.resolve(Response.json(options.repairs ?? []));
     if (url.includes("/api/host/hardware")) {
@@ -187,6 +188,27 @@ describe("HomePage - Your apps panel", () => {
       const list = await findByRole("list", { name: "Your apps" });
       const labels = within(list).getAllByText(/^(Settings|Chat)$/);
       expect(labels.map((el) => el.textContent)).toEqual(["Settings", "Chat"]);
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  // COORDINATOR, 2026-09-20: "Your apps" and "Your packages" used to be
+  // two stacked sections, each with its own empty state - one strip now,
+  // pinned apps and installed packages together as tiles, one empty
+  // state, no second heading.
+  test("shows an installed package as a tile in the same strip as a pinned app, not a second section", async () => {
+    const restoreFetch = stubFetch({
+      turnBodies: [],
+      pinnedApps: ["/chat"],
+      widgets: [{ package: "weather", id: "today", title: "Weather", size: "card", refresh_s: 1800 }],
+    });
+    try {
+      const { findByRole, queryByText } = renderHome();
+      const list = await findByRole("list", { name: "Your apps" });
+      expect(within(list).getByText("Chat")).toBeTruthy();
+      expect(within(list).getByText("Weather")).toBeTruthy();
+      expect(queryByText("Your packages")).toBeNull();
     } finally {
       restoreFetch();
     }
