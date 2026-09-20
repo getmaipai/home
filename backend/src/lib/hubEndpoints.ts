@@ -17,7 +17,7 @@ import { db } from "@/db";
 import { hubEndpoints } from "@/db/schema";
 import { getTailscaleStatus } from "@/lib/tailscale";
 import { newEndpointId } from "@/lib/id";
-import { isPrivateOrLoopbackIpv4, isCgnatIpv4 } from "@/lib/ssrfGuard";
+import { isPrivateOrLoopbackIpv4, isCgnatIpv4 } from "@maipai/core/src/ssrfGuard";
 
 export type EndpointKind = "lan" | "overlay" | "public";
 export type EndpointSource = "detected" | "managed";

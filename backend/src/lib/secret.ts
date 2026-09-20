@@ -33,6 +33,15 @@ function applyPepper(secret: string): string {
   return createHmac("sha256", getPepper()).update(secret).digest("base64");
 }
 
+/** Forces the pepper to resolve now rather than on the first real
+ * sign-in - called once at boot (index.ts) so a broken keystore (a
+ * Windows DPAPI failure, KeystoreProtectionFailedError) surfaces as a
+ * refused boot with a clear reason, not a random first sign-in's own
+ * opaque 500. */
+export function ensureSecretPepperReady(): void {
+  getPepper();
+}
+
 export async function hashSecret(secret: string): Promise<string> {
   return Bun.password.hash(applyPepper(secret), {
     algorithm: "argon2id",
@@ -46,4 +55,9 @@ export async function verifySecret(
   hash: string,
 ): Promise<boolean> {
   return Bun.password.verify(applyPepper(secret), hash);
+}
+
+/** Test-only: the pepper is module-local state with no other reset hook. */
+export function __resetPepperCacheForTests(): void {
+  cachedPepper = null;
 }

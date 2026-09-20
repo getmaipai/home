@@ -5,7 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
-import { assertNotPrivateHost } from "@/lib/ssrfGuard";
+import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -525,7 +525,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
         fetch: () => new Response(null, { status: 302, headers: { Location: "http://127.0.0.1:9/secret" } }),
       });
       const validateHop = async (hopUrl: string): Promise<void> => {
-        await assertNotPrivateHost(new URL(hopUrl).hostname).catch((err) => {
+        await assertNotPrivateHost(new URL(hopUrl).hostname).catch((err: unknown) => {
           throw new HostError("invalid_input", (err as Error).message);
         });
       };

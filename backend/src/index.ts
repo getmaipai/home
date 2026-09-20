@@ -23,12 +23,31 @@ import { websocket } from "hono/bun";
 import { seedHlcFromDatabase } from "@/lib/hlc";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { startupUrls } from "@/lib/startupUrls";
-import { installConsoleFileMirror, installFatalErrorHandlers } from "@/lib/log";
+import { installConsoleFileMirror, installFatalErrorHandlers, appendLogLine } from "@/lib/log";
 import { shutdownEngines } from "@/lib/hubShutdown";
+import { ensureSecretPepperReady } from "@/lib/secret";
+import { KeystoreProtectionFailedError } from "@/lib/keystore";
 
 const port = Number(process.env.PORT ?? 8787);
 installConsoleFileMirror();
 installFatalErrorHandlers(shutdownEngines);
+
+// core-v0.1.0's keystore refuses to silently fall back to an unprotected
+// plaintext key when Windows DPAPI fails (KeystoreProtectionFailedError,
+// where the old code used to write the raw key to disk instead). Forcing
+// the household's own pepper to resolve here, before the server accepts
+// a single request, turns that into a refused boot with a clear reason
+// instead of a random first sign-in's own opaque 500.
+try {
+  ensureSecretPepperReady();
+} catch (err) {
+  if (err instanceof KeystoreProtectionFailedError) {
+    appendLogLine(`[fatal] boot refused: ${err.message}`);
+    console.error(`[fatal] boot refused: ${err.message}`);
+    process.exit(1);
+  }
+  throw err;
+}
 
 // FAST-01: set up the warmup prompt provider for cache priming after engine
 // spawn. ROUTE-02: with the ordinary tool block, the same one every

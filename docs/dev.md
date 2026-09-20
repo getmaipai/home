@@ -35,10 +35,12 @@ ENGINE-HOST-03 through MEDIA-HOST-02 are the mechanical follow-ups.
 
 Later the same day the engine layer became its own product: MaiPai
 Stack (`getmaipai/stack`, design in its `docs/dev.md`, the decision in
-`.github/docs/DECISIONS.md` 2026-09-17). The Stack owns the engine
-catalog, downloads and checksums, the supervisors, the governor, model
-identity and updates, and serves every role at one address; it knows
-clients, not people, and Home is its first client. ENGINE-HOST-03 (the
+`.github/docs/DECISIONS.md` 2026-09-17). Refocused again on 2026-09-20
+(`.github/docs/DECISIONS.md`, 2026-09-20): MaiPai Stack is the engine
+foundation of MaiPai Home, the headless service that installs, sizes,
+runs, watches, updates and tests the engines and models behind Home and
+gives Home one stable address by role. It has no interface and no
+users of its own; Home is its only caller. ENGINE-HOST-03 (the
 first-day bench) still runs here because the Studio arrives before the
 Stack has code; ENGINE-HOST-04 through -06 and MEDIA-HOST-01 and -02
 are the Stack's milestone 0 and are reserved in the backlog, and
@@ -17954,5 +17956,13 @@ Verdict: a page ask is one foreground fetch after the household's own SearXNG se
 The reader uses Linkedom (ISC) for the DOM and Mozilla Readability (Apache-2.0) for the article boundary. Both licenses are compatible with this repository's AGPL-3.0 package license. Cheerio plus a separate HTML-to-text helper was rejected because it would create two independently maintained parsing surfaces. The reader bounds the page text, links, and headings before they enter an outcome or model context. Links retain their visible text, absolute sanitized href, rel, and nearby text. The result reuses ATT-01's bounded document chunk shape, with the page URL as its source, so COMP-01 can build the details document without a second artifact contract.
 
 The websearch recipe carries the page result beside its search rows. The turn engine requests `read_page` only for page-shaped lookup language such as support, download, driver, price, fix, or page, and the same path can be extended for an explicit article lookup. For a link deliverable, the engine selects a page link whose text, href, or nearby text contains the requested field words. The selected href and title become the first source. If no link matches, the spoken result is exactly that the page does not have that field; model prose cannot substitute for the missing page evidence. Child projection keeps the grown-up line and removes page sources and document links according to the existing ceiling.
+
+## Home adopts `@maipai/core` (core-v0.1.0, 2026-09-20)
+
+Pinned as `"@maipai/core": "file:../../shared/core"` in `backend/package.json`, per `shared`'s own pin design (no registry; `bun install` copies a real, self-contained package from the sibling `getmaipai/shared` checkout). **The pinned tag is `core-v0.1.0`.** Bumping it means checking out the new tag in the sibling `shared` checkout, then re-running `bun install` in `backend/` - `bun.lock` records the resolved copy, but nothing here checks the sibling's tag automatically, the same honesty-of-the-pin contract `@maipai/standards` already uses.
+
+Sixteen helpers that used to live in `backend/src/lib/` (`log`, `withTimeout`, `paths`'s `ensureDataDir`/`statMtimeMs`, `archive`, `hardware`, `openapi`, `secretThrottle`, `hlc`, `id`'s `randomSuffix`, `secrets`, `keystore`, `rateLimiter`, `singleflight`, `ssrfGuard`, `backupCrypto`) now import their actual logic from `@maipai/core/src/*`. Four (`withTimeout`, `archive`, `singleflight`, `ssrfGuard`) had no Home-specific state and their consumers now import `@maipai/core/src/*` directly. The rest kept their `@/lib/*` file as a thin wrapper - Home's own instantiation (its data directory, its keystore's `appId`, its device id as the hlc node, its `TRUST_PROXY` setting) around a `core` factory - specifically so the module-level singleton behavior every existing caller already depended on (one shared hlc clock, one shared sign-in throttle across every route, one shared rate limiter) survives unchanged; no consumer file needed to change beyond a handful of test fixtures gaining `HardwareInfo`'s new (Stack-added) `osVersion` field.
+
+**New at this adoption, not before: a broken keystore refuses to boot.** `core-v0.1.0`'s keystore (`@maipai/core/src/keystore.ts`) throws `KeystoreProtectionFailedError` when Windows DPAPI protection fails, rather than silently writing an unprotected plaintext key to disk the way this repo's own pre-adoption `keystore.ts` did (a real gap a code review on the `shared` side caught). `backend/src/index.ts` now calls `lib/secret.ts`'s `ensureSecretPepperReady()` right after installing the log/fatal handlers, before the server accepts a single request: if the household's own PIN/password pepper can't be resolved, the hub logs `[fatal] boot refused: ...` and exits, instead of leaving every sign-in route to hit the same failure later as an opaque 500. This only changes behavior on Windows when PowerShell is blocked or unavailable; `tests/secret.test.ts`'s `ensureSecretPepperReady` describe block covers both the healthy path and the refusal (faking `process.platform` since this dev machine's own DPAPI path never runs for real).
 
 The websearch package's data source says that a page ask sends that one page URL to the household's own SearXNG or page host, keeps the result only in the turn outcome and details document, and does not fetch linked pages. The acceptance rows are `download-link-on-page`, `value-on-page`, `page-without-requested-link`, and `who-is-builds-a-card-from-the-page`. The latter remains bounded by the current card schema while article sections are carried in the document result until the additive article-card spec work is scheduled.

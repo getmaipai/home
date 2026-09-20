@@ -10,7 +10,7 @@ import { CHAT_MODEL_SETTING_KEY } from "@/settings/aiKeys";
 import { engineBinaryPath, getChatClient, getEngineStatus, restartChatBackend, stopChatBackend } from "@/lib/llmSupervisor";
 import { modelsDir } from "@/lib/paths";
 import { getEngineStatsSamples } from "@/lib/engineStats";
-import { withTimeout } from "@/lib/withTimeout";
+import { withTimeout } from "@maipai/core/src/withTimeout";
 import { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { AppEnv } from "@/types";
 

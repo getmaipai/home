@@ -8,7 +8,7 @@
 import { join } from "node:path";
 import { downloadUrl } from "@/lib/modelDownload";
 import { modelsDir } from "@/lib/paths";
-import { singleflight } from "@/lib/singleflight";
+import { singleflight } from "@maipai/core/src/singleflight";
 
 // MEM-05 (2026-09-13, Jesse's decision): the household default is the
 // 4B. Live use of the 1.7B showed it re-emitting its own extraction

@@ -1,6 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, afterEach } from "bun:test";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { Person } from "@maipai/spec/gen/ts/person.js";
-import { hashSecret, verifySecret } from "@/lib/secret";
+import { hashSecret, verifySecret, ensureSecretPepperReady, __resetPepperCacheForTests } from "@/lib/secret";
+import { KeystoreProtectionFailedError } from "@/lib/keystore";
+import { dataDir } from "@/lib/paths";
 import { newPersonId } from "@/lib/id";
 import { ROLE_LADDER } from "@/middleware/auth";
 
@@ -24,6 +28,44 @@ describe("secret hashing", () => {
   test("hashes never contain the plaintext secret", async () => {
     const hash = await hashSecret("correcthorse");
     expect(hash).not.toContain("correcthorse");
+  });
+});
+
+describe("ensureSecretPepperReady", () => {
+  afterEach(() => {
+    __resetPepperCacheForTests();
+  });
+
+  test("resolves without throwing on this test machine's real keystore backend", () => {
+    __resetPepperCacheForTests();
+    expect(() => ensureSecretPepperReady()).not.toThrow();
+  });
+
+  // core-v0.1.0's keystore refuses to silently write an unprotected
+  // plaintext key when Windows DPAPI fails - boot must refuse instead of
+  // continuing (index.ts). powershell isn't on this (real, non-Windows)
+  // test machine's PATH, so faking win32 makes the real DPAPI call fail
+  // exactly the way it would on a Windows box with PowerShell blocked.
+  test("surfaces KeystoreProtectionFailedError when DPAPI protection fails, rather than silently succeeding", () => {
+    __resetPepperCacheForTests();
+    // Force a genuinely fresh key: an earlier test in this same process
+    // may have already written secret_pepper.key under the real
+    // platform's backend, and getOrCreateHexKey only ever WRITES (the
+    // path that would invoke DPAPI) when nothing is there to read yet.
+    // Backed up and restored below - other tests in this run share the
+    // same MAIPAI_DATA_DIR and may expect the pepper to stay stable.
+    const keyPath = join(dataDir, "keys", "secret_pepper.key");
+    const backup = existsSync(keyPath) ? readFileSync(keyPath) : null;
+    rmSync(keyPath, { force: true });
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      expect(() => ensureSecretPepperReady()).toThrow(KeystoreProtectionFailedError);
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform });
+      __resetPepperCacheForTests();
+      if (backup) writeFileSync(keyPath, backup, { mode: 0o600 });
+    }
   });
 });
 

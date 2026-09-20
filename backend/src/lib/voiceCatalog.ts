@@ -13,7 +13,7 @@
 // doesn't fetch it here either - Pocket TTS's own server resolves and
 // caches the real `hf://` file itself, the same way it already does for
 // the 26 built-in presets (spec/voice/README.md).
-import { singleflight } from "@/lib/singleflight";
+import { singleflight } from "@maipai/core/src/singleflight";
 import { tryConsume, type TokenBucketOptions } from "@/lib/rateLimiter";
 
 // Overridable for tests only (MAIPAI_VOICE_CATALOG_URL, tests/preload.ts) -

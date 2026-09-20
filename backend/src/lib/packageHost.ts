@@ -56,7 +56,7 @@ import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulator
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { tryConsume } from "@/lib/rateLimiter";
-import { assertNotPrivateHost, SsrfBlockedError } from "@/lib/ssrfGuard";
+import { assertNotPrivateHost, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import * as memory from "@/lib/memory";
 import { deleteAttachmentsForPerson } from "@/lib/attachments";
 import * as settings from "@/lib/settings";

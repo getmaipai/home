@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.6.3",
+    "@maipai/core": "file:../../shared/core",
     "@maipai/spec": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@mozilla/readability": "^0.6.0",

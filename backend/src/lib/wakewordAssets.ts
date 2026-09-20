@@ -19,7 +19,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { downloadUrl } from "@/lib/modelDownload";
 import { wakewordDir } from "@/lib/paths";
-import { singleflight } from "@/lib/singleflight";
+import { singleflight } from "@maipai/core/src/singleflight";
 
 const OWW_RELEASE_BASE = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1";
 

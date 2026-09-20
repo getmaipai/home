@@ -42,7 +42,7 @@ import { dataDir } from "@/lib/paths";
 import { detectLanIps } from "@/lib/hubEndpoints";
 import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
-import { singleflight } from "@/lib/singleflight";
+import { singleflight } from "@maipai/core/src/singleflight";
 
 const generateRsaKeyPair = promisify(generateKeyPairCb);
 

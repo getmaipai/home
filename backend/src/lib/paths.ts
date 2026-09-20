@@ -1,5 +1,4 @@
 import { resolve, join } from "node:path";
-import { existsSync, mkdirSync, statSync } from "node:fs";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 
 // The bundled packages' own source directory - checked into git, never
@@ -156,24 +155,7 @@ export const clonedVoicesDir = resolve(dataDir, "voice", "cloned");
 // before it is resolved or used.
 export const attachmentsDir = resolve(dataDir, "people");
 
-// Shared by lib/backup.ts's ensureBackupDir() and lib/clonedVoices.ts's
-// ensureDir(): a code review (2026-09-04) found both had independently
-// hand-rolled the identical "create it, owner-only, if it's not already
-// there" check. 0700: every directory under data/ (and its backupDir
-// sibling) holds real household data, never a mode a future caller
-// should have to remember to pass.
-export function ensureDataDir(dir: string): void {
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
-}
-
-// Shared by lib/plugins.ts's and lib/skills.ts's mtime-keyed manifest/
-// recipe/skill caches (a latency review, 2026-09-06) - a code review the
-// same day found the identical try/statSync/catch written out verbatim
-// in both files, both of which already import PACKAGES_DIR from here.
-export function statMtimeMs(path: string): number | null {
-  try {
-    return statSync(path).mtimeMs;
-  } catch {
-    return null;
-  }
-}
+// ensureDataDir and statMtimeMs themselves live in @maipai/core/src/paths
+// now (core-v0.1.0, since neither reads a product's data layout);
+// re-exported here so every existing @/lib/paths import keeps working.
+export { ensureDataDir, statMtimeMs } from "@maipai/core/src/paths";

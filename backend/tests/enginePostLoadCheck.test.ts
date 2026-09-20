@@ -9,7 +9,7 @@ import { startStubLlmServer, type StubLlmServerHandle } from "@maipai/spec/llm/t
 const qwen3_8b = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
 
 function hw(): HardwareInfo {
-  return { platform: "darwin", arch: "arm64", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] };
+  return { platform: "darwin", arch: "arm64", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [], osVersion: "test" };
 }
 
 let server: StubLlmServerHandle | undefined;

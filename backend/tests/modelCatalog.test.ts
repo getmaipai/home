@@ -13,6 +13,7 @@ function hw(overrides: Partial<HardwareInfo>): HardwareInfo {
     isAppleSilicon: false,
     unifiedMemoryGb: 0,
     cudaDevices: [],
+    osVersion: "test",
     ...overrides,
   };
 }

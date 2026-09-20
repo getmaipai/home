@@ -16,7 +16,7 @@ import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, statSync, unlinkSync } from "node:fs";
 import { mkdirSync, renameSync } from "node:fs";
 import { dirname } from "node:path";
-import { withTimeout } from "@/lib/withTimeout";
+import { withTimeout } from "@maipai/core/src/withTimeout";
 
 export interface DownloadProgress {
   completedBytes: number;

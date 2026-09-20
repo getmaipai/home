@@ -18,7 +18,7 @@ import { detectHardware } from "@/lib/hardware";
 import { selectEngineBinary, ENGINE_READY_MARKER, type EngineArchive } from "@/lib/engineCatalog";
 import { modelsDir, enginesDir } from "@/lib/paths";
 import { downloadUrl } from "@/lib/modelDownload";
-import { extractArchive } from "@/lib/archive";
+import { extractArchive } from "@maipai/core/src/archive";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { CHAT_MODEL_SETTING_KEY } from "@/settings/aiKeys";
 import { getChatClient, restartChatBackend, getLastPostLoadCheck } from "@/lib/llmSupervisor";

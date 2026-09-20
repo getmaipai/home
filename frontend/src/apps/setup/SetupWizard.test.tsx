@@ -53,6 +53,7 @@ const HARDWARE: HardwareInfo = {
   isAppleSilicon: true,
   unifiedMemoryGb: 16,
   cudaDevices: [],
+  osVersion: "test",
 };
 
 const MODEL_FITS: ModelFit[] = [

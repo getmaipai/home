@@ -17,7 +17,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { downloadUrl } from "@/lib/modelDownload";
 import { sttDir } from "@/lib/paths";
-import { singleflight } from "@/lib/singleflight";
+import { singleflight } from "@maipai/core/src/singleflight";
 
 const execFileAsync = promisify(execFile);
 

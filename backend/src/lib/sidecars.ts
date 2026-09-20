@@ -22,7 +22,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import { hotReloadState } from "@/lib/hotReloadState";
-import { withTimeout } from "@/lib/withTimeout";
+import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { EngineHealthEntry, EngineHealthKind } from "@/wire";
 
 const execFileAsync = promisify(execFile);

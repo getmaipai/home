@@ -11,7 +11,7 @@
 import { join } from "node:path";
 import { downloadUrl } from "@/lib/modelDownload";
 import { modelsDir } from "@/lib/paths";
-import { singleflight } from "@/lib/singleflight";
+import { singleflight } from "@maipai/core/src/singleflight";
 
 export const EMBED_MODEL_FILE = "nomic-embed-text-v1.5.Q4_K_M.gguf";
 export const EMBED_MODEL_URL =

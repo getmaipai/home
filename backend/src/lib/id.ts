@@ -1,18 +1,8 @@
-import { randomBytes } from "node:crypto";
-
-const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
-
-// Exported so lib/deviceId.ts doesn't hand-roll the same "random base36
-// string from crypto bytes" loop a second time (a code review,
-// 2026-09-04, found it had).
-export function randomSuffix(length: number): string {
-  const bytes = randomBytes(length);
-  let out = "";
-  for (let i = 0; i < length; i++) {
-    out += ALPHABET[bytes[i]! % ALPHABET.length];
-  }
-  return out;
-}
+// randomSuffix itself lives in @maipai/core/src/id now (core-v0.1.0,
+// since it names no spec record type); every newXId() below still owns
+// its own prefix and pattern, which is Home's own.
+import { randomSuffix } from "@maipai/core/src/id";
+export { randomSuffix };
 
 /** Matches spec/schemas/person.schema.json's `^person-[a-z0-9]{6,}$`. */
 export function newPersonId(): string {
