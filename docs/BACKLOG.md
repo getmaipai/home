@@ -7664,6 +7664,20 @@ on a spec tag that was never cut.
       no metadata still lists with "unknown" values rather than being
       dropped. Out of scope: voice cloning's own flow. Exit:
       `bash scripts/check.sh` and the captures opened.
+      Two owner rulings (2026-09-20 17:55): (1) the Voice section of
+      Settings shows the top choices inline, a row of up to six voice
+      cards (friendly name, one-line description, language, the
+      preview button, the current one marked), chosen by the Stack's
+      list order for the household's language, with "Browse all
+      voices" opening the full browser beside them; picking a card
+      sets the voice without opening the browser. (2) Every part of
+      the voice UI (top choices, the browser, its filters, the preview,
+      the download state) is generic over the voice engine: it reads
+      only the Stack's voice list and its `engine` and `source` fields
+      and never names Pocket TTS or any engine in code or copy except
+      as the value of a filter chip; a second engine's voices appear
+      in the same rows and cards with no UI change, and a test proves
+      it with a scripted list mixing two engines.
 
 - [ ] Wake word past phase 1 (L) - mic capture + inference exists
       in-browser; everything else (barge-in in this repo, satellite mode,
