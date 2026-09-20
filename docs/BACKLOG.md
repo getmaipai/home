@@ -6296,25 +6296,18 @@ approvals are still real, unstarted work for a future session.
       changing update the way `install()`'s own `requiresConfirmation`
       already models) - the honest empty state HOME-UI-02 shipped
       becomes real content instead of being replaced.
-- [ ] **Fix SettingsPage's content squeeze at the kit's real 960px
+- [x] **Fix SettingsPage's content squeeze at the kit's real 960px
       breakpoint, then drop the `--breakpoint-lg` override** (S) - step
       5a (2026-09-20) restored `--breakpoint-lg` to 1024px in
       `frontend/src/shell/tokens.css` rather than let the kit's own
       960px reopen a real squeeze bug in `SettingsPage.tsx`'s own
       `lg:hidden`/`lg:flex` split (the shell's rail plus the settings
       tree sidebar crowding the content column below ~1024px, first
-      found 2026-09-05). A breakpoint is a structural kit token, not a
-      product color choice (docs/UI.md), so a product-side override is
-      a second definition that should not outlive its bug - fix the
-      actual squeeze (a narrower settings sidebar, a different
-      collapse point, or `SettingsPage.tsx`'s own layout, not another
-      token override) so the page holds up at the kit's real 960px, then
-      delete `--breakpoint-lg` from `tokens.css`. Needs a real viewport
-      between 960 and 1024px exercised (nothing in
-      `scripts/screenshot.ts`'s `VIEWPORTS` - 820/1440/1920 - straddles
-      this gap; add one or check manually) before calling it fixed.
-      Exit check: `home/scripts/check.sh` green with `--breakpoint-lg`
-      gone, a screenshot at ~1000px width showing no squeeze.
+      found 2026-09-05). Fixed by narrowing the settings tree sidebar
+      from `w-52` to `w-44` so the content column holds at the kit's
+      real 960px `lg` tier, and deleting the `--breakpoint-lg`
+      override from `tokens.css`. Added a 1000px viewport to
+      `scripts/screenshot.ts` to exercise the 960-1024px gap.
 - [ ] **Chat's empty state and message turns don't yet match
       `shared/ui/docs/spec.md`'s Chat section** (M) - found live, step
       5b (2026-09-20), judging the acceptance screenshot set against the

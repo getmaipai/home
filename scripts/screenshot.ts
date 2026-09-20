@@ -317,6 +317,7 @@ interface ViewportSpec {
 const VIEWPORTS: ViewportSpec[] = [
   { slug: "phone", width: 390, height: 844 },
   { slug: "tablet", width: 820, height: 1180 },
+  { slug: "lap", width: 1000, height: 1000 },
   { slug: "desktop", width: 1440, height: 900 },
   { slug: "far", width: 1920, height: 1080, userAgent: "Mozilla/5.0 (SmartTV; GoogleTV) MaiPaiHomeScreenshotMatrix/1.0" },
 ];

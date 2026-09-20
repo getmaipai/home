@@ -21,23 +21,6 @@
  * shell's own height clamp had silently become `height: auto`. */
 @source "../../../../shared/ui/src";
 
-@theme {
-  /* 1024px, not the kit's own 960px (its spec's responsive tiers):
-   * SettingsPage.tsx's own `lg:hidden`/`lg:flex` split was tuned
-   * specifically to 1024px by a 2026-09-05 live review (its own
-   * comments: "content column badly squeezed below ~1024px" with the
-   * shell's own rail also on screen) - Home's pre-adoption tokens.css
-   * carried this same override for the same reason. Nothing in the
-   * kit's own sidebar/dashboard blocks needs `lg` any earlier than this
-   * (their own `lg:` usages are cosmetic - a header label showing,
-   * a filter row hiding - not survival-critical the way this one is),
-   * so raising it back doesn't cost the kit's own layouts anything a
-   * screenshot would catch, at any of Home's own viewports (820/1440,
-   * neither near the 960-1024 gap this affects).
-   */
-  --breakpoint-lg: 1024px;
-}
-
 :root {
   /* Home's brand accent is cyan, not the kit's electric blue
    * (brand/README.md's per-product accent table). 26%, not the

@@ -291,12 +291,15 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               same idea - its own tree lives inside the editor tab, not in
               place of the activity bar). Scrolls the content pane to a
               section rather than owning a second copy of it. `lg`, not
-              `md`: the tree plus the shell's own global sidebar leaves the
-              content column badly squeezed below ~1024px (found live at
-              an 800px viewport - a settings row wrapped into a near-
-              vertical stack of single words). Below that width, the tree
-              hides and the content gets the full column back. */}
-          <aside aria-label="Settings navigation" className="hidden w-52 shrink-0 flex-col gap-1 overflow-y-auto pe-2 lg:flex">
+              `md`: below `lg` the tree hides and the content gets the full
+              column back (found live at an 800px viewport - a settings row
+              wrapped into a near-vertical stack of single words). `w-44`,
+              not `w-52`: the kit's real 960px `lg` tier (shared/ui/docs/
+              spec.md's responsive tiers: "960 to 1279 px: reduce card
+              columns") plus the shell's own 252px rail left the content
+              column squeezed at `w-52`; `w-44` (176px) holds up at 960px
+              while still reading at `text-base`. */}
+          <aside aria-label="Settings navigation" className="hidden w-44 shrink-0 flex-col gap-1 overflow-y-auto pe-2 lg:flex">
             {tree.map((entry, index) => {
               const Icon = getIcon(entry.icon);
               // A routed entry (`to`) is active by URL match, not scroll
