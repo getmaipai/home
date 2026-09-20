@@ -204,6 +204,13 @@ const SCREENS_DIR = useWebkit ? join(ROOT, "docs", "assets", "screens", "webkit"
 const HERO_PATH = useWebkit ? join(ROOT, "docs", "assets", "webkit", "hero.png") : join(ROOT, "docs", "assets", "hero.png");
 const dedicatedScreenshots: Array<{ file: string; route: string; viewport: string; theme: string }> = [];
 
+// A tiny solid-color PNG, embedded so captureChatSourcesMemoryAttachment's
+// fake image attachment always renders (org standard: "Deterministic and
+// offline by default" - no live fetch to a fake external URL, which just
+// renders as a broken-image icon).
+const TRAIL_THUMBNAIL_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAACxElEQVR42u3SRUIQAAAAQZ7IS3yOATZgByKpYHeLAXZ3t55kL77COewLdgYGV6/6O7im1ta6GqrhWl8bamNtqs21pbbWSI3WWG2r7bWjdtau2l17am/tq/01Xgdqog7WZE3VdM3UbM3VoTpc87VQR+poHavjdaJO1qk6XWfqbJ2r83WhLtalulxX6mpdq+u1WDfqZt2q27VUy3Wn7ta9ul8P6mE9qsf1pJ7Ws3peL+plvarX9abe1rt6Xx/qY32qz/Wlvta3+l4/6mf9qt/1p/6zHwMAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAII4L8fK9fe4oni3vjtAAAAAElFTkSuQmCC";
+
 const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
 const chatFocusReview = process.argv.includes("--chat-focus-review");
@@ -212,6 +219,10 @@ const chatContinueReview = process.argv.includes("--chat-continue-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview || chatTemporaryReview;
 const chatStatsReview = process.argv.includes("--chat-stats-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
+// spec.md "Acceptance for an implementation": the three states with no
+// existing dedicated capture (sources card + memory chip + image
+// attachment together, a streaming reply, the engine-not-ready state).
+const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const settingsReview = process.argv.includes("--settings-review");
 const conversationsReview = process.argv.includes("--conversations-review");
 const pictureReview = process.argv.includes("--picture-review");
@@ -847,9 +858,17 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
     if (navTop === undefined || composerBottom === undefined) throw new Error("Could not measure the phone bottom nav or the composer to check they don't overlap");
     if (composerBottom > navTop) throw new Error(`On phone, with a loaded conversation, the composer's bottom edge (${composerBottom}) sits ${composerBottom - navTop}px inside PhoneNav's own top edge (${navTop}) - a real tap on Send would land on the nav instead (#75)`);
   }
+  // Desktop's thread list is the persistent column (spec.md "Layout"),
+  // never toggled - ChatPage.tsx's own "Show threads"/"Hide threads"
+  // button is `sm:hidden`, so it exists in the DOM but is not
+  // Playwright-actionable there, and there is nothing to open. Only
+  // phone drives it, via the Sheet it actually controls.
+  const showThreads = async () => {
+    if (viewport.slug === "phone") await page.getByRole("button", { name: "Show threads" }).click();
+  };
   await page.reload();
   await page.getByText("And some herbs for cooking", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Show threads" }).click();
+  await showThreads();
   const item = page.locator('[data-slot="aui_thread-list-item"]').filter({ has: page.getByRole("button", { name: "Help me plan a small garden", exact: true }) });
   await item.getByRole("button", { name: "More options" }).click();
   await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
@@ -857,7 +876,7 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await page.getByRole("textbox", { name: "Rename thread" }).press("Enter");
   await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
   await page.reload();
-  await page.getByRole("button", { name: "Show threads" }).click();
+  await showThreads();
   await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
   await settleAnimations(page);
   await page.screenshot({ path: join(SCREENS_DIR, `chat-history-${viewport.slug}-${theme}.png`) });
@@ -865,12 +884,26 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await other.getByRole("button", { name: "More options" }).click();
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page.getByRole("button", { name: "Delete chat", exact: true }).click();
-  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  // A bare `dialog` role, not scoped to this one's own name ("Delete
+  // chat"), started matching the phone thread list's own Sheet too
+  // once step 5b made that a real dialog-role element (spec.md
+  // "Layout": phone opens the thread list as a sheet) - the confirm
+  // dialog closes on delete, but that outer sheet correctly stays
+  // open, so an unscoped wait for "any dialog hidden" hung forever on
+  // the wrong one.
+  await page.getByRole("dialog", { name: "Delete chat" }).waitFor({ state: "hidden" });
   await page.reload();
-  await page.getByRole("button", { name: "Show threads" }).click();
+  await showThreads();
   await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
   if (await page.getByRole("button", { name: "Help me choose a book", exact: true }).count()) throw new Error("Deleted chat returned after reload");
-  await page.getByRole("button", { name: "Hide threads" }).click();
+  if (viewport.slug === "phone") {
+    // Radix marks the header's own outer toggle `aria-hidden` while the
+    // Sheet is open (it lives outside the Sheet's portal) - the same
+    // reason ChatPage.test.tsx's "thread history" test closes via the
+    // Sheet's own visible Close button instead. That button's label is
+    // "Close" (sheet.tsx's sr-only span), not "Hide threads".
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+  }
   await page.getByText("And some herbs for cooking", { exact: true }).waitFor();
 }
 
@@ -1014,6 +1047,192 @@ async function captureChatDocumentPane(browser: Browser, sessionValue: string, v
   }
 }
 
+/** spec.md "Acceptance for an implementation", state 2: a thread with the
+ * sources card open, a memory chip, and an image attachment together on
+ * one reply. Stubs the conversation's own GET turns endpoint directly (a
+ * loaded row, not a live `/api/turn/stream`) because only a loaded row
+ * carries `memory_ids` - chatMemoryState.ts's deriveMemoryStatus() only
+ * reaches "saved" from a non-empty memory_ids list, which a live turn
+ * never carries (the judge runs after the turn, never during it). Field
+ * names match chatHistoryAdapter.ts's own reads of ConversationTurnWithMemoryIds
+ * (backend/src/wire.ts) exactly. */
+async function captureChatSourcesMemoryAttachment(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    const conversationId = "conv-attach123";
+    const turnId = "turn-attach123";
+    // useRemoteThreadListRuntime's own adapter (chatThreadListAdapter.ts)
+    // calls `fetch(remoteId)` - GET /api/conversations/:id, singular -
+    // before it will switch to a `threadId` prop it doesn't already know
+    // about; a real 404 here (this conversation is fake, never actually
+    // created) makes it silently fall back to a fresh empty thread
+    // instead, and the reply text below never appears. Found live: the
+    // first attempt at this capture only stubbed the plural `/turns` GET
+    // and timed out.
+    await page.route(`**/api/conversations/${conversationId}`, (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: conversationId,
+        person: "person-attach123",
+        surface: "chat",
+        mode: "chat",
+        companion_id: null,
+        title: "Trail ideas",
+        status: "open",
+        summary: null,
+        summary_through_turn: null,
+        source: "hub",
+        hlc: "1788000000000:0:example",
+        created_at: "2026-09-16T00:00:00.000Z",
+        updated_at: "2026-09-16T00:00:00.000Z",
+      }),
+    }));
+    await page.route(`**/api/conversations/${conversationId}/turns`, (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([{
+        id: turnId,
+        conversationId,
+        userText: "Any family-friendly trails nearby?",
+        replyText: "The Greenway Trail is a short, family-friendly loop [1].",
+        source: "model",
+        pluginId: null,
+        commandId: null,
+        safetyFlagged: false,
+        safetyAction: "allow",
+        minorSpeaker: false,
+        createdAt: "2026-09-16T00:00:00.000Z",
+        judgeStatus: "done",
+        judgeAttempts: 1,
+        outcomes: null,
+        document: null,
+        memory_ids: ["mem-attach123"],
+        sources: [{
+          id: "src-attach123",
+          kind: "web",
+          title: "Greenway Trail guide",
+          url: "https://example.com/greenway",
+          site: "example.com",
+          snippet: "A short, family-friendly loop.",
+          source: turnId,
+          created_at: "2026-09-16T00:00:00.000Z",
+          hlc: "1788000000000:0:example",
+        }],
+        media: null,
+        media_items: [{
+          kind: "image",
+          url: "https://example.com/greenway.jpg",
+          // A real, always-loadable image with no live network dependency
+          // (org standard: "Deterministic and offline by default") - a
+          // fake https URL here renders as a broken-image icon, found
+          // live on the first attempt at this capture. `url` above stays
+          // a realistic-looking (but still fake) address, since it's
+          // only ever used for the "open in a new tab" href, never as
+          // the rendered `<img src>` once `thumbnail` is set
+          // (chatCitations.ts's ChatMedia: `item.thumbnail ?? item.url`).
+          thumbnail: `data:image/png;base64,${TRAIL_THUMBNAIL_PNG_BASE64}`,
+          source: turnId,
+          source_url: "https://example.com/greenway",
+        }],
+        stats: null,
+      }]),
+    }));
+    await page.goto(`${BASE_URL}/chat?conversation=${conversationId}`);
+    await page.getByText("The Greenway Trail is a short, family-friendly loop", { exact: false }).waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.getByText("Remembered", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Source 1: Greenway Trail guide", exact: true }).click();
+    await page.getByText("Greenway Trail guide", { exact: true }).waitFor();
+    await settleAnimations(page);
+    const screenshot = `chat-sources-memory-attachment-${viewport.slug}-${theme}.png`;
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-sources-memory-attachment", viewport: viewport.slug, theme });
+  } finally {
+    await context.close();
+  }
+}
+
+/** spec.md "Acceptance for an implementation", state 3: a streaming
+ * reply. `/api/turn/stream` is a real ndjson stream the frontend reads
+ * incrementally (chatModelAdapter.ts) - a `route.fulfill()` body is
+ * delivered whole and near-instantly on localhost, too fast to reliably
+ * catch mid-stream. Overriding `window.fetch` in the page instead (via
+ * `addInitScript`, so it is in place before the app's own first fetch)
+ * gives a real, still-open `ReadableStream` whose one chunk is enqueued
+ * and then deliberately never closed - the app has no way to tell this
+ * apart from a slow real reply still arriving, so `running` (and the
+ * streaming caret) stays true for as long as this page lives, a stable
+ * target for a screenshot. */
+async function captureChatStreaming(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch;
+      const patched = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (url.includes("/api/turn/stream")) {
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode(`${JSON.stringify({ type: "delta", text: "The Greenway Trail is a short, family" })}\n`));
+              // No controller.close() - see the function's own comment above.
+            },
+          });
+          return new Response(stream, { status: 200, headers: { "content-type": "application/x-ndjson" } });
+        }
+        return originalFetch(input, init);
+      };
+      window.fetch = patched as typeof fetch;
+    });
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.getByRole("textbox", { name: "Message input" }).fill("Any family-friendly trails nearby?");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByText("The Greenway Trail is a short, family", { exact: false }).waitFor();
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor();
+    await settleAnimations(page);
+    const screenshot = `chat-streaming-${viewport.slug}-${theme}.png`;
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-streaming", viewport: viewport.slug, theme });
+  } finally {
+    await context.close();
+  }
+}
+
+/** spec.md "Acceptance for an implementation", state 4: the engine-not-
+ * ready state ("Empty, loading, error" - "the composer is disabled with
+ * the health item's one-sentence reason as its placeholder and its fix
+ * as a button beside it"). Same `/api/health` shape ChatPage.test.tsx's
+ * "the composer is disabled while the model is starting" test uses. */
+async function captureChatEngineNotReady(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.route("**/api/health", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ brain: "starting", voice: "none" }),
+    }));
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.getByPlaceholder("MaiPai's AI is starting up. This can take a moment.").waitFor();
+    await page.getByRole("link", { name: "Open AI models", exact: true }).waitFor();
+    await settleAnimations(page);
+    const screenshot = `chat-engine-not-ready-${viewport.slug}-${theme}.png`;
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "chat-engine-not-ready", viewport: viewport.slug, theme });
+  } finally {
+    await context.close();
+  }
+}
+
 /** CHAT-PARITY-01's focused review: the seeded demo machine does not have a
  * multi-gigabyte model installed, so this capture supplies the compact,
  * already-reachable model-list response at the browser boundary. The real
@@ -1037,10 +1256,14 @@ async function captureChatModelPicker(browser: Browser, sessionValue: string): P
     }));
     await page.goto(`${BASE_URL}/chat`);
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    const trigger = page.getByRole("button", { name: "Choose chat model (current: Qwen3 8B Instruct)" });
+    // ModelPicker.tsx's HeaderPicker trigger, not the deleted
+    // ChatModelPicker.tsx's own accessible name - found stale by review
+    // (step 5b's rebuild switched components but left this selector
+    // untouched, so this capture silently stopped matching anything).
+    const trigger = page.getByRole("button", { name: "Chat model: Qwen3 8B Instruct" });
     await trigger.waitFor();
     await trigger.click();
-    await page.getByText("Choose a model that fits this computer.", { exact: true }).waitFor();
+    await page.getByRole("menuitem", { name: "Open AI models", exact: true }).waitFor();
     await settleAnimations(page);
     const screenshot = "chat-model-picker-desktop-light.png";
     await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
@@ -1873,7 +2096,17 @@ async function main() {
 
     if (!a11yOnly && chatContinueReview) await captureChatContinueReview(browser, sessionValue);
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !notificationsReview && !conversationsReview && !pictureReview) {
+    if (!a11yOnly && chatAcceptanceReview) {
+      for (const combo of A11Y_ONLY_COMBOS) {
+        const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
+        if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
+        await captureChatSourcesMemoryAttachment(browser, sessionValue, viewport, combo.theme);
+        await captureChatStreaming(browser, sessionValue, viewport, combo.theme);
+        await captureChatEngineNotReady(browser, sessionValue, viewport, combo.theme);
+      }
+    }
+
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !notificationsReview && !conversationsReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;

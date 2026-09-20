@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
 export interface EngineHealth {
   brain: string;
   voice: string;
 }
+
+// thread.aui.tsx's own MessageError reads this (spec.md "Empty, loading,
+// error": a failed turn's recovery row offers "Open AI models" only
+// when the brain itself is the reason, not for a turn that failed for
+// some other cause) - ChatPage.tsx is the one provider, computed from
+// the same useEngineHealth() poll below.
+export const ChatBrainBadContext = createContext(false);
 
 // The one poll of /api/health (getEngineStatus().kind on the backend) -
 // SensesDock's status pill and the composer's ready-to-send gate both

@@ -4,7 +4,7 @@ import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import type { SttSocket, SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
-// The same minimal Web Audio fake WakeWordToggle.test.tsx already uses
+// The same minimal Web Audio fake useWakeWord.test.ts already uses
 // (mic-capture.ts's real startMicCapture() is exercised here too, since
 // it isn't injectable the way the socket is - only the message-handling
 // logic below is this file's own concern, not real audio capture,

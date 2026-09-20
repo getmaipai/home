@@ -26,11 +26,14 @@ describe("eslint.config.js", () => {
   // Icons themselves moved to @maipai/ui/src/icons (ui-v0.1.0/0.1.1) -
   // ESLint never scans it (outside src/, and node_modules is excluded by
   // default), so the only real exemption left in this repo is
-  // assistant-ui's own vendored, name-by-name lucide imports.
-  test("allows lucide-react inside kit/assistant-ui", async () => {
+  // thread.aui.tsx's own vendored-registry lucide import (step 5b,
+  // ui-v0.2.0 - its sibling wrappers moved to @maipai/ui/src/assistant-
+  // ui, this one file stayed since it mixes that rendering with real
+  // Home business logic).
+  test("allows lucide-react inside thread.aui.tsx", async () => {
     const ids = await ruleIdsFor(
       'import { Check } from "lucide-react";\nexport const X = Check;\n',
-      "src/kit/assistant-ui/fixture.tsx",
+      "src/apps/chat/thread.aui.tsx",
     );
     expect(ids).not.toContain("no-restricted-imports");
   });

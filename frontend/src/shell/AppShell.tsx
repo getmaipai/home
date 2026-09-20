@@ -11,6 +11,7 @@ import { NAV_ENTRIES } from "@/shell/nav";
 import { APP_CATALOG, favoriteApps } from "@/shell/appCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useAppearance } from "@/shell/useAppearance";
+import { ModelPicker } from "@/shell/ModelPicker";
 import { NotificationBell } from "@/shell/NotificationBell";
 import { ProfileSwitcher } from "@/shell/ProfileSwitcher";
 import { useSearchCommand } from "@/shell/search/useSearchCommand";
@@ -93,11 +94,16 @@ function FooterNavItem({ to, icon, label }: { to: string; icon: string; label: s
 /** Home's own wiring around the kit's Shell contract (docs/UI.md): the
  * kit owns the rail/phone-bar/header layout and the search dialog, Home
  * supplies its brand, nav data, Favorites, and the header's own actions
- * (PinToggle, NotificationBell, ProfileSwitcher) - "the kit gets a slot,
- * Home keeps the feature." The kit's own header search button (ui-v0.1.2)
- * covers touch/phone reachability; Cmd/Ctrl+K and HomePage's own inline
- * prompt box remain as additional entry points, and the sidebar's old
- * dedicated "Search" row (a fourth) is the only one actually gone.
+ * (PinToggle, ModelPicker, NotificationBell, ProfileSwitcher) - "the kit
+ * gets a slot, Home keeps the feature." The kit's own header search
+ * button (ui-v0.1.2) covers touch/phone reachability; Cmd/Ctrl+K and
+ * HomePage's own inline prompt box remain as additional entry points,
+ * and the sidebar's old dedicated "Search" row (a fourth) is the only
+ * one actually gone. `ModelPicker` (step 5b, the chat rebuild) is the
+ * same route-gated-header-action pattern `PinToggle` already used - the
+ * kit has no dedicated "page-specific header control" slot, so a page's
+ * own control renders unconditionally here and decides for itself
+ * whether the current route and person warrant showing anything.
  *
  * Known gap, tracked not dropped (docs/BACKLOG.md): the kit's Shell has
  * no TV-focusable rail yet (the arrow-key/remote nav the old hand-built
@@ -143,6 +149,7 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
       headerActions={
         <>
           <PinToggle person={person} />
+          <ModelPicker person={person} />
           <NotificationBell />
           <ProfileSwitcher person={person} onSwitched={onPersonChange} onSignOut={onSignOut} />
         </>

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { ActionBarMorePrimitive, ActionBarPrimitive, useAuiState, type FeedbackAdapter } from "@assistant-ui/react";
 import { toast } from "sonner";
 import { getIcon } from "@maipai/ui/src/icons";
-import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
+import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-button";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, type ReplyFeedback } from "@/lib/api";
 import { messageText } from "@/apps/chat/chatMessageText";

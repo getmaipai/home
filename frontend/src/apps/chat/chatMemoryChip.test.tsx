@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { act, cleanup, fireEvent } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import {
   AssistantRuntimeProvider,
   ThreadPrimitive,
@@ -8,6 +8,7 @@ import {
   type ChatModelAdapter,
   type ThreadMessageLike,
 } from "@assistant-ui/react";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
 import { forgetMessage } from "@/apps/chat/chatMemoryActions";
@@ -56,24 +57,41 @@ function ChipUnderTest({ message }: { message: ThreadMessageLike }) {
   );
 }
 
+function Location() {
+  return <div data-testid="location">{useLocation().pathname + useLocation().search}</div>;
+}
+
 function renderChip(message: ThreadMessageLike) {
   return renderWithQueryClient(
     <MemoryRouter>
-      <ChipUnderTest message={message} />
+      <TooltipProvider>
+        <Location />
+        <ChipUnderTest message={message} />
+      </TooltipProvider>
     </MemoryRouter>,
   );
 }
 
+// Radix's PopoverTrigger opens on pointerdown, not a plain click;
+// happy-dom's click alone leaves it closed.
+function openPopover(trigger: HTMLElement): void {
+  act(() => {
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 });
+    fireEvent.click(trigger);
+  });
+}
+
 describe("MemoryUpdatedChip", () => {
-  test("saved: shows the linked chip when the row already carries real memory_ids", async () => {
+  test("saved: shows the chip, and its Edit action navigates to the memory page with real memory_ids", async () => {
     const restore = stubFetchNeverCalled();
     try {
-      const { findByText, findByRole } = renderChip(
+      const { findByText, findByRole, getByTestId } = renderChip(
         replyMessage("turn-saved", { conversationId: "conv-1", source: "model", judgeStatus: "done", memoryIds: ["mem-1", "mem-2"] }),
       );
-      await findByText("Memory updated");
-      const link = await findByRole("link", { name: /Memory updated/ });
-      expect(link.getAttribute("href")).toBe("/memory?ids=mem-1,mem-2");
+      await findByText("Remembered");
+      openPopover(await findByRole("button", { name: /Remembered/ }));
+      fireEvent.click(await findByRole("button", { name: "Edit" }));
+      expect(getByTestId("location").textContent).toBe("/memory?ids=mem-1,mem-2");
     } finally {
       restore();
     }
@@ -81,16 +99,16 @@ describe("MemoryUpdatedChip", () => {
 
   // Jesse, 2026-09-13: pending is process, not an outcome - a person
   // should see this chip only once something has actually happened
-  // ("Memory updated"/"Memory wasn't saved"), never a mid-flight
-  // "Checking for memories". The state machine (chatMemoryState.ts)
-  // still tracks pending exactly as before; only the chip's own
-  // rendering of it changed, to nothing.
+  // ("Remembered"/"Memory wasn't saved"), never a mid-flight "Checking
+  // for memories". The state machine (chatMemoryState.ts) still tracks
+  // pending exactly as before; only the chip's own rendering of it
+  // changed, to nothing.
   test("pending: a model turn not yet judged renders no chip at all", async () => {
     const restore = stubFetchNeverCalled();
     try {
       const { container } = renderChip(replyMessage("turn-pending", { conversationId: "conv-1", source: "model", judgeStatus: null, memoryIds: [] }));
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(container.textContent).toBe("");
+      expect(container.querySelector('[data-slot="chat-memory-chip"]')).toBeNull();
     } finally {
       restore();
     }
@@ -101,7 +119,7 @@ describe("MemoryUpdatedChip", () => {
     try {
       const { container } = renderChip(replyMessage("turn-live", { conversationId: "conv-1", source: "model" }));
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(container.textContent).toBe("");
+      expect(container.querySelector('[data-slot="chat-memory-chip"]')).toBeNull();
     } finally {
       restore();
     }
@@ -114,7 +132,7 @@ describe("MemoryUpdatedChip", () => {
         replyMessage("turn-not-saved", { conversationId: "conv-1", source: "model", judgeStatus: "done", memoryIds: [] }),
       );
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(queryByText("Memory updated")).toBeNull();
+      expect(queryByText("Remembered")).toBeNull();
     } finally {
       restore();
     }
@@ -127,21 +145,22 @@ describe("MemoryUpdatedChip", () => {
         replyMessage("turn-plugin", { conversationId: "conv-1", source: "plugin", judgeStatus: null, memoryIds: [] }),
       );
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(container.textContent).toBe("");
+      expect(container.querySelector('[data-slot="chat-memory-chip"]')).toBeNull();
     } finally {
       restore();
     }
   });
 
-  test("failed: a judge that couldn't parse the turn shows the failed chip, linked to the memory page", async () => {
+  test("failed: a judge that couldn't parse the turn shows the failed chip, which navigates to the memory page on tap (no popover)", async () => {
     const restore = stubFetchNeverCalled();
     try {
-      const { findByText, findByRole } = renderChip(
+      const { findByText, findByRole, getByTestId } = renderChip(
         replyMessage("turn-failed", { conversationId: "conv-1", source: "model", judgeStatus: "failed", memoryIds: [] }),
       );
       await findByText("Memory wasn't saved");
-      const link = await findByRole("link", { name: /Memory wasn't saved/ });
-      expect(link.getAttribute("href")).toBe("/memory");
+      fireEvent.click(await findByRole("button", { name: /Memory wasn't saved/ }));
+      expect(getByTestId("location").textContent).toBe("/memory");
+      expect(document.querySelector('[data-slot="popover-content"]')).toBeNull();
     } finally {
       restore();
     }
@@ -153,7 +172,7 @@ describe("MemoryUpdatedChip", () => {
       const { findByText } = renderChip(
         replyMessage("turn-manual-save", { conversationId: "conv-1", source: "plugin", judgeStatus: null, memoryIds: ["mem-manual"] }),
       );
-      await findByText("Memory updated");
+      await findByText("Remembered");
     } finally {
       restore();
     }
@@ -162,7 +181,7 @@ describe("MemoryUpdatedChip", () => {
   // CHAT-20's own acceptance: "forget from the chip updates the message."
   // ForgetThisMenuItem (chatActionBar.tsx) calls exactly this same
   // forgetMessage() on a click; this proves the chip really does update
-  // once it resolves, without needing to drive the menu item's own click
+  // once it resolves, without needing to drive the popover's own click
   // handler through a portal.
   test("forgetting a saved message's memory turns the chip off", async () => {
     const original = globalThis.fetch;
@@ -175,12 +194,12 @@ describe("MemoryUpdatedChip", () => {
       const { findByText, queryByText } = renderChip(
         replyMessage("turn-forget", { conversationId: "conv-1", source: "model", judgeStatus: "done", memoryIds: ["mem-1"] }),
       );
-      await findByText("Memory updated");
+      await findByText("Remembered");
 
       await forgetMessage("turn-forget", ["mem-1"]);
 
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(queryByText("Memory updated")).toBeNull();
+      expect(queryByText("Remembered")).toBeNull();
     } finally {
       globalThis.fetch = original;
     }
@@ -191,7 +210,7 @@ describe("MemoryUpdatedChip", () => {
     try {
       const { container } = renderChip({ id: "no-turn", role: "assistant", content: "no metadata" });
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(container.textContent).toBe("");
+      expect(container.querySelector('[data-slot="chat-memory-chip"]')).toBeNull();
     } finally {
       restore();
     }

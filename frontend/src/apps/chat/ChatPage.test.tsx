@@ -240,7 +240,7 @@ describe("ChatPage", () => {
   });
 });
 
-test("the composer is disabled while the model is starting, matching the Brain pill", async () => {
+test("the composer is disabled while the model is starting, with a fix button beside it", async () => {
   const restore = stubFetch({ brain: "starting" });
   try {
     const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
@@ -252,13 +252,17 @@ test("the composer is disabled while the model is starting, matching the Brain p
     // set a disabled textarea's value directly in this test environment).
     await waitFor(() => expect(input.disabled).toBe(true));
     expect((view.getByLabelText("Send message") as HTMLButtonElement).disabled).toBe(true);
-    await waitFor(() => expect(view.getByRole("button", { name: "Chat status: Starting" })).toBeTruthy());
+    // spec.md "Empty, loading, error": the placeholder carries the
+    // reason, a real button beside the composer is the fix - no second
+    // status surface (the old "Chat status" pill) anymore.
+    expect(input.placeholder).toBe("MaiPai's AI is starting up. This can take a moment.");
+    expect((await view.findByRole("link", { name: "Open AI models" })).getAttribute("href")).toBe("/settings/models");
   } finally {
     restore();
   }
 });
 
-test("thread history can be opened and closed without removing the composer", async () => {
+test("thread history opens as a phone sheet without removing the composer, and closes from the sheet's own close button", async () => {
   const restore = stubFetch();
   try {
     const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
@@ -266,8 +270,14 @@ test("thread history can be opened and closed without removing the composer", as
     const toggle = view.getByRole("button", { name: "Show threads" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(toggle);
-    expect(view.getByRole("button", { name: "Hide threads" }).getAttribute("aria-expanded")).toBe("true");
-    fireEvent.click(view.getByRole("button", { name: "Hide threads" }));
+    // spec.md "Layout": phone opens the thread list as a sheet - a real
+    // Radix dialog, which (correctly) makes the rest of the page
+    // accessibility-hidden while it's open, so the trigger itself isn't
+    // queryable anymore; the sheet's own heading and close button are.
+    await view.findByRole("heading", { name: "Conversations" });
+    expect(view.getByRole("textbox", { name: "Message input", hidden: true })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(view.queryByRole("heading", { name: "Conversations" })).toBeNull());
     expect(view.getByRole("textbox", { name: "Message input" })).toBeTruthy();
   } finally { restore(); }
 });
@@ -429,18 +439,25 @@ const WEATHER_SOURCE = {
   hlc: "1757000000000:0:abc123",
 };
 
-test("a reply with sources renders a numbered [N] chip and a SourcesCard", async () => {
+test("a reply with sources renders a numbered [N] chip that opens the SourcesCard and highlights the row", async () => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
   const restore = stubFetchWithSources("It'll be sunny [1].", [WEATHER_SOURCE]);
   try {
     const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
     await sendMessage(view, "what's the weather");
     await view.findByText(/It'll be sunny/);
-    const chip = await view.findByRole("link", { name: "Source 1: Boston weather" });
-    expect(chip.getAttribute("href")).toBe(WEATHER_SOURCE.url);
-    expect(chip.getAttribute("target")).toBe("_blank");
-    expect(chip.getAttribute("rel")).toBe("noopener noreferrer");
-    await view.findByRole("link", { name: "Boston weather · example.com" }); // the SourcesCard
+    // Collapsed by default (spec.md "Inside a turn"): the row's own text
+    // isn't in the document until the citation chip (a button, not a
+    // link - it opens the card rather than following a URL) is clicked.
+    expect(view.queryByText("Boston weather")).toBeNull();
+    const chip = await view.findByRole("button", { name: "Source 1: Boston weather" });
+    fireEvent.click(chip);
+    const row = (await view.findByText("Boston weather")).closest('[data-slot="chat-source-row"]') as HTMLAnchorElement;
+    expect(row).not.toBeNull();
+    expect(row.getAttribute("href")).toBe(WEATHER_SOURCE.url);
+    expect(row.getAttribute("target")).toBe("_blank");
+    expect(row.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(view.getByText("example.com")).toBeInTheDocument();
   } finally {
     restore();
   }
@@ -453,7 +470,7 @@ test("a [7] marker with only one source stays plain text, not a chip", async () 
     const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
     await sendMessage(view, "what's the weather");
     await view.findByText((content) => content.includes("[7]"));
-    expect(view.queryByRole("link", { name: /^Source / })).toBeNull();
+    expect(view.queryByRole("button", { name: /^Source / })).toBeNull();
   } finally {
     restore();
   }
@@ -466,7 +483,7 @@ test("a reply with no sources renders no chip and no SourcesCard", async () => {
     const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
     await sendMessage(view, "hi");
     await view.findByText("A canned reply.");
-    expect(view.queryByRole("link", { name: /^Source / })).toBeNull();
+    expect(view.queryByRole("button", { name: /^Source / })).toBeNull();
   } finally {
     restore();
   }

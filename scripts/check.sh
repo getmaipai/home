@@ -12,14 +12,14 @@ STANDARDS_DIR="$(cd "$STANDARDS_DIR" && pwd)"
 export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 
 # The @maipai/core and @maipai/ui pins (shared tags core-v0.1.0,
-# ui-v0.1.6). Bump a line here and the matching file: dependency in
+# ui-v0.2.2). Bump a line here and the matching file: dependency in
 # backend/package.json or frontend/package.json together, then
 # `bun install --force` in that workspace (a plain `bun install` does
 # not refresh @maipai/ui's file: dependency snapshot in bun's
 # content-addressed store - found live, step 5a, docs/dev.md).
 if [ "$DOCS_ONLY" = 0 ]; then
   CORE_PIN="0.1.0"
-  UI_PIN="0.1.6"
+  UI_PIN="0.2.2"
   SHARED_DIR="${MAIPAI_SHARED_DIR:-../shared}"
   if [ ! -f "$SHARED_DIR/core/package.json" ]; then
     echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); backend imports @maipai/core from its core/ workspace."

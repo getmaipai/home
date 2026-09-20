@@ -6218,6 +6218,48 @@ approvals are still real, unstarted work for a future session.
 
 ## UI / shell
 
+- [ ] **Fix SettingsPage's content squeeze at the kit's real 960px
+      breakpoint, then drop the `--breakpoint-lg` override** (S) - step
+      5a (2026-09-20) restored `--breakpoint-lg` to 1024px in
+      `frontend/src/shell/tokens.css` rather than let the kit's own
+      960px reopen a real squeeze bug in `SettingsPage.tsx`'s own
+      `lg:hidden`/`lg:flex` split (the shell's rail plus the settings
+      tree sidebar crowding the content column below ~1024px, first
+      found 2026-09-05). A breakpoint is a structural kit token, not a
+      product color choice (docs/UI.md), so a product-side override is
+      a second definition that should not outlive its bug - fix the
+      actual squeeze (a narrower settings sidebar, a different
+      collapse point, or `SettingsPage.tsx`'s own layout, not another
+      token override) so the page holds up at the kit's real 960px, then
+      delete `--breakpoint-lg` from `tokens.css`. Needs a real viewport
+      between 960 and 1024px exercised (nothing in
+      `scripts/screenshot.ts`'s `VIEWPORTS` - 820/1440/1920 - straddles
+      this gap; add one or check manually) before calling it fixed.
+      Exit check: `home/scripts/check.sh` green with `--breakpoint-lg`
+      gone, a screenshot at ~1000px width showing no squeeze.
+- [ ] **Chat's empty state and message turns don't yet match
+      `shared/ui/docs/spec.md`'s Chat section** (M) - found live, step
+      5b (2026-09-20), judging the acceptance screenshot set against the
+      spec text just landed alongside it. Three gaps, all pre-existing
+      (`thread.aui.tsx` moved into `apps/chat/` largely unchanged per
+      that step's own scope, which was the four new kit components -
+      senses dock, child band, sources card, memory chip - not a
+      redesign of the message list): (1) "Empty, loading, error" wants
+      the companion's 64px avatar, its name, and one capability line
+      above the three suggestion chips (`ThreadWelcome`/`ThreadSuggestions`
+      in `frontend/src/apps/chat/thread.aui.tsx`) - today's empty state
+      is a bare "How can I help you today?" heading with no avatar and
+      no populated suggestions (the wiring to assistant-ui's own
+      `ThreadPrimitive.Suggestions` is there; nothing feeds it real
+      starter-prompt data). (2) "Thread" wants a 24px avatar and name at
+      the left of every assistant turn; today's turns render as plain
+      text with neither. (3) "Streaming" wants a "2px teal caret"; the
+      current caret (`ThreadMessage`/`MarkdownText` in the same file)
+      renders in the foreground color, not teal. Needs a design pass on
+      where the avatar asset and capability copy come from before
+      implementation. Exit check: `home/scripts/check.sh` green, the
+      same five-state screenshot set re-opened and matching spec.md's
+      "Empty, loading, error" and "Thread" text.
 - [ ] **TV-focusable nav rail, regressed by the `@maipai/ui` kit adoption**
       (M) - `ui-v0.1.0` through `0.1.3` (`shared/ui`, pinned 2026-09-20)
       has no `@noriginmedia/norigin-spatial-navigation` rail the way

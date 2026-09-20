@@ -9,7 +9,7 @@ function waitFor(ms: number): Promise<void> {
 // happy-dom's real WebSocket tries an actual network connection, which
 // this test environment has nothing to answer - a fake, constructible
 // class the test drives by hand instead (readyState, and firing its own
-// listeners), the same technique WakeWordToggle.test.tsx already uses
+// listeners), the same technique useWakeWord.test.ts already uses
 // for the Web Audio API happy-dom also lacks.
 class FakeWebSocket {
   static OPEN = 1;

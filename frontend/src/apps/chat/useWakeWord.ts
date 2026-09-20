@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@maipai/ui/src/ui/button";
-import { getIcon } from "@maipai/ui/src/icons";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { WakeWordLoop } from "@/lib/voice/wake-word-loop";
 import { onWakeDetected, type WakeDetectedEvent } from "@/lib/voice/wake-word-events";
 import { loadInstalledWakewords, DEFAULT_WAKE_WORD_MODEL_ID } from "@/lib/voice/wake-word-models";
 
-const MicIcon = getIcon("mic");
+export type WakeWordStatus = "idle" | "starting" | "listening" | "error";
 
-interface WakeWordToggleProps {
-  onStatusChange?: (status: "idle" | "starting" | "listening" | "error", error: string | null) => void;
+interface UseWakeWordOptions {
   onWakeDetected: (event: WakeDetectedEvent) => void;
+}
+
+interface UseWakeWordResult {
+  enabled: boolean;
+  status: WakeWordStatus;
+  error: string | null;
+  toggle: () => void;
 }
 
 // Phase 1 of the wake-word plan (docs/dev.md, 2026-09-04): "infrastructure
@@ -22,11 +26,16 @@ interface WakeWordToggleProps {
 // trained yet. A MaiPai-trained "hey maipai" detector is a later phase,
 // gated on real household recordings for validation this session cannot
 // fabricate.
-export function WakeWordToggle({ onWakeDetected: onWake, onStatusChange }: WakeWordToggleProps) {
+//
+// The kit's SensesDock (spec.md) renders the wake word toggle as a plain
+// Switch, not a self-contained control - this hook carries every piece
+// of that control's own hard-won async logic (moved here unchanged from
+// the pre-step-5b WakeWordToggle component, kept as `enabled`/`status`/
+// `error`/`toggle` so the kit's dock can drive it directly.
+export function useWakeWord({ onWakeDetected: onWake }: UseWakeWordOptions): UseWakeWordResult {
   const [enabled, setEnabled] = useState(false);
-  const [status, setStatus] = useState<"idle" | "starting" | "listening" | "error">("idle");
+  const [status, setStatus] = useState<WakeWordStatus>("idle");
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { onStatusChange?.(status, error); }, [status, error, onStatusChange]);
   const micRef = useRef<MicCaptureHandle | null>(null);
   const loopRef = useRef<WakeWordLoop | null>(null);
   // Guards every async continuation below against a superseded toggle:
@@ -109,24 +118,5 @@ export function WakeWordToggle({ onWakeDetected: onWake, onStatusChange }: WakeW
     }
   }
 
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <Button
-        type="button"
-        size="sm"
-        variant={enabled ? "default" : "outline"}
-        onClick={() => (enabled ? stop() : start())}
-        aria-pressed={enabled}
-        className="rounded-full"
-      >
-        <MicIcon />
-        {status === "listening"
-          ? 'Listening for "hey jarvis"'
-          : status === "starting"
-            ? "Starting…"
-            : "Wake word (experimental)"}
-      </Button>
-      {error ? <span className="text-base text-destructive">{error}</span> : null}
-    </div>
-  );
+  return { enabled, status, error, toggle: () => (enabled ? stop() : start()) };
 }
