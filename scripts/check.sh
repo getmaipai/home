@@ -16,14 +16,20 @@ STANDARDS_DIR="$(cd "$STANDARDS_DIR" && pwd)"
 export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 
 # The @maipai/core and @maipai/ui pins (shared tags core-v0.1.0,
-# ui-v0.2.4). Bump a line here and the matching file: dependency in
+# ui-v0.3.3). Bump a line here and the matching file: dependency in
 # backend/package.json or frontend/package.json together, then
 # `bun install --force` in that workspace (a plain `bun install` does
 # not refresh @maipai/ui's file: dependency snapshot in bun's
 # content-addressed store - found live, step 5a, docs/dev.md).
+#
+# UI_PIN sat stale at 0.2.4 through ui-v0.3.0/0.3.1/0.3.2 (HOME-UI-01
+# and HOME-UI-02 both adopted a newer kit without ever bumping this
+# line or running this gate's own pin check end to end) - found
+# cherry-picking a77cbce8, closed here rather than left for the next
+# session to hit cold.
 if [ "$DOCS_ONLY" = 0 ]; then
   CORE_PIN="0.1.0"
-  UI_PIN="0.2.4"
+  UI_PIN="0.3.3"
   SPEC_PIN="0.1.1"
   SHARED_DIR="${MAIPAI_SHARED_DIR:-../shared}"
   if [ ! -d "$SHARED_DIR" ]; then
