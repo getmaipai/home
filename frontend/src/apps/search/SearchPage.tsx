@@ -49,7 +49,7 @@ export function SearchPage({ person }: SearchPageProps) {
   const AskIcon = getIcon("sparkles");
 
   return (
-    <Page title="Search">
+    <Page title="Search" hideTitle>
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
         <Input
           ref={inputRef}

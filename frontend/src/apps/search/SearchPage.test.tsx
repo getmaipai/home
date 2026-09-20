@@ -59,7 +59,7 @@ describe("SearchPage", () => {
       const { findByRole, findByText } = renderSearchPage();
       const input = await findByRole("textbox", { name: "Search" });
       fireEvent.change(input, { target: { value: "memory" } });
-      await findByText("Memory");
+      await findByText("Memories");
     } finally {
       restore();
     }
@@ -71,7 +71,7 @@ describe("SearchPage", () => {
       const { findByRole, findByText } = renderSearchPage();
       const input = await findByRole("textbox", { name: "Search" });
       fireEvent.change(input, { target: { value: "memory" } });
-      const match = await findByRole("button", { name: /Memory/ });
+      const match = await findByRole("button", { name: /Memories/ });
       fireEvent.click(match);
       await findByText("The real memories page");
     } finally {

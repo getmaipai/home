@@ -18088,3 +18088,213 @@ Three of the five states had no existing dedicated capture (only "empty thread" 
 **`AGENTS.md`, `.gitignore`, `scripts/check.sh`'s own header comment** updated to say `spec/` lives in `getmaipai/shared` now, not here, plus a "Pinning `getmaipai/shared`" paragraph in `AGENTS.md` mirroring the one that already existed implicitly for `core`/`ui`. `spec/schemas.resolved/` dropped from `.gitignore` (nothing here generates it anymore).
 
 **Verification**: Home's full `scripts/check.sh` green with the `SPEC_PIN` check passing against `shared/spec` at `spec-v0.1.1` (bumped from `0.1.0` the same day - `shared`'s own correction commit), `bun install --force` in `backend/` and `frontend/` after the pin swap. `git grep` for any remaining `(\.\./)+spec/` relative import across `backend/`, `frontend/`, `scripts/` came back empty after the two fixes above - nothing else was silently pointing at the now-deleted local `spec/`.
+
+## Home's shell and dashboard under the kit (HOME-UI-01, ui-v0.3.0, 2026-09-20)
+
+The owner's ruling on "Home's pages under the kit"
+([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md),
+landed verbatim from COORDINATOR's scratchpad): Home follows the Stack
+console spec's look and feel exactly (the shell, the colors, the icon
+tiles, the panel headers, the header, the footer, the type, the
+density, the spacing), never its content - Home's own navigation,
+routes, records and actions fill the same patterns. This step covers
+the rail, the header, the footer, and the dashboard (`/`); every other
+page keeps its own content, restyled only where the shell wraps it.
+
+### `shared/ui`: five new components, a `Shell` footer slot, `ui-v0.3.0`
+
+`IconTile` (the one icon tile every card, row, nav group heading and
+panel header now draws through: 18% fill, 35% border, a soft glow, two
+sizes), `PanelHeader` (a panel's header row: the icon tile, the title,
+a right-aligned "View all"/"Browse all" link with an arrow, a hairline
+underneath - `linkAriaLabel` lets two panels on one page share the
+same visible label with distinct accessible names, since Home's
+Recent-memories and People panels both say "View all"), `HubCard` (the
+rail's bottom hub card, collapsing to its status dot alone when the
+rail collapses), `FooterBar` (the fixed 40px status bar), and
+`HeaderSearchField` (the header's real search field - a raised-panel
+input, the search icon, the ⌘K pill, icon-only under `sm`, replacing
+the kit's old bare icon-button trigger). `Shell` gained a `footer`
+slot and its header now renders three real flex regions (title,
+centered search, actions) instead of title-then-everything-else.
+`MetricCard`/`CategoryTile`/`ActionTile` restyled onto `IconTile`;
+`nav-main`'s active item is the violet-to-`--hue-violet-deep` gradient
+the spec calls for, not a flat fill. Two review passes (medium, then
+the fix hunks) - the full account, including two of the fixer's own
+mistakes the second pass caught and the reasoning for each, is in
+`shared`'s own `docs/BACKLOG.md`/`CHANGELOG.md` at `ui-v0.3.0`,
+verbatim rather than duplicated here.
+
+### Home: the rail, the header, the footer
+
+`AppShell.tsx` rebuilt: `Brand` wraps the existing logo images in the
+spec's gradient tile (blue to violet, a soft glow) with the tagline
+"Your AI. On your terms." underneath; nav groups are **Home** (Home,
+Chat, Conversations, Apps), **Household** (People, Memories), **System**
+(Settings, Privacy) - **Manage is omitted**, since Home has no
+Engines/Packages/Updates/Repairs/Backups destinations of its own yet
+(Repairs and Health stay Settings sections, `RepairsPage`/
+`HealthSection`, reached at `/settings/repairs` and `/settings/health`,
+until HOME-STACK-04 gives them real top-level pages); Conversations
+sits under Home, next to Chat, since the ruling's own Household list
+(People, Memories, Lists) has no chat-history entry and this is chat's
+own history. `NAV_ENTRIES`'s "Memory" label became "Memories" (the
+ruling's own wording) - found live: `appCatalog.ts`'s search keywords
+didn't include the word "memory" itself once the label no longer did,
+so typing "memory" in search stopped finding the Memories app;
+`"memory"` added back as an explicit keyword.
+
+The rail's old footer nav row (Privacy, Settings) is gone - those now
+live in the System group - freeing the `sidebarFooter` slot for a new
+`HubStatusCard` (real data: `api.hardware()` for the machine's name/OS,
+`api.repairs()` for the open-repair count and status color, tapping
+opens `/settings/repairs`). A new `HomeFooterBar` reads the same
+`useHubStatus()` hook (one hook, one cache entry per read, shared with
+the dashboard's own metric row) for the fixed footer's version/engines-
+running/repairs-open/updates segments. The header's title and subtitle
+are now genuinely destination-owned (`shell/routeHeader.ts`, a small
+route-to-{title,subtitle} table matched the same way the rail
+highlights its active item) - the Home route's subtitle is the
+existing `greetingFor()` helper plus the ruling's own sentence ("Good
+afternoon, Sage. Here is your household today."). A `ThemeToggle`
+(new, Home's own, not the kit's `AppearanceControl`: that component
+assumes a `next-themes` `ThemeProvider` neither the kit's `Shell` nor
+Home mounts, and Home already has its own real appearance system,
+`useAppearance.ts` - "the kit gets a slot, Home keeps the feature," the
+same reason `PinToggle`/`ModelPicker`/`NotificationBell`/
+`ProfileSwitcher` are Home's own) fills the header's sun/moon slot,
+found missing only once the header was actually screenshotted: the
+kit's own `AppearanceControl` exists but was never wired anywhere in
+this codebase, and would have rendered inert without a provider it has
+no reason to gain just for this.
+
+**A real, previously-invisible duplicate-header bug, found by the
+screenshots, not guessed at.** The header rule ("no duplicate page
+title/subtitle beneath the fixed header") only ever mattered once a
+fixed header existed to duplicate against - six pages (`PrivacyPage`,
+`MemoryPage`, `ConversationsPage`, `SearchPage`, `PeoplePage`,
+`NotificationsPage`) still rendered their own visible `<Page title>`
+h1 (three others, `SettingsPage`/`ChatPage`/`AppsPage`, already had
+`hideTitle` from the kit-adoption step); all six switched to
+`hideTitle` (the h1 stays `sr-only`, so nothing about the page's own
+accessible heading changed). `routeHeader.ts` also covers `/search`
+and `/notifications`, two real routes outside the rail's own nav
+entries, so their fixed header never falls back to the generic
+"MaiPai Home" title. One page had a SECOND, separate duplication the
+`hideTitle` sweep didn't touch: `SettingsPage.tsx` renders its own
+literal `<h2>Settings</h2>` plus a tab-specific subtitle, independent
+of `Page`'s own (already-hidden) title - found live in the desktop
+screenshot, the fixed header and this h2 both saying "Settings" a few
+lines apart. Fixed by renaming the h2 to what it actually names (the
+tab switcher's own selection, "Household" or "Me"), keeping the
+tab-specific subtitle - the header rule's own allowed exception ("a
+local section heading... names a distinct working area").
+
+### Home: the dashboard (`/`)
+
+`HomePage.tsx` rewritten to the section's own composition, replacing
+the old ask-box-plus-cards layout the acceptance criteria names
+explicitly as what must not survive ("a page that looks like the old
+Home page with new colors fails"):
+
+1. **Metric row** (`MetricRow`): Chat and Voice read `useHubStatus()`'s
+   `health.brain`/`health.voice` (the same engine-kind strings
+   `useEngineHealth()` polls for Chat's own composer gate, reused from
+   one shared `/api/health` read rather than a second poller) through a
+   small `engineStateText()` mapping (Ready/Starting/Stopped/Not set
+   up/Checking). Updates and Repairs are real, not placeholders - see
+   below.
+2. **Panel row**: `TodayPanel` (the existing weather-turn logic, now
+   with the real date under it) and `RecentMemoriesPanel` (the last
+   five, by `created_at`, "View all" to `/memory`).
+3. **Your apps** (`YourAppsPanel`): the existing pinned-apps strip,
+   restyled onto `IconTile`, `CardSizeSlider` hidden on the phone
+   (found live: the slider and "Browse all" were squeezing the panel
+   title into a truncated sliver in the row's shared space at 390px -
+   a density control has little to control once the grid is already
+   one or two columns there anyway).
+4. **Household row**: `PeoplePanel` (the same avatar-strip pattern the
+   old page's `WhoIsHere` had, no presence - unchanged, still honest
+   about not knowing who's actually home), `ActivityPanel` (Home has no
+   activity/audit log yet, so this merges two already-real feeds
+   client-side - recent conversations and recent memories, by real
+   timestamp, not a fabricated third source), `QuickActionsPanel` (Ask
+   MaiPai → `/chat`, Add a person → `/settings/users` - `UsersSection`'s
+   real "Add someone" form, Check for updates → a real
+   `POST /api/updates/check` call gated to owner/admin with a toast
+   result, Open Repairs → `/settings/repairs`).
+5. The ask box (`HomeSearchPrompt`) is gone from the page body -
+   asking now lives only in the header's search field and in Chat, per
+   the section's own line 5.
+
+**A real backend feature, found and wired, not skipped for lack of
+one.** `backend/src/routes/updates.ts`/`lib/updates.ts` (the app's own
+cached GitHub-release check, `GET /api/updates` and
+`POST /api/updates/check`, scoped to the app only - no package/model
+update system exists) had never been called from the frontend at all.
+`api.ts` gained `updates()`/`checkForUpdate()` and a hand-typed
+`UpdateProjection` (the real interface lives in `lib/updates.ts`,
+which carries `@/db`-aliased imports frontend's tsconfig can't resolve
+- the same reason `DeviceInfo`/`SessionInfo` are hand-typed a few lines
+above it, not a new pattern). The Updates metric card, the footer's
+"updates available" segment, and the Quick Actions "Check for updates"
+tile are all real now, where the spec's own composition would
+otherwise have forced a choice between a fabricated placeholder and
+silently dropping a named card - `useHubStatus()`'s `updates` field and
+`updateAvailable()` are the one shared read both the dashboard and the
+footer use.
+
+### Verification
+
+`bunx tsc --noEmit` clean (frontend). `bun test` (frontend): 484 pass,
+0 fail (482 existing plus `ThemeToggle.test.tsx`'s 2; `HomePage.test.tsx`
+rewritten around the new composition, its old Tagline and search-prompt-
+box describe blocks removed since those features moved to the header -
+5 tests retired with the feature, not silently broken; `SearchPage.test.tsx`
+and `HomePage.test.tsx` updated for the "Memories" rename).
+`bunx eslint` clean, including the `local/type-floor` rule (three real
+`text-xs`-under-16px hits fixed: the People panel's name label, the
+Activity panel's relative-time label, the Brand tagline - all bumped to
+`text-base`, matching `WhoIsHere`'s own pre-existing convention for the
+same kind of label).
+
+Verified live: `bun run build` (blocked earlier in this session by
+`home/spec`'s own mid-RF-05b state - `@maipai/spec/gen/ts/settings-key.js`
+missing until Session B's `spec-v0.1.1` fix landed; not this item's bug,
+cleared once `ui-v0.3.0` rebased onto it) and `bash scripts/app.sh
+start` both green against the real, merged `@maipai/ui`. Screenshots
+taken with a throwaway seeded-household script (this session's own,
+not `scripts/screenshot.ts` - that script's own `bun run build` step
+hit the same pre-fix blocker; a real gap, filed below) against a real
+running instance (`PORT=8794`, its own isolated `data/local-app`):
+home-desktop and home-phone, light and dark, opened and judged beside
+`shared/ui/docs/reference/overview-dashboard.png` per the section's own
+acceptance line - same header, rail, footer, tiles, panel headers,
+pills, spacing; the phone view collapses to the 2x2 metric grid,
+stacked panels, and the tab bar exactly as section 7 describes.
+`/apps`, `/settings`, `/people` also opened (the header-title/subtitle
+and `hideTitle` sweep touches every page, not just the dashboard) -
+all three read correctly, including the `SettingsPage` duplicate-title
+fix. A stale-service-worker/cached-`index.html` false alarm (a
+`bun run start` process kept serving an old build after a later
+`bun run build` under it - a dev-server hygiene artifact of iterating
+against a live process, not a real bug) cost one debugging round;
+resolved by a clean `scripts/app.sh stop` + `start`, noted here so the
+next session recognizes the symptom (a `text/html`-typed `.js` module
+response) instead of re-diagnosing it as a product bug.
+
+Code review run twice (medium: shared/ui's own diff separately from
+Home's; Home's own pass and findings are in the commit message rather
+than duplicated here).
+
+**Known gaps, tracked not dropped:**
+- Package-update/Engine/Backup destinations (the Manage nav group) -
+  HOME-STACK-04.
+- `scripts/screenshot.ts`'s own matrix run was not exercised this
+  session (its `bun run build` step predates the `spec-v0.1.1` fix
+  landing in this worktree's own timeline) - worth a clean re-run
+  before the next full screenshot-matrix pass, since this step's own
+  verification used a narrower, hand-written capture script instead.
+- The rail's hub card and footer's `FooterBar` link touch-targets carry
+  a small, documented residual gap on the outermost edges (see
+  `shared`'s own `ui-v0.3.0` entry) - not a Home-side fix.

@@ -100,7 +100,7 @@ export function NotificationsPage() {
   }
 
   return (
-    <Page title="Notifications">
+    <Page title="Notifications" hideTitle>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
       <div tabIndex={0} className={cn("flex flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
         {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}

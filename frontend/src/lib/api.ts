@@ -125,6 +125,19 @@ export interface SessionInfo {
   expiresAt: string;
   isCurrent: boolean;
 }
+// Hand-typed for the same reason as DeviceInfo/SessionInfo above:
+// backend/src/routes/updates.ts's own UpdateProjectionSchema, not
+// imported from @/wire - the real UpdateProjection interface
+// (backend/src/lib/updates.ts) carries @/db-aliased imports frontend's
+// tsconfig has no mapping for.
+export interface UpdateProjection {
+  installed: string;
+  latest: string | null;
+  summary: string | null;
+  url: string | null;
+  checkedAt: string | null;
+  error: string | null;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -531,6 +544,13 @@ export const api = {
   // field but `id`.
   fixIssue: (id: string) => request<Issue>(`/api/repairs/${encodeURIComponent(id)}/fix`, { method: "POST" }),
   dismissIssue: (id: string) => request<{ id: string }>(`/api/repairs/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+  // GET /api/updates (backend/src/routes/updates.ts): the app's own
+  // cached update check, app-only scope (no package/model/sidecar
+  // update system exists yet - that file's own header). checkForUpdate()
+  // forces a fresh GitHub check; owner/admin (or a backups.run grant)
+  // only, the route's own 403 on anyone else.
+  updates: () => request<UpdateProjection>("/api/updates"),
+  checkForUpdate: () => request<UpdateProjection>("/api/updates/check", { method: "POST" }),
   // `person`, for the per-person view an adult opens for a child
   // (session E step 5): GET /api/memory's own `?person=` (backend/src/
   // routes/memory.ts's parseListOptions) - the same real access check

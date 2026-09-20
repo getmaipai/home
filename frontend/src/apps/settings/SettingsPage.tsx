@@ -238,8 +238,14 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
   return (
     <Page title="Settings" hideTitle>
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-5 overflow-hidden px-4 py-5 sm:px-6">
+        {/* "Household"/"Me", not "Settings": the fixed header (spec
+            "Current destination header rule") already owns the plain
+            "Settings" title - a second one here would be exactly the
+            duplicate that rule forbids. This names the distinct working
+            area the tab switcher below actually selects, the rule's own
+            allowed exception. */}
         <div>
-          <h2 className="text-3xl font-semibold tracking-tight">Settings</h2>
+          <h2 className="text-3xl font-semibold tracking-tight">{tab === "household" ? "Household" : "Me"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{tab === "household" ? "Manage your shared home, AI, and connected services." : "Your voice, your preferences, your MaiPai."}</p>
         </div>
         {/* Household/Me is the primary scope switcher, not a nice-to-have

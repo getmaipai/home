@@ -163,7 +163,7 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
   }
 
   return (
-    <Page title="Conversations">
+    <Page title="Conversations" hideTitle>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
       <div tabIndex={0} className={cn("flex flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
         {canViewOthers && peopleQuery.data && peopleQuery.data.length > 1 ? (

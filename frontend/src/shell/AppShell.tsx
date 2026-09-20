@@ -2,18 +2,20 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Shell } from "@maipai/ui/src/Shell";
 import type { NavGroup } from "@maipai/ui/src/blocks/dashboard/components/nav-main";
-import { ungroupedNav } from "@maipai/ui/src/blocks/dashboard/components/app-sidebar";
-import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@maipai/ui/src/ui/sidebar";
 import { isActiveNavPath } from "@maipai/ui/src/nav";
-import { getIcon } from "@maipai/ui/src/icons";
+import { getIcon, type IconName } from "@maipai/ui/src/icons";
 import { Button } from "@maipai/ui/src/ui/button";
 import { NAV_ENTRIES } from "@/shell/nav";
-import { APP_CATALOG, favoriteApps } from "@/shell/appCatalog";
+import { APP_CATALOG } from "@/shell/appCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useAppearance } from "@/shell/useAppearance";
+import { ThemeToggle } from "@/shell/ThemeToggle";
 import { ModelPicker } from "@/shell/ModelPicker";
 import { NotificationBell } from "@/shell/NotificationBell";
 import { ProfileSwitcher } from "@/shell/ProfileSwitcher";
+import { HubStatusCard } from "@/shell/HubStatusCard";
+import { HomeFooterBar } from "@/shell/HomeFooterBar";
+import { routeHeader } from "@/shell/routeHeader";
 import { useSearchCommand } from "@/shell/search/useSearchCommand";
 import type { SearchResultItem } from "@/shell/search/providers";
 import type { Roster } from "@/lib/api";
@@ -28,7 +30,10 @@ interface AppShellProps {
 
 /** The pin/unpin control for "each app's header" (docs/BACKLOG.md's
  * home-screen item, step 6) - the current page's own entry in the app
- * catalog, or nothing on Home itself (`/`), which has nothing to pin. */
+ * catalog, or nothing on Home itself (`/`), which has nothing to pin.
+ * Still real once the rail's own groups cover every catalog route
+ * (below): this feeds the dashboard's "Your apps" strip, a person's
+ * own subset of the full app list, not rail reachability. */
 function PinToggle({ person }: { person: Roster }) {
   const location = useLocation();
   const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
@@ -51,64 +56,60 @@ function PinToggle({ person }: { person: Roster }) {
   );
 }
 
+// The product mark (spec "The shell, exactly": "the MaiPai Home glyph
+// on the rounded gradient tile, 40 px" plus the tagline under the
+// wordmark) - Home's own logo image inside the kit's gradient tile
+// treatment, not a lucide icon (IconTile is for category icons; the
+// brand mark is the product's own art).
 function Brand() {
   return (
     // min-h-12/min-w-12 (48px): docs/UI.md's touch-target floor - this is
     // a real link home, whose row is otherwise only as tall as its
-    // content (~32px), and whose parent SidebarMenuButton goes
-    // `flex-none` (shrinks to just the icon's own width) once the rail
-    // collapses to icons - min-w-12 keeps the link itself a real 48px
-    // square there instead of a 32px-wide sliver (found by the tablet
-    // a11y sweep, whose rail collapses to icons by default).
+    // content, and whose parent SidebarMenuButton goes `flex-none`
+    // (shrinks to just the icon's own width) once the rail collapses to
+    // icons - min-w-12 keeps the link itself a real 48px square there
+    // instead of a 32px-wide sliver (found by the tablet a11y sweep,
+    // whose rail collapses to icons by default).
     <Link to="/" aria-label="MaiPai Home" className="flex min-h-12 min-w-12 flex-1 items-center gap-2.5">
-      <span className="flex size-8 shrink-0 items-center justify-center">
-        <img src="/brand/maipai-home-icon-light.png" alt="" className="size-8 object-contain brand-logo-light" />
-        <img src="/brand/maipai-home-icon-dark.png" alt="" className="size-8 object-contain brand-logo-dark" />
+      <span
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-1.5"
+        style={{ boxShadow: "0 0 16px color-mix(in srgb, var(--hue-violet) 25%, transparent)" }}
+      >
+        <img src="/brand/maipai-home-icon-light.png" alt="" className="size-full object-contain brand-logo-light" />
+        <img src="/brand/maipai-home-icon-dark.png" alt="" className="size-full object-contain brand-logo-dark" />
       </span>
-      <span className="text-base font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
-        MaiPai <span className="text-primary">Home</span>
+      <span className="min-w-0 group-data-[collapsible=icon]:hidden">
+        <span className="block truncate text-base font-semibold tracking-tight">
+          MaiPai <span className="text-primary">Home</span>
+        </span>
+        {/* text-base, not text-xs: the type floor (docs/UI.md). */}
+        <span className="block truncate text-base text-muted-foreground">Your AI. On your terms.</span>
       </span>
     </Link>
   );
 }
 
-/** A footer nav row, matching NAV_ENTRIES' own active-highlight rule
- * (isActiveNavPath) - AppSidebar computes this automatically for the
- * `nav` prop's own groups, but the footer slot is arbitrary ReactNode,
- * so it has to be done here too. */
-function FooterNavItem({ to, icon, label }: { to: string; icon: string; label: string }) {
-  const location = useLocation();
-  const Icon = getIcon(icon);
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={isActiveNavPath(location.pathname, to)} tooltip={label}>
-        <Link to={to} aria-label={label}>
-          <Icon aria-hidden />
-          {/* group-data-[collapsible=icon]:hidden - the same fix nav-
-              main.tsx's own row needed (shared/ui, this step): without
-              it, sidebar.tsx's `[&>span:last-child]:truncate` clips this
-              label to a stray single letter once the rail collapses,
-              instead of hiding it. */}
-          <span className="group-data-[collapsible=icon]:hidden">{label}</span>
-        </Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
+function navGroup(label: string, paths: readonly string[]): NavGroup {
+  const items = paths.flatMap((to) => { const entry = NAV_ENTRIES.find((e) => e.to === to); return entry ? [{ title: entry.label, url: entry.to, icon: entry.icon as IconName }] : []; });
+  return { label, items };
 }
 
 /** Home's own wiring around the kit's Shell contract (docs/UI.md): the
- * kit owns the rail/phone-bar/header layout and the search dialog, Home
- * supplies its brand, nav data, Favorites, and the header's own actions
- * (PinToggle, ModelPicker, NotificationBell, ProfileSwitcher) - "the kit
- * gets a slot, Home keeps the feature." The kit's own header search
- * button (ui-v0.1.2) covers touch/phone reachability; Cmd/Ctrl+K and
- * HomePage's own inline prompt box remain as additional entry points,
- * and the sidebar's old dedicated "Search" row (a fourth) is the only
- * one actually gone. `ModelPicker` (step 5b, the chat rebuild) is the
- * same route-gated-header-action pattern `PinToggle` already used - the
- * kit has no dedicated "page-specific header control" slot, so a page's
- * own control renders unconditionally here and decides for itself
- * whether the current route and person warrant showing anything.
+ * kit owns the rail/phone-bar/header/footer layout and the search
+ * dialog, Home supplies its brand, grouped nav, the hub card, the
+ * footer summary, and the header's own actions (PinToggle, ModelPicker,
+ * NotificationBell, ProfileSwitcher) - "the kit gets a slot, Home keeps
+ * the feature." Nav groups follow the owner's ruling on Home's pages
+ * under the kit (home/docs/design/home-pages-2026-09-20.md, "The shell,
+ * exactly"): Home, Household, System - Manage is omitted because Home
+ * has no Engines/Packages/Updates/Repairs/Backups pages of its own yet
+ * (they stay a Settings section, RepairsSection.tsx, until HOME-STACK-04
+ * gives them real destinations); Conversations sits under Home,
+ * alongside Chat, since the ruling's own Household list (People,
+ * Memories, Lists) has no chat-history entry and this is chat's own
+ * history. The kit's own header search field (this step) covers touch/
+ * phone reachability; Cmd/Ctrl+K and HomePage's own search remain as
+ * additional entry points.
  *
  * Known gap, tracked not dropped (docs/BACKLOG.md): the kit's Shell has
  * no TV-focusable rail yet (the arrow-key/remote nav the old hand-built
@@ -117,10 +118,9 @@ function FooterNavItem({ to, icon, label }: { to: string; icon: string; label: s
  * protected.
  */
 export function AppShell({ person, onSignOut, onPersonChange, children }: AppShellProps) {
-  useAppearance(person.id);
+  const { setAppearance } = useAppearance(person.id);
   const navigate = useNavigate();
-  const { pinned } = usePinnedApps(person.id);
-  const favorites = favoriteApps(pinned).filter((app) => app.to !== "/chat" && app.to !== "/settings" && app.to !== "/privacy").slice(0, 6);
+  const location = useLocation();
 
   const [query, setQuery] = useState("");
   const { visibleGroups } = useSearchCommand(person.id, query, true);
@@ -132,29 +132,32 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
     navigate("/chat", { state: { initialText: q } });
   }
 
-  const mainEntries = NAV_ENTRIES.filter((entry) => ["/", "/apps", "/chat"].includes(entry.to));
   const groups: NavGroup[] = [
-    ...ungroupedNav(mainEntries, "Navigation"),
-    ...(favorites.length > 0 ? ungroupedNav(favorites, "Favorites") : []),
+    navGroup("Home", ["/", "/chat", "/conversations", "/apps"]),
+    navGroup("Household", ["/people", "/memory"]),
+    navGroup("System", ["/settings", "/privacy"]),
   ];
-  const footerEntries = NAV_ENTRIES.filter((entry) => entry.to === "/privacy" || entry.to === "/settings");
+
+  const { title, subtitle } = routeHeader(location.pathname, person);
 
   return (
     <Shell
       nav={groups}
       brand={<Brand />}
       railStorageKey="maipai-home:shell-rail"
-      sidebarFooter={
-        <SidebarMenu>
-          {footerEntries.map((entry) => (
-            <FooterNavItem key={entry.to} to={entry.to} icon={entry.icon} label={entry.label} />
-          ))}
-        </SidebarMenu>
+      sidebarFooter={<HubStatusCard person={person} />}
+      footer={<HomeFooterBar person={person} />}
+      headerTitle={
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold sm:text-xl">{title}</h1>
+          {subtitle ? <p className="hidden truncate text-sm text-muted-foreground sm:block">{subtitle}</p> : null}
+        </div>
       }
       headerActions={
         <>
           <PinToggle person={person} />
           <ModelPicker person={person} />
+          <ThemeToggle setAppearance={setAppearance} />
           <NotificationBell />
           <ProfileSwitcher person={person} onSwitched={onPersonChange} onSignOut={onSignOut} />
         </>

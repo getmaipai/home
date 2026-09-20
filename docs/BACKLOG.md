@@ -6218,6 +6218,26 @@ approvals are still real, unstarted work for a future session.
 
 ## UI / shell
 
+- [x] **HOME-UI-01: the rail, header, footer and dashboard to the
+      owner's ruling on "Home's pages under the kit"** (M,
+      2026-09-20) - [docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md).
+      `shared/ui` gained five components at `ui-v0.3.0` (`IconTile`,
+      `PanelHeader`, `HubCard`, `FooterBar`, `HeaderSearchField`) and a
+      `Shell` footer slot; `AppShell.tsx` rebuilt (grouped nav - Home,
+      Household, System, Manage omitted for now - the hub card, a real
+      centered header search field, a new `ThemeToggle`, route-owned
+      header title/subtitle via `shell/routeHeader.ts`); `HomePage.tsx`
+      rewritten to the section's own composition (metric row, Today/
+      Recent-memories panels, Your apps, People/Activity/Quick actions -
+      the ask box moved to the header). The header rule's "no duplicate
+      title" swept across six other pages (`hideTitle`) plus a second,
+      separate duplicate `SettingsPage.tsx` had on its own. A real,
+      previously-unwired backend feature (`GET/POST /api/updates`) got
+      its first frontend caller for the Updates metric/footer segment/
+      quick action, rather than a fabricated placeholder. Full account
+      in [dev.md](dev.md)'s own entry. Exit check: `bunx tsc --noEmit`
+      and `bun test` clean (484 pass), screenshots opened beside
+      `shared/ui/docs/reference/overview-dashboard.png` and judged.
 - [ ] **Fix SettingsPage's content squeeze at the kit's real 960px
       breakpoint, then drop the `--breakpoint-lg` override** (S) - step
       5a (2026-09-20) restored `--breakpoint-lg` to 1024px in

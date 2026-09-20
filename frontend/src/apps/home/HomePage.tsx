@@ -1,26 +1,24 @@
 import { favoriteApps } from "@/shell/appCatalog";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trans } from "@lingui/react";
 import { useQuery } from "@tanstack/react-query";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
-import { Card } from "@maipai/ui/src/primitives/Card";
 import { CardGrid } from "@maipai/ui/src/primitives/CardGrid";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
-import { Button } from "@maipai/ui/src/ui/button";
-import { Command, CommandInput, CommandList } from "@maipai/ui/src/ui/command";
-import { getIcon } from "@maipai/ui/src/icons";
+import { MetricCard } from "@maipai/ui/src/blocks/cards/MetricCard";
+import { PanelHeader } from "@maipai/ui/src/blocks/cards/PanelHeader";
+import { ActionTile } from "@maipai/ui/src/blocks/cards/ActionTile";
+import { IconTile } from "@maipai/ui/src/primitives/IconTile";
+import type { IconName } from "@maipai/ui/src/icons";
 import { CardSizeSlider, useCardSize, cardSizeStyle } from "@maipai/ui/src/primitives/CardSizeSlider";
+import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { NodeRenderer } from "@maipai/ui/src/schema/NodeRenderer";
 import type { WidgetCardNode } from "@maipai/ui/src/schema/types";
-import { api, type Roster, type PersonRosterEntry, type ResolvedSetting } from "@/lib/api";
-import { greetingFor } from "@/apps/home/greeting";
+import { api, ApiError, type Roster, type PersonRosterEntry, type ResolvedSetting, type MemoryRecord, type ConversationSummary } from "@/lib/api";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
-import { useSearchCommand } from "@/shell/search/useSearchCommand";
-import { SearchResultGroups } from "@maipai/ui/src/search/SearchResultGroups";
-import type { SearchResultItem } from "@/shell/search/providers";
+import { useHubStatus, updateAvailable } from "@/shell/useHubStatus";
 import { weatherCardQuestion } from "@maipai/home-backend/src/homeCardQuestions";
 
 // The one widget_card instance Home mounts (docs/plans/session-e-ui-and-
@@ -34,33 +32,12 @@ interface HomePageProps {
   person: Roster;
 }
 
-// Home cards render its own answer, or say nothing (docs/UI.md: a failed
-// card is a quiet gap in "today", never a red error banner on the one
-// page every visit starts from).
-function TodayCard({ icon, title, action, children }: { icon: string; title: string; action?: ReactNode; children: ReactNode }) {
-  const Icon = getIcon(icon);
-  return (
-    <Card label={title} className="p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Icon aria-hidden className="size-4" />
-          <span>{title}</span>
-        </div>
-        {action}
-      </div>
-      <div className="mt-2 text-base">{children}</div>
-    </Card>
-  );
-}
-
 // Shares the Settings page's own cache entry for this scope
 // (SettingsRenderer.tsx: `["settings-values", scopeValue]`) rather than a
 // second fetch of the same household settings, and shared here by
-// WeatherCard and Tagline rather than each declaring an identical
-// `useQuery` of their own (code review, 2026-09-11) - one definition, so
-// a future change to this read (staleTime, retry policy) can't drift
-// between the two call sites. A household changes its own settings
-// rarely, hence the 5-minute staleTime.
+// WeatherCard alone rather than declaring an identical `useQuery` of its
+// own. A household changes its own settings rarely, hence the 5-minute
+// staleTime.
 function useHouseholdSettings() {
   return useQuery({
     queryKey: ["settings-values", "household"],
@@ -69,35 +46,69 @@ function useHouseholdSettings() {
   });
 }
 
-// The same "find by key, only trust a non-empty string" read WeatherCard
-// and Tagline each need for their own household setting - one definition
-// (code review, 2026-09-11) rather than the identical inline find()
-// typed out twice.
 function textSetting(values: ResolvedSetting[] | undefined, key: string): string | undefined {
   const value = values?.find((s) => s.key === key)?.value;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function WeatherCard() {
-  // Found live 2026-09-11: with no place in the fixed utterance below, a
-  // place-free turn left the model to guess a `place` argument on its
-  // own, which produced the literal word "here" - and Open-Meteo
-  // genuinely has a village named that. `household.home_place`
-  // (backend/src/settings/coreKeys.ts) gives this card a real place to
-  // ask about once the household has set one.
+function panelCard(children: ReactNode, className?: string) {
+  return <div className={cn("rounded-2xl border bg-[var(--surface-card)] p-4", className)}>{children}</div>;
+}
+
+// The Chat/Voice metric cards' big text (spec "The dashboard": "Chat
+// (ready or the reason)"/"Voice (listening and speaking ready)") -
+// health.brain/health.voice carry the real EngineHealthKind strings
+// (backend/src/wire.ts: url/override/selection/stub/stopped/starting/
+// none/spawned/restarting/failed - the same set useEngineHealth()'s own
+// poll reads for ChatPage's composer gate, reused here from
+// useHubStatus()'s single shared /api/health read rather than a second
+// poller). Every "operational" kind (url/override/selection/stub/
+// spawned, or anything not in the table below) reads as ready; the
+// table is deliberately the exceptions, not an allow-list, so a kind
+// this file hasn't heard of yet still reads as ready rather than
+// silently falling through to it.
+const ENGINE_STATE_TEXT: Record<string, string> = {
+  starting: "Starting",
+  restarting: "Starting",
+  stopped: "Stopped",
+  failed: "Failed",
+  none: "Not set up",
+};
+
+function engineStateText(kind: string | undefined): string {
+  if (!kind) return "Checking...";
+  return ENGINE_STATE_TEXT[kind] ?? "Ready";
+}
+
+function engineReady(kind: string | undefined): boolean {
+  return !!kind && !(kind in ENGINE_STATE_TEXT);
+}
+
+function MetricRow({ person }: { person: Roster }) {
+  const { health, repairs, updates, canManage } = useHubStatus(person.role);
+  const hasUpdate = updateAvailable(updates);
+  const repairsCount = canManage ? (repairs ? String(repairs.length) : "...") : "—";
+  const repairsState = canManage ? (repairs ? (repairs.length === 0 ? "All good" : "View repairs") : undefined) : "Admins only";
+  const repairsHref = canManage && repairs && repairs.length > 0 ? "/settings/repairs" : undefined;
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <MetricCard icon="message-circle" hue="--hue-blue" count={engineStateText(health?.brain)} label="Chat" state={health?.brain === "stopped" || health?.brain === "failed" ? "Not answering - an admin can restart it" : undefined} stateHref={health?.brain === "stopped" || health?.brain === "failed" ? "/settings/health" : undefined} />
+      <MetricCard icon="mic" hue="--hue-violet" count={engineStateText(health?.voice)} label="Voice" state={engineReady(health?.voice) ? "Listening and speaking ready" : undefined} />
+      <MetricCard icon="download" hue="--hue-teal" count={updates ? (hasUpdate ? "1" : "0") : "..."} label="Updates" state={updates ? (hasUpdate ? `${updates.latest} available` : "Up to date") : undefined} stateHref={hasUpdate ? "/settings" : undefined} />
+      <MetricCard icon="wrench" hue="--hue-orange" count={repairsCount} label="Repairs" state={repairsState} stateHref={repairsHref} />
+    </div>
+  );
+}
+
+function WeatherLine() {
   const settingsQuery = useHouseholdSettings();
   const place = textSetting(settingsQuery.data, "household.home_place");
   const question = weatherCardQuestion(place);
-  // Cached by the query layer (step 6: "calling the weather plugin
-  // through the existing turn route with a fixed utterance, cached by
-  // the query layer") - a real turn through the shared engine, not a
-  // separate widget backend, per the plugin model every package uses.
-  // 30 minutes: often enough that "today" never looks stale, rare enough
-  // that opening Home repeatedly in a session doesn't create a new turn
-  // (and a new conversation-history row) every time. Gated on the
-  // settings read landing first, so this never fires once with the
-  // place-free question and again once the place is known - each visit
-  // asks exactly one question.
+  // Cached by the query layer - a real turn through the shared engine,
+  // not a separate widget backend, per the plugin model every package
+  // uses. 30 minutes: often enough that "today" never looks stale, rare
+  // enough that opening Home repeatedly in a session doesn't create a
+  // new turn (and a new conversation-history row) every time.
   const query = useQuery({
     queryKey: ["home-turn", "weather", question],
     queryFn: () => runFixedTurn(question),
@@ -105,54 +116,106 @@ function WeatherCard() {
     retry: false,
     enabled: !settingsQuery.isPending,
   });
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   return (
-    <TodayCard icon="sparkles" title="Weather">
-      {settingsQuery.isPending || query.isLoading ? "Checking..." : (query.data ?? "Couldn't check the weather right now.")}
-    </TodayCard>
+    <div className="flex flex-col gap-2 text-sm">
+      <div className="flex items-center gap-2">
+        <IconTile icon="sparkles" hue="--hue-blue" size="sm" glow={false} />
+        <span>{settingsQuery.isPending || query.isLoading ? "Checking the weather..." : (query.data ?? "Couldn't check the weather right now.")}</span>
+      </div>
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <IconTile icon="calendar" hue="--hue-violet" size="sm" glow={false} />
+        <span>{today}</span>
+      </div>
+    </div>
   );
 }
 
-function RecentMemoriesCard() {
+function RecentMemoriesPanel() {
   const navigate = useNavigate();
   // The same `["memory-list", "me"]` key MemoryPage.tsx's own
   // `OwnMemories` uses for the actor's own list - one cache entry, not a
   // second fetch, and forgetting or archiving a memory anywhere
-  // invalidates this card too (lane 3 item 4, 2026-09-13: this key was
-  // `["schema-binding", "/api/memory"]` while MemoryPage's default view
-  // was schema-page-driven; it moved to hand-written for real batch
-  // forget, and this card's key moved with it, or the two would silently
-  // stop sharing a cache entry). Sliced to "recent" client-side
-  // (`created_at` descending): the contract's own `GET /api/memory?since=`
-  // (session-a-intelligence.md) isn't on `main` yet, so this is the same
-  // "local mock until the real route lands" the conversations adapter
-  // already uses, not a second design.
-  const query = useQuery({
-    queryKey: ["memory-list", "me"],
-    queryFn: () => api.memories(),
-  });
-  const recent = [...(query.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3);
+  // invalidates this panel too.
+  const query = useQuery<MemoryRecord[]>({ queryKey: ["memory-list", "me"], queryFn: () => api.memories() });
+  const recent = [...(query.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5);
+  return panelCard(
+    <>
+      <PanelHeader icon="brain" hue="--hue-teal" title="Recent memories" linkLabel="View all" linkAriaLabel="View all memories" onLinkClick={() => navigate("/memory")} />
+      <div className="mt-3">
+        {recent.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing remembered yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {recent.map((m) => (
+              <li key={m.id} className="flex items-center gap-2 text-sm">
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[var(--hue-teal)]" />
+                <span className="truncate">{m.text}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>,
+  );
+}
+
+function TodayPanel() {
+  return panelCard(
+    <>
+      <PanelHeader icon="calendar" hue="--hue-blue" title="Today" />
+      <div className="mt-3">
+        <WeatherLine />
+      </div>
+    </>,
+  );
+}
+
+interface CardSizeProps {
+  cardSize: number;
+  setCardSize: (next: number) => void;
+}
+
+// The density control (spec "The dashboard": "the card-size slider
+// stays as the strip's density control") is one shared setting, not one
+// per strip - it applied to both "Your apps" and "Your packages" before
+// this page's rewrite, and still does: lifted to HomePage so both keep
+// reading the same `["home"]` localStorage key instead of Your apps
+// getting its own independent copy while Your packages silently lost
+// its control (a code review caught exactly that regression).
+function YourAppsPanel({ person, cardSize, setCardSize }: { person: Roster } & CardSizeProps) {
+  const navigate = useNavigate();
+  const { pinned } = usePinnedApps(person.id);
+  const entries = favoriteApps(pinned);
   return (
-    <TodayCard
-      icon="brain"
-      title="Recent memories"
-      action={
-        <Button variant="ghost" size="sm" onClick={() => navigate("/memory")}>
-          View all →
-        </Button>
-      }
-    >
-      {recent.length === 0 ? (
-        "Nothing remembered yet."
-      ) : (
-        <ul className="flex flex-col gap-1">
-          {recent.map((m) => (
-            <li key={m.id} className="truncate">
-              {m.text}
-            </li>
-          ))}
-        </ul>
-      )}
-    </TodayCard>
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <PanelHeader icon="layout-grid" hue="--hue-blue" title="Your apps" linkLabel="Browse all" onLinkClick={() => navigate("/apps")} className="min-w-0 flex-1 border-b-0 pb-0" />
+        {/* Hidden on the phone: a density control has little room to
+            matter once the grid is already down to one or two columns,
+            and it was squeezing the title into a truncated sliver in
+            the row's shared space. */}
+        <div className="hidden shrink-0 sm:block">
+          <CardSizeSlider size={cardSize} onChange={setCardSize} />
+        </div>
+      </div>
+      <div className="mt-3" style={cardSizeStyle(cardSize)}>
+        <CardGrid
+          label="Your apps"
+          items={entries}
+          getKey={(e) => e.to}
+          getLabel={(e) => e.label}
+          onSelect={(e) => navigate(e.to)}
+          emptyState={{ icon: "pin", text: "Pin your go-to apps from the app library." }}
+          renderItem={(e) => (
+            <div className="flex flex-col items-center gap-2 p-4">
+              <IconTile icon={e.icon as IconName} hue="--hue-blue" />
+              <span className="text-sm">{e.label}</span>
+            </div>
+          )}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -160,196 +223,153 @@ function RecentMemoriesCard() {
 // session/presence infrastructure exists yet (docs/BACKLOG.md's own note,
 // "presence unknown for now"). Showing who lives here is still real and
 // useful on its own; it just isn't "who is home right now" yet.
-function WhoIsHere({ selfId }: { selfId: string }) {
+function PeoplePanel({ selfId }: { selfId: string }) {
+  const navigate = useNavigate();
   const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: api.people });
   const people = query.data ?? [];
-  if (people.length === 0) return null;
-  return (
-    // `shrink-0 min-h-[72px]`: `overflow-x-auto` computes `overflow-y` to
-    // `auto` too (MediaShelf.tsx's own comment on the identical quirk,
-    // 2026-09-05), which makes this row's own automatic minimum size (a
-    // flex item's `min-height: auto` resolves to 0, not its content
-    // size, once it establishes a scroll container) collapse to zero
-    // inside this page's own `flex-col` layout - a real bug found live,
-    // 2026-09-13: every name under an avatar rendered fully clipped, cut
-    // off at the very top of each letter, in the published home
-    // screenshot. `min-h-[72px]` (the 40px avatar, the label's own
-    // ~24px line height at `text-base`'s default leading, and the 4px
-    // gap between them, with a little rounding room) gives the row a
-    // real height that doesn't depend on the browser's own automatic
-    // sizing at all - recomputed lane 7 item 3 (2026-09-13) when the
-    // label below moved off `text-xs` to the type floor, from the
-    // original `min-h-16` (64px) tuned for that smaller label's own
-    // ~20px line height. This is the same quirk MediaShelf.tsx's own
-    // scroll rail already documents (worked around there with padding,
-    // for a different symptom - focus-ring clipping, not a height
-    // collapse, since that rail isn't usually a `flex-col` item the way
-    // this row is) -  a code review, 2026-09-13, flagged that the two
-    // fixes are two different techniques for the identical root cause
-    // with nothing centralizing it; noted rather than unified here
-    // (scripts/screenshot.ts's own `clippedStrips` check, added in the
-    // same commit as this fix, is the runtime backstop for a THIRD
-    // instance turning up before anyone gets to that).
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
-    <div tabIndex={0} className={cn("flex min-h-[72px] shrink-0 items-center gap-2 overflow-x-auto", FOCUS_RING)}>
-      {people.map((p) => (
-        <div key={p.id} className="flex shrink-0 flex-col items-center gap-1">
-          <Avatar name={p.display_name} className="h-10 w-10 text-sm" />
-          {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
-          <span className="text-base text-muted-foreground">{p.id === selfId ? "You" : p.display_name}</span>
+  return panelCard(
+    <>
+      <PanelHeader icon="users" hue="--hue-violet" title="People" linkLabel="View all" linkAriaLabel="View all people" onLinkClick={() => navigate("/people")} />
+      {people.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">No one else in this household yet.</p>
+      ) : (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
+        <div tabIndex={0} className={cn("mt-3 flex min-h-[72px] shrink-0 items-center gap-3 overflow-x-auto", FOCUS_RING)}>
+          {people.map((p) => (
+            <div key={p.id} className="flex shrink-0 flex-col items-center gap-1">
+              <Avatar name={p.display_name} className="h-10 w-10 text-sm" />
+              {/* text-base, not text-xs: the type floor (docs/UI.md). */}
+              <span className="text-base text-muted-foreground">{p.id === selfId ? "You" : p.display_name}</span>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+      )}
+    </>,
   );
 }
 
-// Found live 2026-09-11: the header hardcoded this generic line with no
-// way for a household to make the page its own.
-const DEFAULT_TAGLINE = "Made for your everyday";
-
-function Tagline() {
-  const query = useHouseholdSettings();
-  const familyName = textSetting(query.data, "household.family_name");
-  const text = familyName ? `${familyName} Family` : DEFAULT_TAGLINE;
-  // text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3.
-  return <p className="mb-2 text-base font-medium tracking-widest text-primary uppercase">{text}</p>;
+interface ActivityRow {
+  id: string;
+  text: string;
+  at: string;
+  hue: string;
 }
 
-function PinnedAppsStrip({ person }: { person: Roster }) {
-  const navigate = useNavigate();
-  const { pinned } = usePinnedApps(person.id);
-  const entries = favoriteApps(pinned);
-  return (
-    <CardGrid
-      label="Pinned apps"
-      items={entries}
-      getKey={(e) => e.to}
-      getLabel={(e) => e.label}
-      onSelect={(e) => navigate(e.to)}
-      emptyState={{ icon: "pin", text: "Pin your go-to apps from the app library." }}
-      renderItem={(e) => {
-        const Icon = getIcon(e.icon);
-        return (
-          <div className="flex flex-col items-center gap-2 p-4">
-            <Icon aria-hidden className="size-6" />
-            <span className="text-sm">{e.label}</span>
-          </div>
-        );
-      }}
-    />
+function relativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+// The household row's Activity panel (spec "The dashboard": "the last
+// five events: a chat, a package added, an update applied, with colored
+// dots and times"). Home has no dedicated activity/audit log yet
+// (docs/BACKLOG.md), so this merges two real feeds client-side rather
+// than fabricating one - recent conversations and recent memories, both
+// already fetched for their own panels above, by real timestamp.
+function ActivityPanel() {
+  const conversationsQuery = useQuery<ConversationSummary[]>({ queryKey: ["conversations-list", null, ""], queryFn: () => api.conversationList() });
+  const memoriesQuery = useQuery<MemoryRecord[]>({ queryKey: ["memory-list", "me"], queryFn: () => api.memories() });
+  const fromConversations: ActivityRow[] = (conversationsQuery.data ?? [])
+    .filter((c) => c.last_turn_at)
+    .map((c) => ({ id: `conv-${c.id}`, text: c.title ? `Chat: ${c.title}` : "A new conversation", at: c.last_turn_at!, hue: "--hue-blue" }));
+  const fromMemories: ActivityRow[] = (memoriesQuery.data ?? []).map((m) => ({ id: `mem-${m.id}`, text: `Remembered: ${m.text}`, at: m.created_at, hue: "--hue-teal" }));
+  const rows = [...fromConversations, ...fromMemories].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5);
+  return panelCard(
+    <>
+      <PanelHeader icon="activity" hue="--hue-teal" title="Activity" />
+      <div className="mt-3">
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing has happened yet today.</p>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {rows.map((row) => (
+              <li key={row.id} className="flex items-center gap-2 text-sm">
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: `var(${row.hue})` }} />
+                <span className="min-w-0 flex-1 truncate">{row.text}</span>
+                {/* text-base, not text-xs: the type floor (docs/UI.md). */}
+                <span className="shrink-0 text-base text-muted-foreground">{relativeTime(row.at)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>,
   );
 }
 
-// Lane 9 item 1: "one prompt box that is both search and chat" - the
-// exact same shared query (`useSearchCommand`, `SearchResultGroups`)
-// `CommandPalette.tsx`'s Cmd/Ctrl+K dialog uses, laid out inline on the
-// page instead of a modal (docs/BACKLOG.md: "the same prompt box the
-// home-screen item above describes; build it once"). Typing shows
-// matches (apps, memories, conversations, and more); Enter with nothing
-// deliberately arrowed to sends the raw text to chat, exactly as the
-// plain box already did - `SearchResultGroups`'s own "Ask" row renders
-// first, so cmdk's own default-highlight-first-item behavior lands
-// there unless a person arrows down to a real match first.
-function HomeSearchPrompt({ person }: { person: Roster }) {
+// Quick actions (spec "The dashboard"): Ask MaiPai, Add a person, Check
+// for updates, Open Repairs - real destinations (Settings > Users has
+// "Add someone", Settings > Repairs is RepairsPage), not invented ones.
+// "Check for updates" calls the real POST /api/updates/check rather
+// than navigating anywhere, mirroring the reference's own action tiles.
+// The route's own gate is owner/admin OR a backups.run grant; `Roster`
+// carries no client-visible grant list to check the latter against, so
+// `canCheckUpdates` is a role-only approximation - a person holding only
+// a backups.run grant won't see this tile even though the backend would
+// accept their request. Known, accepted gap, not silently wrong: the
+// tile's absence never claims they lack access, it just doesn't offer
+// the shortcut.
+function QuickActionsPanel({ person }: { person: Roster }) {
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
-  const { visibleGroups, trimmed } = useSearchCommand(person.id, query);
-
-  function select(item: SearchResultItem) {
-    navigate(item.to, item.state ? { state: item.state } : undefined);
-    setQuery("");
+  const { push } = useToast();
+  const canCheckUpdates = person.role === "owner" || person.role === "admin";
+  async function checkForUpdates() {
+    try {
+      const result = await api.checkForUpdate();
+      push(updateAvailable(result) ? `${result.latest} is available.` : "MaiPai Home is up to date.");
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Could not check for updates.");
+    }
   }
-
-  function askMaiPai() {
-    if (!query.trim()) return;
-    navigate("/chat", { state: { initialText: query } });
-    setQuery("");
-  }
-
-  return (
-    <Command
-      shouldFilter={false}
-      // `shrink-0 h-auto!`, not `Command`'s own `size-full`: two
-      // separate bugs found live, 2026-09-13, from the SAME root cause
-      // (`Command`'s base class carries `size-full overflow-hidden`,
-      // meant for `CommandDialog`'s always-sized `DialogContent`, wrong
-      // for this inline box's real parent - a plain flow div inside an
-      // `overflow-y-auto flex-col` scroll container). Bug 1: with only
-      // the default `flex-shrink: 1`, the flex algorithm shrank the
-      // whole box to a few px regardless of content (the identical
-      // "overflow-hidden zeroes a flex item's own automatic minimum
-      // size" quirk WhoIsHere/MediaShelf already document) - a height
-      // override alone did nothing, since shrinking overrides an
-      // explicit height. Bug 2: `shrink-0` alone fixed that, but then
-      // exposed `size-full`'s OWN `height: 100%` computing against the
-      // scroll container's real height (~650px), stretching the box
-      // and pushing every card below it out of view. Both together are
-      // the real fix - `h-auto!` (forced: a plain `h-auto` alone
-      // survived in the class list next to `size-full` rather than
-      // replacing it, `cn()`'s twMerge not treating them as
-      // conflicting, and lost the cascade to `.size-full` either way).
-      className="h-auto! shrink-0 rounded-2xl! border border-border/70 bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring/30"
-    >
-      <CommandInput value={query} onValueChange={setQuery} placeholder="Ask MaiPai anything..." aria-label="Ask MaiPai" />
-      {/* `CommandList` always mounted, not conditional on `trimmed`: found
-          live, 2026-09-13 - cmdk's own `CommandInput` always carries
-          `aria-controls` pointing at the list's id regardless, so
-          unmounting the list on an empty query left that id dangling
-          (axe's aria-valid-attr-value, critical). Results stay
-          conditional on `trimmed`, matching Home's own "no dropdown
-          clutter until you type" intent (the strip below already shows
-          pinned apps) - only the list ELEMENT itself needs to always
-          exist, not its contents. */}
-      <CommandList>{trimmed !== "" ? <SearchResultGroups groups={visibleGroups} trimmedQuery={trimmed} onSelect={select} onAsk={askMaiPai} askLabel="Ask MaiPai" /> : null}</CommandList>
-    </Command>
+  return panelCard(
+    <>
+      <PanelHeader icon="sparkles" hue="--hue-orange" title="Quick actions" />
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <ActionTile icon="message-circle" hue="--hue-blue" label="Ask MaiPai" subtitle="Start a conversation" onClick={() => navigate("/chat")} />
+        <ActionTile icon="users" hue="--hue-violet" label="Add a person" subtitle="Grow the household" onClick={() => navigate("/settings/users")} />
+        {canCheckUpdates ? <ActionTile icon="refresh-cw" hue="--hue-teal" label="Check for updates" subtitle="Look for a new release" onClick={() => void checkForUpdates()} /> : null}
+        <ActionTile icon="wrench" hue="--hue-orange" label="Open Repairs" subtitle="See what needs attention" onClick={() => navigate("/settings/repairs")} />
+      </div>
+    </>,
   );
 }
 
 export function HomePage({ person }: HomePageProps) {
-  const navigate = useNavigate();
+  // Shared with "Your packages" below - see YourAppsPanel's own comment.
   const [cardSize, setCardSize] = useCardSize("home");
-
-  // hideTitle: the greeting right below already gives this page its
-  // identity (name + time of day) - a second, generic "Home" label above
-  // it would be pure redundancy, unlike Settings (Page.tsx's own default
-  // case), which had no visible identity at all before this step.
+  // hideTitle: the fixed header (spec "Current destination header
+  // rule") now owns the destination's title and subtitle, including the
+  // signed-in person's own greeting (shell/routeHeader.ts) - a second
+  // one here would be exactly the duplicate header that rule forbids.
   return (
     <Page title="Home" hideTitle>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
-      <div tabIndex={0} className={cn("mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-8 overflow-y-auto px-4 py-6 sm:px-8", FOCUS_RING)}>
-        <div>
-          <Tagline />
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{greetingFor(new Date(), person.display_name)}</h2>
+      <div tabIndex={0} className={cn("mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-8", FOCUS_RING)}>
+        <MetricRow person={person} />
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <TodayPanel />
+          <RecentMemoriesPanel />
         </div>
 
-        <WhoIsHere selfId={person.id} />
-
-        <HomeSearchPrompt person={person} />
+        <YourAppsPanel person={person} cardSize={cardSize} setCardSize={setCardSize} />
 
         <div>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-            <Trans id="Today" message="Today" />
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <WeatherCard />
-            <RecentMemoriesCard />
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Your packages</h3>
+          <div style={cardSizeStyle(cardSize)}>
+            <NodeRenderer node={PACKAGE_WIDGET_CARDS} />
           </div>
         </div>
 
-        <div style={cardSizeStyle(cardSize)}>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-muted-foreground">Your packages</h3>
-            <CardSizeSlider size={cardSize} onChange={setCardSize} />
-          </div>
-          <NodeRenderer node={PACKAGE_WIDGET_CARDS} />
-        </div>
-
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-muted-foreground">Favorites</h3>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/apps")}>Browse apps →</Button>
-          </div>
-          <PinnedAppsStrip person={person} />
+        <div className="grid gap-3 lg:grid-cols-3">
+          <PeoplePanel selfId={person.id} />
+          <ActivityPanel />
+          <QuickActionsPanel person={person} />
         </div>
       </div>
     </Page>
