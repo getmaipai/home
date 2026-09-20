@@ -18628,3 +18628,7 @@ SHARED-PIN-01 (B's pin-form migration, landed underneath this work
 mid-session) and moving `UI_PIN`/`SPEC_PIN` to `0.4.0`/`0.1.2`: 3525
 backend tests, 493 frontend tests, build, `a11y-only`, docs
 reading-level, and the standards core all green.
+
+## Home's Stack client (HOME-STACK-02a, 2026-09-20)
+
+The home backend now talks to the Stack directly, through `src/lib/stack/`: a typed client (`client.ts`) that wraps the Stack's OpenAPI surface on loopback `http://127.0.0.1:8770` with a 30-second `withTimeout` envelope, a typed error surface (`errors.ts`) mapping HTTP status codes to `StackError` kinds (`unknown`, `unverified`, `cancelled`, `offline`, `timeout`, `unreachable`, `unexpected`), and wire types (`types.ts`) mirroring the Stack's response shapes. The client exposes the role routes (`/v1/chat/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`, `/v1/audio/speech`, `/v1/images/generations`), job control (`/stack/v1/jobs/:id`), and the admin surface (`/stack/v1/roles`, `/stack/v1/engines`, `/stack/v1/models`, `/stack/v1/health`, `/stack/v1/settings`, `/stack/v1/hardware/budget`, `/stack/v1/updates`, `/healthz`). It is not yet wired into any existing home module; that rework is HOME-STACK-02b. Verified by `bun test tests/stackClient.test.ts` (15 tests) and `tsc --noEmit`.

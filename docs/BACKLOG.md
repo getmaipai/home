@@ -2273,6 +2273,7 @@ invented for the roster's household, and added to
 <a id="stack-16"></a>
 
 - [ ] **STACK-16: Home runs on the Stack** (L, after the Stack's STACK-14; design pass in `docs/dev.md` first)
+  - [x] **HOME-STACK-02a: Home's Stack client** (done 2026-09-20): the typed client, error surface, and wire types in `backend/src/lib/stack/`; not yet wired into existing modules (that is HOME-STACK-02b).
 
     Objective: register Home as a Stack client, call every role by name
     at the Stack's address, read identity from its headers, bridge its
