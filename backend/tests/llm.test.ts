@@ -8,6 +8,10 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { complete, startCompleteStream, embed, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall, CHAT_SAMPLING } from "@/lib/llm";
 import { clampMaxTokens } from "@/routes/llm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setStackClientForTests, __resetStackEngineForTests, getActiveChatEngineIdentity } from "@/lib/stackEngine";
+import { listIssues } from "@/lib/issues";
+import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
@@ -18,6 +22,7 @@ beforeEach(() => {
 afterEach(() => {
   __resetLlmSupervisorForTests();
   __resetEmbedSupervisorForTests();
+  __resetStackEngineForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
 
@@ -642,5 +647,166 @@ describe("POST /api/llm/embed", () => {
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const res = await owner.post("/api/llm/embed", { texts: ["x".repeat(4_001)] });
     expect(res.status).toBe(400);
+  });
+});
+
+// HOME-STACK-02b: engines.stack.url empty (the default, every test above
+// this point) must keep going through the stub/supervisor path exactly
+// as before; set, it must go through the Stack client instead - proven
+// with a real scripted Stack (tests/stackFixture.ts's Bun.serve fixture),
+// injected via __setStackClientForTests() the same way llmSupervisor.ts's
+// own tests inject a scripted engine.
+describe("lib/llm.ts routed through a configured Stack", () => {
+  let fixture: StackFixture;
+
+  function configureStack(): void {
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+  }
+
+  afterEach(() => {
+    fixture?.stop();
+  });
+
+  test("complete() answers through the Stack and records the reply's identity", async () => {
+    fixture = startStackFixture({
+      "POST /v1/chat/completions": async () =>
+        Response.json(
+          { id: "chatcmpl-1", object: "chat.completion", model: "chat", choices: [{ message: { role: "assistant", content: "hello from the stack" } }] },
+          { headers: IDENTITY_HEADERS },
+        ),
+    });
+    configureStack();
+
+    const result = await complete("chat", [{ role: "user", content: "hi" }]);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.text).toBe("hello from the stack");
+    expect(getActiveChatEngineIdentity()).toEqual({ host: "local", build: "b10797", model: "qwen3-8b-instruct-q4_k_m.gguf", healthy: null });
+  });
+
+  test("a scripted 503 becomes the companion line and a Repairs entry carrying offline_reason", async () => {
+    fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => offlineResponse("chat", "the engine process is not running"),
+    });
+    configureStack();
+
+    const result = await complete("chat", [{ role: "user", content: "hi" }]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(503);
+      expect(result.code).toBe("unavailable");
+      expect(result.error).toBe("I can't think right now.");
+    }
+    const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.chat");
+    expect(issue?.detail).toBe("the engine process is not running");
+  });
+
+  // A code review caught the first cut of this only raising Repairs for
+  // a scripted 503 ("offline"), not for the socket refusing entirely
+  // ("unreachable") - the whole Stack being down, arguably the more
+  // common real failure, silently cleared any existing Repairs entry
+  // instead of raising one.
+  test("the Stack being unreachable (not just one role reporting offline) also raises a Repairs entry", async () => {
+    fixture = startStackFixture({});
+    configureStack();
+    fixture.stop(); // the URL is configured but nothing listens there now
+
+    const result = await complete("chat", [{ role: "user", content: "hi" }]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(503);
+      expect(result.error).toBe("I can't think right now.");
+    }
+    const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.chat");
+    expect(issue).toBeDefined();
+    expect(issue?.detail).toContain("not running");
+  });
+
+  test("a 400 keeps the Stack's own stated reason, no guessed cause", async () => {
+    fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => Response.json({ error: "the model field must be a role id or an installed model id", roles: ["chat", "embed"] }, { status: 400 }),
+    });
+    configureStack();
+
+    const result = await complete("chat", [{ role: "user", content: "hi" }]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("the model field must be a role id or an installed model id");
+  });
+
+  test("startCompleteStream() streams real deltas through the Stack and captures identity from the headers, before any token arrives", async () => {
+    fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => {
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            const enc = new TextEncoder();
+            controller.enqueue(enc.encode('data: {"id":"1","model":"chat","choices":[{"index":0,"delta":{"content":"hel"},"finish_reason":null}]}\n\n'));
+            controller.enqueue(enc.encode('data: {"id":"1","model":"chat","choices":[{"index":0,"delta":{"content":"lo"},"finish_reason":"stop"}]}\n\n'));
+            controller.enqueue(enc.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+        return new Response(body, { headers: IDENTITY_HEADERS });
+      },
+    });
+    configureStack();
+
+    const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }]);
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    // The identity is already readable before the first token is pulled -
+    // the acceptance criterion this proves ("the identity headers are
+    // logged per turn" reads the reply, not a probe, and reads it early
+    // enough for a [turn] line built alongside the stream, not after it).
+    expect(getActiveChatEngineIdentity()?.model).toBe("qwen3-8b-instruct-q4_k_m.gguf");
+    let text = "";
+    for await (const delta of started.tokens) text += delta;
+    expect(text).toBe("hello");
+    expect(started.stats.stopReason).toBe("stop");
+  });
+
+  test("embed() answers through the Stack, sorted by the wire's own index", async () => {
+    fixture = startStackFixture({
+      "POST /v1/embeddings": async () =>
+        Response.json({ object: "list", model: "embed", data: [{ index: 1, embedding: [0.2] }, { index: 0, embedding: [0.1] }] }, { headers: IDENTITY_HEADERS }),
+    });
+    configureStack();
+
+    const result = await embed(["a", "b"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.vectors).toEqual([[0.1], [0.2]]);
+  });
+
+  test("embed()'s own Stack 503 maps to the same unavailable shape, no companion line (that's a chat-only line)", async () => {
+    fixture = startStackFixture({
+      "POST /v1/embeddings": async () => offlineResponse("embed", "the embed engine is not running"),
+    });
+    configureStack();
+
+    const result = await embed(["a"]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("embed model unavailable: the Stack is offline");
+    const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.embed");
+    expect(issue?.detail).toBe("the embed engine is not running");
+  });
+});
+
+// Found live: safety.test.ts's own "every real settings key, stressed to
+// its most permissive value" sweep sets engines.stack.url to a plain
+// non-URL string ("stress-test-value", extremeValueFor()'s stand-in for
+// any text key with an empty default) and expects chat to keep working
+// regardless, the same as every other settings key it stresses - it
+// broke instead, because a non-empty string alone was enough for
+// getStackUrl() to call it "configured" and hand it straight to
+// createStackClient(), which throws on a non-loopback-shaped URL.
+describe("lib/llm.ts with engines.stack.url set to garbage (not a real URL)", () => {
+  afterEach(() => {
+    __resetStackEngineForTests();
+  });
+
+  test("a plain non-URL string is treated as unconfigured, not a broken Stack", async () => {
+    setHouseholdSettingValue("engines.stack.url", "stress-test-value");
+
+    const result = await complete("chat", [{ role: "user", content: "hi" }]);
+    expect(result.ok).toBe(true); // the stub backend answered, same as engines.stack.url empty
   });
 });

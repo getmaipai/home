@@ -22,6 +22,18 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 // dedicated chat surface less likely to drift into a second setting.
 export const CHAT_MODEL_SETTING_KEY = "chat.model_id" as const;
 
+// HOME-STACK-02b: one setting decides whether Home's model calls go
+// through a MaiPai Stack instead of its own built-in supervisors. Empty
+// (the default) means no Stack is configured: Home keeps today's own
+// spawned engines exactly as before. HOME-STACK-01's installer is the
+// real, planned writer once it lands; until then this is a manual escape
+// hatch for a hand-run Stack, same household scope and same
+// not-for-the-generic-renderer posture as `chat.model_id` above (no
+// download or spawn side effect here either, but pointing Home at the
+// wrong URL silently breaks every model call, so it stays out of the
+// Advanced fold a person could stumble into).
+export const STACK_URL_SETTING_KEY = "engines.stack.url" as const;
+
 export const AI_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
     key: "chat.model_id",
@@ -67,6 +79,17 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "KV cache precision override",
     help: "\"Auto\" quantizes the conversation cache to fit more context in the same memory, with a small quality tradeoff. \"Full\" uses full precision: more accurate, uses roughly twice the memory for the same context size.",
     level: "advanced",
+    lives_in: "household.ai",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "engines.stack.url",
+    scope: "household",
+    selector: "text",
+    default: "",
+    label: "MaiPai Stack address",
+    help: "Empty uses Home's own built-in engines. Set once a MaiPai Stack is installed on this machine to route chat, embeddings and voice through it instead.",
+    level: "expert",
     lives_in: "household.ai",
     honoured_by: ["home"],
   }),

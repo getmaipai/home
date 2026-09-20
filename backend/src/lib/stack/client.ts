@@ -71,8 +71,11 @@ export interface StackClientOptions {
 }
 
 /** The header names are in role-reply-headers.schema.json; used exactly.
- * `none` means no engine answered, per that schema. */
-function identityFromHeaders(headers: Headers): EngineIdentity {
+ * `none` means no engine answered, per that schema. Exported for
+ * llm.ts's Stack-routed streaming path (startCompleteStream()), which
+ * reads a raw `{ stream, headers }` reply itself rather than going
+ * through this file's own chat()/embeddings() JSON helpers. */
+export function identityFromHeaders(headers: Headers): EngineIdentity {
   const get = (name: string): string | null => {
     const value = headers.get(name);
     return value && value !== "none" ? value : null;

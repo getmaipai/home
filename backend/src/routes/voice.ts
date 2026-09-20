@@ -13,7 +13,10 @@ import {
   wakewordAssetPath,
 } from "@/lib/wakewordAssets";
 import { getVoiceCatalog, isVoiceCatalogPath } from "@/lib/voiceCatalog";
-import { setPersonTtsVoiceUnchecked, setValue, resetValue } from "@/lib/settings";
+import { setPersonTtsVoiceUnchecked, setValue, resetValue, resolveForResponse } from "@/lib/settings";
+import { getRegistryKey } from "@/lib/settingsRegistry";
+import { getStackUrl, getStackClient, stackFailureResult } from "@/lib/stackEngine";
+import { isOwnerOrAdmin } from "@/lib/access";
 import { ResolvedSettingSchema } from "@/routes/settings";
 import { restartTtsBackend } from "@/lib/ttsSupervisor";
 import {
@@ -248,7 +251,7 @@ const hfTokenRoute = createRoute({
       content: { "application/json": { schema: ResolvedSettingSchema } },
       description: "The updated setting record.",
     },
-    ...errorResponses({ 400: "Token is required, or unknown settings key", 401: "Not signed in", 403: "Not allowed" }),
+    ...errorResponses({ 400: "Token is required, or unknown settings key", 401: "Not signed in", 403: "Not allowed", 503: "The Stack did not answer" }),
   },
 });
 
@@ -259,6 +262,28 @@ voiceRoutes.openapi(hfTokenRoute, async (c) => {
   if (!token) {
     return c.json({ error: "token is required" }, 400);
   }
+
+  // HOME-STACK-02b: a Stack owns its own tts engine and the token it
+  // needs to clone a voice, so a configured Stack gets the write
+  // instead of Home's own env-fed TTS process - Home's household
+  // voice.hf_token key is never populated at all in this mode (there is
+  // nothing here for it to feed). Same owner/admin gate as the
+  // household-setting path below (setValue()'s own assertCanAccessScope) -
+  // this branch bypasses setValue() entirely, so the check has to be
+  // made explicitly here instead of inherited from it.
+  if (getStackUrl()) {
+    if (!isOwnerOrAdmin(actor)) {
+      return c.json({ error: "only owner or admin may change household settings" }, 403);
+    }
+    try {
+      await getStackClient().applySettings({ "stack.engines.tts.hf_token": token });
+    } catch (err) {
+      const failure = stackFailureResult(err, "tts");
+      return c.json({ error: failure.error }, failure.status);
+    }
+    return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, token, "user"), 200);
+  }
+
   const result = setValue(actor, "household", "voice.hf_token", token);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
@@ -280,12 +305,25 @@ const hfTokenRemoveRoute = createRoute({
       content: { "application/json": { schema: ResolvedSettingSchema } },
       description: "The updated setting record.",
     },
-    ...errorResponses({ 400: "Unknown settings key", 401: "Not signed in", 403: "Not allowed" }),
+    ...errorResponses({ 400: "Unknown settings key", 401: "Not signed in", 403: "Not allowed", 503: "The Stack did not answer" }),
   },
 });
 
 voiceRoutes.openapi(hfTokenRemoveRoute, async (c) => {
   const actor = c.get("person");
+  if (getStackUrl()) {
+    if (!isOwnerOrAdmin(actor)) {
+      return c.json({ error: "only owner or admin may change household settings" }, 403);
+    }
+    try {
+      await getStackClient().applySettings({ "stack.engines.tts.hf_token": "" });
+    } catch (err) {
+      const failure = stackFailureResult(err, "tts");
+      return c.json({ error: failure.error }, failure.status);
+    }
+    return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, "", "default"), 200);
+  }
+
   const result = resetValue(actor, "household", "voice.hf_token");
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);

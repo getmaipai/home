@@ -19,6 +19,8 @@ import { existsSync } from "node:fs";
 // @ts-ignore - no resolvable .d.ts
 import sherpaOnnx from "sherpa-onnx-node";
 import { ensureSttAssets, isSttInstalled, sileroVadPath, moonshinePath } from "@/lib/sttAssets";
+import { encodeWav } from "@/lib/sttSession";
+import { getStackUrl, getStackClient, resolveStackOffline, reportStackFailure } from "@/lib/stackEngine";
 
 interface OfflineStream {
   acceptWaveform(input: { sampleRate: number; samples: Float32Array }): void;
@@ -118,8 +120,30 @@ export function __resetSttForTests(): void {
  * know or care which one is active, the same indirection llm.ts's own
  * complete()/startCompleteStream() give every caller over the stub vs.
  * real chat backend. */
+/** HOME-STACK-02b: the Stack's /v1/audio/transcriptions takes a WAV
+ * file in its `file` field (stack/backend/src/routes/v1.ts's
+ * TranscriptionFormSchema) - sttSession.ts's own encodeWav() already
+ * exists for the wire's own SttWireEvent path, reused here rather than
+ * a second PCM-to-WAV encoder. */
+async function transcribeViaStack(samples: Float32Array, sampleRate: number): Promise<string> {
+  const wav = encodeWav(samples, sampleRate);
+  const form = new FormData();
+  form.append("file", new File([wav], "utterance.wav", { type: "audio/wav" }));
+  form.append("model", "stt");
+  try {
+    const client = getStackClient();
+    const result = await client.transcribe(form);
+    resolveStackOffline("stt");
+    return result.data.text;
+  } catch (err) {
+    reportStackFailure(err, "stt");
+    throw err;
+  }
+}
+
 export async function transcribeUtterance(samples: Float32Array, sampleRate: number): Promise<string> {
   if (testBackend) return testBackend(samples, sampleRate);
+  if (getStackUrl()) return transcribeViaStack(samples, sampleRate);
   return transcribe(samples, sampleRate);
 }
 

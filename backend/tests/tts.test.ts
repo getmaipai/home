@@ -4,6 +4,10 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
 import { synthesizeSpeech } from "@/lib/tts";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { listIssues } from "@/lib/issues";
+import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
@@ -12,6 +16,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetTtsSupervisorForTests();
+  __resetStackEngineForTests();
 });
 
 describe("lib/tts.ts synthesizeSpeech()", () => {
@@ -155,5 +160,56 @@ describe("POST /api/tts", () => {
       await childClient.post("/api/tts", { text: "hi" });
       expect(receivedVoiceUrls).toEqual(["estelle", "jean"]);
     });
+  });
+});
+
+// HOME-STACK-02b: engines.stack.url set routes synthesizeSpeech() through
+// the Stack's /v1/audio/speech (spec/voice's own form) instead of the
+// locally-spawned Pocket TTS process.
+describe("lib/tts.ts routed through a configured Stack", () => {
+  let fixture: StackFixture;
+
+  afterEach(() => {
+    fixture?.stop();
+  });
+
+  test("streams the Stack's audio and forwards text/voice_url", async () => {
+    const received: { text: string | null; voiceUrl: string | null } = { text: null, voiceUrl: null };
+    fixture = startStackFixture({
+      "POST /v1/audio/speech": async (req) => {
+        const form = await req.formData();
+        received.text = form.get("text") as string | null;
+        received.voiceUrl = form.get("voice_url") as string | null;
+        return new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } });
+      },
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+
+    const result = await synthesizeSpeech("good morning", "alba");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.contentType).toBe("audio/wav");
+      const audio = new Uint8Array(await new Response(result.value.stream).arrayBuffer());
+      expect(audio.byteLength).toBe(44);
+    }
+    expect(received).toEqual({ text: "good morning", voiceUrl: "alba" });
+  });
+
+  test("a scripted 503 maps to unavailable and raises a Repairs entry carrying offline_reason", async () => {
+    fixture = startStackFixture({
+      "POST /v1/audio/speech": async () => offlineResponse("tts", "the tts engine process is not running"),
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+
+    const result = await synthesizeSpeech("good morning");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(503);
+      expect(result.code).toBe("unavailable");
+    }
+    const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.tts");
+    expect(issue?.detail).toBe("the tts engine process is not running");
   });
 });

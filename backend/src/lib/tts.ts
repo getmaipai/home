@@ -5,6 +5,7 @@
 // right status code for.
 import { getTtsClient } from "@/lib/ttsSupervisor";
 import { TtsClientError } from "@maipai/spec/voice/ts/client.js";
+import { getStackUrl, getStackClient, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
 // A very long chat reply synthesized in one call would tie up the one
 // spawned Pocket TTS process for a long time - bounded generously above
@@ -28,6 +29,25 @@ export type TtsOpResult =
  * parameter existed, since which values are even reachable here is
  * already restricted by that setting key's own `select` options, not
  * anything this function re-checks. */
+/** HOME-STACK-02b: the Stack's /v1/audio/speech takes spec/voice's own
+ * form (stack/backend/src/routes/v1.ts's SpeechFormSchema) - the same
+ * `text`/`voice_url` fields ttsSupervisor.ts's own client already sends
+ * a locally-spawned engine, just posted to the Stack instead. */
+async function synthesizeViaStack(text: string, voiceUrl?: string): Promise<TtsOpResult> {
+  const form = new FormData();
+  form.append("text", text);
+  if (voiceUrl) form.append("voice_url", voiceUrl);
+  form.append("model", "tts");
+  try {
+    const client = getStackClient();
+    const res = await client.speak(form);
+    resolveStackOffline("tts");
+    return { ok: true, value: { stream: res.body!, contentType: res.headers.get("content-type") ?? "audio/wav" } };
+  } catch (err) {
+    return stackFailureResult(err, "tts");
+  }
+}
+
 export async function synthesizeSpeech(text: string, voiceUrl?: string): Promise<TtsOpResult> {
   if (typeof text !== "string" || text.trim().length === 0) {
     return { ok: false, status: 400, code: "invalid_input", error: "text must be a non-empty string" };
@@ -35,6 +55,8 @@ export async function synthesizeSpeech(text: string, voiceUrl?: string): Promise
   if (text.length > MAX_TEXT_LENGTH) {
     return { ok: false, status: 400, code: "invalid_input", error: `text must be ${MAX_TEXT_LENGTH} characters or fewer` };
   }
+
+  if (getStackUrl()) return synthesizeViaStack(text, voiceUrl);
 
   let client;
   try {

@@ -17,9 +17,12 @@ import { getChatClient, reportChatBackendUnreachable } from "@/lib/llmSupervisor
 import { getEmbedClient } from "@/lib/embedSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError, type ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
-import type { ChatRole, ChatCompletionRequest, ToolDefinition, ToolCallWire } from "@maipai/spec/llm/ts/types.js";
+import type { ChatRole, ChatCompletionRequest, ChatCompletionChunk, ToolDefinition, ToolCallWire } from "@maipai/spec/llm/ts/types.js";
 import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
+import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 import { seedFields } from "@/lib/benchSampling";
+import { getStackUrl, getStackClient, recordStackChatIdentity, stackFailureResult, resolveStackOffline } from "@/lib/stackEngine";
+import { identityFromHeaders } from "@/lib/stack/client";
 
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
 // of a few - Session A's own per-person limit (its step 11) hadn't
@@ -265,6 +268,58 @@ function chatSamplingFor(opts: { temperature?: number; response_format?: unknown
   return CHAT_SAMPLING;
 }
 
+/** The request body shared by complete() and its Stack-routed twin below
+ * - factored out so the two call sites (a local LlamaServerClient, the
+ * Stack's own /v1/chat/completions) can never drift on what a completion
+ * actually asks for. */
+function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
+  const { thinking, tools, tool_choice, ...rest } = opts;
+  const offering = !!tools && tools.length > 0;
+  return {
+    offering,
+    body: {
+      messages,
+      ...rest,
+      ...chatSamplingFor(rest),
+      ...seedFields(),
+      response_format: offering ? undefined : rest.response_format,
+      tools: offering ? tools!.map(toToolDefinition) : undefined,
+      tool_choice: offering ? (tool_choice ?? "auto") : undefined,
+      chat_template_kwargs: { enable_thinking: !!thinking },
+      cache_prompt: true,
+      id_slot: 0,
+    },
+  };
+}
+
+/** HOME-STACK-02b: role="chat" for every real caller today (turnEngine.ts's
+ * own turns and personaJudge.ts/memoryJudge.ts's judge calls all pass
+ * "chat" - there is no separate judge role on the wire, only a different
+ * prompt), sent to the Stack as its own `model` per the role wire so a
+ * differently-sized model can answer it there. */
+async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: LlmCompleteOptions): Promise<LlmOpResult> {
+  const { offering, body } = chatRequestBody(messages, opts);
+  try {
+    const client = getStackClient();
+    const result = await client.chat({ model: role, ...body });
+    if ("stream" in result) {
+      // complete() never asks for stream: true; a Stack that streamed
+      // anyway is a contract break worth a loud, distinct failure rather
+      // than silently reading `undefined` fields below.
+      return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: the Stack streamed a non-streaming request" };
+    }
+    recordStackChatIdentity(result.identity);
+    resolveStackOffline(role);
+    const data = result.data as { choices?: Array<{ message: { content: string; tool_calls?: ToolCallWire[] } }>; model?: string };
+    const choice = data.choices?.[0];
+    if (!choice) return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
+    const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
+    return { ok: true, value: { text: choice.message.content, model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+  } catch (err) {
+    return stackFailureResult(err, role);
+  }
+}
+
 export async function complete(
   role: LlmRole,
   messages: LlmMessage[],
@@ -272,6 +327,8 @@ export async function complete(
 ): Promise<LlmOpResult> {
   const invalid = validate(role, messages);
   if (invalid) return invalid;
+
+  if (getStackUrl()) return completeViaStack(role, messages, opts);
 
   let client;
   try {
@@ -281,31 +338,17 @@ export async function complete(
   }
 
   try {
-    const { thinking, tools, tool_choice, ...rest } = opts;
-    const offering = !!tools && tools.length > 0;
-    const response = await client.chatComplete({
-      model: "chat",
-      messages,
-      // `rest` first, then the sampling: a caller that passed
-      // `temperature: undefined` (routes/llm.ts forwards the body's
-      // field as-is) must not end up with the samplers on and no
-      // temperature (a code review caught the other order doing that).
-      ...rest,
-      ...chatSamplingFor(rest),
-      ...seedFields(),
-      // A code review (2026-09-07) found `...rest` above still carries a
-      // caller-supplied `response_format` through with nothing stopping
-      // it from being sent alongside `tools` in the same request - no
-      // real caller does both today, but nothing enforced that. Explicit
-      // now, matching this option's own doc comment: offering tools
-      // always wins.
-      response_format: offering ? undefined : rest.response_format,
-      tools: offering ? tools!.map(toToolDefinition) : undefined,
-      tool_choice: offering ? (tool_choice ?? "auto") : undefined,
-      chat_template_kwargs: { enable_thinking: !!thinking },
-      cache_prompt: true,
-      id_slot: 0,
-    });
+    // `rest` first, then the sampling: a caller that passed
+    // `temperature: undefined` (routes/llm.ts forwards the body's field
+    // as-is) must not end up with the samplers on and no temperature (a
+    // code review caught the other order doing that). A code review
+    // (2026-09-07) also found an earlier cut still carrying a
+    // caller-supplied `response_format` through alongside `tools` with
+    // nothing stopping it - chatRequestBody() makes offering tools
+    // always win, explicitly. Both fixes live in that one shared
+    // builder now, not duplicated between this call and the Stack's.
+    const { offering, body } = chatRequestBody(messages, opts);
+    const response = await client.chatComplete({ model: "chat", ...body });
     const choice = response.choices[0];
     if (!choice) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
@@ -345,6 +388,98 @@ export type LlmStreamStartResult =
  * LlmCompleteOptions: that type's fields all end up spread straight into
  * the request body sent to llama-server (`...rest` below), and a signal
  * has no business there. */
+/** HOME-STACK-02b's streaming twin of completeViaStack(): the Stack's
+ * `/v1/chat/completions` is the same OpenAI-compatible SSE wire
+ * `@maipai/spec/llm/ts/client.ts`'s own chatCompleteStream() already
+ * parses against a direct llama-server - that method owns its own fetch
+ * internally, so it cannot be pointed at a stream this file already has
+ * in hand, but its chunk-interpretation logic (the `data:`/`[DONE]`
+ * framing, per-index tool-call assembly, stats) is ported here verbatim
+ * against `stack/client.ts`'s own `{ stream, headers }` reply instead -
+ * that shape is what gives this path what the direct client's method
+ * cannot: the identity headers, readable the moment the connection
+ * opens, before a single token arrives. Simplified relative to the
+ * original: no idle-timeout re-arming per chunk (the caller's own
+ * `signal` still aborts on a client disconnect); a genuinely wedged
+ * Stack stream is a gap to close in a follow-up, not silently patched
+ * over here with an untested port of that machinery too. */
+async function* stackChatDeltas(
+  stream: ReadableStream<Uint8Array>,
+  stats: ChatCompletionStreamStats,
+): AsyncGenerator<string, ToolCallWire[] | undefined, void> {
+  const toolCallsByIndex = new Map<number, { id: string; name: string; args: string }>();
+  const assembleToolCalls = (): ToolCallWire[] | undefined =>
+    toolCallsByIndex.size === 0
+      ? undefined
+      : [...toolCallsByIndex.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([, call]) => ({ id: call.id, type: "function" as const, function: { name: call.name, arguments: call.args } }));
+  const reader = stream.getReader();
+  for await (const line of readTextLines(reader)) {
+    if (!line.startsWith("data:")) continue;
+    const data = line.slice("data:".length).trim();
+    if (data === "[DONE]") {
+      reader.cancel().catch(() => {});
+      return assembleToolCalls();
+    }
+    if (!data) continue;
+    let chunk: ChatCompletionChunk;
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    if (chunk.usage) stats.usage = chunk.usage;
+    if (chunk.timings) stats.timings = chunk.timings;
+    const finishReason = chunk.choices?.[0]?.finish_reason;
+    if (finishReason) stats.stopReason = finishReason;
+    const delta = chunk.choices?.[0]?.delta;
+    const content = delta?.content;
+    if (content) yield content;
+    for (const fragment of delta?.tool_calls ?? []) {
+      const existing = toolCallsByIndex.get(fragment.index) ?? { id: "", name: "", args: "" };
+      if (fragment.id) existing.id = fragment.id;
+      if (fragment.function?.name) existing.name = fragment.function.name;
+      if (fragment.function?.arguments) existing.args += fragment.function.arguments;
+      toolCallsByIndex.set(fragment.index, existing);
+    }
+  }
+  return assembleToolCalls();
+}
+
+async function startCompleteStreamViaStack(
+  role: LlmRole,
+  messages: LlmMessage[],
+  opts: LlmCompleteOptions,
+  signal?: AbortSignal,
+): Promise<LlmStreamStartResult> {
+  const { offering, body } = chatRequestBody(messages, opts);
+  const stats: ChatCompletionStreamStats = { usage: null, timings: null, stopReason: null };
+  let stream: ReadableStream<Uint8Array>;
+  let headers: Headers;
+  try {
+    const client = getStackClient();
+    const result = await client.chat({ model: role, ...body, stream: true }, { signal });
+    if (!("stream" in result)) {
+      return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: the Stack answered a streaming request without a stream" };
+    }
+    ({ stream, headers } = result);
+  } catch (err) {
+    return stackFailureResult(err, role);
+  }
+  recordStackChatIdentity(identityFromHeaders(headers));
+  resolveStackOffline(role);
+  async function* tokens(): AsyncGenerator<string, ToolCall[] | undefined, void> {
+    try {
+      const wireToolCalls = yield* stackChatDeltas(stream, stats);
+      return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
+    } catch (err) {
+      throw new Error(`chat model unavailable: ${(err as Error).message}`);
+    }
+  }
+  return { ok: true, tokens: tokens(), stats };
+}
+
 export async function startCompleteStream(
   role: LlmRole,
   messages: LlmMessage[],
@@ -354,6 +489,8 @@ export async function startCompleteStream(
   const invalid = validate(role, messages);
   if (invalid) return invalid;
 
+  if (getStackUrl()) return startCompleteStreamViaStack(role, messages, opts, signal);
+
   let client;
   try {
     client = await getChatClient();
@@ -361,8 +498,11 @@ export async function startCompleteStream(
     return { ok: false, status: 503, code: "unavailable", error: `chat model unavailable: ${(err as Error).message}` };
   }
 
-  const { thinking, tools, tool_choice, ...rest } = opts;
-  const offering = !!tools && tools.length > 0;
+  // Same shared builder complete() uses (see its own comment) - a review
+  // caught an earlier cut of this file leaving this method's own copy of
+  // the request unswapped, exactly the drift chatRequestBody() exists to
+  // prevent.
+  const { offering, body } = chatRequestBody(messages, opts);
   const stats: ChatCompletionStreamStats = { usage: null, timings: null, stopReason: null };
   // Fix E: `yield*` delegation both forwards every text delta the inner
   // generator yields AND evaluates to its own return value once it ends
@@ -374,25 +514,7 @@ export async function startCompleteStream(
   // transform an individual delta the way those two do.
   async function* tokens(): AsyncGenerator<string, ToolCall[] | undefined, void> {
     try {
-      const wireToolCalls = yield* client!.chatCompleteStream(
-        {
-          model: "chat",
-          messages,
-          ...rest,
-          ...chatSamplingFor(rest),
-          ...seedFields(),
-          // Same explicit precedence as complete()'s own fix: offering
-          // tools always wins over a caller-supplied response_format.
-          response_format: offering ? undefined : rest.response_format,
-          tools: offering ? tools!.map(toToolDefinition) : undefined,
-          tool_choice: offering ? (tool_choice ?? "auto") : undefined,
-          chat_template_kwargs: { enable_thinking: !!thinking },
-          cache_prompt: true,
-          id_slot: 0,
-        },
-        signal,
-        stats,
-      );
+      const wireToolCalls = yield* client!.chatCompleteStream({ model: "chat", ...body }, signal, stats);
       return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
     } catch (err) {
       // A request the caller itself cancelled (the person closed the tab
@@ -425,10 +547,25 @@ export type EmbedOpResult =
  * `role` parameter (unlike complete()) - there is exactly one embedding
  * model, embedAssets.ts's pinned nomic-embed-text-v1.5, with no
  * catalog/selection to route between yet. */
+async function embedViaStack(texts: string[]): Promise<EmbedOpResult> {
+  try {
+    const client = getStackClient();
+    const result = await client.embeddings({ model: "embed", input: texts });
+    resolveStackOffline("embed");
+    const data = result.data as { data: Array<{ index: number; embedding: number[] }>; model: string };
+    const vectors = [...data.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
+    return { ok: true, value: { vectors, model: data.model } };
+  } catch (err) {
+    return stackFailureResult(err, "embed");
+  }
+}
+
 export async function embed(texts: string[]): Promise<EmbedOpResult> {
   if (!Array.isArray(texts) || texts.length === 0 || texts.some((t) => typeof t !== "string" || t.length === 0)) {
     return { ok: false, status: 400, code: "invalid_input", error: "texts must be a non-empty array of non-empty strings" };
   }
+
+  if (getStackUrl()) return embedViaStack(texts);
 
   let client;
   try {

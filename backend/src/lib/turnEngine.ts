@@ -29,7 +29,7 @@ import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuot
 import { intentFor, deliverableQuery, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { getChatEngineIdentity } from "@/lib/llmSupervisor";
+import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import { buildTurnStats } from "@/lib/turnStats";
@@ -257,7 +257,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     // Only when the chat engine answered (a model turn, or a package the
     // model's own call resolved: a first token was measured), never on a
     // deterministic tier's turn (a review).
-    ...(value.source === "model" || (timings?.first_token_ms ?? null) !== null ? { engine: formatEngineIdentity(getChatEngineIdentity()) } : {}),
+    ...(value.source === "model" || (timings?.first_token_ms ?? null) !== null ? { engine: formatEngineIdentity(getActiveChatEngineIdentity()) } : {}),
     ...(named.length > 0 ? { subjects: named, subject: named[0]!.name } : {}),
     ...(lookupShape ? { lookup_shape: lookupShape } : {}),
     ...(composed ? { composed: composedLog(composed), ...(composed.ungrounded ? { ungrounded: composed.ungrounded } : {}), phase: composed.phase } : {}),
@@ -304,7 +304,7 @@ function logTurnSafely(
   // engine's, then every guard hit); both ride on the wire (the value
   // is the one returned to the caller), the `[turn]` line and the row.
   const rules = rulesFired(meta.rules ?? [], meta.guardHits, meta.signal.source);
-  if (meta.streamStats) value.stats = buildTurnStats(meta.streamStats, meta.timings, meta.startedAt, Date.now(), getChatEngineIdentity());
+  if (meta.streamStats) value.stats = buildTurnStats(meta.streamStats, meta.timings, meta.startedAt, Date.now(), getActiveChatEngineIdentity());
   const rung = rungOf(value, meta.outcomes ?? [], meta.signal, { householdSubject: rules.includes("lookup.household_subject") || (meta.subjects ?? []).some((s) => s.type === "household") });
   value.rung = rung;
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's

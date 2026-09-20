@@ -5,6 +5,9 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { getTtsBackendKind, getTtsClient, __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
 import { clonedVoicesDir } from "@/lib/paths";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { startStackFixture, offlineResponse, type StackFixture } from "./stackFixture";
 
 function resetClonedVoicesDir(): void {
   if (!existsSync(clonedVoicesDir)) return;
@@ -18,6 +21,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetTtsSupervisorForTests();
+  __resetStackEngineForTests();
 });
 
 async function ownerClient(): Promise<TestClient> {
@@ -106,6 +110,79 @@ describe("POST /api/voice/hf-token/remove", () => {
     expect(body.isSet).toBe(false);
 
     expect(getTtsBackendKind()).toBe("none");
+  });
+});
+
+// HOME-STACK-02b: engines.stack.url set moves the hf-token write to the
+// Stack's own stack.engines.tts.hf_token setting instead of Home's
+// household voice.hf_token key.
+describe("hf-token routes, with a configured Stack", () => {
+  let fixture: StackFixture;
+
+  afterEach(() => {
+    fixture?.stop();
+  });
+
+  test("POST /api/voice/hf-token writes to the Stack, not Home's own household setting", async () => {
+    const receivedValues: { body: Record<string, unknown> | null } = { body: null };
+    fixture = startStackFixture({
+      "POST /stack/v1/settings/apply": async (req) => {
+        receivedValues.body = (await req.json()) as Record<string, unknown>;
+        return Response.json({ sections: [], settings: [] });
+      },
+    });
+    const owner = await ownerClient();
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+
+    const res = await owner.post("/api/voice/hf-token", { token: "hf_realtoken123" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { key: string; isSet: boolean; value: unknown };
+    expect(body.key).toBe("voice.hf_token");
+    expect(body.isSet).toBe(true);
+    expect(body.value).toBeNull(); // secret: never echoed back
+    expect(receivedValues.body).toEqual({ "stack.engines.tts.hf_token": "hf_realtoken123" });
+  });
+
+  test("POST /api/voice/hf-token still refuses a non-admin adult", async () => {
+    fixture = startStackFixture({ "POST /stack/v1/settings/apply": async () => Response.json({ sections: [], settings: [] }) });
+    const owner = await ownerClient();
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const adult = (await adultRes.json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+
+    const res = await adultClient.post("/api/voice/hf-token", { token: "hf_x" });
+    expect(res.status).toBe(403);
+  });
+
+  test("POST /api/voice/hf-token/remove clears the Stack's setting", async () => {
+    const receivedValues: { body: Record<string, unknown> | null } = { body: null };
+    fixture = startStackFixture({
+      "POST /stack/v1/settings/apply": async (req) => {
+        receivedValues.body = (await req.json()) as Record<string, unknown>;
+        return Response.json({ sections: [], settings: [] });
+      },
+    });
+    const owner = await ownerClient();
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+
+    const res = await owner.post("/api/voice/hf-token/remove");
+    expect(res.status).toBe(200);
+    expect(receivedValues.body).toEqual({ "stack.engines.tts.hf_token": "" });
+  });
+
+  test("a scripted Stack failure answers with the Stack's own status, no household write attempted", async () => {
+    fixture = startStackFixture({ "POST /stack/v1/settings/apply": async () => offlineResponse("tts", "the tts engine is not running") });
+    const owner = await ownerClient();
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+
+    const res = await owner.post("/api/voice/hf-token", { token: "hf_x" });
+    expect(res.status).toBe(503);
   });
 });
 

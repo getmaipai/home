@@ -2,12 +2,16 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { __setSttBackendForTests, __resetSttForTests, sttAssetsInstalled, sttRecognizerLoaded } from "@/lib/stt";
+import { __setSttBackendForTests, __resetSttForTests, sttAssetsInstalled, sttRecognizerLoaded, transcribeUtterance } from "@/lib/stt";
 import { encodeWav } from "@/lib/sttSession";
 import { websocket } from "hono/bun";
 import { app } from "@/app";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { sileroVadPath } from "@/lib/sttAssets";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { listIssues } from "@/lib/issues";
+import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
@@ -16,6 +20,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetSttForTests();
+  __resetStackEngineForTests();
 });
 
 async function owner(): Promise<TestClient> {
@@ -144,5 +149,50 @@ describe("lib/stt.ts test seam", () => {
     __setSttBackendForTests(async () => "anything");
     expect(sttAssetsInstalled()).toBe(false);
     expect(sttRecognizerLoaded()).toBe(false);
+  });
+});
+
+// HOME-STACK-02b: engines.stack.url set (no __setSttBackendForTests() -
+// transcribeUtterance() checks that seam FIRST, so exercising the Stack
+// branch means leaving it unset) routes through the Stack's
+// /v1/audio/transcriptions instead of the in-process recognizer.
+describe("lib/stt.ts routed through a configured Stack", () => {
+  let fixture: StackFixture;
+
+  afterEach(() => {
+    fixture?.stop();
+  });
+
+  test("transcribes through the Stack, sending a real WAV file", async () => {
+    let receivedFile: File | null = null;
+    fixture = startStackFixture({
+      "POST /v1/audio/transcriptions": async (req) => {
+        const form = await req.formData();
+        receivedFile = form.get("file") as File | null;
+        return Response.json({ text: "the stack heard this" }, { headers: IDENTITY_HEADERS });
+      },
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+
+    const samples = new Float32Array(1600);
+    for (let i = 0; i < samples.length; i++) samples[i] = Math.sin(i / 8) * 0.4;
+    const text = await transcribeUtterance(samples, 16_000);
+    expect(text).toBe("the stack heard this");
+    expect(receivedFile).not.toBeNull();
+    expect((receivedFile as unknown as File).name).toBe("utterance.wav");
+  });
+
+  test("a scripted 503 raises a Repairs entry carrying offline_reason and still throws", async () => {
+    fixture = startStackFixture({
+      "POST /v1/audio/transcriptions": async () => offlineResponse("stt", "the stt engine process is not running"),
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+
+    const samples = new Float32Array(1600);
+    await expect(transcribeUtterance(samples, 16_000)).rejects.toThrow();
+    const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.stt");
+    expect(issue?.detail).toBe("the stt engine process is not running");
   });
 });

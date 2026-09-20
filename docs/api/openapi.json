@@ -6528,6 +6528,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "The Stack did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -6616,6 +6626,16 @@
           },
           "403": {
             "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer",
             "content": {
               "application/json": {
                 "schema": {
