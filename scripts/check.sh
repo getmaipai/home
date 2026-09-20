@@ -117,6 +117,9 @@ if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
   echo "== scripts: typecheck"
   (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
 
+  echo "== scripts: bun test"
+  (cd scripts && bun test)
+
   echo "== backend: bun test"
   (cd backend && bun test)
 fi

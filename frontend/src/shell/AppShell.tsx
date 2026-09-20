@@ -113,17 +113,23 @@ function navGroup(label: string, paths: readonly string[]): NavGroup {
  * dialog, Home supplies its brand, grouped nav, the hub card, the
  * footer summary, and the header's own actions (PinToggle, ModelPicker,
  * NotificationBell, ProfileSwitcher) - "the kit gets a slot, Home keeps
- * the feature." Nav groups follow the owner's ruling on Home's pages
- * under the kit (home/docs/design/home-pages-2026-09-20.md, "The shell,
- * exactly"): Home, Household, System - Manage is omitted because Home
- * has no Engines/Packages/Updates/Repairs/Backups pages of its own yet
- * (they stay a Settings section, RepairsSection.tsx, until HOME-STACK-04
- * gives them real destinations); Conversations sits under Home,
- * alongside Chat, since the ruling's own Household list (People,
- * Memories, Lists) has no chat-history entry and this is chat's own
- * history. The kit's own header search field (this step) covers touch/
- * phone reachability; Cmd/Ctrl+K and HomePage's own search remain as
- * additional entry points.
+ * the feature." Nav groups follow the owner's "Navigation, corrected"
+ * ruling (2026-09-20, home/docs/design/home-pages-2026-09-20.md):
+ * **Home** (Home, Chat, Apps), **Household** (People - Memories moved
+ * onto a person's own profile, reached from there, not a rail item of
+ * its own), **System** (Settings, Privacy - Privacy's own move into a
+ * Settings section is HOME-UI-03's, not touched here). Manage is
+ * omitted because Home has no Engines/Packages/Updates/Repairs/Backups
+ * pages of its own yet (they stay a Settings section,
+ * RepairsSection.tsx, until HOME-STACK-04 gives them real
+ * destinations). Conversations is gone entirely - it is Chat's own
+ * thread list now, never a rail item. `phoneNavMax={4}` on `<Shell>`
+ * below matches the same ruling's own phone tab bar: "Home, Chat, Apps,
+ * More" - three real destinations, not the kit's own default four,
+ * before folding the rest (People, Settings, Privacy) under More. The
+ * kit's own header search field covers touch/phone reachability;
+ * Cmd/Ctrl+K and HomePage's own search remain as additional entry
+ * points.
  *
  * Known gap, tracked not dropped (docs/BACKLOG.md): the kit's Shell has
  * no TV-focusable rail yet (the arrow-key/remote nav the old hand-built
@@ -148,8 +154,8 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
   }
 
   const groups: NavGroup[] = [
-    navGroup("Home", ["/", "/chat", "/conversations", "/apps"]),
-    navGroup("Household", ["/people", "/memory"]),
+    navGroup("Home", ["/", "/chat", "/apps"]),
+    navGroup("Household", ["/people"]),
     navGroup("System", ["/settings", "/privacy"]),
   ];
 
@@ -160,6 +166,7 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
       nav={groups}
       brand={<Brand />}
       railStorageKey="maipai-home:shell-rail"
+      phoneNavMax={4}
       sidebarFooter={<HubStatusCard person={person} />}
       footer={<HomeFooterBar person={person} />}
       headerTitle={

@@ -1,5 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { ProfileSwitcher } from "@/shell/ProfileSwitcher";
 import type { Roster } from "@/lib/api";
 
@@ -54,7 +55,9 @@ describe("ProfileSwitcher", () => {
     });
     try {
       const { getByRole, findByText, getAllByText } = render(
-        <ProfileSwitcher person={makePerson()} onSwitched={async () => {}} onSignOut={() => {}} />,
+        <MemoryRouter>
+          <ProfileSwitcher person={makePerson()} onSwitched={async () => {}} onSignOut={() => {}} />
+        </MemoryRouter>,
       );
       await act(async () => {
         fireEvent.click(getByRole("button", { name: /switch profile or sign out/i }));
@@ -77,7 +80,9 @@ describe("ProfileSwitcher", () => {
     });
     try {
       const { getByRole, findByText } = render(
-        <ProfileSwitcher person={makePerson()} onSwitched={onSwitched} onSignOut={() => {}} />,
+        <MemoryRouter>
+          <ProfileSwitcher person={makePerson()} onSwitched={onSwitched} onSignOut={() => {}} />
+        </MemoryRouter>,
       );
       await act(async () => {
         fireEvent.click(getByRole("button", { name: /switch profile or sign out/i }));
@@ -100,7 +105,9 @@ describe("ProfileSwitcher", () => {
     });
     try {
       const { getByRole, findByText, getByPlaceholderText } = render(
-        <ProfileSwitcher person={makePerson()} onSwitched={onSwitched} onSignOut={() => {}} />,
+        <MemoryRouter>
+          <ProfileSwitcher person={makePerson()} onSwitched={onSwitched} onSignOut={() => {}} />
+        </MemoryRouter>,
       );
       await act(async () => {
         fireEvent.click(getByRole("button", { name: /switch profile or sign out/i }));
@@ -124,7 +131,9 @@ describe("ProfileSwitcher", () => {
     const restore = stubFetch({ "/api/auth/profiles": [makePerson()] });
     try {
       const { getByRole, findByText } = render(
-        <ProfileSwitcher person={makePerson()} onSwitched={async () => {}} onSignOut={onSignOut} />,
+        <MemoryRouter>
+          <ProfileSwitcher person={makePerson()} onSwitched={async () => {}} onSignOut={onSignOut} />
+        </MemoryRouter>,
       );
       await act(async () => {
         fireEvent.click(getByRole("button", { name: /switch profile or sign out/i }));
@@ -134,6 +143,26 @@ describe("ProfileSwitcher", () => {
         fireEvent.click(signOut);
       });
       expect(onSignOut).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+    }
+  });
+
+  // Owner ruling, "Navigation, corrected," 2026-09-20: "the avatar
+  // menu's Profile opens the signed-in person's own [profile]" -
+  // where Memories moved once they left the rail.
+  test("Profile links to the signed-in person's own profile", async () => {
+    const restore = stubFetch({ "/api/auth/profiles": [makePerson()] });
+    try {
+      const { getByRole, findByRole } = render(
+        <MemoryRouter>
+          <ProfileSwitcher person={makePerson()} onSwitched={async () => {}} onSignOut={() => {}} />
+        </MemoryRouter>,
+      );
+      await act(async () => {
+        fireEvent.click(getByRole("button", { name: /switch profile or sign out/i }));
+      });
+      expect(await findByRole("link", { name: "Profile" })).toHaveAttribute("href", "/people/person-sage");
     } finally {
       restore();
     }

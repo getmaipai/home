@@ -18,13 +18,19 @@ export type { NavEntry };
 // this codebase hardcoded a link to bare "/" expecting Chat (checked
 // before moving it), so there is no broken old link to redirect - `/`
 // simply shows different, better content now.
+// Owner ruling, "Navigation, corrected," 2026-09-20: Conversations is
+// Chat's own thread list, not a destination of its own; Memories moved
+// onto a person's own profile (People > a person > Memories). Order
+// matters here beyond readability - AppShell.tsx's own `groups` puts
+// Home/Chat/Apps first for exactly this list, and the phone tab bar
+// (`Shell`'s `phoneNavMax`) shows the first three before folding the
+// rest under More, so those three have to be first in the flattened
+// entry list this feeds.
 export const NAV_ENTRIES: readonly NavEntry[] = [
   { to: "/", icon: "home", label: "Home" },
-  { to: "/apps", icon: "layout-grid", label: "Apps" },
   { to: "/chat", icon: "message-circle", label: "Chat" },
-  { to: "/conversations", icon: "history", label: "Conversations" },
+  { to: "/apps", icon: "layout-grid", label: "Apps" },
   { to: "/people", icon: "users", label: "People" },
-  { to: "/memory", icon: "brain", label: "Memories" },
   { to: "/privacy", icon: "shield-check", label: "Privacy" },
   { to: "/settings", icon: "settings", label: "Settings" },
 ] as const;

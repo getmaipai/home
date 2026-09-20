@@ -279,3 +279,109 @@ and the status dot at its corner, tooltip with the status text. On
 the phone the rail does not exist (the tab bar). Acceptance: the
 collapsed rail captured at 1440 in both looks and both themes, every
 element centered on the same vertical axis.
+
+### Phone density, and conversations inside Chat (owner findings, 2026-09-20 15:57; both looks)
+
+The phone dashboard as shipped is oversized and not the same product
+as the desktop: metric cards half a screen tall with 24 px numbers
+and empty space, panel rows at desktop size, and text running past
+the right edge of the Today and Recent memories cards (a real
+horizontal overflow the capture check did not catch: it must be
+caught, so the overflow check runs on every panel's content box, not
+only the page). Rules for the phone, both looks:
+
+- **Metric cards** in the 2 by 2 grid are compact: 32 px tile, the
+  number or state at 20 px semibold on the same line as the label at
+  13 px, the status line at 12 px under, 12 px padding, the card no
+  taller than its content (about 84 px).
+- **Panels**: header row with a 32 px tile and the 16 px title; rows
+  at 14 px with 8 px rhythm; every line wraps inside the card's
+  content box or truncates with an ellipsis on its own line; nothing
+  ever paints past the card edge.
+- **Type on the phone**: 20 px page title in the header, 16 px panel
+  titles, 14 px rows, 12 px supporting; never the desktop's 28 px.
+- **Header**: title left; search, theme, bell, avatar as 40 px
+  controls right; the bell's count badge 16 px.
+- **Gutter** 16 px, card gap 12 px, section gap 20 px; the page reads
+  as one continuous, dense column the way the reference reads on the
+  desktop, the same product, smaller.
+
+**Conversations live inside Chat.** "Conversations" is not a
+destination of its own: it is Chat's thread list (the chat section:
+a persistent column on desktop, a sheet from the header's list icon
+on the phone). Remove the Conversations item from the rail and from
+the phone tab bar; the tab bar is Home, Chat, Apps, More (People and
+the rest under More). The route `/conversations` redirects to Chat
+with its list open so nothing bookmarked breaks.
+
+### Navigation, corrected (owner ruling, 2026-09-20 16:20)
+
+Three destinations leave the rail; nothing they held is lost:
+
+- **Privacy** is not a destination. The "what leaves the house" table
+  and the privacy switches become a **Privacy section of Settings**
+  (the settings workspace's section list: General, People, Chat,
+  Voice, Engines, Notifications, Backups, Privacy, Developer, in that
+  order), rendered by the same renderer, with the table as a things
+  table inside the section. `/privacy` redirects to
+  `/settings/privacy`. The user-tier privacy page in `docs/user/`
+  stays and describes that section.
+- **Memories** belong to a person, so they live on the person's
+  profile: People, a person, the **Memories** tab (a things page of
+  that person's memories with the kind badge, the time and the
+  details pane; keep, edit, forget as pane actions), and for the
+  person signed in, the avatar menu's **Profile** opens their own.
+  The dashboard's Recent memories panel stays and its "View all"
+  opens the signed-in person's Memories tab. `/memories` redirects
+  there.
+- **Conversations** are Chat's thread list (already ruled above).
+
+The rail is therefore: **Home** (Home, Chat, Apps), **Household**
+(People, Lists when Lists ships), **System** (Settings); Engines,
+Packages, Updates, Repairs and Backups appear under **Manage** when
+their pages exist (HOME-STACK-04 and after), never as placeholders.
+The phone tab bar: Home, Chat, Apps, More (People, Settings and the
+Manage pages under More).
+
+### The phone composition (owner reference, 2026-09-20 16:25)
+
+The owner supplied a phone reference (a creative-tools app's home
+screen; the image is his, not ours to copy pixel for pixel, and its
+look is what the phone rules above must produce). What it does, and
+what Home's phone does the same way, with Home's own tokens, icons
+and content:
+
+- **Header**: the product wordmark at the left (16 px semibold, the
+  accent on the second word as the logo does), a small version pill
+  beside it, the avatar at the right; nothing else. Search, theme and
+  the bell move under the avatar's menu and into the palette on the
+  phone; the bell's count shows as a dot on the avatar.
+- **Hero card**: one full-width card at the top with the day's
+  headline: the ask box as a card ("Ask MaiPai", one line of
+  invitation, a primary button) over a soft gradient of the accent
+  (violet to blue at 20 percent), 16 px radius, 20 px padding; or,
+  when there is something to say, the day's item (a reminder, a
+  repair, an update) in the same card.
+- **Section headers**: a title at 18 px semibold with a one-line
+  secondary subtitle at 13 px directly under it (no icon tile on the
+  phone), 24 px above, 12 px below.
+- **Shelves**: recents scroll horizontally (recent conversations,
+  recent memories as 160 px cards with 16 px radius, one line of
+  text and a time), the first card a "+" tile where adding makes
+  sense (a new chat).
+- **App cards**: a two-column grid of dark rounded cards (16 px
+  radius, 16 px padding), each with a 24 px icon top-left, a bold
+  16 px title, one 13 px secondary line, and a small badge top-right
+  for a state (NEW, UPDATE, OFF) in the accent; the tile's accent is
+  the app's kind.
+- **Status**: the four metrics of the desktop become one compact
+  strip under the hero (four 32 px tiles in a row with a one-word
+  state each), not four cards.
+- **Density**: 16 px gutter, 12 px gaps, no empty regions; the page
+  scrolls as one dense column; the tab bar stays.
+
+Acceptance: the phone dashboard capture at 390, both looks and
+themes, read beside the owner's reference for composition (header,
+hero, section headers with subtitles, shelves, two-column app cards,
+the metric strip) while every color, icon and type comes from the
+kit; it must still be recognized as the same product as the desktop.

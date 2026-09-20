@@ -149,7 +149,13 @@ export function ChatPage({ person }: ChatPageProps) {
   // onSpeakingChange, wired to the scheduler's onFirstAudio/onEnded) so
   // a dedicated control can cover it.
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [threadsOpen, setThreadsOpen] = useState(false);
+  // `?list=1` (the `/conversations` redirect - owner ruling,
+  // "Navigation, corrected," 2026-09-20: "Conversations live inside
+  // Chat... a sheet from the header's list icon on the phone") opens
+  // the thread sheet on arrival, phone width only - the persistent
+  // desktop column is already always visible, so this initial value is
+  // simply inert there (the Sheet this drives is `lg:hidden`).
+  const [threadsOpen, setThreadsOpen] = useState(() => new URLSearchParams(window.location.search).get("list") === "1");
   const [speechError, setSpeechError] = useState(false);
   const wakeWord = useWakeWord({ onWakeDetected: () => setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.") });
 

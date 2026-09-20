@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useState, type ComponentProps, type ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
 import { SignIn } from "@/shell/SignIn";
 import { AppShell } from "@/shell/AppShell";
+import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { HomePage } from "@/apps/home/HomePage";
@@ -44,6 +45,7 @@ function lazyNamed<P extends object = Record<string, never>>(
   return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType<P> })));
 }
 
+
 // Lane 10 item 2 (docs/BACKLOG.md's "Real code-splitting for the frontend
 // shell chunk"): every app EXCEPT Home and Chat becomes its own chunk,
 // dynamic-imported only once its route is actually visited - Home and
@@ -73,9 +75,6 @@ const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWi
   () => import("@/apps/setup/SetupWizard"),
   "SetupWizard",
 );
-const ConversationsPage = lazyNamed<
-  ComponentProps<typeof import("@/apps/conversations/ConversationsPage")["ConversationsPage"]>
->(() => import("@/apps/conversations/ConversationsPage"), "ConversationsPage");
 const NotificationsPage = lazyNamed(() => import("@/apps/notifications/NotificationsPage"), "NotificationsPage");
 const SearchPage = lazyNamed<ComponentProps<typeof import("@/apps/search/SearchPage")["SearchPage"]>>(
   () => import("@/apps/search/SearchPage"),
@@ -114,11 +113,13 @@ const UsersPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/UsersP
   "UsersPage",
 );
 const DevicesPage = lazyNamed(() => import("@/apps/settings/DevicesPage"), "DevicesPage");
-const PeoplePage = lazyNamed(() => import("@/apps/people/PeoplePage"), "PeoplePage");
-const MemoryPage = lazyNamed<ComponentProps<typeof import("@/apps/memory/MemoryPage")["MemoryPage"]>>(
-  () => import("@/apps/memory/MemoryPage"),
-  "MemoryPage",
+const PeoplePage = lazyNamed<ComponentProps<typeof import("@/apps/people/PeoplePage")["PeoplePage"]>>(
+  () => import("@/apps/people/PeoplePage"),
+  "PeoplePage",
 );
+const PersonProfilePage = lazyNamed<
+  ComponentProps<typeof import("@/apps/people/PersonProfilePage")["PersonProfilePage"]>
+>(() => import("@/apps/people/PersonProfilePage"), "PersonProfilePage");
 const PrivacyPage = lazyNamed(() => import("@/apps/privacy/PrivacyPage"), "PrivacyPage");
 
 // One QueryClient for the app's lifetime (docs/plans/session-b-ui.md
@@ -202,11 +203,23 @@ export function App() {
                               <Route path="/" element={<HomePage person={person} />} />
                               <Route path="/apps" element={<AppsPage person={person} />} />
                               <Route path="/chat" element={<ChatPage person={person} />} />
-                              <Route path="/conversations" element={<ConversationsPage person={person} />} />
+                              {/* Conversations is Chat's own thread list now, not a
+                                  destination of its own (owner ruling, "Navigation,
+                                  corrected," 2026-09-20) - `?list=1` opens the phone
+                                  sheet ChatPage.tsx already renders; the desktop
+                                  column is always visible, so this redirect is
+                                  already "the list open" there without it. */}
+                              <Route path="/conversations" element={<Navigate to="/chat?list=1" replace />} />
                               <Route path="/notifications" element={<NotificationsPage />} />
                               <Route path="/search" element={<SearchPage person={person} />} />
-                              <Route path="/people" element={<PeoplePage />} />
-                              <Route path="/memory" element={<MemoryPage person={person} />} />
+                              <Route path="/people" element={<PeoplePage person={person} />} />
+                              <Route path="/people/:id" element={<PersonProfilePage person={person} />} />
+                              {/* Memories belong to a person now (same ruling): both
+                                  spellings of the old destination redirect to the
+                                  signed-in person's own Memories tab, so nothing
+                                  bookmarked breaks. */}
+                              <Route path="/memory" element={<MemoriesRedirect selfId={person.id} />} />
+                              <Route path="/memories" element={<MemoriesRedirect selfId={person.id} />} />
                               <Route path="/privacy" element={<PrivacyPage />} />
                               <Route
                                 path="/settings"
