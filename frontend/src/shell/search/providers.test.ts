@@ -68,7 +68,7 @@ describe("runSearchProviders - people", () => {
     try {
       const groups = await runSearchProviders("marlow");
       const people = findGroup(groups, "People");
-      expect(people?.items).toEqual([{ id: "person:person-marlow1", label: "Marlow", sublabel: "teen", icon: "users", to: "/people" }]);
+      expect(people?.items).toEqual([{ id: "person:person-marlow1", label: "Marlow", sublabel: "teen", icon: "users", to: "/people/person-marlow1" }]);
     } finally {
       restore();
     }

@@ -114,7 +114,7 @@ function renderHome(person: Roster = makePerson()) {
         <MemoryRouter initialEntries={["/"]}>
           <Routes>
             <Route path="/" element={<HomePage person={person} />} />
-            <Route path="/memory" element={<div>The real memories page</div>} />
+            <Route path="/people/:id" element={<div>The real profile page</div>} />
           </Routes>
         </MemoryRouter>
       </I18nProvider>
@@ -157,14 +157,17 @@ describe("HomePage - Today panel weather line", () => {
 // Found live 2026-09-11 alongside the weather bug: the memories panel
 // had no way to reach the real memories page at all.
 describe("HomePage - Recent memories panel", () => {
-  test("'View all' navigates to the real memories page", async () => {
+  // Opens the signed-in person's own Memories tab (owner ruling,
+  // "Navigation, corrected," 2026-09-20) - Memories moved off the rail
+  // and onto a person's profile.
+  test("'View all' navigates to the signed-in person's own profile", async () => {
     const turnBodies: unknown[] = [];
     const restoreFetch = stubFetch({ turnBodies });
     try {
       const { findByRole, findByText } = renderHome();
       const link = await findByRole("button", { name: "View all memories" });
       fireEvent.click(link);
-      await findByText("The real memories page");
+      await findByText("The real profile page");
     } finally {
       restoreFetch();
     }

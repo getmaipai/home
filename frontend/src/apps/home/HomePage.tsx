@@ -4,15 +4,15 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
-import { CardGrid } from "@maipai/ui/src/primitives/CardGrid";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { MetricCard } from "@maipai/ui/src/blocks/cards/MetricCard";
 import { PanelHeader } from "@maipai/ui/src/blocks/cards/PanelHeader";
 import { ActionTile } from "@maipai/ui/src/blocks/cards/ActionTile";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
-import type { IconName } from "@maipai/ui/src/icons";
-import { CardSizeSlider, useCardSize, cardSizeStyle } from "@maipai/ui/src/primitives/CardSizeSlider";
+import { getIcon, type IconName } from "@maipai/ui/src/icons";
+import { Button } from "@maipai/ui/src/ui/button";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
+import { usePhoneMode } from "@maipai/ui/src/blocks/phone/PhoneMode";
 import { api, ApiError, type Roster, type PersonRosterEntry, type ResolvedSetting, type MemoryRecord, type ConversationSummary, type WidgetDescriptor } from "@/lib/api";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
@@ -122,9 +122,9 @@ function WeatherLine() {
   );
 }
 
-function RecentMemoriesPanel() {
+function RecentMemoriesPanel({ selfId }: { selfId: string }) {
   const navigate = useNavigate();
-  // The same `["memory-list", "me"]` key MemoryPage.tsx's own
+  // The same `["memory-list", "me"]` key `PersonMemories.tsx`'s own
   // `OwnMemories` uses for the actor's own list - one cache entry, not a
   // second fetch, and forgetting or archiving a memory anywhere
   // invalidates this panel too.
@@ -132,7 +132,10 @@ function RecentMemoriesPanel() {
   const recent = [...(query.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5);
   return panelCard(
     <>
-      <PanelHeader icon="brain" hue="--hue-teal" title="Recent memories" linkLabel="View all" linkAriaLabel="View all memories" onLinkClick={() => navigate("/memory")} />
+      {/* Opens the signed-in person's own Memories tab (owner ruling,
+          "Navigation, corrected," 2026-09-20) - Memories no longer has
+          a rail destination of its own. */}
+      <PanelHeader icon="brain" hue="--hue-teal" title="Recent memories" linkLabel="View all" linkAriaLabel="View all memories" onLinkClick={() => navigate(`/people/${selfId}?tab=memories`)} />
       <div className="mt-3">
         {recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nothing remembered yet.</p>
@@ -185,46 +188,63 @@ interface PackageStripTile {
 }
 type StripTile = AppStripTile | PackageStripTile;
 
+// A compact installed-components row (owner correction, HOME-UI-02c's
+// own capture review, 2026-09-20: "'Your apps' on the dashboard is the
+// reference's installed-components strip (a row of compact tiles: icon
+// tile left, name, one-line count or state), not tall cards with a
+// centered icon and a density slider") - the reference's own "Models
+// 12 installed" pattern, one tile per pinned app/package instead of a
+// category. No live per-item count or state exists for a package tile
+// yet (`WidgetDescriptor` carries none - this file's own older comment
+// already said so), so the one-line label is honest about what each
+// tile is (App/Package) rather than a fabricated number.
+function AppsRow({ tiles, onSelect }: { tiles: StripTile[]; onSelect: (t: StripTile) => void }) {
+  if (tiles.length === 0) {
+    return <p className="mt-3 text-sm text-muted-foreground">Pin your go-to apps from the app library.</p>;
+  }
+  return (
+    <div role="list" aria-label="Your apps" className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {tiles.map((t) => (
+        // role="list" needs a role="listitem" child, but a Button is
+        // interactive and jsx-a11y/no-interactive-element-to-
+        // noninteractive-role refuses that role directly on it (a
+        // review on this exact component, 2026-09-20) - a plain,
+        // non-interactive wrapper carries the item role instead, found
+        // missing entirely by axe's own aria-required-children check
+        // once role="list" had zero role="listitem" children.
+        <div key={t.key} role="listitem">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onSelect(t)}
+            className="h-auto w-full min-w-0 items-center justify-start gap-3 rounded-xl border bg-[var(--surface-card)] p-3 text-left font-normal hover:bg-[var(--surface-pane)]"
+          >
+            <IconTile icon={t.kind === "app" ? t.icon : "package"} hue={t.kind === "app" ? "--hue-blue" : "--hue-teal"} size="sm" glow={false} />
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-sm font-medium">{t.kind === "app" ? t.label : t.title}</span>
+              {/* Deliberate type-floor exception (docs/UI.md, lane 7 item
+                  3): a compact secondary label under a tile's own title,
+                  the same category as a nav group heading or a badge. */}
+              <span className="text-xs text-muted-foreground">{t.kind === "app" ? "App" : "Package"}</span>
+            </div>
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function YourAppsPanel({ person }: { person: Roster }) {
   const navigate = useNavigate();
   const { pinned } = usePinnedApps(person.id);
-  // The density control (spec "The dashboard": "the card-size slider
-  // stays as the strip's density control") - this strip's own setting,
-  // not shared with anything else now that "Your packages" is merged
-  // into it rather than a second consumer (COORDINATOR, 2026-09-20).
-  const [cardSize, setCardSize] = useCardSize("home");
   const appTiles: StripTile[] = favoriteApps(pinned).map((e) => ({ kind: "app", key: `app-${e.to}`, to: e.to, icon: e.icon as IconName, label: e.label }));
   const widgetsQuery = useQuery<WidgetDescriptor[]>({ queryKey: ["widgets"], queryFn: () => api.widgets() });
   const packageTiles: StripTile[] = (widgetsQuery.data ?? []).map((w) => ({ kind: "package", key: `pkg-${w.package}-${w.id}`, title: w.title }));
   const tiles = [...appTiles, ...packageTiles];
   return (
     <div>
-      <div className="flex items-center justify-between gap-3">
-        <PanelHeader icon="layout-grid" hue="--hue-blue" title="Your apps" linkLabel="Browse all" onLinkClick={() => navigate("/apps")} className="min-w-0 flex-1 border-b-0 pb-0" />
-        {/* Hidden on the phone: a density control has little room to
-            matter once the grid is already down to one or two columns,
-            and it was squeezing the title into a truncated sliver in
-            the row's shared space. */}
-        <div className="hidden shrink-0 sm:block">
-          <CardSizeSlider size={cardSize} onChange={setCardSize} />
-        </div>
-      </div>
-      <div className="mt-3" style={cardSizeStyle(cardSize)}>
-        <CardGrid
-          label="Your apps"
-          items={tiles}
-          getKey={(t) => t.key}
-          getLabel={(t) => (t.kind === "app" ? t.label : t.title)}
-          onSelect={(t) => navigate(t.kind === "app" ? t.to : "/apps")}
-          emptyState={{ icon: "pin", text: "Pin your go-to apps from the app library." }}
-          renderItem={(t) => (
-            <div className="flex flex-col items-center gap-2 p-4">
-              <IconTile icon={t.kind === "app" ? t.icon : "package"} hue={t.kind === "app" ? "--hue-blue" : "--hue-teal"} />
-              <span className="text-sm">{t.kind === "app" ? t.label : t.title}</span>
-            </div>
-          )}
-        />
-      </div>
+      <PanelHeader icon="layout-grid" hue="--hue-blue" title="Your apps" linkLabel="Browse all" onLinkClick={() => navigate("/apps")} />
+      <AppsRow tiles={tiles} onSelect={(t) => navigate(t.kind === "app" ? t.to : "/apps")} />
     </div>
   );
 }
@@ -349,35 +369,297 @@ function QuickActionsPanel({ person }: { person: Roster }) {
   );
 }
 
+// The phone dashboard (owner reference, "The phone composition,"
+// 2026-09-20, folded into the same "Phone density" findings this
+// item's own acceptance judges): a distinct, denser composition from
+// the desktop's - the same tokens, icons and data, never the desktop's
+// own panels shrunk down. A hero card up top (the ask invitation, or
+// the day's one real thing to know about - a repair or an update),
+// a compact four-tile metric strip, two horizontal shelves (recent
+// conversations, recent memories), then a two-column app card grid.
+// Section headers here are a plain title/subtitle pair, no icon tile
+// (the reference's own phone section headers drop it - "no tile on
+// the phone" is the ruling's own words) - `PanelHeader` is the
+// desktop's own pattern, not reused here on purpose.
+function PhoneSectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="mt-6 mb-3 flex flex-col gap-0.5">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <p className="text-sm text-muted-foreground">{subtitle}</p>
+    </div>
+  );
+}
+
+function PhoneHeroCard({ person }: { person: Roster }) {
+  const navigate = useNavigate();
+  const { repairs, updates, canManage } = useHubStatus(person.role);
+  const hasUpdate = updateAvailable(updates);
+  // The day's one real thing (a repair, then an update), or the plain
+  // ask invitation when there is nothing to say - never both at once,
+  // the reference's own "one full-width card... the day's headline."
+  if (canManage && repairs && repairs.length > 0) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => navigate("/settings/repairs")}
+        className="h-auto w-full flex-col items-start gap-1 rounded-2xl p-5 text-left font-normal"
+        style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--hue-orange) 22%, var(--surface-card)), var(--surface-card))" }}
+      >
+        <span className="text-sm font-medium text-muted-foreground">Today</span>
+        <span className="text-lg font-semibold">
+          {repairs.length} repair{repairs.length === 1 ? "" : "s"} need{repairs.length === 1 ? "s" : ""} attention
+        </span>
+        <span className="mt-2 text-sm text-primary">Open Repairs →</span>
+      </Button>
+    );
+  }
+  if (hasUpdate) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => navigate("/settings")}
+        className="h-auto w-full flex-col items-start gap-1 rounded-2xl p-5 text-left font-normal"
+        style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--hue-teal) 22%, var(--surface-card)), var(--surface-card))" }}
+      >
+        <span className="text-sm font-medium text-muted-foreground">Today</span>
+        <span className="text-lg font-semibold">{updates?.latest} is available</span>
+        <span className="mt-2 text-sm text-primary">View updates →</span>
+      </Button>
+    );
+  }
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={() => navigate("/chat")}
+      className="h-auto w-full flex-col items-start gap-1 rounded-2xl p-5 text-left font-normal"
+      style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--hue-violet) 20%, var(--surface-card)), color-mix(in srgb, var(--hue-blue) 20%, var(--surface-card)))" }}
+    >
+      <span className="text-lg font-semibold">Ask MaiPai</span>
+      <span className="text-sm text-muted-foreground">Anything on your mind - just ask.</span>
+      <span className="mt-2 inline-flex items-center rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Start a conversation</span>
+    </Button>
+  );
+}
+
+function PhoneMetricStrip({ person }: { person: Roster }) {
+  const { health, repairs, updates, canManage } = useHubStatus(person.role);
+  const hasUpdate = updateAvailable(updates);
+  const tiles: { icon: IconName; hue: string; state: string }[] = [
+    { icon: "message-circle", hue: "--hue-blue", state: engineStateText(health?.brain) },
+    { icon: "mic", hue: "--hue-violet", state: engineStateText(health?.voice) },
+    { icon: "download", hue: "--hue-teal", state: updates ? (hasUpdate ? "Update" : "Up to date") : "…" },
+    { icon: "wrench", hue: "--hue-orange", state: canManage ? (repairs ? (repairs.length === 0 ? "Good" : `${repairs.length} open`) : "…") : "—" },
+  ];
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {tiles.map((t, i) => (
+        <div key={i} className="flex flex-col items-center gap-1 rounded-xl border bg-[var(--surface-card)] p-2 text-center">
+          <IconTile icon={t.icon} hue={t.hue} size="sm" glow={false} />
+          {/* Deliberate type-floor exception (docs/UI.md, lane 7 item
+              3): the phone metric strip's own one-word state, the
+              ruling's own "12px supporting" phone type scale. */}
+          <span className="text-xs text-muted-foreground">{t.state}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface ShelfItem {
+  key: string;
+  label: string;
+  sublabel: string;
+  onClick: () => void;
+}
+
+// Horizontal shelves (recent conversations, recent memories): 160px
+// cards, a "+" first card where adding makes sense (a new chat).
+function PhoneShelf({ items, onAdd, addLabel, emptyText }: { items: ShelfItem[]; onAdd?: () => void; addLabel?: string; emptyText: string }) {
+  const PlusIcon = getIcon("plus");
+  if (items.length === 0 && !onAdd) {
+    return <p className="text-sm text-muted-foreground">{emptyText}</p>;
+  }
+  return (
+    // min-h-[168px]: the WhoIsHere/MediaShelf quirk (real Chromium only,
+    // never happy-dom - this file's own header comment on the identical
+    // fix elsewhere) - an overflow-x-auto flex row's automatic min-
+    // height computes to zero, collapsing the whole shelf to a sliver
+    // with nothing in the a11y/overflow checks catching it visually,
+    // only the screenshot pipeline's own dedicated clippedStrips check
+    // (found live, HOME-UI-02d: home-phone-dark.png's own "Conversations"
+    // shelf rendered as a near-invisible dashed line instead of its own
+    // cards). 168px is a safe floor for the cards' own h-auto content
+    // (a 20px icon or two text lines, plus p-4/p-3 padding) - real
+    // content can still grow the row taller; this only guards the
+    // collapse-to-zero failure mode.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable shelf, not a widget (DetailPane.tsx's own precedent).
+    <div tabIndex={0} className={cn("flex min-h-[168px] gap-3 overflow-x-auto pb-1", FOCUS_RING)}>
+      {onAdd ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onAdd}
+          aria-label={addLabel}
+          className="h-auto w-40 shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed p-4 font-normal text-muted-foreground"
+        >
+          <PlusIcon className="size-5" aria-hidden />
+          <span className="text-sm">{addLabel}</span>
+        </Button>
+      ) : null}
+      {items.map((item) => (
+        <Button
+          key={item.key}
+          type="button"
+          variant="ghost"
+          onClick={item.onClick}
+          className="h-auto w-40 shrink-0 flex-col items-start justify-end gap-1 rounded-2xl border bg-[var(--surface-card)] p-3 text-left font-normal"
+        >
+          <span className="line-clamp-2 text-sm font-medium">{item.label}</span>
+          {/* Deliberate type-floor exception (docs/UI.md, lane 7 item
+              3): a shelf card's own compact time/subtitle line. */}
+          <span className="text-xs text-muted-foreground">{item.sublabel}</span>
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+function PhoneConversationsShelf() {
+  const navigate = useNavigate();
+  const query = useQuery<ConversationSummary[]>({ queryKey: ["conversations-list", null, ""], queryFn: () => api.conversationList() });
+  const recent = [...(query.data ?? [])].filter((c) => c.last_turn_at).sort((a, b) => b.last_turn_at!.localeCompare(a.last_turn_at!)).slice(0, 8);
+  const items: ShelfItem[] = recent.map((c) => ({
+    key: c.id,
+    label: c.title ?? "A conversation",
+    sublabel: relativeTime(c.last_turn_at!),
+    onClick: () => navigate(`/chat?conversation=${c.id}`),
+  }));
+  return <PhoneShelf items={items} onAdd={() => navigate("/chat")} addLabel="New chat" emptyText="No conversations yet." />;
+}
+
+function PhoneMemoriesShelf({ selfId }: { selfId: string }) {
+  const navigate = useNavigate();
+  const query = useQuery<MemoryRecord[]>({ queryKey: ["memory-list", "me"], queryFn: () => api.memories() });
+  const recent = [...(query.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 8);
+  const items: ShelfItem[] = recent.map((m) => ({
+    key: m.id,
+    label: m.text,
+    sublabel: relativeTime(m.created_at),
+    onClick: () => navigate(`/people/${selfId}?tab=memories`),
+  }));
+  return <PhoneShelf items={items} emptyText="Nothing remembered yet." />;
+}
+
+// The two-column dark app-card grid: a 24px icon top-left, a bold
+// title, one secondary line, a small state badge top-right when there
+// is a real state to show (no live per-tile state exists for a package
+// yet, same honest gap `AppsRow` above notes - the badge is simply
+// omitted rather than invented).
+function PhoneAppCards({ tiles, onSelect }: { tiles: StripTile[]; onSelect: (t: StripTile) => void }) {
+  if (tiles.length === 0) {
+    return <p className="text-sm text-muted-foreground">Pin your go-to apps from the app library.</p>;
+  }
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {tiles.map((t) => (
+        <Button
+          key={t.key}
+          type="button"
+          variant="ghost"
+          onClick={() => onSelect(t)}
+          className="h-auto flex-col items-start gap-2 rounded-2xl border bg-[var(--surface-pane)] p-4 text-left font-normal"
+        >
+          <IconTile icon={t.kind === "app" ? t.icon : "package"} hue={t.kind === "app" ? "--hue-blue" : "--hue-teal"} size="sm" glow={false} />
+          <span className="truncate text-base font-semibold">{t.kind === "app" ? t.label : t.title}</span>
+          {/* Deliberate type-floor exception (docs/UI.md, lane 7 item
+              3): the app card's own compact kind line. */}
+          <span className="text-xs text-muted-foreground">{t.kind === "app" ? "App" : "Package"}</span>
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+function PhoneDashboard({ person }: { person: Roster }) {
+  const navigate = useNavigate();
+  const { pinned } = usePinnedApps(person.id);
+  const appTiles: StripTile[] = favoriteApps(pinned).map((e) => ({ kind: "app", key: `app-${e.to}`, to: e.to, icon: e.icon as IconName, label: e.label }));
+  const widgetsQuery = useQuery<WidgetDescriptor[]>({ queryKey: ["widgets"], queryFn: () => api.widgets() });
+  const packageTiles: StripTile[] = (widgetsQuery.data ?? []).map((w) => ({ kind: "package", key: `pkg-${w.package}-${w.id}`, title: w.title }));
+  const tiles = [...appTiles, ...packageTiles];
+  return (
+    <>
+      <PhoneHeroCard person={person} />
+      <div className="mt-4">
+        <PhoneMetricStrip person={person} />
+      </div>
+      <PhoneSectionHeader title="Conversations" subtitle="Pick up where you left off." />
+      <PhoneConversationsShelf />
+      <PhoneSectionHeader title="Recent memories" subtitle="What MaiPai has remembered lately." />
+      <PhoneMemoriesShelf selfId={person.id} />
+      <PhoneSectionHeader title="Your apps" subtitle="Everything you've pinned." />
+      <PhoneAppCards tiles={tiles} onSelect={(t) => navigate(t.kind === "app" ? t.to : "/apps")} />
+    </>
+  );
+}
+
 export function HomePage({ person }: HomePageProps) {
   // hideTitle: the fixed header (spec "Current destination header
   // rule") now owns the destination's title and subtitle, including the
   // signed-in person's own greeting (shell/routeHeader.ts) - a second
   // one here would be exactly the duplicate header that rule forbids.
+  //
+  // Phone gets its own composition, not the desktop's panels shrunk
+  // down (owner reference, "The phone composition," "Phone density,"
+  // 2026-09-20) - `usePhoneMode()` is the same real breakpoint context
+  // ThingsTable/FilterColumn already read (`PhoneModeContext`, wired to
+  // a live breakpoint since HOME-UI-02), not a second detector.
+  const phone = usePhoneMode();
   return (
     <Page title="Home" hideTitle>
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
-          Studio (owner ruling, "Two looks, one setting"): "the content
-          area fills the pane edge to edge with a 24px gutter and no
-          max-width column" plus the reference's own subtle canvas
-          gradient - the dashboard's own wrapper, not every page's,
-          since the ruling's acceptance judges this one route. Calm
-          keeps the centered column that shipped. */}
-      <div tabIndex={0} style={{ background: "var(--canvas-background)" }} className={cn("mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 sm:px-8 studio:max-w-none studio:px-6", FOCUS_RING)}>
-        <MetricRow person={person} />
+      {/* A keyboard-scrollable region, not a widget (DetailPane.tsx's
+          own precedent). Studio (owner ruling, "Two looks, one
+          setting"): "the content area fills the pane edge to edge with
+          a 24px gutter and no max-width column" plus the reference's
+          own subtle canvas gradient - the dashboard's own wrapper, not
+          every page's, since the ruling's acceptance judges this one
+          route. Calm keeps the centered column that shipped. Phone:
+          16px gutter, no canvas gradient (the ruling's own phone
+          density rules name 16px/12px/20px rhythm, not the Studio
+          desktop treatment). */}
+      <div
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see the comment above.
+        tabIndex={0}
+        style={{ background: phone ? undefined : "var(--canvas-background)" }}
+        className={cn(
+          "mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-y-auto",
+          phone ? "gap-5 px-4 py-4" : "gap-6 px-4 py-6 sm:px-8 studio:max-w-none studio:px-6",
+          FOCUS_RING,
+        )}
+      >
+        {phone ? (
+          <PhoneDashboard person={person} />
+        ) : (
+          <>
+            <MetricRow person={person} />
 
-        <div className="grid gap-3 lg:grid-cols-2">
-          <TodayPanel />
-          <RecentMemoriesPanel />
-        </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <TodayPanel />
+              <RecentMemoriesPanel selfId={person.id} />
+            </div>
 
-        <YourAppsPanel person={person} />
+            <YourAppsPanel person={person} />
 
-        <div className="grid gap-3 lg:grid-cols-3">
-          <PeoplePanel selfId={person.id} />
-          <ActivityPanel />
-          <QuickActionsPanel person={person} />
-        </div>
+            <div className="grid gap-3 lg:grid-cols-3">
+              <PeoplePanel selfId={person.id} />
+              <ActivityPanel />
+              <QuickActionsPanel person={person} />
+            </div>
+          </>
+        )}
       </div>
     </Page>
   );

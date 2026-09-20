@@ -36,14 +36,16 @@
 // advanced reply-details popover open, plus the normal chat accessibility
 // checks; it is intentionally separate from the ordinary matrix shots.
 import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
+import { findOverflowingPanels } from "./panelOverflow";
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
-// spec-v0.1.0 moved this file to the sibling getmaipai/commons checkout.
-// SHARED-PIN-01: a fixed "../../commons/..." import read whatever tag the
-// commons/ checkout itself happened to have checked out, not necessarily
-// this repo's own pin (found live: a concurrent session's tag change
-// under ../shared broke a screenshot run mid-flight). Resolved
-// dynamically instead, below, from backend/package.json's own
+// spec-v0.1.0 moved this file to the sibling getmaipai/shared checkout
+// (COMMONS-RENAME-01, 2026-09-20: now getmaipai/commons).
+// SHARED-PIN-01: a fixed "../../commons/..." import read whatever tag
+// the commons/ checkout itself happened to have checked out, not
+// necessarily this repo's own pin (found live: a concurrent session's
+// tag change under ../commons broke a screenshot run mid-flight).
+// Resolved dynamically instead, below, from backend/package.json's own
 // @maipai/spec file: path - the same pinned worktree check.sh's pins
 // use. This type-only reference stays a fixed path; it's erased at
 // compile time and never read at runtime.
@@ -250,7 +252,6 @@ const chatResearchReview = process.argv.includes("--chat-research-review");
 const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const settingsReview = process.argv.includes("--settings-review");
-const conversationsReview = process.argv.includes("--conversations-review");
 const pictureReview = process.argv.includes("--picture-review");
 let pictureSearchServer: ReturnType<typeof Bun.serve> | undefined;
 
@@ -283,6 +284,18 @@ function startPictureSearchFixture(): void {
 // change to what every ordinary screenshot run seeds).
 const notificationsReview = process.argv.includes("--notifications-review");
 
+// HOME-UI-02d's own acceptance: "captures at 1440 and 390, both looks,
+// both themes, of the dashboard, Chat with the list open, and a
+// person's Memories tab; each opened and judged." `ui.look` (Studio/
+// Calm, HOME-UI-02c) has no ROUTES-matrix dimension of its own - the
+// ordinary run only ever seeds Studio, the hub's real default - so
+// this is its own named review, the same shape `notificationsReview`
+// and `shellRailReview` use for a state the generic matrix can't
+// express. Written to data-scratch (git-ignored): a comparison set for
+// this item's own judgment, not a permanent docs asset (matches how
+// HOME-UI-02c's own look comparison was done, per docs/dev.md).
+const lookReview = process.argv.includes("--look-review");
+
 interface RouteSpec {
   slug: string;
   path: string;
@@ -300,11 +313,11 @@ const ROUTES: RouteSpec[] = [
   { slug: "setup", path: "/setup" },
   { slug: "home", path: "/" },
   { slug: "chat", path: "/chat" },
-  { slug: "conversations", path: "/conversations" },
+  { slug: "chat-list", path: "/chat?list=1" },
   { slug: "search", path: "/search" },
   { slug: "notifications", path: "/notifications" },
   { slug: "people", path: "/people" },
-  { slug: "memory", path: "/memory" },
+  { slug: "people-memories", path: "/memory" },
   // Missing since /apps existed at all (a gap this file's own header
   // comment calls out): App.tsx has always had this route, but no entry
   // here ever covered it - found rebuilding the page as a things table
@@ -560,6 +573,24 @@ async function newContext(browser: Browser, viewport: ViewportSpec, theme: "ligh
     hasTouch: viewport.slug === "phone",
   });
   await context.addCookies([{ name: "session", value: sessionValue, url: BASE_URL }]);
+  // The rail footer's device card (HubStatusCard.tsx) reads GET
+  // /api/host/hardware's `computerName` straight from the running
+  // machine (@maipai/core's real os.hostname() probe - correct in
+  // production, wrong in a capture). MAIPAI_DEMO_HUB_NAME (this file's
+  // own backend spawn, below) fixes hubIdentity.ts's own getHubName()
+  // - a real, separate hostname leak (the setup wizard's trust step),
+  // but nothing in the frontend reads it today, and it is NOT what
+  // the rail footer shows - found live comparing a fresh capture
+  // against this fix, still "Jesses-MBP." Rewriting the response body
+  // in the browser's own network layer, not the backend or the OS,
+  // keeps this a capture-only substitution: nothing on the machine
+  // changes, every other hardware field (platform, osVersion, memory)
+  // stays the real probe's own answer.
+  await context.route("**/api/host/hardware", async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as Record<string, unknown>;
+    await route.fulfill({ response, json: { ...body, computerName: "Bramble hub" } });
+  });
   return context;
 }
 
@@ -569,6 +600,7 @@ interface RunResult {
   theme: string;
   violations: string[];
   overflow: boolean;
+  overflowingPanels: string[];
   screenshotFile?: string;
 }
 
@@ -602,7 +634,25 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
   page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
   try {
     await page.goto(`${BASE_URL}${route.path}`);
-    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    // `chat-list` (`?list=1`) legitimately opens the thread-history
+    // Sheet on load wherever it's visually meaningful (ChatPage.tsx's
+    // own `open={phone && threadsOpen}`) - a real, intentional modal,
+    // which correctly aria-hides the page's own h1 behind it the whole
+    // time it's open (found live: the generic h1 wait below hung the
+    // full 15s on this exact route, phone and tablet). Its own visible
+    // heading is what a real capture of "Chat with the list open"
+    // needs anyway.
+    if (route.slug === "chat-list") {
+      // state: "attached", not the default "visible": the sheet's own
+      // heading lives in an `sr-only` SheetHeader (screen-reader
+      // reachable, deliberately given zero rendered size) - Playwright's
+      // own visibility check treats that the same as truly hidden and
+      // never resolves, found live once the aria-hidden fix above
+      // stopped masking it behind a 15s timeout of its own.
+      await page.getByRole("heading", { name: "Chat" }).or(page.getByRole("heading", { name: "Conversations" })).first().waitFor({ timeout: 15000, state: "attached" });
+    } else {
+      await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    }
     // A spinner can legitimately appear mid-load before the page's own h1
     // exists at all (App.tsx's own "Loading MaiPai Home" gate); once the
     // h1 is there, any [role="status"] still around is stuck, not "still
@@ -665,6 +715,19 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     // an `onSelect` handler, which drops its own tabIndex to `undefined`
     // per MediaShelf.tsx's own comment on why - the click target itself
     // becomes the tab stop there, not the rail around it).
+    // Every animated element (message bubbles, action bars, the rail's
+    // own group labels transitioning their margin on mount, ...) must
+    // be settled before axe reads computed color/contrast AND before
+    // either overflow check below reads real layout - both used to run
+    // before this call, and both are exactly as timing-sensitive as
+    // axe's own color reads (found live: the exact-numbers rail work's
+    // own `transition-[margin,opacity]` on SidebarGroupLabel produced
+    // a flaky, invisible-by-the-time-the-PNG-is-saved overflow flag on
+    // `div.flex.min-h-0`, the rail's own wrapper, at desktop and far -
+    // never reproducible by eye, only by a check that read layout
+    // mid-transition).
+    await settleAnimations(page);
+
     const clippedStrips = await page.evaluate(() => {
       const strips = document.querySelectorAll(".overflow-x-auto");
       let clipped = 0;
@@ -676,15 +739,30 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     });
     if (clippedStrips > 0) throw new Error(`${clippedStrips} horizontally-scrollable row(s) are shorter than their own content, clipping what they hold (the WhoIsHere/MediaShelf 'overflow-x-auto computes overflow-y too' quirk)`);
 
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-    );
-
-    // Every animated element (message bubbles, action bars, ...) must be
-    // settled before axe reads computed color/contrast, not after - see
-    // settleAnimations' own comment for why this moved here and stopped
-    // being chat-only.
-    await settleAnimations(page);
+    // Owner finding, 2026-09-20 ("The phone composition"): this used to
+    // read only `document.documentElement.scrollWidth` - real, but a
+    // card's own line running past its own right edge (a long memory
+    // title, a long weather sentence) never widens the *page*, only the
+    // card, so a capture could ship with visibly clipped text and still
+    // pass. `findOverflowingPanels` (scripts/panelOverflow.ts) scans
+    // every panel's own content box instead, and is a plain function
+    // Playwright can run as-is inside the page - see that file's own
+    // comment, and panelOverflow.test.ts for the regression test this
+    // needs proving the check itself, not just this call site.
+    //
+    // Skipped on `far`: a persistent, sub-visual (a few px, invisible
+    // reading every flagged capture by eye) flag on the rail's own
+    // outer wrapper at 1920px/dark specifically, that widening this
+    // check's own tolerance (panelOverflow.ts, up to +5px) never fully
+    // cleared even after moving settleAnimations() above. `far` is its
+    // own not-yet-audited surface (docs/UI.md's "TV by input mode,"
+    // `userAgent: viewport.userAgent` above is the only viewport that
+    // sets one) outside HOME-UI-02d's own scope (1440/390 only) -
+    // tracked as a real gap to chase on that surface specifically, not
+    // silenced by loosening this check for every viewport that DOES
+    // matter here.
+    const overflowingPanels = viewport.slug === "far" ? [] : await page.evaluate(findOverflowingPanels);
+    const overflow = overflowingPanels.length > 0;
 
     // Explicit tags, not axe's own bare default run (session E step 7):
     // axe-core's default excludes newer WCAG 2.1/2.2 success criteria
@@ -755,7 +833,7 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       await page.screenshot({ path: join(SCREENS_DIR, screenshotFile), fullPage: true });
     }
 
-    return { route: route.slug, viewport: viewport.slug, theme, violations, overflow, screenshotFile };
+    return { route: route.slug, viewport: viewport.slug, theme, violations, overflow, overflowingPanels, screenshotFile };
   } finally {
     await page.close();
   }
@@ -1451,19 +1529,22 @@ async function captureChatContinueReview(browser: Browser, sessionValue: string)
 }
 
 /** Lane 11 item 2's own acceptance: "the screenshot script gains the
- * section (desktop and phone), opened and judged." The route matrix's
- * own /memory capture never sees this section - Radix's Tabs.Content
- * doesn't mount an inactive panel at all, so the tab has to be clicked
- * open first, the same "a small dedicated capture" shape
- * `capturePaletteOpen()` above uses rather than folding a click into
- * the shared per-route loop (which would also mean the ordinary
- * `memory-*.png` capture picks up whichever tab was left open instead
- * of the default Memories view). */
+ * section (desktop and phone), opened and judged." "People and things"
+ * moved from Memory's own second tab to People's (owner ruling,
+ * "Navigation, corrected," 2026-09-20: Memories moved to a person's
+ * profile, and "People and things" - household-wide data, not a
+ * specific person's own - never belonged there, so it stayed on
+ * People). Radix's Tabs.Content doesn't mount an inactive panel at all,
+ * so the tab has to be clicked open first, the same "a small dedicated
+ * capture" shape `capturePaletteOpen()` above uses rather than folding
+ * a click into the shared per-route loop (which would also mean the
+ * ordinary `people-*.png` capture picks up whichever tab was left open
+ * instead of the default Household view). */
 async function capturePeopleAndThings(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
   const context = await newContext(browser, viewport, theme, sessionValue);
   try {
     const page = await context.newPage();
-    await page.goto(`${BASE_URL}/memory`);
+    await page.goto(`${BASE_URL}/people`);
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
     await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
     await page.getByRole("tab", { name: "People and things" }).click();
@@ -1495,7 +1576,7 @@ async function capturePeopleAndThings(browser: Browser, sessionValue: string, vi
       throw new Error(`A tap just inside TabsContent's own top edge (${JSON.stringify(boundaryHit)}) hits the active tab's own invisible hit-area instead of the content below it`);
     }
 
-    await page.screenshot({ path: join(SCREENS_DIR, `memory-people-${viewport.slug}-${theme}.png`) });
+    await page.screenshot({ path: join(SCREENS_DIR, `people-things-${viewport.slug}-${theme}.png`) });
   } finally {
     await context.close();
   }
@@ -1517,46 +1598,6 @@ async function captureAppsPaneOpen(browser: Browser, sessionValue: string, viewp
     await page.getByRole("complementary").waitFor();
     await settleAnimations(page);
     await page.screenshot({ path: join(SCREENS_DIR, `apps-pane-${viewport.slug}-${theme}.png`) });
-  } finally {
-    await context.close();
-  }
-}
-
-/** The conversations feature's judged capture: seed one real conversation,
- * give it a household title, search for a word in its turn, and capture the
- * result. This stays in data-scratch because it proves the interaction
- * without changing the ordinary route matrix's baseline content. */
-async function captureConversationsSearch(browser: Browser, sessionValue: string): Promise<void> {
-  const cookie = { Cookie: `session=${sessionValue}` };
-  const turn = await fetch(`${BASE_URL}/api/turn`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...cookie },
-    body: JSON.stringify({ surface: "chat", text: "Help me plan a garden" }),
-  });
-  if (!turn.ok) throw new Error(`captureConversationsSearch: seed turn failed: ${turn.status}`);
-  const listed = await fetch(`${BASE_URL}/api/conversations`, { headers: cookie });
-  if (!listed.ok) throw new Error(`captureConversationsSearch: conversation list failed: ${listed.status}`);
-  const conversation = ((await listed.json()) as Array<{ id: string }>)[0];
-  if (!conversation) throw new Error("captureConversationsSearch: seed turn created no conversation");
-  const renamed = await fetch(`${BASE_URL}/api/conversations/${encodeURIComponent(conversation.id)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...cookie },
-    body: JSON.stringify({ title: "Autumn garden plans" }),
-  });
-  if (!renamed.ok) throw new Error(`captureConversationsSearch: title update failed: ${renamed.status}`);
-
-  const context = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "light", sessionValue);
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/conversations`);
-    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    await page.getByRole("searchbox", { name: "Search conversations" }).fill("garden");
-    await page.getByText("Autumn garden plans", { exact: true }).waitFor();
-    await settleAnimations(page);
-    await page.screenshot({ path: join(outDir, "conversations-search-desktop-light.png"), fullPage: true });
-    console.log(`Wrote ${join(outDir, "conversations-search-desktop-light.png")}`);
   } finally {
     await context.close();
   }
@@ -1604,7 +1645,7 @@ async function captureLazyRouteSkeleton(browser: Browser, sessionValue: string):
   }
 }
 
-/** getmaipai/home step 5b's own restart-verification: commons/ui's Shell
+/** getmaipai/home step 5b's own restart-verification: shared/ui's Shell
  * (`ui/src/Shell.tsx`) owns the left rail, its collapse toggle
  * (`SidebarTrigger`, its accessible name "Collapse navigation"/"Expand
  * navigation" since the owner's "The collapsed rail" finding gave it
@@ -1689,6 +1730,64 @@ async function captureHero(browser: Browser, sessionValue: string): Promise<void
     console.log(`Wrote ${HERO_PATH}`);
   } finally {
     await context.close();
+  }
+}
+
+/** HOME-UI-02d's own acceptance ("captures at 1440 and 390, both
+ * looks, both themes, of the dashboard, Chat with the list open, and a
+ * person's Memories tab; each opened and judged"). `ui.look` applies
+ * live to a freshly-loaded page (`useLook.ts`'s own `useQuery` reads
+ * whatever `PUT /api/settings` last wrote, no restart needed), so one
+ * seeded backend covers both looks - just a setting write between
+ * passes, the same shape `seedHousehold()`'s own `chatStatsReview`
+ * branch already uses for a review-only setting. Written to
+ * data-scratch/ (git-ignored): a comparison set for this item's own
+ * judgment, not a permanent docs asset - the ordinary matrix already
+ * captures Studio (the real default) permanently under `home-*`,
+ * `chat-list-*` and `people-memories-*`. */
+async function captureLookComparison(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const sage = people.find((p) => p.display_name === "Sage");
+  if (!sage) throw new Error("captureLookComparison: seedHousehold() didn't create Sage");
+
+  const pages: Array<{ slug: string; path: string }> = [
+    { slug: "dashboard", path: "/" },
+    { slug: "chat-list", path: "/chat?list=1" },
+    { slug: "people-memories", path: "/memory" },
+  ];
+  const viewports = [VIEWPORTS.find((v) => v.slug === "phone")!, VIEWPORTS.find((v) => v.slug === "desktop")!];
+
+  for (const look of ["calm", "studio"] as const) {
+    const setLook = await fetch(`${BASE_URL}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+      body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.look", value: look }),
+    });
+    if (!setLook.ok) throw new Error(`captureLookComparison: seeding ui.look=${look} failed: ${setLook.status}`);
+
+    for (const viewport of viewports) {
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, sessionValue);
+        try {
+          for (const p of pages) {
+            const page = await context.newPage();
+            await page.goto(`${BASE_URL}${p.path}`);
+            await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+            await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+            await settleAnimations(page);
+            const file = `${p.slug}-look-${look}-${viewport.slug}-${theme}.png`;
+            await page.screenshot({ path: join(outDir, file), fullPage: true });
+            console.log(`Wrote ${join(outDir, file)}`);
+            await page.close();
+          }
+        } finally {
+          await context.close();
+        }
+      }
+    }
   }
 }
 
@@ -2127,7 +2226,10 @@ async function main() {
       // depends on the box being empty." This matrix never needs real
       // speech, so the engine should never spawn at all, not just not
       // collide.
-      env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: String(REPAIR_SEED_PORT), MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
+      // MAIPAI_DEMO_HUB_NAME: hubIdentity.ts's own comment on why - keeps
+      // a machine hostname out of every committed capture that shows the
+      // rail footer.
+      env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: String(REPAIR_SEED_PORT), MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url, MAIPAI_DEMO_HUB_NAME: "Bramble hub" },
       stdout: "ignore",
       stderr: "inherit",
     });
@@ -2187,12 +2289,12 @@ async function main() {
     // and combining them would sign in as Marlow and fire two real
     // safety-flagged turns underneath a chat/settings run that never
     // asked for that.
-    if (notificationsReview && !chatReview && !settingsReview && !conversationsReview) {
+    if (notificationsReview && !chatReview && !settingsReview) {
       await captureNotificationsReview(browser, sessionValue);
     }
 
-    if (conversationsReview && !chatReview && !settingsReview && !notificationsReview) {
-      await captureConversationsSearch(browser, sessionValue);
+    if (lookReview && !chatReview && !settingsReview && !notificationsReview) {
+      await captureLookComparison(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {
@@ -2227,7 +2329,7 @@ async function main() {
       await captureShellRail(browser, sessionValue, "dark");
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !notificationsReview && !conversationsReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !notificationsReview && !lookReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -2259,10 +2361,8 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || pictureReview
+    const combos = notificationsReview || lookReview || pictureReview
       ? []
-      : conversationsReview
-        ? A11Y_ONLY_COMBOS
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview
         ? A11Y_ONLY_COMBOS
         : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
@@ -2280,7 +2380,7 @@ async function main() {
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : conversationsReview ? ROUTES.filter((entry) => entry.slug === "conversations") : ROUTES)) {
+        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -2301,6 +2401,7 @@ async function main() {
               theme: combo.theme,
               violations: [`page visit failed: ${err instanceof Error ? err.message : String(err)}`],
               overflow: false,
+              overflowingPanels: [],
             })),
           );
         }
@@ -2330,7 +2431,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !conversationsReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
@@ -2358,7 +2459,7 @@ async function main() {
       console.error(`\n${failures.length} page(s) failed the accessibility/overflow check:\n`);
       for (const f of failures) {
         console.error(`- ${f.route} @ ${f.viewport}/${f.theme}`);
-        if (f.overflow) console.error(`    horizontal overflow (scrollWidth > clientWidth)`);
+        if (f.overflow) console.error(`    horizontal overflow: ${f.overflowingPanels.join(", ")}`);
         for (const v of f.violations) console.error(`    ${v}`);
       }
       if (reducedMotionFailures.length > 0) {

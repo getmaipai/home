@@ -80,15 +80,24 @@ function Brand() {
           tile (owner ruling, "Two looks, one setting": "the logo on a
           40px gradient tile... 12px radius") in Studio, the circle that
           shipped in Calm. */}
+      {/* size-10 (40px) is Calm's own tile; Studio's exact 48px mark
+          (owner findings, "The Studio look, the numbers," 2026-09-20
+          18:15) replaces it under studio: - the accent glow already
+          here matches that same finding's "accent glow" on the mark. */}
       <span
-        className="flex size-10 shrink-0 items-center justify-center bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-1.5"
+        className="flex size-10 studio:size-12 shrink-0 items-center justify-center bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-1.5"
         style={{ borderRadius: "var(--tile-radius)", boxShadow: "0 0 16px color-mix(in srgb, var(--hue-violet) 25%, transparent)" }}
       >
         <img src="/brand/maipai-home-icon-light.png" alt="" className="size-full object-contain brand-logo-light" />
         <img src="/brand/maipai-home-icon-dark.png" alt="" className="size-full object-contain brand-logo-dark" />
       </span>
       <span className="min-w-0 group-data-[collapsible=icon]:hidden">
-        <span className="block truncate text-base font-semibold tracking-tight studio:text-lg">
+        {/* text-lg (18px) was Studio's own rough estimate; 19px with
+            -0.4px tracking is the exact reference figure (owner
+            findings, "The Studio look, the numbers," 2026-09-20
+            18:15) - arbitrary values since neither is a Tailwind
+            step. */}
+        <span className="block truncate text-base font-semibold tracking-tight studio:text-[19px] studio:tracking-[-0.4px]">
           MaiPai <span className="text-primary">Home</span>
         </span>
         {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3): a
@@ -97,7 +106,10 @@ function Brand() {
             never truncated with an ellipsis (COORDINATOR, 2026-09-20: "the
             tagline wraps to a second line... nothing in the rail is ever
             cut"), wraps onto its own second line instead. */}
-        <span className="block text-xs text-muted-foreground">Your AI. On your terms.</span>
+        {/* Studio's own exact 11px, a deliberate type-floor exception too
+            (owner findings, "The Studio look, the numbers," 2026-09-20
+            18:15) - a hair under Calm's own text-xs (12px). */}
+        <span className="block text-xs studio:text-[11px] text-muted-foreground">Your AI. On your terms.</span>
       </span>
     </Link>
   );
@@ -113,17 +125,23 @@ function navGroup(label: string, paths: readonly string[]): NavGroup {
  * dialog, Home supplies its brand, grouped nav, the hub card, the
  * footer summary, and the header's own actions (PinToggle, ModelPicker,
  * NotificationBell, ProfileSwitcher) - "the kit gets a slot, Home keeps
- * the feature." Nav groups follow the owner's ruling on Home's pages
- * under the kit (home/docs/design/home-pages-2026-09-20.md, "The shell,
- * exactly"): Home, Household, System - Manage is omitted because Home
- * has no Engines/Packages/Updates/Repairs/Backups pages of its own yet
- * (they stay a Settings section, RepairsSection.tsx, until HOME-STACK-04
- * gives them real destinations); Conversations sits under Home,
- * alongside Chat, since the ruling's own Household list (People,
- * Memories, Lists) has no chat-history entry and this is chat's own
- * history. The kit's own header search field (this step) covers touch/
- * phone reachability; Cmd/Ctrl+K and HomePage's own search remain as
- * additional entry points.
+ * the feature." Nav groups follow the owner's "Navigation, corrected"
+ * ruling (2026-09-20, home/docs/design/home-pages-2026-09-20.md):
+ * **Home** (Home, Chat, Apps), **Household** (People - Memories moved
+ * onto a person's own profile, reached from there, not a rail item of
+ * its own), **System** (Settings, Privacy - Privacy's own move into a
+ * Settings section is HOME-UI-03's, not touched here). Manage is
+ * omitted because Home has no Engines/Packages/Updates/Repairs/Backups
+ * pages of its own yet (they stay a Settings section,
+ * RepairsSection.tsx, until HOME-STACK-04 gives them real
+ * destinations). Conversations is gone entirely - it is Chat's own
+ * thread list now, never a rail item. `phoneNavMax={4}` on `<Shell>`
+ * below matches the same ruling's own phone tab bar: "Home, Chat, Apps,
+ * More" - three real destinations, not the kit's own default four,
+ * before folding the rest (People, Settings, Privacy) under More. The
+ * kit's own header search field covers touch/phone reachability;
+ * Cmd/Ctrl+K and HomePage's own search remain as additional entry
+ * points.
  *
  * Known gap, tracked not dropped (docs/BACKLOG.md): the kit's Shell has
  * no TV-focusable rail yet (the arrow-key/remote nav the old hand-built
@@ -148,8 +166,8 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
   }
 
   const groups: NavGroup[] = [
-    navGroup("Home", ["/", "/chat", "/conversations", "/apps"]),
-    navGroup("Household", ["/people", "/memory"]),
+    navGroup("Home", ["/", "/chat", "/apps"]),
+    navGroup("Household", ["/people"]),
     navGroup("System", ["/settings", "/privacy"]),
   ];
 
@@ -160,6 +178,7 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
       nav={groups}
       brand={<Brand />}
       railStorageKey="maipai-home:shell-rail"
+      phoneNavMax={4}
       sidebarFooter={<HubStatusCard person={person} />}
       footer={<HomeFooterBar person={person} />}
       headerTitle={

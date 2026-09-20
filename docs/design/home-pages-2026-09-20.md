@@ -279,3 +279,218 @@ and the status dot at its corner, tooltip with the status text. On
 the phone the rail does not exist (the tab bar). Acceptance: the
 collapsed rail captured at 1440 in both looks and both themes, every
 element centered on the same vertical axis.
+
+### Phone density, and conversations inside Chat (owner findings, 2026-09-20 15:57; both looks)
+
+The phone dashboard as shipped is oversized and not the same product
+as the desktop: metric cards half a screen tall with 24 px numbers
+and empty space, panel rows at desktop size, and text running past
+the right edge of the Today and Recent memories cards (a real
+horizontal overflow the capture check did not catch: it must be
+caught, so the overflow check runs on every panel's content box, not
+only the page). Rules for the phone, both looks:
+
+- **Metric cards** in the 2 by 2 grid are compact: 32 px tile, the
+  number or state at 20 px semibold on the same line as the label at
+  13 px, the status line at 12 px under, 12 px padding, the card no
+  taller than its content (about 84 px).
+- **Panels**: header row with a 32 px tile and the 16 px title; rows
+  at 14 px with 8 px rhythm; every line wraps inside the card's
+  content box or truncates with an ellipsis on its own line; nothing
+  ever paints past the card edge.
+- **Type on the phone**: 20 px page title in the header, 16 px panel
+  titles, 14 px rows, 12 px supporting; never the desktop's 28 px.
+- **Header**: title left; search, theme, bell, avatar as 40 px
+  controls right; the bell's count badge 16 px.
+- **Gutter** 16 px, card gap 12 px, section gap 20 px; the page reads
+  as one continuous, dense column the way the reference reads on the
+  desktop, the same product, smaller.
+
+**Conversations live inside Chat.** "Conversations" is not a
+destination of its own: it is Chat's thread list (the chat section:
+a persistent column on desktop, a sheet from the header's list icon
+on the phone). Remove the Conversations item from the rail and from
+the phone tab bar; the tab bar is Home, Chat, Apps, More (People and
+the rest under More). The route `/conversations` redirects to Chat
+with its list open so nothing bookmarked breaks.
+
+**What retiring the old Conversations page actually cost** (a code
+review's own removed-behavior audit, HOME-UI-02d, 2026-09-20): the
+deleted page had a person picker for an admin's oversight of a
+child's conversations, a multi-select with batch delete and a clear-
+all, a per-row pin/unpin, and server-side search across a message's
+own body, not just its title. None of the four survived the move -
+the new thread list has single-thread delete/rename and client-side
+title-only search, nothing else. Ruled not an accepted loss: all four
+move into Chat's own thread list, the same surface Conversations
+already was, as HOME-UI-02e (right after 02d lands, before 03).
+
+### Navigation, corrected (owner ruling, 2026-09-20 16:20)
+
+Three destinations leave the rail; nothing they held is lost:
+
+- **Privacy** is not a destination. The "what leaves the house" table
+  and the privacy switches become a **Privacy section of Settings**
+  (the settings workspace's section list: General, People, Chat,
+  Voice, Engines, Notifications, Backups, Privacy, Developer, in that
+  order), rendered by the same renderer, with the table as a things
+  table inside the section. `/privacy` redirects to
+  `/settings/privacy`. The user-tier privacy page in `docs/user/`
+  stays and describes that section.
+- **Memories** belong to a person, so they live on the person's
+  profile: People, a person, the **Memories** tab (a things page of
+  that person's memories with the kind badge, the time and the
+  details pane; keep, edit, forget as pane actions), and for the
+  person signed in, the avatar menu's **Profile** opens their own.
+  The dashboard's Recent memories panel stays and its "View all"
+  opens the signed-in person's Memories tab. `/memories` redirects
+  there.
+- **Conversations** are Chat's thread list (already ruled above).
+
+The rail is therefore: **Home** (Home, Chat, Apps), **Household**
+(People, Lists when Lists ships), **System** (Settings); Engines,
+Packages, Updates, Repairs and Backups appear under **Manage** when
+their pages exist (HOME-STACK-04 and after), never as placeholders.
+The phone tab bar: Home, Chat, Apps, More (People, Settings and the
+Manage pages under More).
+
+### The phone composition (owner reference, 2026-09-20 16:25)
+
+The owner supplied a phone reference (a creative-tools app's home
+screen; the image is his, not ours to copy pixel for pixel, and its
+look is what the phone rules above must produce). What it does, and
+what Home's phone does the same way, with Home's own tokens, icons
+and content:
+
+- **Header**: the product wordmark at the left (16 px semibold, the
+  accent on the second word as the logo does), a small version pill
+  beside it, the avatar at the right; nothing else. Search, theme and
+  the bell move under the avatar's menu and into the palette on the
+  phone; the bell's count shows as a dot on the avatar.
+- **Hero card**: one full-width card at the top with the day's
+  headline: the ask box as a card ("Ask MaiPai", one line of
+  invitation, a primary button) over a soft gradient of the accent
+  (violet to blue at 20 percent), 16 px radius, 20 px padding; or,
+  when there is something to say, the day's item (a reminder, a
+  repair, an update) in the same card.
+- **Section headers**: a title at 18 px semibold with a one-line
+  secondary subtitle at 13 px directly under it (no icon tile on the
+  phone), 24 px above, 12 px below.
+- **Shelves**: recents scroll horizontally (recent conversations,
+  recent memories as 160 px cards with 16 px radius, one line of
+  text and a time), the first card a "+" tile where adding makes
+  sense (a new chat).
+- **App cards**: a two-column grid of dark rounded cards (16 px
+  radius, 16 px padding), each with a 24 px icon top-left, a bold
+  16 px title, one 13 px secondary line, and a small badge top-right
+  for a state (NEW, UPDATE, OFF) in the accent; the tile's accent is
+  the app's kind.
+- **Status**: the four metrics of the desktop become one compact
+  strip under the hero (four 32 px tiles in a row with a one-word
+  state each), not four cards.
+- **Density**: 16 px gutter, 12 px gaps, no empty regions; the page
+  scrolls as one dense column; the tab bar stays.
+
+Acceptance: the phone dashboard capture at 390, both looks and
+themes, read beside the owner's reference for composition (header,
+hero, section headers with subtitles, shelves, two-column app cards,
+the metric strip) while every color, icon and type comes from the
+kit; it must still be recognized as the same product as the desktop.
+
+### The Studio look, the numbers (owner-supplied analysis, 2026-09-20 18:15)
+
+The owner had a second reading of the live Home page against the
+reference done outside the org and handed over its conclusions with
+a built page that reproduces the reference's geometry. Its product
+half (menus, routes, the machine selector) was written against the
+Stack's old console and does not apply; its style half does, and
+where a number below differs from an earlier estimate in this doc,
+this number wins. The palette it names is the one already in the
+kit spec (page canvas `#07111F`, sidebar `#0A1A2E`, panel `#102238`,
+raised `#142A43`, border `#294563`, text `#F4F8FF` and `#A9BED7`,
+blue `#21A6FF`, violet `#A434FF`, teal `#00E3AE`, orange `#FF8A35`,
+pink `#FF3E9A`, red `#FF4B62`); Home's Studio look uses exactly these
+values, not approximations, and the light theme derives from them by
+the kit's contrast rules.
+
+**The shell is fixed; only the content scrolls.** The rail, the
+header and the footer never scroll. Rail 252px expanded, 72px
+collapsed. Header 96px tall (the title and subtitle block), footer
+40px, one row. The content column scrolls between them with 16px top
+padding, 24px sides, 20px bottom. Breakpoints: 960 to 1279px the
+rail starts collapsed; below 720px the rail is an off-canvas drawer
+(the phone shell), never a narrow rail. The page has a soft radial
+gradient at the top right of the canvas (`radial-gradient(circle at
+65% -20%, #102C4B 0, transparent 42%)` over the canvas color); the
+rail has a vertical gradient (`#0B1C31` to `#091827`) and a 1px
+border on its right.
+
+**Rail geometry.** Padding 17px top, 13px sides, 14px bottom. Brand
+row 62px tall: a 48px mark with the accent glow, the wordmark 19px
+semibold with -0.4px tracking, the tagline 11px secondary under it,
+14px below the row. Group labels 10px uppercase with 0.08em tracking
+in secondary text, 11px above, 7px below, inset 7px. Items: 10px
+vertical and 12px horizontal padding, 8px radius, 2px between items,
+14px gap between the 19px icon and the 14px label at weight 520
+(the kit's medium); hover fills raised; the active item is the
+violet gradient (`#3E1BB2` to `#311893`) with a 1px inset ring
+`#6E3DF8` and a soft violet glow, white label. Dividers 1px `#24405F`,
+12px above and below, inset 7px. Collapsed: icon only with tooltips
+and accessible names, dividers kept, labels hidden, the same 72px
+column centered.
+
+**Header.** 24px side padding, 22px gap between the title block, the
+search and the right cluster. Title 29px with -0.7px tracking and
+6px to the 14px secondary subtitle. Search 39px tall, radius 10px,
+raised background with the border color, 12px placeholder, the
+keyboard hint as a 10px chip; it is a real input (typing filters at
+once), and Cmd/Ctrl+K focuses this same input with results beneath
+it, never an empty modal. Right cluster: 39px round controls with a
+1px border and panel fill, 12px apart; the count badge is 17px, red,
+10px bold, at the control's top right. A 1px vertical divider
+separates the cluster from the search.
+
+**Cards and panels.** Card radius 12px, 1px border, a 145-degree
+gradient fill (`#11243A` to `#0D1C2D`). Metric card: 16px padding,
+17px gap, a 57px icon tile with 14px radius and the role's tinted
+fill, the value 25px bold, the label 14px, the status line 12px in
+the status color 6px under. Panel title row: 17px bold, 12px 14px 10px
+padding, a 1px bottom border, the tile 20px in the accent, the
+"View all" link 12px semibold in violet. Grid gaps 12px everywhere;
+the two-column row splits 44 / 56. Table header 31px, 11px secondary
+text; rows 49px minimum, 12px text, name bold with a 10px secondary
+line under it; type pills 11px with 5px 9px padding and 7px radius
+in the category's tint. Compact tiles (the installed-components
+strip and Home's "Your apps"): icon 23px in the kind's color at the
+left, a 12px bold label, a 10px secondary line, 10px padding, 10px
+radius; eight across at 1440. Quick actions: two columns, 9px gap,
+10px padding, 9px radius, raised fill.
+
+**Footer.** Three columns (1fr, 1.2fr, 1fr), 12px secondary text:
+the version plain at the left, the counts centered with 16px gaps and
+1px separators, each a link to its filtered view; one aggregate
+health line at the right with an 11px dot. Never a sensor strip; at
+tight widths the version, the update count and the health survive
+first.
+
+**Category colors.** Chat and models blue or violet; images pink;
+video cyan; audio amber; engines and runtimes blue; workflows
+orange; integrations and extensions teal; training violet; system
+teal. Home's kinds map onto these once, in the kit's status and kind
+maps, never per page.
+
+**States and standards, restated as the kit's contract.** Every
+shared component implements hover, selected, focus-visible,
+disabled, loading, success, warning, error, empty, offline and
+unknown. Focus is a 2px electric-blue ring with separation, always
+keyboard-visible. Status is never color alone: a label or an
+accessible name accompanies every dot. Reduced motion is respected.
+Skeletons hold layout while loading; spinners only for a local
+action. A destructive action is visually separated, red only at its
+confirmation step, and states what it affects. A detail pane is a
+single floating right pane whose header, tabs and action rail stay
+pinned while its body scrolls; the list behind it dims; Escape or the
+close control returns focus to the row; below 960px it is a
+full-width overlay and below 720px a full-screen sheet with a
+visible Back and sticky actions. A things page's controls dock and
+table header stick inside the content region, the rows scroll.

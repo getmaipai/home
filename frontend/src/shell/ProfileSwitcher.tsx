@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import * as RadixPopover from "@radix-ui/react-popover";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -82,6 +83,7 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitch
 
   const others = (profiles ?? []).filter((p) => p.id !== person.id);
   const LogOutIcon = getIcon("log-out");
+  const ProfileIcon = getIcon("user");
 
   return (
     <RadixPopover.Root
@@ -161,6 +163,15 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitch
               )}
               {error ? <p className="px-2 text-sm text-destructive">{error}</p> : null}
               <Separator className="my-1" />
+              {/* "Profile" opens the signed-in person's own profile
+                  (owner ruling, "Navigation, corrected," 2026-09-20) -
+                  where Memories moved once they left the rail. */}
+              <Button asChild type="button" variant="ghost" onClick={() => setOpen(false)} className="h-auto min-h-12 justify-start gap-2 px-2">
+                <Link to={`/people/${person.id}`}>
+                  <ProfileIcon className="h-4 w-4" aria-hidden />
+                  <span className="text-base">Profile</span>
+                </Link>
+              </Button>
               <Button
                 type="button"
                 variant="ghost"

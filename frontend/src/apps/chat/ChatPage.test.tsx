@@ -2,6 +2,7 @@ import { describe, test, expect, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ChatPage } from "@/apps/chat/ChatPage";
+import { PhoneModeContext } from "@maipai/ui/src/blocks/phone/PhoneMode";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 import { ndjsonStream } from "../../../tests/ndjsonStream";
@@ -265,7 +266,15 @@ test("the composer is disabled while the model is starting, with a fix button be
 test("thread history opens as a phone sheet without removing the composer, and closes from the sheet's own close button", async () => {
   const restore = stubFetch();
   try {
-    const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+    // PhoneModeContext, not just clicking the header's own `lg:hidden`
+    // toggle: the Sheet's own `open` prop now gates on `usePhoneMode()`
+    // too (ChatPage.tsx's own comment on why - Radix's Dialog.Root
+    // aria-hides every sibling the instant `open` is true, CSS-hidden
+    // content or not, which made scripts/screenshot.ts's own `chat-
+    // list` capture time out waiting for an h1 on desktop), so this
+    // test needs the real context, not happy-dom's own lack of a
+    // layout engine to fake "phone" the way it used to.
+    const view = renderWithQueryClient(<MemoryRouter><PhoneModeContext.Provider value={true}><ChatPage person={makePerson()} /></PhoneModeContext.Provider></MemoryRouter>);
     await waitFor(() => expect(view.getByRole("textbox", { name: "Message input" })).toBeTruthy());
     const toggle = view.getByRole("button", { name: "Show threads" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");

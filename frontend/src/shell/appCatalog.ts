@@ -9,8 +9,19 @@ export interface AppEntry extends NavEntry {
 // Only registered, launchable routes belong here. Package apps can join
 // this catalog when their frontend routes are registered.
 export const APP_CATALOG: readonly AppEntry[] = [
-  { to: "/chat", icon: "message-circle", label: "Chat", description: "Ask, think, and talk things through.", category: "Everyday", keywords: ["assistant", "ai", "talk"] },
-  { to: "/conversations", icon: "history", label: "Conversations", description: "Pick up where you left off.", category: "Everyday", keywords: ["history", "messages"] },
+  // Conversations is not a destination of its own (owner ruling,
+  // "Navigation, corrected," 2026-09-20) - it's Chat's own thread list,
+  // so it has no separate catalog entry to pin or search for anymore.
+  { to: "/chat", icon: "message-circle", label: "Chat", description: "Ask, think, and talk things through.", category: "Everyday", keywords: ["assistant", "ai", "talk", "conversations", "history"] },
+  // No NAV_ENTRIES counterpart anymore (owner ruling, "Navigation,
+  // corrected," 2026-09-20 - Memories moved to a person's own profile,
+  // off the rail): `/memory` still works, `MemoriesRedirect` sends it
+  // to the signed-in person's own Memories tab, so this stays a real,
+  // working catalog entry, just a standalone one now - the trailing
+  // `.map(...NAV_ENTRIES.find(...))` below finds nothing for it and
+  // leaves these fields exactly as written here, a code review's own
+  // finding worth a comment so a future rename of "Memories" in
+  // nav.ts doesn't wonder why this entry never follows it.
   { to: "/memory", icon: "brain", label: "Memories", description: "The details you want MaiPai to remember.", category: "Personal", keywords: ["remember", "saved", "memory"] },
   { to: "/people", icon: "users", label: "People", description: "Everyone who shares your home.", category: "Personal", keywords: ["family", "household"] },
   { to: "/privacy", icon: "shield-check", label: "Privacy", description: "Understand and control what you share.", category: "System", keywords: ["data", "security"] },

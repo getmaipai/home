@@ -6284,6 +6284,96 @@ approvals are still real, unstarted work for a future session.
       both 180 pages/0 violations; the four `shell-rail-{expanded,
       collapsed}-desktop-{light,dark}.png` captures opened and judged
       against the owner's own checklist.
+- [x] **HOME-UI-02d: the phone dashboard, Conversations folds into
+      Chat, and the rail's navigation correction** (M, 2026-09-20) -
+      the owner's "Phone density, and conversations inside Chat,"
+      "Navigation, corrected," "The phone composition," "The rail
+      geometry, exactly," and "The Studio look, the numbers" rulings
+      ([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md)).
+      Phone dashboard rebuilt to the reference's own composition: a
+      wordmark header with search/theme/bell folded into the avatar
+      menu (the bell's count as a dot on the avatar), a hero ask card,
+      the four metrics as one 32px-tile strip, 18px section titles with
+      13px subtitles, horizontal shelves for recent conversations and
+      memories, two-column app cards. Conversations retired as its own
+      page: Chat's own thread list (search, rename, delete already
+      built in) is the persistent desktop column and a phone/tablet
+      sheet, `/conversations` redirects to `/chat?list=1`. Rail
+      regrouped to Home (Home, Chat, Apps) / Household (People) /
+      System (Settings) - Privacy stays in the rail for HOME-UI-03 to
+      fold into Settings; Memories moved onto a person's own profile
+      as a Memories tab (`PersonProfilePage.tsx`, reusing the old
+      MemoryPage's own components unchanged), `/memory`/`/memories`
+      redirect there. "Your apps" on the dashboard is now the
+      reference's compact installed-components strip, not tall cards
+      with a density slider. The screenshot pipeline gained a real
+      per-panel overflow check (`scripts/panelOverflow.ts`,
+      `findOverflowingPanels`) replacing its old page-level-only one,
+      and seeds the rail footer's device name ("Bramble hub," the
+      persona roster, matching HOME-UI-03's own already-uncommitted
+      fix) instead of the real machine hostname. `ui-v0.4.1`/`0.4.2`
+      carry the kit side: `PhoneNav`'s configurable `max` (Home's own
+      three-destination phone tab bar), the notification badge's
+      broken position and "9+" cap, and the rail's own reference-exact
+      Studio geometry (fixed 252px/72px rail width, exact padding/
+      radius/gaps, the active item's real gradient/ring/glow,
+      `NotificationPopover`'s badge) - `0.4.2` fixed four box-model
+      bugs a code review caught in `0.4.1`'s own geometry (an over-
+      constrained width+margin box overflowing the rail by its own
+      right margin, an 8px brand-tile/pill misalignment, a group-
+      divider double-inset, a stale comment/changelog contradiction on
+      the collapsed rail's own width). Three real, pre-existing bugs
+      found and fixed along the way, not this item's own scope but
+      blocking its acceptance: Radix's `Dialog.Root` (Chat's own
+      thread-history Sheet) aria-hiding the page's own h1 the instant
+      it mounts open, whether or not its content is CSS-hidden, which
+      hung the screenshot pipeline on desktop before `phone &&
+      threadsOpen` gated it correctly; the "WhoIsHere/MediaShelf" real-
+      Chromium shelf-collapse quirk (HOME-UI-02c already named it
+      twice) hitting a third component, the phone dashboard's own new
+      shelves; Chat's own header controls and a Settings > Voices card
+      running past their own edge at 390px, never caught by the old
+      page-level overflow check - exactly the evidence
+      `findOverflowingPanels` (`scripts/panelOverflow.ts`) existed to
+      produce. What retiring Conversations as its own page cost is
+      recorded under the design doc's own "Conversations live inside
+      Chat" ruling and scoped as HOME-UI-02e, next. Full account in
+      [dev.md](dev.md)'s own entry. Exit check: `bash scripts/check.sh`
+      green on both repos; `scripts/screenshot.ts` (full matrix) and
+      `--shell-rail-review` clean; captures at 1440 and 390, both looks
+      and themes, of the dashboard, Chat with the list open, and a
+      person's Memories tab, opened and judged; the 390 dashboard read
+      against the owner's own phone reference's prose description (the
+      reference image itself is another product's screen and stays out
+      of both repos); `panelOverflow.test.ts` proving the new check
+      catches a seeded overflow.
+- [ ] **HOME-UI-02e: Conversations' own real functions move into
+      Chat's thread list** (S-M) - HOME-UI-02d's own removed-behavior
+      audit found four things the old Conversations page did that the
+      new thread list doesn't: a person picker for an admin's
+      oversight of a child's conversations (the same permission check
+      the deleted page used), multi-select with batch delete and a
+      clear-all (the org's own standing rule: batch delete on every
+      deletable list), pin and unpin on the thread row and its menu,
+      and search backed by the existing server-side message-body
+      search, not the new list's client-side title-only filter. Ruled
+      not an accepted loss (design doc's own "Conversations live
+      inside Chat" section has the full account); scoped right after
+      02d lands, before HOME-UI-03. Files: `frontend/src/apps/chat/
+      chatThreadListAdapter.ts` (only exposes single-thread `delete`/
+      `rename` today), `commons/ui/src/assistant-ui/thread-list.aui.tsx`
+      (`ThreadListItem`/`useThreadListGroups`, the kit component these
+      four land in - check with `commons`'s own maintainer before
+      editing there). `api.batchDeleteConversations`/
+      `api.clearConversations` (`frontend/src/lib/api.ts`) and the
+      backend's own pin field already exist and are unused from the
+      frontend today - confirm each is still wired correctly on the
+      backend before building the UI on top of it. Exit check: `bash
+      scripts/check.sh` green; a regression test per restored function
+      (a parent picking a child's own thread list and seeing only
+      theirs, a batch-delete removing exactly the selected threads, a
+      clear-all, pin surviving a reload, a message-body search finding
+      a thread its title never mentions).
 - [ ] **STORE-01: a real GET route to browse a trusted catalog index,
       and the settings it needs** (S/M) - the gap HOME-UI-02 found and
       deliberately did not build around: "the store is the same page
@@ -8082,7 +8172,6 @@ otherwise be lost with the mirror.
   containing them (see "Legacy: copy, re-examine, record").
 - **`catalog`** (public package store) - repo scaffolding only
   (LICENSE/NOTICE/README, standards pin).
-- [x] the standards pin resolves through a per-tag worktree, std-v0.3.0 (verified at this commit)
 - **`go`** (Apple TV/iPhone client) - marketing copy only, no real app yet.
 
 ## Wave 2 additions (2026-09-06)

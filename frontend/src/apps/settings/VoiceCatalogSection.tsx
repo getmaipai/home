@@ -79,7 +79,16 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
   return (
     <Section heading="More voices">
       {!expanded ? (
-        <Button type="button" variant="link" onClick={expand} className="h-auto min-h-12 w-fit">
+        // w-fit (previously) sized this to its own unwrapped text width
+        // regardless of the section's own available width - found live
+        // at 390px, the label running off the card's own right edge
+        // instead of wrapping (the screenshot pipeline's own per-panel
+        // overflow check, HOME-UI-02d, is what caught it; the page-
+        // level check before it never saw a sub-region's own overflow).
+        // whitespace-normal + text-left: Button's own default is a
+        // single nowrap line, wrong for a sentence this long on a
+        // narrow screen.
+        <Button type="button" variant="link" onClick={expand} className="h-auto min-h-12 w-full text-left whitespace-normal">
           Browse the full community voice catalog (2,000+ voices)
         </Button>
       ) : loadError ? (

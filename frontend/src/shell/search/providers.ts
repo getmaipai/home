@@ -48,10 +48,11 @@ async function peopleProvider(query: string): Promise<SearchGroup> {
     const items = people
       .filter((p) => matchesQuery(query, p.display_name, p.nickname))
       .slice(0, RESULTS_PER_PROVIDER)
-      // No per-person deep link exists yet (PeoplePage.tsx has no route
-      // per person) - every match opens the roster, same interim shape
-      // the settings and commands providers below use.
-      .map((p) => ({ id: `person:${p.id}`, label: p.display_name, sublabel: p.role, icon: "users", to: "/people" }));
+      // `/people/:id` now exists (HOME-UI-02d, PersonProfilePage.tsx) -
+      // a code review caught this comment/behavior as stale, still
+      // sending every match to the bare roster instead of the real
+      // per-person profile it names.
+      .map((p) => ({ id: `person:${p.id}`, label: p.display_name, sublabel: p.role, icon: "users", to: `/people/${p.id}` }));
     return { heading: "People", items };
   } catch {
     return { heading: "People", items: [] };

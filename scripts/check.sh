@@ -43,7 +43,7 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 # session to hit cold.
 if [ "$DOCS_ONLY" = 0 ]; then
   CORE_TAG="core-v0.1.0"
-  UI_TAG="ui-v0.4.0"
+  UI_TAG="ui-v0.4.2"
   SPEC_TAG="spec-v0.1.2"
   SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
   if [ ! -d "$SHARED_REPO" ]; then
@@ -121,6 +121,9 @@ if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
 
   echo "== scripts: typecheck"
   (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
+
+  echo "== scripts: bun test"
+  (cd scripts && bun test)
 
   echo "== backend: bun test"
   (cd backend && bun test)

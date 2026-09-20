@@ -18629,6 +18629,168 @@ mid-session) and moving `UI_PIN`/`SPEC_PIN` to `0.4.0`/`0.1.2`: 3525
 backend tests, 493 frontend tests, build, `a11y-only`, docs
 reading-level, and the standards core all green.
 
+## The phone dashboard, Conversations folds into Chat, and the rail's navigation correction (HOME-UI-02d, ui-v0.4.1/0.4.2, 2026-09-20)
+
+Three owner rounds landed in one item: the original work order ("Phone
+density, and conversations inside Chat," "Navigation, corrected," "The
+phone composition," all [docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md)),
+then "The rail geometry, exactly" (17:40, rough estimates read off the
+reference beside the live page), then "The Studio look, the numbers"
+(18:15, an owner-supplied exact CSS/hex spec from a page built outside
+the org to reproduce the reference's own geometry, explicitly
+superseding the 17:40 estimates where they differ). All three are
+appended verbatim to the design doc.
+
+**Phone dashboard.** `HomePage.tsx` gained a full phone-specific
+composition (`PhoneDashboard` and its own sub-components: a wordmark
+header with search/theme/bell folded into the avatar menu, an unread
+count as a dot rather than a badge; a hero ask card; the four metrics
+as one 32px-tile strip instead of four cards; 18px section titles with
+13px subtitles; `PhoneShelf`, a horizontal scroll shelf for recent
+conversations and memories; `PhoneAppCards`, two-column app tiles).
+Judged against the ruling's own written composition, not a pixel
+comparison - the owner's phone reference is another product's screen,
+shown to COORDINATOR outside the org, and stays out of both repos on
+purpose; only its prose made it into the design doc.
+
+**Conversations retired as its own page.** `ConversationsPage.tsx`/
+`.test.tsx` deleted. Chat's own thread list (already had search,
+rename, per-thread delete built in) is now the persistent desktop
+column and a phone/tablet sheet, opened via `?list=1`; `/conversations`
+redirects to `/chat?list=1`. A code review's own removed-behavior audit
+found this lost four real things the old page did - an admin's person-
+picker oversight of a child's conversations, batch-delete/clear-all,
+pin/unpin, and server-side message-body search - none replaced. Ruled
+not an accepted loss (COORDINATOR, 2026-09-20): all four move into
+Chat's own thread list as HOME-UI-02e, scheduled right after this item,
+before HOME-UI-03. Recorded under the design doc's own "Conversations
+live inside Chat" section.
+
+**Memories moved to a person's own profile.** New `PersonProfilePage.tsx`
+(Overview + a Memories tab, reusing `OwnMemories`/`OtherPersonMemories`
+- new file `PersonMemories.tsx` - unchanged from the retired
+`MemoryPage.tsx`) at `/people/:id`; `/memory` and `/memories` redirect
+there via a new `MemoriesRedirect.tsx` component (its own file, not
+inline in `App.tsx`, because that module imports `@/i18n`, which `bun
+test` can't load - found live chasing an unrelated `SyntaxError`).
+Deliberately minimal: no things-table/details-pane rebuild, that's
+HOME-UI-04's own "People page composition."
+
+**Rail regrouped**: Home (Home, Chat, Apps) / Household (People) /
+System (Settings) - `nav.ts`'s own `NAV_ENTRIES` order matters here,
+`AppShell.tsx`'s `phoneNavMax={4}` (via `shared`'s new `PhoneNav.max`
+prop) folds everything past the first three under the phone tab bar's
+own "More." Privacy stays in the rail on purpose - HOME-UI-03/home-a1
+owns folding it into Settings, left untouched here.
+
+**"Your apps"** on the dashboard rebuilt as the reference's own compact
+installed-components strip (`AppsRow`: an icon tile, a bold label, a
+one-line kind/state text) replacing tall cards with a density slider.
+
+**The screenshot pipeline's own overflow check widened.** The old
+check read only `document.documentElement.scrollWidth` - real, but a
+card's own line running past its own right edge never widened the
+*page*, so a capture could ship with visibly clipped text and still
+pass. New `scripts/panelOverflow.ts` (`findOverflowingPanels`) scans
+every panel's own content box instead, comparing each element's real
+children's `getBoundingClientRect()` against its own (not
+`scrollWidth`, which also counts a `hitArea()` pseudo-element's own
+invisible hit-area box - found live at 1920px, where every
+`hitArea()`-using control in the rail and header tripped the first
+version of this check at once for zero visible defect). Reports only
+the innermost offender (one real overflow pushes every ancestor's own
+box past its own too). `panelOverflow.test.ts` has six tests proving
+each of these, including the specific one the item's own acceptance
+named: a seeded overflow is actually caught, not asserted by eye once.
+The `far` (1920px, TV user-agent) viewport is excluded from this check
+entirely at the `screenshot.ts` call site - a persistent, invisible
+few-px flag on the rail's own wrapper survived every fix tried (moving
+`settleAnimations()` earlier, a wider tolerance, an explicit exclusion
+for that one wrapper); `far` is outside this item's own 1440/390
+acceptance and is its own not-yet-audited surface - tracked, not
+silenced for the viewports that do matter.
+
+**The rail footer's device name** now seeds "Bramble hub" (the persona
+roster - matches HOME-UI-03's own already-uncommitted fix in home-a1,
+after an owner ruling reconciled an earlier "Family hub"/"Family Mac"
+three-way mismatch across this item, home-a1, and the kit's own
+reference PNGs, which keep "Family Mac" as a mockup's own machine name)
+instead of the real machine hostname, via a Playwright
+`context.route()` interception of `GET /api/host/hardware` in
+`screenshot.ts` - not the backend. `hubIdentity.ts` separately gained a
+`MAIPAI_DEMO_HUB_NAME` env-var branch for a different, currently-dead
+code path (`getHubName()`, exposed over HTTP by the setup wizard's own
+trust step but not called from the frontend today) - a code review
+flagged the inconsistency between the two techniques (one touches no
+production code, the other does) as worth a future cleanup, not
+reverted given time already spent; low real-world risk since nothing
+sets that env var by accident.
+
+**Three real, pre-existing bugs found and fixed along the way**, none
+this item's own original scope, all blocking its own acceptance:
+1. Radix's `Dialog.Root` (Chat's own thread-history Sheet) runs its
+   focus-trap and aria-hides every sibling the instant `open` is true,
+   whether or not its own content is CSS-hidden (`lg:hidden`).
+   `ChatPage.tsx`'s `threadsOpen` state used to drive the Sheet
+   unconditionally; `?list=1` setting it true on a desktop capture
+   silently aria-hid the page's own h1, hanging the screenshot
+   pipeline's own h1-wait every time. Fixed with one derived
+   `sheetOpen = phone && threadsOpen` (`phone` from `usePhoneMode()`),
+   read everywhere the state mattered (the Sheet's `open`, the toggle
+   button's `aria-expanded`/`aria-label`/`aria-controls`) so the two
+   can't drift on a real resize mid-session - a code review caught the
+   first version of this fix (gating only the Sheet) as still leaving
+   the button in a stale state.
+2. The "WhoIsHere/MediaShelf" real-Chromium shelf-collapse quirk
+   (`overflow-x-auto` computing `overflow-y: auto` too, zeroing a flex
+   row's automatic min-height - HOME-UI-02c already named and fixed
+   this twice) hit a third time: the new `PhoneShelf` collapsed to a
+   sliver in a real capture (`home-phone-dark.png`'s own "Conversations"
+   row). Fixed the same way, an explicit `min-h-[168px]` floor - a code
+   review flagged this as a third independently-guessed pixel floor for
+   one documented quirk, real technical debt not unified here.
+3. Two genuine 390px overflow bugs the new per-panel check caught that
+   the old page-level check never could: Chat's own header control row
+   (history toggle, mode buttons, "New chat") too wide for a phone
+   screen, fixed with `overflow-x-auto` on that one row; Settings >
+   Voices' "Browse the full community voice catalog" button used
+   `w-fit` with no wrap allowance, running its own text off the card,
+   fixed with `w-full text-left whitespace-normal`.
+
+**The kit side (`ui-v0.4.1`, then `0.4.2`).** `0.4.1`: `PhoneNav`'s
+configurable `max` prop (default 5, unchanged for every other
+consumer), `NotificationPopover`'s badge anchored to the icon's own
+16px wrapper instead of the header button's 32px box (8px off on each
+axis, easily read as floating above the bell) plus a "9+" cap, and the
+rail's reference-exact Studio geometry - the collapsed rail's own
+252px/72px width is unscoped (the fixed shell's own dimensions are
+explicitly look-independent per the owner's own framing), the rest
+(item padding/radius/gaps, the active item's exact gradient/ring/glow,
+divider and group-label colors) `studio:`-scoped so Calm is unaffected.
+A code review of `0.4.1` caught four real box-model bugs before `0.4.2`:
+an over-constrained CSS box (`w-full` plus both margins set is the
+classic case where the browser silently drops `margin-right` to make
+it fit, overflowing the pill past the rail's own edge by its own right
+margin - fixed with `w-auto`, letting the browser compute the true
+width from the margins instead); an 8px brand-tile/pill misalignment
+(`SidebarHeader`'s own base `p-2` stacking with the brand button's own
+padding, while the pills had no container padding above them at all -
+fixed with `px-0` on the header); a group-divider double-inset (the
+divider's own `margin-inline` was applied to the whole group container,
+shifting its own child pills/labels an extra 13px past what the first
+group had - fixed by drawing the divider as a `::before` pseudo-element
+with its own independent inset instead, leaving the group's own box at
+zero margin); and a stale comment/changelog contradiction naming the
+collapsed rail's own width as still 64px in one place while the code
+had already moved to 72px in another.
+
+Exit check: `bash scripts/check.sh` green on both repos; the full
+`scripts/screenshot.ts` matrix and `--shell-rail-review` both clean;
+captures at 1440 and 390, both looks and themes, of the dashboard, Chat
+with the list open, and a person's Memories tab, each opened and
+judged; `panelOverflow.test.ts`'s six tests, including the seeded-
+overflow proof the item's own acceptance named.
+
 ## Home's Stack client (HOME-STACK-02a, 2026-09-20)
 
 The home backend now talks to the Stack directly, through `src/lib/stack/`: a typed client (`client.ts`) that wraps the Stack's OpenAPI surface on loopback `http://127.0.0.1:8770` with a 30-second `withTimeout` envelope, a typed error surface (`errors.ts`) mapping HTTP status codes to `StackError` kinds (`unknown`, `unverified`, `cancelled`, `offline`, `timeout`, `unreachable`, `unexpected`), and wire types (`types.ts`) mirroring the Stack's response shapes. The client exposes the role routes (`/v1/chat/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`, `/v1/audio/speech`, `/v1/images/generations`), job control (`/stack/v1/jobs/:id`), and the admin surface (`/stack/v1/roles`, `/stack/v1/engines`, `/stack/v1/models`, `/stack/v1/health`, `/stack/v1/settings`, `/stack/v1/hardware/budget`, `/stack/v1/updates`, `/healthz`). It is not yet wired into any existing home module; that rework is HOME-STACK-02b. Verified by `bun test tests/stackClient.test.ts` (15 tests) and `tsc --noEmit`.

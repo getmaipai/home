@@ -6,6 +6,7 @@ import { AssistantRuntimeProvider, useAui, useLocalRuntime, useRemoteThreadListR
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@maipai/ui/src/ui/sheet";
+import { usePhoneMode } from "@maipai/ui/src/blocks/phone/PhoneMode";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { Thread } from "@/apps/chat/thread.aui";
 import { ThreadList, ThreadListNew } from "@maipai/ui/src/assistant-ui/thread-list.aui";
@@ -149,7 +150,34 @@ export function ChatPage({ person }: ChatPageProps) {
   // onSpeakingChange, wired to the scheduler's onFirstAudio/onEnded) so
   // a dedicated control can cover it.
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [threadsOpen, setThreadsOpen] = useState(false);
+  // `?list=1` (the `/conversations` redirect - owner ruling,
+  // "Navigation, corrected," 2026-09-20: "Conversations live inside
+  // Chat... a sheet from the header's list icon on the phone") opens
+  // the thread sheet on arrival, phone width only - the persistent
+  // desktop column is already always visible. `phone &&` here, not
+  // just on the Sheet's own `open` prop below: a `threadsOpen=true`
+  // with no phone-width Sheet actually open left the header's own
+  // toggle button (`aria-expanded="true" aria-controls="chat-
+  // threads"`) pointing at an id Radix never mounts while `open` is
+  // false, an `aria-valid-attr-value` violation found live once
+  // desktop/tablet stopped hanging on the aria-hidden bug below and
+  // could reach this next one. `useBreakpoint()` (usePhoneMode's own
+  // source) reads `window.innerWidth` synchronously on first render,
+  // so `phone` is already correct the instant this initializer runs,
+  // same as the URL search params are.
+  const phone = usePhoneMode();
+  const [threadsOpen, setThreadsOpen] = useState(() => phone && new URLSearchParams(window.location.search).get("list") === "1");
+  // A code review caught this as reachable, not just theoretical:
+  // `phone` is a live breakpoint (`usePhoneMode()`) that can flip
+  // mid-session on a real resize/rotation, but nothing reset
+  // `threadsOpen` when it did - the toggle button's own aria-expanded/
+  // aria-label/aria-controls read raw `threadsOpen` while the Sheet's
+  // `open` prop read `phone && threadsOpen`, so a resize while the
+  // sheet was open left the button announcing "Hide threads,"
+  // `aria-expanded="true"`, and `aria-controls` pointing at a sheet
+  // Radix had already stopped mounting. One derived value, read
+  // everywhere below, so the two can't drift apart again.
+  const sheetOpen = phone && threadsOpen;
   const [speechError, setSpeechError] = useState(false);
   const wakeWord = useWakeWord({ onWakeDetected: () => setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.") });
 
@@ -296,14 +324,24 @@ export function ChatPage({ person }: ChatPageProps) {
                       action row cannot paint through it at short heights. */}
                   <div data-slot="aui_chat-header" className="relative z-20 shrink-0 border-b border-border/60 bg-background px-4 py-2">
                     <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1">
+            {/* overflow-x-auto: found live at 390px - the history
+                toggle, "Chat," Research/Temporary/Details (each only
+                rendered when its own condition allows it) and "New
+                chat" together are wider than a phone screen with
+                nothing to shrink further without losing a real
+                control; scrolling keeps every one of them reachable
+                instead of clipping the row (the screenshot pipeline's
+                own per-panel overflow check, HOME-UI-02d, is what
+                caught this - a real, pre-existing gap the page-level
+                check before it never saw). */}
+            <div className="flex items-center gap-1 overflow-x-auto">
               {/* Phone and tablet (spec.md "Layout"; `lg:` not `sm:` -
                   tokens.css's own --breakpoint-lg note: the kit's 960px
                   default reopens a squeeze at tablet width, the same
                   reason SettingsPage's own rail uses `lg:flex` and not
                   `sm:flex`): desktop's own thread list is the persistent
                   column below, never toggled. */}
-              <Button variant="ghost" size="icon" className="lg:hidden" aria-label={threadsOpen ? "Hide threads" : "Show threads"} aria-expanded={threadsOpen} aria-controls="chat-threads" onClick={() => setThreadsOpen((open) => !open)}>
+              <Button variant="ghost" size="icon" className="lg:hidden" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="chat-threads" onClick={() => setThreadsOpen((open) => !open)}>
                 <HistoryIcon className="size-4" />
               </Button>
               <h2 className="text-base font-semibold">Chat</h2>
@@ -358,7 +396,7 @@ export function ChatPage({ person }: ChatPageProps) {
             <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-e border-border/60 bg-background p-2 lg:flex">
               <ThreadList />
             </aside>
-            <Sheet open={threadsOpen} onOpenChange={setThreadsOpen}>
+            <Sheet open={sheetOpen} onOpenChange={setThreadsOpen}>
               <SheetContent id="chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-2 lg:hidden">
                 <SheetHeader className="sr-only">
                   <SheetTitle>Conversations</SheetTitle>

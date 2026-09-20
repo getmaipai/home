@@ -19,6 +19,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@axe-core/playwright@^4.13.0",
+        "npm:@happy-dom/global-registrator@^20.14.0",
         "npm:playwright@^1.48.0",
         "npm:text-readability@^1.1.1"
       ]

@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
-import { Page } from "@maipai/ui/src/primitives/Page";
 import { List } from "@maipai/ui/src/primitives/List";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Select } from "@maipai/ui/src/primitives/Select";
@@ -10,17 +8,10 @@ import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
 import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@maipai/ui/src/ui/tabs";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, isOwnerOrAdminRole, type MemoryRecord, type PersonRosterEntry, type Roster } from "@/lib/api";
-import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
-import { PeopleAndThings } from "@/apps/memory/PeopleAndThings";
+import { api, ApiError, type MemoryRecord } from "@/lib/api";
 
 const ArchiveIcon = getIcon("archive");
-
-interface MemoryPageProps {
-  person: Roster;
-}
 
 const ME = "me";
 
@@ -143,7 +134,7 @@ function MemoryRows({
 // of at all (the same "stays hand-written" call this session's Repairs
 // and Conversations pages already made for a structurally identical
 // reason - a real capability the generic interpreter doesn't have).
-function OtherPersonMemories({ personId, personName }: { personId: string; personName: string }) {
+export function OtherPersonMemories({ personId, personName }: { personId: string; personName: string }) {
   const query = useQuery<MemoryRecord[]>({
     queryKey: ["memory-list", personId],
     queryFn: () => api.memories(personId),
@@ -269,7 +260,7 @@ function OtherPersonMemories({ personId, personName }: { personId: string; perso
 // for; inventing one for a single page is exactly the kind of ahead-of-
 // need primitive docs/plans/session-b-ui.md step 5 says not to build).
 // The subtitle shows the raw scope value instead.
-function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string> | null; actorIsAdult: boolean }) {
+export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string> | null; actorIsAdult: boolean }) {
   const queryClient = useQueryClient();
   const query = useQuery<MemoryRecord[]>({
     queryKey: ["memory-list", ME],
@@ -410,115 +401,5 @@ function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string> | nul
         )}
       </AsyncState>
     </div>
-  );
-}
-
-export function MemoryPage({ person }: MemoryPageProps) {
-  // Chat's "memory updated" chip (chatMemoryChip.tsx, step 4) deep-links
-  // here with ?ids=<memory ids>: a client-side filter over the same list
-  // `OwnMemories` already fetches, not a second fetch. Select mode and
-  // clear-all are hidden while this filter is active - it's a narrow,
-  // temporary view of what chat just changed, not the place to batch-act
-  // on the whole list.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const idsParam = searchParams.get("ids");
-  const filterIds = idsParam ? new Set(idsParam.split(",")) : null;
-
-  // docs/UI.md: "the active tab lives in the URL" - `?section=` rather
-  // than a separate piece of component state, so a reload, a shared
-  // link, and the browser's own back/forward all land on the same tab
-  // a person was actually looking at. Anything but the one other real
-  // value falls back to Memories (a stray or stale `?section=` should
-  // never show a blank tab).
-  const activeTab = searchParams.get("section") === "people-and-things" ? "people-and-things" : "memories";
-  function onTabChange(value: string) {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (value === "people-and-things") next.set("section", value);
-        else next.delete("section");
-        return next;
-      },
-      { replace: true },
-    );
-  }
-
-  const canViewOthers = isOwnerOrAdminRole(person.role);
-  const [viewing, setViewing] = useState<string>(ME);
-  const viewingSelf = viewing === ME;
-  const peopleQuery = useQuery<PersonRosterEntry[]>({
-    queryKey: ["people"],
-    queryFn: () => api.people(),
-    enabled: canViewOthers,
-  });
-  const viewingPerson = !viewingSelf ? peopleQuery.data?.find((p) => p.id === viewing) : undefined;
-
-  const memoriesQuery = useQuery<MemoryRecord[]>({
-    queryKey: ["memory-list", ME],
-    queryFn: () => api.memories(),
-    enabled: viewingSelf,
-  });
-  const visibleCount = filterIds
-    ? (memoriesQuery.data?.filter((m) => filterIds.has(m.id)).length ?? 0)
-    : undefined;
-
-  const personPicker =
-    canViewOthers && peopleQuery.data && peopleQuery.data.length > 1 ? (
-      <Select
-        value={viewing}
-        onValueChange={setViewing}
-        options={[ME, ...peopleQuery.data.filter((p) => p.id !== person.id).map((p) => p.id)]}
-        getLabel={(v) => (v === ME ? "Me" : (peopleQuery.data?.find((p) => p.id === v)?.display_name ?? v))}
-        aria-label="Viewing whose memories"
-      />
-    ) : null;
-
-  return (
-    <Page title="Memory" hideTitle>
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
-      <div tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
-        {/* Lane 11 item 2: a real sibling section within the app that
-            already owns "what MaiPai knows" (the work order's own
-            phrasing), not a second nav entry - entities/relationships are
-            a different record shape from memories with no shared query to
-            join on, so a tab (not a merged list) is the honest split.
-            Defaults to Memories, so `?ids=` deep links from the chat chip
-            (below) still land where they always have. `activeTab`/
-            `onTabChange` (below) keep this in the URL, per docs/UI.md's
-            own tab rule ("the active tab lives in the URL") - a second
-            review pass caught this section as fully uncontrolled, so a
-            reload, a shared link, or the browser's own back/forward
-            always landed back on Memories. */}
-        <Tabs value={activeTab} onValueChange={onTabChange}>
-          <TabsList>
-            <TabsTrigger value="memories">Memories</TabsTrigger>
-            <TabsTrigger value="people-and-things">People and things</TabsTrigger>
-          </TabsList>
-          <TabsContent value="memories" className="flex flex-col gap-4">
-            {personPicker}
-            {viewingPerson ? (
-              <OtherPersonMemories personId={viewingPerson.id} personName={viewingPerson.display_name} />
-            ) : (
-              <>
-                {filterIds ? (
-                  <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
-                    <span>
-                      Showing {visibleCount ?? 0} memory update{visibleCount === 1 ? "" : "s"}
-                    </span>
-                    <Link to="/memory" className="text-primary underline">
-                      Show all
-                    </Link>
-                  </div>
-                ) : null}
-                <OwnMemories filterIds={filterIds} actorIsAdult={person.role === "adult"} />
-              </>
-            )}
-          </TabsContent>
-          <TabsContent value="people-and-things">
-            <PeopleAndThings actorRole={person.role} />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </Page>
   );
 }
