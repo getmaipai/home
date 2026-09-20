@@ -18298,3 +18298,108 @@ than duplicated here).
 - The rail's hub card and footer's `FooterBar` link touch-targets carry
   a small, documented residual gap on the outermost edges (see
   `shared`'s own `ui-v0.3.0` entry) - not a Home-side fix.
+
+## The Apps page as a real things table (HOME-UI-02, ui-v0.3.2, 2026-09-20)
+
+The "Apps" paragraph of the owner's ruling
+([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md)):
+"Everything installed on this hub" as the kit's own things-page pattern
+- a filter column (kind, category, state), a things table with icon
+tiles/type badges/status pills, a details pane with Install and Remove
+as pane actions, the store behind a "From the catalog" filter, never a
+second screen. The old `AppsPage.tsx` (a card grid over `APP_CATALOG`,
+the dashboard's own nav-shortcut list) is a different catalog from what
+this route now shows: the 33 real installed packages `GET /api/plugins`
+reports (plugin/companion/skill, the voice capabilities MaiPai actually
+runs), not the handful of navigable pages. Nothing about the nav
+shortcuts changed; they stay exactly where HOME-UI-01 left them.
+
+### A real scope gap, found and resolved before building around it
+
+"The store is the same page behind a 'From the catalog' filter" has
+nothing to build on yet: `lib/storeIndex.ts`/`lib/store.ts` (session-d's
+step 6) only verify and install a package the caller already names with
+a target path, an index source and a trust config - there is no route
+that lists what is actually in an index, no pinned default index
+URL or trust config anywhere, and no settings key for one (store.ts's
+own comment already says so: "no real pinned production catalog URL or
+maintainer root key yet"). Session D's own plan scoped that repo to
+backend/spec/catalog only; the frontend store UI was left for whoever
+built this page next. Flagged to COORDINATOR before writing any UI
+around it, rather than fabricate catalog data or a fake Install button
+with nothing behind it - COORDINATOR's call: build the real installed
+side, give "From the catalog" an honest, connected-nothing empty state,
+and file the real gap as a pickup-ready backlog item (below) instead of
+inventing scope inside this M item's budget. Remove is real (the
+existing `POST /api/store/installs/:id/uninstall` route); Install has
+nothing to wire to yet.
+
+### `shared/ui`: `TypeBadge`, a real pane confirm step, `PhoneModeContext` actually wired (ui-v0.3.2)
+
+Full account in `shared`'s own `ui-v0.3.2` changelog entry. Three things
+the kit had never actually been exercised against, all found wiring
+this page: `StatusPill` rendered with no background tint or text color
+at all (a plain bordered span, zero real consumers until `DetailsPane`'s
+pane header got one); the same hue-text contrast bug `ui-v0.3.1` fixed
+on `MetricCard` also existed, unshipped, on `StatusPill`/`TypeBadge`'s
+own 15%-tinted pill background (worse than a plain panel - the tint
+pulls the background toward the hue itself); `PhoneModeContext` existed
+with no product ever providing it, so `usePhoneMode()` (`ThingsTable`/
+`ThingsPage`'s own phone-layout switch) read `false` unconditionally on
+every screen size, until `Shell` started providing it from the same
+`useBreakpoint().tier === "phone"` the rail's own mobile switch already
+uses. `DetailsPane` gained a real confirm/cancel step for a destructive
+action (it fired immediately before, with no confirmation at all,
+unlike `ThingsTable`'s own row actions) - async-safe by construction
+after a review pointed at the exact bug the schema renderer's own
+`ConfirmDialog` was built to avoid (2026-09-05, Radix's default confirm
+closing before an async action settles): a `busy` state blocks every
+action button and the pane's own Close/Escape until the confirmed
+action settles, and a pending confirm clears the instant the pane
+re-renders for a different item or closes (a second real bug the same
+review caught live, before this shipped: a stale confirm otherwise
+stayed armed under a new item's name).
+
+### Home: the page, the screenshot matrix gap, the follow-up
+
+`frontend/src/apps/library/AppsPage.tsx` rebuilt on `ThingsPage` +
+`FilterColumn` + `ThingsTable` + `DetailsPane` + `KeyValueList`: four
+filter groups (Source, Kind, Category, State), a table column for the
+icon-tiled name, category, a `TypeBadge` for kind, and the installed
+version; the pane's Overview tab lists version/category/type/quality/
+minimum role/offline behavior/permissions through `KeyValueList`, Remove
+wired to the real uninstall route and gated on both role
+(`isOwnerOrAdminRole`, the owner/admin-only store routes) and whether
+the package actually has an active store install (`GET
+/api/store/installs/:id` - a bundled-only package reads "This ships
+with Home; nothing to remove," a failed check reads its own "couldn't
+check" reason, never silently conflated with the bundled case, the same
+class of honesty bug HOME-UI-01's `useHubStatus` fix already established
+the pattern for). `lib/api.ts` gained `InstalledPackage` (the real
+`GET /api/plugins` row shape - the manifest's own `smoke` field and the
+route's live-status `smoke` field share a key name and genuinely
+disagree in shape, `Omit`-and-replaced rather than left to silently
+conflict) and `StoreInstall`, plus `storeInstall()`/`uninstallPackage()`.
+
+`scripts/screenshot.ts` never had a `/apps` entry in its own `ROUTES`
+list - present since the route existed, closed here in the same commit
+as the rebuild (this file's own header comment already calls exactly
+this gap out: "a route added later without an entry here is a real
+gap"). A second, bespoke capture opens the pane on a real row (Weather)
+the same way `capturePeopleAndThings` does for Memory's own tabs.
+
+Review: medium, two passes on each diff (`shared/ui`'s kit patch
+separately from Home's own page, each with a fix-hunks-only re-review;
+findings and dispositions are in the two commit messages rather than
+duplicated here). Exit check: `bunx tsc --noEmit` and `bun test` clean
+on both repos; two environmentally flaky, unrelated failures
+(`NotificationBell.test.tsx`, `MemoryPage.test.tsx`, both untouched
+this session) reproduced identically on a clean `git stash` baseline,
+confirming they predate this work.
+
+**Known gaps, tracked not dropped:**
+- The catalog-listing follow-up (a real GET route over a trusted
+  index, the settings it needs) - filed pickup-ready in
+  `docs/BACKLOG.md`.
+- Engines/Packages/Updates/Repairs/Backups (the Manage nav group) -
+  HOME-STACK-04, unchanged by this item.

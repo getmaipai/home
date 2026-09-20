@@ -6238,6 +6238,64 @@ approvals are still real, unstarted work for a future session.
       in [dev.md](dev.md)'s own entry. Exit check: `bunx tsc --noEmit`
       and `bun test` clean (484 pass), screenshots opened beside
       `shared/ui/docs/reference/overview-dashboard.png` and judged.
+- [x] **HOME-UI-02: the Apps page as a real things table** (M,
+      2026-09-20) - the "Apps" paragraph of
+      [docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md).
+      `AppsPage.tsx` rebuilt on the kit's `ThingsPage`/`FilterColumn`/
+      `ThingsTable`/`DetailsPane`/`KeyValueList` over the 33 real
+      installed packages `GET /api/plugins` reports (plugin/companion/
+      skill - a different catalog from the nav shortcuts the old page
+      showed, which are untouched); Remove wired to the real uninstall
+      route, gated on role and on whether the package actually has an
+      active store install, never conflating "can't check" with
+      "confirmed nothing to remove." `shared/ui` gained `TypeBadge`, a
+      real async-safe confirm step on `DetailsPane`'s destructive
+      actions, and a `PhoneModeContext` actually wired to a live
+      breakpoint (`ui-v0.3.2`) - three real gaps in code that had never
+      been exercised until this page used it, none caught by
+      `ui-v0.3.0`/`0.3.1`'s own review passes. `scripts/screenshot.ts`
+      never had a `/apps` route entry at all; closed in the same commit.
+      Full account in [dev.md](dev.md)'s own entry. Exit check: `bunx
+      tsc --noEmit` and `bun test` clean on both repos, screenshots
+      opened (desktop/phone, light/dark, plus the pane open).
+- [ ] **STORE-01: a real GET route to browse a trusted catalog index,
+      and the settings it needs** (S/M) - the gap HOME-UI-02 found and
+      deliberately did not build around: "the store is the same page
+      behind a 'From the catalog' filter"
+      ([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md))
+      has nothing to build on. `backend/src/lib/storeIndex.ts` already
+      verifies a signed index (`fetchRawIndex`/`verifyIndex`) and
+      `backend/src/lib/store.ts` already installs a named package from
+      one, but nothing lists what an index actually contains, and there
+      is no pinned index URL or root-key trust config anywhere - an
+      admin has no way to say "here is the catalog" at all yet. Files:
+      a new route in `backend/src/routes/store.ts` (owner/admin gated,
+      the same `requireRole("owner", "admin")` every other route there
+      uses) wrapping `fetchRawIndex`/`verifyIndex` into a `GET
+      /api/store/catalog` (or similar) that returns the verified
+      index's target list; the pinned index URL and the root public
+      key(s) as settings, declared once the way every other settings
+      key is (`getmaipai/shared`'s `spec/settings/` declaration source,
+      `backend/src/lib/settingsRegistry.ts` reads the generated
+      registry - see an existing declared key for the pattern). Test:
+      mirror `backend/tests/storeIndex.test.ts`'s own scripted-index
+      fixture (`backend/tests/support/tufFixtures.ts`'s
+      `buildFixtureIndex`/`makeKeyPair`/`sign`) and `backend/tests/
+      store.test.ts`'s own route-test conventions (`owner()`/`teen()`
+      test clients, the role-gate test, a tamper case). Acceptance: a
+      local fixture index (`{kind: "dir", dir: ...}`, the same shape
+      `install()` already accepts) lists real targets through the new
+      route; a bad signature or an expired/rolled-back index refuses
+      the same way `install()` already does, not a partial or silent
+      empty list. Out of scope: any UI change (the second line below
+      is that). Exit check: `bash scripts/check.sh`, the new route's
+      tests green.
+      Second line, once the route above exists: wire `AppsPage.tsx`'s
+      "From the catalog" filter to real data and give it a real Install
+      action (the pane action row, `disabledReason` for a permission-
+      changing update the way `install()`'s own `requiresConfirmation`
+      already models) - the honest empty state HOME-UI-02 shipped
+      becomes real content instead of being replaced.
 - [ ] **Fix SettingsPage's content squeeze at the kit's real 960px
       breakpoint, then drop the `--breakpoint-lg` override** (S) - step
       5a (2026-09-20) restored `--breakpoint-lg` to 1024px in

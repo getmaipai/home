@@ -283,6 +283,11 @@ const ROUTES: RouteSpec[] = [
   { slug: "notifications", path: "/notifications" },
   { slug: "people", path: "/people" },
   { slug: "memory", path: "/memory" },
+  // Missing since /apps existed at all (a gap this file's own header
+  // comment calls out): App.tsx has always had this route, but no entry
+  // here ever covered it - found rebuilding the page as a things table
+  // (HOME-UI-02) and closed in the same commit as the rebuild.
+  { slug: "apps", path: "/apps" },
   { slug: "privacy", path: "/privacy" },
   { slug: "settings", path: "/settings" },
   { slug: "settings-models", path: "/settings/models" },
@@ -1473,6 +1478,27 @@ async function capturePeopleAndThings(browser: Browser, sessionValue: string, vi
   }
 }
 
+// Apps (HOME-UI-02): the details pane over a real installed package,
+// the same "click a real row" shape capturePeopleAndThings uses for
+// Memory's own tabs - the ordinary ROUTES matrix only ever proves the
+// table itself, never the pane a real household member spends most of
+// this page's time in.
+async function captureAppsPaneOpen(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/apps`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.getByText("Weather", { exact: true }).first().click();
+    await page.getByRole("complementary").waitFor();
+    await settleAnimations(page);
+    await page.screenshot({ path: join(SCREENS_DIR, `apps-pane-${viewport.slug}-${theme}.png`) });
+  } finally {
+    await context.close();
+  }
+}
+
 /** The conversations feature's judged capture: seed one real conversation,
  * give it a household title, search for a word in its turn, and capture the
  * result. This stays in data-scratch because it proves the interaction
@@ -2182,6 +2208,7 @@ async function main() {
       await capturePaletteOpen(browser, sessionValue, desktop, "light");
       await capturePeopleAndThings(browser, sessionValue, phone, "dark");
       await capturePeopleAndThings(browser, sessionValue, desktop, "light");
+      await captureAppsPaneOpen(browser, sessionValue, desktop, "light");
       // Isolated, unlike the captures above: it hardcodes one chunk's own
       // hashed-filename prefix and races a fixed delay against a fixed
       // timeout, both of which are more likely to need adjusting after an

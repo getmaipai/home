@@ -139,6 +139,39 @@ export interface UpdateProjection {
   error: string | null;
 }
 
+// GET /api/plugins's real row shape (backend/src/routes/plugins.ts):
+// every field PackageManifest already declares, plus the live status
+// routes/plugins.ts adds. `smoke` is `Omit`-and-replaced, not just
+// added: the manifest's own `smoke` field (how to run the package's
+// smoke test) and this route's own `smoke` field (the live result of
+// the last run) are two different shapes sharing one key name -
+// routes/plugins.ts's own spread (`{...manifest, ..., smoke: {...}}`)
+// really does overwrite the former with the latter on the wire, so this
+// type says so rather than conflict with PackageManifest's own
+// declaration.
+export interface InstalledPackage extends Omit<PackageManifest, "smoke"> {
+  installed_version: string;
+  latest_version: string;
+  channel: "stable" | "beta";
+  status: "enabled" | "disabled";
+  smoke: { last_run_at: string | null; ok: boolean | null; message: string | null };
+}
+
+// GET /api/store/installs/:id's response (backend/src/routes/store.ts's
+// InstalledPackageSchema): null when the package has no active store
+// install (bundled-only, or never installed through the store) - the
+// Apps page's pane checks this before offering Remove, since uninstall
+// has nothing real to do for a package that's never gone through it.
+export interface StoreInstall {
+  id: string;
+  version: string;
+  previousVersion: string | null;
+  channel: "stable" | "beta";
+  sourceCommit: string;
+  permissions: string[];
+  installedAt: string;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -596,7 +629,14 @@ export const api = {
   // manifest, `routing.examples` included - the chat composer's empty-
   // state suggested prompts (step 4) are drawn from these rather than
   // invented, so they're always real things MaiPai can actually do.
-  plugins: () => request<PackageManifest[]>("/api/plugins"),
+  plugins: () => request<InstalledPackage[]>("/api/plugins"),
+  // Owner/admin only (routes/store.ts's own gate) - null means the
+  // package has no active store install (bundled-only, or never
+  // installed). Called lazily, on-demand for the pane's selected
+  // package, never for every row: 33 real packages installed today,
+  // and Remove's own real/disabled state is the only reason to ask.
+  storeInstall: (id: string) => request<StoreInstall | null>(`/api/store/installs/${encodeURIComponent(id)}`),
+  uninstallPackage: (id: string) => request<{ ok: true }>(`/api/store/installs/${encodeURIComponent(id)}/uninstall`, { method: "POST" }),
   hardware: () => request<HardwareInfo>("/api/host/hardware"),
   models: (role: string) => request<ModelFit[]>(`/api/host/models?role=${encodeURIComponent(role)}`),
   chatModels: () => request<ChatModelsResponse>("/api/host/chat-models"),
