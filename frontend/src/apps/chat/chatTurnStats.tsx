@@ -2,7 +2,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { createContext, useContext, useState } from "react";
 import { useAuiState } from "@assistant-ui/react";
 import type { TurnStats } from "@maipai/home-backend/src/wire";
-import { Button } from "@/kit/ui/button";
+import { Button } from "@maipai/ui/src/ui/button";
 
 export const ChatTurnStatsVisibleContext = createContext(false);
 

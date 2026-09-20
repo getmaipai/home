@@ -2,7 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { RepairsSection } from "@/apps/settings/RepairsSection";
-import { ToastProvider } from "@/kit/primitives/Toast";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Issue } from "@/lib/api";
 

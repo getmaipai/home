@@ -5,15 +5,15 @@ import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
 import { SignIn } from "@/shell/SignIn";
-import { Shell } from "@/shell/Shell";
+import { AppShell } from "@/shell/AppShell";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { HomePage } from "@/apps/home/HomePage";
-import { Progress } from "@/kit/primitives/Progress";
-import { RouteSkeleton } from "@/kit/primitives/RouteSkeleton";
-import { ErrorBoundary } from "@/kit/primitives/ErrorBoundary";
-import { ToastProvider } from "@/kit/primitives/Toast";
-import { TooltipProvider } from "@/kit/ui/tooltip";
+import { Progress } from "@maipai/ui/src/primitives/Progress";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
+import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { api, type Roster } from "@/lib/api";
 
 // A small helper for a named export, since `lazy()` itself only takes a
@@ -192,7 +192,7 @@ export function App() {
                       ) : person === null ? (
                         <SignIn onSignedIn={loadPerson} />
                       ) : (
-                        <Shell
+                        <AppShell
                           person={person}
                           onSignOut={() => api.logout().finally(() => setPerson(null))}
                           onPersonChange={revalidatePerson}
@@ -234,7 +234,7 @@ export function App() {
                               </Route>
                             </Routes>
                           </Suspense>
-                        </Shell>
+                        </AppShell>
                       )
                     }
                   />

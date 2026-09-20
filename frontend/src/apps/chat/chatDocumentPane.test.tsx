@@ -151,7 +151,16 @@ describe("COMP-01d details pane", () => {
         query: "safe animals",
         results: [{ title: "Bunny", line: "A gentle animal.", source_id: source.id }],
       }));
-      await waitFor(() => expect(document.body.querySelector('[data-side="bottom"]')).not.toBeNull());
+      // The kit's SheetContent (@maipai/ui) applies the bottom-side
+      // classes directly from its own `side` prop, not a `data-side`
+      // attribute - assert the actual bottom-sheet geometry rather than
+      // an implementation detail the kit doesn't carry.
+      await waitFor(() => {
+        const content = document.body.querySelector('[data-slot="sheet-content"]');
+        expect(content).not.toBeNull();
+        expect(content?.className).toContain("bottom-0");
+        expect(content?.className).toContain("slide-in-from-bottom");
+      });
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     }

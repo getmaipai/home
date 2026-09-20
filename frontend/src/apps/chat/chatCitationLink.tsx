@@ -2,7 +2,7 @@ import type { AnchorHTMLAttributes } from "react";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { parseCitationHref } from "@/apps/chat/chatCitations";
 import { MARKDOWN_LINK_CLASS } from "@/kit/assistant-ui/markdown-text";
-import { cn } from "@/kit/utils";
+import { cn } from "@maipai/ui/src/utils";
 
 /** markdown-text.tsx's `a` override for a chat reply: chatCitations.ts's
  * markCitations() rewrites a matched `[N]` marker into a real markdown

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { EmptyState } from "@/kit/primitives/EmptyState";
-import { Section } from "@/kit/primitives/Section";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
+import { Section } from "@maipai/ui/src/primitives/Section";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 interface AdminGatedContentProps {

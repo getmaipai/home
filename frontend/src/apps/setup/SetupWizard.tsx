@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Wizard, type WizardStep } from "@/kit/primitives/Wizard";
-import { Input } from "@/kit/ui/input";
-import { Button } from "@/kit/ui/button";
-import { Checkbox } from "@/kit/ui/checkbox";
-import { Progress } from "@/kit/primitives/Progress";
+import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Checkbox } from "@maipai/ui/src/ui/checkbox";
+import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { describeHardware, activeJobOf, ModelJobProgress } from "@/apps/settings/ModelsSection";
 import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type BackupInfo } from "@/lib/api";
 

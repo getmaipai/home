@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Section } from "@/kit/primitives/Section";
-import { Progress } from "@/kit/primitives/Progress";
-import { Button } from "@/kit/ui/button";
-import { getIcon } from "@/kit/icons";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { Progress } from "@maipai/ui/src/primitives/Progress";
+import { Button } from "@maipai/ui/src/ui/button";
+import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type EngineStatus } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
 

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Section } from "@/kit/primitives/Section";
-import { Input } from "@/kit/ui/input";
-import { Button } from "@/kit/ui/button";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError } from "@/lib/api";
 
 const KEY = "voice.hf_token";

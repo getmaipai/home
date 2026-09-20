@@ -3,23 +3,23 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trans } from "@lingui/react";
 import { useQuery } from "@tanstack/react-query";
-import { Page } from "@/kit/primitives/Page";
-import { cn, FOCUS_RING } from "@/kit/utils";
-import { Card } from "@/kit/primitives/Card";
-import { CardGrid } from "@/kit/primitives/CardGrid";
-import { Avatar } from "@/kit/primitives/Avatar";
-import { Button } from "@/kit/ui/button";
-import { Command, CommandInput, CommandList } from "@/kit/ui/command";
-import { getIcon } from "@/kit/icons";
-import { CardSizeSlider, useCardSize, cardSizeStyle } from "@/kit/primitives/CardSizeSlider";
-import { NodeRenderer } from "@/kit/schema/NodeRenderer";
-import type { WidgetCardNode } from "@/kit/schema/types";
+import { Page } from "@maipai/ui/src/primitives/Page";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
+import { Card } from "@maipai/ui/src/primitives/Card";
+import { CardGrid } from "@maipai/ui/src/primitives/CardGrid";
+import { Avatar } from "@maipai/ui/src/primitives/Avatar";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Command, CommandInput, CommandList } from "@maipai/ui/src/ui/command";
+import { getIcon } from "@maipai/ui/src/icons";
+import { CardSizeSlider, useCardSize, cardSizeStyle } from "@maipai/ui/src/primitives/CardSizeSlider";
+import { NodeRenderer } from "@maipai/ui/src/schema/NodeRenderer";
+import type { WidgetCardNode } from "@maipai/ui/src/schema/types";
 import { api, type Roster, type PersonRosterEntry, type ResolvedSetting } from "@/lib/api";
 import { greetingFor } from "@/apps/home/greeting";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useSearchCommand } from "@/shell/search/useSearchCommand";
-import { SearchResultGroups } from "@/shell/search/SearchResultGroups";
+import { SearchResultGroups } from "@maipai/ui/src/search/SearchResultGroups";
 import type { SearchResultItem } from "@/shell/search/providers";
 import { weatherCardQuestion } from "@maipai/home-backend/src/homeCardQuestions";
 
@@ -300,7 +300,7 @@ function HomeSearchPrompt({ person }: { person: Roster }) {
           clutter until you type" intent (the strip below already shows
           pinned apps) - only the list ELEMENT itself needs to always
           exist, not its contents. */}
-      <CommandList>{trimmed !== "" ? <SearchResultGroups groups={visibleGroups} trimmedQuery={trimmed} onSelect={select} onAsk={askMaiPai} /> : null}</CommandList>
+      <CommandList>{trimmed !== "" ? <SearchResultGroups groups={visibleGroups} trimmedQuery={trimmed} onSelect={select} onAsk={askMaiPai} askLabel="Ask MaiPai" /> : null}</CommandList>
     </Command>
   );
 }

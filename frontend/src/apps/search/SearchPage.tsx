@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Page } from "@/kit/primitives/Page";
-import { Input } from "@/kit/ui/input";
-import { Button } from "@/kit/ui/button";
-import { getIcon } from "@/kit/icons";
+import { Page } from "@maipai/ui/src/primitives/Page";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Button } from "@maipai/ui/src/ui/button";
+import { getIcon } from "@maipai/ui/src/icons";
 import { useSearchCommand } from "@/shell/search/useSearchCommand";
 import type { SearchResultItem } from "@/shell/search/providers";
-import { cn, FOCUS_RING } from "@/kit/utils";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 import type { Roster } from "@/lib/api";
 
 interface SearchPageProps {

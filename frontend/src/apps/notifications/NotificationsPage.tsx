@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Page } from "@/kit/primitives/Page";
-import { List } from "@/kit/primitives/List";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { EmptyState } from "@/kit/primitives/EmptyState";
-import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
+import { Page } from "@maipai/ui/src/primitives/Page";
+import { List } from "@maipai/ui/src/primitives/List";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
+import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
 import { useSelectMode } from "@/kit/hooks/useSelectMode";
-import { Checkbox } from "@/kit/ui/checkbox";
-import { Badge } from "@/kit/ui/badge";
-import { Button } from "@/kit/ui/button";
+import { Checkbox } from "@maipai/ui/src/ui/checkbox";
+import { Badge } from "@maipai/ui/src/ui/badge";
+import { Button } from "@maipai/ui/src/ui/button";
 import { NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY } from "@/shell/NotificationBell";
 import { api, ApiError, type NotificationDeliveryView } from "@/lib/api";
-import { cn, FOCUS_RING } from "@/kit/utils";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

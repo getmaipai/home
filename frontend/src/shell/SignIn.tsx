@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { api, ApiError, type Roster } from "@/lib/api";
-import { Button } from "@/kit/ui/button";
-import { Input } from "@/kit/ui/input";
-import { Avatar } from "@/kit/primitives/Avatar";
-import { Progress } from "@/kit/primitives/Progress";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Avatar } from "@maipai/ui/src/primitives/Avatar";
+import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
-import { cn, FOCUS_RING } from "@/kit/utils";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 
 interface SignInProps {
   onSignedIn: () => void;

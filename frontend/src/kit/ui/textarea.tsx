@@ -1,5 +1,5 @@
 import * as React from "react"
-import { cn } from "@/kit/utils"
+import { cn } from "@maipai/ui/src/utils"
 
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (

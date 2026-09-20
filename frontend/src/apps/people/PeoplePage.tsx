@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { Page } from "@/kit/primitives/Page";
-import { Section } from "@/kit/primitives/Section";
-import { List } from "@/kit/primitives/List";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { Avatar } from "@/kit/primitives/Avatar";
+import { Page } from "@maipai/ui/src/primitives/Page";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { List } from "@maipai/ui/src/primitives/List";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { api, type PersonRosterEntry } from "@/lib/api";
 import { ROLE_LABELS } from "@/apps/people/roles";
-import { cn, FOCUS_RING } from "@/kit/utils";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 
 // Jesse, 2026-09-06: "the edit part is for USERS, not people" - adding,
 // editing, and removing accounts moved to Settings -> Household -> Users

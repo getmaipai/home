@@ -8,9 +8,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/kit/ui/tooltip";
-import { Button } from "@/kit/ui/button";
-import { cn } from "@/kit/utils";
+} from "@maipai/ui/src/ui/tooltip";
+import { Button } from "@maipai/ui/src/ui/button";
+import { cn } from "@maipai/ui/src/utils";
 
 export type TooltipIconButtonProps = ComponentPropsWithRef<typeof Button> & {
   tooltip: string;

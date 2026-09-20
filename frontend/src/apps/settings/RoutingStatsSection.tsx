@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Section } from "@/kit/primitives/Section";
-import { Progress } from "@/kit/primitives/Progress";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { api, ApiError, type RoutingStats } from "@/lib/api";
 
 // The plan's own next step after shipping real plugins (4.5): "count

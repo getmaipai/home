@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
-import { Button } from "@/kit/ui/button";
-import { getIcon } from "@/kit/icons";
+import { Button } from "@maipai/ui/src/ui/button";
+import { getIcon } from "@maipai/ui/src/icons";
 import { useChatListenStore } from "./chatListenStore";
 import type { EngineHealth } from "./useEngineHealth";
-import { cn } from "@/kit/utils";
+import { cn } from "@maipai/ui/src/utils";
 
 export type ReplyState = "idle" | "waiting" | "responding" | "ready" | "error";
 export type EarState = "idle" | "starting" | "listening" | "error";

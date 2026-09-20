@@ -22,9 +22,9 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/kit/ui/collapsible";
-import { cn } from "@/kit/utils";
-import { Button } from "@/kit/ui/button";
+} from "@maipai/ui/src/ui/collapsible";
+import { cn } from "@maipai/ui/src/utils";
+import { Button } from "@maipai/ui/src/ui/button";
 import { Textarea } from "@/kit/ui/textarea";
 
 const ANIMATION_DURATION = 200;

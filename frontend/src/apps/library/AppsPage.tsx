@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Page } from "@/kit/primitives/Page";
-import { Button } from "@/kit/ui/button";
-import { Input } from "@/kit/ui/input";
-import { getIcon } from "@/kit/icons";
+import { Page } from "@maipai/ui/src/primitives/Page";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
+import { getIcon } from "@maipai/ui/src/icons";
 import { APP_CATALOG, filterApps } from "@/shell/appCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
-import { cn, FOCUS_RING } from "@/kit/utils";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 import type { Roster } from "@/lib/api";
 
 const SearchIcon = getIcon("search");

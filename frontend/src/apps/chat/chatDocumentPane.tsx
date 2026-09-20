@@ -3,16 +3,16 @@ import { createContext, useContext, type ReactNode } from "react";
 import { useAuiState } from "@assistant-ui/react";
 import type { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import { api } from "@/lib/api";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { Card } from "@/kit/primitives/Card";
-import { DetailPane } from "@/kit/primitives/DetailPane";
-import { List } from "@/kit/primitives/List";
-import { Section } from "@/kit/primitives/Section";
-import { Badge } from "@/kit/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/kit/ui/sheet";
-import { Button } from "@/kit/ui/button";
-import { getIcon } from "@/kit/icons";
-import { useIsMobile } from "@/kit/hooks/use-mobile";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { Card } from "@maipai/ui/src/primitives/Card";
+import { DetailPane } from "@maipai/ui/src/primitives/DetailPane";
+import { List } from "@maipai/ui/src/primitives/List";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { Badge } from "@maipai/ui/src/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
+import { Button } from "@maipai/ui/src/ui/button";
+import { getIcon } from "@maipai/ui/src/icons";
+import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 
 type OpenDocument = (turnId: string) => void;
 
@@ -218,7 +218,7 @@ interface ChatDocumentPaneProps {
 
 export function ChatDocumentPane({ turnId, onClose }: ChatDocumentPaneProps) {
   const open = turnId !== null;
-  const isMobile = useIsMobile();
+  const isMobile = useBreakpoint().tier === "phone";
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>

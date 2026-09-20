@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import * as RadixPopover from "@radix-ui/react-popover";
-import { Button } from "@/kit/ui/button";
-import { Input } from "@/kit/ui/input";
-import { Separator } from "@/kit/ui/separator";
-import { Avatar } from "@/kit/primitives/Avatar";
-import { getIcon } from "@/kit/icons";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Separator } from "@maipai/ui/src/ui/separator";
+import { Avatar } from "@maipai/ui/src/primitives/Avatar";
+import { getIcon } from "@maipai/ui/src/icons";
 import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
-import { pauseTvNavForOverlay } from "@/shell/tvNav";
+import { pauseTvNavForOverlay } from "@maipai/ui/src/tvNav";
 import { api, ApiError, type Roster } from "@/lib/api";
 
 interface ProfileSwitcherProps {

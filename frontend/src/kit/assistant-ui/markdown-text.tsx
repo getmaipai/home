@@ -15,7 +15,7 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 
 import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
 import { useCopyToClipboard } from "@/kit/assistant-ui/hooks/use-copy-to-clipboard";
-import { cn } from "@/kit/utils";
+import { cn } from "@maipai/ui/src/utils";
 
 type MarkdownTextProps = Partial<TextMessagePartProps> & {
   components?: Parameters<typeof memoizeMarkdownComponents>[0];

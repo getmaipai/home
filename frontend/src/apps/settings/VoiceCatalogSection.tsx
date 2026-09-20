@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { Section } from "@/kit/primitives/Section";
-import { Input } from "@/kit/ui/input";
-import { Button } from "@/kit/ui/button";
-import { Progress } from "@/kit/primitives/Progress";
-import { titleCaseOption } from "@/kit/settings/SettingField";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Progress } from "@maipai/ui/src/primitives/Progress";
+import { titleCaseOption } from "@maipai/ui/src/settings/SettingField";
 
 interface VoiceCatalogSectionProps {
   personId: string;

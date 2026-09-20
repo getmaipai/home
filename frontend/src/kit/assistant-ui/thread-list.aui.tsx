@@ -1,12 +1,12 @@
 "use client";
 
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/kit/ui/dialog";
-import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
-import { Button } from "@/kit/ui/button";
-import { Input } from "@/kit/ui/input";
-import { Skeleton } from "@/kit/ui/skeleton";
-import { cn } from "@/kit/utils";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@maipai/ui/src/ui/dialog";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Skeleton } from "@maipai/ui/src/ui/skeleton";
+import { cn } from "@maipai/ui/src/utils";
 import {
   AuiIf,
   ThreadListItemMorePrimitive,

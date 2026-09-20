@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Section } from "@/kit/primitives/Section";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { Button } from "@/kit/ui/button";
-import { Badge } from "@/kit/ui/badge";
-import { useToast } from "@/kit/primitives/Toast";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Badge } from "@maipai/ui/src/ui/badge";
+import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { api, ApiError, type HealthStatus, type Roster } from "@/lib/api";
 import type { EngineHealthEntry } from "@/lib/api";
 

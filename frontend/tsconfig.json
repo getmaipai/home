@@ -14,7 +14,26 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "baseUrl": ".",
     "paths": {
+      // `@/kit/*` falls through to `@maipai/ui`'s own `src/` after Home's
+      // own residual kit (assistant-ui, the couple of pieces that stay
+      // Home-specific): `@maipai/ui`'s source is subpath-imported
+      // directly (no dist build, per its own no-barrel convention), so
+      // its internal files still use ITS OWN tsconfig's `@/kit/*` alias
+      // (`../../shared/ui/tsconfig.json`) - a single `tsc` run has one
+      // `paths` table for the whole program, so this repo's copy has to
+      // know both meanings, tried in order. The fallback goes through
+      // `./node_modules/@maipai/ui/src/*` (the installed symlink), not
+      // a raw relative path straight into `../../shared/ui/src/*`: a
+      // raw relative path opens the file from OUTSIDE bun's own
+      // dependency graph entirely, and shared/ui's own `@types/react`
+      // (a separate devDependency install, a different physical copy
+      // than Home's) then wins the walk-up lookup instead of the one
+      // the installed `@maipai/ui` package already unifies with Home's,
+      // causing "two different types with this name exist" on every
+      // ref-typed prop (found live building this exact fallback).
+      "@/kit/*": ["./src/kit/*", "./node_modules/@maipai/ui/src/*"],
       "@/*": ["./src/*"]
     }
   },

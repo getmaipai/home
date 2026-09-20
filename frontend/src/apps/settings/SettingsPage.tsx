@@ -1,13 +1,13 @@
-import { Select } from "@/kit/primitives/Select";
-import { getIcon } from "@/kit/icons";
+import { Select } from "@maipai/ui/src/primitives/Select";
+import { getIcon } from "@maipai/ui/src/icons";
 import { useEffect, useRef, useState, Fragment, Suspense, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Page } from "@/kit/primitives/Page";
-import { RouteSkeleton } from "@/kit/primitives/RouteSkeleton";
-import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
-import { Input } from "@/kit/ui/input";
-import { Button } from "@/kit/ui/button";
-import { cn, FOCUS_RING } from "@/kit/utils";
+import { Page } from "@maipai/ui/src/primitives/Page";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
+import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Button } from "@maipai/ui/src/ui/button";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
 import { DisplayNameSection } from "@/apps/settings/DisplayNameSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
@@ -368,7 +368,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
                 </Suspense>
               ) : tab === "household" ? (
                 <>
-                  <SettingsRenderer scope="household" scopeValue="household" filter={search} />
+                  <SettingsRenderer scope="household" scopeValue="household" filter={search} honouredBy="home" />
                   <ExtraSections hidden={!!search.trim()}>
                     {/* voice.hf_token is a household-scope key: writing it
                         already requires owner/admin (lib/settings.ts's
@@ -389,7 +389,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
                 </>
               ) : (
                 <>
-                  <SettingsRenderer scope="person" scopeValue={`person:${person.id}`} filter={search} />
+                  <SettingsRenderer scope="person" scopeValue={`person:${person.id}`} filter={search} honouredBy="home" />
                   <ExtraSections hidden={!!search.trim()}>
                     <div id="section-display-name">
                       <DisplayNameSection person={person} onChanged={onPersonChange} />

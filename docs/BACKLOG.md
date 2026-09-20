@@ -6218,6 +6218,19 @@ approvals are still real, unstarted work for a future session.
 
 ## UI / shell
 
+- [ ] **TV-focusable nav rail, regressed by the `@maipai/ui` kit adoption**
+      (M) - `ui-v0.1.0` through `0.1.3` (`shared/ui`, pinned 2026-09-20)
+      has no `@noriginmedia/norigin-spatial-navigation` rail the way
+      Home's own pre-adoption `shell/Shell.tsx`/`shell/tvNav.ts` did (see
+      the now-`[x]` "Two render profiles per component, near and far"
+      item below, whose hand-built rail this replaced and whose
+      dependency this repo's `frontend/package.json` dropped as
+      orphaned). Tracked upstream, not dropped: `shared/docs/BACKLOG.md`
+      carries the real fix as a kit-level item (needs a design pass on
+      how a focusable rail composes with `Shell.tsx`'s generic
+      `NavGroup`/`NavEntry` props first). Home's own `AppShell.tsx`
+      points here. Exit check: `home/scripts/check.sh` green once
+      `shared/ui` ships the rail and Home re-pins.
 - [x] Person edit and delete (M) - done 2026-09-05. `PATCH`/`DELETE`
       `/api/people/:id` plus `POST /api/people/batch-delete`, the rules
       in `lib/personLifecycle.ts`, and real UI with multi-select. A

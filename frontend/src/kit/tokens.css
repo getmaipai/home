@@ -20,6 +20,20 @@
 @import "shadcn/tailwind.css";
 @import "tw-shimmer";
 
+/* Tailwind v4's automatic content detection never scans node_modules
+ * (its own documented default) - `@maipai/ui`'s own source (subpath-
+ * imported directly, no dist build, so ITS OWN classNames need Home's
+ * own Tailwind to generate CSS for them) is reached through
+ * `node_modules/@maipai/ui`, so without this it silently generates NO
+ * rule at all for any class that appears only there. `h-svh` was the
+ * one that gave it away: a class Home's own kit/ui/sidebar.tsx used to
+ * carry too, until step 5 deleted that file and Tailwind quietly
+ * stopped emitting the rule the moment shared/ui's copy became the
+ * only place it was written - found live building step 5, a real
+ * conversation's composer landing 2000+ px below the fold because the
+ * shell's own height clamp had silently become `height: auto`. */
+@source "../../../../shared/ui/src";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -294,6 +308,33 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* The kit's own "destructive" Button/Badge variant pairs a solid
+ * `--destructive` background with white text (@maipai/ui's own visual
+ * language, ui-v0.1.0/0.1.1/0.1.2). `--destructive`'s own dark-mode
+ * value above is deliberately LIGHTENED, not darkened, for the opposite
+ * pairing (as text, or a translucent tint, over this theme's own
+ * near-black surfaces) - a bright red background under white text fails
+ * contrast at that lightness (axe `color-contrast`, serious; found live
+ * by the far/TV a11y sweep on RepairsSection's own destructive Badge,
+ * getmaipai/home#122 filed for the specific page that surfaced it).
+ * Reasserting Home's own tinted destructive treatment here, scoped to
+ * dark mode only (light mode's 38%-lightness value already passes as a
+ * solid background) - a product-level color choice, not a kit change,
+ * the same "kit provides structure, the product provides color" split
+ * step 5's adoption drew everywhere else. */
+.dark [data-slot="badge"][data-variant="destructive"],
+.dark [data-slot="button"][data-variant="destructive"] {
+  background-color: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) [data-slot="badge"][data-variant="destructive"],
+  :root:not(.light) [data-slot="button"][data-variant="destructive"] {
+    background-color: color-mix(in oklch, var(--destructive) 15%, transparent);
+    color: var(--destructive);
   }
 }
 

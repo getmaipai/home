@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Section } from "@/kit/primitives/Section";
-import { List } from "@/kit/primitives/List";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { EmptyState } from "@/kit/primitives/EmptyState";
-import { Button } from "@/kit/ui/button";
-import { Badge } from "@/kit/ui/badge";
-import { useToast } from "@/kit/primitives/Toast";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { List } from "@maipai/ui/src/primitives/List";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Badge } from "@maipai/ui/src/ui/badge";
+import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { api, ApiError, type Issue } from "@/lib/api";
 
 const SEVERITY_VARIANT: Record<Issue["severity"], "destructive" | "outline" | "secondary"> = {

@@ -60,13 +60,13 @@ const hoverNeedsFocus = {
 // supposed to be smaller than body text). This rule is what keeps that
 // sweep from regressing: same best-effort shape as `hoverNeedsFocus`
 // above (string/template literals and `cn(...)` call arguments, not a
-// full data-flow analysis), scoped to `src/apps` and `src/shell` only,
-// matching the file scope the kit's OTHER accessibility-floor rules
-// already use below (`src/kit/ui`/`src/kit/assistant-ui` are vendored,
-// not hand-audited wholesale - see that block's own comment) - a
-// sub-floor class there still needs the SAME exception comment by
-// convention (every instance in this sweep has one), just not lint-
-// enforced, the same "hand-fixed where it mattered" posture the kit
+// full data-flow analysis), scoped to `src/apps` and `src/shell` only -
+// the kit itself moved to `@maipai/ui` (ui-v0.1.0/0.1.1) and is audited
+// by shared/ui's own gate now, not this one; `src/kit/assistant-ui`
+// (still vendored here) is exempted below the same way. A sub-floor
+// class there still needs the SAME exception comment by convention
+// (every instance in this sweep has one), just not lint-enforced, the
+// same "hand-fixed where it mattered" posture the kit
 // already takes for the 48px/focus-ring floors.
 const SUB_FLOOR_TEXT_CLASS = /\btext-xs\b|\btext-\[(\d+)px\]/g;
 const EXCEPTION_MARKER = /type-floor/i;
@@ -148,9 +148,9 @@ export default tseslint.config(
   {
     // docs/UI.md > Icons: "lucide only, by name; the lint fails any other
     // import or pasted SVG." The kit owns the name -> component registry
-    // (kit/icons.ts); nothing else imports lucide-react directly.
+    // (@maipai/ui/src/icons); nothing else imports lucide-react directly.
     files: ["**/*.{ts,tsx}"],
-    ignores: ["src/kit/icons.ts", "src/kit/ui/**", "src/kit/assistant-ui/**"],
+    ignores: ["src/kit/ui/**", "src/kit/assistant-ui/**"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -158,7 +158,7 @@ export default tseslint.config(
           paths: [
             {
               name: "lucide-react",
-              message: "Import icons by name from @/kit/icons (getIcon), never lucide-react directly.",
+              message: "Import icons by name from @maipai/ui/src/icons (getIcon), never lucide-react directly.",
             },
           ],
         },
@@ -172,10 +172,11 @@ export default tseslint.config(
     // a mandate to hand-patch every accessibility nuance of vendored
     // component internals (input-group.tsx's click-to-focus convenience
     // click handler, markdown-text.tsx's passthrough heading/anchor
-    // renderers, thread.aui.tsx's composer autofocus). The kit's own
-    // accessibility floor (48px targets, focus rings, 16px text) was still
-    // applied by hand where it mattered - see button.tsx, switch.tsx,
-    // checkbox.tsx, input.tsx, select.tsx.
+    // renderers, thread.aui.tsx's composer autofocus). `src/kit/ui` now
+    // holds only `textarea.tsx` (assistant-ui's own composer field) -
+    // the rest of the kit moved to `@maipai/ui` (ui-v0.1.0/0.1.1), where
+    // the same 48px/focus-ring/16px floor was applied by hand and is
+    // shared/ui's own gate's concern now, not this repo's.
     files: ["src/kit/ui/**/*.tsx", "src/kit/assistant-ui/**/*.tsx"],
     rules: {
       "jsx-a11y/click-events-have-key-events": "off",
@@ -188,19 +189,19 @@ export default tseslint.config(
   {
     // A package's pages compose the kit's primitives (docs/UI.md > Pages
     // are data); a raw <button>/<input> in src/apps is exactly the
-    // hand-rolled widget org standard 6 forbids. kit/ui and kit/primitives
-    // are where these elements are legitimately defined.
+    // hand-rolled widget org standard 6 forbids. src/kit/ui and
+    // @maipai/ui/src/ui are where these elements are legitimately defined.
     files: ["src/apps/**/*.tsx"],
     rules: {
       "no-restricted-syntax": [
         "error",
         {
           selector: "JSXOpeningElement[name.name='button']",
-          message: "Use @/kit/ui/button's Button, not a raw <button>, in src/apps.",
+          message: "Use @maipai/ui/src/ui/button's Button, not a raw <button>, in src/apps.",
         },
         {
           selector: "JSXOpeningElement[name.name='input']",
-          message: "Use @/kit/ui/input's Input, not a raw <input>, in src/apps.",
+          message: "Use @maipai/ui/src/ui/input's Input, not a raw <input>, in src/apps.",
         },
       ],
     },

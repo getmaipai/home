@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Section } from "@/kit/primitives/Section";
-import { List } from "@/kit/primitives/List";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { EmptyState } from "@/kit/primitives/EmptyState";
-import { Badge } from "@/kit/ui/badge";
-import { Button } from "@/kit/ui/button";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { List } from "@maipai/ui/src/primitives/List";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
+import { Badge } from "@maipai/ui/src/ui/badge";
+import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
 
 function whenText(iso: string): string {

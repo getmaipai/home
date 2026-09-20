@@ -15,8 +15,8 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/kit/ui/collapsible";
-import { cn } from "@/kit/utils";
+} from "@maipai/ui/src/ui/collapsible";
+import { cn } from "@maipai/ui/src/utils";
 
 const ANIMATION_DURATION = 200;
 

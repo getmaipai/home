@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as RadixPopover from "@radix-ui/react-popover";
 import { Link } from "react-router-dom";
-import { Button } from "@/kit/ui/button";
-import { getIcon } from "@/kit/icons";
-import { useToast } from "@/kit/primitives/Toast";
-import { pauseTvNavForOverlay } from "@/shell/tvNav";
+import { Button } from "@maipai/ui/src/ui/button";
+import { getIcon } from "@maipai/ui/src/icons";
+import { useToast } from "@maipai/ui/src/primitives/Toast";
+import { pauseTvNavForOverlay } from "@maipai/ui/src/tvNav";
 import { api, type NotificationDeliveryView } from "@/lib/api";
 
 // Exported: chatMemoryChip.tsx reads this same cached list (the "memory

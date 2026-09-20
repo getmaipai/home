@@ -1,6 +1,6 @@
 import { useAuiState } from "@assistant-ui/react";
 import { Link } from "react-router-dom";
-import { getIcon } from "@/kit/icons";
+import { getIcon } from "@maipai/ui/src/icons";
 import { useMemoryState } from "@/apps/chat/chatMemoryState";
 
 const Brain = getIcon("brain");

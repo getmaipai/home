@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Page } from "@/kit/primitives/Page";
-import { Section } from "@/kit/primitives/Section";
-import { cn, FOCUS_RING } from "@/kit/utils";
-import { List } from "@/kit/primitives/List";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { getIcon } from "@/kit/icons";
+import { Page } from "@maipai/ui/src/primitives/Page";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
+import { List } from "@maipai/ui/src/primitives/List";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type PrivacyConnection } from "@/lib/api";
 
 // The privacy page every MaiPai product has to keep

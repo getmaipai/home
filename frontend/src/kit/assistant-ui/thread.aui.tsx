@@ -43,9 +43,9 @@ import { ChatTurnStats } from "@/apps/chat/chatTurnStats";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
 import { api } from "@/lib/api";
-import { Button } from "@/kit/ui/button";
-import { Skeleton } from "@/kit/ui/skeleton";
-import { cn } from "@/kit/utils";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Skeleton } from "@maipai/ui/src/ui/skeleton";
+import { cn } from "@maipai/ui/src/utils";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,

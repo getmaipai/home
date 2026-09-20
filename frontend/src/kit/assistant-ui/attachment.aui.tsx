@@ -25,21 +25,21 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/kit/ui/tooltip";
+} from "@maipai/ui/src/ui/tooltip";
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogTrigger,
-} from "@/kit/ui/dialog";
+} from "@maipai/ui/src/ui/dialog";
 import {
   Avatar,
   AvatarImage,
   AvatarFallback,
-} from "@/kit/ui/avatar";
+} from "@maipai/ui/src/ui/avatar";
 import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
 import { useAttachmentSrc } from "@/kit/assistant-ui/hooks/use-attachment-src";
-import { cn } from "@/kit/utils";
+import { cn } from "@maipai/ui/src/utils";
 
 type AttachmentPreviewProps = {
   src: string;

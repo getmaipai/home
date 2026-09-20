@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Page } from "@/kit/primitives/Page";
-import { List } from "@/kit/primitives/List";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { Checkbox } from "@/kit/ui/checkbox";
-import { Input } from "@/kit/ui/input";
-import { Button } from "@/kit/ui/button";
-import { Select } from "@/kit/primitives/Select";
-import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
-import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
+import { Page } from "@maipai/ui/src/primitives/Page";
+import { List } from "@maipai/ui/src/primitives/List";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { Checkbox } from "@maipai/ui/src/ui/checkbox";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Select } from "@maipai/ui/src/primitives/Select";
+import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { api, ApiError, isOwnerOrAdminRole, type ConversationSummary, type PersonRosterEntry, type Roster } from "@/lib/api";
-import { cn, FOCUS_RING } from "@/kit/utils";
-import { getIcon } from "@/kit/icons";
+import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
+import { getIcon } from "@maipai/ui/src/icons";
 
 interface ConversationsPageProps {
   person: Roster;

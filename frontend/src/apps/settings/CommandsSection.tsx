@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type CommandRow, type CommandAction } from "@/lib/api";
-import { Section } from "@/kit/primitives/Section";
-import { Input } from "@/kit/ui/input";
-import { Button } from "@/kit/ui/button";
-import { Select } from "@/kit/primitives/Select";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Select } from "@maipai/ui/src/primitives/Select";
 import { ROLE_LABELS, ROLE_LADDER, meetsMinRole } from "@/apps/people/roles";
 
 interface CommandsSectionProps {

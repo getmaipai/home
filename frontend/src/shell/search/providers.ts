@@ -1,20 +1,9 @@
 import { APP_CATALOG, filterApps } from "@/shell/appCatalog";
 import { api } from "@/lib/api";
 import { NAV_ENTRIES } from "@/shell/nav";
+import type { SearchGroup, SearchResultItem } from "@maipai/ui/src/search/types";
 
-export interface SearchResultItem {
-  id: string;
-  label: string;
-  sublabel?: string;
-  icon: string;
-  to: string;
-  state?: Record<string, unknown>;
-}
-
-export interface SearchGroup {
-  heading: string;
-  items: SearchResultItem[];
-}
+export type { SearchGroup, SearchResultItem };
 
 const RESULTS_PER_PROVIDER = 6;
 

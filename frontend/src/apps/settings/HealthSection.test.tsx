@@ -3,7 +3,7 @@ import { render, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { HealthSection } from "@/apps/settings/HealthSection";
-import { ToastProvider } from "@/kit/primitives/Toast";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import type { HealthStatus, Roster } from "@/lib/api";
 
 afterEach(cleanup);

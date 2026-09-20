@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Link } from "react-router-dom";
-import { Button } from "@/kit/ui/button";
-import { getIcon } from "@/kit/icons";
+import { Button } from "@maipai/ui/src/ui/button";
+import { getIcon } from "@maipai/ui/src/icons";
 import { api, type ChatModelsResponse, type ModelJob, type Roster } from "@/lib/api";
 import type { EngineHealth } from "./useEngineHealth";
 

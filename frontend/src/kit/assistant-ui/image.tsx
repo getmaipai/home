@@ -24,7 +24,7 @@ import type {
   ImageMessagePart,
   ImageMessagePartComponent,
 } from "@assistant-ui/react";
-import { cn } from "@/kit/utils";
+import { cn } from "@maipai/ui/src/utils";
 
 const extensionForMimeType = (mimeType?: string): string => {
   switch (mimeType) {

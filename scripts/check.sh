@@ -11,6 +11,34 @@ STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
 STANDARDS_DIR="$(cd "$STANDARDS_DIR" && pwd)"
 export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 
+# The @maipai/core and @maipai/ui pins (shared tags core-v0.1.0,
+# ui-v0.1.3). Bump a line here and the matching file: dependency in
+# backend/package.json or frontend/package.json together, then
+# `bun install` in that workspace.
+if [ "$DOCS_ONLY" = 0 ]; then
+  CORE_PIN="0.1.0"
+  UI_PIN="0.1.3"
+  SHARED_DIR="${MAIPAI_SHARED_DIR:-../shared}"
+  if [ ! -f "$SHARED_DIR/core/package.json" ]; then
+    echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); backend imports @maipai/core from its core/ workspace."
+    exit 1
+  fi
+  CORE_VERSION="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$SHARED_DIR/core/package.json")"
+  if [ "$CORE_VERSION" != "$CORE_PIN" ]; then
+    echo "@maipai/core at $SHARED_DIR/core is version $CORE_VERSION; this repo pins core-v$CORE_PIN. Check out the tag there or move the pin here."
+    exit 1
+  fi
+  if [ ! -f "$SHARED_DIR/ui/package.json" ]; then
+    echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); frontend imports @maipai/ui from its ui/ workspace."
+    exit 1
+  fi
+  UI_VERSION="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$SHARED_DIR/ui/package.json")"
+  if [ "$UI_VERSION" != "$UI_PIN" ]; then
+    echo "@maipai/ui at $SHARED_DIR/ui is version $UI_VERSION; this repo pins ui-v$UI_PIN. Check out the tag there or move the pin here."
+    exit 1
+  fi
+fi
+
 if [ "$DOCS_ONLY" = 0 ] && [ -d spec/schemas ]; then
   # spec/README.md: "standards/gen/ts/ and standards/gen/py/ (in the
   # sibling .github checkout) need to already be generated before home's

@@ -4,6 +4,56 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { lingui } from "@lingui/vite-plugin";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import type { Plugin } from "vite";
+
+// `@maipai/ui`'s own source files (subpath-imported directly, no dist
+// build) use `@/kit/*` as an alias meaning THEIR OWN `shared/ui/src/*`
+// (its own tsconfig.json), while Home's app code uses the SAME-LOOKING
+// `@/kit/*` meaning Home's own residual `src/kit/*` (assistant-ui, the
+// couple of pieces that stay Home-specific). `frontend/tsconfig.json`'s
+// own `@/kit/*` paths carries the identical fallback for `tsc` (its own
+// comment there has the fuller story, including a duplicate
+// `@types/react` gotcha this same distinction had to route around); this
+// plugin is Vite/Rolldown's side of the same fix, picking based on who's
+// asking rather than a fixed target a plain `resolve.alias` entry could
+// express.
+//
+// The shared-ui branch resolves through the bare `@maipai/ui/src/*`
+// package specifier (`this.resolve`, going through normal node_modules
+// resolution) rather than a raw filesystem path built from
+// `fileURLToPath` straight into `../../shared/ui/src`: a raw path reaches
+// the same file by a DIFFERENT id string than App.tsx's own direct
+// `@maipai/ui/src/...` imports use, and Rolldown treats two different id
+// strings for the same physical file as two different modules - each
+// getting its own module-scope `createContext()` call, so `Shell`'s
+// `SidebarProvider` and `AppSidebar`'s `useSidebar()` silently stopped
+// sharing one context the moment either got split into a different
+// chunk (found live: a lazy route crashing with "useSidebar must be
+// used within a SidebarProvider" despite very much being inside one).
+// Home's own residual kit has no such second resolution path to
+// collide with, so it stays a direct filesystem lookup.
+const homeKitDir = fileURLToPath(new URL("./src/kit", import.meta.url));
+function resolveHomeKitFile(rest: string): string | null {
+  for (const ext of [".tsx", ".ts"]) {
+    const candidate = `${homeKitDir}/${rest}${ext}`;
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+function kitAliasPlugin(): Plugin {
+  return {
+    name: "maipai-home-kit-alias",
+    enforce: "pre",
+    async resolveId(source, importer, options) {
+      if (!source.startsWith("@/kit/") || !importer) return null;
+      const rest = source.slice("@/kit/".length);
+      const fromSharedUi = importer.includes("/@maipai/ui/") || importer.includes("/@maipai+ui@");
+      if (!fromSharedUi) return resolveHomeKitFile(rest);
+      return this.resolve(`@maipai/ui/src/${rest}`, importer, { ...options, skipSelf: true });
+    },
+  };
+}
 
 // The backend has no CORS and a Strict-SameSite session cookie (see
 // backend/src/middleware/auth.ts), so the dev server proxies /api instead
@@ -13,6 +63,7 @@ import { fileURLToPath } from "node:url";
 // process, same origin, no proxy needed there).
 export default defineConfig({
   plugins: [
+    kitAliasPlugin(),
     react(),
     tailwindcss(),
     // Session E step 8, i18n scaffolding: `.po` catalog compile-on-
@@ -85,15 +136,44 @@ export default defineConfig({
         // for the frontend shell chunk") is route-level `import()` for
         // every app but Home and Chat (App.tsx's `lazyNamed`), which
         // dropped the entry chunk to ~1.85 MiB - back under the
-        // default, so the override is gone rather than left at a value
-        // nothing needs anymore.
+        // default, so the override was removed once nothing needed it.
+        // Home adopting `@maipai/ui` crossed 2 MiB again at first
+        // (2.17 MiB) - not from the kit's real surface after all, but
+        // from `kitAliasPlugin`'s original resolution route duplicating
+        // react/react-router-dom/@maipai/ui's own module instances across
+        // chunk boundaries (its own comment above has the story); fixing
+        // that resolution brought the entry chunk to ~1.83 MiB, under the
+        // default again, so no override is needed this time either.
       },
     }),
   ],
   resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
+    // `@/kit/*` itself is handled by `kitAliasPlugin()` above (it needs
+    // to pick a target per-importer, which a plain alias entry can't
+    // express) - excluded here (the negative lookahead) rather than left
+    // to "whichever runs first": Vite's own alias resolution matches
+    // `@/kit/*` too (a `"@"` -> path entry matches anything starting
+    // `@/`) and doesn't yield to a later plugin's `enforce: "pre"` under
+    // Rolldown, so both handling `@/kit/*` unconditionally raced and
+    // Vite's own alias won every time (found live building this fix).
+    alias: [{ find: /^@\/(?!kit\/)/, replacement: `${fileURLToPath(new URL("./src", import.meta.url))}/` }],
+    // `@maipai/ui`'s files resolve outside `frontend/`'s own tree (via
+    // `kitAliasPlugin` above, and via the plain `node_modules/@maipai/ui`
+    // symlink for its non-`@/kit` imports too) - a real react-in-a-lazy-
+    // chunk crash ("Cannot read properties of null (reading
+    // 'useContext')", PeoplePage's own async chunk bundling a second,
+    // separate copy of react's runtime alongside the entry chunk's)
+    // showed Rolldown's automatic chunk-splitting didn't always
+    // recognize those two resolution paths as the SAME physical react
+    // module once one of them crossed an async import() boundary.
+    // `dedupe` is the documented fix for exactly this class of bug:
+    // force one canonical instance regardless of which path resolved it.
+    // `react-router-dom` needed the same fix right behind it: the
+    // identical symptom one layer up (`useLocation()` throwing "may be
+    // used only in the context of a <Router>" from inside `@maipai/ui`'s
+    // own `AppSidebar`, which very much was inside one) - a second
+    // package @maipai/ui also imports directly rather than as a peer.
+    dedupe: ["react", "react-dom", "react-router-dom"],
   },
   server: {
     // Vite 6+ rejects requests whose Host header isn't localhost/an IP,

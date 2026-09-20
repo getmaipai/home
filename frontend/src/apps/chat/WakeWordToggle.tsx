@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/kit/ui/button";
-import { getIcon } from "@/kit/icons";
+import { Button } from "@maipai/ui/src/ui/button";
+import { getIcon } from "@maipai/ui/src/icons";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { WakeWordLoop } from "@/lib/voice/wake-word-loop";
 import { onWakeDetected, type WakeDetectedEvent } from "@/lib/voice/wake-word-events";
