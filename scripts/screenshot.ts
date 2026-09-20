@@ -39,7 +39,15 @@ import { chromium, webkit, type Browser, type BrowserContext } from "playwright"
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
 // spec-v0.1.0 moved this file to the sibling getmaipai/shared checkout.
-import { startStubLlmServer } from "../../shared/spec/llm/ts/stubServer";
+// SHARED-PIN-01: a fixed "../../shared/..." import read whatever tag the
+// shared/ checkout itself happened to have checked out, not necessarily
+// this repo's own pin (found live: a concurrent session's tag change
+// under ../shared broke a screenshot run mid-flight). Resolved
+// dynamically instead, below, from backend/package.json's own
+// @maipai/spec file: path - the same pinned worktree check.sh's pins
+// use. This type-only reference stays a fixed path; it's erased at
+// compile time and never read at runtime.
+type StubServerModule = typeof import("../../shared/spec/llm/ts/stubServer");
 import AxeBuilder from "@axe-core/playwright";
 import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -75,6 +83,20 @@ let DATA_DIR: string;
 let BASE_URL: string;
 const ROOT = join(import.meta.dir, "..");
 const useWebkit = process.argv.includes("--webkit");
+
+// backend/ and frontend/ pin the same @maipai/spec tag, so backend's
+// package.json is as good a source as either for the worktree this
+// script's own stub-server import (below) needs to resolve.
+function resolveSpecWorktreeDir(): string {
+  const backendPackageJson = JSON.parse(readFileSync(join(ROOT, "backend", "package.json"), "utf8")) as {
+    dependencies: Record<string, string>;
+  };
+  const specDependency = backendPackageJson.dependencies["@maipai/spec"];
+  if (!specDependency?.startsWith("file:")) {
+    throw new Error(`backend/package.json's @maipai/spec dependency isn't a file: pin: ${specDependency}`);
+  }
+  return join(ROOT, "backend", specDependency.slice("file:".length));
+}
 
 // #105's own code review found the trade this fix makes: `main()`'s own
 // `finally` block removes THIS run's DATA_DIR when it finishes, but a
@@ -1999,6 +2021,7 @@ async function main() {
   // answer for real - this branch only ever fires if routing changes to
   // send the question to the model instead. The herbs/book branches
   // stay chat-review's.
+  const { startStubLlmServer } = (await import(join(resolveSpecWorktreeDir(), "llm", "ts", "stubServer"))) as StubServerModule;
   const chatModel = startStubLlmServer(0, { chatStats: {
     usage: { prompt_tokens: 182, completion_tokens: 46, total_tokens: 228 },
     timings: { prompt_n: 182, predicted_n: 46, predicted_ms: 248, predicted_per_second: 185, cache_n: 1200 },

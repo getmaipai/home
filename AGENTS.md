@@ -25,15 +25,25 @@ see "Pinning" below); `bot` pins the same tag. Full stack standard:
 `.github`.
 
 **Pinning `getmaipai/shared`:** this repo resolves `@maipai/core`,
-`@maipai/ui` and `@maipai/spec` from a sibling `getmaipai/shared`
-checkout (`../shared` by default, override with `MAIPAI_SHARED_DIR`),
-each pinned to a tag stated in `backend/package.json` /
-`frontend/package.json` and checked by `scripts/check.sh`. Bumping a
-pin: check out the new tag in the sibling `shared/` checkout, update the
-pin in this repo's `package.json` files and in `scripts/check.sh`, then
-`bun install --force` in `backend/` and `frontend/` (a plain `bun
-install` doesn't refresh a `file:` dependency's snapshot in bun's
-content-addressed store).
+`@maipai/ui` and `@maipai/spec` each from their own immutable per-tag
+worktree, not from the sibling `getmaipai/shared` checkout itself -
+that checkout is one mutable directory any session on the machine can
+`git checkout` a different tag into, and reading it directly let one
+session's pin change silently detach every other consumer underneath
+it (SHARED-PIN-01, `shared/docs/dev.md`). `scripts/check.sh` calls
+`shared`'s own `scripts/ensure-tag.sh <workspace> <tag>` for each pin,
+which creates `../shared-tags/<workspace>-<tag>` as a detached worktree
+of that tag the first time it's asked for and reuses it after (`../
+shared` by default for locating the `shared` repo itself, override
+with `MAIPAI_SHARED_DIR`). Each `package.json` `file:` dependency names
+that same worktree path directly (e.g. `file:../../shared-tags/
+core-core-v0.1.0/core`). Bumping a pin is therefore two edits: the tag
+string in `scripts/check.sh` and the matching `file:` path in
+`backend/package.json` or `frontend/package.json`, then run
+`scripts/check.sh` (it creates the new tag's worktree if this is the
+first consumer to ask for it) followed by `bun install --force` in
+`backend/` and `frontend/` (a plain `bun install` doesn't refresh a
+`file:` dependency's snapshot in bun's content-addressed store).
 
 Commands: from the repo root (the `home/` folder containing `package.json`),
 `bun start` builds and starts the local app in the background and prints
@@ -47,7 +57,8 @@ full pre-commit gate: it needs a sibling `getmaipai/.github` checkout
 (`../.github` by default, override with `MAIPAI_STANDARDS_DIR`, which may be
 relative to the repo root) with its
 own `gen/ts` and `gen/py` already generated, and a sibling
-`getmaipai/shared` checkout at the pinned tags (see "Pinning" above), or
-the gate fails with a "missing" error that looks unrelated to what you
-changed.
+`getmaipai/shared` checkout present with the pinned tags fetched (see
+"Pinning" above - the gate resolves each into its own worktree itself),
+or the gate fails with a "missing" error that looks unrelated to what
+you changed.
 A commit that touches only docs runs `bash scripts/check.sh --docs` instead (the reading-level lint plus the standards core, seconds not minutes).

@@ -18403,3 +18403,94 @@ confirming they predate this work.
   `docs/BACKLOG.md`.
 - Engines/Packages/Updates/Repairs/Backups (the Manage nav group) -
   HOME-STACK-04, unchanged by this item.
+
+## Pins moved to per-tag worktrees (SHARED-PIN-01, 2026-09-20)
+
+Found live: `scripts/check.sh`'s pin check and every `file:` dependency
+in `backend/package.json`/`frontend/package.json` read whatever tag the
+sibling `getmaipai/shared` checkout happened to have checked out - one
+mutable directory shared by every session on the machine. A session
+gating Home at `ui-v0.2.4` ran `git checkout ui-v0.2.4` in `../shared`,
+which silently detached every other consumer and session reading that
+same directory underneath it. `getmaipai/shared`'s own
+`scripts/ensure-tag.sh` (landed the same day, `shared/docs/dev.md`) is
+the fix: it resolves a `<workspace> <tag>` pair to an immutable
+`../shared-tags/<workspace>-<tag>` `git worktree`, created once and
+reused after, refusing a tag `shared` doesn't have.
+
+Adopted here: `backend/package.json` and `frontend/package.json`'s
+`@maipai/core`/`@maipai/ui`/`@maipai/spec` `file:` paths now name a
+worktree directly (e.g. `file:../../shared-tags/core-core-v0.1.0/
+core`) instead of the shared sibling checkout; `scripts/check.sh` calls
+`ensure-tag.sh` for each pin before `bun install` and checks the
+resolved worktree's own `package.json` version against the tag (the
+same honesty-of-the-pin contract as before, just reading a worktree
+instead of the mutable checkout). `AGENTS.md`'s "Pinning" section
+rewritten to match: bumping a pin is now two edits - the tag string in
+`scripts/check.sh` and the matching `file:` path - then
+`scripts/check.sh` (creates the new tag's worktree if needed) and
+`bun install --force`.
+
+`scripts/screenshot.ts`'s `import { startStubLlmServer } from
+"../../shared/spec/llm/ts/stubServer"` got the same treatment,
+COORDINATOR calling out that a script the release skill runs is a gate
+in practice even though `check.sh` doesn't wire it in directly: that
+fixed relative path read whatever `shared/` had checked out, the exact
+bug this item exists to fix, and A lost an hour to it live the same
+day. Resolved dynamically instead - `resolveSpecWorktreeDir()` reads
+`backend/package.json`'s own `@maipai/spec` `file:` path (backend and
+frontend pin the same tag, so either would do) and the actual
+`import()` is a computed path built from it; only a `typeof import(...)`
+type reference stays a fixed path, erased at compile time and never
+read at runtime. `bun run a11y` (part of `check.sh`) exercises this
+same code path on every gate run.
+
+Also found along the way, not part of this item's own worktree
+mechanism but the reason it was blocked at first: `ui-v0.3.1`,
+`ui-v0.3.2` and `ui-v0.3.3` were never git-tagged in `shared` despite
+their commit messages and this repo's own `UI_PIN` already naming
+`0.3.3` - `ensure-tag.sh` correctly refused the unknown tag until
+COORDINATOR had them cut (verified against each commit's own
+`package.json` version and `CHANGELOG.md` entry first; hashes in
+`shared`'s own dev doc).
+
+**A medium-effort review of this diff found two real issues, both
+before commit:**
+1. The first version of the settings-registry drift check pointed
+   `gen:settings`'s own `MAIPAI_SHARED_DIR` straight at the resolved
+   `spec` worktree and let it write `spec/settings/keys.json` there -
+   silently reintroducing SHARED-PIN-01 inside its own fix, since that
+   worktree is a cache every consumer pinning `spec-v0.1.1` shares
+   (`bot` included), not this repo's private scratch space. Fixed:
+   the drift check now seeds a private `mktemp -d` scratch directory
+   with the worktree's own committed `keys.json` (`git show
+   HEAD:spec/settings/keys.json`, read-only), generates into the
+   scratch copy, diffs the two, and removes the scratch directory
+   after - the worktree's working tree is never written to. Verified
+   live: `git status` inside `../shared-tags/spec-spec-v0.1.1` stayed
+   clean through a full `scripts/check.sh` run.
+2. `@maipai/ui`'s own `package.json` depends on `@maipai/spec` via a
+   bare relative `file:../spec`, resolved from wherever `ui` itself is
+   checked out. Before this item, `ui` and `spec` were always read
+   from the same single mutable `shared/` checkout, so that nested
+   dependency and this repo's own direct `@maipai/spec` pin were
+   mechanically guaranteed to be the same commit. After this item,
+   they resolve from two independently-pinned tags' worktrees, and
+   nothing keeps them in sync going forward - a real duplicate-
+   instance risk (two physically separate `@maipai/spec` copies is not
+   new, `bun`'s `file:` dependencies already always copy rather than
+   link; a version divergence between the two copies is new). Checked
+   live: `ui-v0.3.3`'s own nested `spec/` and this repo's directly
+   pinned `spec-v0.1.1` currently match byte-for-byte except one
+   docs-only file, so there's no live break today. Not fixed here -
+   the fix belongs in `shared`'s own tagging discipline (should `ui`
+   pin an exact spec tag internally instead of a bare relative path?),
+   not in a consumer's pin adoption - flagged to COORDINATOR as a
+   `shared`-repo follow-up.
+
+**Verification**: `scripts/check.sh` green end to end (backend install,
+settings/API-docs drift checks including the scratch-dir `spec` diff,
+backend and frontend test/lint/build, the `a11y` step exercising the
+new dynamic stub-server import, standards core) with the new pin
+resolution live - not just typechecked. The `spec` tag worktree
+confirmed clean (`git status --short`) before and after the run.

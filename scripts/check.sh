@@ -15,12 +15,21 @@ STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
 STANDARDS_DIR="$(cd "$STANDARDS_DIR" && pwd)"
 export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 
-# The @maipai/core and @maipai/ui pins (shared tags core-v0.1.0,
-# ui-v0.3.3). Bump a line here and the matching file: dependency in
-# backend/package.json or frontend/package.json together, then
+# The @maipai/core, @maipai/ui and @maipai/spec pins, each a full shared
+# tag name (not a bare version - core-v0.1.0, ui-v0.3.3, spec-v0.1.1).
+# Each resolves to its own immutable per-tag worktree via getmaipai/
+# shared's scripts/ensure-tag.sh (SHARED-PIN-01, 2026-09-20) instead of
+# reading whatever the shared/ checkout itself happens to have checked
+# out - that checkout is one mutable directory shared by every session
+# on the machine, and reading it directly let one session's `git
+# checkout` there silently detach every other consumer's install
+# underneath it (found live: a session gating Home at ui-v0.2.4 did
+# exactly this). Bumping a pin is now two edits - the tag string here,
+# and the matching file: dependency in backend/package.json or
+# frontend/package.json (it names the same tag in its own path) - then
 # `bun install --force` in that workspace (a plain `bun install` does
-# not refresh @maipai/ui's file: dependency snapshot in bun's
-# content-addressed store - found live, step 5a, docs/dev.md).
+# not refresh a file: dependency's snapshot in bun's content-addressed
+# store - found live, step 5a, docs/dev.md).
 #
 # UI_PIN sat stale at 0.2.4 through ui-v0.3.0/0.3.1/0.3.2 (HOME-UI-01
 # and HOME-UI-02 both adopted a newer kit without ever bumping this
@@ -28,43 +37,46 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 # cherry-picking a77cbce8, closed here rather than left for the next
 # session to hit cold.
 if [ "$DOCS_ONLY" = 0 ]; then
-  CORE_PIN="0.1.0"
-  UI_PIN="0.3.3"
-  SPEC_PIN="0.1.1"
-  SHARED_DIR="${MAIPAI_SHARED_DIR:-../shared}"
-  if [ ! -d "$SHARED_DIR" ]; then
-    echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."
+  CORE_TAG="core-v0.1.0"
+  UI_TAG="ui-v0.3.3"
+  SPEC_TAG="spec-v0.1.1"
+  SHARED_REPO="${MAIPAI_SHARED_DIR:-../shared}"
+  if [ ! -d "$SHARED_REPO" ]; then
+    echo "getmaipai/shared is missing at $SHARED_REPO (set MAIPAI_SHARED_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."
     exit 1
   fi
-  SHARED_DIR="$(cd "$SHARED_DIR" && pwd)"
-  export MAIPAI_SHARED_DIR="$SHARED_DIR"
-  if [ ! -f "$SHARED_DIR/core/package.json" ]; then
-    echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); backend imports @maipai/core from its core/ workspace."
-    exit 1
-  fi
-  CORE_VERSION="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$SHARED_DIR/core/package.json")"
-  if [ "$CORE_VERSION" != "$CORE_PIN" ]; then
-    echo "@maipai/core at $SHARED_DIR/core is version $CORE_VERSION; this repo pins core-v$CORE_PIN. Check out the tag there or move the pin here."
-    exit 1
-  fi
-  if [ ! -f "$SHARED_DIR/ui/package.json" ]; then
-    echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); frontend imports @maipai/ui from its ui/ workspace."
-    exit 1
-  fi
-  UI_VERSION="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$SHARED_DIR/ui/package.json")"
-  if [ "$UI_VERSION" != "$UI_PIN" ]; then
-    echo "@maipai/ui at $SHARED_DIR/ui is version $UI_VERSION; this repo pins ui-v$UI_PIN. Check out the tag there or move the pin here."
-    exit 1
-  fi
-  if [ ! -f "$SHARED_DIR/spec/package.json" ]; then
-    echo "getmaipai/shared is missing at $SHARED_DIR (set MAIPAI_SHARED_DIR); backend and frontend import @maipai/spec from its spec/ workspace."
-    exit 1
-  fi
-  SPEC_VERSION="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$SHARED_DIR/spec/package.json")"
-  if [ "$SPEC_VERSION" != "$SPEC_PIN" ]; then
-    echo "@maipai/spec at $SHARED_DIR/spec is version $SPEC_VERSION; this repo pins spec-v$SPEC_PIN. Check out the tag there or move the pin here."
-    exit 1
-  fi
+  SHARED_REPO="$(cd "$SHARED_REPO" && pwd)"
+
+  # Resolves one workspace's pin to its tag worktree (creating it via
+  # ensure-tag.sh if no consumer has asked for that tag yet, reusing it
+  # otherwise) and checks the worktree's own package.json version
+  # against the tag name, the same honesty-of-the-pin contract the
+  # standards core already uses - this only ever fires if a tag itself
+  # were cut against the wrong commit, since ensure-tag.sh has already
+  # confirmed the tag exists and the worktree is really checked out
+  # there. Prints the worktree path on stdout.
+  ensure_pin() {
+    local workspace="$1"
+    local tag="$2"
+    local expected_version="${tag#"$workspace"-v}"
+    local dir
+    dir="$(bash "$SHARED_REPO/scripts/ensure-tag.sh" "$workspace" "$tag")"
+    if [ ! -f "$dir/$workspace/package.json" ]; then
+      echo "$tag's worktree at $dir has no $workspace/package.json - check the workspace name." >&2
+      exit 1
+    fi
+    local actual_version
+    actual_version="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$dir/$workspace/package.json")"
+    if [ "$actual_version" != "$expected_version" ]; then
+      echo "@maipai/$workspace at $dir/$workspace is version $actual_version, but its own tag is $tag - the tag was cut against the wrong commit in getmaipai/shared." >&2
+      exit 1
+    fi
+    echo "$dir"
+  }
+
+  CORE_DIR="$(ensure_pin core "$CORE_TAG")"
+  UI_DIR="$(ensure_pin ui "$UI_TAG")"
+  SPEC_DIR="$(ensure_pin spec "$SPEC_TAG")"
 fi
 
 if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
@@ -72,12 +84,24 @@ if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
   bun install --silent
 
   echo "== backend: settings registry, regenerate and check for drift"
-  (cd backend && bun run gen:settings >/dev/null)
-  if ! git -C "$SHARED_DIR" diff --quiet -- spec/settings/keys.json; then
-    echo "$SHARED_DIR/spec/settings/keys.json is out of date with backend/src/settings/coreKeys.ts. Run 'bun run gen:settings' in backend/ and commit the result in getmaipai/shared."
-    git -C "$SHARED_DIR" --no-pager diff --stat -- spec/settings/keys.json
+  # $SPEC_DIR is a per-tag worktree shared by every consumer pinning
+  # spec-v0.1.1 (home, bot, and any other session's check.sh run) - a
+  # review on this same item caught an earlier version of this step
+  # writing gen:settings' own output straight into it, silently
+  # reintroducing SHARED-PIN-01 inside its own fix. Generated into a
+  # private scratch directory instead and compared there, never
+  # touching the worktree's working tree at all.
+  SETTINGS_SCRATCH="$(mktemp -d)"
+  mkdir -p "$SETTINGS_SCRATCH/spec/settings"
+  git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json > "$SETTINGS_SCRATCH/spec/settings/keys.json"
+  (cd backend && MAIPAI_SHARED_DIR="$SETTINGS_SCRATCH" bun run gen:settings >/dev/null)
+  if ! diff -q "$SETTINGS_SCRATCH/spec/settings/keys.json" <(git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json) >/dev/null; then
+    echo "backend/src/settings/coreKeys.ts no longer matches spec/settings/keys.json as pinned at $SPEC_TAG. Run 'bun run gen:settings' in backend/ (with MAIPAI_SHARED_DIR pointed at a scratch copy, not $SPEC_DIR - that worktree is shared and read-only), then fix and re-tag spec/settings/keys.json in getmaipai/shared's own main checkout and bump the pin here."
+    diff -u <(git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json) "$SETTINGS_SCRATCH/spec/settings/keys.json" || true
+    rm -rf "$SETTINGS_SCRATCH"
     exit 1
   fi
+  rm -rf "$SETTINGS_SCRATCH"
 
   echo "== backend: API docs, regenerate and check for drift"
   (cd backend && bun run gen:api-docs >/dev/null)
