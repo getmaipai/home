@@ -6301,7 +6301,7 @@ approvals are still real, unstarted work for a future session.
       /api/store/catalog` (or similar) that returns the verified
       index's target list; the pinned index URL and the root public
       key(s) as settings, declared once the way every other settings
-      key is (`getmaipai/shared`'s `spec/settings/` declaration source,
+      key is (`getmaipai/commons`'s `spec/settings/` declaration source,
       `backend/src/lib/settingsRegistry.ts` reads the generated
       registry - see an existing declared key for the pattern). Test:
       mirror `backend/tests/storeIndex.test.ts`'s own scripted-index
@@ -6335,7 +6335,7 @@ approvals are still real, unstarted work for a future session.
       override from `tokens.css`. Added a 1000px viewport to
       `scripts/screenshot.ts` to exercise the 960-1024px gap.
 - [ ] **Chat's empty state and message turns don't yet match
-      `shared/ui/docs/spec.md`'s Chat section** (M) - found live, step
+      `commons/ui/docs/spec.md`'s Chat section** (M) - found live, step
       5b (2026-09-20), judging the acceptance screenshot set against the
       spec text just landed alongside it. Three gaps, all pre-existing
       (`thread.aui.tsx` moved into `apps/chat/` largely unchanged per
@@ -6358,18 +6358,18 @@ approvals are still real, unstarted work for a future session.
       same five-state screenshot set re-opened and matching spec.md's
       "Empty, loading, error" and "Thread" text.
 - [ ] **TV-focusable nav rail, regressed by the `@maipai/ui` kit adoption**
-      (M) - `ui-v0.1.0` through `0.1.3` (`shared/ui`, pinned 2026-09-20)
+      (M) - `ui-v0.1.0` through `0.1.3` (`commons/ui`, pinned 2026-09-20)
       has no `@noriginmedia/norigin-spatial-navigation` rail the way
       Home's own pre-adoption `shell/Shell.tsx`/`shell/tvNav.ts` did (see
       the now-`[x]` "Two render profiles per component, near and far"
       item below, whose hand-built rail this replaced and whose
       dependency this repo's `frontend/package.json` dropped as
-      orphaned). Tracked upstream, not dropped: `shared/docs/BACKLOG.md`
+      orphaned). Tracked upstream, not dropped: `commons/docs/BACKLOG.md`
       carries the real fix as a kit-level item (needs a design pass on
       how a focusable rail composes with `Shell.tsx`'s generic
       `NavGroup`/`NavEntry` props first). Home's own `AppShell.tsx`
       points here. Exit check: `home/scripts/check.sh` green once
-      `shared/ui` ships the rail and Home re-pins.
+      `commons/ui` ships the rail and Home re-pins.
 - [x] Person edit and delete (M) - done 2026-09-05. `PATCH`/`DELETE`
       `/api/people/:id` plus `POST /api/people/batch-delete`, the rules
       in `lib/personLifecycle.ts`, and real UI with multi-select. A

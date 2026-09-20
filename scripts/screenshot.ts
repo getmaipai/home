@@ -38,16 +38,16 @@
 import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
-// spec-v0.1.0 moved this file to the sibling getmaipai/shared checkout.
-// SHARED-PIN-01: a fixed "../../shared/..." import read whatever tag the
-// shared/ checkout itself happened to have checked out, not necessarily
+// spec-v0.1.0 moved this file to the sibling getmaipai/commons checkout.
+// SHARED-PIN-01: a fixed "../../commons/..." import read whatever tag the
+// commons/ checkout itself happened to have checked out, not necessarily
 // this repo's own pin (found live: a concurrent session's tag change
 // under ../shared broke a screenshot run mid-flight). Resolved
 // dynamically instead, below, from backend/package.json's own
 // @maipai/spec file: path - the same pinned worktree check.sh's pins
 // use. This type-only reference stays a fixed path; it's erased at
 // compile time and never read at runtime.
-type StubServerModule = typeof import("../../shared/spec/llm/ts/stubServer");
+type StubServerModule = typeof import("../../commons/spec/llm/ts/stubServer");
 import AxeBuilder from "@axe-core/playwright";
 import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -1604,7 +1604,7 @@ async function captureLazyRouteSkeleton(browser: Browser, sessionValue: string):
   }
 }
 
-/** getmaipai/home step 5b's own restart-verification: shared/ui's Shell
+/** getmaipai/home step 5b's own restart-verification: commons/ui's Shell
  * (`ui/src/Shell.tsx`) owns the left rail, its collapse toggle
  * (`SidebarTrigger`, its accessible name "Collapse navigation"/"Expand
  * navigation" since the owner's "The collapsed rail" finding gave it

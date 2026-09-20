@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # MaiPai Home pre-commit gate. Checks the @maipai/core, @maipai/ui and
-# @maipai/spec pins against getmaipai/shared, runs the backend's checks
-# (including the settings registry drift check against shared/spec),
+# @maipai/spec pins against getmaipai/commons, runs the backend's checks
+# (including the settings registry drift check against commons/spec),
 # then the frontend's, then the pinned @maipai/standards core. See
 # docs/dev.md. @maipai/spec's own checks (lint, tests, codegen drift)
-# run in shared's own check.sh, not here - this repo just pins a tag.
+# run in commons's own check.sh, not here - this repo just pins a tag.
 # With --docs it runs only the reading-level lint and the standards core, the gate for a commit that touches only Markdown.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -15,11 +15,11 @@ STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
 STANDARDS_DIR="$(cd "$STANDARDS_DIR" && pwd)"
 export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 
-# The @maipai/core, @maipai/ui and @maipai/spec pins, each a full shared
+# The @maipai/core, @maipai/ui and @maipai/spec pins, each a full commons
 # tag name (not a bare version - core-v0.1.0, ui-v0.3.3, spec-v0.1.1).
 # Each resolves to its own immutable per-tag worktree via getmaipai/
-# shared's scripts/ensure-tag.sh (SHARED-PIN-01, 2026-09-20) instead of
-# reading whatever the shared/ checkout itself happens to have checked
+# commons's scripts/ensure-tag.sh (SHARED-PIN-01, 2026-09-20) instead of
+# reading whatever the commons/ checkout itself happens to have checked
 # out - that checkout is one mutable directory shared by every session
 # on the machine, and reading it directly let one session's `git
 # checkout` there silently detach every other consumer's install
@@ -40,9 +40,9 @@ if [ "$DOCS_ONLY" = 0 ]; then
   CORE_TAG="core-v0.1.0"
   UI_TAG="ui-v0.4.0"
   SPEC_TAG="spec-v0.1.2"
-  SHARED_REPO="${MAIPAI_SHARED_DIR:-../shared}"
+  SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
   if [ ! -d "$SHARED_REPO" ]; then
-    echo "getmaipai/shared is missing at $SHARED_REPO (set MAIPAI_SHARED_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."
+    echo "getmaipai/commons is missing at $SHARED_REPO (set MAIPAI_COMMONS_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."
     exit 1
   fi
   SHARED_REPO="$(cd "$SHARED_REPO" && pwd)"
@@ -68,7 +68,7 @@ if [ "$DOCS_ONLY" = 0 ]; then
     local actual_version
     actual_version="$(sed -n 's/^  "version": "\([^"]*\)",$/\1/p' "$dir/$workspace/package.json")"
     if [ "$actual_version" != "$expected_version" ]; then
-      echo "@maipai/$workspace at $dir/$workspace is version $actual_version, but its own tag is $tag - the tag was cut against the wrong commit in getmaipai/shared." >&2
+      echo "@maipai/$workspace at $dir/$workspace is version $actual_version, but its own tag is $tag - the tag was cut against the wrong commit in getmaipai/commons." >&2
       exit 1
     fi
     echo "$dir"
@@ -94,9 +94,9 @@ if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
   SETTINGS_SCRATCH="$(mktemp -d)"
   mkdir -p "$SETTINGS_SCRATCH/spec/settings"
   git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json > "$SETTINGS_SCRATCH/spec/settings/keys.json"
-  (cd backend && MAIPAI_SHARED_DIR="$SETTINGS_SCRATCH" bun run gen:settings >/dev/null)
+  (cd backend && MAIPAI_COMMONS_DIR="$SETTINGS_SCRATCH" bun run gen:settings >/dev/null)
   if ! diff -q "$SETTINGS_SCRATCH/spec/settings/keys.json" <(git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json) >/dev/null; then
-    echo "backend/src/settings/coreKeys.ts no longer matches spec/settings/keys.json as pinned at $SPEC_TAG. Run 'bun run gen:settings' in backend/ (with MAIPAI_SHARED_DIR pointed at a scratch copy, not $SPEC_DIR - that worktree is shared and read-only), then fix and re-tag spec/settings/keys.json in getmaipai/shared's own main checkout and bump the pin here."
+    echo "backend/src/settings/coreKeys.ts no longer matches spec/settings/keys.json as pinned at $SPEC_TAG. Run 'bun run gen:settings' in backend/ (with MAIPAI_COMMONS_DIR pointed at a scratch copy, not $SPEC_DIR - that worktree is shared and read-only), then fix and re-tag spec/settings/keys.json in getmaipai/commons's own main checkout and bump the pin here."
     diff -u <(git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json) "$SETTINGS_SCRATCH/spec/settings/keys.json" || true
     rm -rf "$SETTINGS_SCRATCH"
     exit 1

@@ -19,24 +19,24 @@ hard-won logic, never a requirement of feature scope.
 
 Layout: `backend/` (Bun, Hono, Zod, Drizzle/SQLite), `frontend/` (React,
 Vite). The shared record shapes, interpreters, and fixtures live in
-`getmaipai/shared`'s `spec/` workspace (`@maipai/spec`, pinned by tag -
+`getmaipai/commons`'s `spec/` workspace (`@maipai/spec`, pinned by tag -
 see "Pinning" below); `bot` pins the same tag. Full stack standard:
 [STACK.md](https://github.com/getmaipai/.github/blob/main/STACK.md) in
 `.github`.
 
-**Pinning `getmaipai/shared`:** this repo resolves `@maipai/core`,
+**Pinning `getmaipai/commons`:** this repo resolves `@maipai/core`,
 `@maipai/ui` and `@maipai/spec` each from their own immutable per-tag
-worktree, not from the sibling `getmaipai/shared` checkout itself -
+worktree, not from the sibling `getmaipai/commons` checkout itself -
 that checkout is one mutable directory any session on the machine can
 `git checkout` a different tag into, and reading it directly let one
 session's pin change silently detach every other consumer underneath
-it (SHARED-PIN-01, `shared/docs/dev.md`). `scripts/check.sh` calls
-`shared`'s own `scripts/ensure-tag.sh <workspace> <tag>` for each pin,
-which creates `../shared-tags/<workspace>-<tag>` as a detached worktree
+it (SHARED-PIN-01, `commons/docs/dev.md`). `scripts/check.sh` calls
+`commons`'s own `scripts/ensure-tag.sh <workspace> <tag>` for each pin,
+which creates `../commons-tags/<workspace>-<tag>` as a detached worktree
 of that tag the first time it's asked for and reuses it after (`../
-shared` by default for locating the `shared` repo itself, override
-with `MAIPAI_SHARED_DIR`). Each `package.json` `file:` dependency names
-that same worktree path directly (e.g. `file:../../shared-tags/
+commons` by default for locating the `commons` repo itself, override
+with `MAIPAI_COMMONS_DIR`). Each `package.json` `file:` dependency names
+that same worktree path directly (e.g. `file:../../commons-tags/
 core-core-v0.1.0/core`). Bumping a pin is therefore two edits: the tag
 string in `scripts/check.sh` and the matching `file:` path in
 `backend/package.json` or `frontend/package.json`, then run
@@ -57,7 +57,7 @@ full pre-commit gate: it needs a sibling `getmaipai/.github` checkout
 (`../.github` by default, override with `MAIPAI_STANDARDS_DIR`, which may be
 relative to the repo root) with its
 own `gen/ts` and `gen/py` already generated, and a sibling
-`getmaipai/shared` checkout present with the pinned tags fetched (see
+`getmaipai/commons` checkout present with the pinned tags fetched (see
 "Pinning" above - the gate resolves each into its own worktree itself),
 or the gate fails with a "missing" error that looks unrelated to what
 you changed.

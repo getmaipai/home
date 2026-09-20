@@ -22,7 +22,7 @@ import type { Plugin } from "vite";
 // The shared-ui branch resolves through the bare `@maipai/ui/src/*`
 // package specifier (`this.resolve`, going through normal node_modules
 // resolution) rather than a raw filesystem path built from
-// `fileURLToPath` straight into `../../shared/ui/src`: a raw path reaches
+// `fileURLToPath` straight into `../../commons/ui/src`: a raw path reaches
 // the same file by a DIFFERENT id string than App.tsx's own direct
 // `@maipai/ui/src/...` imports use, and Rolldown treats two different id
 // strings for the same physical file as two different modules - each
