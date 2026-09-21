@@ -412,6 +412,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // `args`/`argsText`: the wire never carries the tool's own
             // call arguments, only its result.
             const structuredPart = event.value.structured_part;
+            // SHELL-02 slice 4: the artifact record's own writer
+            // (ARTIFACT-02, composer.ts's `artifactForOutcomes()`)
+            // names only which version a turn minted or updated
+            // ({id, version}), never the body - a real
+            // ToolCallMessagePart here, `toolName: "write_document"`
+            // (the one bundled package that writes this record today),
+            // so the Elements' registered artifact-card render
+            // (NextChatPage.tsx) can fetch the full version and open
+            // it in canvas-split on click.
+            const artifact = event.value.artifact;
             // Fix B4 (docs/dev.md's "Chat reliability" B4): the same
             // metadata shape chatHistoryAdapter.ts attaches on reload, so
             // chatSourceCaption.tsx renders identically whether a message
@@ -445,6 +455,18 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                         args: {},
                         argsText: "",
                         result: structuredPart,
+                      },
+                    ]
+                  : []),
+                ...(artifact
+                  ? [
+                      {
+                        type: "tool-call" as const,
+                        toolCallId: `${event.value.turn_id}-artifact`,
+                        toolName: "write_document",
+                        args: {},
+                        argsText: "",
+                        result: artifact,
                       },
                     ]
                   : []),

@@ -311,6 +311,7 @@ const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
+const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 
 interface RouteSpec {
   slug: string;
@@ -2343,6 +2344,64 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   }
 }
 
+/** SHELL-02 slice 4's own stated acceptance ("a real 'write me a short
+ * note about X' turn... the deterministic capture"): "pizza night" is
+ * the stub model's own scripted `scriptedToolCalls` branch (main()'s
+ * `startStubLlmServer` call below) - a real tool_calls completion
+ * through the real turn engine and the real write_document package
+ * (recipe.json's `artifact` op), not a Home-fabricated card. The
+ * routing side needs no scripting of its own, but does need a real
+ * "command" shape: write_document has no `routing.patterns` of its own
+ * (only `examples`, which `commandOpenersFrom()` never reads), so a
+ * bare "write me..." opener reads as an ordinary statement, not a
+ * command - `utteranceShape.ts`'s own `COURTESY_PREFIX` ("could/would/
+ * can/will you...") is what reliably lands `shape: "command"` instead
+ * (`selectOfferedTools()`'s own comment - a command shape offers its
+ * top-ranked candidates regardless of TIER2_AMBIGUOUS_FLOOR, unlike an
+ * ordinary statement or question), the same reason this prompt doesn't
+ * need seedWeatherCache()'s kind of fixture. Clicking the card and
+ * waiting on the canvas's own document body proves the whole chain:
+ * the artifact tool-call part, the card's own api.artifactCurrent()
+ * fetch, and the canvas-split Element's real content, not just that
+ * the turn completed. */
+async function captureNextChatArtifactReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextChatArtifactReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "dark", sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/next/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).fill("Could you write me a short note about pizza night?");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    // The artifact-card Element's own root slot, standalone in the
+    // message flow (ArtifactTool's own `display: "standalone"`).
+    await page.locator('[data-slot="artifact-card"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-slot="artifact-card"]').click();
+    // The canvas-split Element's own document body, real content
+    // fetched through api.artifactCurrent() - not the card's loading
+    // placeholder.
+    await page.locator('[data-slot="canvas-split-body"]').waitFor({ timeout: 15000 });
+    await settleAnimations(page);
+    const path = join(outDir, `next-chat-artifact-${viewport.width}-dark.png`);
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+    await page.close();
+  } finally {
+    await context.close();
+  }
+}
+
 /** SHELL-05's own acceptance ("1440 and 390... captures dark/light"):
  * both viewports, both themes, of `/next/settings`. Waits on "Family
  * name", a real, always-present basic key under Household > System
@@ -2893,6 +2952,27 @@ async function main() {
   const chatModel = startStubLlmServer(0, { chatStats: {
     usage: { prompt_tokens: 182, completion_tokens: 46, total_tokens: 228 },
     timings: { prompt_n: 182, predicted_n: 46, predicted_ms: 248, predicted_per_second: 185, cache_n: 1200 },
+  }, scriptedToolCalls: (request) => {
+    // SHELL-02 slice 4's own capture (captureNextChatArtifactReview):
+    // checked before scriptedChatReply, so every other capture's turn
+    // falls through to it unchanged. "pizza night" is unique to that
+    // one prompt; the real write_document package (recipe.json) turns
+    // these args into the real artifact record, so nothing about the
+    // card or the canvas panel is scripted past this one model call.
+    const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    if (!text.includes("pizza night")) return undefined;
+    return [{
+      id: "call-write-document",
+      type: "function",
+      function: {
+        name: "write_document",
+        arguments: JSON.stringify({
+          title: "Pizza Night",
+          kind: "markdown",
+          body: "Every Friday night, the whole family makes pizza together. Everyone picks their own toppings, and the little ones help roll out the dough.",
+        }),
+      },
+    }];
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
@@ -3120,6 +3200,10 @@ async function main() {
 
     if (nextBackupsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview) {
       await captureNextBackupsReview(browser, sessionValue);
+    }
+
+    if (nextChatArtifactReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview) {
+      await captureNextChatArtifactReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

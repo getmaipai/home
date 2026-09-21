@@ -49,6 +49,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { recordEpisodes, deleteEpisodesForTurns } from "@/lib/episodes";
 import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
+import { artifactsByTurn } from "@/lib/artifacts";
 import { nextHlc, compareHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
@@ -1159,10 +1160,17 @@ export function listConversationTurns(
   // the point is never showing a minor's own reasoning back to THEM,
   // not withholding it from a parent's oversight.
   const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
+  // artifacts.ts's own visibleArtifactRow() access check, inlined
+  // rather than called per row (it would re-fetch the same turn row
+  // `r` already is): a child sees an artifact only from their own
+  // turn (already true of every row here, per getConversation()'s own
+  // access rule above) and only when that turn wasn't safety-refused.
+  const artifactByTurn = artifactsByTurn(rows.map((r) => r.id));
 
   return { ok: true, value: rows.map((r) => {
     const { media: rawMedia, reasoning, ...row } = r;
-    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== null && !dropReasoning ? { reasoning } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    const artifact = actor.role === "child" && r.safetyAction === "refuse" ? undefined : artifactByTurn.get(r.id);
+    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== null && !dropReasoning ? { reasoning } : {}), ...(artifact ? { artifact } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 

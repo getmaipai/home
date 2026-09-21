@@ -59,6 +59,25 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.metadata!.custom!.sources).toEqual(sources);
   });
 
+  // SHELL-02 slice 4: canvas-split's own acceptance ("this slice must
+  // survive reload") - a row carrying `artifact` ({id, version},
+  // conversationHistory.ts's own reload-path twin of the live `done`
+  // event) becomes the same real tool-call part chatModelAdapter.ts
+  // builds live, alongside the reply text (not instead of it).
+  test("a row carrying an artifact becomes a real tool-call part alongside the reply text", () => {
+    const row = { ...makeRow("row-1", "Wrote it."), artifact: { id: "art-example123", version: 2 } };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "text", text: "Wrote it." },
+      { type: "tool-call", toolCallId: "row-1-artifact", toolName: "write_document", args: {}, argsText: "", result: { id: "art-example123", version: 2 } },
+    ]);
+  });
+
+  test("a row with no artifact keeps the plain reply text, unchanged", () => {
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "just a reply")], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toBe("just a reply");
+  });
+
   test("a row without sources leaves metadata.custom.sources undefined, not a crash", () => {
     const items = flatten(rowsToBranchableMessages([makeRow("row-1", "a reply")], "Nova", "conv-example123"));
     expect(items[1]!.message.metadata!.custom!.sources).toBeUndefined();

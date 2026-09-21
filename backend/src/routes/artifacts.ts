@@ -7,7 +7,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Artifact } from "@maipai/spec/gen/ts/artifact.js";
 import { requireAuth } from "@/middleware/auth";
-import { getArtifactRow, visibleArtifactRow, toArtifact } from "@/lib/artifacts";
+import { getArtifactRow, currentArtifactRow, visibleArtifactRow, toArtifact } from "@/lib/artifacts";
 import type { AppEnv } from "@/types";
 
 export const artifactsRoutes = apiRouter();
@@ -37,6 +37,38 @@ artifactsRoutes.openapi(getArtifactRoute, (c) => {
   const row = getArtifactRow(c.req.valid("param").id);
   if (!row || !visibleArtifactRow(actor, row)) return c.json({ error: "artifact not found" }, 404);
   return c.json(toArtifact(row), 200);
+});
+
+// SHELL-02 slice 4: canvas-split's own acceptance ("a later turn's
+// update to the same artifact id replaces the pane's content") reads
+// naturally through here rather than needing the frontend to track
+// `artifactKey` at all (Home-internal, never on the wire) - resolve
+// `id` to its own key, then to whichever version is `isCurrent` right
+// now (`currentArtifactRow()`, already used by `updateArtifact()`'s
+// own "no longer current" 409 check). Any version's id resolves to
+// the same current row, so the frontend can always ask "what does
+// this artifact look like now" without knowing which version it last
+// saw.
+const getCurrentArtifactRoute = createRoute({
+  method: "get",
+  path: "/{id}/current",
+  tags: ["Artifacts"],
+  summary: "Read the current version of the artifact this version belongs to",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "art-example123") },
+  responses: {
+    200: { content: { "application/json": { schema: Artifact } }, description: "The artifact's current version." },
+    ...errorResponses({ 401: "Sign in first", 404: "Artifact not found" }),
+  },
+});
+
+artifactsRoutes.openapi(getCurrentArtifactRoute, (c) => {
+  const actor = c.get("person");
+  const row = getArtifactRow(c.req.valid("param").id);
+  if (!row || !visibleArtifactRow(actor, row)) return c.json({ error: "artifact not found" }, 404);
+  const current = currentArtifactRow(row.artifactKey) ?? row;
+  if (!visibleArtifactRow(actor, current)) return c.json({ error: "artifact not found" }, 404);
+  return c.json(toArtifact(current), 200);
 });
 
 const exportArtifactRoute = createRoute({

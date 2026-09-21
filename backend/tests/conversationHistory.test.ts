@@ -25,6 +25,8 @@ import {
   getPendingAsk,
   setPendingAsk,
 } from "@/lib/conversationHistory";
+import { createArtifact } from "@/lib/artifacts";
+import { newConversationTurnId } from "@/lib/id";
 import { createCommand } from "@/lib/commands";
 import { REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { db } from "@/db";
@@ -1803,6 +1805,54 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     const asOwner = listConversationTurns(ownerActor, conv.value.id);
     expect(asOwner.ok).toBe(true);
     if (asOwner.ok) expect(asOwner.value[0]?.reasoning).toBe("the household wants this remembered, so I should call remember");
+  });
+
+  // SHELL-02 slice 4: canvas-split's own acceptance ("this slice must
+  // survive reload") - the live `done` event's `TurnValue.artifact`
+  // ({id, version}) has a reload-path twin here, read from the
+  // `artifacts` table by `turn_id` rather than stored a second time on
+  // the turn row itself.
+  test("a turn that minted an artifact carries its id and version on reload", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const turnId = newConversationTurnId();
+    logTurn(actor, "chat", "write me a short note about pizza night", { reply: { text: "Wrote it." }, source: "plugin", plugin_id: "write_document", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
+    const v1 = createArtifact({ conversationId: conv.value.id, turnId, kind: "markdown", title: "Pizza night", body: "Every Friday.", createdBy: actor.id, provenance: `artifact-tool:${turnId}` });
+
+    const result = listConversationTurns(actor, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value[0]?.artifact).toEqual({ id: v1.id, version: 1 });
+  });
+
+  test("a turn with no artifact carries no artifact field", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-no-artifact" });
+
+    const result = listConversationTurns(actor, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value[0]?.artifact).toBeUndefined();
+  });
+
+  test("a child never sees an artifact from their own safety-refused turn, but an owner/admin still does", async () => {
+    const { client, actor: ownerActor } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    const conv = resolveOrCreateConversation(child, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const turnId = newConversationTurnId();
+    logTurn(child, "chat", "write something", { reply: { text: "I can't help with that." }, source: "safety_refuse", safety: { ...SAFE, action: "refuse" }, conversation_id: conv.value.id, turn_id: turnId });
+    db.update(conversationTurns).set({ safetyAction: "refuse" }).where(eq(conversationTurns.id, turnId)).run();
+    const v1 = createArtifact({ conversationId: conv.value.id, turnId, kind: "markdown", title: "Should not be visible", body: "x", createdBy: child.id, provenance: `artifact-tool:${turnId}` });
+
+    const asChild = listConversationTurns(child, conv.value.id);
+    expect(asChild.ok).toBe(true);
+    if (asChild.ok) expect(asChild.value[0]?.artifact).toBeUndefined();
+
+    const asOwner = listConversationTurns(ownerActor, conv.value.id);
+    expect(asOwner.ok).toBe(true);
+    if (asOwner.ok) expect(asOwner.value[0]?.artifact).toEqual({ id: v1.id, version: 1 });
   });
 });
 

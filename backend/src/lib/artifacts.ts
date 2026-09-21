@@ -5,7 +5,7 @@
 // immutable version per row, chained by parent_version; this file owns
 // the version-chain bookkeeping (artifactKey, the current pointer) that
 // lives only in Home's own table, never in the synced spec shape.
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { artifacts, conversationTurns } from "@/db/schema";
 import { Artifact, type Artifact as ArtifactValue } from "@maipai/spec/gen/ts/artifact.js";
@@ -122,6 +122,20 @@ export function getArtifactRow(id: string): ArtifactRow | null {
 
 export function currentArtifactRow(artifactKey: string): ArtifactRow | null {
   return db.select().from(artifacts).where(and(eq(artifacts.artifactKey, artifactKey), eq(artifacts.isCurrent, true))).get() ?? null;
+}
+
+/** SHELL-02 slice 4: the reload path's own read of the same fact
+ * `TurnValue.artifact` carries live (turnEngine.ts's `logTurnSafely()`)
+ * - whichever version THIS turn minted or updated, a fixed historical
+ * fact even once a later turn supersedes it (the same shape
+ * `structured_part` reads/writes, `artifacts_turn_id_idx` already
+ * indexes this). Batched by turn id the same way
+ * `conversationHistory.ts`'s own `memoryIdsByTurn()` is - the one
+ * caller, `listConversationTurns()`, already avoids an N+1 query for
+ * memory ids and shouldn't grow one here. */
+export function artifactsByTurn(turnIds: readonly string[]): Map<string, { id: string; version: number }> {
+  const rows = turnIds.length > 0 ? db.select().from(artifacts).where(inArray(artifacts.turnId, turnIds)).all() : [];
+  return new Map(rows.map((row) => [row.turnId, { id: row.id, version: row.version }]));
 }
 
 /** A child sees an artifact only from a turn that is theirs and that

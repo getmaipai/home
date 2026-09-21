@@ -117,7 +117,16 @@ export function rowsToBranchableMessages(
     const replyMessage: ThreadMessageLike = {
       id: replyId,
       role: "assistant",
-      content: row.replyText,
+      // SHELL-02 slice 4: canvas-split's own acceptance ("this slice
+      // must survive reload") - `row.artifact` ({id, version},
+      // conversationHistory.ts's own reload-path twin of the live
+      // `done` event's `TurnValue.artifact`) becomes the same real
+      // tool-call part chatModelAdapter.ts builds live, so the
+      // artifact-card Element renders identically whether this turn
+      // just streamed in or came back from GET /api/conversations/:id/turns.
+      content: row.artifact
+        ? [{ type: "text", text: row.replyText }, { type: "tool-call", toolCallId: `${row.id}-artifact`, toolName: "write_document", args: {}, argsText: "", result: row.artifact }]
+        : row.replyText,
       createdAt,
       status: { type: "complete", reason: "stop" },
       // Fix B4 (docs/dev.md's "Chat reliability" B4): chatSourceCaption.tsx

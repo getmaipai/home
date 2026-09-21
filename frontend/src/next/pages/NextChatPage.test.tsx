@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import type { ReactElement } from "react";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { NextChatPage } from "@/next/pages/NextChatPage";
 import type { Roster } from "@/lib/api";
@@ -10,6 +12,15 @@ afterEach(() => {
   cleanup();
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
 });
+
+// SHELL-02 slice 4: the artifact-card/canvas-split Elements both use
+// react-query (`api.artifactCurrent`) - HealthSection.test.tsx's own
+// pattern, a fresh no-retry client per render so a failed fetch in one
+// test doesn't hang the next on a retry backoff.
+function renderPage(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 function makePerson(): Roster {
   return {
@@ -55,7 +66,7 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
   test("mounts the Elements composer, ready for a real turn", async () => {
     const restore = stubFetch();
     try {
-      const { findByLabelText } = render(
+      const { findByLabelText } = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
@@ -71,7 +82,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   test("shows New Thread and an empty thread list with no past conversations", async () => {
     const restore = stubFetch();
     try {
-      const { findByText } = render(
+      const { findByText } = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
@@ -94,7 +105,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     try {
-      const { findByText } = render(
+      const { findByText } = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
@@ -117,7 +128,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   test("New Thread closes the phone/tablet Sheet, the same as selecting a past conversation", async () => {
     const restore = stubFetch();
     try {
-      const view = render(
+      const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
@@ -174,7 +185,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       ]),
     );
     try {
-      const view = render(
+      const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
@@ -199,7 +210,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       ]),
     );
     try {
-      const view = render(
+      const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
@@ -207,6 +218,98 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       await sendMessage(view, "what herbs should I grow");
       expect(await view.findByText("Basil and parsley are easy herbs.")).toBeVisible();
       expect(view.queryByText("Lantern Bay")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
+  const ARTIFACT = {
+    id: "art-example123",
+    conversation_id: "conv-artifact123",
+    turn_id: "turn-artifact123",
+    kind: "markdown" as const,
+    title: "Pizza night",
+    body: "Every Friday night.",
+    version: 1,
+    parent_version: null,
+    created_by: "person-abc123",
+    provenance: "artifact-tool:turn-artifact123",
+    created_at: "2026-09-21T00:00:00.000Z",
+    hlc: "1788000000000:0:test",
+  };
+
+  // stubTurnFetch's own shape, plus GET /api/artifacts/:id/current -
+  // the same route ArtifactCardToolRender and ArtifactCanvasPanel both
+  // call (api.artifactCurrent), never the bare per-version GET.
+  function stubArtifactTurnFetch(streamBody: ReadableStream<Uint8Array>): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-artifact123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes(`/api/artifacts/${ARTIFACT.id}/current`)) return Promise.resolve(Response.json(ARTIFACT));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+  }
+
+  test("a write_document turn renders an artifact card; clicking it opens the canvas with the real document, closing it keeps the thread", async () => {
+    const restore = stubArtifactTurnFetch(
+      ndjsonStream([
+        { type: "delta", text: "Wrote it." },
+        {
+          type: "done",
+          value: {
+            turn_id: "turn-artifact123",
+            reply: { text: "Wrote it." },
+            source: "plugin",
+            plugin_id: "write_document",
+            safety: SAFETY,
+            artifact: { id: ARTIFACT.id, version: ARTIFACT.version },
+          },
+        },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "write me a short note about pizza night");
+      expect(await view.findByText("Wrote it.")).toBeVisible();
+      // The card's own fetched title, not a placeholder - proves the
+      // artifact tool-call part reached ArtifactCard through a real
+      // api.artifactCurrent() round trip, not just that the turn
+      // completed.
+      const card = await view.findByText(ARTIFACT.title);
+      fireEvent.click(card);
+      // Two mounts of the same panel exist in jsdom at once (the
+      // desktop pane, CSS-hidden below `lg`, and the phone/tablet
+      // Sheet, a real Radix dialog only mounted while open) - the same
+      // reason "New Thread closes the phone/tablet Sheet" above scopes
+      // to the dialog rather than querying the whole document. The
+      // Sheet's own sr-only title is the scoping handle here.
+      const dialogTitle = await view.findByRole("heading", { name: "Document" });
+      const dialog = within(dialogTitle.closest('[role="dialog"]')!);
+      expect(await dialog.findByText("Every Friday night.")).toBeVisible();
+      fireEvent.click(dialog.getByRole("button", { name: "Close the canvas" }));
+      await waitFor(() => expect(view.queryByRole("heading", { name: "Document" })).toBeNull());
+      // Closing the canvas never touches the thread.
+      expect(view.getByText("Wrote it.")).toBeVisible();
     } finally {
       restore();
     }

@@ -9,6 +9,7 @@ import type { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
+import type { Artifact } from "@maipai/spec/gen/ts/artifact.js";
 import type {
   Roster,
   TurnValue,
@@ -421,6 +422,13 @@ export const api = {
   chooseConversationTurn: (id: string) =>
     request<{ turn_id: string; parent_turn_id: string | null; branch_chosen: boolean }>(`/api/conversations/turns/${encodeURIComponent(id)}/choose`, { method: "POST" }),
   conversationTurnDocument: (id: string) => request<TurnArtifact>(`/api/conversations/turns/${encodeURIComponent(id)}/document`),
+  // SHELL-02 slice 4: always the CURRENT version of whichever artifact
+  // this id belongs to (routes/artifacts.ts's own /current, resolved
+  // server-side through the Home-internal artifactKey the frontend
+  // never sees) - canvas-split.tsx's own acceptance ("a later turn's
+  // update to the same artifact id replaces the pane's content")
+  // needs this, not the bare per-version GET.
+  artifactCurrent: (id: string) => request<Artifact>(`/api/artifacts/${encodeURIComponent(id)}/current`),
   conversationFeedback: (id: string) => request<ReplyFeedback | null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`),
   submitConversationFeedback: (id: string, verdict: ReplyFeedback["verdict"], reason: ReplyFeedback["reason"] = null) =>
     request<ReplyFeedback>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, {

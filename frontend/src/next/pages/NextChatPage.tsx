@@ -1,14 +1,18 @@
-import { useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
+import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
+import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, CanvasSplitLine, CanvasSplitMessage, CanvasSplitThread } from "@maipai/ui/src/elements/canvas-split";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, type Roster, type StructuredPart } from "@/lib/api";
+import { api, ApiError, type Roster, type StructuredPart } from "@/lib/api";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
@@ -42,6 +46,94 @@ function StructuredResultTools() {
   useAssistantToolUI({ toolName: "weather", render: SpecSheetToolRender, display: "standalone" });
   useAssistantToolUI({ toolName: "almanac-date", render: SpecSheetToolRender, display: "standalone" });
   return null;
+}
+
+// SHELL-02 slice 4: the artifact-card row of the wiring table.
+// `useAssistantToolUI`'s own `result` is only ever `{id, version}`
+// (chatModelAdapter.ts/chatHistoryAdapter.ts's own comment on why: the
+// wire and the reload row both name a version, never carry its body) -
+// the card fetches the CURRENT version itself (`api.artifactCurrent`,
+// not the bare per-version read) so its own title/kind stay fresh the
+// same way the open canvas does, if a later turn updates this exact
+// artifact before the card is ever clicked.
+const ArtifactOpenContext = createContext<(id: string) => void>(() => {});
+
+const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string; version: number }> = ({ result }) => {
+  const openArtifact = useContext(ArtifactOpenContext);
+  const query = useQuery({
+    queryKey: ["artifact-current", result?.id],
+    queryFn: () => api.artifactCurrent(result!.id),
+    enabled: result !== undefined,
+  });
+  if (!result) return null;
+  const data = query.data;
+  // A code review caught this: on a failed fetch (the artifact later
+  // deleted, a transient network error), `isLoading` settles to false
+  // with `data` still undefined - without this branch the card was
+  // stuck reading a non-spinning "Loading..." forever, never an error.
+  const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
+  return (
+    <ArtifactCard
+      title={data?.title ?? "Document"}
+      meta={meta}
+      generating={query.isLoading}
+      onClick={() => openArtifact(result.id)}
+    />
+  );
+};
+
+function ArtifactTool() {
+  useAssistantToolUI({ toolName: "write_document", render: ArtifactCardToolRender, display: "standalone" });
+  return null;
+}
+
+/** canvas-split's own acceptance: opens beside the thread, closing
+ * keeps the thread, a later turn's update to the same artifact
+ * replaces the pane's content. The last one comes free of any id
+ * bookkeeping: `api.artifactCurrent()` always resolves through the
+ * artifact's own key server-side (routes/artifacts.ts's `/current`),
+ * so re-fetching the SAME `openArtifactId` after a new turn completes
+ * is enough - `NextChatPage`'s own effect invalidates the query
+ * whenever the thread's message count changes, the simplest real
+ * signal "a turn just finished." No mini transcript reconstruction
+ * (`CanvasSplitThread`/`CanvasSplitMessage`, used exactly as shipped
+ * below): fetching the triggering turn's own user message would be a
+ * second round trip this slice doesn't need yet, so this shows the
+ * document's own title as the one assistant-side line instead of
+ * inventing dialogue. */
+function ArtifactCanvasPanel({ artifactId, onClose }: { artifactId: string; onClose: () => void }) {
+  const query = useQuery({ queryKey: ["artifact-current", artifactId], queryFn: () => api.artifactCurrent(artifactId) });
+  return (
+    <CanvasSplit>
+      <CanvasSplitThread>
+        <CanvasSplitMessage speaker="assistant">{query.data ? `Wrote "${query.data.title}."` : "Wrote the document."}</CanvasSplitMessage>
+      </CanvasSplitThread>
+      <CanvasSplitDocument>
+        <AsyncState
+          data={query.data}
+          error={query.isError}
+          isFetching={query.isFetching}
+          onRetry={() => void query.refetch()}
+          errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load this document."}
+          loadingLabel="Loading document"
+        >
+          {(artifact) => (
+            <>
+              <CanvasSplitHeader title={artifact.title} version={artifact.version} saved onCopy={() => void navigator.clipboard.writeText(artifact.body)} onClose={onClose} />
+              <CanvasSplitBody>
+                {artifact.body.split("\n").map((line, index) => (
+                  // No stable id in a plain-text body: index is fine,
+                  // this list never reorders itself, only refetches as
+                  // a whole.
+                  <CanvasSplitLine key={index}>{line || " "}</CanvasSplitLine>
+                ))}
+              </CanvasSplitBody>
+            </>
+          )}
+        </AsyncState>
+      </CanvasSplitDocument>
+    </CanvasSplit>
+  );
 }
 
 /** /next/chat: SHELL-02's slice 2 (docs/plans/shell-on-shadcndashboard-
@@ -81,9 +173,21 @@ function StructuredResultTools() {
  * then reverts to plain text the moment the page reloads or the
  * thread is reopened.
  *
- * Attachments, suggestions and artifacts are each their own follow-up
- * slice (the wiring table's remaining rows). `speakReplies: false`
- * still holds - no "stop speaking" control on screen yet. */
+ * Slice 4 (artifacts): the `write_document` package's own record
+ * (`TurnValue.artifact`/the reload row's own `artifact` field, both
+ * `{id, version}` only) renders as `ArtifactCard` inline
+ * (`ArtifactTool` below), keyed on the one bundled package that
+ * writes this record today. Clicking it opens `ArtifactCanvasPanel`
+ * beside the thread on desktop, as a bottom Sheet on phone/tablet
+ * (mirroring the retired `chatDocumentPane.tsx`'s own split); closing
+ * it clears `openArtifactId`, never touches the thread. Unlike
+ * `structured_part` (getmaipai/home#130), this survives reload: the
+ * artifact record is really stored, so `api.artifactCurrent()`
+ * resolves it fresh every time, live turn or history alike.
+ *
+ * Suggestions and attachments are each their own follow-up slice (the
+ * wiring table's remaining rows). `speakReplies: false` still holds -
+ * no "stop speaking" control on screen yet. */
 // The shipped `<ThreadList>` (thread-list.aui.tsx's own default export)
 // hardcodes its own `<ThreadListNew>` with no way to hand it a click
 // handler - composed here instead from that same file's other exported
@@ -151,51 +255,96 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   return { runtime, banner };
 }
 
+/** Mounted inside AssistantRuntimeProvider only for its side effect: a
+ * later turn's own message lands in the thread, and that is the signal
+ * ("a turn just finished") that any open artifact-canvas query should
+ * refetch, since a reply may have updated the exact artifact id it's
+ * showing. No thread-id bookkeeping needed - `api.artifactCurrent()`
+ * resolves through the artifactKey server-side either way. */
+function ArtifactCacheInvalidator() {
+  const queryClient = useQueryClient();
+  const messageCount = useAuiState((s) => s.thread.messages.length);
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: ["artifact-current"] });
+  }, [messageCount, queryClient]);
+  return null;
+}
+
 export function NextChatPage({ person }: { person: Roster }) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { runtime, banner } = useNextChatRuntime(person, () => setSheetOpen(false));
+  const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
+  // A code review caught this: switching threads (onThreadIdChange,
+  // inside useNextChatRuntime) left a previous thread's artifact
+  // canvas open over the newly-loaded one - the panel has to close on
+  // the same signal the phone/tablet Sheet already does.
+  const { runtime, banner } = useNextChatRuntime(person, () => {
+    setSheetOpen(false);
+    setOpenArtifactId(null);
+  });
   // One element, rendered at both the desktop rail and the phone/tablet
   // Sheet below - ChatPage.tsx's own fix for exactly this (a code
   // review caught the two call sites drifting once one grew props the
   // other didn't).
   const threadList = <NextThreadList onNewThread={() => setSheetOpen(false)} />;
+  const closeArtifact = () => setOpenArtifactId(null);
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <StructuredResultTools />
-      <div className="flex h-[calc(100vh-140px)] flex-col">
-        <div className="flex items-center border-b border-border pb-2 lg:hidden">
-          <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
-            <HistoryIcon className="size-4" />
-          </Button>
+      <ArtifactOpenContext.Provider value={setOpenArtifactId}>
+        <StructuredResultTools />
+        <ArtifactTool />
+        <ArtifactCacheInvalidator />
+        <div className="flex h-[calc(100vh-140px)] flex-col">
+          <div className="flex items-center border-b border-border pb-2 lg:hidden">
+            <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
+              <HistoryIcon className="size-4" />
+            </Button>
+          </div>
+          {banner ? (
+            <Alert className="mx-4 mt-2 mb-2">
+              <AlertDescription>{banner}</AlertDescription>
+            </Alert>
+          ) : null}
+          <div className="flex min-h-0 flex-1 gap-4">
+            {/* `lg:` not `sm:` - tokens.css's own --breakpoint-lg note
+                (the kit's 960px default reopens a squeeze at tablet
+                width), the same reason ChatPage.tsx's own persistent
+                column uses it. */}
+            <div className="hidden w-64 shrink-0 overflow-y-auto border-r border-border pr-2 lg:block">
+              {threadList}
+            </div>
+            <div className="min-w-0 flex-1">
+              <Thread />
+            </div>
+            {openArtifactId !== null ? (
+              // Desktop only - the phone/tablet Sheet below covers the
+              // same panel under `lg:hidden`, mirroring
+              // chatDocumentPane.tsx's own split.
+              <div className="hidden w-full max-w-xl shrink-0 overflow-y-auto lg:block">
+                <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} />
+              </div>
+            ) : null}
+          </div>
         </div>
-        {banner ? (
-          <Alert className="mx-4 mt-2 mb-2">
-            <AlertDescription>{banner}</AlertDescription>
-          </Alert>
-        ) : null}
-        <div className="flex min-h-0 flex-1 gap-4">
-          {/* `lg:` not `sm:` - tokens.css's own --breakpoint-lg note
-              (the kit's 960px default reopens a squeeze at tablet
-              width), the same reason ChatPage.tsx's own persistent
-              column uses it. */}
-          <div className="hidden w-64 shrink-0 overflow-y-auto border-r border-border pr-2 lg:block">
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-2 lg:hidden">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Conversations</SheetTitle>
+              <SheetDescription>Past conversations</SheetDescription>
+            </SheetHeader>
             {threadList}
-          </div>
-          <div className="min-w-0 flex-1">
-            <Thread />
-          </div>
-        </div>
-      </div>
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-2 lg:hidden">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Conversations</SheetTitle>
-            <SheetDescription>Past conversations</SheetDescription>
-          </SheetHeader>
-          {threadList}
-        </SheetContent>
-      </Sheet>
+          </SheetContent>
+        </Sheet>
+        <Sheet open={openArtifactId !== null} onOpenChange={(next) => { if (!next) closeArtifact(); }}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto lg:hidden">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Document</SheetTitle>
+              <SheetDescription>The document from this reply</SheetDescription>
+            </SheetHeader>
+            {openArtifactId !== null ? <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} /> : null}
+          </SheetContent>
+        </Sheet>
+      </ArtifactOpenContext.Provider>
     </AssistantRuntimeProvider>
   );
 }
