@@ -24,7 +24,7 @@
         "npm:text-readability@^1.1.1"
       ],
       "overrides": {
-        "zod": "4.5.4"
+        "zod": "4.6.5"
       }
     },
     "members": {
@@ -60,7 +60,7 @@
         "packageJson": {
           "dependencies": [
             "npm:@assistant-ui/react-markdown@~0.14.14",
-            "npm:@assistant-ui/react@0.15.18",
+            "npm:@assistant-ui/react@0.15.21",
             "npm:@happy-dom/global-registrator@^20.14.0",
             "npm:@lingui/cli@6.6.0",
             "npm:@lingui/core@6.6.0",
@@ -76,7 +76,7 @@
             "npm:@types/react-dom@^19.3.0",
             "npm:@types/react@^19.3.0",
             "npm:@vitejs/plugin-react@^6.1.1",
-            "npm:assistant-stream@0.3.41",
+            "npm:assistant-stream@0.3.44",
             "npm:class-variance-authority@~0.7.1",
             "npm:clsx@^2.1.1",
             "npm:cmdk@^1.1.1",

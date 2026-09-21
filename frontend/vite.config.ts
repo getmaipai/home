@@ -55,6 +55,44 @@ function kitAliasPlugin(): Plugin {
   };
 }
 
+// CHAT-SDK-01: the assistant-ui registry's own vendoring convention
+// (ui/docs/dashboard-upstream.md's "elements" section) writes each
+// Element's cross-file imports as `@/elements/*` (`thread.aui.tsx`
+// importing `reasoning.tsx`, `reasoning.tsx` importing `@/elements/
+// ui/collapsible`, and so on) - a SECOND `@/`-prefixed alias the
+// vendored files use to mean their own tree, the same shape as
+// `@/kit/*` above but for a different prefix and, so far, only ever
+// asked for by the shared-ui side (Home has no `src/elements/` of its
+// own to collide with - checked live, not assumed). Scoped to the
+// shared-ui importer only, same as `kitAliasPlugin`: a bare `resolve.
+// alias` entry for `@/elements/*` would just as happily "resolve" a
+// future Home-authored `@/elements/*` import to the kit's tree instead
+// of failing loudly, the same silent-collision risk `@/kit/*` already
+// routes around. `@/components/*` (a sibling convention the registry's
+// other flavors use, unused in this kit's own vendored tree today -
+// tsconfig.json's own `paths` comment has why) deliberately has no
+// entry here either: a review caught an earlier version handling it
+// speculatively, which excluded it from the plain alias below without
+// giving it anywhere real to resolve, so a future Home-authored `@/
+// components/*` import would have hit neither this plugin nor that
+// alias and failed opaquely instead of resolving to Home's own `src/
+// components/*` the way it does today. Add both the prefix here and
+// its own `paths` entry together, the day something actually vendors
+// a file that needs it.
+function kitElementsAliasPlugin(): Plugin {
+  return {
+    name: "maipai-home-kit-elements-alias",
+    enforce: "pre",
+    async resolveId(source, importer, options) {
+      if (!source.startsWith("@/elements/") || !importer) return null;
+      const fromSharedUi = importer.includes("/@maipai/ui/") || importer.includes("/@maipai+ui@");
+      if (!fromSharedUi) return null;
+      const rest = source.slice("@/".length);
+      return this.resolve(`@maipai/ui/src/${rest}`, importer, { ...options, skipSelf: true });
+    },
+  };
+}
+
 // The backend has no CORS and a Strict-SameSite session cookie (see
 // backend/src/middleware/auth.ts), so the dev server proxies /api instead
 // of the browser talking cross-origin to :8787 directly: the browser then
@@ -64,6 +102,7 @@ function kitAliasPlugin(): Plugin {
 export default defineConfig({
   plugins: [
     kitAliasPlugin(),
+    kitElementsAliasPlugin(),
     react(),
     tailwindcss(),
     // Session E step 8, i18n scaffolding: `.po` catalog compile-on-
@@ -156,7 +195,22 @@ export default defineConfig({
     // `@/`) and doesn't yield to a later plugin's `enforce: "pre"` under
     // Rolldown, so both handling `@/kit/*` unconditionally raced and
     // Vite's own alias won every time (found live building this fix).
-    alias: [{ find: /^@\/(?!kit\/)/, replacement: `${fileURLToPath(new URL("./src", import.meta.url))}/` }],
+    // CHAT-SDK-01: `elements/` joins `kit/`'s own exclusion here for the
+    // identical reason its own comment already gives - Vite's plain
+    // alias resolution matches `@/elements/*` too and doesn't yield to
+    // `kitElementsAliasPlugin`'s `enforce: "pre"` resolveId hook under
+    // Rolldown (found live: a real production build failed resolving
+    // `@/elements/ui/collapsible` - "No such file or directory" against
+    // Home's own `src/elements/ui/collapsible`, which doesn't exist -
+    // the plugin never got a turn). `components/` stays OUT of this
+    // exclusion (a review caught an earlier version adding it
+    // speculatively): excluding a prefix here only makes sense once
+    // something ahead of this alias - `kitElementsAliasPlugin` above -
+    // actually claims it; until then, excluding it just strands a
+    // future Home-authored `@/components/*` import with no path to
+    // resolve at all, worse than today's real behavior (Home's own
+    // `src/components/*`).
+    alias: [{ find: /^@\/(?!kit\/|elements\/)/, replacement: `${fileURLToPath(new URL("./src", import.meta.url))}/` }],
     // `@maipai/ui`'s files resolve outside `frontend/`'s own tree (via
     // `kitAliasPlugin` above, and via the plain `node_modules/@maipai/ui`
     // symlink for its non-`@/kit` imports too) - a real react-in-a-lazy-

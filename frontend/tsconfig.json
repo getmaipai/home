@@ -34,6 +34,19 @@
       // causing "two different types with this name exist" on every
       // ref-typed prop (found live building this exact fallback).
       "@/kit/*": ["./src/kit/*", "./node_modules/@maipai/ui/src/*"],
+      // CHAT-SDK-01: the vendored assistant-ui Elements (`@maipai/ui`'s
+      // own `src/elements/`) use `@/elements/*` the same way - their
+      // own registry's vendoring convention (checked live: 8 files, all
+      // under `src/elements/`), not this repo's. A single `paths`
+      // target is enough here, unlike `@/kit/*`'s two-target fallback
+      // above: Home has no `src/elements/` of its own (checked live)
+      // for this to collide with, so there is only one meaning to
+      // resolve, ever - `vite.config.ts`'s `kitElementsAliasPlugin` is
+      // Rolldown's side of the identical mapping (it also handles a
+      // parallel `@/components/*` the registry's other flavors use
+      // elsewhere, unused in this kit's own vendored tree today - no
+      // `paths` entry for it here until something actually needs one).
+      "@/elements/*": ["./node_modules/@maipai/ui/src/elements/*"],
       "@/*": ["./src/*"]
     }
   },

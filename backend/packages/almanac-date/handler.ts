@@ -14,7 +14,7 @@
 // knowledge/handler.ts's own header for why.
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js";
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.30.0/server/stdio.js";
-import { z } from "npm:zod@4.5.4";
+import { z } from "npm:zod@4.6.5";
 
 export function currentDate(now: Date = new Date()): { text: string; speech: string; data: { date: string; weekday: string } } {
   const formatted = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });

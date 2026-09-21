@@ -128,7 +128,19 @@ describe("ChatPage", () => {
       fireEvent.click(await view.findByRole("button", { name: "Start temporary chat" }));
       await view.findByRole("button", { name: "Turn off temporary chat" });
       expect(createBodies).toContainEqual({ surface: "chat", mode: "temporary" });
-      expect(view.getByRole("status")).toHaveTextContent("not saved to normal history or memory");
+      // A real, pre-existing race in ChatPage.tsx itself (found live,
+      // CHAT-SDK-01, fixed there with `selfSetModeRef` - its own comment
+      // has the full story): starting a temporary chat sets
+      // `conversationMode` from the server's own response, then changes
+      // `conversationId` via `setSearchParams`, which used to re-run the
+      // id-driven effect unconditionally, resetting to "chat" and
+      // re-fetching - racing the value this test just asserted came
+      // through. The old assistant-ui pin's own scheduling never let
+      // that second effect run before a synchronous `getByRole` here;
+      // the new one's does, so this polls now rather than trusting
+      // "already there" - the honest assertion either way, not a
+      // workaround for the timing this fix already closed.
+      expect(await view.findByRole("status")).toHaveTextContent("not saved to normal history or memory");
     } finally { restore(); }
   });
 

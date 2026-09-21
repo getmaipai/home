@@ -161,7 +161,30 @@ export function ChatPage({ person }: ChatPageProps) {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const conversationId = searchParams.get("conversation");
+  // `toggleTemporaryMode` below already knows the mode of a conversation
+  // it just created (the server's own response) before it ever calls
+  // `setSearchParams` - which changes `conversationId`, re-running this
+  // effect a second time for the very id it just set. Without this ref,
+  // that second run always won the race: it unconditionally resets to
+  // "chat" first, then re-fetches the same conversation from a fresh
+  // GET - a real round trip that can resolve with something other than
+  // "temporary" (the exact gap ChatPage.test.tsx's own mock exposed:
+  // its GET handler falls through to a generic stub with no `mode`
+  // field), overwriting the freshly-known-good value this effect's
+  // caller just set a moment earlier. A real, pre-existing race (found
+  // live, CHAT-SDK-01) that a synchronous assertion right after the
+  // button's own label changed happened to never observe at the old
+  // assistant-ui pin; the new one's own scheduling exposed it as a
+  // reproducible failure, not a flake. Cleared the moment this effect
+  // consumes it, so a person actually navigating to a different
+  // conversation (never routed through here) still gets the real fetch.
+  const selfSetModeRef = useRef<{ id: string; mode: ChatConversationMode } | null>(null);
   useEffect(() => {
+    if (selfSetModeRef.current?.id === conversationId) {
+      setConversationMode(selfSetModeRef.current.mode);
+      selfSetModeRef.current = null;
+      return;
+    }
     setConversationMode("chat");
     if (!conversationId) return;
     api.conversation(conversationId).then((conversation) => {
@@ -173,6 +196,7 @@ export function ChatPage({ person }: ChatPageProps) {
     if (!canViewTemporaryMode) return;
     if (!conversationId) {
       void api.createConversation("temporary").then((conversation) => {
+        selfSetModeRef.current = { id: conversation.id, mode: conversation.mode };
         setConversationMode(conversation.mode);
         setSearchParams({ conversation: conversation.id });
       }).catch(() => setBanner("Temporary chat could not be started. Try again."));

@@ -18,7 +18,7 @@
 // its own directory.
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js";
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.30.0/server/stdio.js";
-import { z } from "npm:zod@4.5.4";
+import { z } from "npm:zod@4.6.5";
 
 interface WikidataSearchResult {
   id: string;
