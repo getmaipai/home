@@ -60,14 +60,25 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
   // read-the-shared-cache pattern useAppearance.ts uses for
   // `ui.appearance`, through a `data-look` attribute `tokens.css`'s
   // `studio:` variant and look-scoped tokens key off.
+  //
+  // HOME-UI-04b (2026-09-21): the seven shadcn base-color presets
+  // (ui.shadcn.com/docs/theming's own current list - Neutral, Stone,
+  // Zinc, Mauve, Olive, Mist, Taupe) join Studio and Calm on the same
+  // enum and the same style-variant mechanism (commons-a/ui/src/
+  // dashboard/css/globals.css), applied on /next only (`useNextLook`)
+  // - the old shell's `useLook` still resolves the value (`Look`
+  // widened to match in `@/shell/useLook.ts`) but has no `.style-<
+  // color>` CSS of its own, so an old-shell person who picked a color
+  // preset just keeps Studio's own palette there until the old shell
+  // retires.
   SettingsKey.parse({
     key: "ui.look",
     scope: "person",
     selector: "select",
-    range: { options: ["studio", "calm"] },
+    range: { options: ["studio", "calm", "neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe"] },
     default: "studio",
     label: "Look",
-    help: "Studio matches the reference design exactly. Calm is the softer look Home shipped first.",
+    help: "Studio matches the reference design exactly. Calm is the softer look Home shipped first. The rest are shadcn's own color presets.",
     level: "basic",
     lives_in: "profile.appearance",
     honoured_by: ["home"],

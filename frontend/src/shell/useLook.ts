@@ -2,10 +2,16 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-export type Look = "calm" | "studio";
+// HOME-UI-04b: widened to match ui.look's own enum (backend/src/
+// settings/uiKeys.ts) - the seven shadcn base-color presets only have
+// CSS on /next (useNextLook), never a `data-look` value here, so an
+// old-shell person who picked one just keeps Studio's palette there
+// until the old shell retires.
+export const LOOKS = ["calm", "studio", "neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe"] as const;
+export type Look = (typeof LOOKS)[number];
 
 function isLook(value: unknown): value is Look {
-  return value === "calm" || value === "studio";
+  return (LOOKS as readonly unknown[]).includes(value);
 }
 
 /** `ui.look` (person scope, backend/src/settings/uiKeys.ts): the owner's

@@ -299,6 +299,7 @@ const notificationsReview = process.argv.includes("--notifications-review");
 const lookReview = process.argv.includes("--look-review");
 const nextStandupReview = process.argv.includes("--next-standup-review");
 const nextSidebarReview = process.argv.includes("--next-sidebar-review");
+const nextLookPresetsReview = process.argv.includes("--next-look-presets-review");
 
 interface RouteSpec {
   slug: string;
@@ -2019,6 +2020,50 @@ async function captureNextSidebarReview(browser: Browser, sessionValue: string):
   }
 }
 
+// HOME-UI-04b item 3's own proof: the dashboard in three of the nine
+// ui.look presets, 1440 dark (COORDINATOR's own ask) - Neutral and
+// Mauve (two of the seven new shadcn base-color presets) plus Studio
+// (the pre-existing default, proving the old presets still work
+// alongside the new ones on the same mechanism).
+async function captureNextLookPresets(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextLookPresets: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const sage = people.find((p) => p.display_name === "Sage");
+  if (!sage) throw new Error("captureNextLookPresets: seedHousehold() didn't create Sage");
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  for (const look of ["neutral", "mauve", "studio"] as const) {
+    const setLook = await fetch(`${BASE_URL}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+      body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.look", value: look }),
+    });
+    if (!setLook.ok) throw new Error(`captureNextLookPresets: seeding ui.look=${look} failed: ${setLook.status}`);
+
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next`);
+      await page.locator("text=Weekly sales").first().waitFor({ timeout: 15000 });
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `next-look-${look}-desktop-dark.png`) });
+      console.log(`Wrote ${join(outDir, `next-look-${look}-desktop-dark.png`)}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2548,6 +2593,10 @@ async function main() {
 
     if (nextSidebarReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview) {
       await captureNextSidebarReview(browser, sessionValue);
+    }
+
+    if (nextLookPresetsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview) {
+      await captureNextLookPresets(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {
