@@ -50,6 +50,7 @@ const HOUSEHOLD_TREE: TreeEntry[] = [
   { id: "settings-household.integrations", label: "Integrations", group: "AI & connections", icon: "layout-grid" },
   { id: "backups-page-link", label: "Backups", to: "/settings/backups", group: "Maintenance", icon: "archive", description: "Keep your household’s data backed up." },
   { id: "repairs-page-link", label: "Repairs", to: "/settings/repairs", group: "Maintenance", icon: "shield-check", description: "Check issues that need your attention." },
+  { id: "updates-page-link", label: "Updates", to: "/settings/updates", group: "Maintenance", icon: "refresh-cw", description: "See what's installed and what's new." },
   { id: "settings-household.ai", label: "AI model tuning", group: "Advanced", icon: "brain" },
   { id: "section-hf-token", label: "Hugging Face token", group: "Advanced", icon: "lock" },
   { id: "section-routing", label: "Plugin routing", group: "Advanced", icon: "layout-grid" },

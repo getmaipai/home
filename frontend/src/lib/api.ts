@@ -130,6 +130,30 @@ export interface SessionInfo {
 // imported from @/wire - the real UpdateProjection interface
 // (backend/src/lib/updates.ts) carries @/db-aliased imports frontend's
 // tsconfig has no mapping for.
+// HOME-STACK-05: additive to the app's own flat fields above (org
+// CLAUDE.md > Compatibility) - null for every household without a
+// Stack, which is every household today.
+export interface StackEngineUpdate {
+  name: string;
+  installed: string | null;
+  available: string | null;
+  availableKnown: boolean;
+  lastChecked: string | null;
+  notes: string | null;
+}
+
+export interface StackModelUpdate {
+  id: string;
+  installed: string;
+  available: string | null;
+}
+
+export interface StackUpdatesProjection {
+  checksEnabled: boolean;
+  engines: StackEngineUpdate[];
+  models: { lastChecked: string | null; entries: StackModelUpdate[] };
+}
+
 export interface UpdateProjection {
   installed: string;
   latest: string | null;
@@ -137,6 +161,8 @@ export interface UpdateProjection {
   url: string | null;
   checkedAt: string | null;
   error: string | null;
+  stack: StackUpdatesProjection | null;
+  stackError: string | null;
 }
 
 // GET /api/plugins's real row shape (backend/src/routes/plugins.ts):
@@ -584,6 +610,14 @@ export const api = {
   // only, the route's own 403 on anyone else.
   updates: () => request<UpdateProjection>("/api/updates"),
   checkForUpdate: () => request<UpdateProjection>("/api/updates/check", { method: "POST" }),
+  // HOME-STACK-05: the Stack's own maintenance actions - each a real
+  // network call through the Stack, owner/admin (or backups.run) only,
+  // same as checkForUpdate() above.
+  checkStackUpdates: () => request<StackUpdatesProjection>("/api/updates/stack/check", { method: "POST" }),
+  applyStackEngineUpdate: (name: string) => request<{ applied: boolean; tag: string | null; previous: string | null }>(`/api/updates/stack/engines/${encodeURIComponent(name)}/apply`, { method: "POST" }),
+  rollbackStackEngine: (name: string, tag: string) => request<{ ok: true; tag: string }>(`/api/updates/stack/engines/${encodeURIComponent(name)}/rollback`, { method: "POST", body: JSON.stringify({ tag }) }),
+  sweepStackStorage: () => request<{ removed: string[] }>("/api/updates/stack/sweep", { method: "POST" }),
+  runStackReadinessCheck: () => request<{ at: string; ok: boolean; reason: string | null }>("/api/updates/stack/readiness-check", { method: "POST" }),
   // `person`, for the per-person view an adult opens for a child
   // (session E step 5): GET /api/memory's own `?person=` (backend/src/
   // routes/memory.ts's parseListOptions) - the same real access check

@@ -41,6 +41,8 @@ import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle
 import { trigger } from "@/lib/notifications";
 import { checkDiskFull } from "@/lib/storage";
 import { checkForAppUpdate } from "@/lib/updates";
+import { isStackConfigured } from "@/lib/stackEngine";
+import { stackUpdatesEnabled, checkStackUpdates, runStackReadinessCheck, sweepStackStorage } from "@/lib/stackUpdates";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { PluginOpResult } from "@/lib/plugins";
@@ -244,6 +246,21 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "updates.check": async () => {
     await checkForAppUpdate();
+  },
+  // HOME-STACK-05: the maintenance the Stack does not schedule for
+  // itself (stack/docs/integrations.md) - gated on the household's own
+  // stack.updates.enabled (a Stack setting, read live through the
+  // client, never mirrored into Home's own registry) on top of the
+  // standing engines.stack.url gate, so a configured-but-opted-out
+  // Stack still runs nothing here.
+  "stack.updates.maintenance": async () => {
+    if (!isStackConfigured() || !(await stackUpdatesEnabled())) return;
+    const check = await checkStackUpdates();
+    console.log(check.ok ? `[stack-updates] catalog check ok, ${check.value.engines.length} engine(s)` : `[stack-updates] catalog check failed: ${check.error}`);
+    const readiness = await runStackReadinessCheck();
+    console.log(readiness.ok ? `[stack-updates] readiness check ${readiness.value.ok ? "ok" : "failed"}: ${readiness.value.reason ?? "no reason given"}` : `[stack-updates] readiness check failed: ${readiness.error}`);
+    const sweep = await sweepStackStorage();
+    console.log(sweep.ok ? `[stack-updates] storage sweep removed ${sweep.value.removed.length} blob(s)` : `[stack-updates] storage sweep failed: ${sweep.error}`);
   },
   "memory.embedding_retry": async () => {
     await drainPendingEmbeddings();

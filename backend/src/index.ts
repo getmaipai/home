@@ -116,6 +116,10 @@ ensureCoreJob("websearch.check_searxng_health", "every:1h");
 // plan's packages/models/sidecars projection halves are deferred, no
 // catalog or per-model version tracking exists yet to check against).
 ensureCoreJob("updates.check", "every:1d");
+// HOME-STACK-05: same daily cadence as the app's own check above - the
+// job itself is a no-op when engines.stack.url is empty or the
+// household hasn't turned stack.updates.enabled on.
+ensureCoreJob("stack.updates.maintenance", "every:1d");
 // docs/PACKAGES.md's bronze bar: smoke "at install, at every update, and
 // on a schedule" (lib/smoke.ts). No install/update flow exists yet
 // (session-d step 6 builds the store), so a boot-time pass below stands

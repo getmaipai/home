@@ -220,6 +220,31 @@ const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => {
   ],
   ["/stack/v1/updates", "GET", () => ({ status: 200, body: { checksEnabled: true, engines: [{ name: "llama", installed: "b10797", available: "b10797", availableKnown: true, update: null }] } })],
   ["/stack/v1/updates/check", "POST", () => ({ status: 200, body: { checksEnabled: true, engines: [{ name: "llama", installed: "b10797", available: "b10800", availableKnown: true, update: "b10800" }] } })],
+  ["/stack/v1/updates/engines/llama-server/apply", "POST", () => ({ status: 200, body: { applied: true, tag: "b10800", previous: "b10797" } })],
+  [
+    "/stack/v1/updates/engines/llama-server/rollback",
+    "POST",
+    (body) => {
+      const b = body as { tag?: string };
+      return { status: 200, body: { ok: true, tag: b.tag } };
+    },
+  ],
+  ["/stack/v1/storage/sweep", "POST", () => ({ status: 200, body: { removed: ["sha256:aaaa"] } })],
+  [
+    "/stack/v1/check",
+    "POST",
+    () => ({
+      status: 200,
+      body: {
+        at: "2026-09-20T00:00:00Z",
+        ok: true,
+        results: [{ role: "chat", ok: true, ms: 12, reason: null, loadMs: null }],
+        fitTogether: { ok: true, reason: null },
+        reason: null,
+        generation: 1,
+      },
+    }),
+  ],
 ];
 
 let server: ReturnType<typeof Bun.serve>;
@@ -450,5 +475,17 @@ describe("createStackClient", () => {
     expect(((await client.hardware()) as { hardware: { isAppleSilicon: boolean } }).hardware.isAppleSilicon).toBe(true);
     expect(((await client.updates()) as { checksEnabled: boolean }).checksEnabled).toBe(true);
     expect(((await client.checkUpdates()) as { engines: Array<{ available: string }> }).engines[0]!.available).toBe("b10800");
+  });
+
+  test("applyEngineUpdate, rollbackEngine, sweepStorage and runCheck all answer", async () => {
+    const client = createStackClient({ baseUrl });
+    const applied = await client.applyEngineUpdate("llama-server");
+    expect(applied).toEqual({ applied: true, tag: "b10800", previous: "b10797" });
+    const rolledBack = await client.rollbackEngine("llama-server", "b10797");
+    expect(rolledBack).toEqual({ ok: true, tag: "b10797" });
+    expect((await client.sweepStorage()).removed).toEqual(["sha256:aaaa"]);
+    const run = await client.runCheck();
+    expect(run.ok).toBe(true);
+    expect(run.results[0]!.role).toBe("chat");
   });
 });

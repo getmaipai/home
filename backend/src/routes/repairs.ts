@@ -12,6 +12,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { listIssues, fixIssue, dismissIssue } from "@/lib/issues";
+import { syncStackHealthIssues } from "@/lib/stackHealthSync";
 import { Issue } from "@maipai/spec/gen/ts/issue.js";
 
 export const repairsRoutes = apiRouter();
@@ -41,7 +42,8 @@ const listRoute = createRoute({
     ...errorResponses({ 403: "Not owner/admin" }),
   },
 });
-repairsRoutes.openapi(listRoute, (c) => {
+repairsRoutes.openapi(listRoute, async (c) => {
+  await syncStackHealthIssues();
   const includeResolved = c.req.valid("query").include_resolved === "true";
   return c.json(listIssues({ includeResolved }), 200);
 });

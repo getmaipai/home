@@ -16,6 +16,11 @@ import type {
   EnginesListResponse,
   BudgetResponse,
   FailureBody,
+  StackUpdatesState,
+  StackEngineApplyResult,
+  StackEngineRollbackResult,
+  StackStorageSweepResult,
+  StackCheckRun,
 } from "./types";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8770";
@@ -59,8 +64,16 @@ export interface StackClient {
   applySettings(values: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   budget(opts?: { signal?: AbortSignal }): Promise<BudgetResponse>;
   hardware(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
-  updates(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
-  checkUpdates(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  updates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
+  checkUpdates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
+  /** POST /stack/v1/updates/engines/{name}/apply - stage, drain, swap and check. */
+  applyEngineUpdate(name: string, opts?: { signal?: AbortSignal }): Promise<StackEngineApplyResult>;
+  /** POST /stack/v1/updates/engines/{name}/rollback - go back to an installed build. */
+  rollbackEngine(name: string, tag: string, opts?: { signal?: AbortSignal }): Promise<StackEngineRollbackResult>;
+  /** POST /stack/v1/storage/sweep - prune orphaned blobs past their grace period. */
+  sweepStorage(opts?: { signal?: AbortSignal }): Promise<StackStorageSweepResult>;
+  /** POST /stack/v1/check - the readiness check, run now. */
+  runCheck(opts?: { signal?: AbortSignal }): Promise<StackCheckRun>;
   healthz(opts?: { signal?: AbortSignal }): Promise<{ ok: boolean; version: string; uptimeSeconds: number }>;
 }
 
@@ -292,8 +305,12 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     applySettings: (values, opts) => call("/stack/v1/settings/apply", jsonInit(values), json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     budget: (opts) => call("/stack/v1/hardware/budget", { method: "GET" }, json<BudgetResponse>, opts),
     hardware: (opts) => call("/stack/v1/hardware", { method: "GET" }, json<Record<string, unknown>>, opts),
-    updates: (opts) => call("/stack/v1/updates", { method: "GET" }, json<Record<string, unknown>>, opts),
-    checkUpdates: (opts) => call("/stack/v1/updates/check", { method: "POST" }, json<Record<string, unknown>>, opts),
+    updates: (opts) => call("/stack/v1/updates", { method: "GET" }, json<StackUpdatesState>, opts),
+    checkUpdates: (opts) => call("/stack/v1/updates/check", { method: "POST" }, json<StackUpdatesState>, opts),
+    applyEngineUpdate: (name, opts) => call(`/stack/v1/updates/engines/${encodeURIComponent(name)}/apply`, { method: "POST" }, json<StackEngineApplyResult>, opts),
+    rollbackEngine: (name, tag, opts) => call(`/stack/v1/updates/engines/${encodeURIComponent(name)}/rollback`, jsonInit({ tag }), json<StackEngineRollbackResult>, opts),
+    sweepStorage: (opts) => call("/stack/v1/storage/sweep", { method: "POST" }, json<StackStorageSweepResult>, opts),
+    runCheck: (opts) => call("/stack/v1/check", { method: "POST" }, json<StackCheckRun>, opts),
     healthz: (opts) => call("/healthz", { method: "GET" }, json<{ ok: boolean; version: string; uptimeSeconds: number }>, opts),
   };
 }

@@ -15717,10 +15717,10 @@
         "tags": [
           "Updates"
         ],
-        "summary": "The last known update check result (app only)",
+        "summary": "The last known update check result (app, plus the Stack's when configured)",
         "responses": {
           "200": {
-            "description": "Cached - does not itself call GitHub.",
+            "description": "app is cached (does not itself call GitHub); stack is a live read, null when no Stack is configured.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15790,6 +15790,98 @@
                     "error": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "stack": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "checksEnabled": {
+                          "type": "boolean"
+                        },
+                        "engines": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "installed": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "available": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "availableKnown": {
+                                "type": "boolean"
+                              },
+                              "lastChecked": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "installed",
+                              "available",
+                              "availableKnown",
+                              "lastChecked",
+                              "notes"
+                            ]
+                          }
+                        },
+                        "models": {
+                          "type": "object",
+                          "properties": {
+                            "lastChecked": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "entries": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "installed": {
+                                    "type": "string"
+                                  },
+                                  "available": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "installed",
+                                  "available"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "lastChecked",
+                            "entries"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "checksEnabled",
+                        "engines",
+                        "models"
+                      ]
+                    },
+                    "stackError": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -15803,7 +15895,9 @@
                     "needs",
                     "blockedBy",
                     "checkedAt",
-                    "error"
+                    "error",
+                    "stack",
+                    "stackError"
                   ]
                 }
               }
@@ -15921,6 +16015,390 @@
           },
           "403": {
             "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/stack/check": {
+      "post": {
+        "tags": [
+          "Updates"
+        ],
+        "summary": "Ask the Stack to read the Catalog index now",
+        "responses": {
+          "200": {
+            "description": "The state after the check.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checksEnabled": {
+                      "type": "boolean"
+                    },
+                    "engines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "installed": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "available": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "availableKnown": {
+                            "type": "boolean"
+                          },
+                          "lastChecked": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "installed",
+                          "available",
+                          "availableKnown",
+                          "lastChecked",
+                          "notes"
+                        ]
+                      }
+                    },
+                    "models": {
+                      "type": "object",
+                      "properties": {
+                        "lastChecked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "installed": {
+                                "type": "string"
+                              },
+                              "available": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "installed",
+                              "available"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "lastChecked",
+                        "entries"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "checksEnabled",
+                    "engines",
+                    "models"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/stack/engines/{name}/apply": {
+      "post": {
+        "tags": [
+          "Updates"
+        ],
+        "summary": "Stage, drain, swap and check the Stack's available engine build",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "llama-server"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "applied": {
+                      "type": "boolean"
+                    },
+                    "tag": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "previous": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "applied",
+                    "tag",
+                    "previous"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer, or the swap failed and was rolled back",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/stack/engines/{name}/rollback": {
+      "post": {
+        "tags": [
+          "Updates"
+        ],
+        "summary": "Go back to an installed engine build",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "llama-server"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tag"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rolled back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "tag": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "tag"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer, or the tag is not installed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/stack/sweep": {
+      "post": {
+        "tags": [
+          "Updates"
+        ],
+        "summary": "Prune the Stack's orphaned blobs past their grace period",
+        "responses": {
+          "200": {
+            "description": "The digests removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "removed"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/stack/readiness-check": {
+      "post": {
+        "tags": [
+          "Updates"
+        ],
+        "summary": "Run the Stack's readiness check now",
+        "responses": {
+          "200": {
+            "description": "The run's headline result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "at",
+                    "ok",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer",
             "content": {
               "application/json": {
                 "schema": {

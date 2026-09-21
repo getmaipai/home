@@ -211,6 +211,66 @@ export interface BudgetResponse {
   queue: Array<{ id: string; position: number; kind: "resident" | "jit" | "generator" }>;
 }
 
+// GET/POST /stack/v1/updates, /updates/check
+export interface StackEngineUpdate {
+  name: string;
+  installed: string | null;
+  available: string | null;
+  availableKnown: boolean;
+  lastChecked: string | null;
+  notes: string | null;
+}
+
+export interface StackModelUpdate {
+  id: string;
+  installed: string;
+  available: string | null;
+}
+
+export interface StackUpdatesState {
+  checksEnabled: boolean;
+  engines: StackEngineUpdate[];
+  models: { lastChecked: string | null; entries: StackModelUpdate[] };
+  recommendations: unknown[];
+}
+
+// POST /stack/v1/updates/engines/{name}/apply
+export interface StackEngineApplyResult {
+  applied: boolean;
+  tag: string | null;
+  previous: string | null;
+}
+
+// POST /stack/v1/updates/engines/{name}/rollback
+export interface StackEngineRollbackResult {
+  ok: true;
+  tag: string;
+}
+
+// POST /stack/v1/storage/sweep
+export interface StackStorageSweepResult {
+  removed: string[];
+}
+
+// POST /stack/v1/check, GET /stack/v1/check/latest
+export interface StackCheckRoleResult {
+  role: string;
+  ok: boolean;
+  ms: number;
+  reason: string | null;
+  loadMs: number | null;
+  skipped?: boolean;
+}
+
+export interface StackCheckRun {
+  at: string;
+  ok: boolean;
+  results: StackCheckRoleResult[];
+  fitTogether: { ok: boolean; reason: string | null };
+  reason: string | null;
+  generation: number;
+}
+
 // The failure body every role route returns with an error status.
 export interface FailureBody {
   error: string;

@@ -337,6 +337,7 @@ const ROUTES: RouteSpec[] = [
   { slug: "settings-users", path: "/settings/users" },
   { slug: "settings-devices", path: "/settings/devices" },
   { slug: "settings-repairs", path: "/settings/repairs" },
+  { slug: "settings-updates", path: "/settings/updates" },
 ];
 
 interface ViewportSpec {

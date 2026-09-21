@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, mock } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -7,6 +7,9 @@ import { checkForAppUpdate, cachedUpdateProjection, isNewerVersion } from "@/lib
 import { listPending } from "@/lib/notifications";
 import { sqlite } from "@/db";
 import type { PersonRow } from "@/types";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { startStackFixture, offlineResponse, type StackFixture } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
@@ -270,5 +273,136 @@ describe("GET/POST /api/updates", () => {
     } finally {
       restore();
     }
+  });
+});
+
+// HOME-STACK-05: the Stack's own engine/model rows beside Home's own
+// release row - null when engines.stack.url is empty (this file's
+// tests above, all unmodified).
+describe("GET /api/updates, with a configured Stack", () => {
+  let fixture: StackFixture;
+
+  afterEach(() => {
+    fixture?.stop();
+    __resetStackEngineForTests();
+  });
+
+  test("stack is null with no Stack configured", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const body = (await (await owner.get("/api/updates")).json()) as { stack: unknown };
+    expect(body.stack).toBeNull();
+  });
+
+  test("a fixture engine index makes an update row appear", async () => {
+    fixture = startStackFixture({
+      "GET /stack/v1/updates": async () =>
+        Response.json({ checksEnabled: true, engines: [{ name: "llama-server", installed: "b1", available: "b2", availableKnown: true, lastChecked: "2026-09-20T00:00:00Z", notes: "a note" }], models: { lastChecked: null, entries: [] } }),
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const body = (await (await owner.get("/api/updates")).json()) as { stack: { engines: Array<{ name: string; installed: string; available: string; availableKnown: boolean; lastChecked: string; notes: string }> } };
+    expect(body.stack.engines).toEqual([{ name: "llama-server", installed: "b1", available: "b2", availableKnown: true, lastChecked: "2026-09-20T00:00:00Z", notes: "a note" }]);
+  });
+
+  test("a Stack read failure surfaces stackError instead of silently reading as no Stack at all", async () => {
+    fixture = startStackFixture({
+      "GET /stack/v1/updates": async () => Response.json({ error: "the index is still loading" }, { status: 409 }),
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const body = (await (await owner.get("/api/updates")).json()) as { stack: unknown; stackError: string | null };
+    expect(body.stack).toBeNull();
+    expect(body.stackError).toBe("updates model unavailable: the index is still loading");
+  });
+
+  test("apply swaps the engine build", async () => {
+    fixture = startStackFixture({
+      "POST /stack/v1/updates/engines/llama-server/apply": async () => Response.json({ applied: true, tag: "b2", previous: "b1" }),
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.post("/api/updates/stack/engines/llama-server/apply", {});
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ applied: true, tag: "b2", previous: "b1" });
+  });
+
+  test("a scripted failed swap answers with the Stack's own rollback reason, not a guessed cause", async () => {
+    fixture = startStackFixture({
+      "POST /stack/v1/updates/engines/llama-server/apply": async () => Response.json({ error: "the swap failed and was rolled back to b1" }, { status: 400 }),
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.post("/api/updates/stack/engines/llama-server/apply", {});
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("the swap failed and was rolled back to b1");
+  });
+
+  test("rollback goes back to an installed build", async () => {
+    fixture = startStackFixture({
+      "POST /stack/v1/updates/engines/llama-server/rollback": async (req) => {
+        const { tag } = (await req.json()) as { tag: string };
+        return Response.json({ ok: true, tag });
+      },
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.post("/api/updates/stack/engines/llama-server/rollback", { tag: "b1" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, tag: "b1" });
+  });
+
+  test("sweep and readiness-check both answer, and a non-admin is refused all four", async () => {
+    fixture = startStackFixture({
+      "POST /stack/v1/storage/sweep": async () => Response.json({ removed: ["sha256:aaaa"] }),
+      "POST /stack/v1/check": async () => Response.json({ at: "2026-09-20T00:00:00Z", ok: true, results: [], fitTogether: { ok: true, reason: null }, reason: null, generation: 1 }),
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+
+    const sweepRes = await owner.post("/api/updates/stack/sweep", {});
+    expect(sweepRes.status).toBe(200);
+    expect(await sweepRes.json()).toEqual({ removed: ["sha256:aaaa"] });
+
+    const checkRes = await owner.post("/api/updates/stack/readiness-check", {});
+    expect(checkRes.status).toBe(200);
+    expect(await checkRes.json()).toEqual({ at: "2026-09-20T00:00:00Z", ok: true, reason: null });
+
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const adult = (await adultRes.json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
+    expect((await adultClient.post("/api/updates/stack/check", {})).status).toBe(403);
+    expect((await adultClient.post("/api/updates/stack/engines/llama-server/apply", {})).status).toBe(403);
+    expect((await adultClient.post("/api/updates/stack/engines/llama-server/rollback", { tag: "b1" })).status).toBe(403);
+    expect((await adultClient.post("/api/updates/stack/sweep", {})).status).toBe(403);
+    expect((await adultClient.post("/api/updates/stack/readiness-check", {})).status).toBe(403);
+  });
+
+  test("a scripted Stack offline answers 503 with the companion-free plain wording", async () => {
+    fixture = startStackFixture({
+      "POST /stack/v1/updates/check": async () => offlineResponse("updates", "the stack process is not running"),
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.post("/api/updates/stack/check", {});
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("updates model unavailable: the Stack is offline");
   });
 });

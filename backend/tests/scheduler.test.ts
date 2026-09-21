@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -10,6 +10,9 @@ import { eq } from "drizzle-orm";
 import { remember } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { listIssues } from "@/lib/issues";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { startStackFixture, IDENTITY_HEADERS, type StackFixture } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
@@ -300,6 +303,71 @@ describe("runDueJobs", () => {
 
     const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, scheduled.value.id)).get()!;
     expect(row.status).toBe("done"); // not somehow re-queued by the second, overlapping call
+  });
+
+  // HOME-STACK-05: the maintenance actions the Stack does not schedule
+  // for itself - gated on both engines.stack.url (this suite's own
+  // default is empty) and the Stack's own stack.updates.enabled.
+  describe("stack.updates.maintenance", () => {
+    let fixture: StackFixture;
+
+    afterEach(() => {
+      fixture?.stop();
+      __resetStackEngineForTests();
+    });
+
+    test("does nothing when no Stack is configured", async () => {
+      ensureCoreJob("stack.updates.maintenance", "every:1d");
+      db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).run();
+      const result = await runDueJobs(runPlugin);
+      expect(result.ran).toBe(1);
+      expect(result.errors).toBe(0);
+    });
+
+    test("does nothing when the Stack is configured but stack.updates.enabled is off", async () => {
+      const hits: string[] = [];
+      fixture = startStackFixture({
+        "GET /stack/v1/settings": async () => Response.json({ sections: [], settings: [{ key: "stack.updates.enabled", scope: "device", selector: "boolean", default: false, label: "Check for updates", level: "basic", lives_in: "stack", honoured_by: ["home"], needs_restart: false, in_effect: false, pending: null }] }),
+        "POST /stack/v1/updates/check": async () => { hits.push("check"); return Response.json({}); },
+        "POST /stack/v1/check": async () => { hits.push("readiness"); return Response.json({}); },
+        "POST /stack/v1/storage/sweep": async () => { hits.push("sweep"); return Response.json({ removed: [] }); },
+      });
+      setHouseholdSettingValue("engines.stack.url", fixture.url);
+      __setStackClientForTests(fixture.client);
+
+      ensureCoreJob("stack.updates.maintenance", "every:1d");
+      db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).run();
+      await runDueJobs(runPlugin);
+      expect(hits).toEqual([]);
+    });
+
+    test("runs the catalog check, the readiness check and the storage sweep, and logs each", async () => {
+      fixture = startStackFixture({
+        "GET /stack/v1/settings": async () => Response.json({ sections: [], settings: [{ key: "stack.updates.enabled", scope: "device", selector: "boolean", default: false, label: "Check for updates", level: "basic", lives_in: "stack", honoured_by: ["home"], needs_restart: false, in_effect: true, pending: null }] }),
+        "POST /stack/v1/updates/check": async () => Response.json({ checksEnabled: true, engines: [{ name: "llama-server", installed: "b1", available: "b2", availableKnown: true, lastChecked: "2026-09-20T00:00:00Z", notes: null }], models: { lastChecked: null, entries: [] } }, { headers: IDENTITY_HEADERS }),
+        "POST /stack/v1/check": async () => Response.json({ at: "2026-09-20T00:00:00Z", ok: true, results: [], fitTogether: { ok: true, reason: null }, reason: null, generation: 1 }),
+        "POST /stack/v1/storage/sweep": async () => Response.json({ removed: ["sha256:aaaa"] }),
+      });
+      setHouseholdSettingValue("engines.stack.url", fixture.url);
+      __setStackClientForTests(fixture.client);
+
+      ensureCoreJob("stack.updates.maintenance", "every:1d");
+      db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).run();
+
+      const logs: string[] = [];
+      const originalLog = console.log;
+      console.log = (...args: unknown[]) => { logs.push(String(args[0])); originalLog(...args); };
+      try {
+        const result = await runDueJobs(runPlugin);
+        expect(result.ran).toBe(1);
+        expect(result.errors).toBe(0);
+      } finally {
+        console.log = originalLog;
+      }
+      expect(logs.some((l) => l.includes("[stack-updates] catalog check ok, 1 engine(s)"))).toBe(true);
+      expect(logs.some((l) => l.includes("[stack-updates] readiness check ok"))).toBe(true);
+      expect(logs.some((l) => l.includes("[stack-updates] storage sweep removed 1 blob(s)"))).toBe(true);
+    });
   });
 });
 
