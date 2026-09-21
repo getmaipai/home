@@ -19141,7 +19141,7 @@ never be "studio" again, so every rule and Tailwind variant gated on
 it (the main nav rail's own geometry, the brand tile, the page title)
 went permanently dead; Studio's own values were promoted to
 unconditional in the same item (ui-v0.5.18) rather than left silently
-reverted to Calm's plainer fallback. Landed so far: HOME-UI-04 (the
+reverted to Calm's plainer fallback. Then, the same afternoon: CHAT-SDK-01 (c413594e, ui-v0.5.16), LOOK-01 (5822231a, neutral the named default, ui-v0.5.18), SHELL-02's first two slices of `/next/chat` (68784232 the Elements thread on a real turn with reasoning live; c0469d64 history and the thread list), SHELL-03 `/next/apps` (ebe0ceff, on GET /api/plugins), SHELL-04 `/next/people` (81494595), SHELL-05 `/next/settings` (3d1ff358, the registry renderer on the template's fields), SHELL-06 `/next/engines` (0ecfd157, with the honest "not configured" 200), and PWA-SW-01 (7712ee5f). Open: the chat's remaining slices (tools and generative UI, artifacts, suggestions and attachments and read-aloud), SHELL-07 and SHELL-08, then SHELL-09, the cutover and the deletion of the old interface. HOME-UI-04 (the
 stand-up, the Manage group on the template's tables view), HOME-UI-04b
 (the flag reachable, the collapsed rail, dark mode, the presets),
 HOME-UI-04d (one theme writer: the template's own ThemeProvider fed
