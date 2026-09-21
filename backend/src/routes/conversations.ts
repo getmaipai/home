@@ -64,7 +64,15 @@ conversationsRoutes.get("/", requireAuth, async (c) => {
   const actor = c.get("person");
   const person = c.req.query("person");
   const query = c.req.query("q");
-  return c.json(listConversations(actor, query ? undefined : person, query));
+  // HOME-UI-02e: was `query ? undefined : person` - a search query
+  // silently discarded whatever person was being viewed, sending an
+  // admin who typed a search while viewing a child's own thread list
+  // back to searching their own conversations instead, with nothing on
+  // screen saying so. `listConversations` itself already scopes the
+  // search to whichever target `personId` names (`target = personId ??
+  // actor.id`, conversationHistory.ts), so there was never a reason to
+  // drop it here.
+  return c.json(listConversations(actor, person, query));
 });
 
 conversationsRoutes.get("/turns", requireAuth, async (c) => {

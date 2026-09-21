@@ -2,17 +2,19 @@ import { SensesDock, type SenseItem } from "@maipai/ui/src/blocks/chat/SensesDoc
 import { ChildBand } from "@maipai/ui/src/blocks/chat/ChildBand";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, useAui, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Select } from "@maipai/ui/src/primitives/Select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@maipai/ui/src/ui/sheet";
 import { usePhoneMode } from "@maipai/ui/src/blocks/phone/PhoneMode";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { Thread } from "@/apps/chat/thread.aui";
-import { ThreadList, ThreadListNew } from "@maipai/ui/src/assistant-ui/thread-list.aui";
+import { ThreadList, ThreadListNew, type ThreadListActions } from "@maipai/ui/src/assistant-ui/thread-list.aui";
 import * as Popover from "@radix-ui/react-popover";
 import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-button";
-import { api } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type PersonRosterEntry } from "@/lib/api";
 import { useWakeWord } from "@/apps/chat/useWakeWord";
 import { getIcon } from "@maipai/ui/src/icons";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
@@ -67,6 +69,75 @@ interface ChatPageProps {
 }
 
 type ChatConversationMode = "chat" | "research" | "temporary";
+
+/** The thread list plus, for an owner or admin with more than one
+ * household member, the picker that switches whose list it shows -
+ * ConversationsPage's own admin-oversight function, restored (HOME-UI-
+ * 02e). Rendered twice (the desktop column, the phone/tablet sheet) so
+ * this is its own component rather than repeated inline JSX. */
+function ChatThreadListPanel({
+  person,
+  canViewOthers,
+  people,
+  viewingPersonId,
+  onViewingPersonChange,
+  actions,
+  onSearchQueryChange,
+}: {
+  person: Roster;
+  canViewOthers: boolean;
+  people: PersonRosterEntry[] | undefined;
+  viewingPersonId: string | undefined;
+  onViewingPersonChange: (personId: string | undefined) => void;
+  actions: ThreadListActions | undefined;
+  onSearchQueryChange: (query: string) => void;
+}) {
+  const others = people?.filter((p) => p.id !== person.id) ?? [];
+  const viewingSelf = viewingPersonId === undefined || viewingPersonId === person.id;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {canViewOthers && others.length > 0 && (
+        <Select
+          aria-label="Whose chats"
+          value={viewingPersonId ?? person.id}
+          onValueChange={(value) => onViewingPersonChange(value === person.id ? undefined : value)}
+          options={[person.id, ...others.map((p) => p.id)]}
+          getLabel={(id) => (id === person.id ? "You" : (others.find((p) => p.id === id)?.display_name ?? id))}
+        />
+      )}
+      {/* pinnable unconditional (not gated on viewingSelf, unlike
+          actions below): Home's own adapter always implements
+          updateCustom, and the backend's own PATCH route already
+          enforces the same canAccessPerson() check pinning would need -
+          an admin looking at a child's own list can pin their threads
+          the same way ConversationsPage's own retired page let them.
+          newChatEnabled={viewingSelf}: the kit's own adapter has no
+          per-target `initialize()`, so a "New chat" clicked while
+          viewing someone else would create the conversation under the
+          viewer instead and splice into what the screen still labels
+          as the other person's list. key={viewingPersonId ?? "self"}
+          (a code review, critical): without it, the kit's own multi-
+          select state (selectMode/selected) is plain useState inside
+          `ThreadList` with nothing to reset it on a person switch - a
+          selection begun on the admin's own list would survive the
+          switch, could gain a child's thread too, and "Delete selected"
+          would submit a mixed id list the backend's own per-id
+          `canAccessPerson` check actually allows, silently deleting the
+          child's conversation while the screen only ever showed "You"
+          at the moment of the click. Changing `key` forces React to
+          fully unmount and remount `ThreadList` on every switch,
+          resetting all of its own internal state, not just the parts
+          this file happens to know about. */}
+      <ThreadList
+        key={viewingPersonId ?? "self"}
+        actions={actions}
+        pinnable
+        newChatEnabled={viewingSelf}
+        onSearchQueryChange={onSearchQueryChange}
+      />
+    </div>
+  );
+}
 
 export function ChatPage({ person }: ChatPageProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -189,6 +260,29 @@ export function ChatPage({ person }: ChatPageProps) {
   // prompts). A failed or slow reply's own recovery UI lives on the turn
   // itself now (thread.aui.tsx's MessageError/indicator), not a second
   // status surface here (spec.md "Empty, loading, error").
+  // HOME-UI-02e: restoring ConversationsPage's own admin oversight -
+  // `viewingPersonId` undefined means "my own list," the same
+  // convention the retired page used (`viewing` state there). Declared
+  // ahead of `composerDisabledReason`/`composerDisabledRef` below: the
+  // STT auto-send path reads that ref directly, bypassing the rendered
+  // composer's own `disabled` prop entirely, so `viewingSelf` has to be
+  // known before that ref's first assignment, not computed later and
+  // left stale for voice turns the same way a code review already
+  // found once for the engine-health reason (2026-09-06, the "Starting…
+  // shown while chat still accepted prompts" bug this whole ref exists
+  // to close).
+  const [viewingPersonId, setViewingPersonId] = useState<string | undefined>(undefined);
+  const viewingSelf = viewingPersonId === undefined || viewingPersonId === person.id;
+  // `getConversationId()`'s own `api.resumeConversation` rejects any
+  // conversation whose `personId` isn't the actor's
+  // (conversationHistory.ts) - opening one of a child's real
+  // conversations and replying used to fail with an opaque error
+  // instead of being prevented (a code review). Not layered onto
+  // `brainBad`/`ChatBrainBadContext` below - that context means "the
+  // engine is unhealthy," a different concept a person viewing someone
+  // else's list shouldn't see conflated with.
+  const viewingOthersComposerReason = viewingSelf ? undefined : "Viewing someone else's chats - switch back to “You” to reply.";
+
   const health = useEngineHealth();
   const composerDisabledReason = brainBlockReason(health?.brain);
   // One definition of "bad" for both consumers: `brainBlockReason`'s own
@@ -227,7 +321,7 @@ export function ChatPage({ person }: ChatPageProps) {
   // exact bug this whole gate exists to close, just through voice
   // instead of the keyboard.
   const composerDisabledRef = useRef<string | undefined>(undefined);
-  composerDisabledRef.current = composerDisabledReason;
+  composerDisabledRef.current = composerDisabledReason ?? viewingOthersComposerReason;
 
   const suggestionAdapter = useMemo(() => createChatSuggestionAdapter(initialText), [initialText]);
   const imageAttachmentAdapter = useMemo(
@@ -252,7 +346,38 @@ export function ChatPage({ person }: ChatPageProps) {
       }),
     [],
   );
-  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
+  // Multi-select, clear-all, and server-side search - the rest of
+  // ConversationsPage's own admin-oversight restoration (design doc's
+  // "Conversations live inside Chat"); `viewingPersonId`/`viewingSelf`
+  // themselves are declared above, ahead of `composerDisabledReason`.
+  // Re-creating the adapter on either change is the documented way to
+  // make `useRemoteThreadListRuntime` reload (its own
+  // `RemoteThreadListOptions.adapter` doc comment: "the adapter
+  // reference should remain stable across renders. Replacing it reloads
+  // the list").
+  const [threadSearchQuery, setThreadSearchQuery] = useState("");
+  const canViewOthers = isOwnerOrAdminRole(person.role);
+  // staleTime matches the sibling admin-gated pattern (useHubStatus.ts's
+  // own `hardware` query) - the roster barely changes, so a return trip
+  // to Chat shouldn't refetch it every time.
+  const peopleQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people(), staleTime: 5 * 60 * 1000, enabled: canViewOthers });
+  const threadListAdapter = useMemo(
+    () => createChatThreadListAdapter(person.display_name, { personId: viewingSelf ? undefined : viewingPersonId, query: threadSearchQuery.trim() || undefined }),
+    [person.display_name, viewingSelf, viewingPersonId, threadSearchQuery],
+  );
+  // Only offered for the actor's own list, matching the retired page's
+  // own gating: `api.clearConversations()` only ever deletes the
+  // actor's own conversations regardless of who's being viewed
+  // (conversationHistory.ts's own `clearConversations`), so offering it
+  // while viewing someone else would silently do nothing useful - hiding
+  // it here is the honest UI for what the endpoint actually does, not
+  // just belt-and-suspenders.
+  const threadListActions: ThreadListActions | undefined = viewingSelf
+    ? {
+        batchDelete: async (remoteIds) => { await api.batchDeleteConversations(remoteIds); },
+        clearAll: async () => { await api.clearConversations(); },
+      }
+    : undefined;
 
   // A named, `use`-prefixed function, not an inline arrow: `useRemoteThreadListRuntime`
   // calls `runtimeHook` from inside its own render (assistant-ui's documented
@@ -301,6 +426,24 @@ export function ChatPage({ person }: ChatPageProps) {
       setThreadsOpen(false);
     },
   });
+
+  // One element, rendered at both the desktop aside and the phone/tablet
+  // Sheet's own content below - a code review caught the two call sites
+  // being copy-pasted with identical props (nothing differs between
+  // them); reusing the same element reference at two different tree
+  // positions is a normal React pattern, not a "rendered twice" bug -
+  // each gets its own component instance from its own parent position.
+  const threadListPanel = (
+    <ChatThreadListPanel
+      person={person}
+      canViewOthers={canViewOthers}
+      people={peopleQuery.data}
+      viewingPersonId={viewingPersonId}
+      onViewingPersonChange={setViewingPersonId}
+      actions={threadListActions}
+      onSearchQueryChange={setThreadSearchQuery}
+    />
+  );
 
   return (
     // SensesDock's own Tooltip needs an ancestor TooltipProvider - the
@@ -370,7 +513,14 @@ export function ChatPage({ person }: ChatPageProps) {
                   the column") - this header shortcut exists only where
                   the list starts hidden inside the sheet (phone and
                   tablet - `lg:`, not `sm:`, see the toggle button above). */}
-              <ThreadListNew aria-label="New chat" className="relative lg:hidden size-9 justify-center p-0 before:absolute before:-inset-1.5 before:content-['']" labelClassName="sr-only" />
+              {/* viewingSelf-gated (a code review): this header shortcut
+                  is a second, standalone `<ThreadListNew>` outside the
+                  kit's own `<ThreadList>` toolbar, so `newChatEnabled`
+                  on that component never reaches it - the same
+                  cross-person-splice gap `newChatEnabled` exists to
+                  close, reachable through this second entry point until
+                  it's gated the same way here directly. */}
+              {viewingSelf && <ThreadListNew aria-label="New chat" className="relative lg:hidden size-9 justify-center p-0 before:absolute before:-inset-1.5 before:content-['']" labelClassName="sr-only" />}
             </div>
             {/* spec.md "The senses dock and the model picker": the model
                 picker is not a chat control - it lives in the header
@@ -394,7 +544,7 @@ export function ChatPage({ person }: ChatPageProps) {
                 Message input textarea at 820px, found live in the full
                 screenshot matrix. */}
             <aside className="hidden w-[280px] shrink-0 flex-col overflow-y-auto border-e border-border/60 bg-background p-2 lg:flex">
-              <ThreadList />
+              {threadListPanel}
             </aside>
             <Sheet open={sheetOpen} onOpenChange={setThreadsOpen}>
               <SheetContent id="chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-2 lg:hidden">
@@ -402,11 +552,11 @@ export function ChatPage({ person }: ChatPageProps) {
                   <SheetTitle>Conversations</SheetTitle>
                   <SheetDescription>Your chat threads</SheetDescription>
                 </SheetHeader>
-                <ThreadList />
+                {threadListPanel}
               </SheetContent>
             </Sheet>
             <div className="min-h-0 min-w-0 flex-1">
-              <Thread composerDisabled={composerDisabledReason !== undefined} composerDisabledReason={composerDisabledReason}
+              <Thread composerDisabled={composerDisabledReason !== undefined || viewingOthersComposerReason !== undefined} composerDisabledReason={composerDisabledReason ?? viewingOthersComposerReason}
                 composerToolbar={<>
                   <Popover.Root>
                     <Popover.Trigger asChild>

@@ -31,7 +31,7 @@
 // best-effort upgrade on top of it, not a precondition. See
 // summarizeBeforeDelete()'s own comment for exactly what that means
 // when no real model is running yet.
-import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc, like } from "drizzle-orm";
+import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc, sql } from "drizzle-orm";
 import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
@@ -1005,7 +1005,13 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
     .all();
   const normalizedQuery = query?.trim() ?? "";
   if (normalizedQuery) {
-    const pattern = `%${normalizedQuery}%`;
+    // `%`/`_` are LIKE wildcards (a bare backslash isn't, without an
+    // ESCAPE clause naming one) - a literal search for "50% off" would
+    // otherwise match anything with "50", any character, " off" instead
+    // of the substring actually typed. Escaping the query and naming
+    // `\` as the escape character makes every character in it literal.
+    const escapedQuery = normalizedQuery.replace(/[\\%_]/g, "\\$&");
+    const pattern = `%${escapedQuery}%`;
     const matchingTitleIds = db
       .select({ id: conversations.id })
       .from(conversations)
@@ -1014,7 +1020,7 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
           eq(conversations.personId, target),
           not(eq(conversations.status, "deleted")),
           not(eq(conversations.mode, "temporary")),
-          like(conversations.title, pattern),
+          sql`${conversations.title} LIKE ${pattern} ESCAPE '\\'`,
         ),
       )
       .all()
@@ -1025,7 +1031,7 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
       .where(
         and(
           eq(conversationTurns.personId, target),
-          or(like(conversationTurns.userText, pattern), like(conversationTurns.replyText, pattern)),
+          or(sql`${conversationTurns.userText} LIKE ${pattern} ESCAPE '\\'`, sql`${conversationTurns.replyText} LIKE ${pattern} ESCAPE '\\'`),
         ),
       )
       .all()

@@ -251,6 +251,7 @@ const chatResearchReview = process.argv.includes("--chat-research-review");
 // attachment together, a streaming reply, the engine-not-ready state).
 const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
+const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const settingsReview = process.argv.includes("--settings-review");
 const pictureReview = process.argv.includes("--picture-review");
 let pictureSearchServer: ReturnType<typeof Bun.serve> | undefined;
@@ -1708,6 +1709,56 @@ async function captureShellRail(browser: Browser, sessionValue: string, theme: "
   }
 }
 
+/** HOME-UI-02e part two's own acceptance (COORDINATOR: "Captures at
+ * 1440 and 390 with the list open and a selection active") - the
+ * thread list's own restored multi-select, seeded with two real chat
+ * threads (not the empty state) so the batch bar and a checked row both
+ * show real content, not a placeholder. Written to data-scratch/ like
+ * this file's other named review captures - a verification shot for
+ * the coordinator to judge, not a permanent docs asset. */
+async function captureChatThreadActionsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+
+  async function seedConversation(title: string): Promise<void> {
+    const created = await fetch(`${BASE_URL}/api/conversations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...cookie },
+      body: JSON.stringify({ surface: "chat" }),
+    });
+    const row = (await created.json()) as { id: string };
+    await fetch(`${BASE_URL}/api/conversations/${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...cookie },
+      body: JSON.stringify({ title }),
+    });
+  }
+  await seedConversation("Weekend garden plans");
+  await seedConversation("Shopping list ideas");
+
+  for (const viewport of [VIEWPORTS.find((v) => v.slug === "desktop")!, VIEWPORTS.find((v) => v.slug === "phone")!]) {
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.goto(viewport.slug === "phone" ? `${BASE_URL}/chat?list=1` : `${BASE_URL}/chat`);
+      await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+      await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+      await page.getByText("Weekend garden plans", { exact: true }).waitFor();
+      await page.getByRole("button", { name: "Select chats" }).click();
+      await page.getByRole("checkbox", { name: "Select “Weekend garden plans”" }).click();
+      await page.getByText("1 selected", { exact: true }).waitFor();
+      await settleAnimations(page);
+      const file = `chat-thread-actions-${viewport.slug}-dark.png`;
+      await page.screenshot({ path: join(outDir, file), fullPage: true });
+      console.log(`Wrote ${join(outDir, file)}`);
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function captureHero(browser: Browser, sessionValue: string): Promise<void> {
   const context = await newContext(browser, { slug: "desktop", width: 1280, height: 800 }, "dark", sessionValue);
   try {
@@ -2327,7 +2378,11 @@ async function main() {
       await captureShellRail(browser, sessionValue, "dark");
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !notificationsReview && !lookReview && !pictureReview) {
+    if (!a11yOnly && chatThreadActionsReview) {
+      await captureChatThreadActionsReview(browser, sessionValue);
+    }
+
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !notificationsReview && !lookReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;

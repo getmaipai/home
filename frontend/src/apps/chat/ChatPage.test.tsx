@@ -41,6 +41,16 @@ function stubFetch(options: { ttsCalls?: string[]; brain?: string; settingWrites
     if (url.includes("/api/health")) return Promise.resolve(new Response(JSON.stringify({ brain: options.brain ?? "llama-server", voice: "none" }), { status: 200 }));
     if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-example123", status: "open", surface: "chat" }));
     if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    // HOME-UI-02e's own person picker fires for makePerson()'s "owner"
+    // role - unstubbed before a code review caught it, so every test
+    // here silently swallowed a failed fetch inside react-query instead
+    // of failing loud (react-query never rethrows a queryFn rejection
+    // into the render). Just the acting person: `others` filters to
+    // empty, so the picker itself stays unrendered here, same as before
+    // this endpoint existed - a real rendered test of the picker with a
+    // second person belongs in its own test, not grafted onto every
+    // existing one.
+    if (url.includes("/api/people")) return Promise.resolve(Response.json([makePerson()]));
     if (url.includes("/api/plugins")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/settings?") && (!init?.method || init.method === "GET")) return Promise.resolve(Response.json([]));
@@ -130,6 +140,46 @@ describe("ChatPage", () => {
       await view.findByLabelText("Message input");
       expect(view.queryByRole("button", { name: /temporary chat/i })).toBeNull();
       expect(view.queryByText(/not saved to normal history or memory/i)).toBeNull();
+    } finally { restore(); }
+  });
+
+  // A code review caught a critical bug this test guards: the thread
+  // list's own multi-select state used to have nothing resetting it
+  // when the person picker switched targets, so a selection begun on
+  // the owner's own list could survive the switch, gain one of the
+  // child's own threads too, and "Delete selected" would submit a
+  // mixed id list the backend's own per-id permission check actually
+  // allows - genuinely deleting the child's conversation while the
+  // screen only ever showed "You" at the moment of the click. The fix
+  // (a `key` on the kit's own `<ThreadList>` tied to the viewed person)
+  // is exercised here for real, not just reasoned about: enter select
+  // mode, check a thread, switch the picker, and confirm the selection
+  // - and select mode itself - didn't survive the switch.
+  test("switching the person picker resets an in-progress selection, not just the visible list", async () => {
+    const child = { ...makePerson(), id: "person-child456", display_name: "Bramble", role: "child" as const };
+    const restore = stubFetch();
+    const fallback = globalThis.fetch;
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/people")) return Response.json([makePerson(), child]);
+      if (url === "/api/conversations") return Response.json([{ id: "conv-mine123", title: "My own chat", surface: "chat", created_at: "2026-09-07T00:00:00Z", pinned: false }]);
+      if (url === `/api/conversations?person=${child.id}`) return Response.json([{ id: "conv-bramble123", title: "Bramble's chat", surface: "chat", created_at: "2026-09-07T00:00:00Z", pinned: false }]);
+      return fallback(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+      await view.findByText("My own chat");
+      fireEvent.click(await view.findByRole("button", { name: "Select chats" }));
+      fireEvent.click(await view.findByRole("checkbox", { name: "Select “My own chat”" }));
+      await view.findByText("1 selected");
+
+      fireEvent.click(await view.findByRole("combobox", { name: "Whose chats" }));
+      fireEvent.click(await view.findByRole("option", { name: "Bramble" }));
+      await view.findByText("Bramble's chat");
+
+      expect(view.queryByText("1 selected")).toBeNull();
+      expect(view.queryByRole("button", { name: "Exit select mode" })).toBeNull();
+      expect(view.queryByRole("checkbox")).toBeNull();
     } finally { restore(); }
   });
 
@@ -411,6 +461,7 @@ function stubFetchWithSources(replyText: string, sources: unknown[]): () => void
     if (url.includes("/api/health")) return Promise.resolve(new Response(JSON.stringify({ brain: "llama-server", voice: "none" }), { status: 200 }));
     if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-example123", status: "open", surface: "chat" }));
     if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    if (url.includes("/api/people")) return Promise.resolve(Response.json([makePerson()]));
     if (url.includes("/api/plugins")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/turn/stream")) {

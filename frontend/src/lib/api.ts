@@ -420,6 +420,20 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ title, ...(pinned === undefined ? {} : { pinned }) }),
     }),
+  // No `title` in the body at all, not `title: undefined` - the PATCH
+  // route reads `body.title === undefined` as "leave it alone"
+  // (conversationHistory.ts's own updateConversationTitle()); a JSON
+  // body with an explicit `title` key set to anything, even `undefined`
+  // stringified away, is indistinguishable from omitting the key once
+  // serialized, but writing the request this way (its own body shape,
+  // not a call to renameConversation with a title it would have to
+  // track and resend) keeps a pin toggle from ever needing the
+  // conversation's own current title just to leave it untouched.
+  setConversationPinned: (id: string, pinned: boolean) =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ pinned }),
+    }),
   setConversationMode: (id: string, mode: Conversation["mode"]) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "PATCH",

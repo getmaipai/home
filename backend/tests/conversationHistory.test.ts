@@ -768,6 +768,54 @@ describe("GET /api/conversations (step 3: now lists conversation THREADS, not tu
     expect(rows[0]!.pinned).toBe(true);
     expect(rows[0]!.title).toBe("First conversation");
   });
+
+  // HOME-UI-02e: the route used to read `query ? undefined : person`,
+  // silently dropping whichever person was being viewed the moment a
+  // search query was present - an admin viewing a child's own thread
+  // list who then searched would have gotten back their OWN matching
+  // conversations instead, with nothing on screen saying the view had
+  // switched. Both params are independent (conversationHistory.ts's own
+  // `listConversations` already scopes a query to whichever `personId`
+  // it's given); the route just needed to stop discarding one.
+  test("combines person and search: an admin's query searches the viewed child's own conversations, not the admin's", async () => {
+    const { client, actor } = await owner();
+    const ownMatching = resolveOrCreateConversation(actor, "chat");
+    if (!ownMatching.ok) throw new Error(ownMatching.error);
+    logTurn(actor, "chat", "garden notes for me", { reply: { text: "compost tips" }, source: "model", safety: SAFE, conversation_id: ownMatching.value.id, turn_id: "turn-combo-own" });
+
+    const child = await addPerson(client, "Bramble", "child");
+    const childMatching = resolveOrCreateConversation(child, "chat");
+    if (!childMatching.ok) throw new Error(childMatching.error);
+    logTurn(child, "chat", "garden notes for Bramble", { reply: { text: "compost tips" }, source: "model", safety: SAFE, conversation_id: childMatching.value.id, turn_id: "turn-combo-child" });
+
+    const res = await client.get(`/api/conversations?person=${child.id}&q=garden`);
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<{ id: string }>;
+    expect(rows.map((row) => row.id)).toEqual([childMatching.value.id]);
+  });
+
+  // HOME-UI-02e's own search box is the first real, user-reachable
+  // caller of this LIKE query since ConversationsPage was deleted -
+  // `%`/`_` are LIKE wildcards, so a literal search for "50% off"
+  // matching anything shaped "50<any char> off" instead of the actual
+  // substring typed is a correctness bug, not just a theoretical one,
+  // once a person can actually type it into a box.
+  test("a literal percent or underscore in the query matches literally, not as a SQL wildcard", async () => {
+    const { client, actor } = await owner();
+    const discount = resolveOrCreateConversation(actor, "chat");
+    if (!discount.ok) throw new Error(discount.error);
+    logTurn(actor, "chat", "found a 50% off coupon", { reply: { text: "nice find" }, source: "model", safety: SAFE, conversation_id: discount.value.id, turn_id: "turn-escape-percent" });
+    const unrelated = createConversation(actor, { surface: "chat" });
+    if (!unrelated.ok) throw new Error(unrelated.error);
+    logTurn(actor, "chat", "50x off the mark", { reply: { text: "way off" }, source: "model", safety: SAFE, conversation_id: unrelated.value.id, turn_id: "turn-escape-unrelated" });
+
+    const literalPercent = await client.get(`/api/conversations?q=${encodeURIComponent("50%")}`);
+    const literalRows = (await literalPercent.json()) as Array<{ id: string }>;
+    expect(literalRows.map((row) => row.id)).toEqual([discount.value.id]);
+
+    const wildcardAttempt = await client.get(`/api/conversations?q=${encodeURIComponent("50_off")}`);
+    expect(await wildcardAttempt.json()).toEqual([]);
+  });
 });
 
 describe("GET /api/conversations/turns (the pre-existing flat-turn-list behaviour, moved here unchanged)", () => {

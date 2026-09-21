@@ -6350,9 +6350,9 @@ approvals are still real, unstarted work for a future session.
       reference image itself is another product's screen and stays out
       of both repos); `panelOverflow.test.ts` proving the new check
       catches a seeded overflow.
-- [ ] **HOME-UI-02e: rail geometry corrected, then Conversations' own
-      real functions move into Chat's thread list** (S-M) - two parts.
-      **Part one, done (`ui-v0.4.3`/`.4`, 2026-09-20):** HOME-UI-02d's
+- [x] **HOME-UI-02e: rail geometry corrected, then Conversations' own
+      real functions move into Chat's thread list** (S-M) - two parts,
+      both done. **Part one (`ui-v0.4.3`/`.4`, 2026-09-20):** HOME-UI-02d's
       own committed capture didn't match the rail-geometry numbers it
       claimed to (pixel-measured, not visually scanned) - the active
       pill unset, the brand tile clipped at x 0, no gap before the
@@ -6363,33 +6363,34 @@ approvals are still real, unstarted work for a future session.
       kit's own fix could have worked until `Brand` forwarded its
       props). `hubIdentity.ts`'s `MAIPAI_DEMO_HUB_NAME` env-var branch
       removed too. Full account in [dev.md](dev.md)'s own "Rail
-      geometry, corrected again" entry. **Part two, not started:**
-      HOME-UI-02d's own removed-behavior audit found four things the
-      old Conversations page did that the new thread list doesn't: a
-      person picker for an admin's
-      oversight of a child's conversations (the same permission check
-      the deleted page used), multi-select with batch delete and a
-      clear-all (the org's own standing rule: batch delete on every
-      deletable list), pin and unpin on the thread row and its menu,
-      and search backed by the existing server-side message-body
-      search, not the new list's client-side title-only filter. Ruled
-      not an accepted loss (design doc's own "Conversations live
-      inside Chat" section has the full account); scoped right after
-      02d lands, before HOME-UI-03. Files: `frontend/src/apps/chat/
-      chatThreadListAdapter.ts` (only exposes single-thread `delete`/
-      `rename` today), `commons/ui/src/assistant-ui/thread-list.aui.tsx`
-      (`ThreadListItem`/`useThreadListGroups`, the kit component these
-      four land in - check with `commons`'s own maintainer before
-      editing there). `api.batchDeleteConversations`/
-      `api.clearConversations` (`frontend/src/lib/api.ts`) and the
-      backend's own pin field already exist and are unused from the
-      frontend today - confirm each is still wired correctly on the
-      backend before building the UI on top of it. Exit check: `bash
-      scripts/check.sh` green; a regression test per restored function
-      (a parent picking a child's own thread list and seeing only
-      theirs, a batch-delete removing exactly the selected threads, a
-      clear-all, pin surviving a reload, a message-body search finding
-      a thread its title never mentions).
+      geometry, corrected again" entry. **Part two (`ui-v0.4.8`,
+      2026-09-20):** the four things the old Conversations page did
+      that the new thread list didn't - a person picker for an admin's
+      oversight of a child's conversations, multi-select with batch
+      delete and a clear-all, pin and unpin on the thread row and its
+      menu, and search backed by the existing server-side message-body
+      search - are all restored. `chatThreadListAdapter.ts` now takes
+      `{ personId, query }` and implements `updateCustom` for pin
+      (piggybacking on `RemoteThreadListAdapter`'s own `custom`
+      extension point, not a new adapter shape); `thread-list.aui.tsx`
+      (the kit) gained multi-select, a batch bar, clear-all, and pin UI
+      behind a new opt-in `actions`/`pinnable` prop pair, so a caller
+      that doesn't supply them is unaffected. A real backend bug
+      surfaced along the way and is fixed too: `GET /api/conversations`
+      used to silently drop whichever person was being viewed the
+      moment a search query was present (`query ? undefined : person`),
+      so an admin searching while viewing a child's own list would have
+      searched their own conversations instead. Full account in
+      [dev.md](dev.md)'s own "Conversations' real functions, restored"
+      entry. Exit check: `bash scripts/check.sh` green; a regression
+      test per restored function (a parent picking a child's own thread
+      list and seeing only theirs, a batch-delete removing exactly the
+      selected threads, a clear-all, pin surviving a reload, a
+      message-body search finding a thread its title never mentions) -
+      all five in `chatThreadListAdapter.test.ts` and
+      `conversationHistory.test.ts`; captures at 1440 (list open, a
+      selection active) and 390 - the 390 capture is blocked by a
+      pre-existing, unrelated bug (see dev.md).
 - [ ] **HOME-UI-02f: fold the phone header's search/theme/bell into the
       avatar menu, the bell as a dot** (S) - HOME-UI-02d's own known
       gap, flagged and left unfixed at the time: the phone header still
