@@ -9,11 +9,18 @@ loud would"), which is right for a robot and wrong on a screen where
 someone typed a question and is reading. ChatGPT gives long structured
 answers when typed and two-sentence answers in Voice, and nobody calls
 Voice incomplete. So the register follows the surface, not a setting.
-There are no user-facing controls: no answer-length preference, no
-Quick/Thorough picker. The owner's worry, that a control adds
-confusion, is the ruling; the only override is language, which people
-already use ("shorter", "tell me more", "just the number", "read me the
-whole thing"), honored for that turn and the next few.
+The controls are exactly ChatGPT's and nothing more (the owner's
+ruling, revised the same evening: "follow what ChatGPT does exactly"):
+the composer carries a thinking-effort control and a model picker
+whose label reads the current choice ("Instant"), both from the
+shipped Elements (`composer-model-picker`, the effort control if the
+catalog ships one, otherwise the picker's own options), fed by the
+Stack's roles and models through the Engines API; there is no
+answer-length preference anywhere, on the settings page or in the
+composer, because ChatGPT has none. Beyond those two controls the
+override is language, which people already use ("shorter", "tell me
+more", "just the number", "read me the whole thing"), honored for that
+turn and the next few.
 
 ## Why this is a contract and not a prompt tweak
 
@@ -93,7 +100,18 @@ already expects, not a mode.
    `reply.speech`; a tap opens the screen contract. Blocked on the hub
    device; the wire needs nothing new.
 
-Nothing here adds a setting; `ui.*` keys are untouched. The chat
+4. **RESP-04, the composer's two controls (S, with SHELL-02 slice
+   5).** The `composer-model-picker` Element as shipped, its options the
+   Stack's models for the chat role (or Home's configured engines
+   until the Stack runs Home), the label reading the current one; the
+   thinking-effort control from the catalog if it ships one, else the
+   picker's options carry it (Instant, Thinking); the choice rides the
+   turn request (`thinking`, `model`) and is remembered per person
+   without a settings page (the last choice, stored with the
+   conversation). Voice and glance surfaces have no controls, as
+   ChatGPT Voice has none.
+
+Nothing here adds a settings key; `ui.*` keys are untouched. The chat
 page's Elements already render everything the screen contract names
 (SHELL-02's slices); the voice surfaces already consume
 `reply.speech`. The order after the shell program: RESP-01 first,
