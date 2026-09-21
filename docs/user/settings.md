@@ -30,6 +30,10 @@ Switch to the **Me** tab for your own personal preferences:
 - **Commands**: teach MaiPai a phrase of your own. For example, "when I say movie night, dim the lights."
 - **Devices & sessions**: see what's signed in as you. Sign out anything you don't recognize.
 
+## With the new look on
+
+If you turned on **New shell (preview)**, the Settings page has two tabs at the top, **Household** and **Me**. Each setting sits in a card with its name and a short note. Pick **Look** under Me to change the colors of the whole app. The change shows right away, with no reload. A **Reset to default** link appears next to anything you changed. Some pages, like Users, Models, Backups and Voices, still open in the old look for now.
+
 ## Find a setting fast
 
 Use the **Search settings** box at the top of the page. It jumps you straight to what you're looking for.
