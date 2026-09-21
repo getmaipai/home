@@ -51,7 +51,16 @@ moved `@assistant-ui/core` 0.3.17 to 0.3.20 and broke the chat's tests before
 it was caught by diffing against a clean `origin/main` worktree). On a
 lockfile conflict, take `main`'s `bun.lock` whole, then `bun install --force`;
 the diff against a clean `origin/main` worktree before committing is what
-proves only your pin moved.
+proves only your pin moved. The same applies to the main checkout that serves `localhost:8787`:
+a pin bump landed on `main` is not on 8787 until `bun install --force`
+has run in that checkout's `frontend/` and `backend/`, because `bun
+restart` rebuilds with whatever `file:` snapshot the store already
+holds (2026-09-21: 8787 served a build with the kit's single-root fix
+but the previous tag's palette, because the bump to ui-v0.5.13 was
+installed in the session's worktree and never in `main`'s). A done
+report's "what you see on reload" line is proven on 8787 itself after
+the restart, by a probe or a screenshot taken from that port, never
+from a worktree's own build.
 
 Commands: from the repo root (the `home/` folder containing `package.json`),
 `bun start` builds and starts the local app in the background and prints
