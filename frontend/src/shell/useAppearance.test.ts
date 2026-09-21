@@ -49,16 +49,44 @@ describe("useAppearance", () => {
     }
   });
 
-  test("system leaves neither class applied", async () => {
+  // HOME-UI-04b: "system" always resolves to a concrete class now, not
+  // neither - found live on /next/apps, the vendored shadcndashboard
+  // template's own `dark:*` Tailwind utilities are gated by this
+  // project's `@custom-variant dark (&:is(.dark *))`, which needs a
+  // literal `.dark` ancestor and never matches the OS-level
+  // `prefers-color-scheme` media query the kit's own CSS-variable
+  // tokens already followed with no class needed. Leaving both classes
+  // off under "system" - the default for every real person - left
+  // every such utility dead. Both matchMedia outcomes covered, mocked
+  // rather than relying on the test environment's own default.
+  test("system resolves to .dark when the OS prefers dark", async () => {
     const restore = stubFetch({
       "/api/settings": [{ key: "ui.appearance", value: "system", scope: "person" }],
     });
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = mock(() => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
     try {
       renderHook(() => useAppearance("person-1"));
-      await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-      expect(document.documentElement.classList.contains("dark")).toBe(false);
+      await waitFor(() => expect(document.documentElement.classList.contains("dark")).toBe(true));
       expect(document.documentElement.classList.contains("light")).toBe(false);
     } finally {
+      window.matchMedia = originalMatchMedia;
+      restore();
+    }
+  });
+
+  test("system resolves to .light when the OS prefers light", async () => {
+    const restore = stubFetch({
+      "/api/settings": [{ key: "ui.appearance", value: "system", scope: "person" }],
+    });
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = mock(() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+    try {
+      renderHook(() => useAppearance("person-1"));
+      await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
+      expect(document.documentElement.classList.contains("dark")).toBe(false);
+    } finally {
+      window.matchMedia = originalMatchMedia;
       restore();
     }
   });

@@ -12,6 +12,7 @@ import "@maipai/ui/src/dashboard/css/globals.css";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { useShellNext } from "@/next/useShellNext";
 import { useNextLook } from "@/next/useNextLook";
+import { useAppearance } from "@/shell/useAppearance";
 import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
 import { NextAppsPage } from "@/next/pages/NextAppsPage";
 import { NextPeoplePage } from "@/next/pages/NextPeoplePage";
@@ -44,6 +45,12 @@ import type { Roster } from "@/lib/api";
 export function NextRoutes({ person }: { person: Roster }) {
   const shellNext = useShellNext();
   useNextLook(person.id);
+  // The old shell's own `.dark`/`.light` class on <html> (HOME-UI-04b,
+  // useAppearance.ts's own header comment has why the vendored
+  // template - unlike the kit - needs the literal class, not just the
+  // CSS variables): /next mounts no equivalent of its own, so nothing
+  // ever set it here before this.
+  useAppearance(person.id);
   if (shellNext === "loading") return <RouteSkeleton />;
   if (shellNext === "off") return <Navigate to="/" replace />;
 

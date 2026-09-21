@@ -298,6 +298,7 @@ const notificationsReview = process.argv.includes("--notifications-review");
 // HOME-UI-02c's own look comparison was done, per docs/dev.md).
 const lookReview = process.argv.includes("--look-review");
 const nextStandupReview = process.argv.includes("--next-standup-review");
+const nextSidebarReview = process.argv.includes("--next-sidebar-review");
 
 interface RouteSpec {
   slug: string;
@@ -1971,6 +1972,53 @@ async function flagTurnsAsMarlow(sessionValue: string, texts: readonly string[],
   }
 }
 
+// HOME-UI-04b's own double-border, collapsed-rail and invisible-table-
+// text findings: a throwaway review set (data-scratch, not the stand-
+// up's own committed acceptance captures), expanded vs. collapsed, both
+// themes, desktop only (the owner's own findings were both desktop-
+// only), plus one dark-only shot of /next/apps (the Employee Data
+// Table row the owner's own third capture flagged).
+async function captureNextSidebarReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextSidebarReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next`);
+      await page.locator("text=Weekly sales").first().waitFor({ timeout: 15000 });
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `next-sidebar-expanded-desktop-${theme}.png`) });
+      console.log(`Wrote ${join(outDir, `next-sidebar-expanded-desktop-${theme}.png`)}`);
+
+      await page.locator("button:has(svg.lucide-panel-left)").first().click();
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `next-sidebar-collapsed-desktop-${theme}.png`) });
+      console.log(`Wrote ${join(outDir, `next-sidebar-collapsed-desktop-${theme}.png`)}`);
+
+      if (theme === "dark") {
+        await page.goto(`${BASE_URL}/next/apps`);
+        await page.locator("text=Employee Data Table").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        await page.screenshot({ path: join(outDir, `next-apps-table-desktop-${theme}.png`) });
+        console.log(`Wrote ${join(outDir, `next-apps-table-desktop-${theme}.png`)}`);
+      }
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2496,6 +2544,10 @@ async function main() {
 
     if (nextStandupReview && !chatReview && !settingsReview && !notificationsReview && !lookReview) {
       await captureNextStandup(browser, sessionValue);
+    }
+
+    if (nextSidebarReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview) {
+      await captureNextSidebarReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

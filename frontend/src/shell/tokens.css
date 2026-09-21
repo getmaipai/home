@@ -18,8 +18,23 @@
  * stopped emitting the rule the moment shared/ui's copy became the
  * only place it was written - found live building step 5, a real
  * conversation's composer landing 2000+ px below the fold because the
- * shell's own height clamp had silently become `height: auto`. */
-@source "../../../../shared/ui/src";
+ * shell's own height clamp had silently become `height: auto`.
+ *
+ * Repointed through node_modules, not `shared/ui/src` (HOME-UI-04b,
+ * 2026-09-21): `shared` is a symlink to `getmaipai/commons`, the one
+ * mutable checkout every session on the machine shares and can `git
+ * checkout` a different tag into (SHARED-PIN-01) - reading it directly
+ * here reintroduced exactly the bug the per-tag `commons-tags`
+ * worktree resolution already fixed for every JS/TS import. Found
+ * live: the dashboard template's collapsed sidebar rendered as a
+ * cropped full sidebar with clipped labels instead of icons-only,
+ * because none of `dashboard/components/ui/sidebar.tsx`'s eight
+ * `group-data-[collapsible=icon]:*` utilities made it into the built
+ * CSS (grepped: 8 in source, 0 in `dist/assets/*.css`). Routing
+ * through `node_modules/@maipai/ui` scans the exact pinned-tag
+ * snapshot bun already resolved for every JS import, the same
+ * resolution `@maipai/ui/src/tokens.css`'s own `@import` above uses. */
+@source "../../node_modules/@maipai/ui/src";
 
 :root {
   /* Home's brand accent is cyan, not the kit's electric blue

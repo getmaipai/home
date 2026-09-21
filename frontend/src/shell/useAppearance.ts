@@ -8,12 +8,25 @@ const DARK_THEME_COLOR = "#0b0b0f";
 
 function applyAppearance(appearance: Appearance) {
   const root = document.documentElement;
-  root.classList.remove("dark", "light");
-  if (appearance !== "system") root.classList.add(appearance);
-
   const isDark =
     appearance === "dark" ||
     (appearance === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  // Always a concrete class, "system" included (HOME-UI-04b, found live
+  // on /next/apps): the kit's own components never needed one - they
+  // read the CSS variables, which already follow `@media (prefers-
+  // color-scheme: dark)` with no class required - but the vendored
+  // shadcndashboard template's `dark:*` Tailwind utilities are governed
+  // by this project's own `@custom-variant dark (&:is(.dark *))`
+  // (dashboard/css/globals.css), which matches only a literal `.dark`
+  // ancestor, never the media query. Leaving both classes off under
+  // "system" (the default for every real person) left every vendored
+  // `dark:*` utility dead - found as invisible near-black text on a
+  // dark card (DataTable.tsx's `text-gray-900 dark:text-white`, one of
+  // several such rows). Setting the resolved class here, always, fixes
+  // every current and future vendored component that uses the standard
+  // convention, not just this one row.
+  root.classList.toggle("dark", isDark);
+  root.classList.toggle("light", !isDark);
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", isDark ? DARK_THEME_COLOR : LIGHT_THEME_COLOR);
 }
 
