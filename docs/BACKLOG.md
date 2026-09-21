@@ -5429,20 +5429,86 @@ one row of.
       file's own header: "must stay behaviorally identical... the
       conformance fixtures prove that" - calling a method on the shared
       `Host` interface, `host-emulator.ts`, that `packageHost.ts`
-      implements for real). Do the same shape: an 18th `artifact` op in
-      both interpreters with new conformance fixtures in
-      `spec/fixtures/recipes/`, a new `Host.artifact()` method, and
-      `packageHost.ts`'s real implementation calling
-      `lib/artifacts.ts`'s `createArtifact`/`updateArtifact`. Then a
-      bundled `documents` package (`backend/packages/documents/`,
-      `kind: plugin`, ranked and consequential like any action package)
-      whose recipe exposes the tool the model calls, named
-      `write_document` with args `title`, `kind`, `body` (or a patch
-      against the current version) - that exact name is what
-      artifact-card's own toolkit binds to on the frontend, so nothing
-      extra needs registering there. Acceptance: a model-driven live
-      chat creates then edits an artifact, `TurnValue.artifact` (already
-      landed, additive, no writer yet) gets set from the real tool call,
+      implements for real).
+
+      **The design (coordinator-approved 2026-09-21, build it as
+      written, not re-derived):**
+
+      An 18th recipe op: `{"op": "artifact", "as": "result", "title":
+      "{title}", "kind": "{kind}", "body": "{body}", "id_from":
+      "artifact_id"}`, added to `recipe.schema.json`'s `step` oneOf,
+      `interpreters/ts/recipe-interpreter.ts`'s `RecipeStep` union and
+      switch, and `interpreters/py/recipe_interpreter.py` identically,
+      with new conformance fixtures in `spec/fixtures/recipes/` proving
+      both languages agree. `title`/`kind`/`body` interpolate normally
+      (`interpolate(step.field, scope)`, the same as every other step) -
+      always required in `write_document`'s own tool args, even on an
+      update (the model just resends the current title unchanged rather
+      than the interpreter threading "optional on update" through the
+      templating layer, which has no clean way to express it).
+      `id_from` names a scope variable to read DIRECTLY, no `{}`
+      wrapping - the exact bare-name convention `pick`'s own `"from"`
+      field already uses (`scope[step.id_from]`), not the same
+      `interpolate()` path `title`/`kind`/`body` take, because
+      `interpolate()` leaves an unresolved `{name}` template as the
+      literal string `{name}` rather than resolving to `undefined` -
+      indistinguishable from a real answer that happened to look like
+      that string, and wrong for a field whose ABSENCE (the model's tool
+      call omitted `artifact_id`) is the create/update discriminator
+      itself, since the recipe language has no conditional to branch on
+      one. Whether `scope.artifact_id` is defined is what the op uses to
+      call `host.artifact.create()` vs `host.artifact.update()` - no
+      other branching needed.
+
+      `Host` (`host-emulator.ts`) gains an `artifact` member:
+      `create({title, kind, body}): {id, version}` and
+      `update({artifact_id, title, body}): {id, version}`, both throwing
+      `HostError` with an EXISTING `errors/errors.json` code
+      (`not_found` for an unknown `artifact_id`, `invalid_input` for one
+      that is no longer current) rather than inventing a new one. A
+      matching deterministic in-memory implementation goes on the TS and
+      Python emulators (`emulators/ts/host-emulator.ts`,
+      `emulators/py/host_emulator.py`) for the conformance fixtures to
+      run against. New permission `artifact:write` in
+      `vocab/permissions.json`, one line, matching every other host
+      method's own entry there (`"Call host.artifact.create/update."`).
+
+      **Provenance, the one addition past the original draft
+      (coordinator, 2026-09-21): the op records provenance the way
+      `remember` already does** - `packageHost.ts`'s own `remember()`
+      sets `source = turnId ?? \`package:${manifest.id}\`` (a comment
+      there: "the turn id when this call is happening inside a turn...
+      package id otherwise") - `host.artifact.create`/`update`'s real
+      implementation uses the IDENTICAL expression for
+      `createArtifact`/`updateArtifact`'s own `provenance` field, so a
+      document knows which turn (or which non-turn package invocation)
+      wrote each version, not a bespoke string. `packageHost.ts`'s real
+      implementation resolves `conversation_id` by looking up the bound
+      `turnId`'s own row (real DB access a Tier 1 handler could never
+      have) before calling `lib/artifacts.ts`'s `createArtifact`/
+      `updateArtifact` directly.
+
+      The op ALSO binds two flat scope keys directly (not nested under
+      `result` - `interpolate()` has no dot-path support, and every
+      existing step's own `data` mapping only ever reads flat top-level
+      scope vars): `scope.artifact_id = result.id` and
+      `scope.artifact_version = result.version`. The bundled `documents`
+      package (`backend/packages/documents/`, `kind: plugin`, ranked and
+      consequential like any action package)'s recipe: the `artifact`
+      step, then a `format` step whose `data` is `{"artifact_id":
+      "{artifact_id}", "artifact_version": "{artifact_version}"}` -
+      exactly the shape `composer.ts`'s `structuredPartForOutcomes()`
+      already reads weather's/almanac-date's own flat `result.data`
+      fields from, so `TurnValue.artifact` (landed, additive, no writer
+      until this item) gets set from this outcome the identical way.
+      The tool name is `write_document`, args `title`, `kind`, `body`
+      (always required; `artifact_id` optional, its presence is the
+      update discriminator) - that exact name is what artifact-card's
+      own toolkit binds to on the frontend, so nothing extra needs
+      registering there.
+
+      Acceptance: a model-driven live chat creates then edits an
+      artifact, `TurnValue.artifact` gets set from the real tool call,
       and the TS/Python conformance fixtures prove both interpreters
       agree. Out of scope: any OTHER package gaining artifact-writing
       permission by default - `documents` is the one bundled caller
