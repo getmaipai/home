@@ -260,6 +260,30 @@ describe("GET /api/plugins", () => {
     expect(res.status).toBe(401);
   });
 
+  test("a child's list holds only child-level packages (APPS-VIS-01)", async () => {
+    const ownerClient = await owner();
+    const childClient = await child(ownerClient);
+    const res = await childClient.get("/api/plugins");
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<{ min_role?: string }>;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => (row.min_role ?? "child") === "child")).toBe(true);
+  });
+
+  test("the owner's list is a superset of a child's", async () => {
+    const ownerClient = await owner();
+    const childClient = await child(ownerClient);
+    const ownerRes = await ownerClient.get("/api/plugins");
+    const childRes = await childClient.get("/api/plugins");
+    expect(ownerRes.status).toBe(200);
+    expect(childRes.status).toBe(200);
+    const ownerRows = (await ownerRes.json()) as Array<{ id: string }>;
+    const childRows = (await childRes.json()) as Array<{ id: string }>;
+    const ownerIds = new Set(ownerRows.map((row) => row.id));
+    expect(childRows.every((row) => ownerIds.has(row.id))).toBe(true);
+    expect(ownerRows.length).toBeGreaterThan(childRows.length);
+  });
+
   test("lists the bundled remember package's manifest", async () => {
     const client = await owner();
     const res = await client.get("/api/plugins");
