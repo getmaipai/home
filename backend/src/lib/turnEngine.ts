@@ -2103,7 +2103,7 @@ export async function resolvePendingAsk(
       if (pending.carriedQuestion && searchable) {
         const expression = worldAnswerQuery(subject, pending.carriedQuestion, name);
         const searchArgs = engineWebsearchArgs(expression);
-        const result = await runPlugin("websearch", actor, searchArgs, turnId);
+        const result = await runPlugin("websearch", actor, searchArgs, { id: turnId, conversationId: conversation.id });
         outcomes.push(
           outcomeOf(
             result.ok
@@ -2153,7 +2153,7 @@ export async function resolvePendingAsk(
       // proposal carried; a retry of the same "yes" finds no pending ask.
       protocol.answer = { kind: "confirm", answer: "affirmative" };
       setPendingAsk(conversation.id, null);
-      const result = await runPlugin(pending.packageId, actor, pending.args, turnId);
+      const result = await runPlugin(pending.packageId, actor, pending.args, { id: turnId, conversationId: conversation.id });
       outcomes.push(
         outcomeOf(
           result.ok
@@ -2214,7 +2214,7 @@ export async function resolvePendingAsk(
       return { reply: { text: "Okay, I'll leave it." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
     }
     if (!lookupConsent(text)) return null;
-    const result = await runPlugin(pending.packageId, actor, pending.args, turnId);
+    const result = await runPlugin(pending.packageId, actor, pending.args, { id: turnId, conversationId: conversation.id });
     outcomes.push(
       outcomeOf(
         result.ok
@@ -2263,7 +2263,7 @@ export async function resolvePendingAsk(
   const boundArg = pending.argName ? { [pending.argName]: text.trim() } : manifest ? deterministicArgs(manifest.args, text) : null;
   if (!boundArg) return null; // can't bind - fall through to normal routing rather than guess
   const boundArgs = { ...pending.args, ...boundArg };
-  const result = await runPlugin(pending.packageId, actor, boundArgs, turnId);
+  const result = await runPlugin(pending.packageId, actor, boundArgs, { id: turnId, conversationId: conversation.id });
   outcomes.push(
     outcomeOf(
       result.ok
@@ -2873,7 +2873,7 @@ async function prepareTurn(
       directOutcomes.push(outcomeOf({ callId: `${turnId}:floor`, packageId: routed.id, status: "pending", args: rest, via: "pattern", userMessage: prompt }));
       return immediate({ reply: { text: prompt }, source: "confirm", plugin_id: routed.id, safety, crisis_resources: crisisResources });
     }
-    const result = await runPlugin(routed.id, actor, routed.args, turnId);
+    const result = await runPlugin(routed.id, actor, routed.args, { id: turnId, conversationId: conversation.id });
     // CHAT-15: the floor's own outcome, the same shape the model's tool
     // call leaves: succeeded with the result, pending when the result
     // parks the action, failed with the typed code and a household-safe
@@ -3682,7 +3682,7 @@ async function resolveToolCallsInOrder(
       result: await runPlugin(c.tool, actor, {
         ...((c.args ?? {}) as Record<string, unknown>),
         ...(c.tool === "websearch" && pageReadRequested(utterance) ? { read_page: true } : {}),
-      }, turnId),
+      }, { id: turnId, conversationId }),
     })),
   );
   // #93: a recall the MODEL asked for that found nothing is a miss, not
@@ -4064,7 +4064,7 @@ async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }
   if (!resolved && lookupIds.has("websearch") && !searched && expression) {
     console.log(searchDirect ? `[turn] the forced lookup on turn ${prepared.turnId} is the search with the engine's query (${prepared.lookupTools.length === 1 ? "the only lookup tool" : "the budget's last call is the composition's"})` : `[turn] the forced lookup's first rung answered nothing on turn ${prepared.turnId}; the search runs next`);
     const searchArgs = { ...engineWebsearchArgs(expression, searchDeliverable), ...(pageReadRequested(text) ? { read_page: true } : {}) };
-    const result = await runPlugin("websearch", actor, searchArgs, prepared.turnId);
+    const result = await runPlugin("websearch", actor, searchArgs, { id: prepared.turnId, conversationId });
     outcomes.push(
       outcomeOf(
         result.ok

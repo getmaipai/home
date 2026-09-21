@@ -3,10 +3,17 @@
 // own createArtifact/updateArtifact are covered directly by
 // tests/artifacts.test.ts (version chaining, the child-safety visibility
 // gate); this file proves the HOST layer on top of that: permission
-// gating, the conversation_id lookup from a bound turnId, the identical
-// provenance expression memory.remember() already uses, and the one
-// check lib/artifacts.ts itself has no way to make - a non-owner cannot
-// supersede someone else's artifact through this path.
+// gating, the identical provenance expression memory.remember() already
+// uses, and the one check lib/artifacts.ts itself has no way to make -
+// a non-owner cannot supersede someone else's artifact through this
+// path. `conversationId` is passed straight through from the caller's
+// own turn context (bundled with the turn id, `{id, conversationId}`),
+// never looked up from a `conversation_turns` row keyed on turnId - a
+// live turn's own row doesn't exist yet at this point in the turn
+// (getmaipai/home#131, still open: `turnFor()` below pre-inserts that
+// row so `createArtifact()`'s own foreign key doesn't fail here either,
+// which is exactly why no test in this file reproduces #131 itself -
+// see that issue for the real-turn repro).
 import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
@@ -97,18 +104,46 @@ describe("packageHost artifact.create/update", () => {
 
   test("needs a real conversation turn to attach to", () => {
     const host = createHost(child(), manifest({ permissions: ["artifact:write"] }));
-    // No turnId passed to createHost() - a direct plugin run / scheduled
-    // job, the same shape memory.remember() falls back to `package:<id>`
-    // for, but an Artifact's turn_id is a required FK with nowhere to fall
-    // back to.
+    // Neither turnId nor conversationId passed to createHost() - a
+    // direct plugin run / scheduled job, the same shape memory.remember()
+    // falls back to `package:<id>` for, but an Artifact's turn_id is a
+    // required FK with nowhere to fall back to.
     expect(() => host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" })).toThrow(HostError);
+  });
+
+  // getmaipai/home#131: a real live turn calls this with a turnId whose
+  // own conversation_turns row genuinely doesn't exist yet (logTurn()
+  // only writes it once the whole turn finishes, after this call ran) -
+  // every OTHER test in this file uses turnFor() to pre-insert that row
+  // first, which is exactly why the bug this reproduces went uncaught
+  // until a real runTurn() call hit it live. This only proves what THIS
+  // diff fixed (create() no longer throws the misleading `not_found` a
+  // stale conversationTurns-by-turnId lookup used to raise here, since
+  // conversationId now comes from the caller directly) - it does not
+  // yet pass end to end, and isn't expected to until #131's own fix
+  // lands: the insert below still fails, on the artifacts table's own
+  // real foreign key against conversation_turns, a different and honest
+  // failure, not the old "no such conversation turn" one.
+  test("a turn with no conversation_turns row yet (the real live-turn shape) fails on the real FK, not the old not_found lookup - getmaipai/home#131", () => {
+    const actor = child();
+    const conversationId = conversationFor(actor);
+    const unloggedTurnId = newConversationTurnId(); // never inserted into conversation_turns
+    const host = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: unloggedTurnId, conversationId });
+    let caught: unknown;
+    try {
+      host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught).not.toBeInstanceOf(HostError);
   });
 
   test("create() writes a real first version with the turn's own conversation and provenance", () => {
     const actor = child();
     const conversationId = conversationFor(actor);
     const turnId = turnFor(actor, conversationId);
-    const host = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], turnId);
+    const host = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: turnId, conversationId });
 
     const result = host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent\n- stove" });
     expect(result.version).toBe(1);
@@ -128,14 +163,14 @@ describe("packageHost artifact.create/update", () => {
     const actor = child();
     const conversationId = conversationFor(actor);
     const turn1 = turnFor(actor, conversationId);
-    const created = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], turn1).artifact.create({
+    const created = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: turn1, conversationId }).artifact.create({
       title: "Packing list",
       kind: "markdown",
       body: "- tent",
     });
 
     const turn2 = turnFor(actor, conversationId);
-    const updated = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], turn2).artifact.update({
+    const updated = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: turn2, conversationId }).artifact.update({
       artifact_id: created.id,
       title: "Packing list",
       body: "- tent\n- stove",
@@ -155,7 +190,7 @@ describe("packageHost artifact.create/update", () => {
   test("updating an unknown artifact_id throws not_found", () => {
     const actor = child();
     const turnId = turnFor(actor, conversationFor(actor));
-    const host = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], turnId);
+    const host = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: turnId });
     expect(() => host.artifact.update({ artifact_id: "art-missing1", title: "x", body: "y" })).toThrow(HostError);
     try {
       host.artifact.update({ artifact_id: "art-missing1", title: "x", body: "y" });
@@ -168,12 +203,12 @@ describe("packageHost artifact.create/update", () => {
     const actor = child();
     const conversationId = conversationFor(actor);
     const turn1 = turnFor(actor, conversationId);
-    const v1 = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], turn1).artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" });
+    const v1 = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: turn1, conversationId }).artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" });
     const turn2 = turnFor(actor, conversationId);
-    createHost(actor, manifest({ permissions: ["artifact:write"] }), [], turn2).artifact.update({ artifact_id: v1.id, title: "Packing list", body: "- tent\n- stove" });
+    createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: turn2, conversationId }).artifact.update({ artifact_id: v1.id, title: "Packing list", body: "- tent\n- stove" });
 
     const turn3 = turnFor(actor, conversationId);
-    const host3 = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], turn3);
+    const host3 = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: turn3 });
     expect(() => host3.artifact.update({ artifact_id: v1.id, title: "Packing list", body: "- tent\n- boots" })).toThrow(HostError);
     try {
       host3.artifact.update({ artifact_id: v1.id, title: "Packing list", body: "- tent\n- boots" });
@@ -191,10 +226,10 @@ describe("packageHost artifact.create/update", () => {
     const kid = child();
     const conversationId = conversationFor(owner_);
     const turn1 = turnFor(owner_, conversationId);
-    const v1 = createHost(owner_, manifest({ permissions: ["artifact:write"] }), [], turn1).artifact.create({ title: "Adult's list", kind: "markdown", body: "- car keys" });
+    const v1 = createHost(owner_, manifest({ permissions: ["artifact:write"] }), [], { id: turn1, conversationId }).artifact.create({ title: "Adult's list", kind: "markdown", body: "- car keys" });
 
     const kidTurn = turnFor(kid, conversationFor(kid));
-    const kidHost = createHost(kid, manifest({ permissions: ["artifact:write"] }), [], kidTurn);
+    const kidHost = createHost(kid, manifest({ permissions: ["artifact:write"] }), [], { id: kidTurn });
     expect(() => kidHost.artifact.update({ artifact_id: v1.id, title: "Adult's list", body: "- car keys\n- wallet" })).toThrow(HostError);
     try {
       kidHost.artifact.update({ artifact_id: v1.id, title: "Adult's list", body: "- car keys\n- wallet" });
@@ -213,7 +248,7 @@ describe("packageHost artifact.create/update", () => {
     const kid = child();
     const conversationId = conversationFor(kid);
     const turnId = turnFor(kid, conversationId, "allow");
-    const result = createHost(kid, manifest({ permissions: ["artifact:write"] }), [], turnId).artifact.create({ title: "My list", kind: "markdown", body: "- toy" });
+    const result = createHost(kid, manifest({ permissions: ["artifact:write"] }), [], { id: turnId, conversationId }).artifact.create({ title: "My list", kind: "markdown", body: "- toy" });
     expect(visibleArtifactRow(kid, getArtifactRow(result.id)!)).toBe(true);
   });
 });
@@ -231,7 +266,7 @@ describe("the bundled write_document package, through the real host", () => {
     const conversationId = conversationFor(actor);
     const turn1 = turnFor(actor, conversationId);
 
-    const created = await runPlugin("write_document", actor, { title: "Packing list", kind: "markdown", body: "- tent\n- stove" }, turn1);
+    const created = await runPlugin("write_document", actor, { title: "Packing list", kind: "markdown", body: "- tent\n- stove" }, { id: turn1, conversationId });
     expect(created.ok).toBe(true);
     if (!created.ok) return;
     expect(created.value.reply?.text).toBe('Here\'s "Packing list".');
@@ -246,7 +281,7 @@ describe("the bundled write_document package, through the real host", () => {
       "write_document",
       actor,
       { title: "Packing list", kind: "markdown", body: "- tent\n- stove\n- lantern", artifact_id: firstId },
-      turn2,
+      { id: turn2, conversationId },
     );
     expect(edited.ok).toBe(true);
     if (!edited.ok) return;

@@ -284,19 +284,26 @@ export function safeFailureMessage(result: Extract<PluginOpResult<PluginResult>,
  * validates recipe.json; Tier 1 has none) - `loadManifestOnly()` is the
  * one read both share.
  *
- * `turnId`, when this run is happening inside a conversation turn
+ * `turn`, when this run is happening inside a conversation turn
  * (turnEngine.ts's prepareTurn(), the only real caller that has one), is
  * handed straight to createHost() so anything the recipe remembers is
  * attributed to that turn (step 2's provenance rule) rather than the
  * package id. Omitted for every other caller (a direct
  * `POST /api/plugins/:id/run`, a scheduled job): there's no turn to
  * attribute to, so memory.remember() falls back to the package id, same
- * as before this existed. */
+ * as before this existed. `turn.conversationId` rides alongside `turn.id`
+ * for the same reason and travels no further than createHost() -
+ * host.artifact.create() needs it up front, before conversationTurns has
+ * a row for this turn at all (logTurn() writes that row only once the
+ * whole turn finishes composing, after every tool outcome including this
+ * one) - bundled with the turn id in one object, not a second positional
+ * parameter (a code review, 2026-09-21: two adjacent same-typed optional
+ * strings have no runtime cross-check against each other). */
 export async function runPlugin(
   id: string,
   actor: PersonRow,
   inputs: Record<string, unknown>,
-  turnId?: string,
+  turn?: { id: string; conversationId?: string },
 ): Promise<PluginOpResult<PluginResult>> {
   const manifestResult = loadManifestOnly(id);
   if (!manifestResult.ok) return manifestResult;
@@ -323,7 +330,7 @@ export async function runPlugin(
   const loaded = loadPackage(id);
   if (!loaded.ok) return loaded;
   const { recipe } = loaded.value;
-  const host = createHost(actor, manifest, [], turnId);
+  const host = createHost(actor, manifest, [], turn);
   try {
     return { ok: true, value: await runRecipe(recipe, inputs, host) };
   } catch (err) {

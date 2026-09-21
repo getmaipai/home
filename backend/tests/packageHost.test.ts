@@ -146,7 +146,7 @@ describe("packageHost memory.remember", () => {
   // field for the package id, see createHost()'s own comment).
   test("with a turnId, source is the turn id, not the package id", async () => {
     const actor = await owner();
-    const host = createHost(actor, manifest({ permissions: ["memory:write"] }), [], "turn-faketest01");
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }), [], { id: "turn-faketest01" });
     const id = host.memory.remember("the calendar rule about pizza night", "fact", "household");
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
     expect(row.source).toBe("turn-faketest01");

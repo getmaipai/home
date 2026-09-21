@@ -56,9 +56,6 @@ import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulator
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { Artifact as ArtifactValue } from "@maipai/spec/gen/ts/artifact.js";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { conversationTurns } from "@/db/schema";
 import { createArtifact, updateArtifact, getArtifactRow } from "@/lib/artifacts";
 import { tryConsume } from "@/lib/rateLimiter";
 import { assertNotPrivateHost, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
@@ -885,8 +882,16 @@ function mapWriteFailure(status: number, error: string): never {
  * false and nothing else fits), so the package is logged instead of
  * stored when this happens. Omitted for an invocation with no turn (a
  * direct plugin run, a scheduled job): `source` falls back to
- * `package:<id>`, unchanged from before this parameter existed. */
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turnId?: string): Host {
+ * `package:<id>`, unchanged from before this parameter existed.
+ * `turn.conversationId` rides along on the same object rather than as
+ * its own positional parameter (a code review, 2026-09-21: two
+ * adjacent same-typed optional strings have no runtime cross-check, so
+ * a future call site could silently pass one turn's id with a
+ * different turn's conversation) - every real caller already has both
+ * together in scope (the conversation a turn belongs to), so building
+ * one object at the call site is the natural shape, not friction added
+ * for its own sake. */
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -1038,8 +1043,8 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // Provenance: the turn id when this call is happening inside a
         // turn (see createHost()'s own comment on why there's no second
         // field for the package id), package id otherwise.
-        const source = turnId ?? `package:${manifest.id}`;
-        if (turnId) logEntry("info", "remembered via turn", { turn_id: turnId });
+        const source = turn?.id ?? `package:${manifest.id}`;
+        if (turn?.id) logEntry("info", "remembered via turn", { turn_id: turn.id });
         const result = memory.remember(actor, {
           text,
           category: category ?? "fact",
@@ -1062,19 +1067,30 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         requirePermission("artifact:write");
         // turn_id is a required FK on the Artifact record (artifact.schema.json)
         // - unlike memory.remember's own free-text `source`, there is no
-        // fallback shape for "no turn": a live chat artifact always has one.
-        if (!turnId) {
+        // fallback shape for "no turn": a live chat artifact always has
+        // one. `turn.conversationId` is passed straight from the
+        // caller's own in-flight turn context (turnEngine.ts already
+        // has it every place it calls runPlugin() with a turn id),
+        // never looked up from conversationTurns: that row is written
+        // by logTurn() only once the WHOLE turn finishes composing,
+        // well after any tool outcome (including this one) has already
+        // run - a DB lookup here always missed for a real live turn,
+        // the only turn this ever runs on (found live, 2026-09-21,
+        // verifying SHELL-02 slice 4: every test that passed before
+        // this fix had pre-inserted the row itself,
+        // packageHostArtifact.test.ts's own turnFor(), which no real
+        // turn ever does up front). The row not existing yet is itself
+        // a real, deeper gap this fix doesn't close (getmaipai/home#131):
+        // createArtifact() below still fails its own foreign-key
+        // constraint against conversationTurns until that's fixed.
+        if (!turn?.id || !turn.conversationId) {
           throw new HostError("not_found", "host.artifact.create needs a conversation turn to attach to");
-        }
-        const turn = db.select({ conversationId: conversationTurns.conversationId }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
-        if (!turn || !turn.conversationId) {
-          throw new HostError("not_found", `no such conversation turn ${turnId}`);
         }
         // The identical provenance FIELD memory.remember() already uses
         // for its own `source` (docs/dev.md's "Provenance" note) -
         // unlike remember()'s `turnId ?? package:${manifest.id}`, there
         // is no fallback branch to write here: the throw above already
-        // guarantees turnId is bound by this point (turn_id is a
+        // guarantees turn.id is bound by this point (turn_id is a
         // required FK, not a free-text field with room for a package-id
         // shaped placeholder), so provenance is always exactly the turn
         // id, never a bare `??` expression that can't actually fall
@@ -1082,12 +1098,12 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // earlier draft carried here).
         const value = createArtifact({
           conversationId: turn.conversationId,
-          turnId,
+          turnId: turn.id,
           kind: input.kind as ArtifactValue["kind"],
           title: input.title,
           body: input.body,
           createdBy: actor.id,
-          provenance: turnId,
+          provenance: turn.id,
         });
         return { id: value.id, version: value.version };
       },
@@ -1097,7 +1113,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // optional-on-update case.
       update(input: { artifact_id: string; title: string; body: string }): { id: string; version: number } {
         requirePermission("artifact:write");
-        if (!turnId) {
+        if (!turn?.id) {
           throw new HostError("not_found", "host.artifact.update needs a conversation turn to attach to");
         }
         // lib/artifacts.ts's own updateArtifact() has no actor check at
@@ -1113,15 +1129,15 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           throw new HostError("not_found", `no artifact version ${input.artifact_id}`);
         }
         // Same provenance field as create() above, and the same reason
-        // there's no `?? package:${manifest.id}` fallback: turnId is
+        // there's no `?? package:${manifest.id}` fallback: turn.id is
         // guaranteed bound by the throw above.
         const result = updateArtifact({
           currentId: input.artifact_id,
           title: input.title,
           body: input.body,
-          turnId,
+          turnId: turn.id,
           createdBy: actor.id,
-          provenance: turnId,
+          provenance: turn.id,
         });
         if (!result.ok) {
           // lib/artifacts.ts's own updateArtifact(): 404 for an unknown
