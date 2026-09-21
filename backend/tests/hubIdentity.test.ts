@@ -41,21 +41,4 @@ describe("getHubName()/setHubName()", () => {
     setHubName("Something Else");
     expect(getHubInstanceId()).toBe(id);
   });
-
-  // scripts/screenshot.ts's own throwaway backend sets this so a
-  // machine's real hostname never becomes the seeded name behind a
-  // committed capture (owner finding, "The phone composition,"
-  // 2026-09-20).
-  test("MAIPAI_DEMO_HUB_NAME overrides the machine hostname as the default, first-boot name", () => {
-    const original = process.env.MAIPAI_DEMO_HUB_NAME;
-    process.env.MAIPAI_DEMO_HUB_NAME = "Bramble hub";
-    try {
-      __resetHubIdentityForTests();
-      resetDb();
-      expect(getHubName()).toBe("Bramble hub");
-    } finally {
-      if (original === undefined) delete process.env.MAIPAI_DEMO_HUB_NAME;
-      else process.env.MAIPAI_DEMO_HUB_NAME = original;
-    }
-  });
 });

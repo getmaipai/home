@@ -36,14 +36,6 @@ function loadOrCreate(): { instanceId: string; name: string } {
 }
 
 function defaultHubName(): string {
-  // Never set on a real install - only scripts/screenshot.ts's own
-  // throwaway backend passes this, so a machine's real hostname never
-  // becomes the seeded name behind a committed capture (owner finding,
-  // "The phone composition," 2026-09-20: a screenshot script seeding
-  // the hub's display name to a demo value so a hostname never appears
-  // in one).
-  const demoName = process.env.MAIPAI_DEMO_HUB_NAME;
-  if (demoName) return demoName;
   return hostname().replace(/\.local$/i, "") || "MaiPai Home";
 }
 

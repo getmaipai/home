@@ -397,6 +397,45 @@ hero, section headers with subtitles, shelves, two-column app cards,
 the metric strip) while every color, icon and type comes from the
 kit; it must still be recognized as the same product as the desktop.
 
+### The rail geometry, exactly (owner findings, 2026-09-20 17:40)
+
+Numbers are read off `commons/ui/docs/reference/overview-dashboard.png`
+(the reference for the live Studio dashboard at 1440), scaled to our
+16px base.
+
+1. Rail items are inset pills, never edge to edge. Today the active
+   fill runs from the rail's left edge to past its right edge and is
+   cut off. Rule: the rail has 12px side padding; every item is a
+   40px-tall pill with 10px radius inset 12px from both rail edges
+   (width = rail width minus 24), 4px between items; the active
+   gradient fills only that pill; icon 20px with 12px inner padding,
+   12px gap to the 14px label; both vertically centered in the pill.
+2. The logo block needs room: 20px above it and 16px on its left (the
+   tile's left edge sits at the same x as the item pills' left edge);
+   tile 40px, wordmark 15px semibold, tagline 12px; then 24px of space
+   before the first group label. Today "HOME" sits directly under the
+   tagline.
+3. Group labels: 11px small caps at the pills' left edge, 20px above
+   (12px when directly under the logo block's 24px gap), 8px below;
+   the divider between groups is 1px, inset 16px from both rail edges,
+   with 12px above and below it.
+4. Header: the title block gets 16px top padding and 16px below the
+   subtitle before the header's bottom border; the content column
+   starts 24px under that border. Today the subtitle touches the
+   border.
+5. The bell's count badge is broken (a large "24" floating above the
+   bell, overlapping the cluster). Rule: 16px badge, 10px semibold,
+   anchored to the bell's top-right corner, never overlapping a
+   neighbor; counts above 9 show "9+".
+6. The rail footer (device card) shows the machine hostname; the
+   capture fix is already in scope (seed a demo name), and the live
+   app shows the hub's declared name from Settings when one is set,
+   else the product name "MaiPai Home", never the OS hostname.
+
+Acceptance for this piece: the 1440 Studio dark capture, expanded and
+collapsed, read beside the reference for the rail inset, logo spacing,
+group rhythm, header padding and badge; the same in Calm and light.
+
 ### The Studio look, the numbers (owner-supplied analysis, 2026-09-20 18:15)
 
 The owner had a second reading of the live Home page against the

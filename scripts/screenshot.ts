@@ -576,16 +576,16 @@ async function newContext(browser: Browser, viewport: ViewportSpec, theme: "ligh
   // The rail footer's device card (HubStatusCard.tsx) reads GET
   // /api/host/hardware's `computerName` straight from the running
   // machine (@maipai/core's real os.hostname() probe - correct in
-  // production, wrong in a capture). MAIPAI_DEMO_HUB_NAME (this file's
-  // own backend spawn, below) fixes hubIdentity.ts's own getHubName()
-  // - a real, separate hostname leak (the setup wizard's trust step),
-  // but nothing in the frontend reads it today, and it is NOT what
-  // the rail footer shows - found live comparing a fresh capture
-  // against this fix, still "Jesses-MBP." Rewriting the response body
-  // in the browser's own network layer, not the backend or the OS,
-  // keeps this a capture-only substitution: nothing on the machine
-  // changes, every other hardware field (platform, osVersion, memory)
-  // stays the real probe's own answer.
+  // production, wrong in a capture). Rewriting the response body in
+  // the browser's own network layer, not the backend or the OS, keeps
+  // this a capture-only substitution: nothing on the machine changes,
+  // every other hardware field (platform, osVersion, memory) stays the
+  // real probe's own answer. hubIdentity.ts's own getHubName() is a
+  // separate hostname source (mdns, the setup wizard's trust step, the
+  // emergency kit doc) - nothing the dashboard capture renders reads
+  // it, so it needs no seed here (owner ruling, ui-v0.4.3: production
+  // code carries no demo-name env branch, only this Playwright-side
+  // substitution).
   await context.route("**/api/host/hardware", async (route) => {
     const response = await route.fetch();
     const body = (await response.json()) as Record<string, unknown>;
@@ -2226,10 +2226,7 @@ async function main() {
       // depends on the box being empty." This matrix never needs real
       // speech, so the engine should never spawn at all, not just not
       // collide.
-      // MAIPAI_DEMO_HUB_NAME: hubIdentity.ts's own comment on why - keeps
-      // a machine hostname out of every committed capture that shows the
-      // rail footer.
-      env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: String(REPAIR_SEED_PORT), MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url, MAIPAI_DEMO_HUB_NAME: "Bramble hub" },
+      env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: String(REPAIR_SEED_PORT), MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
       stdout: "ignore",
       stderr: "inherit",
     });

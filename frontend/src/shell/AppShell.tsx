@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { forwardRef, useState, type ComponentPropsWithoutRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Shell } from "@maipai/ui/src/Shell";
 import type { NavGroup } from "@maipai/ui/src/blocks/dashboard/components/nav-main";
 import { isActiveNavPath } from "@maipai/ui/src/nav";
 import { getIcon, type IconName } from "@maipai/ui/src/icons";
 import { Button } from "@maipai/ui/src/ui/button";
+import { cn } from "@maipai/ui/src/utils";
 import { NAV_ENTRIES } from "@/shell/nav";
 import { APP_CATALOG } from "@/shell/appCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
@@ -62,7 +63,24 @@ function PinToggle({ person }: { person: Roster }) {
 // wordmark) - Home's own logo image inside the kit's gradient tile
 // treatment, not a lucide icon (IconTile is for category icons; the
 // brand mark is the product's own art).
-function Brand() {
+//
+// forwardRef + spread ...props (ui-v0.4.4 follow-up, found by pixel-
+// measuring a live capture): app-sidebar.tsx wraps `brand` in
+// `<SidebarMenuButton asChild>`, a Radix Slot contract that clones its
+// single child with the button's own props (className, data-slot,
+// data-active, and so on) merged in - a contract only a component that
+// actually accepts and forwards its own props can honor. This
+// component took none (a bare `function Brand()`), so every className
+// app-sidebar.tsx ever set on that wrapper - v0.4.1 through v0.4.4's
+// own padding fixes included - was silently dropped before it reached
+// this Link; the brand tile was never actually receiving the rail's
+// own inset, no version of it, which is why pixel-measuring the built
+// capture kept finding it clipped at x 0 no matter what the wrapper's
+// own className said. `props.className` last in `cn()` so the kit's
+// own values (padding, gap) win over this component's base layout
+// classes where they overlap, matching every other `asChild` child in
+// this file's own nav rows (NavLink already forwards correctly).
+export const Brand = forwardRef<HTMLAnchorElement, ComponentPropsWithoutRef<"a">>(function Brand({ className, ...props }, ref) {
   return (
     // min-h-12/min-w-12 (48px): docs/UI.md's touch-target floor, kept
     // for collapsed too (owner finding, "The collapsed rail,"
@@ -74,7 +92,13 @@ function Brand() {
     // the sidebar's own invisible hit-area extension - same centered
     // icon, same footprint - so this is just a more direct way to the
     // same floor for the one row that has its own competing classes.
-    <Link to="/" aria-label="MaiPai Home" className="flex min-h-12 min-w-12 flex-1 items-center gap-2.5 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:justify-center">
+    <Link
+      ref={ref}
+      to="/"
+      aria-label="MaiPai Home"
+      {...props}
+      className={cn("flex min-h-12 min-w-12 flex-1 items-center gap-2.5 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:justify-center", className)}
+    >
       {/* borderRadius: var(--tile-radius), same token IconTile.tsx draws
           every other tile through - the reference's own gradient product
           tile (owner ruling, "Two looks, one setting": "the logo on a
@@ -113,7 +137,7 @@ function Brand() {
       </span>
     </Link>
   );
-}
+});
 
 function navGroup(label: string, paths: readonly string[]): NavGroup {
   const items = paths.flatMap((to) => { const entry = NAV_ENTRIES.find((e) => e.to === to); return entry ? [{ title: entry.label, url: entry.to, icon: entry.icon as IconName }] : []; });

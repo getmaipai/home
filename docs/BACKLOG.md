@@ -6349,10 +6349,23 @@ approvals are still real, unstarted work for a future session.
       reference image itself is another product's screen and stays out
       of both repos); `panelOverflow.test.ts` proving the new check
       catches a seeded overflow.
-- [ ] **HOME-UI-02e: Conversations' own real functions move into
-      Chat's thread list** (S-M) - HOME-UI-02d's own removed-behavior
-      audit found four things the old Conversations page did that the
-      new thread list doesn't: a person picker for an admin's
+- [ ] **HOME-UI-02e: rail geometry corrected, then Conversations' own
+      real functions move into Chat's thread list** (S-M) - two parts.
+      **Part one, done (`ui-v0.4.3`/`.4`, 2026-09-20):** HOME-UI-02d's
+      own committed capture didn't match the rail-geometry numbers it
+      claimed to (pixel-measured, not visually scanned) - the active
+      pill unset, the brand tile clipped at x 0, no gap before the
+      first group label; fixed twice over (`ui-v0.4.3` restated the
+      owner's own literal numbers, `ui-v0.4.4` found `home`'s own
+      `AppShell.tsx` `Brand` component silently dropped every
+      className the kit ever tried to inject on it - no version of the
+      kit's own fix could have worked until `Brand` forwarded its
+      props). `hubIdentity.ts`'s `MAIPAI_DEMO_HUB_NAME` env-var branch
+      removed too. Full account in [dev.md](dev.md)'s own "Rail
+      geometry, corrected again" entry. **Part two, not started:**
+      HOME-UI-02d's own removed-behavior audit found four things the
+      old Conversations page did that the new thread list doesn't: a
+      person picker for an admin's
       oversight of a child's conversations (the same permission check
       the deleted page used), multi-select with batch delete and a
       clear-all (the org's own standing rule: batch delete on every
@@ -6376,6 +6389,25 @@ approvals are still real, unstarted work for a future session.
       theirs, a batch-delete removing exactly the selected threads, a
       clear-all, pin surviving a reload, a message-body search finding
       a thread its title never mentions).
+- [ ] **HOME-UI-02f: fold the phone header's search/theme/bell into the
+      avatar menu, the bell as a dot** (S) - HOME-UI-02d's own known
+      gap, flagged and left unfixed at the time: the phone header still
+      shows search/theme/bell as three separate icons instead of the
+      reference's own folded avatar menu with the bell's own count as a
+      dot. `Shell.tsx`'s own header contract renders `search`/
+      `headerActions` unconditionally regardless of phone/desktop, so
+      this is a real header-contract change to the kit (`commons/ui/
+      src/Shell.tsx`), not a call-site patch - scoped as its own item
+      rather than silently deferred again. Scheduled after HOME-UI-02e.
+      Files: `commons/ui/src/Shell.tsx` (the header's own phone-mode
+      branch, `usePhoneMode()`/`useBreakpoint()` already available),
+      `frontend/src/shell/AppShell.tsx`'s `headerActions` (the avatar
+      menu already exists via `ProfileSwitcher` - the fold adds search
+      and the bell into it on phone, not a new menu). Exit check: `bash
+      scripts/check.sh` green on both repos; a 390 dashboard capture,
+      both themes, showing one avatar control with no separate search/
+      theme/bell icons and the bell's unread count as a dot on the
+      avatar, not a floating badge.
 - [ ] **STORE-01: a real GET route to browse a trusted catalog index,
       and the settings it needs** (S/M) - the gap HOME-UI-02 found and
       deliberately did not build around: "the store is the same page
