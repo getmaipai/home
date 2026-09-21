@@ -13,6 +13,10 @@ Home is the first thing you see when you open MaiPai. It's built to be glanceabl
 - **Your packages.** Cards from any apps you've installed. Nothing here until you add some.
 - **Your apps.** Shortcuts to your favorite pages. Pin an app from its own header to add it here.
 
+## With the new look on
+
+If you turned on **New shell (preview)** in Settings, the Home page looks different. It shows your household at a glance. You see how many people are in it, whether an update is waiting, and what needs a repair. A chart shows how much MaiPai was used each day for the last month. Below that is a list of the newest chats. Everything else on this page works the same.
+
 ## Ask a quick question
 
 1. Tap the box that says **Ask MaiPai anything...**
