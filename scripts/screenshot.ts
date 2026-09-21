@@ -306,6 +306,9 @@ const nextDashboardReview = process.argv.includes("--next-dashboard-review");
 const nextAppsReview = process.argv.includes("--next-apps-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
+const nextUpdatesReview = process.argv.includes("--next-updates-review");
+const nextRepairsReview = process.argv.includes("--next-repairs-review");
+const nextBackupsReview = process.argv.includes("--next-backups-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 
@@ -2415,6 +2418,125 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
   }
 }
 
+/** SHELL-07's own acceptance ("captures"): both viewports, both
+ * themes, of `/next/updates`. Waits on "MaiPai Home" - the app's own
+ * row is always present regardless of whether a Stack is configured,
+ * and (unlike the sidebar's own "Shadcn Dashboard" logo text) only
+ * renders once `GET /api/updates` has actually resolved. */
+async function captureNextUpdatesReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextUpdatesReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/updates`);
+        // Not a substring match: the app's own generic boot skeleton
+        // shows "Loading MaiPai Home" before anything mounts, which a
+        // plain `text=MaiPai Home` locator matches too - found live,
+        // the first version of this capture fired on that skeleton
+        // instead of the real row.
+        await page.getByText("MaiPai Home", { exact: true }).first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-updates-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
+/** SHELL-07's own acceptance: both viewports, both themes, of `/next/
+ * repairs`. Found live, not assumed: this throwaway backend's own real
+ * boot process raises a real issue (the Wyoming satellite server
+ * failing to bind, logged on every run of this script), so the real
+ * table has a real row to wait on rather than the empty state a first
+ * draft of this capture assumed and timed out on. */
+async function captureNextRepairsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextRepairsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/repairs`);
+        // Not actually empty in this seeded backend: the real server
+        // boot process raises a real issue (the Wyoming satellite
+        // server failing to bind - found live, not fabricated for the
+        // capture), so a real table row is the honest wait condition
+        // here, not the empty state this function first assumed.
+        await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-repairs-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
+/** SHELL-07's own acceptance: both viewports, both themes, of `/next/
+ * backups`. This throwaway backend's own fresh data directory has
+ * never run a backup, so the real, expected capture is the vendored
+ * `DataTable`'s own "No data available." empty state, the same honest-
+ * empty-state posture as Repairs above. */
+async function captureNextBackupsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextBackupsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/backups`);
+        await page.locator("text=No data available.").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-backups-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2986,6 +3108,18 @@ async function main() {
 
     if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
       await captureNextChatToolsReview(browser, sessionValue);
+    }
+
+    if (nextUpdatesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview) {
+      await captureNextUpdatesReview(browser, sessionValue);
+    }
+
+    if (nextRepairsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview) {
+      await captureNextRepairsReview(browser, sessionValue);
+    }
+
+    if (nextBackupsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview) {
+      await captureNextBackupsReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

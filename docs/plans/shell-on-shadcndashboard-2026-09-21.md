@@ -115,7 +115,7 @@ each lands.
 | `/next/people` | user-profile (own profile card), data-tables (`DataTable`) | the household (`GET /api/people`); the signed-in person's own profile only (see the row's own named gap below) | not yet - viewing another person's own profile and the Memories tab still need `apps/people/*`, `apps/memories/*` |
 | `/next/settings` | form-layouts in tabs and cards (`Tabs`, `Card`) | the settings registry (`GET /api/settings/registry`, `GET`/`PUT`/`reset /api/settings`) by section and scope; every other management page stays on the old route (see the row's own named gap below) | not yet - only the registry-driven inline keys moved, `apps/settings/*` still owns every dedicated management page |
 | `/next/engines` | data-tables (`DataTable`) | `GET /api/engines`, `GET /api/engines/health` (HOME-STACK-04a) - roles by address, engine state, health severities; actions (start/stop/restart, a role switch) stay on the old surface (see the row's own named gap below) | none (new) |
-| `/next/updates`, `/next/repairs`, `/next/backups` | data-tables, cards | the routes HOME-STACK-05 landed | `apps/settings/UpdatesSection.tsx`, repairs, backups pages |
+| `/next/updates`, `/next/repairs`, `/next/backups` | data-tables (`DataTable`) | `GET /api/updates`, `/api/repairs`, `/api/backups`; apply/rollback, fix/dismiss and run/restore all stay on the old pages (see the row's own named gap below) | not yet - all three old pages still own their own real actions |
 | `/next/sign-in` | auth view | Home's sign-in and passkeys | `apps/auth/*` |
 
 **SHELL-01's own named gap (found landing the row, 2026-09-21):** the
@@ -271,6 +271,39 @@ names: roles by address, engine state, and health severities. A
 household-memory-budget card (the route's own "cards" half) is a real,
 separate follow-up - not built here since the acceptance didn't ask
 for it and adding it unasked would be inventing scope.
+
+**SHELL-07's own named gap (found landing the row, 2026-09-21):** all
+three old pages are real, unlike SHELL-06's `/api/engines` - `GET /api/
+updates`, `/api/repairs` and `/api/backups` are all live and already
+have a frontend (`UpdatesSection.tsx`, `RepairsSection.tsx`,
+`BackupsSection.tsx`), so this row is a genuine port: real `DataTable`
+rows built from `rowsFrom()`/`hasUpdate()` (exported from
+`UpdatesSection.tsx` rather than redefined - the identical "does this
+row have a real update" rule, one definition) for Updates, real
+`Issue[]` rows for Repairs, real `BackupInfo[]` history rows plus the
+real pending-restore banner for Backups. One correction to the row's
+own ask: Backups was framed as "history rows with size and outcome and
+the schedule card" - `BackupInfo` (`backend/src/wire.ts`) carries only
+`filename`/`createdAt`/`bytes`, no outcome field (a failed backup
+attempt never produces a listed file, so there is no failed row to
+show), and neither the old page nor `GET /api/backups` has ever had a
+schedule concept - the "Backup storage limit" setting's own help text
+names a fixed retention cadence, a quantity limit, not a schedule
+anything renders. Built against what is actually there instead of
+inventing the two missing pieces.
+Real actions (apply an engine update and roll one back, run a repair's
+fix or dismiss it, run a backup now or restore one) are wired on all
+three old pages through the kit's own `ThingsTable`/hand-built
+`Button`s - real callback surfaces `UpdatesSection.tsx`'s own
+`rowActions` prop and `RepairsSection.tsx`'s/`BackupsSection.tsx`'s own
+`onClick`s already use. The vendored `DataTable`'s Action column has no
+click handler wired to either icon, the same gap every `/next`
+data-table has found so far, so all three actions stay on the old
+routes. All three `/next` pages gate to owner/admin exactly as their
+old counterparts do (`AdminGatedContent`), even where a route itself
+reads looser (`GET /api/updates` is `requireAuth` only) - matching the
+old page's own visible gate is the parity this row asks for, not a new
+rule.
 
 One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
 the chat move together. There is no `ui.chat.next`; `ui.shell.next`

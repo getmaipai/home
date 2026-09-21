@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
-import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
-import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { NextRoutes } from "@/next/NextRoutes";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { Roster } from "@/lib/api";
@@ -133,21 +130,9 @@ describe("NextRoutes appearance", () => {
   });
 });
 
-describe("next Manage routes", () => {
-  // /next/engines moved off this shared "still a stub" check once
-  // SHELL-06 gave it real data and its own dedicated test file
-  // (NextEnginesPage.test.tsx) - it needs a QueryClientProvider this
-  // bare MemoryRouter render doesn't supply.
-  test.each([
-    ["/next/updates", NextUpdatesPage],
-    ["/next/repairs", NextRepairsPage],
-    ["/next/backups", NextBackupsPage],
-  ])("%s renders the template tables view", (_route, Page) => {
-    render(
-      <MemoryRouter initialEntries={[_route]}>
-        <Page />
-      </MemoryRouter>,
-    );
-    expect(document.body.textContent).toContain("Tables");
-  });
-});
+// The old "next Manage routes" shared stub check (a bare MemoryRouter
+// render, no QueryClientProvider, asserting the vendored demo's own
+// "Tables" breadcrumb text) is gone: /next/engines, /next/updates,
+// /next/repairs and /next/backups all have real data and their own
+// QueryClient-dependent dedicated test files now (NextEnginesPage.test.tsx,
+// NextUpdatesPage.test.tsx, NextRepairsPage.test.tsx, NextBackupsPage.test.tsx).

@@ -51,9 +51,9 @@ function NextRoutesInner({ person }: { person: Roster }) {
         <Route path="people" element={<NextPeoplePage person={person} />} />
         <Route path="settings" element={<NextSettingsPage person={person} />} />
         <Route path="engines" element={<NextEnginesPage />} />
-        <Route path="updates" element={<NextUpdatesPage />} />
-        <Route path="repairs" element={<NextRepairsPage />} />
-        <Route path="backups" element={<NextBackupsPage />} />
+        <Route path="updates" element={<NextUpdatesPage person={person} />} />
+        <Route path="repairs" element={<NextRepairsPage person={person} />} />
+        <Route path="backups" element={<NextBackupsPage person={person} />} />
       </Route>
     </Routes>
   );

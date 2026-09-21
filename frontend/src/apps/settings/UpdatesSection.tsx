@@ -19,7 +19,10 @@ import { api, ApiError, type UpdateProjection } from "@/lib/api";
 // purpose: the Stack's own update route only ever applies to engines
 // (updates/engines/{name}/apply) - a model is a fresh pull by pin, a
 // different, not-yet-built flow (docs/BACKLOG.md's own STORE-01 gap).
-interface UpdateRow {
+// Exported: SHELL-07's /next/updates reads the identical row shape and
+// "does this row have a real update" rule rather than a second
+// definition of either.
+export interface UpdateRow {
   kind: "app" | "engine" | "model";
   id: string;
   name: string;
@@ -29,7 +32,7 @@ interface UpdateRow {
   notes: string | null;
 }
 
-function rowsFrom(projection: UpdateProjection): UpdateRow[] {
+export function rowsFrom(projection: UpdateProjection): UpdateRow[] {
   const rows: UpdateRow[] = [
     { kind: "app", id: "app", name: "MaiPai Home", installed: projection.installed, available: projection.latest, lastChecked: projection.checkedAt, notes: projection.error ?? projection.summary },
   ];
@@ -49,7 +52,7 @@ function rowIcon(kind: UpdateRow["kind"]): IconName {
   return kind === "app" ? "home" : kind === "engine" ? "cpu" : "package";
 }
 
-function hasUpdate(row: UpdateRow): boolean {
+export function hasUpdate(row: UpdateRow): boolean {
   return row.available !== null && row.available !== row.installed;
 }
 

@@ -1,6 +1,72 @@
-import TablesPage from "@maipai/ui/src/dashboard/views/pages/tables";
+import { useQuery } from "@tanstack/react-query";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { getIcon } from "@maipai/ui/src/icons";
+import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { api, ApiError, isOwnerOrAdminRole, type Issue, type Roster } from "@/lib/api";
 
-/** /next/repairs: the stand-up's data-tables route for the Manage group (step 1); real data is a step-2 row. */
-export function NextRepairsPage() {
-  return <TablesPage />;
+/** /next/repairs: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
+ * 2026-09-21.md's plan row) - `GET /api/repairs` through the template's
+ * `DataTable`: severity, title, detail and the fix's own label, the
+ * same fields `RepairsSection.tsx` shows.
+ *
+ * Named gap: running a fix or dismissing an issue are real actions on
+ * the old page (`RepairsSection.tsx`'s own `Button` per row, a real
+ * `onClick`) - the vendored `DataTable`'s Action column has no click
+ * handler wired to either icon, the same gap every `/next` data-table
+ * has found, so those stay on the old route. Gated to owner/admin like
+ * the old page and the backend both agree on here (`GET /api/repairs`
+ * itself is `requireRole("owner", "admin")`, unlike Updates' looser
+ * read gate). */
+const RepairsIcon = getIcon("wrench");
+
+interface Row extends Record<string, unknown> {
+  title: string;
+  status: string;
+  detail: string;
+  fix: string;
+}
+
+function toRow(issue: Issue): Row {
+  return {
+    title: issue.title,
+    status: issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1),
+    detail: issue.detail,
+    fix: issue.fix?.label ?? "-",
+  };
+}
+
+export function NextRepairsPage({ person }: { person: Roster }) {
+  const canManage = isOwnerOrAdminRole(person.role);
+  const query = useQuery<Issue[]>({ queryKey: ["repairs"], queryFn: () => api.repairs(), enabled: canManage });
+
+  return (
+    <div className="flex flex-col gap-4">
+      <CardHeader className="p-0">
+        <CardTitle className="flex items-center gap-2">
+          <RepairsIcon size={16} className="text-muted-foreground" />
+          Repairs
+        </CardTitle>
+      </CardHeader>
+
+      {!canManage ? (
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground">Only an owner or admin can manage repairs.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <AsyncState
+          data={query.data}
+          error={query.isError}
+          isFetching={query.isFetching}
+          onRetry={() => query.refetch()}
+          errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load repairs."}
+          loadingLabel="Loading repairs"
+        >
+          {(issues: Issue[]) => <DataTable data={issues.map(toRow)} />}
+        </AsyncState>
+      )}
+    </div>
+  );
 }
