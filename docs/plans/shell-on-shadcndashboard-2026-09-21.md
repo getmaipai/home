@@ -329,14 +329,22 @@ earlier table), with `TurnValue.artifact` set from its result.
 
 ## Sessions and order
 
-Session A (fresh, Sonnet) takes step 1 from this record, then the
-rows in table order; Session B, after the installer, takes the
-artifact record and the turn-engine tool the artifact-card needs,
-then the Engines row; the lanes take S rows (updates, repairs,
-backups) once the pattern is landed by the first two rows. Each row
-is one commit with its test, its capture and the table row filled.
-Review budget as usual; the reviewer's first check on every row is
-"is anything here Home-drawn", and a yes returns the item.
+The order as it ran (updated 2026-09-21 afternoon): Session A did step
+1, then the stand-up's defects (HOME-UI-04b, 04d, 04e), CHAT-SDK-01
+and LOOK-01, and now takes SHELL-02 (`/next/chat`) in slices, the
+first being the Elements thread and composer on Home's existing
+adapters with one streaming turn and the reasoning element live, then
+history, the thread list, attachments, suggestions, tools and
+artifacts as follow-ups, each landed as it works. Session B did the
+wire (REASONING-01/02, the memory-outcome notifications), SHELL-01
+whole (backend and page) and SHELL-03, and takes the remaining SHELL
+rows in order (04, 05, 06, 07, 08), each row one commit with its
+tests, its captures from `scripts/screenshot.ts` and the BACKLOG row
+ticked; the local-model lane takes HOME-UI-04g (the first paint of
+`/next`) and S items beside; Codex takes docs and backlog. Each row's
+reviewer first checks "is anything here Home-drawn", and a yes returns
+the item; a vendored part with no data surface is composed from its
+own primitives and the gap is named in this record's row.
 
 ## Risk and rollback
 
