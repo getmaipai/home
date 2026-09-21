@@ -9,6 +9,10 @@ MaiPai keeps a separate profile for everyone in your household. Each profile has
 
 Open **People** in the sidebar. You'll see everyone with a profile on this hub, along with their role (Owner, Adult, Teen, or Child).
 
+## With the new look on
+
+If you turned on **New shell (preview)** in Settings, the People page shows your own profile card at the top, with your name and role. Below it is a table of everyone in the household. Click a column name to sort the table. Use the old page to add, edit, or remove people for now. Turn off the preview first.
+
 ## Add, edit, or remove someone
 
 Account management lives in Settings, not on the People page itself.
