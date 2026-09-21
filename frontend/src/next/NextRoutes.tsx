@@ -48,7 +48,7 @@ function NextRoutesInner({ person }: { person: Roster }) {
         <Route index element={<NextDashboardPage person={person} />} />
         <Route path="chat" element={<NextChatPage />} />
         <Route path="apps" element={<NextAppsPage />} />
-        <Route path="people" element={<NextPeoplePage />} />
+        <Route path="people" element={<NextPeoplePage person={person} />} />
         <Route path="settings" element={<NextSettingsPage />} />
         <Route path="engines" element={<NextEnginesPage />} />
         <Route path="updates" element={<NextUpdatesPage />} />

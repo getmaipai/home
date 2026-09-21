@@ -112,7 +112,7 @@ each lands.
 | `/next` | modern dashboard (KPI cards, charts, recent list) | engines status, updates, repairs, people, activity | `frontend/src/apps/home/*`, the dashboard blocks in the kit |
 | `/next/chat` | Elements: thread, thread-list-sidebar, composer family, reasoning, tool-call, sources, artifact-card, canvas-split, orb, read-aloud | the existing model, history, thread-list, suggestion, attachment, dictation adapters; the artifact record | `apps/chat/thread.aui.tsx`, `chatDocumentPane.tsx`, the kit's `.aui` files |
 | `/next/apps` | data-tables view (`DataTable`) | packages list (`GET /api/plugins`); install and remove stay on the old route (see the row's own named gap below) | not yet - `apps/library/AppsPage.tsx` still owns install/remove, `ThingsTable` retires once it does |
-| `/next/people` | user-profile, data-tables | people, memories tab | `apps/people/*`, `apps/memories/*` |
+| `/next/people` | user-profile (own profile card), data-tables (`DataTable`) | the household (`GET /api/people`); the signed-in person's own profile only (see the row's own named gap below) | not yet - viewing another person's own profile and the Memories tab still need `apps/people/*`, `apps/memories/*` |
 | `/next/settings` | form-layouts in tabs and cards | the settings renderer's keys by section and scope | `apps/settings/*`, `apps/privacy/*` |
 | `/next/engines` | data-tables, cards | the Engines API (HOME-STACK-04a) | none (new) |
 | `/next/updates`, `/next/repairs`, `/next/backups` | data-tables, cards | the routes HOME-STACK-05 landed | `apps/settings/UpdatesSection.tsx`, repairs, backups pages |
@@ -172,6 +172,32 @@ scope: neither shell filters the list by the actor's role today -
 `lib/widgets.ts`, `lib/turnEngine.ts`), never visibility - tracked as
 its own item, `APPS-VIS-01`, since fixing it in `routes/plugins.ts`
 fixes both shells at once.
+
+**SHELL-04's own named gap (found landing the row, 2026-09-21):** the
+vendored `UserProfile` (`@maipai/ui/src/dashboard/components/
+user-profile/index.tsx`) is the same shape as the dashboard's own demo
+widgets - zero data-binding surface, every field (`firstName`,
+`email`, `phone`, `position`, `facebook`/`twitter`/`github`/`dribbble`,
+`location`, `state`, `pin`, `zip`, `taxNo`) a local `useState` seeded
+with hardcoded demo values, and its "Edit" dialogs only ever write
+back to that same local state, never a server. Composed from the same
+shipped primitives it's built from instead (`Card`, `CardContent`, the
+kit's own `Avatar`), mirroring its top header card's shape (an avatar,
+a name, a subtitle line) - every field with no Home counterpart comes
+out rather than getting faked: no email, phone, position, social
+links, address, or Edit action (account editing already lives in
+Settings -> Users, the same "the edit part is for USERS, not people"
+rule `AppsPage.tsx` documents). `/next/people` shows the SIGNED-IN
+person's own profile only - viewing someone else's profile, and the
+Memories tab, stay on `PersonProfilePage.tsx` until their own row
+moves them; `PersonProfilePage.tsx`'s own real "This is your own
+profile." copy is reused verbatim rather than reworded. The household
+list reuses `/next/apps`'s own `DataTable` pattern exactly (a real
+`data` prop, real rows, the same hardcoded-title fix as a `CardHeader`/
+`CardTitle` above it, the same dead Action-column icons left
+unwired) - `GET /api/people` is unscoped by design (`PeoplePage.tsx`'s
+own "a plain directory, readable by anyone signed in" comment), so
+nothing was invented to filter it.
 
 One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
 the chat move together. There is no `ui.chat.next`; `ui.shell.next`

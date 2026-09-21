@@ -1882,7 +1882,7 @@ async function captureNextStandup(browser: Browser, sessionValue: string): Promi
   const pages: Array<{ slug: string; path: string; waitFor: string }> = [
     { slug: "dashboard", path: "/next", waitFor: "text=Stay informed with today's activity" },
     { slug: "apps", path: "/next/apps", waitFor: "table" },
-    { slug: "people", path: "/next/people", waitFor: "text=Personal Information" },
+    { slug: "people", path: "/next/people", waitFor: "table" },
     { slug: "settings", path: "/next/settings", waitFor: "text=Default Inputs" },
     { slug: "sign-in", path: "/next/sign-in", waitFor: "form" },
   ];
@@ -2116,18 +2116,21 @@ async function captureNextAppearanceMismatch(browser: Browser, sessionValue: str
   }
 }
 
-/** HOME-UI-04e's own acceptance: /next/people (the vendored template's
- * own user-profile view) at 1440 and 390, dark - proving both fixes at
- * once. The single-Tailwind-root fix: at 1440, the hero renders as a
- * row and the two info panels render as two columns (the phone layout,
- * stacked and single-column, is what the bug forced at every width);
- * at 390 the phone layout is still correct on its own terms, unrelated
- * to the bug (sm's own breakpoint is 640px). The palette fix: the page
- * reads as one flat dark sheet with faint hairlines (the source's own
- * translucent border), not stacked lit panels (Home's former opaque
- * navy). Dark only - the acceptance's own pixel probe (body/card/
- * hairline against the demo) was run in dark; a light capture would
- * prove nothing this acceptance asks for. */
+/** HOME-UI-04e's own acceptance (1440 and 390, dark, against the
+ * vendored template's own demo user-profile view - the single-
+ * Tailwind-root and palette fixes it proved are long since landed) -
+ * now doubling as SHELL-04's own permanent capture (2026-09-21):
+ * extended to both themes, and its wait condition moved off
+ * "Personal Information", the vendored `UserProfile`'s own demo
+ * section heading that no real `/next/people` composition has ever
+ * shown (SHELL-04 dropped that section entirely - no Home counterpart
+ * for email/phone/position/address). Waits on a real table row rather
+ * than the profile card's own "This is your own profile." text - a
+ * review caught that the profile card renders straight from the
+ * `person` prop, outside the household `AsyncState`, so that text
+ * paints on first render regardless of whether `GET /api/people` has
+ * resolved; `table tbody tr` is gated by the fetch the way the apps
+ * row's own capture already established. */
 async function captureNextPeopleReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2141,18 +2144,20 @@ async function captureNextPeopleReview(browser: Browser, sessionValue: string): 
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
-    const context = await newContext(browser, viewport, "dark", sessionValue);
-    try {
-      const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next/people`);
-      await page.locator("text=Personal Information").first().waitFor({ timeout: 15000 });
-      await settleAnimations(page);
-      const path = join(outDir, `next-people-${viewport.width}-dark.png`);
-      await page.screenshot({ path, fullPage: slug === "phone" });
-      console.log(`Wrote ${path}`);
-      await page.close();
-    } finally {
-      await context.close();
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/people`);
+        await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-people-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
     }
   }
 }
