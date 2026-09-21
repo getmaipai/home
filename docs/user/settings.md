@@ -15,12 +15,14 @@ Settings are split into two tabs at the top of the page. **Household** holds sha
 - **Backups**: run a backup now, or see your backup history.
 - **Repairs**: MaiPai's own health check. Anything that needs attention shows up here with a fix you can apply.
 - **Plugin routing**: see how MaiPai matches your requests to its built-in skills.
+- **New shell (preview)**: try the new look of the app early. It is under System, then General, and needs the Advanced level shown (the level switch is at the top of the settings page). Turn it off to go back. While it is on, the chat also uses its new design.
 
 ## Your own settings
 
 Switch to the **Me** tab for your own personal preferences:
 
 - **Appearance**, **Personality**, **Voice**: how MaiPai looks and sounds when it talks to you.
+- **Look**: pick the color scheme of the whole app. Studio is the standard look. Calm is softer. The other seven are ready-made color sets (Neutral, Stone, Zinc, Mauve, Olive, Mist, Taupe). Light and dark mode both follow whichever one you pick.
 - **My notifications**: how you're notified. This includes linking your own Telegram chat.
 - **Voices**: browse and pick a speaking voice, or clone your own.
 - **PIN / password**: change how you sign in.
