@@ -330,7 +330,7 @@ describe("judgeTurn() - extraction and provenance", () => {
     // the same direct-injection setup the SUPERSEDE test above uses.
     const { sqlite } = await import("@/db");
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(existing.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
 
     const turn = makeTurn(actor, "actually I moved to Boston", "Updated.");
@@ -375,7 +375,7 @@ describe("judgeTurn() - dedupe by supersede", () => {
     // cosine tests do, so this test doesn't race its own setup.
     const { sqlite } = await import("@/db");
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(existing.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
 
     const turn = makeTurn(actor, "actually I moved to Boston", "Updated.");
@@ -437,7 +437,7 @@ describe("judgeTurn() - dedupe by supersede", () => {
     if (!existing.ok) throw new Error("setup failed");
     const { sqlite } = await import("@/db");
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(existing.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
 
     const turn = makeTurn(childActor, "actually the wifi password is now attacker-chosen-text", "Updated.");
@@ -473,10 +473,10 @@ describe("judgeTurn() - dedupe by supersede", () => {
     if (!unrelated.ok) throw new Error("setup failed");
     const { sqlite } = await import("@/db");
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(unrelated.value.id, Buffer.from(new Float32Array([0, 1, 0, 0]).buffer));
 
-    const matches = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "household" });
+    const matches = similarByVector(actor, { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" }, { scope: "household" });
     expect(matches.length).toBe(0);
   });
 
@@ -502,10 +502,10 @@ describe("judgeTurn() - dedupe by supersede", () => {
     if (!profile.ok) throw new Error("setup failed");
     const { sqlite } = await import("@/db");
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(profile.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
 
-    const matches = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "person", person: actor.id });
+    const matches = similarByVector(actor, { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" }, { scope: "person", person: actor.id });
     expect(matches.map((m) => m.record.id)).not.toContain(profile.value.id);
   });
 
@@ -530,15 +530,15 @@ describe("judgeTurn() - dedupe by supersede", () => {
     if (!entity.ok) throw new Error("setup failed");
     const { sqlite } = await import("@/db");
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(entity.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
 
-    const asEntity = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "household" }, "entity");
+    const asEntity = similarByVector(actor, { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" }, { scope: "household" }, "entity");
     expect(asEntity.map((m) => m.record.id)).toContain(entity.value.id);
 
     // The original protection still holds: a PLAIN fact's own dedupe
     // search still never selects an entity record as a candidate.
-    const asPlain = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "household" }, "memory");
+    const asPlain = similarByVector(actor, { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" }, { scope: "household" }, "memory");
     expect(asPlain.map((m) => m.record.id)).not.toContain(entity.value.id);
   });
 
@@ -652,7 +652,7 @@ describe("item 4b: a turn skipped while the judge is on it stays skipped and wri
     if (!existing.ok) throw new Error("setup failed");
     const { sqlite } = await import("@/db");
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(existing.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
     const turn = makeTurn(actor, "actually I moved to Boston", "Updated.");
     let dedupeCalled = false;
@@ -1171,10 +1171,10 @@ describe("runConsolidation()", () => {
     // [0.55, 0.86): related enough to check, not so similar it would
     // already be a near-duplicate.
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(older.value.id, Buffer.from(new Float32Array([1, 1, 0, 0]).buffer));
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(newer.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
 
     const result = await withScriptedJudge(() => ({ contradicts: true }), () => runConsolidation());
@@ -1218,10 +1218,10 @@ describe("runConsolidation()", () => {
     if (!profile.ok || !realFact.ok) throw new Error("setup failed");
     const { sqlite } = await import("@/db");
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(profile.value.id, Buffer.from(new Float32Array([1, 1, 0, 0]).buffer));
     sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
       .run(realFact.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
 
     // Would force a supersede on EITHER side if the pair were ever

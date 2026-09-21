@@ -598,11 +598,23 @@ export interface EmbedValue {
    * own `index`; this sorts by it before returning). */
   vectors: number[][];
   model: string;
+  /** The preprocessing scheme version these vectors were produced under
+   * (CHAT-09's embedding identity, alongside the model: a vector's
+   * identity is model + dims + preprocess). Always `EMBED_PREPROCESS`
+   * for live embeds; re-embed jobs stamp it the same way. */
+  preprocess: string;
 }
 
 export type EmbedOpResult =
   | { ok: true; value: EmbedValue }
   | { ok: false; status: 400 | 503; code: "invalid_input" | "unavailable"; error: string };
+
+// CHAT-09: the preprocessing scheme version stamped into every stored
+// embedding row and carried on every query vector. Today there is exactly
+// one ("v1" = the current raw / document-prefix scheme); a future change
+// to the scheme bumps this and re-embeds rather than silently mixing
+// incompatible rows in the cosine comparison.
+export const EMBED_PREPROCESS = "v1";
 
 /** 4.11's `embed` role: text in, one real vector per input out. No
  * `role` parameter (unlike complete()) - there is exactly one embedding
@@ -615,7 +627,7 @@ async function embedViaStack(texts: string[]): Promise<EmbedOpResult> {
     resolveStackOffline("embed");
     const data = result.data as { data: Array<{ index: number; embedding: number[] }>; model: string };
     const vectors = [...data.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
-    return { ok: true, value: { vectors, model: data.model } };
+    return { ok: true, value: { vectors, model: data.model, preprocess: EMBED_PREPROCESS } };
   } catch (err) {
     return stackFailureResult(err, "embed");
   }
@@ -638,7 +650,7 @@ export async function embed(texts: string[]): Promise<EmbedOpResult> {
   try {
     const response = await client.embed({ model: "embed", input: texts });
     const vectors = [...response.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
-    return { ok: true, value: { vectors, model: response.model } };
+    return { ok: true, value: { vectors, model: response.model, preprocess: EMBED_PREPROCESS } };
   } catch (err) {
     const message = err instanceof LlmClientError ? err.message : (err as Error).message;
     return { ok: false, status: 503, code: "unavailable", error: `embed model unavailable: ${message}` };

@@ -46,14 +46,14 @@ describe("ensureRoutingEmbeddings()", () => {
     expect(second[0]!.hlc).toBe(firstHlc); // untouched: the exists-check found it and skipped it entirely
   });
 
-  test("a changed example re-embeds under a new hash, without deleting the old row", async () => {
+  test("a changed example re-embeds under a new hash and prunes the old row", async () => {
     await ensureRoutingEmbeddings([{ id: "test-pkg", examples: ["hello world"] }]);
     expect(rowsFor("test-pkg")).toHaveLength(1);
 
     await ensureRoutingEmbeddings([{ id: "test-pkg", examples: ["hello universe"] }]);
     const rows = rowsFor("test-pkg");
-    expect(rows).toHaveLength(2); // the old hash's row is still there, orphaned but harmless
-    expect(rows.map((r) => r.example).sort()).toEqual(["hello universe", "hello world"]);
+    expect(rows).toHaveLength(1); // the stale row is pruned, only the new one remains
+    expect(rows.map((r) => r.example)).toEqual(["hello universe"]);
   });
 
   test("a candidate with no examples is simply skipped, no error", async () => {
@@ -65,8 +65,11 @@ describe("ensureRoutingEmbeddings()", () => {
 describe("embedUtterance()", () => {
   test("returns a real vector for real text", async () => {
     const v = await embedUtterance("what's the weather in Seattle");
-    expect(v).toBeInstanceOf(Float32Array);
-    expect(v!.length).toBeGreaterThan(0);
+    expect(v).toBeDefined();
+    expect(v!.vector).toBeInstanceOf(Float32Array);
+    expect(v!.vector.length).toBeGreaterThan(0);
+    expect(v!.space).toBe("embed");
+    expect(v!.preprocess).toBe("v1");
   });
 
   test("returns undefined rather than throwing when embed() itself rejects the input - the exact 'fall back to keyword overlap' signal callers key off", async () => {

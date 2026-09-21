@@ -19,10 +19,10 @@
 // pinned embedding model is the whole household's reality today, and a
 // model change is a future migration, not a per-call check here.
 import { createHash } from "node:crypto";
-import { inArray } from "drizzle-orm";
+import { inArray, eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { routingEmbeddings } from "@/db/schema";
-import { embed } from "@/lib/llm";
+import { embed, EMBED_PREPROCESS } from "@/lib/llm";
 import { cosineSimilarity, vectorToBuffer, bufferToVector } from "@/lib/memory";
 import { nextHlc } from "@/lib/hlc";
 
@@ -105,6 +105,29 @@ export async function ensureRoutingEmbeddings(candidates: readonly RoutingCandid
       if (!existingHashes.has(`${id}:${hash}`)) pending.push({ packageId: id, example, hash });
     }
   }
+
+  // CHAT-09: prune stale rows whose example_hash no longer matches any
+  // current manifest example for that package. A package whose manifest
+  // changed (example removed or rewritten) leaves old rows in the store;
+  // they must go even when every current example is already embedded,
+  // even when the embed backend is down, and even when the new
+  // examples array is empty. Never delete another package's rows.
+  const currentHashesByPackage = new Map<string, Set<string>>();
+  for (const { id, examples } of candidates) {
+    let set = currentHashesByPackage.get(id);
+    if (!set) { set = new Set(); currentHashesByPackage.set(id, set); }
+    for (const example of examples ?? []) set.add(hashExample(example));
+  }
+  const allRows = db.select({ packageId: routingEmbeddings.packageId, exampleHash: routingEmbeddings.exampleHash }).from(routingEmbeddings).all();
+  for (const row of allRows) {
+    const hashes = currentHashesByPackage.get(row.packageId);
+    if (hashes && !hashes.has(row.exampleHash)) {
+      db.delete(routingEmbeddings)
+        .where(and(eq(routingEmbeddings.packageId, row.packageId), eq(routingEmbeddings.exampleHash, row.exampleHash)))
+        .run();
+    }
+  }
+
   if (pending.length === 0) return;
 
   let result;
@@ -128,6 +151,7 @@ export async function ensureRoutingEmbeddings(candidates: readonly RoutingCandid
       dims: vector.length,
       vector: vectorToBuffer(vector),
       hlc: now,
+      preprocess: result.value.preprocess,
     };
     // A concurrent turn embedding the identical new example is possible
     // (two household members speaking at once, both missing the same
@@ -151,12 +175,20 @@ let __embedCallCount = 0;
  * candidate this turn," the same contract memory.ts's
  * `embedQueryForRecall()` already established for the identical
  * down-backend case. */
-export async function embedUtterance(text: string): Promise<Float32Array | undefined> {
+export interface UtteranceVector {
+  vector: Float32Array;
+  space: string;
+  dims: number;
+  preprocess: string;
+}
+
+export async function embedUtterance(text: string): Promise<UtteranceVector | undefined> {
   __embedCallCount++;
   try {
     const result = await embed([text]);
     if (!result.ok) return undefined;
-    return new Float32Array(result.value.vectors[0]!);
+    const v = result.value.vectors[0]!;
+    return { vector: new Float32Array(v), space: result.value.model, dims: v.length, preprocess: result.value.preprocess };
   } catch {
     return undefined;
   }
@@ -177,12 +209,23 @@ export function __resetEmbedCallCountForTests(): void {
  * was down at ensureRoutingEmbeddings time, or it simply has no
  * examples) is absent from the returned map entirely, not scored 0 -
  * callers that need a fallback score for it use `exampleScore()`. */
-export function scoreByEmbedding(utteranceVector: Float32Array, candidateIds: readonly string[]): Map<string, number> {
+export function scoreByEmbedding(utteranceVector: UtteranceVector, candidateIds: readonly string[]): Map<string, number> {
   if (candidateIds.length === 0) return new Map();
-  const rows = db.select().from(routingEmbeddings).where(inArray(routingEmbeddings.packageId, [...candidateIds])).all();
+  const rows = db
+    .select()
+    .from(routingEmbeddings)
+    .where(
+      and(
+        inArray(routingEmbeddings.packageId, [...candidateIds]),
+        eq(routingEmbeddings.space, utteranceVector.space),
+        eq(routingEmbeddings.dims, utteranceVector.dims),
+        eq(routingEmbeddings.preprocess, utteranceVector.preprocess),
+      ),
+    )
+    .all();
   const scores = new Map<string, number>();
   for (const row of rows) {
-    const cosine = cosineSimilarity(utteranceVector, bufferToVector(row.vector));
+    const cosine = cosineSimilarity(utteranceVector.vector, bufferToVector(row.vector));
     const best = scores.get(row.packageId);
     if (best === undefined || cosine > best) scores.set(row.packageId, cosine);
   }

@@ -242,7 +242,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
     let episodic = -1;
     let top = { text: "", cosine: -1 };
     for (const r of records) {
-      const c = cosineSimilarity(q, r.vector);
+      const c = cosineSimilarity(q.vector, r.vector);
       if (r.tier === "durable") durable = Math.max(durable, c);
       else episodic = Math.max(episodic, c);
       if (c > top.cosine) top = { text: r.text, cosine: c };
@@ -278,8 +278,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
     if (!q) throw new Error(`could not embed "${query}"`);
     const record = records.find((r) => r.text === answer);
     if (!record) throw new Error(`no seeded record "${answer}"`);
-    const cosine = cosineSimilarity(q, record.vector);
-    const best = records.reduce((b, r) => Math.max(b, cosineSimilarity(q, r.vector)), -1);
+    const cosine = cosineSimilarity(q.vector, record.vector);
+    const best = records.reduce((b, r) => Math.max(b, cosineSimilarity(q.vector, r.vector)), -1);
     signals.push(cosine);
     console.log(`  ${f(cosine)}  "${query}" -> "${answer}" ${cosine >= best - 1e-9 ? "(top)" : `(top was ${f(best)})`}`);
   }
@@ -292,7 +292,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
     if (!q) throw new Error(`could not embed "${query}"`);
     const record = records.find((r) => r.text === answer);
     if (!record) throw new Error(`no seeded record "${answer}"`);
-    const cosine = cosineSimilarity(q, record.vector);
+    const cosine = cosineSimilarity(q.vector, record.vector);
     indirect.push(cosine);
     console.log(`  ${f(cosine)}  "${query}" -> "${answer}"`);
   }
@@ -332,7 +332,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
     let wantedCosine = -1;
     let wantedShared = 0;
     for (const r of episodeRows) {
-      const c = cosineSimilarity(q, bufferToVector(r.vector));
+      const c = cosineSimilarity(q.vector, bufferToVector(r.vector));
       const pair = episodeRows.find((p) => p.turnId === r.turnId && p.speaker !== r.speaker)?.text ?? "";
       const shared = sharedContentTerms(terms, `${r.text} ${pair}`);
       if (c > best.cosine) best = { text: r.text, cosine: c, shared, conversation: turnConversation.get(r.turnId) ?? "" };

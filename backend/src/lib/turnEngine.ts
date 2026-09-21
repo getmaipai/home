@@ -15,7 +15,7 @@ import { evaluateSafety, evaluateReply, forOutput, carriesCrisisSignal } from "@
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE, redactCredentials } from "@/lib/memoryContentPolicy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin, safeFailureMessage, validatePackageArgs } from "@/lib/plugins";
-import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, commandOpenersFrom, type UtteranceShape } from "@/lib/routing";
+import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, commandOpenersFrom, type UtteranceShape, type UtteranceVector } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged, trigger } from "@/lib/notifications";
@@ -1575,7 +1575,7 @@ export async function routeSemantic(
   text: string,
   actor: PersonRow,
   loaded: LoadedManifest[],
-  utteranceVector: Float32Array | undefined,
+  utteranceVector: UtteranceVector | undefined,
 ): Promise<RouteResult> {
   const eligible: LoadedManifest[] = [];
   for (const { id, manifest } of loaded) {
@@ -1622,7 +1622,7 @@ export async function routeSemantic(
  * timing (routingCorpus.test.ts's direct call); prepareTurn() calls them
  * separately so the embed only happens when the literal half missed.
  * Embeds here when the caller did not, exactly once. */
-export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[], utteranceVector?: Float32Array): Promise<RouteResult> {
+export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[], utteranceVector?: UtteranceVector): Promise<RouteResult> {
   const literal = routeLiteral(text, actor, loaded);
   if (literal) return literal;
   return routeSemantic(text, actor, loaded, utteranceVector ?? (await embedUtterance(text)));
@@ -2759,7 +2759,7 @@ async function prepareTurn(
   // separately) and reused below as recall()'s own queryVector -
   // embedQueryForRecall() stays in memory.ts for its other real caller
   // (packageHost.ts's Host.memory.recall).
-  let utteranceVector: Float32Array | undefined;
+  let utteranceVector: UtteranceVector | undefined;
   // #92: the roster (read above, with the signal) feeds routing, so a
   // literal pattern of an outside-looking package can yield on a
   // household name; the same list feeds the prompt and the guards below.

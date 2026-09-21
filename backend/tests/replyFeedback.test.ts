@@ -57,7 +57,7 @@ describe("reply feedback migration and schema", () => {
     const indexes = sqlite.query("PRAGMA index_list(reply_feedback)").all() as Array<{ name: string; unique: number }>;
     expect(indexes.some((index) => index.name === "reply_feedback_turn_person_unique" && index.unique === 1)).toBe(true);
     expect((sqlite.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(CURRENT_SCHEMA_VERSION);
-    expect(CURRENT_SCHEMA_VERSION).toBe(39);
+    expect(CURRENT_SCHEMA_VERSION).toBe(40);
   });
 });
 

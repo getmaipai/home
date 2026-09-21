@@ -17,7 +17,7 @@ import { toMemoryRecord } from "@/lib/memoryShape";
 import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { tokenize } from "@/lib/text";
-import { embed } from "@/lib/llm";
+import { embed, EMBED_PREPROCESS } from "@/lib/llm";
 import { getEmbedBackendKind } from "@/lib/embedSupervisor";
 import { nextHlc } from "@/lib/hlc";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
@@ -172,7 +172,7 @@ export interface RememberInput {
    * found remember() was blindly re-embedding the identical text a
    * second time). Only safe when the vector was computed for precisely
    * the text being stored. */
-  precomputed_embedding?: { space: string; vector: readonly number[] };
+  precomputed_embedding?: { space: string; vector: readonly number[]; preprocess: string };
 }
 
 export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult<MemoryRecord> {
@@ -284,7 +284,7 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
   // storeEmbedding() itself is synchronous DB work, not I/O, so this
   // branch completes before remember() returns rather than racing it.
   if (input.precomputed_embedding) {
-    storeEmbedding(parsed.data.id, input.precomputed_embedding.space, input.precomputed_embedding.vector);
+    storeEmbedding(parsed.data.id, input.precomputed_embedding.space, input.precomputed_embedding.vector, input.precomputed_embedding.preprocess);
   } else {
     void embedMemoryRecordSafely(parsed.data.id, parsed.data.text);
   }
@@ -330,16 +330,16 @@ export async function embedMemoryRecordSafely(memoryId: string, text: string): P
       queueForEmbedding(memoryId);
       return;
     }
-    storeEmbedding(memoryId, result.value.model, result.value.vectors[0]!);
+    storeEmbedding(memoryId, result.value.model, result.value.vectors[0]!, result.value.preprocess);
   } catch (err) {
     console.error(`[memory] embed-on-write failed for ${memoryId}, queued for retry: ${(err as Error).message}`);
     queueForEmbedding(memoryId);
   }
 }
 
-function storeEmbedding(memoryId: string, space: string, vector: readonly number[]): void {
+function storeEmbedding(memoryId: string, space: string, vector: readonly number[], preprocess: string): void {
   try {
-    const row = { memoryId, space, dims: vector.length, vector: vectorToBuffer(vector), hlc: nextHlc() };
+    const row = { memoryId, space, dims: vector.length, vector: vectorToBuffer(vector), hlc: nextHlc(), preprocess };
     db.insert(memoryEmbeddings)
       .values(row)
       .onConflictDoUpdate({ target: memoryEmbeddings.memoryId, set: row })
@@ -393,10 +393,15 @@ export async function drainPendingEmbeddings(): Promise<{ embedded: number; stil
   let embedded = 0;
   if (live.length > 0) {
     try {
-      const result = await embed(live.map((r) => r.text));
+      // CHAT-09: bounded to 32 records per batch so one long retry queue
+      // can't hold up the whole per-minute tick; the remainder stays
+      // queued and resumes on the next tick (the existing retry job's
+      // resume-after-interruption contract, now explicitly bounded).
+      const batch = live.slice(0, 32);
+      const result = await embed(batch.map((r) => r.text));
       if (result.ok) {
-        live.forEach((r, i) => {
-          storeEmbedding(r.id, result.value.model, result.value.vectors[i]!);
+        batch.forEach((r, i) => {
+          storeEmbedding(r.id, result.value.model, result.value.vectors[i]!, result.value.preprocess);
           embedded++;
         });
       } // else: still down; every row stays queued for the next tick
@@ -513,7 +518,7 @@ export interface RecallOptions extends ListOptions {
     * down) falls back to keyword overlap for every candidate - the exact
     * placeholder behavior this step replaces, kept as the real fallback
     * it always was. */
-  queryVector?: Float32Array;
+    queryVector?: QueryVector;
   /** CHAT-08 (a): true only for an explicit historical read (a caller
    * asking "what was true at this moment"). Superseded records that
    * were valid at the asOf moment then surface; a current read (asOf
@@ -625,11 +630,19 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  * side too, not just this file's. Filed as its own follow-up
  * (docs/BACKLOG.md, "Chat, memory and persona"), not done here: the raw
  * text, same as what's embedded on write, until a real migration exists. */
-export async function embedQueryForRecall(query: string): Promise<Float32Array | undefined> {
+export interface QueryVector {
+  vector: Float32Array;
+  space: string;
+  dims: number;
+  preprocess: string;
+}
+
+export async function embedQueryForRecall(query: string): Promise<QueryVector | undefined> {
   try {
     const result = await embed([query]);
     if (!result.ok) return undefined;
-    return new Float32Array(result.value.vectors[0]!);
+    const v = result.value.vectors[0]!;
+    return { vector: new Float32Array(v), space: result.value.model, dims: v.length, preprocess: result.value.preprocess };
   } catch {
     return undefined;
   }
@@ -772,8 +785,10 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
     const forceInclude = row.pinned || isEntityMatch;
 
     let score: number;
-    if (opts.queryVector && storedVector) {
-      const cosine = cosineSimilarity(opts.queryVector, storedVector);
+    const vectorRow = vectorRows.find((v) => v.memoryId === row.id);
+    const identityMatch = vectorRow && opts.queryVector && vectorRow.space === opts.queryVector.space && vectorRow.dims === opts.queryVector.dims && vectorRow.preprocess === opts.queryVector.preprocess;
+    if (opts.queryVector && storedVector && identityMatch) {
+      const cosine = cosineSimilarity(opts.queryVector.vector, storedVector);
       // The floor excludes outright, it doesn't down-weight (legacy's
       // real behavior, confirmed against the mirror rather than
       // assumed): a candidate below its tier's floor never enters the
@@ -843,7 +858,7 @@ export interface SimilarMatch {
  * the way an actual recall answer is. */
 export function similarByVector(
   actor: PersonRow,
-  vector: Float32Array,
+  vector: QueryVector,
   opts: ListOptions = {},
   candidateRecordKind: "memory" | "entity" = "memory",
 ): SimilarMatch[] {
@@ -894,7 +909,14 @@ export function similarByVector(
   for (const row of rows) {
     const stored = vectorsByMemoryId.get(row.id);
     if (!stored) continue;
-    const cosine = cosineSimilarity(vector, stored);
+    const vectorRow = vectorRows.find((v) => v.memoryId === row.id);
+    const identityMatch =
+      vectorRow &&
+      vectorRow.space === vector.space &&
+      vectorRow.dims === vector.dims &&
+      vectorRow.preprocess === vector.preprocess;
+    if (!identityMatch) continue;
+    const cosine = cosineSimilarity(vector.vector, stored);
     if (cosine >= DEDUPE_MIN_COSINE) scored.push({ record: toMemoryRecord(row), cosine });
   }
   scored.sort((a, b) => b.cosine - a.cosine);

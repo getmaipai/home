@@ -191,6 +191,7 @@ export const memoryEmbeddings = sqliteTable("memory_embeddings", {
   dims: integer("dims").notNull(),
   vector: blob("vector", { mode: "buffer" }).notNull(),
   hlc: text("hlc").notNull(),
+  preprocess: text("preprocess").notNull().default("v1"),
 });
 
 // The retry queue for a record written while the embed backend was down
@@ -241,6 +242,7 @@ export const episodeEmbeddings = sqliteTable("episode_embeddings", {
   dims: integer("dims").notNull(),
   vector: blob("vector", { mode: "buffer" }).notNull(),
   hlc: text("hlc").notNull(),
+  preprocess: text("preprocess").notNull().default("v1"),
 });
 
 export const pendingEpisodeEmbeddings = sqliteTable("pending_episode_embeddings", {
@@ -1058,6 +1060,7 @@ export const routingEmbeddings = sqliteTable(
     dims: integer("dims").notNull(),
     vector: blob("vector", { mode: "buffer" }).notNull(),
     hlc: text("hlc").notNull(),
+    preprocess: text("preprocess").notNull().default("v1"),
   },
   (table) => [primaryKey({ columns: [table.packageId, table.exampleHash, table.space] })],
 );

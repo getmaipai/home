@@ -1258,7 +1258,14 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       continue;
     }
     const embedded = await embed([fact.text]);
-    const vector = embedded.ok ? new Float32Array(embedded.value.vectors[0]!) : undefined;
+    const vector = embedded.ok
+      ? {
+          vector: new Float32Array(embedded.value.vectors[0]!),
+          space: embedded.value.model,
+          dims: embedded.value.vectors[0]!.length,
+          preprocess: embedded.value.preprocess,
+        }
+      : undefined;
     const candidates = vector
       ? similarByVector(
           speaker,
@@ -1362,7 +1369,9 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         // verbatim, unlike SUPERSEDE's own decision.mergedText, which
         // can differ from what was embedded - see RememberInput's own
         // comment on why this field only travels with an exact match).
-        precomputed_embedding: embedded.ok ? { space: embedded.value.model, vector: embedded.value.vectors[0]! } : undefined,
+        precomputed_embedding: embedded.ok
+          ? { space: embedded.value.model, vector: embedded.value.vectors[0]!, preprocess: embedded.value.preprocess }
+          : undefined,
       });
       if (result.ok) {
         written++;

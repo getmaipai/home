@@ -17,9 +17,9 @@ import type { PersonRow, MemoryRecordRow } from "@/types";
 // without going through a real embed() call, so recall()'s cosine
 // scoring can be exercised with hand-picked, easy-to-reason-about
 // numbers instead of the stub embedder's bag-of-words output.
-function injectVector(memoryId: string, vector: number[]): void {
+function injectVector(memoryId: string, vector: number[], space = "test"): void {
   db.insert(memoryEmbeddings)
-    .values({ memoryId, space: "test", dims: vector.length, vector: Buffer.from(new Float32Array(vector).buffer), hlc: "test-hlc" })
+    .values({ memoryId, space, dims: vector.length, vector: Buffer.from(new Float32Array(vector).buffer), hlc: "test-hlc", preprocess: "v1" })
     .run();
 }
 
@@ -1572,7 +1572,7 @@ describe("recall() cosine scoring (step 5: real embeddings)", () => {
     injectVector(target.value.id, [1, 0, 0, 0]);
     injectVector(decoy.value.id, [0, 1, 0, 0]);
 
-    const matches = recall(ownerRow, "where do we keep the spare house key", { queryVector: new Float32Array([1, 0, 0, 0]) });
+    const matches = recall(ownerRow, "where do we keep the spare house key", { queryVector: { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" } });
     const ids = matches.map((m) => m.record.id);
     expect(ids).toContain(target.value.id);
     expect(ids).not.toContain(decoy.value.id);
@@ -1600,7 +1600,7 @@ describe("recall() cosine scoring (step 5: real embeddings)", () => {
     if (!pinned.ok) throw new Error("setup failed");
     injectVector(pinned.value.id, [-1, 0, 0, 0]);
 
-    const matches = recall(ownerRow, "completely unrelated question", { queryVector: new Float32Array([1, 0, 0, 0]) });
+    const matches = recall(ownerRow, "completely unrelated question", { queryVector: { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" } });
     expect(matches.map((m) => m.record.id)).toContain(pinned.value.id);
   });
 
@@ -1626,7 +1626,7 @@ describe("recall() cosine scoring (step 5: real embeddings)", () => {
     if (!profile.ok) throw new Error("setup failed");
     injectVector(profile.value.id, [1, 0, 0, 0]);
 
-    const matches = recall(ownerRow, "the household's own profile paragraph text", { queryVector: new Float32Array([1, 0, 0, 0]) });
+    const matches = recall(ownerRow, "the household's own profile paragraph text", { queryVector: { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" } });
     expect(matches.map((m) => m.record.id)).not.toContain(profile.value.id);
   });
 

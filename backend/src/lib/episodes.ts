@@ -9,7 +9,7 @@ import { embed } from "@/lib/llm";
 import { getEmbedClient } from "@/lib/embedSupervisor";
 import { nextHlc } from "@/lib/hlc";
 import { newEpisodeId } from "@/lib/id";
-import { vectorToBuffer, bufferToVector, cosineSimilarity } from "@/lib/memory";
+import { vectorToBuffer, bufferToVector, cosineSimilarity, type QueryVector } from "@/lib/memory";
 import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import * as chrono from "chrono-node";
 import type { ConversationTurnRow } from "@/wire";
@@ -97,14 +97,15 @@ export async function embedPendingEpisodes(): Promise<number> {
   if (!result.ok) return 0;
 
   const rows = pending.map((p, i) => {
-    const vector = result.value.vectors[i]!;
-    return {
-      episodeId: p.episodes.id,
-      space: "default",
-      dims: vector.length,
-      vector: vectorToBuffer(vector),
-      hlc: nextHlc(),
-    };
+      const vector = result.value.vectors[i]!;
+      return {
+        episodeId: p.episodes.id,
+        space: result.value.model,
+        dims: vector.length,
+        vector: vectorToBuffer(vector),
+        hlc: nextHlc(),
+        preprocess: result.value.preprocess,
+      };
   });
 
   db.insert(episodeEmbeddings).values(rows).run();
@@ -401,7 +402,7 @@ function supersededTurnIdsQuery() {
   return db.select({ id: conversationTurns.supersedes }).from(conversationTurns).where(isNotNull(conversationTurns.supersedes));
 }
 
-export function recallEpisodes(actor: PersonRow, query: string, queryVector: Float32Array | undefined, opts: RecallEpisodesOptions = {}): EpisodeMatch[] {
+export function recallEpisodes(actor: PersonRow, query: string, queryVector: QueryVector | undefined, opts: RecallEpisodesOptions = {}): EpisodeMatch[] {
   const limit = opts.limit ?? 5;
   const now = opts.now ?? new Date();
   const window = dateWindowForQuery(query, now);
@@ -465,15 +466,18 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   // already.
   const vector: CandidateRow[] = [];
   if (queryVector) {
-    const columns = {
-      id: episodes.id,
-      turnId: episodes.turnId,
-      conversationId: episodes.conversationId,
-      speaker: episodes.speaker,
-      text: episodes.text,
-      createdAt: episodes.createdAt,
-      vector: episodeEmbeddings.vector,
-    };
+      const columns = {
+        id: episodes.id,
+        turnId: episodes.turnId,
+        conversationId: episodes.conversationId,
+        speaker: episodes.speaker,
+        text: episodes.text,
+        createdAt: episodes.createdAt,
+        vector: episodeEmbeddings.vector,
+        space: episodeEmbeddings.space,
+        dims: episodeEmbeddings.dims,
+        preprocess: episodeEmbeddings.preprocess,
+      };
     const personScope = within ? and(eq(episodes.personId, actor.id), eq(episodes.conversationId, within)) : eq(episodes.personId, actor.id);
     const scope = window ? and(personScope, gte(episodes.createdAt, window.start.toISOString()), lt(episodes.createdAt, window.end.toISOString())) : personScope;
     const rows = db
@@ -487,7 +491,12 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
     __vectorRowsScanned += rows.length;
     const scored = rows
       .filter((r) => inWindow(r, window) && !excludedTurnIds.has(r.turnId) && !sensitiveTurnIds.has(r.turnId) && (sides === "both" || r.speaker === "user") && (!within || r.conversationId === within))
-      .map((r) => ({ row: r as CandidateRow & { vector: Buffer }, cosine: cosineSimilarity(queryVector, bufferToVector(r.vector as Buffer)) }))
+      .map((r) => {
+        const row = r as CandidateRow & { vector: Buffer; space: string; dims: number; preprocess: string };
+        const identityMatch = row.space === queryVector.space && row.dims === queryVector.dims && row.preprocess === queryVector.preprocess;
+        return identityMatch ? { row, cosine: cosineSimilarity(queryVector.vector, bufferToVector(row.vector)) } : null;
+      })
+      .filter((s): s is { row: CandidateRow & { vector: Buffer; space: string; dims: number; preprocess: string }; cosine: number } => s !== null)
       .filter((s) => s.cosine >= EPISODE_MIN_COSINE)
       .sort((a, b) => b.cosine - a.cosine)
       .slice(0, CANDIDATES_PER_SOURCE);

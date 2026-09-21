@@ -268,7 +268,7 @@ describe("the review's cases", () => {
     const pinned = remember(actor, { text: "Raven is the family's dentist", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.6, pinned: true });
     if (!pinned.ok) throw new Error("setup failed");
     const { sqlite } = await import("@/db");
-    sqlite.query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')").run(pinned.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+    sqlite.query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')").run(pinned.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
     const turn = makeTurn(child, "Raven is not our dentist anymore", "Okay.");
     await withScriptedJudge(
       (name) => {

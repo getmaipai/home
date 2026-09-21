@@ -20,7 +20,7 @@ import {
   formatEpisodeLine,
   answerTerms,
 } from "@/lib/episodes";
-import { forget, vectorToBuffer } from "@/lib/memory";
+import { forget, vectorToBuffer, type QueryVector } from "@/lib/memory";
 import { TestClient } from "./client";
 import { newPersonId } from "@/lib/id";
 import { db, sqlite } from "@/db";
@@ -269,6 +269,11 @@ function newConversation(actor: PersonRow): string {
 }
 
 /** Three conversations over three weeks, the fixture the work order names. */
+function qv(v: number | number[], preprocess: string = "v1"): QueryVector {
+  const vector = typeof v === "number" ? new Float32Array(v) : new Float32Array(v);
+  return { vector, space: "test", dims: vector.length, preprocess };
+}
+
 function seedThreeWeeks(actor: PersonRow): { threeWeeksAgo: string; lastWeek: string; yesterday: string } {
   const threeWeeksAgo = newConversation(actor);
   say(actor, threeWeeksAgo, 21, "any ideas for a picnic recipe", "A tomato tart travels well, and you could bring lemonade.", "t-old-recipe");
@@ -379,12 +384,12 @@ describe("MEM-04 recallEpisodes()", () => {
     place("t-dessert", "assistant", [1, 0, 0]);
     place("t-risotto", "assistant", [0, 1, 0]);
     place("t-trip", "assistant", [0, 0, 1]);
-    const matches = recallEpisodes(actor, "what did you say", new Float32Array([0.95, 0.05, 0]), { now: NOW, sides: "both" });
+    const matches = recallEpisodes(actor, "what did you say", qv([0.95, 0.05, 0]), { now: NOW, sides: "both" });
     expect(matches[0]!.episode.turnId).toBe("t-dessert");
     // Below the cosine floor nothing comes back: a question about something
     // never said is empty, not the nearest unrelated turn.
-    expect(recallEpisodes(actor, "what did you say", new Float32Array([0, 0, 0]), { now: NOW })).toEqual([]);
-    expect(recallEpisodes(actor, "kayak rental", new Float32Array([-1, -1, -1]), { now: NOW })).toEqual([]);
+    expect(recallEpisodes(actor, "what did you say", qv([0, 0, 0]), { now: NOW })).toEqual([]);
+    expect(recallEpisodes(actor, "kayak rental", qv([-1, -1, -1]), { now: NOW })).toEqual([]);
   });
 
   test("with the real embed path (stub engine), pending episodes get vectors and recall still answers", async () => {
@@ -393,7 +398,7 @@ describe("MEM-04 recallEpisodes()", () => {
     const embedded = await embedPendingEpisodes();
     expect(embedded).toBeGreaterThan(0);
     expect(db.select().from(pendingEpisodeEmbeddings).all()).toHaveLength(0);
-    const matches = recallEpisodes(actor, "risotto", new Float32Array(768), { now: NOW, sides: "both" }); // "risotto" is in the hub's side of t-risotto
+    const matches = recallEpisodes(actor, "risotto", qv(768), { now: NOW, sides: "both" }); // "risotto" is in the hub's side of t-risotto
     expect(matches.map((m) => m.episode.turnId)).toContain("t-risotto");
   });
 });
@@ -433,7 +438,7 @@ describe("getmaipai/home#79: the vector scan is bounded", () => {
     seedEmbedded(actor, VECTOR_SCAN_RECENT_EPISODES + 500, conversationId);
     expect(db.select({ id: episodeEmbeddings.episodeId }).from(episodeEmbeddings).all()).toHaveLength(VECTOR_SCAN_RECENT_EPISODES + 500);
     __resetVectorRowsScannedForTests();
-    const matches = recallEpisodes(actor, "what did I say", new Float32Array([1, 0, 0]), { now: NOW });
+    const matches = recallEpisodes(actor, "what did I say", qv([1, 0, 0]), { now: NOW });
     expect(__vectorRowsScannedForTests()).toBe(VECTOR_SCAN_RECENT_EPISODES);
     expect(matches.length).toBeGreaterThan(0);
     // The newest rows are the ones read: the oldest 500 can never win.
@@ -449,11 +454,11 @@ describe("getmaipai/home#79: the vector scan is bounded", () => {
     // the newest N sit within the last two days and point elsewhere.
     seedEmbedded(actor, VECTOR_SCAN_RECENT_EPISODES + 500, conversationId, { oldestInWindow: { count: 500, daysAgo: 21, vector: [0, 1, 0] } });
     __resetVectorRowsScannedForTests();
-    const undated = recallEpisodes(actor, "what did I say", new Float32Array([0, 1, 0]), { now: NOW });
+    const undated = recallEpisodes(actor, "what did I say", qv([0, 1, 0]), { now: NOW });
     expect(__vectorRowsScannedForTests()).toBe(VECTOR_SCAN_RECENT_EPISODES);
     expect(undated).toEqual([]); // the recent scan never sees the old rows, and the recent vectors are orthogonal
     __resetVectorRowsScannedForTests();
-    const dated = recallEpisodes(actor, "what did I say three weeks ago", new Float32Array([0, 1, 0]), { now: NOW });
+    const dated = recallEpisodes(actor, "what did I say three weeks ago", qv([0, 1, 0]), { now: NOW });
     expect(__vectorRowsScannedForTests()).toBe(500); // the window's own rows, not the recent set
     expect(dated.length).toBeGreaterThan(0);
     expect(dated.every((m) => Number(m.episode.turnId.replace("t-bulk-", "")) < 500)).toBe(true);
@@ -679,7 +684,7 @@ describe("RECALL-02: episodes are evidence, never lines", () => {
     const { sqlite } = await import("@/db");
     const row = db.select({ id: episodes.id }).from(episodes).where(eq(episodes.turnId, "t-band")).all()[0]!;
     sqlite.query("INSERT INTO episode_embeddings (episode_id, space, dims, vector, hlc) VALUES (?, 'test', 3, ?, 'test-hlc')").run(row.id, Buffer.from(new Float32Array([1, 0, 0]).buffer));
-    expect(recallEpisodes(actor, "Sage is getting a Tempo treadmill for the office", new Float32Array([1, 0, 0]), { now: NOW }).map((m) => m.episode.turnId)).toEqual(["t-band"]);
+    expect(recallEpisodes(actor, "Sage is getting a Tempo treadmill for the office", qv([1, 0, 0]), { now: NOW }).map((m) => m.episode.turnId)).toEqual(["t-band"]);
   });
 
   test("a hub-side line at its longest fits the cap, and a line that would breach it is skipped, not the block", () => {
