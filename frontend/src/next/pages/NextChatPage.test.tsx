@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { NextChatPage } from "@/next/pages/NextChatPage";
 import type { Roster } from "@/lib/api";
@@ -99,6 +99,34 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       expect(await findByText("A past chat")).toBeVisible();
     } finally {
       globalThis.fetch = original;
+    }
+  });
+
+  // Found live, on 8787, verifying this slice: clicking "New Thread"
+  // from the phone/tablet Sheet started a fresh conversation but left
+  // the Sheet open over it, blocking the composer until it was
+  // manually dismissed - `NextThreadList`'s own composed `onClick` on
+  // `ThreadListNew` (not the shipped `<ThreadList>`, which hardcodes
+  // it with no hook) is the fix. ChatPage.test.tsx's own sibling test
+  // ("thread history opens as a phone sheet...") is the pattern this
+  // mirrors: the Sheet's own heading, not the toggle button, proves
+  // open/closed once Radix aria-hides the rest of the page.
+  test("New Thread closes the phone/tablet Sheet, the same as selecting a past conversation", async () => {
+    const restore = stubFetch();
+    try {
+      const view = render(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Show threads" }));
+      const dialog = await view.findByRole("heading", { name: "Conversations" });
+      fireEvent.click(within(dialog.closest('[role="dialog"]')!).getByText("New Thread"));
+      await view.findByRole("button", { name: "Show threads" });
+      expect(view.queryByRole("heading", { name: "Conversations" })).toBeNull();
+    } finally {
+      restore();
     }
   });
 });

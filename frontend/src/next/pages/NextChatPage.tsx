@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AssistantRuntimeProvider, useAui, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
-import { ThreadList } from "@maipai/ui/src/elements/thread-list.aui";
+import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
@@ -39,6 +39,28 @@ const HistoryIcon = getIcon("history");
  * Attachments, suggestions, tools and artifacts are each their own
  * follow-up slice (the wiring table's remaining rows). `speakReplies:
  * false` still holds - no "stop speaking" control on screen yet. */
+// The shipped `<ThreadList>` (thread-list.aui.tsx's own default export)
+// hardcodes its own `<ThreadListNew>` with no way to hand it a click
+// handler - composed here instead from that same file's other exported
+// pieces (its own implementation, mirrored exactly) so New Thread can
+// also close the phone/tablet Sheet, the same way selecting an
+// existing thread already does. `ThreadListPrimitive.New`'s own onClick
+// is composed with (not replaced by) the one passed here
+// (radix-ui's composeEventHandlers, confirmed in the installed
+// package) - both fire, so this changes nothing about starting a new
+// thread itself.
+function NextThreadList({ onNewThread }: { onNewThread: () => void }) {
+  const [search, setSearch] = useState("");
+  const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
+  return (
+    <ThreadListRoot>
+      <ThreadListNew onClick={onNewThread} />
+      {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} />}
+      <ThreadListItems searchQuery={hasThreads ? search : ""} />
+    </ThreadListRoot>
+  );
+}
+
 function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
@@ -91,7 +113,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // Sheet below - ChatPage.tsx's own fix for exactly this (a code
   // review caught the two call sites drifting once one grew props the
   // other didn't).
-  const threadList = <ThreadList />;
+  const threadList = <NextThreadList onNewThread={() => setSheetOpen(false)} />;
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
