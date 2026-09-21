@@ -19141,7 +19141,7 @@ never be "studio" again, so every rule and Tailwind variant gated on
 it (the main nav rail's own geometry, the brand tile, the page title)
 went permanently dead; Studio's own values were promoted to
 unconditional in the same item (ui-v0.5.18) rather than left silently
-reverted to Calm's plainer fallback. Then, the same afternoon: CHAT-SDK-01 (c413594e, ui-v0.5.16), LOOK-01 (5822231a, neutral the named default, ui-v0.5.18), SHELL-02's first two slices of `/next/chat` (68784232 the Elements thread on a real turn with reasoning live; c0469d64 history and the thread list), SHELL-03 `/next/apps` (ebe0ceff, on GET /api/plugins), SHELL-04 `/next/people` (81494595), SHELL-05 `/next/settings` (3d1ff358, the registry renderer on the template's fields), SHELL-06 `/next/engines` (0ecfd157, with the honest "not configured" 200), and PWA-SW-01 (7712ee5f). Open: the chat's remaining slices (tools and generative UI, artifacts, suggestions and attachments and read-aloud), SHELL-07 and SHELL-08, then SHELL-09, the cutover and the deletion of the old interface. HOME-UI-04 (the
+reverted to Calm's plainer fallback. Then, the same afternoon: CHAT-SDK-01 (c413594e, ui-v0.5.16), LOOK-01 (5822231a, neutral the named default, ui-v0.5.18), SHELL-02's first three slices of `/next/chat` (68784232 the Elements thread on a real turn with reasoning live; c0469d64 history and the thread list; a slice-3 commit landing tools and generative UI - weather's and almanac-date's own structured result rendering through the shipped `SpecSheet` Element, `display: "standalone"` after finding live that its default tucks the card behind a collapsed "1 tool call" trigger), SHELL-03 `/next/apps` (ebe0ceff, on GET /api/plugins), SHELL-04 `/next/people` (81494595), SHELL-05 `/next/settings` (3d1ff358, the registry renderer on the template's fields), SHELL-06 `/next/engines` (0ecfd157, with the honest "not configured" 200), and PWA-SW-01 (7712ee5f). Open: the chat's remaining slices (artifacts, suggestions and attachments and read-aloud), SHELL-07 and SHELL-08, then SHELL-09, the cutover and the deletion of the old interface. HOME-UI-04 (the
 stand-up, the Manage group on the template's tables view), HOME-UI-04b
 (the flag reachable, the collapsed rail, dark mode, the presets),
 HOME-UI-04d (one theme writer: the template's own ThemeProvider fed
@@ -19163,8 +19163,11 @@ onto `useRemoteThreadListRuntime` over the existing
 `chatThreadListAdapter.ts` and mounted the Elements `ThreadList` -
 open a past conversation, continue it, start a new one, delete one, no
 Pin since the vendored menu is Rename/Archive/Delete not Rename/Pin/
-Delete). Open: the rest of SHELL-02's own wiring table (tools and
-generative UI next, then artifacts, then suggestions/attachments/
+Delete), and slice 3 (weather's and almanac-date's own structured
+result renders through the shipped `SpecSheet` Element, keyed on the
+producing package's real name, `display: "standalone"` so it isn't
+tucked behind a collapsed "1 tool call" trigger). Open: the rest of
+SHELL-02's own wiring table (artifacts, then suggestions/attachments/
 read-aloud), then the other SHELL rows.
 
 ## Memory outcomes as notifications (2026-09-21)
