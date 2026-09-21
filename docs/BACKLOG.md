@@ -396,7 +396,7 @@ not permission to expand scope.
 
 <a id="chat-09"></a>
 
-- [ ] **CHAT-09: Version vector spaces and remove stale routing examples** (M)
+- [x] **CHAT-09: Version vector spaces and remove stale routing examples** (M)
 
     Depends on: none. Files: `backend/src/lib/routing.ts`, `memory.ts`,
     `llm.ts`, `embedSupervisor.ts`, `db/schema.ts`, `spec/llm/ts/types.ts`
@@ -420,7 +420,10 @@ not permission to expand scope.
     a formerly winning example removes its influence. Out of scope: vector
     database, ANN index, and unmeasured threshold/prefix changes. Checks:
     `routing.test.ts`, `routingCorpus.test.ts`, `memory.test.ts`, existing
-    embed tests and full exit gate.
+    embed tests and full exit gate. Landed 2026-09-21 at 8243873e (c-99a):
+    embedding spaces versioned by model artifact and preprocess (migration
+    `0054_chat09_embedding_identity.sql`), the stale routing examples
+    removed.
 
 <a id="chat-10"></a>
 
@@ -5577,7 +5580,7 @@ one row of.
       explicit JSON `null` `artifact_id` created in Python, updated
       against `null` in TS); fixed and covered by a fifth conformance
       fixture.
-- [ ] **REASONING-01: stream the model's thinking as its own part** (M) -
+- [x] **REASONING-01: stream the model's thinking as its own part** (M) -
       `reasoning` (`assistant-ui.com/elements/reasoning`) binds to a
       `{type: "reasoning", text, status?}` message part; Home has no such
       stream event today. Not a clean bolt-on: `wellFormed.ts`'s
@@ -5594,7 +5597,14 @@ one row of.
       text}` events distinct from `delta`, the visible reply is
       unaffected, and whatever the reattachment was protecting still
       holds (name it, then prove it in a test). Check: turnEngine stream
-      tests, `bash scripts/check.sh`.
+      tests, `bash scripts/check.sh`. Landed 2026-09-21 at 57c4b430:
+      `routes/turn.ts`'s `streamTurnEvents()` splits the pipeline's combined
+      text into `reasoning` and `delta` wire events at the route boundary
+      (`wellFormed.ts` `feedThinkSplit()`/`flushThinkSplit()`), the engine's
+      own `reasoning_content` separation preferred over tag parsing
+      (spec-v0.1.11), the reattachment upstream untouched so stored and
+      visible text are byte-identical to before, and a minor's own turn never
+      receives the reasoning event.
 
 ## Feature parity: ChatGPT / Gemini / Claude
 
