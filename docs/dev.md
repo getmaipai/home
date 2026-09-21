@@ -19153,14 +19153,18 @@ DECISIONS.md 2026-09-21), LOOK-01 (studio/calm retired, ui-v0.5.17 and
 0.5.18), CHAT-SDK-01 (the coordinated `@assistant-ui/react` bump the
 Elements need, 0.15.18 to 0.15.21, c413594e), SHELL-01 (both the
 backend, `GET /api/dashboard`, 872a4038, and the page, a92f7fbc), and
-SHELL-02's first slice (`/next/chat` mounts the Elements `Thread` on a
-minimal `useLocalRuntime` over `createChatModelAdapter`, one real turn
-with reply text and reasoning both rendering - `chatModelAdapter.ts`
-now builds a `ReasoningMessagePart` from the `reasoning` wire event
-instead of discarding it, gated off by a new `speakReplies` deps flag
-so this composer's missing "stop speaking" control never gets a reply
-to autoplay through). Open: the rest of SHELL-02's own wiring table
-(history, thread list, attachments, suggestions, tools, artifacts,
+SHELL-02's first two slices (`/next/chat` mounts the Elements `Thread`
+on a real turn with reply text and reasoning both rendering -
+`chatModelAdapter.ts` now builds a `ReasoningMessagePart` from the
+`reasoning` wire event instead of discarding it, gated off by a new
+`speakReplies` deps flag so this composer's missing "stop speaking"
+control never gets a reply to autoplay through; slice 2 moved the page
+onto `useRemoteThreadListRuntime` over the existing
+`chatThreadListAdapter.ts` and mounted the Elements `ThreadList` -
+open a past conversation, continue it, start a new one, delete one, no
+Pin since the vendored menu is Rename/Archive/Delete not Rename/Pin/
+Delete). Open: the rest of SHELL-02's own wiring table (tools and
+generative UI next, then artifacts, then suggestions/attachments/
 read-aloud), then the other SHELL rows.
 
 ## Memory outcomes as notifications (2026-09-21)

@@ -25,12 +25,12 @@ import type { Roster } from "@/lib/api";
  * so the URL itself never leaks a preview nobody turned on.
  *
  * `/next/chat` (CHAT-SDK-01 landed the `@assistant-ui/react@0.15.21`
- * bump the Elements need; SHELL-02 is the wiring): the plan's own
- * "chat's wiring table" first slice - the Elements thread and composer
- * on Home's existing streaming adapter, real turns, reply text and
- * reasoning rendering. NextChatPage.tsx's own header names what's
- * still a follow-up slice (history, thread list, attachments,
- * suggestions, tools, artifacts, read-aloud). */
+ * bump the Elements need; SHELL-02 is the wiring, one slice at a
+ * time): the Elements thread and composer on Home's existing
+ * streaming adapter, real turns, reply text and reasoning rendering
+ * (slice 1), joined by the thread list and history (slice 2).
+ * NextChatPage.tsx's own header names what's still a follow-up slice
+ * (attachments, suggestions, tools, artifacts, read-aloud). */
 // HOME-UI-04d: `useNextAppearance` calls the vendored `useTheme()`, so
 // it has to run inside `<ThemeProvider>`, not above it - a small inner
 // component rather than inlining the hook call in `NextRoutes` itself,
@@ -46,7 +46,7 @@ function NextRoutesInner({ person }: { person: Roster }) {
       </Route>
       <Route element={<FullLayout />}>
         <Route index element={<NextDashboardPage person={person} />} />
-        <Route path="chat" element={<NextChatPage />} />
+        <Route path="chat" element={<NextChatPage person={person} />} />
         <Route path="apps" element={<NextAppsPage />} />
         <Route path="people" element={<NextPeoplePage person={person} />} />
         <Route path="settings" element={<NextSettingsPage person={person} />} />
