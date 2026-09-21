@@ -5410,6 +5410,40 @@ The design record is `docs/plans/shell-on-shadcndashboard-2026-09-21.md`
 tool"); read it first for the full contract each item below implements
 one row of.
 
+### The shell program: shadcndashboard, page by page
+
+- [ ] **SHELL-01: `/next` on the template's modern dashboard with Home's real data** (M)
+
+    Objective: `/next` on the template's modern dashboard with Home's real data: engines status, updates, repairs, people, activity. Files: `frontend/src/next/pages/NextDashboardPage.tsx`, the engines, updates, repairs, people, and activity route or lib files, and `frontend/src/apps/home/*` plus the dashboard blocks in the kit that the row retires. Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
+
+- [ ] **SHELL-02: `/next/chat` on assistant-ui's Elements with Home's real data** (L)
+
+    Objective: `/next/chat` on the template's Elements with Home's real data: capability by capability against the chat's wiring table, starting with reply text, reasoning, tool call, and sources. Files: `frontend/src/next/pages/NextChatPage.tsx`, the existing model, history, thread-list, suggestion, attachment, dictation, and artifact route or lib files, and `apps/chat/thread.aui.tsx`, `chatDocumentPane.tsx`, and the kit's `.aui` files that the row retires. Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
+
+- [ ] **SHELL-03: `/next/apps` on the template's data-tables view with Home's real data** (M)
+
+    Objective: `/next/apps` on the template's data-tables view with Home's real data: packages list, install and remove. Files: `frontend/src/next/pages/NextAppsPage.tsx`, the packages route or lib file, and `apps/apps/*` plus `ThingsTable` that the row retires. Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
+
+- [ ] **SHELL-04: `/next/people` on the template's user-profile and data-tables views with Home's real data** (M)
+
+    Objective: `/next/people` on the template's user-profile and data-tables views with Home's real data: people, memories tab. Files: `frontend/src/next/pages/NextPeoplePage.tsx`, the people and memories route or lib files, and `apps/people/*` plus `apps/memories/*` that the row retires. Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
+
+- [ ] **SHELL-05: `/next/settings` on the template's form-layouts in tabs and cards with Home's real data** (M)
+
+    Objective: `/next/settings` on the template's form-layouts in tabs and cards with Home's real data: the settings renderer's keys by section and scope. Files: `frontend/src/next/pages/NextSettingsPage.tsx`, the settings renderer's route or lib file, and `apps/settings/*` plus `apps/privacy/*` that the row retires. Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
+
+- [ ] **SHELL-06: `/next/engines` on the template's data-tables and cards with Home's real data** (M)
+
+    Objective: `/next/engines` on the template's data-tables and cards with Home's real data: the Engines API (HOME-STACK-04a). Files: `frontend/src/next/pages/NextEnginesPage.tsx`, the Engines API route or lib file, and none (new). Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
+
+- [ ] **SHELL-07: `/next/updates`, `/next/repairs`, and `/next/backups` on the template's data-tables and cards with Home's real data** (S each)
+
+    Objective: `/next/updates`, `/next/repairs`, and `/next/backups` on the template's data-tables and cards with Home's real data: the routes HOME-STACK-05 landed. Files: `frontend/src/next/pages/NextUpdatesPage.tsx`, `frontend/src/next/pages/NextRepairsPage.tsx`, `frontend/src/next/pages/NextBackupsPage.tsx`, the updates, repairs, and backups route or lib files, and `apps/settings/UpdatesSection.tsx`, repairs, and backups pages that the row retires. Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
+
+- [ ] **SHELL-08: `/next/sign-in` on the template's auth view with Home's real data** (M)
+
+    Objective: `/next/sign-in` on the template's auth view with Home's real data: Home's sign-in and passkeys. Files: `frontend/src/next/pages/NextSignInPage.tsx`, the sign-in and passkeys route or lib files, and `apps/auth/*` that the row retires. Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
+
 - [ ] **ARTIFACT-02: the `artifact` recipe primitive** (M, high review -
       spans `commons/spec`, both interpreters, and Home) - the sanctioned
       way for the model to create or update a chat artifact live, found
