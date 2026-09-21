@@ -303,6 +303,7 @@ const nextLookPresetsReview = process.argv.includes("--next-look-presets-review"
 const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mismatch-review");
 const nextPeopleReview = process.argv.includes("--next-people-review");
 const nextDashboardReview = process.argv.includes("--next-dashboard-review");
+const nextAppsReview = process.argv.includes("--next-apps-review");
 
 interface RouteSpec {
   slug: string;
@@ -2196,6 +2197,46 @@ async function captureNextDashboardReview(browser: Browser, sessionValue: string
   }
 }
 
+/** SHELL-03's own acceptance ("1440 and 390... judged, report what
+ * Jesse sees at /next/apps"): both viewports, both themes, of `/next/
+ * apps` - the same permanent-capture shape `captureNextDashboardReview`
+ * above already established for the dashboard row. Waits on a real
+ * table row rather than any one package's own display name: GET
+ * /api/plugins's own row order isn't alphabetical (readdirSync's
+ * filesystem order), and DataTable's default page size (5) means a
+ * package picked at random can land past the first page - a specific
+ * name was exactly this flaky the first time this was written. */
+async function captureNextAppsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextAppsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/apps`);
+        await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-apps-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2741,6 +2782,10 @@ async function main() {
 
     if (nextDashboardReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview) {
       await captureNextDashboardReview(browser, sessionValue);
+    }
+
+    if (nextAppsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
+      await captureNextAppsReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

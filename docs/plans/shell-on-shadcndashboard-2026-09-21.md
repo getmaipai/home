@@ -111,7 +111,7 @@ each lands.
 |---|---|---|---|
 | `/next` | modern dashboard (KPI cards, charts, recent list) | engines status, updates, repairs, people, activity | `frontend/src/apps/home/*`, the dashboard blocks in the kit |
 | `/next/chat` | Elements: thread, thread-list-sidebar, composer family, reasoning, tool-call, sources, artifact-card, canvas-split, orb, read-aloud | the existing model, history, thread-list, suggestion, attachment, dictation adapters; the artifact record | `apps/chat/thread.aui.tsx`, `chatDocumentPane.tsx`, the kit's `.aui` files |
-| `/next/apps` | data-tables view | packages list, install and remove | `apps/apps/*`, `ThingsTable` |
+| `/next/apps` | data-tables view (`DataTable`) | packages list (`GET /api/plugins`); install and remove stay on the old route (see the row's own named gap below) | not yet - `apps/library/AppsPage.tsx` still owns install/remove, `ThingsTable` retires once it does |
 | `/next/people` | user-profile, data-tables | people, memories tab | `apps/people/*`, `apps/memories/*` |
 | `/next/settings` | form-layouts in tabs and cards | the settings renderer's keys by section and scope | `apps/settings/*`, `apps/privacy/*` |
 | `/next/engines` | data-tables, cards | the Engines API (HOME-STACK-04a) | none (new) |
@@ -141,6 +141,37 @@ anyone else, so their presence in the response is the visibility
 check), turns per day as the chart, recent activity as the table; no
 revenue, sales, orders or profit cards. A vendored widget file is
 never edited or imported once its Home counterpart lands.
+
+**SHELL-03's own named gap (found landing the row, 2026-09-21):**
+unlike the dashboard's demo widgets, the data-tables view's own
+`DataTable` (`@maipai/ui/src/dashboard/components/tables/data-table/
+DataTable.tsx`) genuinely takes a `data` prop and derives its own
+columns from the row shape it's handed - real data-binding surface, no
+composition needed to get Home's own apps (`GET /api/plugins`, the
+same query `AppsPage.tsx`'s own `pluginsQuery` already reads) into
+real rows and columns. Two narrower gaps inside that same file, found
+the same way: (1) its header is a literal `Employee Data Table` string
+in the JSX, not a prop - every table built on it, whatever data it
+carries, shows that title; not fixable without forking the vendored
+file, so `NextAppsPage.tsx` puts a real `CardHeader`/`CardTitle` (the
+same shipped primitives every other `/next` page's own header already
+uses) above the table instead - the page's real title reads correctly
+even though the table's own internal one still doesn't, and the
+vendored file stays untouched. (2) its per-row "Action" column (a
+pencil and a trash icon) has no click handler wired to either icon at
+all - decorative, not a real prop surface - so real install/remove
+stays on `AppsPage.tsx` (the old shell's own route, with its own
+`DetailsPane` and a working Remove action) until a shipped table with
+an actions callback exists to move it to. `/next/apps` is the
+read-only listing only: name, category, type, version, and a real
+Ready/Attention status (`packageState()`, exported from `AppsPage.tsx`
+so both routes read the identical rule rather than defining "Ready"
+twice). A third gap, found the same way but out of this row's own
+scope: neither shell filters the list by the actor's role today -
+`min_role` gates invocation only (`lib/plugins.ts`'s `runPlugin()`,
+`lib/widgets.ts`, `lib/turnEngine.ts`), never visibility - tracked as
+its own item, `APPS-VIS-01`, since fixing it in `routes/plugins.ts`
+fixes both shells at once.
 
 One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
 the chat move together. There is no `ui.chat.next`; `ui.shell.next`
