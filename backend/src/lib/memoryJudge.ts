@@ -70,7 +70,7 @@ import { updateEntity } from "@/lib/entities";
 import { listOpenQuestions, openQuestionDeclined, queueOpenQuestion, turnSubjectsOf } from "@/lib/conversationHistory";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
 import { complete, embed, type LlmMessage } from "@/lib/llm";
 import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
@@ -942,12 +942,25 @@ async function decideDedupe(newText: string, candidates: SimilarMatch[]): Promis
 // that" can mark the turn skipped while extraction runs (seconds); a
 // failed attempt then must not put it back in the queue, and a finished
 // one must not stamp it done (the second review's findings 3 and 4).
-function markAttempt(turnId: string, attempts: number): void {
-  const status = attempts >= MAX_JUDGE_ATTEMPTS ? "failed" : null;
-  db.update(conversationTurns)
-    .set({ judgeAttempts: attempts, judgeStatus: status, hlc: nextHlc() })
-    .where(and(eq(conversationTurns.id, turnId), isNull(conversationTurns.judgeStatus)))
-    .run();
+// Returns whether this attempt both is the terminal one (the poison
+// guard giving up for good) AND actually landed - judgeTurn() uses this
+// to fire memory.judge_failed exactly once, right at a REAL transition,
+// never on an earlier retry and never when the guarded UPDATE below hit
+// zero rows (a review finding: computing `failed` from `attempts` alone,
+// independent of whether the write matched anything, could fire the
+// notification for a turn a concurrent "forget that" had already marked
+// `skipped` in the same race this function's own header comment already
+// describes - the WHERE clause correctly left the row alone, but the
+// return value didn't know that). Raw sqlite for `.changes`
+// (personLifecycle.ts's own `.run().changes` escape hatch: Drizzle's
+// bun-sqlite `.run()` types its result void), not Drizzle, since this is
+// the one caller that needs to know whether the write actually matched.
+function markAttempt(turnId: string, attempts: number): boolean {
+  const failed = attempts >= MAX_JUDGE_ATTEMPTS;
+  const changes = sqlite
+    .query("UPDATE conversation_turns SET judge_attempts = ?, judge_status = ?, hlc = ? WHERE id = ? AND judge_status IS NULL")
+    .run(attempts, failed ? "failed" : null, nextHlc(), turnId).changes;
+  return failed && changes > 0;
 }
 function markDone(turnId: string): void {
   db.update(conversationTurns)
@@ -1145,7 +1158,9 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   const speakerName = sanitizeForPrompt(speaker.displayName);
   const extracted = await extractFacts(speakerName, turn);
   if (extracted === null) {
-    markAttempt(turn.id, turn.judgeAttempts + 1);
+    if (markAttempt(turn.id, turn.judgeAttempts + 1)) {
+      await trigger("memory.judge_failed", {}, { personId: speaker.id, subjectTurnId: turn.id });
+    }
     return { ok: false, factsWritten: 0 };
   }
   // The output-side rejection: the prompt's own examples, an unfilled

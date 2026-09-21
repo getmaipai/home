@@ -599,6 +599,52 @@ describe("judgeTurn() - the poison guard", () => {
     expect(row.judgeStatus).toBe("failed");
 
     expect(db.select().from(memoryRecords).all().length).toBe(0);
+    // The 1:1 backend counterpart to chatMemoryChip.tsx's own pre-existing
+    // "failed" chip state, fired exactly once at the real transition.
+    const pending = listPending(actor);
+    expect(pending.filter((n) => n.typeId === "memory.judge_failed")).toHaveLength(1);
+  });
+
+  // A review finding: markAttempt()'s returned "did this fail" boolean
+  // must reflect whether its own guarded UPDATE (WHERE judge_status IS
+  // NULL) actually matched a row, not just the attempt count - otherwise
+  // a "forget that" landing concurrently during the third, failing
+  // extraction call (marking the row `skipped` mid-flight, exactly the
+  // race this file's own header comment above markAttempt() describes)
+  // would still fire memory.judge_failed for a turn the person explicitly
+  // asked to forget, which was never actually marked failed at all.
+  test("a concurrent 'forget that' during the final failing attempt never fires memory.judge_failed", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "hello", "hi there");
+
+    let calls = 0;
+    const result = await withScriptedJudge(
+      () => {
+        calls++;
+        // The third call's own extraction request is in flight when the
+        // person says "forget that" - simulated here as a direct DB
+        // write, the same way the lease-race test above simulates "a
+        // person speaks" mid-extraction with a direct side effect in the
+        // scripted callback rather than real concurrency.
+        if (calls === 3) db.update(conversationTurns).set({ judgeStatus: "skipped" }).where(eq(conversationTurns.id, turn.id)).run();
+        return { not_facts: "an invalid shape - extractFacts() returns null" };
+      },
+      async () => {
+        await judgeTurn(turn);
+        const row2 = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+        await judgeTurn(row2);
+        const row3 = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+        return judgeTurn(row3);
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+    // The skip stands - never overwritten back to "failed" by the third
+    // attempt's own markAttempt() call, matching this file's own
+    // "a skipped turn keeps its status" rule (isSkippedTurn()'s comment).
+    expect(row.judgeStatus).toBe("skipped");
+    expect(listPending(actor).some((n) => n.typeId === "memory.judge_failed")).toBe(false);
   });
 
   test("a dedupe-round failure never counts against the poison guard - it just defaults to ADD", async () => {

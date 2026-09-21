@@ -141,6 +141,29 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: false,
   },
+  // The judge's own other terminal outcome (memoryJudge.ts's poison
+  // guard: MAX_JUDGE_ATTEMPTS parse failures give up on a turn for
+  // good, judge_status -> "failed"), fired once, the moment that
+  // transition happens - the exact 1:1 backend counterpart to
+  // chatMemoryChip.tsx's own "failed" chip, which already renders for
+  // this state but had no notification behind it. Deliberately NOT
+  // fired for the far more common "judged, nothing worth remembering"
+  // outcome (judge_status "done", zero facts written): the chip's own
+  // header comment records Jesse's 2026-09-13 ruling that a person
+  // should see something only when it actually happened, and "nothing
+  // to remember" is the overwhelming majority of turns, not an event -
+  // notifying on every one of those would be pure noise. `passive`/
+  // `toast: false`, matching `memory.updated`'s own posture: this is a
+  // record to find later, not something urgent.
+  {
+    id: "memory.judge_failed",
+    level: "passive",
+    audience: "person",
+    template: "I had trouble remembering something from our conversation.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
   // Step 7 (session-f-platform-and-trust.md): "the band change on a
   // birthday with its passive notification" - lib/personLifecycle.ts's
   // scheduled sweep fires this once a child/teen's age crosses 13 or 18.

@@ -170,4 +170,30 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.notifications",
     honoured_by: ["home"],
   }),
+  // Memory outcomes: `memory.updated` (lib/notificationTypes.ts) has
+  // been `configurable: true` and triggered since getmaipai/home#64,
+  // but never got a real toggle key here - the exact gap this pass
+  // closes, alongside its sibling `memory.judge_failed` (the judge's
+  // other terminal outcome), following the four `engines.*` keys'
+  // own pattern above.
+  SettingsKey.parse({
+    key: "notifications.memory.updated.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when I remember something from our conversation",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "notifications.memory.judge_failed.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when I have trouble remembering something from our conversation",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
 ];

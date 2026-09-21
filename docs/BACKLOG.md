@@ -6004,7 +6004,27 @@ Memory clock stamps and validity writes already exist. The remaining temporal-re
 
 Maintenance is already scheduled in `backend/src/index.ts`; profile freshness and unified inference scheduling are tracked by [CHAT-11](#chat-11) and [CHAT-19](#chat-19).
 
-Loaded-history chips and the memory page exist. getmaipai/home#64 (2026-09-13) added a narrower live-status path - the chip now shows on a LIVE reply too, via a `memory.updated` notification (`subjectTurnId`/`memoryIds` on `notificationDeliveries`) the chip polls for, not the conversation-turns re-poll CHAT-20 describes. No `memoryStatus` states (pending/failed/not_saved), no 5s/10min poll lifecycle, no per-message save/forget wiring - CHAT-20 is still the real remaining scope, but should build on or replace this path rather than duplicate it.
+Loaded-history chips and the memory page exist. getmaipai/home#64 (2026-09-13) added a narrower live-status path (the chip polling a `memory.updated` notification); **CHAT-20 has since landed and replaced it** - `chatMemoryState.ts`'s own store now reads `judge_status`/`memory_ids` straight off the conversation-turns re-poll (real `pending`/`saved`/`not_saved`/`failed` states, the 5s/10min poll lifecycle, per-message save/forget wiring), and `memory.updated` is now purely the notification-center record (in-app + optional Telegram), not the chip's live data source. 2026-09-21: `memory.updated` finally got its own settings toggle (`notifications.memory.updated.telegram`, spec-v0.1.13) after being configurable with no way to configure it since #64, and its sibling `memory.judge_failed` (the judge's other terminal outcome, the poison guard giving up) now fires too - the 1:1 backend counterpart to the chip's pre-existing "failed" state, which previously had no notification-center record of its own.
+
+- [ ] **Retire the chip's own poll in favor of notifications** (M) -
+      now that both terminal outcomes the chip shows (`saved` via
+      `memory.updated`, `failed` via `memory.judge_failed`) have a real
+      notification behind them, `chatMemoryState.ts`'s 5s/10min poll
+      lifecycle (`useMemoryStatusPoll`, `pollOnce`, `markStalled`) is a
+      second, duplicate implementation of state a client could instead
+      derive from `NotificationBell.tsx`'s own delivery stream -
+      `CLAUDE.md`'s "one definition, one store" principle. The real
+      design question before touching this: `not_saved` (the
+      overwhelming majority outcome, deliberately silent by Jesse's own
+      2026-09-13 ruling) has no notification counterpart and never
+      should per that ruling, so a notification-only chip needs some
+      OTHER way to know "nothing happened, stop showing pending" instead
+      of the current poll's own judge_status re-check - decide that
+      before ripping out the poll, or a done-but-nothing-written turn
+      would show "pending" forever. Files: `chatMemoryState.ts`,
+      `chatMemoryChip.tsx`, `NotificationBell.tsx`, `lib/notifications.ts`.
+      Check: `chatMemoryChip.test.tsx`, `chatMemoryState.test.ts`,
+      `bash scripts/check.sh`.
 
 - [ ] **A memory change feed for clients** (M) - the older UI work order's
       `GET /api/memory?since=` request remains separate from CHAT-20's
