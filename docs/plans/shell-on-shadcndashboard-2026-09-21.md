@@ -125,6 +125,40 @@ the day the flag defaults on, `/next` becomes `/` for every page
 including Chat. The old shell and the old chat are deleted together,
 one commit, a release later.
 
+## The chat's wiring table: every capability to its Element
+
+The `/next/chat` row is landed capability by capability against this
+table (owner's instruction, 2026-09-21 04:35: each Element is called
+at the moment its capability happens). Left, what the turn engine or
+the Stack does; right, the Element that renders it, as shipped, and
+the part or adapter that feeds it. A capability with no Element is a
+named gap, not a Home-drawn substitute.
+
+| Capability (Home / Stack) | Element(s) | Fed by |
+|---|---|---|
+| The reply text | markdown-text (renderer), message-pair, message-actions, message-timing | the model adapter's text parts |
+| Thinking before the reply | reasoning, thinking-indicator | the reasoning part (`--reasoning` on, streamed) |
+| A tool call and its result | tool-call, tool-group, tool-timeline, tool-error, tool-fallback | the tool-call parts the turn engine already emits |
+| A tool result with structure (weather, almanac, lookups, comparisons, procedures) | chart, spec-sheet, data-table, diagram, mermaid-diagram | the structured part per the generative-UI contract; nothing drawn by Home |
+| Image generation (the Stack's `image` role) | image-generation | the image job: queued, progress from the Stack's job events, the finished file |
+| Sources and citations (lookups, knowledge) | sources, inline-citation, document-reference, retrieval-chunks | the citation and evidence data the turn already carries |
+| A generated document or code (artifacts) | artifact-card, canvas-split, code-diff, shiki-highlighter | the artifact record, the model's artifact tool, versions |
+| Speaking a reply (the `tts` role) | read-aloud | the speech route through the Stack client |
+| Listening (the `stt` role, dictation, the live voice session) | composer-voice, transcription, voice-conversation, orb | the stt socket and the dictation adapter |
+| The wake word and the live connection | connection-state, orb | the wake-word hook and the engine health |
+| A destructive or gated action (delete, purchase, a child's request escalated) | approval-card, permission-grant, confirmation | the turn's approval part; the safety pass |
+| The child band and safety notices | guardrail-notice | the child projection and the safety result |
+| Errors, an engine down, a repair | error-state, empty-state, connection-state | engine health and the Repairs list |
+| Attachments (photos to the vision role) | composer-attachments, attachment | the local image attachment adapter |
+| Suggestions and follow-ups | composer-slash-commands, composer-mentions, composer-context, the suggestions of the thread | the suggestion adapter |
+| Editing, retrying, branching a turn | edit-message, message-branches, message-queue, draft-restore, checkpoints | the history adapter and the runtime |
+| Conversations (list, search, pin, delete, the admin's person view) | thread-list-sidebar, thread-search, conversation-search | the thread-list adapter (HOME-UI-02e's functions as data) |
+| Turn cost and timing (the stats) | cost-meter, context-breakdown, context-display, trace-waterfall, message-timing | turn stats from the backend |
+| Model choice, the model picker | composer-model-picker | the Stack's roles and models through the Engines API |
+| Memory outcomes (saved, not saved, failed) | none shipped: named gap; until an Element exists, the outcome is a notification (the shell's notifications), not a chip drawn by Home | the memory state |
+| Agents, plans, subagents, MCP | agent-card, agent-plan, task-card, mcp-config, mcp-server-panel | later; the Stack's job feed when the household runtime has agents |
+| Sharing a conversation, background runs | shared-conversation, background-runs | later |
+
 ## Sessions and order
 
 Session A (fresh, Sonnet) takes step 1 from this record, then the
