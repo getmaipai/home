@@ -6424,6 +6424,8 @@ approvals are still real, unstarted work for a future session.
 
 ## UI / shell
 
+- [ ] **PWA-SW-01: a waiting service worker must activate** (S, `getmaipai/home#128`) - Chrome kept an app shell days old: the new worker sat in `waiting` and never activated despite `registerType: autoUpdate` and `installReloadOnceOnNewServiceWorker`; the fix is `skipWaiting` on install plus `clients.claim`, with the existing reload-once guard, so one reload brings the new build in. Files: `frontend/src/sw.ts`, `frontend/src/main.tsx` (`installReloadOnceOnNewServiceWorker`), `frontend/vite.config.ts` (the PWA plugin block). Mirror: the plugin's own `workbox.skipWaiting`/`clientsClaim` options. Acceptance: a test in `frontend/src/sw.test.ts` that a registration with a waiting worker ends active after one reload; a manual check in Chrome that a rebuild appears on the next load. Out of scope: changing what is precached. Exit: `bash scripts/check.sh`.
+
 - [x] **HOME-UI-01: the rail, header, footer and dashboard to the
       owner's ruling on "Home's pages under the kit"** (M,
       2026-09-20) - [docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md).
@@ -8001,7 +8003,8 @@ on a spec tag that was never cut.
       `frontend/src/apps/chat/` (the companion voice control), the
       Stack client's `voices()` call (HOME-STACK-02a), `docs/user/settings.md`.
       Mirror: the Apps page's things table (HOME-UI-02). Depends on:
-      stack STACK-101 (the voices route with metadata and a preview).
+      stack STACK-101 (landed 2026-09-21: the list at 6799c8a, the
+      preview at 79eb703; the voice wire carries `engine`).
       Acceptance: captures at 1440 and 390 with the filters applied and a
       preview playing (the play state visible); a test that a voice with
       no metadata still lists with "unknown" values rather than being
