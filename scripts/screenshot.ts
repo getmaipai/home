@@ -304,6 +304,7 @@ const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mi
 const nextPeopleReview = process.argv.includes("--next-people-review");
 const nextDashboardReview = process.argv.includes("--next-dashboard-review");
 const nextAppsReview = process.argv.includes("--next-apps-review");
+const nextChatReview = process.argv.includes("--next-chat-review");
 
 interface RouteSpec {
   slug: string;
@@ -2242,6 +2243,49 @@ async function captureNextAppsReview(browser: Browser, sessionValue: string): Pr
   }
 }
 
+/** SHELL-02's first slice, its own stated acceptance ("captures 1440
+ * dark only for this slice"): a real turn against the real dev engine
+ * (not a mocked stream, the same "real household showed real data"
+ * standard `captureNextDashboardReview`/`captureNextAppsReview` hold
+ * to), with the reasoning Element expanded so the capture actually
+ * shows what the slice proves - not just the collapsed trigger every
+ * reply always renders regardless of whether reasoning ever wired up
+ * to anything. */
+async function captureNextChatReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextChatReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "dark", sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/next/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).fill("What's 2 plus 2?");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    // Wait for the turn to fully finish (Stop generating appears, then
+    // reverts) before expanding Reasoning - otherwise the capture can
+    // land mid-stream, before the model's own reasoning has finished
+    // building up.
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    await page.getByRole("button", { name: "Reasoning" }).click();
+    await settleAnimations(page);
+    const path = join(outDir, `next-chat-${viewport.width}-dark.png`);
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+    await page.close();
+  } finally {
+    await context.close();
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2603,6 +2647,12 @@ async function main() {
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
     if (text.includes("book")) return "What kind of story would you enjoy: a mystery, an adventure, or something funny?";
     if (text.includes("weather like")) return "It's a clear, mild day - around 62°F with a light breeze.";
+    // captureNextChatReview's own fixed question: a `<think>` block so
+    // the stub exercises the real REASONING-01 wire split
+    // (routes/turn.ts's streamTurnEvents(), lib/wellFormed.ts's
+    // feedThinkSplit()) the same way a real model's own reasoning
+    // output would, deterministically.
+    if (text.includes("2 plus 2")) return "<think>The user is asking a simple arithmetic question. 2 plus 2 equals 4.</think>2 plus 2 is 4.";
     // A single "\n" before the closing question, not a blank line -
     // getmaipai/home#99 (found live, 2026-09-13, chasing exactly this
     // reply): `gateOutputSafety()`'s per-sentence safety gate
@@ -2791,6 +2841,10 @@ async function main() {
 
     if (nextAppsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
       await captureNextAppsReview(browser, sessionValue);
+    }
+
+    if (nextChatReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview) {
+      await captureNextChatReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {
