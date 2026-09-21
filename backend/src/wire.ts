@@ -142,6 +142,20 @@ export interface TurnValue {
   artifact?: { id: string; version: number };
   /** STATS-01: optional adult-only engine telemetry, never required. */
   stats?: TurnStats;
+  /** REASONING-02: the reasoning that led to a tool call, on a turn
+   * that resolved to one (peekAndHandle()'s streaming path, runTurn()'s
+   * blocking twin) - the same tag-stripped string a live `reasoning`
+   * wire event would have carried, populated from the buffered prefix
+   * peeked before the tool call because a tool-calling reply never
+   * streams a visible span for gateOutputSafety()/gateGuards() to see,
+   * so nothing else on the pipeline ever captures it (a REASONING-01
+   * review finding: this was previously lost entirely, not just hidden
+   * from the wire). Absent for a prose (model-sourced) reply, whose
+   * think block already rides in `reply.text` and reaches the wire via
+   * the `reasoning` stream event instead. Stored on the turn row;
+   * dropped from this field on the wire for a minor's turn, the same
+   * gate the `reasoning` stream event already uses. */
+  reasoning?: string;
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
@@ -166,7 +180,12 @@ export interface ConversationSummary {
  * the turn plus which memory records trace their provenance to it -
  * empty until the judge (step 6) or an in-turn `remember` writes one. */
 export interface Media { kind: "image"; url: string; thumbnail: string | null; source: string; source_url?: string }
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; stats?: TurnStats; memory_ids: string[] };
+// REASONING-02: `reasoning` is Omitted and redeclared optional here, the
+// same as `stats` - the read side (conversationHistory.ts's
+// listConversationTurns()/list()) drops the raw column entirely for a
+// minor's own turn rather than sending `null`, matching the write-side
+// gate `reasoning`'s own wire event and POST /api/turn already apply.
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; stats?: TurnStats; reasoning?: string; memory_ids: string[] };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

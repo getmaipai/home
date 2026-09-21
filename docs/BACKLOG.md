@@ -5604,7 +5604,32 @@ one row of.
       own `reasoning_content` separation preferred over tag parsing
       (spec-v0.1.11), the reattachment upstream untouched so stored and
       visible text are byte-identical to before, and a minor's own turn never
-      receives the reasoning event.
+      receives the reasoning event. The follow-up a second review pass
+      surfaced (a tool-resolved turn's own reasoning was discarded entirely,
+      not just hidden from the wire) landed the same day as **REASONING-02**,
+      docs/dev.md.
+- [ ] **EXPORT-01: a person's export shaped like their read path** (S) -
+      `conversationHistory.ts`'s `exportPerson()` (`GET /api/conversations
+      /export`, also called from `routes/memory.ts`) returns the raw
+      `ConversationTurnRow[]` completely unshaped - no field is ever
+      dropped from it, and a person may export their OWN data (`person`
+      defaults to `actor.id`), so a minor self-exporting sees fields
+      `list()`/`listConversationTurns()` (the browsing read paths) both
+      gate for a minor: `reasoning` (REASONING-02, gated on the reading
+      actor's own band via `speakerAgeBand()`) and `stats` (STATS-01,
+      "adult-only telemetry" - this gap predates REASONING-02 and was
+      left as found rather than fixed by it). The real design question
+      before touching this: whether a data-portability export should
+      ever redact a field from the person it belongs to at all, or
+      whether "export" is supposed to mean the complete, unredacted
+      archive on purpose (unlike a browsing surface) - decide that first,
+      then either shape `exportPerson()`'s return the same way the two
+      read functions do, or document why export is deliberately
+      different and leave it alone. Files: `conversationHistory.ts`'s
+      `exportPerson()`, `routes/conversations.ts`'s `GET /export`,
+      `routes/memory.ts`'s own export call. Check: a new
+      `conversationHistory.test.ts` case proving whichever way the
+      design question is decided, `bash scripts/check.sh`.
 
 ## Feature parity: ChatGPT / Gemini / Claude
 

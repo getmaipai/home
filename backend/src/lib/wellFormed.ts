@@ -168,6 +168,21 @@ export function flushThinkSplit(state: ThinkSplitState): ThinkSpan[] {
   return [span];
 }
 
+/** REASONING-02: the same reasoning text a live `reasoning` wire event
+ * would have carried for this exact text, in one pass - for a caller
+ * that has a whole completed (or buffered-so-far) string in hand rather
+ * than a token stream, e.g. turnEngine.ts's peekAndHandle()/runTurn()
+ * attaching TurnValue.reasoning when a tool call resolves before any
+ * close tag ever streamed (an open, unclosed think block -
+ * flushThinkSplit()'s truncated-block case). Returns undefined for no
+ * reasoning at all, matching the field's own optionality. */
+export function extractReasoningText(text: string): string | undefined {
+  const state = newThinkSplitState();
+  const spans = [...feedThinkSplit(state, text), ...flushThinkSplit(state)];
+  const reasoning = spans.filter((span) => span.reasoning).map((span) => span.text).join("");
+  return reasoning || undefined;
+}
+
 const WORD_RE = /[\p{L}\p{N}]+(?:['’][\p{L}]+)?/gu;
 /** A malformed output this long or shorter earns one regeneration; a
  * longer one is repaired in place (a long reply with a dangling

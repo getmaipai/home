@@ -515,6 +515,10 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     // pattern win that happens to name the same package: only
     // resolveToolCalls() ever sets routing.tier "tool".
     expect(result.value.routing?.tier).toBe("tool");
+    // REASONING-02: no reasoning was ever scripted for this completion,
+    // so the field stays entirely absent - a tool call on its own never
+    // invents one.
+    expect(result.value.reasoning).toBeUndefined();
   });
 
   // REASONING-01: a review caught peekAndHandle() mistaking a purely-
@@ -534,6 +538,15 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     expect(result.value.source).toBe("plugin");
     expect(result.value.plugin_id).toBe("remember");
     expect(result.value.routing?.tier).toBe("tool");
+    // REASONING-02: the reasoning that led to this call was previously
+    // discarded entirely (a REASONING-01 review finding) - it's now
+    // carried on the returned TurnValue, the same tag-stripped string a
+    // live `reasoning` wire event would have carried, AND on the row
+    // (conversationHistory.ts's logTurn()), so a household's own record
+    // of why the household's own memory got written isn't lost.
+    expect(result.value.reasoning).toBe("the household wants this remembered, so I should call remember");
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+    expect(row?.reasoning).toBe("the household wants this remembered, so I should call remember");
   });
 
   test("runTurnStream(): a tool call still resolves inside the stream even when the model reasons first (thinking on)", async () => {
@@ -556,6 +569,45 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     expect(outcome.resolved.source).toBe("plugin");
     expect(outcome.resolved.plugin_id).toBe("remember");
     expect(outcome.resolved.routing?.tier).toBe("tool");
+    // REASONING-02: peekAndHandle()'s own twin of the blocking fix above.
+    expect(outcome.resolved.reasoning).toBe("the household wants this remembered, so I should call remember");
+    // logTurnSafely() only runs inside finalize() (turnEngine.ts's own
+    // "the ONE place" for the resolved-tool-call case) - drainStream()
+    // above only drains the tokens generator, so the row exists only
+    // once finalize() itself is called, the same as the sibling test
+    // above this one that proves finalize() hands `outcome.resolved`
+    // back unchanged.
+    result.finalize("", outcome);
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, outcome.resolved.turn_id)).get();
+    expect(row?.reasoning).toBe("the household wants this remembered, so I should call remember");
+  });
+
+  // REASONING-02: the minor/child projection (ageBand.ts's shared band,
+  // the same one dropReasoning already gates the live `reasoning` stream
+  // event on) hides TurnValue.reasoning from the wire, whichever route
+  // returns it - POST /api/turn serializes the whole TurnValue directly
+  // (routes/turn.ts), unlike /stream's own hand-built events, so this is
+  // the one boundary that needs its own HTTP-level test rather than a
+  // streamTurnEvents() unit test. The row keeps it regardless: the drop
+  // is presentation-only, the same posture the `reasoning` event itself
+  // takes for the stored combined text.
+  test("POST /api/turn drops a child's own stored reasoning from the response, but the row still has it", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child.id });
+    const res = await withScriptedToolCalls(
+      () => [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
+      () => childClient.post("/api/turn", { text: "Friday is pizza night, can you remember that for me", thinking: true }),
+      () => "the household wants this remembered, so I should call remember",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { turn_id: string; reasoning?: string };
+    expect(body.reasoning).toBeUndefined();
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, body.turn_id)).get();
+    expect(row?.reasoning).toBe("the household wants this remembered, so I should call remember");
   });
 
   test("runTurn(): every proposed call failing falls back to a second, plain completion - never a fabricated success", async () => {

@@ -358,6 +358,10 @@ export function logTurn(
     sources: value.sources ? JSON.stringify(value.sources) : null,
     media: value.media ? JSON.stringify(value.media_items?.length ? { ...value.media, media_items: value.media_items } : value.media) : null,
     stats: value.stats ? JSON.stringify(value.stats) : null,
+    // REASONING-02: null for every prose reply - only a tool-call
+    // resolution ever sets value.reasoning (turnEngine.ts's
+    // peekAndHandle()/runTurn()).
+    reasoning: value.reasoning ?? null,
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
     // row (CHAT-03) they are approximate, and a `policy` turn is skipped
@@ -1142,10 +1146,23 @@ export function listConversationTurns(
   }
 
   const byTurn = memoryIdsByTurn(rows.map((r) => r.id));
+  // REASONING-02: the same minor-projection POST /api/turn and the
+  // streaming `done` event already apply, applied here too - a review
+  // caught the write-side gate having no read-side twin, so a child's
+  // own turn history (this route, the chat history adapter's real
+  // source) leaked the reasoning right back in. Gated on the READING
+  // actor's own band, not the row's `minorSpeaker`: canAccessPerson()
+  // only ever lets a non-adult see their OWN turns (never another
+  // person's, per this file's own access tests), while an owner/admin
+  // reading a child's turns keeps seeing everything, matching this
+  // file's established "owner/admin see a child's turns in full" rule -
+  // the point is never showing a minor's own reasoning back to THEM,
+  // not withholding it from a parent's oversight.
+  const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
 
   return { ok: true, value: rows.map((r) => {
-    const { media: rawMedia, ...row } = r;
-    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] };
+    const { media: rawMedia, reasoning, ...row } = r;
+    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== null && !dropReasoning ? { reasoning } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -1607,9 +1624,14 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const capped = rows.slice(0, LIST_CAP);
   const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
+  // REASONING-02: this is the chat history adapter's real source (this
+  // function's own header above) - the same reader-gated minor
+  // projection as listConversationTurns() above, for the identical
+  // reason (see its own comment).
+  const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
   return capped.map((r) => {
-    const { media: rawMedia, ...row } = r;
-    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, memory_ids: byTurn.get(r.id) ?? [] };
+    const { media: rawMedia, reasoning, ...row } = r;
+    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== null && !dropReasoning ? { reasoning } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

@@ -124,7 +124,12 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
-  return c.json(result.value);
+  // REASONING-02: this blocking route serializes the whole TurnValue
+  // (unlike /stream's own hand-built events), so a minor's reasoning
+  // field is stripped here rather than at a shared boundary - the same
+  // speakerAgeBand() gate the streaming route's own dropReasoning uses.
+  const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
+  return c.json(dropReasoning && result.value.reasoning !== undefined ? { ...result.value, reasoning: undefined } : result.value);
 });
 
 const encoder = new TextEncoder();
@@ -381,7 +386,10 @@ export async function* streamTurnEvents(
     // exactly one "done" line either way, and the resolved case simply
     // has no "delta" lines before it.
     const value = result.finalize(fullText.trim(), (current as IteratorReturnResult<import("@/lib/turnEngine").StreamOutcome>).value);
-    yield { type: "done", value };
+    // REASONING-02: TurnValue.reasoning is dropped from the `done` event
+    // for a minor's turn, the same gate `spanEvents()` already applies to
+    // the live `reasoning` stream event above.
+    yield { type: "done", value: dropReasoning && value.reasoning !== undefined ? { ...value, reasoning: undefined } : value };
   } catch (err) {
     // This catch had no server-side log at all (a live incident,
     // 2026-09-07: the real reason only ever left the process as

@@ -24,7 +24,7 @@ import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameByI
 import { deleteEntity } from "@/lib/entities";
 import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type HubName, type ResolvedNames, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
-import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP, feedThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
+import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP, feedThinkSplit, newThinkSplitState, extractReasoningText } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
 import { intentFor, deliverableQuery, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
@@ -4605,7 +4605,14 @@ async function runTurnHoldingLease(
       const before = prepared.turnContext.outcomes.length;
       const resolved = await resolveOffered(completion.value.tool_calls, offeredIds);
       if (resolved) {
-        value = await composeBlocking(resolved, prepared.turnContext.outcomes.slice(before));
+        // REASONING-02: the blocking twin of peekAndHandle()'s own fix -
+        // `completion.value.text` carries whatever the model thought
+        // before proposing the call (llm.ts's withSynthesizedThink()), and
+        // a tool-calling completion never has a closing visible span to
+        // end it, so this is the same "truncated open block"
+        // extractReasoningText() already handles.
+        const reasoning = extractReasoningText(completion.value.text);
+        value = await composeBlocking(reasoning ? { ...resolved, reasoning } : resolved, prepared.turnContext.outcomes.slice(before));
       } else {
         // Every proposed call failed (bad args, a real runtime error, or
         // named a tool that wasn't actually offered) - the exact "ask
@@ -6090,9 +6097,10 @@ async function runTurnStreamHoldingLease(
     // purely-reasoning prefix, buffering it, and only treat the peek as
     // real text once a genuinely visible span arrives (or the stream
     // ends, in which case whatever tool_calls it resolved to still runs
-    // normally - the reasoning that preceded them is not surfaced as a
-    // reasoning wire event for this turn, the same "nothing yielded
-    // during that phase" limitation this turn shape always had).
+    // normally - the reasoning that preceded them never streams as a
+    // live `reasoning` wire event for this turn, since nothing here
+    // ever yields it, but REASONING-02 attaches it to the resolved
+    // TurnValue below so it still reaches the row and the `done` event).
     const reasoningPeek = newThinkSplitState();
     let buffered = "";
     let first = await iterator.next();
@@ -6116,7 +6124,16 @@ async function runTurnStreamHoldingLease(
           // whose deltas stream through them.
           // OUT-01: a package line that fails the rule is replaced and
           // logged loudly by the boundary; finalize() logs the trace.
-          return yield* composeOrResolve(resolved, modelPrepared.turnContext.outcomes.slice(before));
+          // REASONING-02: `buffered` is everything peeked before the
+          // tool call resolved - a genuinely open, unclosed think block
+          // (a tool-calling reply never streams the visible span that
+          // would have closed it), so extractReasoningText()'s own
+          // flushThinkSplit() pass is exactly the "truncated block"
+          // shape it already handles. Attached here, before
+          // composeOrResolve()'s own spreads, so it rides the resolved
+          // TurnValue all the way to the row and the `done` event.
+          const reasoning = extractReasoningText(buffered);
+          return yield* composeOrResolve(reasoning ? { ...resolved, reasoning } : resolved, modelPrepared.turnContext.outcomes.slice(before));
         }
         // Every proposed call failed - the exact "ask again, never a
         // silent drop" contract: a genuinely second completion, this time

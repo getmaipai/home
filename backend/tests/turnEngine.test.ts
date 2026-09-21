@@ -4555,6 +4555,13 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       // embedded, exactly as a turn with no reasoning event ever existed
       // would have stored it - the wire split changes nothing upstream.
       expect(loggedText).toBe("<think>carry the two</think>17 times 24 is 408.");
+      // REASONING-02: a prose (model-sourced) reply's own think block
+      // reaches the wire only via the `reasoning` stream event above -
+      // finalize() never sets TurnValue.reasoning for this shape, so the
+      // done event's value carries no such field, unchanged from before
+      // this item.
+      const done = events.find((e): e is Extract<TurnStreamEvent, { type: "done" }> => e.type === "done");
+      expect(done?.value.reasoning).toBeUndefined();
     });
 
     test("no think block at all: no reasoning events, delta unchanged from before this item", async () => {
@@ -4611,6 +4618,40 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       // The drop is presentation-only: the stored row still carries the
       // real reasoning, the same as any other actor's turn would.
       expect(loggedText).toBe("<think>carry the two</think>17 times 24 is 408.");
+    });
+
+    // REASONING-02: TurnValue.reasoning (a tool-resolved turn's own
+    // field, turnEngine.ts's peekAndHandle()) rides the `done` event's
+    // value - dropped there for a minor by the SAME dropReasoning gate
+    // as the `reasoning` stream event above, never populated in the
+    // first place for an adult's turn that had none.
+    test("the done event carries TurnValue.reasoning for an adult, drops it for a minor", async () => {
+      function toolResolvedResult(): Extract<TurnStreamResult, { ok: true; kind: "stream" }> {
+        const result = fakeResult(tokens());
+        result.finalize = () => ({
+          reply: { text: "Got it, I'll remember that." },
+          source: "plugin",
+          plugin_id: "remember",
+          safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+          conversation_id: "conv-testfixture",
+          turn_id: "turn-testfixture",
+          reasoning: "the household wants this remembered, so I should call remember",
+        });
+        return result;
+      }
+
+      const adultEvents: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(toolResolvedResult(), "test-person")) adultEvents.push(event);
+      const adultDone = adultEvents.find((e): e is Extract<TurnStreamEvent, { type: "done" }> => e.type === "done");
+      expect(adultDone?.value.reasoning).toBe("the household wants this remembered, so I should call remember");
+
+      const minorEvents: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(toolResolvedResult(), "test-child", THINKING_CUE_DELAY_MS, undefined, true)) minorEvents.push(event);
+      const minorDone = minorEvents.find((e): e is Extract<TurnStreamEvent, { type: "done" }> => e.type === "done");
+      expect(minorDone?.value.reasoning).toBeUndefined();
+      // Presentation-only, same as every other reasoning drop: the
+      // rest of the finalized value is untouched.
+      expect(minorDone?.value.source).toBe("plugin");
     });
   });
 });

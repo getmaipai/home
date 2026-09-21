@@ -393,6 +393,14 @@ export const conversationTurns = sqliteTable(
     // STATS-01: nullable engine telemetry for the adult advanced view.
     // Hub-internal and additive, not part of the synced conversation record.
     stats: text("stats"),
+    // REASONING-02: the reasoning that led to a tool call (wire.ts's
+    // TurnValue.reasoning), null for every prose reply and every row
+    // written before this item. Hub-internal like judge_status/outcomes,
+    // not part of the synced conversation record; the wire-drop for a
+    // minor's turn happens at read time too (conversationHistory.ts's
+    // list()/listConversationTurns()), gated on the reading actor's own
+    // band, not just at turn-response time.
+    reasoning: text("reasoning"),
     // ACT-01: the turn's frozen TurnSignal (spec/schemas/turn-signal.
     // schema.json as JSON), computed before routing and never
     // recomputed, the judge's queue key and REVIEW-01's record of what

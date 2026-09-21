@@ -367,6 +367,39 @@ describe("list()", () => {
     expect(rows.length).toBe(1);
   });
 
+  // REASONING-02, a review finding: the write-side minor-gate on
+  // TurnValue.reasoning (POST /api/turn, the streaming `done` event) had
+  // no read-side twin, so a child's own tool-call reasoning, hidden live,
+  // reappeared unfiltered the moment this same route (getmaipai/home#64's
+  // own "the chat history adapter's real source") loaded it back.
+  test("a child never sees their own stored reasoning through their history, but an owner/admin still does", async () => {
+    const { client, actor: ownerActor } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    const conv = resolveOrCreateConversation(child, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(child, "chat", "remember Friday is pizza night", {
+      reply: { text: "Got it, I'll remember that." },
+      source: "plugin",
+      plugin_id: "remember",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-reasoning-1",
+      reasoning: "the household wants this remembered, so I should call remember",
+    });
+
+    const asChild = list(child, child.id);
+    expect(asChild).toHaveLength(1);
+    expect(asChild[0]!.reasoning).toBeUndefined();
+
+    const asOwner = list(ownerActor, child.id);
+    expect(asOwner).toHaveLength(1);
+    expect(asOwner[0]!.reasoning).toBe("the household wants this remembered, so I should call remember");
+
+    // Presentation-only: the row itself always keeps it.
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-reasoning-1")).get();
+    expect(row?.reasoning).toBe("the household wants this remembered, so I should call remember");
+  });
+
   // 4.14 asks for "a summary and safety flags for a teen's"; no
   // summarization mechanism exists yet, so this pass deliberately narrows
   // to full privacy for a teen (and an adult), the same judgment call
@@ -1744,6 +1777,32 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.map((t) => t.id)).toEqual(["turn-tie-2", "turn-tie-3"]);
+  });
+
+  // REASONING-02: listConversationTurns()'s own twin of list()'s reader-
+  // gated reasoning test above.
+  test("a child never sees their own stored reasoning here either, but an owner/admin still does", async () => {
+    const { client, actor: ownerActor } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    const conv = resolveOrCreateConversation(child, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(child, "chat", "remember Friday is pizza night", {
+      reply: { text: "Got it, I'll remember that." },
+      source: "plugin",
+      plugin_id: "remember",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-reasoning-2",
+      reasoning: "the household wants this remembered, so I should call remember",
+    });
+
+    const asChild = listConversationTurns(child, conv.value.id);
+    expect(asChild.ok).toBe(true);
+    if (asChild.ok) expect(asChild.value[0]?.reasoning).toBeUndefined();
+
+    const asOwner = listConversationTurns(ownerActor, conv.value.id);
+    expect(asOwner.ok).toBe(true);
+    if (asOwner.ok) expect(asOwner.value[0]?.reasoning).toBe("the household wants this remembered, so I should call remember");
   });
 });
 
