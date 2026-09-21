@@ -34,6 +34,22 @@ export type { HardwareInfo, CudaDevice } from "./lib/hardware";
 // moment this field was added.
 export type Roster = Omit<Person, "birthdate"> & { hasSecret: boolean; hasPasskeys?: boolean };
 
+/** One row of a spec-sheet Element's own prop shape, exactly
+ * (assistant-ui.com/elements/spec-sheet: `title`, `subtitle?`,
+ * `rows: {label, value, emphasis?}[]`) - kept identical on purpose so a
+ * frontend spec-sheet tool render passes this object straight through. */
+export interface SpecSheetRow {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}
+
+/** The generative-UI contract's structured part: a tool's result, shaped
+ * for the one Element that renders it, never Home-drawn prose. `kind`
+ * only ever grows (a chart/data-table kind lands the same way once a
+ * producer needs it) - never a field Home invents ahead of a real one. */
+export type StructuredPart = { kind: "spec_sheet"; title: string; subtitle?: string; rows: SpecSheetRow[] };
+
 export interface TurnReply {
   text: string;
   speech?: string;
@@ -106,6 +122,24 @@ export interface TurnValue {
   rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
   /** COMP-01: whether a validated details document is available for this turn. */
   document_available?: boolean;
+  /** The generative-UI contract (chat program record, "The chat's wiring
+   * table"): a tool's result with structure renders as the shipped
+   * Element's own part, never narrated prose and never drawn by Home.
+   * Weather and almanac-date are the first two producers
+   * (lib/composer.ts's structuredPartForOutcomes()); every kind here
+   * matches one Element's own prop shape exactly (spec-sheet today), so
+   * the frontend passes this straight through with no reshaping. */
+  structured_part?: StructuredPart;
+  /** The chat program's artifact-card/canvas-split experience: this
+   * turn's artifact tool call minted or updated a version, named by its
+   * own id and version number (lib/artifacts.ts's ArtifactValue), the
+   * same way `document_available` names a COMP-01 document without
+   * carrying its body inline. No writer yet - the turn-engine dispatch
+   * that lets the model actually call the artifact tool live is a
+   * separate integration, named as a gap in the chat program record
+   * (docs/plans/shell-on-shadcndashboard-2026-09-21.md); a client fetches
+   * the full version from GET /api/artifacts/:id. */
+  artifact?: { id: string; version: number };
   /** STATS-01: optional adult-only engine telemetry, never required. */
   stats?: TurnStats;
 }

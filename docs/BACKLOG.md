@@ -5178,7 +5178,14 @@ alongside the first sourced skill, not before it.
       and record the per-person generation consent shape from the Apple plan.
       Child profiles cannot grant or invoke the people path. Out of scope: a
       separate generation app. Check: chat attachment, safety, consent, and
-      provenance tests plus the full gate.
+      provenance tests plus the full gate. The chat program's generative-UI
+      contract (`docs/plans/shell-on-shadcndashboard-2026-09-21.md`) already
+      names the wire: the image job's queued/progress/done events bind to
+      assistant-ui's `image-generation` Element (its own gap: no numeric-
+      progress prop, only a boolean-ish `running` - collapse queued/progress
+      into that until upstream adds one), and the finished file hands off to
+      the plain `image` Element - do not invent a Home-drawn substitute for
+      either.
 - [ ] Image generation (L) - the design and model/licence bar now live in
       `docs/plans/hub-on-apple-silicon-2026-09-17.md`; do not start code before
       MEDIA-HOST-01's safety and first-day measurement are ready.
@@ -5395,6 +5402,71 @@ Bounded multi-source composition is tracked by [CHAT-15](#chat-15) and [CHAT-16]
       lands, trivia's `recipe.json` is the first real caller: split into
       an `ask` step for the question and a resumed step that compares
       the answer, instead of today's one `format` step revealing both.
+
+## The chat program: assistant-ui Elements (2026-09-21)
+
+The design record is `docs/plans/shell-on-shadcndashboard-2026-09-21.md`
+("The wire the Elements expect", "The artifact record", "The turn-engine
+tool"); read it first for the full contract each item below implements
+one row of.
+
+- [ ] **ARTIFACT-02: the `artifact` recipe primitive** (M, high review -
+      spans `commons/spec`, both interpreters, and Home) - the sanctioned
+      way for the model to create or update a chat artifact live, found
+      while landing the artifact data layer (`lib/artifacts.ts`,
+      `spec/schemas/artifact.schema.json`, spec-v0.1.7): every native
+      tool call in `turnEngine.ts`'s `resolveToolCallsInOrder()` assumes
+      a real catalog package (`rankedById.get(c.tool)!.manifest` - offer,
+      dedupe, cap, consequential and arg-schema checks all read a real
+      `PackageManifest`), and a Tier 1 `handler.ts` has zero DB access
+      (runs as an isolated Deno subprocess - confirmed reading
+      `packages/almanac-date/handler.ts`'s own "no import from anywhere
+      outside its own directory"). The one sanctioned path a package
+      already uses to write a real structured record is a recipe
+      primitive (`remember`'s `"op": "remember"` step, implemented
+      identically in `commons/spec`'s `interpreters/ts/recipe-
+      interpreter.ts` AND `interpreters/py/recipe_interpreter.py` - the
+      file's own header: "must stay behaviorally identical... the
+      conformance fixtures prove that" - calling a method on the shared
+      `Host` interface, `host-emulator.ts`, that `packageHost.ts`
+      implements for real). Do the same shape: an 18th `artifact` op in
+      both interpreters with new conformance fixtures in
+      `spec/fixtures/recipes/`, a new `Host.artifact()` method, and
+      `packageHost.ts`'s real implementation calling
+      `lib/artifacts.ts`'s `createArtifact`/`updateArtifact`. Then a
+      bundled `documents` package (`backend/packages/documents/`,
+      `kind: plugin`, ranked and consequential like any action package)
+      whose recipe exposes the tool the model calls, named
+      `write_document` with args `title`, `kind`, `body` (or a patch
+      against the current version) - that exact name is what
+      artifact-card's own toolkit binds to on the frontend, so nothing
+      extra needs registering there. Acceptance: a model-driven live
+      chat creates then edits an artifact, `TurnValue.artifact` (already
+      landed, additive, no writer yet) gets set from the real tool call,
+      and the TS/Python conformance fixtures prove both interpreters
+      agree. Out of scope: any OTHER package gaining artifact-writing
+      permission by default - `documents` is the one bundled caller
+      until a real reason exists for a second. Check: `spec`'s own
+      `bun test`/`pytest` (conformance fixtures), backend's artifact and
+      turnEngine tests, `bash scripts/check.sh` in both repos.
+- [ ] **REASONING-01: stream the model's thinking as its own part** (M) -
+      `reasoning` (`assistant-ui.com/elements/reasoning`) binds to a
+      `{type: "reasoning", text, status?}` message part; Home has no such
+      stream event today. Not a clean bolt-on: `wellFormed.ts`'s
+      `thinkingPrefix()`/`visibleText()` already split a model's
+      `<think>` block from the visible reply, but the extracted prefix is
+      REATTACHED to the raw text at several points deep in
+      `turnEngine.ts`'s streaming buffer and sentence-splitting logic
+      (`composeBlocking`, the retry-token machinery, the mid-stream
+      `<think>` handling around line 5654) for reasons not fully
+      explained by a read-only pass - understand why that reattachment
+      exists before extracting reasoning as an independently-streamed
+      event, or a fix here risks silently breaking that reassembly.
+      Acceptance: a `thinking: true` turn streams `{type: "reasoning",
+      text}` events distinct from `delta`, the visible reply is
+      unaffected, and whatever the reattachment was protecting still
+      holds (name it, then prove it in a test). Check: turnEngine stream
+      tests, `bash scripts/check.sh`.
 
 ## Feature parity: ChatGPT / Gemini / Claude
 

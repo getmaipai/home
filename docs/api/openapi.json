@@ -5480,6 +5480,209 @@
         }
       }
     },
+    "/api/artifacts/{id}": {
+      "get": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "Read one artifact version",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "art-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The artifact version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^art-[a-z0-9]{6,}$",
+                      "description": "Stable identity for this specific version. A later version of the same artifact has a new id; parent_version is how a client walks the chain back to version 1."
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "pattern": "^conv-[a-z0-9]{6,}$",
+                      "description": "The conversation this version belongs to. A conversation may hold more than one independent artifact; parent_version, not this field, is what identifies one artifact's own version chain."
+                    },
+                    "turn_id": {
+                      "type": "string",
+                      "pattern": "^turn-[a-z0-9]{6,}$",
+                      "description": "The assistant turn that produced this version, whether it created the artifact or edited a prior version into this one."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "markdown",
+                        "code",
+                        "html"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "body": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The full content of this version, never a patch. A caller updating an existing artifact resolves any patch against the current version into a full body before this record is written, so any one version is independently renderable without replaying history."
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "One-based sequence number within this artifact's version chain. Display-only; parent_version is the real pointer a client walks."
+                    },
+                    "parent_version": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^art-[a-z0-9]{6,}$",
+                          "description": "The id of the version this one replaces, or null for an artifact's first version."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The id of the version this one replaces, or null for an artifact's first version."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "The id of the version this one replaces, or null for an artifact's first version."
+                    },
+                    "created_by": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "The household member present on the turn that produced this version."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free-text provenance for the build, such as the turn-engine tool call that produced it."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "conversation_id",
+                    "turn_id",
+                    "kind",
+                    "title",
+                    "body",
+                    "version",
+                    "parent_version",
+                    "created_by",
+                    "provenance",
+                    "created_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One immutable version of a generated document (markdown, code, or html) an assistant turn created or updated for the chat's artifact-card/canvas-split experience. Distinct from TurnArtifact (turn-artifact.schema.json), COMP-01's evidence-grounded details document built from retained tool outcomes - this is the model's own authored content, versioned like a file. A later version is a new row with a new id, chained by parent_version; an existing version is never edited in place. Deliberately not TurnArtifact's own revision scheme (a bare incrementing integer, no id-based chain): this record follows conversation-turn.schema.json's parent_turn_id convention instead, because the chat wire needs a version's own id on the stream (the artifact-card/canvas-split tool call and the message metadata both name a specific version by id, the way parent_turn_id names a specific turn) and because id-chaining, unlike a bare counter, has somewhere to point if branching from a non-latest version is ever needed. validate.ts's/validate.py's validateArtifact() enforces the pairing (version 1 has no parent_version, every later version has one, and neither may equal its own id)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/artifacts/{id}/export": {
+      "get": {
+        "tags": [
+          "Artifacts"
+        ],
+        "summary": "Download an artifact version's body",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "art-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The artifact's body, as a download (Content-Disposition: attachment) - the content type and file extension follow its kind (markdown/.md, code/.txt, html/.html).",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/backups": {
       "get": {
         "tags": [

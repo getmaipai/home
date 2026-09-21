@@ -10,3 +10,8 @@ Deno.test("speech and text are identical - nothing here needs a spoken-vs-shown 
   const result = currentDate(new Date(2026, 5, 15));
   assertEquals(result.speech, result.text);
 });
+
+Deno.test("data carries the date and weekday separately, for the spec-sheet structured part", () => {
+  const result = currentDate(new Date(2026, 0, 1)); // a real Thursday
+  assertEquals(result.data, { date: "Thursday, January 1, 2026", weekday: "Thursday" });
+});

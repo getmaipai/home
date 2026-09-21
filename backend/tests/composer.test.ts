@@ -32,6 +32,7 @@ import {
   buildDocument,
   documentEvidenceVersion,
   projectDocumentForChild,
+  structuredPartForOutcomes,
   type ComposerInput,
 } from "@/lib/composer";
 
@@ -727,5 +728,57 @@ describe("the engine composes a two-outcome turn in one call", () => {
       log.restore();
       stub.stop();
     }
+  });
+});
+
+describe("structuredPartForOutcomes", () => {
+  const fullWeatherOutcome = () =>
+    outcome({
+      callId: "call-w",
+      packageId: "weather",
+      status: "succeeded",
+      args: { place: "Lantern Bay" },
+      result: { actions: [], reply: { text: "It's 61 degrees and clear in Lantern Bay." }, data: { place: "Lantern Bay", temperature: 61, conditions: "clear", high: 68, low: 54, precipitation_chance: 10, unit: "fahrenheit" } },
+    });
+
+  test("weather maps onto a spec-sheet part, one row per known fact", () => {
+    const part = structuredPartForOutcomes([fullWeatherOutcome()]);
+    expect(part).toEqual({
+      kind: "spec_sheet",
+      title: "Lantern Bay",
+      rows: [
+        { label: "Temperature", value: "61°F" },
+        { label: "Conditions", value: "clear" },
+        { label: "High", value: "68°F" },
+        { label: "Low", value: "54°F" },
+        { label: "Chance of rain", value: "10%" },
+      ],
+    });
+  });
+
+  test("almanac-date maps onto a spec-sheet part", () => {
+    const almanacOutcome = outcome({ callId: "call-a", packageId: "almanac-date", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Today is Thursday, January 1, 2026." }, data: { date: "Thursday, January 1, 2026", weekday: "Thursday" } } });
+    expect(structuredPartForOutcomes([almanacOutcome])).toEqual({
+      kind: "spec_sheet",
+      title: "Today",
+      rows: [
+        { label: "Date", value: "Thursday, January 1, 2026" },
+        { label: "Day of week", value: "Thursday" },
+      ],
+    });
+  });
+
+  test("a producer with no mapping yet yields no structured part, not an error", () => {
+    expect(structuredPartForOutcomes([searchOutcome()])).toBeNull();
+  });
+
+  test("no succeeded outcomes yields no structured part", () => {
+    expect(structuredPartForOutcomes([failedOutcome("I couldn't look that up.")])).toBeNull();
+  });
+
+  test("the first known producer wins when several outcomes succeeded", () => {
+    const part = structuredPartForOutcomes([searchOutcome(), fullWeatherOutcome()]);
+    expect(part?.kind).toBe("spec_sheet");
+    expect((part as { title: string }).title).toBe("Lantern Bay");
   });
 });

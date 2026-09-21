@@ -35,6 +35,7 @@ import { nextHlc } from "@/lib/hlc";
 import { randomSuffix } from "@/lib/id";
 import { TurnArtifact as TurnArtifactSchema, type TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 import type { AgeBand } from "@/lib/ageBand";
+import type { StructuredPart } from "@/wire";
 
 /** The fixed line for a data-only result the composer could not phrase
  * (the model failed, or the budget was spent with no direct reply). */
@@ -566,6 +567,51 @@ export function projectDocument(document: TurnArtifactValue, ageBand: AgeBand): 
 export function projectDocumentForChild(document: TurnArtifactValue): ChildTurnArtifact | null {
   const section = withoutSourceLinks(document.section);
   return section ? { ...document, sources: [], section } : null;
+}
+
+/** The generative-UI contract, first two producers: weather's and
+ * almanac-date's own `result.data` (already typed, already the exact
+ * facts a household member asked for - never model prose) mapped onto
+ * spec-sheet's own prop shape. One outcome, not a merge of several: the
+ * first succeeded outcome from a known producer wins, the same
+ * "first section a document finds" precedent buildDocument() above
+ * already sets. A producer with no mapping here (everything else,
+ * until it is converted) yields no structured part - its reply text is
+ * still delivered normally, nothing is lost, there is just nothing
+ * beyond prose to show yet. */
+export function structuredPartForOutcomes(outcomes: readonly ToolExecutionOutcome[]): StructuredPart | null {
+  const succeeded = outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded");
+  for (const outcome of succeeded) {
+    const part = outcome.packageId === "weather" ? weatherSpecSheet(outcome) : outcome.packageId === "almanac-date" ? almanacDateSpecSheet(outcome) : null;
+    if (part) return part;
+  }
+  return null;
+}
+
+function weatherSpecSheet(outcome: Succeeded): StructuredPart | null {
+  const data = recordData(outcome.result?.data);
+  const place = typeof data?.place === "string" ? data.place : null;
+  if (!data || !place) return null;
+  const unitSuffix = data.unit === "celsius" ? "°C" : "°F";
+  const temperature = data.temperature === undefined || data.temperature === null ? null : `${data.temperature}${unitSuffix}`;
+  const rows = [
+    temperature ? { label: "Temperature", value: temperature } : null,
+    typeof data.conditions === "string" ? { label: "Conditions", value: data.conditions } : null,
+    data.high !== undefined && data.high !== null ? { label: "High", value: `${data.high}${unitSuffix}` } : null,
+    data.low !== undefined && data.low !== null ? { label: "Low", value: `${data.low}${unitSuffix}` } : null,
+    data.precipitation_chance !== undefined && data.precipitation_chance !== null && data.precipitation_chance !== "" ? { label: "Chance of rain", value: `${data.precipitation_chance}%` } : null,
+  ].filter((row): row is { label: string; value: string } => row !== null);
+  return rows.length > 0 ? { kind: "spec_sheet", title: place, rows } : null;
+}
+
+function almanacDateSpecSheet(outcome: Succeeded): StructuredPart | null {
+  const data = recordData(outcome.result?.data);
+  if (!data || typeof data.date !== "string") return null;
+  const rows = [
+    { label: "Date", value: data.date },
+    typeof data.weekday === "string" ? { label: "Day of week", value: data.weekday } : null,
+  ].filter((row): row is { label: string; value: string } => row !== null);
+  return { kind: "spec_sheet", title: "Today", rows };
 }
 
 /** The decision, made without a model call. A `composition` plan

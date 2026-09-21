@@ -16,10 +16,11 @@ import { McpServer } from "npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js";
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.30.0/server/stdio.js";
 import { z } from "npm:zod@4.5.4";
 
-export function currentDate(now: Date = new Date()): { text: string; speech: string } {
+export function currentDate(now: Date = new Date()): { text: string; speech: string; data: { date: string; weekday: string } } {
   const formatted = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
   const text = `Today is ${formatted}.`;
-  return { text, speech: text };
+  return { text, speech: text, data: { date: formatted, weekday } };
 }
 
 function handlerNow(args: Record<string, unknown>): Date {
@@ -34,7 +35,8 @@ function handlerNow(args: Record<string, unknown>): Date {
 if (import.meta.main) {
   const server = new McpServer({ name: "almanac-date", version: "0.1.0" });
   server.registerTool("handle", { inputSchema: z.object({ __now: z.string().optional() }).passthrough() }, async (args: Record<string, unknown>) => {
-    return { content: [{ type: "text", text: JSON.stringify({ reply: currentDate(handlerNow(args)), actions: [] }) }] };
+    const { data, ...reply } = currentDate(handlerNow(args));
+    return { content: [{ type: "text", text: JSON.stringify({ reply, data, actions: [] }) }] };
   });
   const transport = new StdioServerTransport();
   await server.connect(transport);

@@ -192,6 +192,86 @@ already has what it needs.
 
 Two cross-cutting findings, not specific to one row: first, several Elements (`sources`, `reasoning`, `guardrail-notice`) need genuinely new stream event types or message-part shapes on `TurnStreamEvent`/`TurnValue` - additive, per Compatibility, but real backend work beyond this item's own artifact record and tool. Second, `chart` (no current producer) and `image-generation` (no numeric-progress field) are notes for later, not open questions - nothing to build against either one tonight.
 
+## The artifact record
+
+`commons/spec/schemas/artifact.schema.json` (`spec-v0.1.7`): one
+immutable version of a generated markdown/code/html document - `id,
+conversation_id, turn_id, kind, title, body, version, parent_version,
+created_by, provenance, created_at, hlc`. Distinct on purpose from
+`TurnArtifact` (COMP-01's evidence-grounded details document, built from
+retained tool outcomes, never model prose): this record is the model's
+own authored content, versioned like a file, and chains by
+`parent_version` naming the prior version's own `id` - conversation-
+turn's `parent_turn_id` convention, not `TurnArtifact`'s bare `revision`
+counter, because the wire needs a version's own id (the artifact-card/
+canvas-split tool call and the message metadata both name one). Home's
+own table (`backend/src/db/schema.ts`'s `artifacts`, migration `0053`)
+adds two Home-internal, non-synced columns the spec record has no
+concept of: `artifactKey` (minted once at version 1, copied onto every
+later version, groups one artifact's whole chain) and `isCurrent` (a
+partial unique index keeps exactly one current row per `artifactKey`,
+flipped inside the same transaction that inserts the next version -
+`backend/src/lib/artifacts.ts`'s `createArtifact`/`updateArtifact`).
+Updating a version that is no longer current is refused (409): there is
+nothing to redo forward to, and history is read-only once superseded.
+
+**Child projection is an access gate, not a content strip.** Unlike
+`TurnArtifact`'s citation-stripping child projection, an artifact has no
+field that becomes unsafe for a child to see once flagged - the whole
+version is either visible or it isn't. `visibleArtifactRow()` extends
+`canAccessPerson()`'s existing "a child sees only their own turns" rule
+with one more condition: the turn that produced this version must not
+have been safety-refused (`conversationTurns.safetyAction !== "refuse"`
+when the actor is a child). A refused turn produces no artifact today,
+so this is defense in depth against a future path that could, proven by
+a direct-insert test rather than a real refusal flow.
+
+**Routes** (`backend/src/routes/artifacts.ts`, read-only - creating and
+updating happens through the turn-engine tool below, never a route):
+`GET /api/artifacts/:id` returns one version's spec-shaped JSON;
+`GET /api/artifacts/:id/export` downloads its body with a slugged
+filename and the content type its `kind` implies (`.md`/text/markdown,
+`.txt`/text/plain, `.html`/text/html) - `canvas-split`'s export action
+and a plain download link both point here.
+
+## The turn-engine tool
+
+**Landed:** the data layer above - the spec record, Home's table and
+migration, `createArtifact`/`updateArtifact`/`getArtifactRow`/
+`currentArtifactRow`, `visibleArtifactRow`, and the two read routes -
+plus `TurnValue.artifact?: { id, version }` on the wire
+(`backend/src/wire.ts`), additive next to `document_available`, naming
+the version a turn minted or updated without carrying its body inline
+(a client fetches the full version from the route above).
+
+**Not landed, named as a real gap rather than shoehorned in:** the
+actual tool the model calls to invoke this live, mid-turn. Every native
+tool call the turn engine offers today (`turnEngine.ts`'s
+`ordinaryToolSpecs()`/`selectOfferedTools()`, dispatched through
+`runPlugin()`) assumes the tool is a catalog package with a manifest and
+either a declarative recipe or a Tier 1 `handler.ts` running in
+`denoHost.ts`'s sandbox - the same shape `websearch`, `remember`, and
+every other offered tool use, real code enforced through recipe
+primitives or a sandboxed handler, not a bare native function. Artifact
+creation needs real version-chain logic (mint an id, resolve the current
+pointer, insert transactionally) that has no recipe primitive today, the
+same reason `TurnArtifact`'s own document building lives directly in
+`composer.ts` rather than as a package at all - but `TurnArtifact` is
+never a tool the MODEL calls, it's built after the fact from retained
+outcomes, so that precedent doesn't answer how a model-invoked tool gets
+real code to run. Wiring this into the model's live tool-offering loop
+needs one of: a new recipe-interpreter primitive in `commons/spec` for
+version-chain writes, or a new native (non-package) dispatch branch
+alongside `runPlugin()`'s call sites - either is its own design pass and
+integration surface across a large, delicate file, not a same-item
+addition under a medium review budget. The intended shape, for whoever
+takes this: one tool, args `{ action: "create" | "update", artifact_id?
+(required for update), title, kind? (required for create), body }`,
+`create` calling `createArtifact()` and `update` calling
+`updateArtifact()` against the conversation's current artifact, streamed
+as the part `artifact-card`/`canvas-split` bind to (this record's
+earlier table), with `TurnValue.artifact` set from its result.
+
 ## Sessions and order
 
 Session A (fresh, Sonnet) takes step 1 from this record, then the

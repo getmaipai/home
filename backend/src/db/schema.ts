@@ -514,6 +514,48 @@ export const attachments = sqliteTable(
   ],
 );
 
+// The chat program's artifact record (spec/schemas/artifact.schema.json):
+// one immutable version per row, chained by parentVersion the same way
+// conversation_turns chains by parent_turn_id. `artifactKey` and
+// `isCurrent` are Home-internal bookkeeping, not part of the synced spec
+// shape - the spec record has no mutable "current version" concept (an
+// existing version is never edited in place), so the pointer lives here,
+// not on the record. `artifactKey` is minted once at version 1 and
+// copied onto every later version in the same chain; exactly one row per
+// artifactKey has isCurrent true, flipped inside the same write that
+// inserts the new version (lib/artifacts.ts's updateArtifact()).
+export const artifacts = sqliteTable(
+  "artifacts",
+  {
+    id: text("id").primaryKey(),
+    artifactKey: text("artifact_key").notNull(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id),
+    turnId: text("turn_id")
+      .notNull()
+      .references(() => conversationTurns.id),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    version: integer("version").notNull(),
+    parentVersion: text("parent_version"),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => people.id),
+    provenance: text("provenance").notNull(),
+    createdAt: text("created_at").notNull(),
+    hlc: text("hlc").notNull(),
+    isCurrent: integer("is_current", { mode: "boolean" }).notNull().default(true),
+  },
+  (table) => [
+    index("artifacts_artifact_key_idx").on(table.artifactKey),
+    index("artifacts_conversation_id_idx").on(table.conversationId),
+    index("artifacts_turn_id_idx").on(table.turnId),
+    uniqueIndex("artifacts_artifact_key_current_idx").on(table.artifactKey, table.isCurrent).where(sql`is_current = 1`),
+  ],
+);
+
 // FEED-01: one person's label for one assistant turn. The record is
 // person-scoped even when an owner or admin is rating a child's visible
 // conversation, so the same turn can carry one independent label per

@@ -143,3 +143,17 @@ export function newEpisodeId(): string {
 export function newAttachmentId(): string {
   return `att-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/artifact.schema.json's `^art-[a-z0-9]{6,}$`. A new
+ * one is minted for every version, chained by parent_version. */
+export function newArtifactId(): string {
+  return `art-${randomSuffix(10)}`;
+}
+
+// Not a spec-shaped id: db/schema.ts's own artifacts.artifactKey, Home-
+// internal bookkeeping grouping one artifact's version chain so the
+// current-version pointer has something stable to key on. Minted once at
+// version 1 and copied onto every later version in the same chain.
+export function newArtifactKey(): string {
+  return `artk-${randomSuffix(10)}`;
+}

@@ -23,6 +23,7 @@ import {
   scheduledJobs,
   conversationTurns,
   attachments,
+  artifacts,
   conversations,
   clonedVoices,
   commands,
@@ -123,6 +124,7 @@ export function resetDb(): void {
   db.delete(episodeEmbeddings).run();
   db.delete(episodes).run();
   db.delete(attachments).run();
+  db.delete(artifacts).run(); // the chat program's generated-document versions, reference conversations and conversation_turns
   db.delete(conversationTurns).run();
   db.delete(conversations).run();
   db.delete(memoryEmbeddings).run();

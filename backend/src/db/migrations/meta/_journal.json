@@ -372,6 +372,13 @@
       "when": 1789582838318,
       "tag": "0052_wealthy_grim_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1789972418890,
+      "tag": "0053_sloppy_ma_gnuci",
+      "breakpoints": true
     }
   ]
 }
