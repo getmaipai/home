@@ -99,6 +99,14 @@ function NextSignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
   );
 }
 
+// HOME-UI-04g: while the household settings query is still loading, the
+// per-browser cache (read inside `useShellNext`) decides which palette
+// to paint. If it says "on", `useShellNext` itself paints the template's
+// look class on the body and the cache is seeded so `main.tsx` painted
+// it before React mounted; the old shell's RouteSkeleton stands as the
+// loading indicator. If it says null or "off", the old shell's navy
+// palette and RouteSkeleton stand - the person either never visited
+// /next or the flag was off, so the old shell's loading state is fine.
 export function NextRoutes({ person, onSignedIn }: { person: Roster | null; onSignedIn: () => void }) {
   const queryClient = useQueryClient();
   const wasSignedOut = useRef(person === null);
@@ -118,7 +126,14 @@ export function NextRoutes({ person, onSignedIn }: { person: Roster | null; onSi
   }, [person, queryClient]);
 
   const shellNext = useShellNext();
-  if (shellNext === "loading") return <RouteSkeleton />;
+
+  if (shellNext === "loading") {
+    return (
+      <div data-testid="next-loading-branch">
+        <RouteSkeleton />
+      </div>
+    );
+  }
   if (shellNext === "off") return <Navigate to="/" replace />;
 
   return <ThemeProvider>{person === null ? <NextSignedOutRoutes onSignedIn={onSignedIn} /> : <NextRoutesInner person={person} />}</ThemeProvider>;

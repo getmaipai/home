@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 import { api, type ResolvedSetting } from "@/lib/api";
+import { readShellNextCache, writeShellNextCache } from "@/next/shellNextCache";
 
 type Appearance = "system" | "light" | "dark";
 
@@ -38,7 +39,12 @@ function isAppearance(value: unknown): value is Appearance {
  * item exists to remove. Self-corrects on the next reload or
  * navigation, which re-seeds the provider fresh; not part of this
  * item's own acceptance (an explicit light/dark choice against a
- * mismatched OS, which is real-time correct either way). */
+ * mismatched OS, which is real-time correct either way).
+ *
+ * HOME-UI-04g: also writes `dark` (the resolved light/dark choice,
+ * with "system" resolved against the OS media query) into the
+ * per-browser cache so `main.tsx` can paint the right dark/light
+ * class before React mounts. */
 export function useNextAppearance(personId: string): void {
   const scopeValue = `person:${personId}`;
   const queryClient = useQueryClient();
@@ -102,4 +108,21 @@ export function useNextAppearance(personId: string): void {
         // a failed write just means it doesn't persist past this session.
       });
   }, [theme, appearance, scopeValue, queryClient, setTheme]);
+
+  // HOME-UI-04g: resolve the effective dark/light and, when the shell
+  // is on, paint the right `.dark`/`.light` class on `<html>` (so the
+  // old shell's loading state already wears the template's palette
+  // while the settings fetch is pending) and write it into the
+  // per-browser cache so main.tsx can paint the same class before
+  // React mounts.
+  const cached = readShellNextCache();
+  useEffect(() => {
+    if (!cached?.on || appearance === undefined) return;
+    const dark =
+      appearance === "dark" ||
+      (appearance === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", dark);
+    document.documentElement.classList.toggle("light", !dark);
+    writeShellNextCache({ ...cached, dark });
+  }, [appearance, cached]);
 }
