@@ -11,11 +11,13 @@ import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import "@maipai/ui/src/dashboard/css/globals.css";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { useShellNext } from "@/next/useShellNext";
+import { useNextLook } from "@/next/useNextLook";
 import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
 import { NextAppsPage } from "@/next/pages/NextAppsPage";
 import { NextPeoplePage } from "@/next/pages/NextPeoplePage";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
+import type { Roster } from "@/lib/api";
 
 /** The `/next/*` route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): behind `ui.shell.next`, mounts the template's
@@ -35,8 +37,9 @@ import { NextSignInPage } from "@/next/pages/NextSignInPage";
  * these same Elements (see the plan's "chat's wiring table"), so this
  * is flagged back to the coordinator to decide alongside that work
  * rather than force-upgraded here. */
-export function NextRoutes() {
+export function NextRoutes({ person }: { person: Roster }) {
   const shellNext = useShellNext();
+  useNextLook(person.id);
   if (shellNext === "loading") return <RouteSkeleton />;
   if (shellNext === "off") return <Navigate to="/" replace />;
 

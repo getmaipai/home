@@ -89,7 +89,10 @@ const NotificationsPage = lazyNamed(() => import("@/apps/notifications/Notificat
 // 2026-09-21.md): its own chunk, not the entry bundle - the vendored kit
 // under it (55 shadcn primitives, the Elements) is real weight nobody
 // pays for until they actually turn ui.shell.next on and visit /next.
-const NextRoutes = lazyNamed(() => import("@/next/NextRoutes"), "NextRoutes");
+const NextRoutes = lazyNamed<ComponentProps<typeof import("@/next/NextRoutes")["NextRoutes"]>>(
+  () => import("@/next/NextRoutes"),
+  "NextRoutes",
+);
 const SearchPage = lazyNamed<ComponentProps<typeof import("@/apps/search/SearchPage")["SearchPage"]>>(
   () => import("@/apps/search/SearchPage"),
   "SearchPage",
@@ -216,7 +219,7 @@ export function App() {
                         <Navigate to="/" replace />
                       ) : (
                         <Suspense fallback={<RouteSkeleton />}>
-                          <NextRoutes />
+                          <NextRoutes person={person} />
                         </Suspense>
                       )
                     }

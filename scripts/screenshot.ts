@@ -297,6 +297,7 @@ const notificationsReview = process.argv.includes("--notifications-review");
 // this item's own judgment, not a permanent docs asset (matches how
 // HOME-UI-02c's own look comparison was done, per docs/dev.md).
 const lookReview = process.argv.includes("--look-review");
+const nextStandupReview = process.argv.includes("--next-standup-review");
 
 interface RouteSpec {
   slug: string;
@@ -1844,6 +1845,85 @@ async function captureLookComparison(browser: Browser, sessionValue: string): Pr
   }
 }
 
+/** The shell-on-shadcndashboard stand-up's own acceptance (docs/plans/
+ * shell-on-shadcndashboard-2026-09-21.md, step 1): "captures at 1440 and
+ * 390, both looks, both themes, of every /next route, opened and judged
+ * for one thing only, that nothing on them is Home-drawn." `ui.shell.next`
+ * (household) gates the whole tree; `ui.look` (person, the same key the
+ * old shell's `useLook.ts` reads) drives the vendored template's own
+ * `.style-calm`/`.style-studio` body class via `useNextLook.ts` - the
+ * same two-setting shape `captureLookComparison` above already uses for
+ * the old shell, reused here rather than invented fresh. Written to
+ * `docs/assets/screens/` (committed, unlike `captureLookComparison`'s
+ * `data-scratch/`): a permanent record of the stand-up's own acceptance,
+ * not a one-off review set. `/next/chat` is excluded - not wired yet
+ * (ui-v0.5.4's named gap, CHAT-SDK-01). */
+async function captureNextStandup(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(SCREENS_DIR, "next-standup");
+  mkdirSync(outDir, { recursive: true });
+
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const sage = people.find((p) => p.display_name === "Sage");
+  if (!sage) throw new Error("captureNextStandup: seedHousehold() didn't create Sage");
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextStandup: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const pages: Array<{ slug: string; path: string; waitFor: string }> = [
+    { slug: "dashboard", path: "/next", waitFor: "text=Weekly sales" },
+    { slug: "apps", path: "/next/apps", waitFor: "table" },
+    { slug: "people", path: "/next/people", waitFor: "text=Personal Information" },
+    { slug: "settings", path: "/next/settings", waitFor: "text=Default Inputs" },
+    { slug: "sign-in", path: "/next/sign-in", waitFor: "form" },
+  ];
+  const viewports = [VIEWPORTS.find((v) => v.slug === "phone")!, VIEWPORTS.find((v) => v.slug === "desktop")!];
+
+  for (const look of ["calm", "studio"] as const) {
+    const setLook = await fetch(`${BASE_URL}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+      body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.look", value: look }),
+    });
+    if (!setLook.ok) throw new Error(`captureNextStandup: seeding ui.look=${look} failed: ${setLook.status}`);
+
+    for (const viewport of viewports) {
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, sessionValue);
+        try {
+          for (const p of pages) {
+            const page = await context.newPage();
+            await page.goto(`${BASE_URL}${p.path}`);
+            await page.locator(p.waitFor).first().waitFor({ timeout: 15000 });
+            await settleAnimations(page);
+            const file = `${p.slug}-look-${look}-${viewport.slug}-${theme}.png`;
+            // Resize to the real scroll height and take a plain (non-fullPage)
+            // shot instead: FullLayout's header is `sticky top-0`
+            // (dashboard/layouts/full/vertical/header/Header.tsx), and
+            // Chromium's fullPage capture stitches tall pages by scrolling,
+            // which re-paints the sticky header mid-stitch and ghosts
+            // whatever was behind it (the footer's copyright line bled into
+            // the Tables page's title bar in dark desktop until this fix -
+            // found live in this stand-up's own acceptance captures, not a
+            // bug in the header or the footer themselves).
+            const fullHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+            await page.setViewportSize({ width: viewport.width, height: fullHeight });
+            await settleAnimations(page);
+            await page.screenshot({ path: join(outDir, file) });
+            console.log(`Wrote ${join(outDir, file)}`);
+            await page.close();
+          }
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
 /** Lane 15's own two review shots: the bell popover's "Dismiss all" and
  * the history page's multi-select, each needing at least two real
  * pending notifications on screen - not fabricated rows (this file's
@@ -2414,6 +2494,10 @@ async function main() {
       await captureLookComparison(browser, sessionValue);
     }
 
+    if (nextStandupReview && !chatReview && !settingsReview && !notificationsReview && !lookReview) {
+      await captureNextStandup(browser, sessionValue);
+    }
+
     if (!a11yOnly && chatReview) {
       if (chatFocusReview) await captureChatModelPicker(browser, sessionValue);
       for (const combo of A11Y_ONLY_COMBOS) {
@@ -2454,7 +2538,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -2486,7 +2570,7 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || pictureReview
+    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview
       ? []
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview
         ? A11Y_ONLY_COMBOS
@@ -2556,7 +2640,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);

@@ -22,15 +22,26 @@ function isLook(value: unknown): value is Look {
  * scopeValue]`, the same key HomePage.tsx's own `useHouseholdSettings`
  * shares for household scope) rather than a one-shot fetch of its own:
  * changing "Look" in Settings applies it live, in this same session,
- * with no reload and no second write path. */
-export function useLook(personId: string): Look {
+ * with no reload and no second write path.
+ *
+ * The resolution itself (`useLookValue`) is shared with `@/next/
+ * useNextLook.ts`: same setting, same cache entry, two different
+ * mechanisms for applying it (this shell's `data-look` attribute vs.
+ * the vendored template's `.style-<look>` body class) - one definition
+ * of what `ui.look` resolves to, not two (getmaipai/CLAUDE.md: "a
+ * settings key ... is declared exactly once"). */
+export function useLookValue(personId: string): Look {
   const scopeValue = `person:${personId}`;
   const query = useQuery({
     queryKey: ["settings-values", scopeValue],
     queryFn: () => api.settingsValues(scopeValue),
   });
   const found = query.data?.find((v) => v.key === "ui.look")?.value;
-  const look: Look = isLook(found) ? found : "studio";
+  return isLook(found) ? found : "studio";
+}
+
+export function useLook(personId: string): Look {
+  const look = useLookValue(personId);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-look", look);
