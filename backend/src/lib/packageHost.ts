@@ -860,7 +860,7 @@ function isFirstPersonStatement(text: string): boolean {
   return FIRST_PERSON_PATTERN.test(text.replace(THIRD_PARTY_POSSESSIVE, ""));
 }
 
-function mapWriteFailure(status: 400 | 403 | 404, error: string): never {
+function mapWriteFailure(status: number, error: string): never {
   // A permission check above only proves the manifest declared the
   // right permission; memory.remember/forget still apply their own
   // caller/scope authorization (role, scope=self, another person's

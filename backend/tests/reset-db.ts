@@ -15,6 +15,7 @@ import {
   memoryRecords,
   memoryEmbeddings,
   pendingEmbeddings,
+  pendingMemoryWork,
   episodes,
   episodeEmbeddings,
   pendingEpisodeEmbeddings,
@@ -129,6 +130,7 @@ export function resetDb(): void {
   db.delete(conversations).run();
   db.delete(memoryEmbeddings).run();
   db.delete(pendingEmbeddings).run();
+  db.delete(pendingMemoryWork).run();
   db.delete(memoryRecords).run();
   db.delete(settingsValues).run();
   // lib/settings.ts's own resolveStoredValue() cache (added in a latency

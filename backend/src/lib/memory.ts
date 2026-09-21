@@ -23,11 +23,12 @@ import { nextHlc } from "@/lib/hlc";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { retireOrphanSubjects } from "@/lib/subjects";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
+import { ingestMemory } from "@/lib/memoryIngestion";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 
 export type MemoryOpResult<T> =
   | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+  | { ok: false; status: number; error: string };
 
 // scope=self is "not shared with anyone" per the schema's own field
 // description: no read path, however privileged, ever returns it.
@@ -176,120 +177,26 @@ export interface RememberInput {
 }
 
 export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult<MemoryRecord> {
-  // CHAT-03: the one content policy, at the write. Every capture path
-  // (the memory API, the remember package through host.memory.remember,
-  // the judge's extracted facts) lands here; a credential never becomes
-  // a record, and the error is the fixed line the household sees.
-  if (detectCredential(input.text).detected) return { ok: false, status: 400, error: CREDENTIAL_SAFE_MESSAGE };
-  const scope = input.scope;
-  const person = input.scope === "person" ? (input.person ?? null) : null;
-  const auth = assertCanWrite(actor, scope, person);
-  if (!auth.ok) return auth;
-
-  // Checked here, not left to the SQLite foreign key: a code review
-  // (2026-09-04) found an owner/admin writing scope=person with a typo'd
-  // personId reached the FK constraint at insert time and got a raw,
-  // uncaught "FOREIGN KEY constraint failed" 500 instead of a clean 400.
-  // Only needed for the owner/admin path (assertCanWrite already proved
-  // actor.id === person on the self-write path, and an authenticated
-  // actor always exists). Excludes soft-deleted people too (a follow-up
-  // review found the first cut of this check didn't), matching the
-  // deletedAt-awareness this same pass added to resolveSession() and
-  // /verify-secret: a deleted person is not a valid write target either.
-  if (person && person !== actor.id) {
-    const exists = db
-      .select({ id: people.id })
-      .from(people)
-      .where(and(eq(people.id, person), isNull(people.deletedAt)))
-      .get();
-    if (!exists) return { ok: false, status: 400, error: `person not found: ${person}` };
-  }
-
-  const recordKind = input.record_kind ?? "memory";
-  const now = new Date().toISOString();
-  const candidate = {
-    id: newMemoryRecordId(recordKind),
-    record_kind: recordKind,
+  const result = ingestMemory({
+    actor,
+    recordKind: input.record_kind,
     text: input.text,
     category: input.category,
     tier: input.tier,
-    status: "active",
-    scope,
-    person,
-    subject_id: input.subject_id ?? null,
+    scope: input.scope as "self" | "person" | "household",
+    person: input.person,
+    subjectId: input.subject_id,
     source: input.source,
     importance: input.importance,
-    pinned: input.pinned ?? false,
-    sensitive: input.sensitive ?? false,
-    child_disclosure: input.child_disclosure ?? "child_ok",
-    child_disclosure_set_by: null,
-    child_disclosure_set_at: null,
-    uses: 0,
-    created_at: now,
-    last_used_at: now,
-    valid_from: input.valid_from ?? null,
-    valid_to: input.valid_to ?? null,
-    expired_at: null,
-    superseded_by: null,
-    embedding_space: input.embedding_space ?? null,
-    hlc: nextHlc(),
-    deleted_at: null,
-  };
-
-  // Validate against the spec BEFORE writing: the single source of truth
-  // for what a valid record looks like is the generated Zod schema, not a
-  // hand-kept second copy of its rules here.
-  const parsed = MemoryRecord.safeParse(candidate);
-  if (!parsed.success) {
-    return { ok: false, status: 400, error: parsed.error.issues.map((i) => i.message).join("; ") };
-  }
-
-  db.insert(memoryRecords)
-    .values({
-      id: parsed.data.id,
-      recordKind: parsed.data.record_kind,
-      text: parsed.data.text,
-      category: parsed.data.category,
-      tier: parsed.data.tier,
-      status: parsed.data.status,
-      scope: parsed.data.scope,
-      person: parsed.data.person,
-      subjectId: parsed.data.subject_id ?? null,
-      source: parsed.data.source,
-      importance: parsed.data.importance,
-      pinned: parsed.data.pinned,
-      sensitive: parsed.data.sensitive,
-      childDisclosure: parsed.data.child_disclosure ?? "child_ok",
-      childDisclosureSetBy: parsed.data.child_disclosure_set_by,
-      childDisclosureSetAt: parsed.data.child_disclosure_set_at,
-      uses: parsed.data.uses,
-      createdAt: parsed.data.created_at,
-      lastUsedAt: parsed.data.last_used_at,
-      validFrom: parsed.data.valid_from,
-      validTo: parsed.data.valid_to,
-      expiredAt: parsed.data.expired_at,
-      supersededBy: parsed.data.superseded_by,
-      embeddingSpace: parsed.data.embedding_space,
-      hlc: parsed.data.hlc,
-      deletedAt: parsed.data.deleted_at,
-    })
-    .run();
-
-  // Step 5: embed on write, fire-and-forget - a real embed() call is
-  // real I/O (network or local inference), and remember() itself must
-  // never wait on it or fail because of it. A backend that's down
-  // queues the id for the retry job below instead of losing the vector
-  // forever. A caller that already has a real vector for this exact
-  // text (input.precomputed_embedding) skips the round trip entirely -
-  // storeEmbedding() itself is synchronous DB work, not I/O, so this
-  // branch completes before remember() returns rather than racing it.
-  if (input.precomputed_embedding) {
-    storeEmbedding(parsed.data.id, input.precomputed_embedding.space, input.precomputed_embedding.vector, input.precomputed_embedding.preprocess);
-  } else {
-    void embedMemoryRecordSafely(parsed.data.id, parsed.data.text);
-  }
-
-  return { ok: true, value: parsed.data };
+    pinned: input.pinned,
+    sensitive: input.sensitive,
+    childDisclosure: input.child_disclosure,
+    validFrom: input.valid_from,
+    validTo: input.valid_to,
+    precomputedEmbedding: input.precomputed_embedding,
+  });
+  if (!result.ok) return { ok: false, status: result.status, error: result.error };
+  return { ok: true, value: toMemoryRecord(result.record) };
 }
 
 // ==== Step 5: the vector store ====

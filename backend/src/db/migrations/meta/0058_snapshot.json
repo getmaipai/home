@@ -1,8 +1,8 @@
 {
-  "id": "3f696de5-8ba8-4e99-9c0e-840932808aa2",
-  "prevId": "d17c26ef-566f-4856-8827-b2c90a598448",
   "version": "6",
   "dialect": "sqlite",
+  "id": "8ffcca7e-7cde-4031-bd2f-df0a3162feff",
+  "prevId": "d17c26ef-566f-4856-8827-b2c90a598448",
   "tables": {
     "app_update_state": {
       "name": "app_update_state",
@@ -137,28 +137,28 @@
         "approvals_person_id_people_id_fk": {
           "name": "approvals_person_id_people_id_fk",
           "tableFrom": "approvals",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "approvals_decided_by_person_id_people_id_fk": {
           "name": "approvals_decided_by_person_id_people_id_fk",
           "tableFrom": "approvals",
+          "tableTo": "people",
           "columnsFrom": [
             "decided_by_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -296,49 +296,49 @@
             "artifact_key",
             "is_current"
           ],
-          "where": "is_current = 1",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_current = 1"
         }
       },
       "foreignKeys": {
         "artifacts_conversation_id_conversations_id_fk": {
           "name": "artifacts_conversation_id_conversations_id_fk",
           "tableFrom": "artifacts",
+          "tableTo": "conversations",
           "columnsFrom": [
             "conversation_id"
           ],
-          "tableTo": "conversations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "artifacts_turn_id_conversation_turns_id_fk": {
           "name": "artifacts_turn_id_conversation_turns_id_fk",
           "tableFrom": "artifacts",
+          "tableTo": "conversation_turns",
           "columnsFrom": [
             "turn_id"
           ],
-          "tableTo": "conversation_turns",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "artifacts_created_by_people_id_fk": {
           "name": "artifacts_created_by_people_id_fk",
           "tableFrom": "artifacts",
+          "tableTo": "people",
           "columnsFrom": [
             "created_by"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -461,41 +461,41 @@
         "attachments_owner_person_id_people_id_fk": {
           "name": "attachments_owner_person_id_people_id_fk",
           "tableFrom": "attachments",
+          "tableTo": "people",
           "columnsFrom": [
             "owner_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "attachments_conversation_id_conversations_id_fk": {
           "name": "attachments_conversation_id_conversations_id_fk",
           "tableFrom": "attachments",
+          "tableTo": "conversations",
           "columnsFrom": [
             "conversation_id"
           ],
-          "tableTo": "conversations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "attachments_turn_id_conversation_turns_id_fk": {
           "name": "attachments_turn_id_conversation_turns_id_fk",
           "tableFrom": "attachments",
+          "tableTo": "conversation_turns",
           "columnsFrom": [
             "turn_id"
           ],
-          "tableTo": "conversation_turns",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -652,15 +652,15 @@
         "cloned_voices_creator_id_people_id_fk": {
           "name": "cloned_voices_creator_id_people_id_fk",
           "tableFrom": "cloned_voices",
+          "tableTo": "people",
           "columnsFrom": [
             "creator_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -725,15 +725,15 @@
         "commands_creator_id_people_id_fk": {
           "name": "commands_creator_id_people_id_fk",
           "tableFrom": "commands",
+          "tableTo": "people",
           "columnsFrom": [
             "creator_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1036,28 +1036,28 @@
         "conversation_turns_person_id_people_id_fk": {
           "name": "conversation_turns_person_id_people_id_fk",
           "tableFrom": "conversation_turns",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "conversation_turns_conversation_id_conversations_id_fk": {
           "name": "conversation_turns_conversation_id_conversations_id_fk",
           "tableFrom": "conversation_turns",
+          "tableTo": "conversations",
           "columnsFrom": [
             "conversation_id"
           ],
-          "tableTo": "conversations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1199,15 +1199,15 @@
         "conversations_person_id_people_id_fk": {
           "name": "conversations_person_id_people_id_fk",
           "tableFrom": "conversations",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1287,28 +1287,28 @@
         "device_tokens_device_id_devices_id_fk": {
           "name": "device_tokens_device_id_devices_id_fk",
           "tableFrom": "device_tokens",
+          "tableTo": "devices",
           "columnsFrom": [
             "device_id"
           ],
-          "tableTo": "devices",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "device_tokens_person_id_people_id_fk": {
           "name": "device_tokens_person_id_people_id_fk",
           "tableFrom": "device_tokens",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1403,15 +1403,15 @@
         "devices_person_id_people_id_fk": {
           "name": "devices_person_id_people_id_fk",
           "tableFrom": "devices",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1564,49 +1564,49 @@
           "columns": [
             "account_person_id"
           ],
-          "where": "account_person_id IS NOT NULL AND deleted_at IS NULL",
-          "isUnique": true
+          "isUnique": true,
+          "where": "account_person_id IS NOT NULL AND deleted_at IS NULL"
         }
       },
       "foreignKeys": {
         "entities_account_person_id_people_id_fk": {
           "name": "entities_account_person_id_people_id_fk",
           "tableFrom": "entities",
+          "tableTo": "people",
           "columnsFrom": [
             "account_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "entities_confirmed_by_person_id_people_id_fk": {
           "name": "entities_confirmed_by_person_id_people_id_fk",
           "tableFrom": "entities",
+          "tableTo": "people",
           "columnsFrom": [
             "confirmed_by_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "entities_person_people_id_fk": {
           "name": "entities_person_people_id_fk",
           "tableFrom": "entities",
+          "tableTo": "people",
           "columnsFrom": [
             "person"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1665,15 +1665,15 @@
         "episode_embeddings_episode_id_episodes_id_fk": {
           "name": "episode_embeddings_episode_id_episodes_id_fk",
           "tableFrom": "episode_embeddings",
+          "tableTo": "episodes",
           "columnsFrom": [
             "episode_id"
           ],
-          "tableTo": "episodes",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1761,41 +1761,41 @@
         "episodes_turn_id_conversation_turns_id_fk": {
           "name": "episodes_turn_id_conversation_turns_id_fk",
           "tableFrom": "episodes",
+          "tableTo": "conversation_turns",
           "columnsFrom": [
             "turn_id"
           ],
-          "tableTo": "conversation_turns",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "episodes_conversation_id_conversations_id_fk": {
           "name": "episodes_conversation_id_conversations_id_fk",
           "tableFrom": "episodes",
+          "tableTo": "conversations",
           "columnsFrom": [
             "conversation_id"
           ],
-          "tableTo": "conversations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "episodes_person_id_people_id_fk": {
           "name": "episodes_person_id_people_id_fk",
           "tableFrom": "episodes",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1909,41 +1909,41 @@
         "grants_person_people_id_fk": {
           "name": "grants_person_people_id_fk",
           "tableFrom": "grants",
+          "tableTo": "people",
           "columnsFrom": [
             "person"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "grants_granted_by_person_id_people_id_fk": {
           "name": "grants_granted_by_person_id_people_id_fk",
           "tableFrom": "grants",
+          "tableTo": "people",
           "columnsFrom": [
             "granted_by_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "grants_acknowledged_by_person_id_people_id_fk": {
           "name": "grants_acknowledged_by_person_id_people_id_fk",
           "tableFrom": "grants",
+          "tableTo": "people",
           "columnsFrom": [
             "acknowledged_by_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2261,15 +2261,15 @@
         "lists_person_people_id_fk": {
           "name": "lists_person_people_id_fk",
           "tableFrom": "lists",
+          "tableTo": "people",
           "columnsFrom": [
             "person"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2328,15 +2328,15 @@
         "memory_embeddings_memory_id_memory_records_id_fk": {
           "name": "memory_embeddings_memory_id_memory_records_id_fk",
           "tableFrom": "memory_embeddings",
+          "tableTo": "memory_records",
           "columnsFrom": [
             "memory_id"
           ],
-          "tableTo": "memory_records",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2548,15 +2548,15 @@
         "memory_records_person_people_id_fk": {
           "name": "memory_records_person_people_id_fk",
           "tableFrom": "memory_records",
+          "tableTo": "people",
           "columnsFrom": [
             "person"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2777,28 +2777,28 @@
         "notification_deliveries_recipient_id_people_id_fk": {
           "name": "notification_deliveries_recipient_id_people_id_fk",
           "tableFrom": "notification_deliveries",
+          "tableTo": "people",
           "columnsFrom": [
             "recipient_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "notification_deliveries_subject_person_id_people_id_fk": {
           "name": "notification_deliveries_subject_person_id_people_id_fk",
           "tableFrom": "notification_deliveries",
+          "tableTo": "people",
           "columnsFrom": [
             "subject_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2899,15 +2899,15 @@
         "open_questions_person_people_id_fk": {
           "name": "open_questions_person_people_id_fk",
           "tableFrom": "open_questions",
+          "tableTo": "people",
           "columnsFrom": [
             "person"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3102,15 +3102,15 @@
         "passkey_credentials_person_id_people_id_fk": {
           "name": "passkey_credentials_person_id_people_id_fk",
           "tableFrom": "passkey_credentials",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3140,15 +3140,15 @@
         "pending_embeddings_memory_id_memory_records_id_fk": {
           "name": "pending_embeddings_memory_id_memory_records_id_fk",
           "tableFrom": "pending_embeddings",
+          "tableTo": "memory_records",
           "columnsFrom": [
             "memory_id"
           ],
-          "tableTo": "memory_records",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3178,15 +3178,60 @@
         "pending_episode_embeddings_episode_id_episodes_id_fk": {
           "name": "pending_episode_embeddings_episode_id_episodes_id_fk",
           "tableFrom": "pending_episode_embeddings",
+          "tableTo": "episodes",
           "columnsFrom": [
             "episode_id"
           ],
-          "tableTo": "episodes",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "pending_memory_work": {
+      "name": "pending_memory_work",
+      "columns": {
+        "memory_id": {
+          "name": "memory_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "queued_at": {
+          "name": "queued_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pending_memory_work_memory_id_memory_records_id_fk": {
+          "name": "pending_memory_work_memory_id_memory_records_id_fk",
+          "tableFrom": "pending_memory_work",
+          "tableTo": "memory_records",
+          "columnsFrom": [
+            "memory_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3362,15 +3407,15 @@
         "person_api_tokens_person_id_people_id_fk": {
           "name": "person_api_tokens_person_id_people_id_fk",
           "tableFrom": "person_api_tokens",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3429,15 +3474,15 @@
         "person_credentials_person_id_people_id_fk": {
           "name": "person_credentials_person_id_people_id_fk",
           "tableFrom": "person_credentials",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3488,15 +3533,15 @@
         "received_backups_device_id_devices_id_fk": {
           "name": "received_backups_device_id_devices_id_fk",
           "tableFrom": "received_backups",
+          "tableTo": "devices",
           "columnsFrom": [
             "device_id"
           ],
-          "tableTo": "devices",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3669,67 +3714,67 @@
         "relationships_from_id_entities_id_fk": {
           "name": "relationships_from_id_entities_id_fk",
           "tableFrom": "relationships",
+          "tableTo": "entities",
           "columnsFrom": [
             "from_id"
           ],
-          "tableTo": "entities",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "relationships_to_id_entities_id_fk": {
           "name": "relationships_to_id_entities_id_fk",
           "tableFrom": "relationships",
+          "tableTo": "entities",
           "columnsFrom": [
             "to_id"
           ],
-          "tableTo": "entities",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "relationships_stated_by_person_id_people_id_fk": {
           "name": "relationships_stated_by_person_id_people_id_fk",
           "tableFrom": "relationships",
+          "tableTo": "people",
           "columnsFrom": [
             "stated_by_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "relationships_confirmed_by_person_id_people_id_fk": {
           "name": "relationships_confirmed_by_person_id_people_id_fk",
           "tableFrom": "relationships",
+          "tableTo": "people",
           "columnsFrom": [
             "confirmed_by_person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "relationships_person_people_id_fk": {
           "name": "relationships_person_people_id_fk",
           "tableFrom": "relationships",
+          "tableTo": "people",
           "columnsFrom": [
             "person"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3809,15 +3854,15 @@
         "reply_constraints_person_people_id_fk": {
           "name": "reply_constraints_person_people_id_fk",
           "tableFrom": "reply_constraints",
+          "tableTo": "people",
           "columnsFrom": [
             "person"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3898,28 +3943,28 @@
         "reply_feedback_turn_id_conversation_turns_id_fk": {
           "name": "reply_feedback_turn_id_conversation_turns_id_fk",
           "tableFrom": "reply_feedback",
+          "tableTo": "conversation_turns",
           "columnsFrom": [
             "turn_id"
           ],
-          "tableTo": "conversation_turns",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "reply_feedback_person_id_people_id_fk": {
           "name": "reply_feedback_person_id_people_id_fk",
           "tableFrom": "reply_feedback",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4104,15 +4149,15 @@
         "scheduled_jobs_person_id_people_id_fk": {
           "name": "scheduled_jobs_person_id_people_id_fk",
           "tableFrom": "scheduled_jobs",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4178,15 +4223,15 @@
         "sessions_person_id_people_id_fk": {
           "name": "sessions_person_id_people_id_fk",
           "tableFrom": "sessions",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4336,15 +4381,15 @@
         "totp_secrets_person_id_people_id_fk": {
           "name": "totp_secrets_person_id_people_id_fk",
           "tableFrom": "totp_secrets",
+          "tableTo": "people",
           "columnsFrom": [
             "person_id"
           ],
-          "tableTo": "people",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4355,9 +4400,9 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}

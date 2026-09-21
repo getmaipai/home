@@ -76,6 +76,7 @@ function cleanup(): void {
   const sourcePattern = `${BENCH_SOURCE}%`;
   sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source LIKE ?)").run(sourcePattern);
   sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source LIKE ?)").run(sourcePattern);
+  sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE source LIKE ?)").run(sourcePattern);
   sqlite.query("DELETE FROM memory_records WHERE source LIKE ?").run(sourcePattern);
   sqlite.query("DELETE FROM people WHERE id = ?").run(testPersonId);
 }

@@ -3,10 +3,11 @@ import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
+import { memoryRecords, memoryEmbeddings, pendingEmbeddings, pendingMemoryWork, people } from "@/db/schema";
 import { recall, remember, list, validAt, supersede, bumpUsage, drainPendingEmbeddings, getProfileParagraph, PROFILE_SOURCE } from "@/lib/memory";
+import { ingestMemory, supersedeMemory, drainPendingWork } from "@/lib/memoryIngestion";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { nextHlc } from "@/lib/hlc";
 import { compareHlc } from "@/lib/hlc";
@@ -2099,5 +2100,230 @@ describe("list() asOf (CHAT-08, chunk a: the list read reads a record as of a mo
     const rows = list(ownerRow, { asOf: new Date("2020-01-01T00:00:00Z") });
     expect(rows.some((r) => r.text.includes("Cedar"))).toBe(false);
     expect(rows.some((r) => r.text.includes("Birch"))).toBe(true);
+  });
+});
+
+describe("CHAT-06: idempotent memory ingestion", () => {
+  test("repeated save yields one active fact", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const first = remember(ownerRow, {
+      text: "our cat is named Marmalade",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const second = remember(ownerRow, {
+      text: "Our Cat Is Named Marmalade",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.id).toBe(first.value.id);
+    const active = db
+      .select()
+      .from(memoryRecords)
+      .where(and(
+        eq(memoryRecords.status, "active"),
+        isNull(memoryRecords.deletedAt),
+        eq(memoryRecords.scope, "household"),
+      ))
+      .all();
+    expect(active.filter((r) => r.text.toLowerCase().includes("marmalade")).length).toBe(1);
+  });
+
+  test("interrupted normalization then restart yields one active fact", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const result = ingestMemory({
+      actor: ownerRow,
+      text: "the kitchen is on the second floor",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const memoryId = result.record.id;
+    const pending = db
+      .select()
+      .from(pendingMemoryWork)
+      .where(eq(pendingMemoryWork.memoryId, memoryId))
+      .get();
+    expect(pending).not.toBeNull();
+    const drain = await drainPendingWork();
+    const remaining = db
+      .select()
+      .from(pendingMemoryWork)
+      .where(eq(pendingMemoryWork.memoryId, memoryId))
+      .get();
+    const active = db
+      .select()
+      .from(memoryRecords)
+      .where(and(
+        eq(memoryRecords.status, "active"),
+        isNull(memoryRecords.deletedAt),
+        eq(memoryRecords.id, memoryId),
+      ))
+      .all();
+    expect(active.length).toBe(1);
+  });
+
+  test("failed dedupe leaves work pending, not ADD", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const result = ingestMemory({
+      actor: ownerRow,
+      text: "we visit grandma on Sundays",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const memoryId = result.record.id;
+    db.insert(pendingMemoryWork)
+      .values({ memoryId, reason: "dedupe_failed", queuedAt: new Date().toISOString() })
+      .onConflictDoNothing()
+      .run();
+    const drain = await drainPendingWork();
+    expect(drain.stillPending).toBeGreaterThanOrEqual(1);
+    const stillPending = db
+      .select()
+      .from(pendingMemoryWork)
+      .where(eq(pendingMemoryWork.memoryId, memoryId))
+      .get();
+    expect(stillPending).not.toBeNull();
+    const active = db
+      .select()
+      .from(memoryRecords)
+      .where(and(
+        eq(memoryRecords.status, "active"),
+        isNull(memoryRecords.deletedAt),
+        eq(memoryRecords.id, memoryId),
+      ))
+      .all();
+    expect(active.length).toBe(1);
+  });
+
+  test("a correction yields one supersession with provenance kept", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const first = remember(ownerRow, {
+      text: "we live on Cedar Street",
+      category: "place",
+      tier: "durable",
+      scope: "household",
+      source: "turn-001",
+      importance: 0.5,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const firstId = first.value.id;
+    const result = supersedeMemory({
+      actor: ownerRow,
+      oldRecord: db.select().from(memoryRecords).where(eq(memoryRecords.id, firstId)).get()!,
+      text: "we live on Birch Street",
+      category: "place",
+      tier: "durable",
+      scope: "household",
+      source: "turn-002",
+      importance: 0.5,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const newId = result.record.id;
+    const old = db.select().from(memoryRecords).where(eq(memoryRecords.id, firstId)).get()!;
+    const fresh = db.select().from(memoryRecords).where(eq(memoryRecords.id, newId)).get()!;
+    expect(old.status).toBe("superseded");
+    expect(old.supersededBy).toBe(newId);
+    expect(fresh.status).toBe("active");
+    expect(fresh.source).toBe("turn-002");
+    const active = db
+      .select()
+      .from(memoryRecords)
+      .where(and(
+        eq(memoryRecords.status, "active"),
+        isNull(memoryRecords.deletedAt),
+        eq(memoryRecords.scope, "household"),
+      ))
+      .all();
+    expect(active.filter((r) => r.text.toLowerCase().includes("birch street")).length).toBe(1);
+  });
+
+  test("same-turn retries neither duplicate nor re-supersede", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const first = remember(ownerRow, {
+      text: "the dog's name is Biscuit",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "turn-100",
+      importance: 0.5,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const firstId = first.value.id;
+    const retry = remember(ownerRow, {
+      text: "The Dog's Name Is Biscuit",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "turn-100",
+      importance: 0.5,
+    });
+    expect(retry.ok).toBe(true);
+    if (!retry.ok) return;
+    expect(retry.value.id).toBe(firstId);
+    const active = db
+      .select()
+      .from(memoryRecords)
+      .where(and(
+        eq(memoryRecords.status, "active"),
+        isNull(memoryRecords.deletedAt),
+        eq(memoryRecords.scope, "household"),
+      ))
+      .all();
+    expect(active.filter((r) => r.text.toLowerCase().includes("biscuit")).length).toBe(1);
+    const sup = supersedeMemory({
+      actor: ownerRow,
+      oldRecord: db.select().from(memoryRecords).where(eq(memoryRecords.id, firstId)).get()!,
+      text: "the dog's name is Biscuit",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "turn-100",
+      importance: 0.5,
+    });
+    expect(sup.ok).toBe(true);
+    if (!sup.ok) return;
+    const supersededCount = db
+      .select()
+      .from(memoryRecords)
+      .where(and(
+        eq(memoryRecords.status, "superseded"),
+        eq(memoryRecords.scope, "household"),
+      ))
+      .all()
+      .filter((r) => r.text.toLowerCase().includes("biscuit")).length;
+    expect(supersededCount).toBe(0);
+    const activeAfter = db
+      .select()
+      .from(memoryRecords)
+      .where(and(
+        eq(memoryRecords.status, "active"),
+        isNull(memoryRecords.deletedAt),
+        eq(memoryRecords.scope, "household"),
+      ))
+      .all();
+    expect(activeAfter.filter((r) => r.text.toLowerCase().includes("biscuit")).length).toBe(1);
   });
 });

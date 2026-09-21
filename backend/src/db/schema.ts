@@ -206,6 +206,19 @@ export const pendingEmbeddings = sqliteTable("pending_embeddings", {
   queuedAt: text("queued_at").notNull(),
 });
 
+// CHAT-06: pending work for a memory record whose ingestion step failed.
+// One row per record still waiting, removed when the work is done.
+// Distinct from pendingEmbeddings: this tracks the ingestion pipeline
+// step (embed or dedupe), while pendingEmbeddings tracks the embedding
+// step specifically for the drain loop.
+export const pendingMemoryWork = sqliteTable("pending_memory_work", {
+  memoryId: text("memory_id")
+    .primaryKey()
+    .references(() => memoryRecords.id),
+  reason: text("reason").notNull(), // "embed_failed" | "dedupe_failed"
+  queuedAt: text("queued_at").notNull(),
+});
+
 // Episodes: every turn verbatim, one row per side (user and assistant),
 // searchable by full-text and vector. Used for hybrid recall of what was
 // said earlier, with timestamps for "last week" style queries. skipped

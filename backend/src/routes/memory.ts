@@ -33,7 +33,7 @@ import type { AppEnv, PersonRow } from "@/types";
 export const memoryRoutes = apiRouter();
 
 function fail(c: Context<AppEnv>, result: Extract<MemoryOpResult<unknown>, { ok: false }>) {
-  return c.json({ error: result.error }, result.status);
+  return c.json({ error: result.error }, result.status as 400 | 401 | 403 | 404 | 409);
 }
 
 // SEC-4 (code review, 2026-09-06): remember(actor, body) used to trust

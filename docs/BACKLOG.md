@@ -288,7 +288,7 @@ not permission to expand scope.
 
 <a id="chat-06"></a>
 
-- [ ] **CHAT-06: Use one idempotent memory-ingestion service** (M)
+- [x] **CHAT-06: Use one idempotent memory-ingestion service** (M)
 
     Depends on: CHAT-03 and CHAT-05. Files: new
     `backend/src/lib/memoryIngestion.ts`, existing `memory.ts`,

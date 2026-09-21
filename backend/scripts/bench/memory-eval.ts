@@ -147,6 +147,7 @@ function cleanup(): void {
   for (const id of createdMemoryIds) {
     sqlite.query("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
     sqlite.query("DELETE FROM pending_embeddings WHERE memory_id = ?").run(id);
+    sqlite.query("DELETE FROM pending_memory_work WHERE memory_id = ?").run(id);
     sqlite.query("DELETE FROM memory_records WHERE id = ?").run(id);
   }
   sqlite.query("DELETE FROM people WHERE id = ?").run(testPersonId);
