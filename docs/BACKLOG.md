@@ -699,7 +699,7 @@ not permission to expand scope.
     open-class judgments. The owner accepted the six corrections in the
     review's order on 2026-09-16. Each is its own item below; the
     program line is the place the dashboard reads.
-    - [ ] **RVW-1: The label harvest and the per-rule report** (S-M).
+    - [x] **RVW-1: The label harvest and the per-rule report** (S-M).
       The turn row and the `[turn]` line gain the answering rung
       (`typed_source | search | model_knowledge | failed | none`) and a
       `corrected_next_turn` flag read from the next turn's repair; a
@@ -713,8 +713,35 @@ not permission to expand scope.
       (docs/dev/session-a.md "RVW-1"): the rung, the rules and the
       correction flag on the row and the `[turn]` line
       (`lib/ruleNames.ts`, migration 0044), `scripts/bench/labels.ts`
-      with its report and tests; open: the first week of the dev hub
-      exported and reconciled.
+      with its report and tests; Done 2026-09-21 (codex-287): two weeks of
+      the dev hub exported (`scripts/bench/labels.ts --since 2026-09-07`):
+      W37 106 turns, all `unrecorded` (they predate migration 0044, as
+      expected); W38 226 turns, 47 with a recorded rung (22 `none`, 15
+      `search`, 10 `model_knowledge`) matching exactly the 47
+      `signal.rule` hits, 9 guard hits (3 `invention`, 2
+      `unsupported_action`, one each `assistant_register`,
+      `capability_claim`, `claimed_experience`, `tag_question`), no
+      corrections; 55 of the 65 rules had zero hits, `almanac` among
+      them.
+    - [ ] **RVW-1b: A sample floor before a zero-hit rule retires** (S).
+      The org rule (RULES-AND-LEARNED-COMPONENTS.md) retires a rule with
+      zero hits over the weekly report, but the first real week had 47
+      labelled turns and 55 zero-hit rules, most of them guards for
+      situations that simply did not occur (crisis, consent, credential).
+      Objective: the weekly report marks a rule as retire-eligible only
+      after N consecutive weeks with zero hits AND a cumulative floor of
+      labelled turns across those weeks (N and the floor set in one place
+      in `scripts/bench/labels.ts`, defaults 4 weeks and 500 turns), and
+      prints the eligible list separately from the plain zero-hit list.
+      Files: `backend/scripts/bench/labels.ts`,
+      `backend/tests/labels.test.ts`.
+      Mirror: the report's existing "rules with zero hits this week"
+      block. Acceptance: a test with five weeks of fixtures where a rule
+      crosses the floor in week five and not before; the org doc's rule
+      sentence gains the floor in the same commit
+      (`.github/docs/RULES-AND-LEARNED-COMPONENTS.md`, a separate commit
+      in that repo). Out of scope: retiring anything.
+      Exit: `bash scripts/check.sh`.
     - [ ] **RVW-2: Human labels for the signal, then a small encoder for
       the residual** (a person's hours, then M). The 500-turn sheet
       (`data-scratch/eval/turn-signal-review-sheet.md`) reviewed for act,
