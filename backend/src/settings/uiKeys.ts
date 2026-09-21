@@ -5,6 +5,24 @@
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const UI_SETTINGS_KEYS: SettingsKey[] = [
+  // The shell-on-shadcndashboard stand-up's own flag (docs/plans/
+  // shell-on-shadcndashboard-2026-09-21.md, step 1): `household` scope,
+  // not `person`, because it governs a second route tree (`/next/*`)
+  // everyone in the house sees the same way, and there is no separate
+  // chat flag - this one governs both together. Off by default; the
+  // day it defaults on, `/next` becomes `/` and the old shell and chat
+  // are deleted in the same commit.
+  SettingsKey.parse({
+    key: "ui.shell.next",
+    scope: "household",
+    selector: "boolean",
+    default: false,
+    label: "New shell (preview)",
+    help: "Try the shell and chat on the new design at /next before it becomes the default for everyone in this household.",
+    level: "expert",
+    lives_in: "household.system",
+    honoured_by: ["home"],
+  }),
   SettingsKey.parse({
     key: "ui.show_turn_stats",
     scope: "person",
