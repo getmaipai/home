@@ -19133,12 +19133,7 @@ Both surfaces switch together under one setting, `ui.shell.next`
 (`frontend/src/next/NextRoutes.tsx`) in place of the old shell; the
 look comes from `ui.look` (studio, calm, and shadcn's seven base
 colors, spec-v0.1.12) through the template's own style-variant
-mechanism (`frontend/src/next/useNextLook.ts`). Landed so far:
-HOME-UI-04 (the stand-up, the Manage group on the template's tables
-view), HOME-UI-04b (the flag reachable, the collapsed rail, dark mode,
-the presets, the single border matched to the upstream demo); open:
-HOME-UI-04d (one theme writer), CHAT-SDK-01 (the SDK upgrade the
-Elements need), `/next/chat`, then the SHELL rows.
+mechanism (`frontend/src/next/useNextLook.ts`). Landed so far: HOME-UI-04 (the stand-up, the Manage group on the template's tables view), HOME-UI-04b (the flag reachable, the collapsed rail, dark mode, the presets), HOME-UI-04d (one theme writer: the template's own ThemeProvider fed from `ui.appearance`, 95ce9d79), HOME-UI-04e (one Tailwind root, so the vendored pages' responsive classes hold; the template's own palette as the default, navy as a preset; da3acf2c, ui-v0.5.13), the "fewer lines" kit rules (ui-v0.5.15 and ui-v0.5.16, the owner's one deviation, DECISIONS.md 2026-09-21), and SHELL-01's backend (`GET /api/dashboard`, 872a4038). Open: CHAT-SDK-01 (the SDK upgrade the Elements need, pins ui-v0.5.16), `/next/chat`, SHELL-01's page, then the other SHELL rows.
 
 ## Memory outcomes as notifications (2026-09-21)
 
