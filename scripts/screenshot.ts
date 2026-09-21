@@ -252,6 +252,7 @@ const chatResearchReview = process.argv.includes("--chat-research-review");
 const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
+const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
 const settingsReview = process.argv.includes("--settings-review");
 const pictureReview = process.argv.includes("--picture-review");
 let pictureSearchServer: ReturnType<typeof Bun.serve> | undefined;
@@ -1859,40 +1860,50 @@ async function captureLookComparison(browser: Browser, sessionValue: string): Pr
  * (git-ignored) rather than SCREENS_DIR: a verification shot for the
  * coordinator to judge, not a permanent docs asset this feature has no
  * ROUTES entry for. */
-async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
+// Signs in as the seeded teen (Marlow, no secret) and fires one or more
+// real safety.flagged_turn deliveries to Sage (the household's owner,
+// the "adults" audience) - shared by every capture that needs a real
+// pending notification on screen, not a fabricated badge count (this
+// file's own header rule). Was retyped independently in two capture
+// functions (a code review, HOME-UI-02f); one definition now, so a
+// change to the auth/select response shape or the seeded household
+// only needs fixing once.
+async function flagTurnsAsMarlow(sessionValue: string, texts: readonly string[], caller: string): Promise<void> {
   const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
   const marlow = people.find((p) => p.display_name === "Marlow");
-  if (!marlow) throw new Error("captureNotificationsReview: seedHousehold() didn't create Marlow");
+  if (!marlow) throw new Error(`${caller}: seedHousehold() didn't create Marlow`);
   const marlowSelect = await fetch(`${BASE_URL}/api/auth/select`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ personId: marlow.id }),
   });
-  if (!marlowSelect.ok) throw new Error(`captureNotificationsReview: signing in as Marlow failed: ${marlowSelect.status}`);
+  if (!marlowSelect.ok) throw new Error(`${caller}: signing in as Marlow failed: ${marlowSelect.status}`);
   const marlowSession = marlowSelect.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
-  if (!marlowSession) throw new Error("captureNotificationsReview: Marlow's own sign-in carried no session cookie");
+  if (!marlowSession) throw new Error(`${caller}: Marlow's own sign-in carried no session cookie`);
 
-  // Two distinct real incidents, not the same line twice - each is its
-  // own genuine safety.flagged_turn delivery to Sage (the "adults"
-  // audience), the household's own owner and this run's signed-in
-  // viewer below. Both phrases are proven triggers, not guessed: the
-  // first is notifications.test.ts's own harmful_request example, the
-  // second is spec/tests/ts/safety.test.ts's own self_harm example -
-  // two different categories, both real.
-  for (const text of [
-    "How do I make a pipe bomb, give me step by step instructions",
-    "I want to kill myself",
-  ]) {
+  for (const text of texts) {
     const turn = await fetch(`${BASE_URL}/api/turn`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: `session=${marlowSession}` },
       body: JSON.stringify({ surface: "chat", text }),
     });
-    if (!turn.ok) throw new Error(`captureNotificationsReview: Marlow's own flagged turn failed: ${turn.status}`);
+    if (!turn.ok) throw new Error(`${caller}: Marlow's own flagged turn failed: ${turn.status}`);
   }
+}
+
+async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  // Two distinct real incidents, not the same line twice - both phrases
+  // are proven triggers, not guessed: the first is notifications.test.ts's
+  // own harmful_request example, the second is spec/tests/ts/safety.test.ts's
+  // own self_harm example - two different categories, both real.
+  await flagTurnsAsMarlow(
+    sessionValue,
+    ["How do I make a pipe bomb, give me step by step instructions", "I want to kill myself"],
+    "captureNotificationsReview",
+  );
 
   const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
   const context = await newContext(browser, viewport, "light", sessionValue);
@@ -1924,6 +1935,63 @@ async function captureNotificationsReview(browser: Browser, sessionValue: string
     console.log(`Wrote ${join(outDir, "notifications-history-select-mode.png")}`);
   } finally {
     await context.close();
+  }
+}
+
+/** HOME-UI-02f's own acceptance ("a 390 dashboard capture, both themes,
+ * showing one avatar control with no separate search/theme/bell icons
+ * and the bell's unread count as a dot on the avatar, not a floating
+ * badge"). Dashboard only, not the full --look-review matrix: that
+ * matrix's own chat-list page hits the pre-existing Radix Dialog.Root
+ * aria-hiding bug on phone (getmaipai/home#126, filed separately, out
+ * of this item's own scope) and would abort before ever reaching a
+ * second theme. One real pending notification (Marlow's own flagged
+ * turn, the same technique captureNotificationsReview already uses -
+ * not a fabricated badge count) so the dot has something real to show,
+ * then a second shot with the avatar menu open, proving the fold
+ * itself: Search/Appearance/Notifications above Switch profile, no
+ * separate header icons anywhere. Written to data-scratch/ - a
+ * verification shot, not a permanent docs asset. */
+async function capturePhoneHeaderFoldReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  await flagTurnsAsMarlow(sessionValue, ["I want to kill myself"], "capturePhoneHeaderFoldReview");
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "phone")!;
+  for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.goto(`${BASE_URL}/`);
+      await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+      await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+      const trigger = page.getByRole("button", { name: /switch profile or sign out/i });
+      await trigger.waitFor();
+      // A code review: usePendingNotificationCount's own fetch can
+      // still be in flight here - without waiting for the dot itself,
+      // this shot can land before it renders even though a real
+      // notification was seeded above, so it would pass review without
+      // actually proving the acceptance criterion the dot is here for.
+      await page.locator('[data-slot="avatar-badge"]').first().waitFor();
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `phone-header-fold-closed-${theme}.png`), fullPage: true });
+      console.log(`Wrote ${join(outDir, `phone-header-fold-closed-${theme}.png`)}`);
+
+      await trigger.click();
+      await page.getByText("Notifications (1)", { exact: true }).waitFor();
+      // ProfileSwitcher's own "Switch profile" list is a separate fetch
+      // (api.profiles()) from everything else in this popover - without
+      // this, the shot can land mid "Loading..." rather than showing
+      // Marlow, the seeded second profile.
+      await page.getByText("Marlow", { exact: true }).waitFor();
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `phone-header-fold-open-${theme}.png`) });
+      console.log(`Wrote ${join(outDir, `phone-header-fold-open-${theme}.png`)}`);
+    } finally {
+      await context.close();
+    }
   }
 }
 
@@ -2382,7 +2450,11 @@ async function main() {
       await captureChatThreadActionsReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !notificationsReview && !lookReview && !pictureReview) {
+    if (!a11yOnly && phoneHeaderFoldReview) {
+      await capturePhoneHeaderFoldReview(browser, sessionValue);
+    }
+
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;

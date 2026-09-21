@@ -23,32 +23,43 @@ export const NOTIFICATIONS_QUERY_KEY = ["notifications"];
 export const NOTIFICATIONS_HISTORY_QUERY_KEY = ["notifications-history"];
 const QUERY_KEY = NOTIFICATIONS_QUERY_KEY;
 
-// The header half of the pending-list surface (getmaipai/.github/docs/
-// NOTIFICATIONS.md: "the shell's notification center"), and the one
-// place a new arrival becomes a Toast - lib/notifications.ts's own
-// `in_app` channel is just a persisted row; this is what turns "a new
-// row exists" into something a person actually notices without having
-// to open the bell. Not a Dialog (docs/MODALS.md): a non-modal Popover,
-// since browsing or dismissing notifications never blocks the rest of
-// the page.
-export function NotificationBell() {
-  const queryClient = useQueryClient();
-  // The data layer (docs/plans/session-b-ui.md step 3) owns the poll now
-  // - `refetchInterval` replaces the hand-rolled `setInterval`, and a
-  // failed tick already leaves `data` as whatever it last was rather than
-  // throwing away the pending list, the same "never surface the
-  // plumbing's own hiccups as a header error" behavior the old catch
-  // block wrote out by hand.
-  const query = useQuery<NotificationDeliveryView[]>({
+// The one place both the bell's own popover and the phone header's
+// avatar dot/count (HOME-UI-02f) read pending notifications from - the
+// same queryKey/queryFn/refetchInterval retyped in each caller was a
+// real drift risk a code review caught (a future change to the query
+// touching one copy and not the other), not just an efficiency nit:
+// react-query already dedupes identical queryKeys to one fetch/poll
+// regardless of how many components call this, so this exists for one
+// definition, not for caching.
+function useNotificationsQuery() {
+  return useQuery<NotificationDeliveryView[]>({
     queryKey: QUERY_KEY,
     queryFn: () => api.notifications(),
     refetchInterval: POLL_MS,
   });
-  const items = query.data ?? [];
-  const [open, setOpen] = useState(false);
+}
+
+// The phone header's own avatar dot (HOME-UI-02f: "the bell's count
+// shows as a dot on the avatar") needs the pending count without
+// mounting this whole bell.
+export function usePendingNotificationCount(): number {
+  return useNotificationsQuery().data?.length ?? 0;
+}
+
+// A new arrival becoming a Toast - lib/notifications.ts's own `in_app`
+// channel is just a persisted row; this is what turns "a new row
+// exists" into something a person actually notices without having to
+// open the bell. Split out of NotificationBell (a code review, HOME-
+// UI-02f: the phone header fold hides that whole component on phone,
+// which silently took this toast behavior with it - the only place it
+// lived) and mounted once, unconditionally, in AppShell.tsx, so a toast
+// fires the same way regardless of whether the bell icon itself is
+// visible on screen right now. Renders nothing - `useToast()`'s own
+// provider does the actual on-screen work.
+export function NotificationToaster(): null {
+  const query = useNotificationsQuery();
   const seenIds = useRef<Set<string> | null>(null);
   const { push } = useToast();
-  const BellIcon = getIcon("bell");
 
   useEffect(() => {
     if (!query.data) return;
@@ -74,6 +85,20 @@ export function NotificationBell() {
       }
     }
   }, [query.data, push]);
+
+  return null;
+}
+
+// The header half of the pending-list surface (getmaipai/.github/docs/
+// NOTIFICATIONS.md: "the shell's notification center") - browsing and
+// dismissing. Not a Dialog (docs/MODALS.md): a non-modal Popover, since
+// doing either never blocks the rest of the page.
+export function NotificationBell() {
+  const queryClient = useQueryClient();
+  const query = useNotificationsQuery();
+  const items = query.data ?? [];
+  const [open, setOpen] = useState(false);
+  const BellIcon = getIcon("bell");
 
   // Shared by both dismiss mutations below (a review caught them
   // duplicating this restore-on-error/invalidate-both-caches logic

@@ -148,6 +148,66 @@ describe("ProfileSwitcher", () => {
     }
   });
 
+  // HOME-UI-02f: the phone header fold has nowhere else to put
+  // Search/Appearance/Notifications, so they join this same menu.
+  test("extraActions renders above Switch profile, with a working close callback", async () => {
+    const restore = stubFetch({ "/api/auth/profiles": [makePerson()] });
+    try {
+      const { getByRole, findByText, queryByText } = render(
+        <MemoryRouter>
+          <ProfileSwitcher
+            person={makePerson()}
+            onSwitched={async () => {}}
+            onSignOut={() => {}}
+            extraActions={(close) => (
+              <button type="button" onClick={() => close()}>
+                Search
+              </button>
+            )}
+          />
+        </MemoryRouter>,
+      );
+      await act(async () => {
+        fireEvent.click(getByRole("button", { name: /switch profile or sign out/i }));
+      });
+      const search = await findByText("Search");
+      expect(search).toBeInTheDocument();
+      await act(async () => {
+        fireEvent.click(search);
+      });
+      expect(queryByText("Search")).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  test("without extraActions, nothing extra renders above Switch profile", async () => {
+    const restore = stubFetch({ "/api/auth/profiles": [makePerson()] });
+    try {
+      const { getByRole, findByText } = render(
+        <MemoryRouter>
+          <ProfileSwitcher person={makePerson()} onSwitched={async () => {}} onSignOut={() => {}} />
+        </MemoryRouter>,
+      );
+      await act(async () => {
+        fireEvent.click(getByRole("button", { name: /switch profile or sign out/i }));
+      });
+      expect(await findByText("Switch profile")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  // HOME-UI-02f: "the bell's count shows as a dot on the avatar."
+  test("dot renders a badge on the trigger's own avatar", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <ProfileSwitcher person={makePerson()} onSwitched={async () => {}} onSignOut={() => {}} dot />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('[data-slot="avatar-badge"]')).not.toBeNull();
+  });
+
   // Owner ruling, "Navigation, corrected," 2026-09-20: "the avatar
   // menu's Profile opens the signed-in person's own [profile]" -
   // where Memories moved once they left the rail.

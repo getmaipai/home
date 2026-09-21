@@ -5,16 +5,18 @@ import type { NavGroup } from "@maipai/ui/src/blocks/dashboard/components/nav-ma
 import { isActiveNavPath } from "@maipai/ui/src/nav";
 import { getIcon, type IconName } from "@maipai/ui/src/icons";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Badge } from "@maipai/ui/src/ui/badge";
 import { cn } from "@maipai/ui/src/utils";
 import { NAV_ENTRIES } from "@/shell/nav";
 import { APP_CATALOG } from "@/shell/appCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
-import { useAppearance } from "@/shell/useAppearance";
+import { useAppearance, type Appearance } from "@/shell/useAppearance";
 import { useLook } from "@/shell/useLook";
 import { ThemeToggle } from "@/shell/ThemeToggle";
 import { ModelPicker } from "@/shell/ModelPicker";
-import { NotificationBell } from "@/shell/NotificationBell";
+import { NotificationBell, NotificationToaster, usePendingNotificationCount } from "@/shell/NotificationBell";
 import { ProfileSwitcher } from "@/shell/ProfileSwitcher";
+import { PhoneHeaderExtras } from "@/shell/PhoneHeaderExtras";
 import { HubStatusCard } from "@/shell/HubStatusCard";
 import { HomeFooterBar } from "@/shell/HomeFooterBar";
 import { routeHeader } from "@/shell/routeHeader";
@@ -22,6 +24,7 @@ import { useSearchCommand } from "@/shell/search/useSearchCommand";
 import type { SearchResultItem } from "@/shell/search/providers";
 import type { Roster } from "@/lib/api";
 import type { ReactNode } from "react";
+import { version } from "../../../package.json";
 
 interface AppShellProps {
   person: Roster;
@@ -55,6 +58,22 @@ function PinToggle({ person }: { person: Roster }) {
     >
       <Icon aria-hidden />
     </Button>
+  );
+}
+
+// The "MaiPai Home" text, the accent on the second word, shared by
+// Brand (the rail's own tile-plus-tagline mark, look-scaled) and
+// PhoneWordmark (a fixed size per the phone reference, not look-scaled)
+// below - a code review, HOME-UI-02f: the two had retyped this same
+// text/accent pairing independently, a real drift risk (the "Studio"
+// look's own accent-glow/size pass already touched Brand's copy once).
+// Each caller keeps its own sizing className; only the text itself is
+// one definition now.
+function WordmarkText({ className }: { className?: string }) {
+  return (
+    <span className={className}>
+      MaiPai <span className="text-primary">Home</span>
+    </span>
   );
 }
 
@@ -121,9 +140,7 @@ export const Brand = forwardRef<HTMLAnchorElement, ComponentPropsWithoutRef<"a">
             findings, "The Studio look, the numbers," 2026-09-20
             18:15) - arbitrary values since neither is a Tailwind
             step. */}
-        <span className="block truncate text-base font-semibold tracking-tight studio:text-[19px] studio:tracking-[-0.4px]">
-          MaiPai <span className="text-primary">Home</span>
-        </span>
+        <WordmarkText className="block truncate text-base font-semibold tracking-tight studio:text-[19px] studio:tracking-[-0.4px]" />
         {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3): a
             compact secondary label under the wordmark, the same category
             as a nav group heading (11px uppercase secondary) or a badge -
@@ -138,6 +155,58 @@ export const Brand = forwardRef<HTMLAnchorElement, ComponentPropsWithoutRef<"a">
     </Link>
   );
 });
+
+// HOME-UI-02f's own phone-only header title (Shell.tsx's `phoneHeaderTitle`):
+// the owner's phone reference, "The phone composition" (2026-09-20) -
+// "the product wordmark at the left (16px semibold, the accent on the
+// second word as the logo does), a small version pill beside it... nothing
+// else." Deliberately not Brand: Brand is the rail's own 40px tile-plus-
+// tagline mark, sized and spaced for a sidebar row, not a compact header
+// - this is its own, smaller reading of the same wordmark.
+function PhoneWordmark() {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <WordmarkText className="truncate text-base font-semibold tracking-tight" />
+      <Badge variant="secondary" className="shrink-0">
+        v{version}
+      </Badge>
+    </div>
+  );
+}
+
+// HOME-UI-02f's own avatar menu content (Shell.tsx's `phoneHeaderActions`
+// render prop): a dedicated component, not inline in AppShell's own
+// return, specifically so `usePendingNotificationCount()`'s poll only
+// runs where this actually renders - `phoneHeaderActions` is a render
+// prop Shell.tsx only ever calls on phone (`showPhoneHeader`), so
+// keeping the hook inline at AppShell's own top level (an earlier draft
+// did) meant it polled and re-rendered the WHOLE shell every 15 seconds
+// on desktop too, for a boolean only this phone-only avatar dot reads
+// (a code review, HOME-UI-02f).
+function PhoneAvatarMenu({
+  person,
+  onPersonChange,
+  onSignOut,
+  openSearch,
+  setAppearance,
+}: {
+  person: Roster;
+  onPersonChange: () => Promise<void>;
+  onSignOut: () => void;
+  openSearch: () => void;
+  setAppearance: (value: Appearance) => void;
+}) {
+  const pendingNotifications = usePendingNotificationCount();
+  return (
+    <ProfileSwitcher
+      person={person}
+      onSwitched={onPersonChange}
+      onSignOut={onSignOut}
+      dot={pendingNotifications > 0}
+      extraActions={(close) => <PhoneHeaderExtras openSearch={openSearch} close={close} setAppearance={setAppearance} />}
+    />
+  );
+}
 
 function navGroup(label: string, paths: readonly string[]): NavGroup {
   const items = paths.flatMap((to) => { const entry = NAV_ENTRIES.find((e) => e.to === to); return entry ? [{ title: entry.label, url: entry.to, icon: entry.icon as IconName }] : []; });
@@ -198,50 +267,82 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
   const { title, subtitle } = routeHeader(location.pathname, person);
 
   return (
-    <Shell
-      nav={groups}
-      brand={<Brand />}
-      railStorageKey="maipai-home:shell-rail"
-      phoneNavMax={4}
-      sidebarFooter={<HubStatusCard person={person} />}
-      footer={<HomeFooterBar person={person} />}
-      headerTitle={
-        <div className="min-w-0">
-          {/* Studio (owner ruling, "Two looks, one setting"): "the page
-              title at 32px semibold with the subtitle at 14px directly
-              under it" - the reference's own larger scale. Calm keeps
-              the size that shipped. */}
-          <h1 className="truncate text-lg font-semibold sm:text-xl studio:text-[32px]">{title}</h1>
-          {subtitle ? <p className="hidden truncate text-sm text-muted-foreground sm:block studio:text-sm">{subtitle}</p> : null}
-        </div>
-      }
-      headerActions={
-        <>
-          <PinToggle person={person} />
-          <ModelPicker person={person} />
-          {/* The reference's own "three equal controls... separated by a
-              hairline between the toggle and the bell" (owner ruling) -
-              Home keeps its own five controls (PinToggle and ModelPicker
-              are Home's, not the reference's), so the hairline lands
-              where Home's own theme toggle sits, the same relative
-              position the reference's own cluster uses. */}
-          <span aria-hidden className="hidden studio:mx-1 studio:block studio:h-6 studio:w-px studio:bg-border" />
-          <ThemeToggle setAppearance={setAppearance} />
-          <NotificationBell />
-          <ProfileSwitcher person={person} onSwitched={onPersonChange} onSignOut={onSignOut} />
-        </>
-      }
-      search={{
-        groups: visibleGroups,
-        query,
-        onQueryChange: setQuery,
-        onSelect: selectSearchResult,
-        onAsk: askMaiPai,
-        askLabel: "Ask MaiPai",
-        placeholder: "Search, or ask MaiPai...",
-      }}
-    >
-      {children}
-    </Shell>
+    <>
+      {/* A new arrival becoming a Toast used to live entirely inside
+          NotificationBell - the phone header fold hides that whole
+          component on phone (phoneHeaderActions renders PhoneAvatarMenu
+          instead of headerActions there), which silently took this
+          toast behavior with it (a code review, HOME-UI-02f). Mounted
+          here, unconditionally, so a toast fires the same way
+          regardless of viewport or which header branch is showing. */}
+      <NotificationToaster />
+      <Shell
+        nav={groups}
+        brand={<Brand />}
+        railStorageKey="maipai-home:shell-rail"
+        phoneNavMax={4}
+        sidebarFooter={<HubStatusCard person={person} />}
+        footer={<HomeFooterBar person={person} />}
+        headerTitle={
+          <div className="min-w-0">
+            {/* Studio (owner ruling, "Two looks, one setting"): "the page
+                title at 32px semibold with the subtitle at 14px directly
+                under it" - the reference's own larger scale. Calm keeps
+                the size that shipped. */}
+            <h1 className="truncate text-lg font-semibold sm:text-xl studio:text-[32px]">{title}</h1>
+            {subtitle ? <p className="hidden truncate text-sm text-muted-foreground sm:block studio:text-sm">{subtitle}</p> : null}
+          </div>
+        }
+        headerActions={
+          <>
+            <PinToggle person={person} />
+            <ModelPicker person={person} />
+            {/* The reference's own "three equal controls... separated by a
+                hairline between the toggle and the bell" (owner ruling) -
+                Home keeps its own five controls (PinToggle and ModelPicker
+                are Home's, not the reference's), so the hairline lands
+                where Home's own theme toggle sits, the same relative
+                position the reference's own cluster uses. */}
+            <span aria-hidden className="hidden studio:mx-1 studio:block studio:h-6 studio:w-px studio:bg-border" />
+            <ThemeToggle setAppearance={setAppearance} />
+            <NotificationBell />
+            <ProfileSwitcher person={person} onSwitched={onPersonChange} onSignOut={onSignOut} />
+          </>
+        }
+        phoneHeaderTitle={
+          <>
+            {/* The reference's own phone header shows only the wordmark,
+                but the page's real title still needs to exist somewhere
+                as a real heading - a phone with no h1 at all is both an
+                accessibility regression (nothing announces which page
+                this is to a screen reader) and a real break for every
+                phone capture in scripts/screenshot.ts, all of which wait
+                on getByRole("heading", { level: 1 }) to know a page has
+                actually loaded (found running this item's own capture:
+                the desktop headerTitle's own h1 was the ONLY h1 on any
+                page - no page's own content renders one - so removing it
+                from the phone header removed it everywhere on phone).
+                sr-only keeps it real and announced without showing on
+                screen, matching the reference's own "nothing else". */}
+            <h1 className="sr-only">{title}</h1>
+            <PhoneWordmark />
+          </>
+        }
+        phoneHeaderActions={(openSearch) => (
+          <PhoneAvatarMenu person={person} onPersonChange={onPersonChange} onSignOut={onSignOut} openSearch={openSearch} setAppearance={setAppearance} />
+        )}
+        search={{
+          groups: visibleGroups,
+          query,
+          onQueryChange: setQuery,
+          onSelect: selectSearchResult,
+          onAsk: askMaiPai,
+          askLabel: "Ask MaiPai",
+          placeholder: "Search, or ask MaiPai...",
+        }}
+      >
+        {children}
+      </Shell>
+    </>
   );
 }

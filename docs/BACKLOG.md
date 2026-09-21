@@ -6391,25 +6391,40 @@ approvals are still real, unstarted work for a future session.
       `conversationHistory.test.ts`; captures at 1440 (list open, a
       selection active) and 390 - the 390 capture is blocked by a
       pre-existing, unrelated bug (see dev.md).
-- [ ] **HOME-UI-02f: fold the phone header's search/theme/bell into the
-      avatar menu, the bell as a dot** (S) - HOME-UI-02d's own known
-      gap, flagged and left unfixed at the time: the phone header still
-      shows search/theme/bell as three separate icons instead of the
-      reference's own folded avatar menu with the bell's own count as a
-      dot. `Shell.tsx`'s own header contract renders `search`/
-      `headerActions` unconditionally regardless of phone/desktop, so
-      this is a real header-contract change to the kit (`commons/ui/
-      src/Shell.tsx`), not a call-site patch - scoped as its own item
-      rather than silently deferred again. Scheduled after HOME-UI-02e.
-      Files: `commons/ui/src/Shell.tsx` (the header's own phone-mode
-      branch, `usePhoneMode()`/`useBreakpoint()` already available),
-      `frontend/src/shell/AppShell.tsx`'s `headerActions` (the avatar
-      menu already exists via `ProfileSwitcher` - the fold adds search
-      and the bell into it on phone, not a new menu). Exit check: `bash
+- [x] **HOME-UI-02f: fold the phone header's search/theme/bell into the
+      avatar menu, the bell as a dot** (S) - done, `ui-v0.4.9`.
+      HOME-UI-02d's own known gap: the phone header showed search/
+      theme/bell as three separate icons instead of the reference's own
+      folded avatar menu with the bell's own count as a dot.
+      `Shell.tsx` gained two new optional props, `phoneHeaderTitle` and
+      `phoneHeaderActions` (a render prop, so the product's own phone
+      menu can open the kit's command palette), that replace
+      `headerTitle`/`search`/`headerActions` on phone width only when
+      both are given - any consumer that hasn't adopted the fold
+      (Stack, Catalog) sees no change. `primitives/Avatar.tsx` gained
+      an optional `dot` prop (the vendored shadcn `AvatarBadge`).
+      `AppShell.tsx`'s `PhoneWordmark` (the compact wordmark + version
+      pill) is the phone title; `ProfileSwitcher`'s existing popover
+      gained an `extraActions` render prop and a `dot` prop, and
+      `PhoneHeaderExtras.tsx` (new) supplies the folded Search/
+      Appearance/Notifications rows - the avatar menu already existed,
+      the fold adds to it rather than building a second menu. A real
+      accessibility gap found running this item's own capture: the
+      desktop `headerTitle`'s own `<h1>` was the ONLY heading on any
+      page (no page's own content renders one), so the phone fold
+      would have removed it everywhere on phone - fixed with a real,
+      `sr-only` `<h1>` alongside the wordmark, which also keeps every
+      phone capture in `scripts/screenshot.ts` working (all wait on
+      `getByRole("heading", {level: 1})`). Landed after two review
+      rounds on the kit branch, both finding real defects (full account
+      in `commons`'s own `ui/CHANGELOG.md`, `ui-v0.4.9` entry). Full
+      account in [dev.md](dev.md)'s own entry. Exit check: `bash
       scripts/check.sh` green on both repos; a 390 dashboard capture,
-      both themes, showing one avatar control with no separate search/
-      theme/bell icons and the bell's unread count as a dot on the
-      avatar, not a floating badge.
+      both themes, closed and with the avatar menu open, showing one
+      avatar control with no separate search/theme/bell icons and the
+      bell's unread count as a dot on the avatar, not a floating badge
+      (`data-scratch/screenshots/phone-header-fold-*.png`, opened and
+      judged).
 - [ ] **STORE-01: a real GET route to browse a trusted catalog index,
       and the settings it needs** (S/M) - the gap HOME-UI-02 found and
       deliberately did not build around: "the store is the same page

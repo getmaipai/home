@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import * as RadixPopover from "@radix-ui/react-popover";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -14,6 +14,25 @@ interface ProfileSwitcherProps {
   person: Roster;
   onSwitched: () => Promise<void>;
   onSignOut: () => void;
+  /** Extra rows above "Switch profile" (HOME-UI-02f: the phone header
+   * fold has nowhere else to put Search/Appearance/Notifications, so
+   * they join this same menu rather than a second one). A render prop,
+   * not a bare node: those rows close this same popover on click, the
+   * way Profile/Sign out below already do, so they need this popover's
+   * own close function rather than owning a second one. `close`'s own
+   * `keepFocus` (a code review, HOME-UI-02f) is for a row that opens
+   * ANOTHER overlay right after closing this one (Search, opening the
+   * kit's command palette) - Radix Popover's default `onCloseAutoFocus`
+   * returns focus to this popover's own trigger the moment it closes,
+   * which can race the new overlay's own autofocus for the same tab
+   * stop; `keepFocus: true` skips that return so the new overlay's own
+   * focus wins uncontested. Omitted on desktop, where those three stay
+   * separate header controls. */
+  extraActions?: (close: (opts?: { keepFocus?: boolean }) => void) => ReactNode;
+  /** A small dot on the trigger's own avatar (HOME-UI-02f: "the bell's
+   * count shows as a dot on the avatar") - only meaningful alongside
+   * `extraActions`, since the desktop bell already shows its own count. */
+  dot?: boolean;
 }
 
 // The header's primary action (docs/plans/session-b-ui.md step 2:
@@ -26,13 +45,20 @@ interface ProfileSwitcherProps {
 // exactly the way the full-screen `SignIn` picker does, sharing its
 // `usePinAutoSubmit` hook for the auto-submit-on-4-digits behavior rather
 // than a second copy.
-export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitcherProps) {
+export function ProfileSwitcher({ person, onSwitched, onSignOut, extraActions, dot }: ProfileSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [profiles, setProfiles] = useState<Roster[] | null>(null);
   const [selected, setSelected] = useState<Roster | null>(null);
   const [secret, setSecret] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Read by RadixPopover.Content's own onCloseAutoFocus below - see
+  // extraActions's own close/keepFocus doc comment above.
+  const keepFocusOnCloseRef = useRef(false);
+  function close(opts?: { keepFocus?: boolean }) {
+    keepFocusOnCloseRef.current = opts?.keepFocus ?? false;
+    setOpen(false);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -100,7 +126,7 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitch
           className="h-auto min-h-12 justify-start gap-2 px-2"
           aria-label={`${person.display_name}, switch profile or sign out`}
         >
-          <Avatar name={person.display_name} className="h-9 w-9 text-sm" />
+          <Avatar name={person.display_name} className="h-9 w-9 text-sm" dot={dot} />
           <span className="hidden text-base sm:inline">{person.display_name}</span>
         </Button>
       </RadixPopover.Trigger>
@@ -109,6 +135,18 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitch
           align="end"
           sideOffset={8}
           className="z-40 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card p-2 text-card-foreground shadow-lg"
+          onCloseAutoFocus={(e) => {
+            // Self-resetting: every OTHER close path here (switching
+            // profiles, signing in, Profile) calls plain setOpen(false),
+            // never close() - without resetting the flag after reading
+            // it, one Search click's keepFocus:true would silently keep
+            // suppressing focus-return on every later close too, not
+            // just the one it was meant for.
+            if (keepFocusOnCloseRef.current) {
+              keepFocusOnCloseRef.current = false;
+              e.preventDefault();
+            }
+          }}
         >
           {selected ? (
             <form onSubmit={handleSecretSubmit} className="flex flex-col gap-3 p-2">
@@ -141,6 +179,12 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitch
             </form>
           ) : (
             <div className="flex flex-col gap-1 p-1">
+              {extraActions ? (
+                <>
+                  {extraActions(close)}
+                  <Separator className="my-1" />
+                </>
+              ) : null}
               <p className="px-2 py-1 text-sm text-muted-foreground">Switch profile</p>
               {profiles === null ? (
                 <p className="px-2 py-2 text-base text-muted-foreground">Loading…</p>

@@ -1,17 +1,26 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { NotificationBell } from "@/shell/NotificationBell";
+import { NotificationBell, NotificationToaster } from "@/shell/NotificationBell";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { NotificationDeliveryView } from "@/lib/api";
 
 afterEach(cleanup);
 
+// AppShell.tsx mounts both together now (HOME-UI-02f: the toast effect
+// moved out of NotificationBell into its own NotificationToaster, split
+// out so a toast still fires on phone even though the phone header
+// fold hides the bell icon itself there - AppShell mounts
+// NotificationToaster unconditionally, regardless of viewport, while
+// NotificationBell stays desktop-only). Rendering both here matches
+// real desktop composition, where this file's own toast assertions are
+// exercised.
 function renderBell() {
   return renderWithQueryClient(
     <MemoryRouter>
       <ToastProvider>
+        <NotificationToaster />
         <NotificationBell />
       </ToastProvider>
     </MemoryRouter>,
@@ -304,6 +313,34 @@ describe("NotificationBell", () => {
       );
     } finally {
       globalThis.fetch = original;
+    }
+  });
+
+  // The exact regression a code review caught on HOME-UI-02f: the phone
+  // header fold hides NotificationBell (the only place the toast effect
+  // used to live) behind PhoneAvatarMenu instead, so a toast on phone
+  // depends entirely on NotificationToaster working with no
+  // NotificationBell mounted anywhere - not just alongside it, the way
+  // every other test above renders both.
+  test("NotificationToaster fires a toast with no NotificationBell mounted at all", async () => {
+    const restore = stubFetch({ "/api/notifications": [] });
+    try {
+      const { getByText, queryClient } = renderWithQueryClient(
+        <MemoryRouter>
+          <ToastProvider>
+            <NotificationToaster />
+          </ToastProvider>
+        </MemoryRouter>,
+      );
+      // No bell button to await here - give the first load a tick to
+      // seed seenIds before the "new" arrival below.
+      await waitFor(() => expect(queryClient.getQueryData(["notifications"])).toBeDefined());
+
+      queryClient.setQueryData(["notifications"], [notification("n1", "Qwen3 8B finished downloading and is ready to use.", { toast: true })]);
+
+      await waitFor(() => expect(getByText("Qwen3 8B finished downloading and is ready to use.")).toBeInTheDocument());
+    } finally {
+      restore();
     }
   });
 });

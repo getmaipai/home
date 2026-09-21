@@ -32,12 +32,21 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
+// Exported so the phone header's own avatar-menu row (a text row, not
+// this file's icon button) can show and act on the same live state
+// without a second copy of the class-observer/media-query wiring -
+// found needing this reading HOME-UI-02f's own scope, "search, theme
+// and the bell move under the avatar's menu."
+export function useIsDark(): boolean {
+  return useSyncExternalStore(subscribe, isDarkNow, () => false);
+}
+
 export interface ThemeToggleProps {
   setAppearance: (value: Appearance) => void;
 }
 
 export function ThemeToggle({ setAppearance }: ThemeToggleProps) {
-  const dark = useSyncExternalStore(subscribe, isDarkNow, () => false);
+  const dark = useIsDark();
   const SunIcon = getIcon("sun");
   const MoonIcon = getIcon("moon");
   const Icon = dark ? SunIcon : MoonIcon;
