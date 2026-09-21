@@ -421,6 +421,87 @@ describe("createChatModelAdapter streaming", () => {
   });
 });
 
+// SHELL-02: the reasoning Element (thread.aui.tsx) has an actual mount
+// point now (/next/chat), so the `reasoning` wire event (REASONING-01)
+// stops being discarded client-side and becomes its own
+// ReasoningMessagePart alongside the reply text.
+describe("createChatModelAdapter reasoning (SHELL-02)", () => {
+  test("a reasoning event renders as its own part alongside the reply text, not discarded", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "reasoning", text: "Let me think about this." },
+        { type: "delta", text: "The answer is 42." },
+        { type: "done", value: { reply: { text: "The answer is 42." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what is the answer")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "reasoning", text: "Let me think about this." },
+        { type: "text", text: "The answer is 42." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  // REASONING-02: a tool-calling reply never streams a live `reasoning`
+  // event (its reasoning never rides a visible span to split out of) -
+  // `event.value.reasoning` (wire.ts's own buffered fallback) is what
+  // the reasoning Element renders for exactly that case.
+  test("a tool-calling reply with no live reasoning event falls back to the done event's own reasoning field", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "It's sunny today." },
+        { type: "done", value: { reply: { text: "It's sunny today." }, reasoning: "Checking the weather tool.", source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what's the weather")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "reasoning", text: "Checking the weather tool." },
+        { type: "text", text: "It's sunny today." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("speakReplies: false never calls TTS, even though the reply still renders and streams", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "First sentence." },
+        { type: "done", value: { reply: { text: "First sentence." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        consumeSupersedes: () => undefined,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+        speakReplies: false,
+      });
+      const options = {
+        messages: [fakeUserMessage("hi there")],
+        runConfig: {},
+        abortSignal: new AbortController().signal,
+        context: {},
+        unstable_getMessage: () => fakeUserMessage("hi there"),
+      } as unknown as ChatModelRunOptions;
+      const yields: ChatModelRunResult[] = [];
+      for await (const r of runAdapter(adapter, options)) yields.push(r);
+      expect(lastText(yields)).toBe("First sentence.");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(env.ttsCalls).toEqual([]);
+    } finally {
+      env.restore();
+    }
+  });
+});
+
 // Lane 11 item 1 (docs/plans/session-b-lane-11-2026-09-13.md): CHAT-16's
 // forward-compatible `status` event (chatTurnActivity.ts's own header on
 // why it's cast this way, not yet a real TurnStreamEvent member) and the

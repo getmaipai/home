@@ -1,4 +1,4 @@
-import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult } from "@assistant-ui/react";
+import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ThreadAssistantMessagePart } from "@assistant-ui/react";
 import { api, readTurnStream, ApiError } from "@/lib/api";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
@@ -79,6 +79,15 @@ export interface ChatModelAdapterDeps {
   /** The selected local engine must opt into image parts explicitly. */
   canUseVision?(): LocalVisionCapability;
   onResearchDocument?(turnId: string): void;
+  // SHELL-02: the plan's own wiring table (docs/plans/shell-on-
+  // shadcndashboard-2026-09-21.md) lists "Speaking a reply" (the
+  // read-aloud Element) as its own row, separate from the reply text
+  // and reasoning rows this adapter already renders - /next/chat's
+  // first slice mounts the Elements composer with no "stop speaking"
+  // control on screen yet, so false here skips every enqueueSentence()
+  // call rather than have a turn autoplay audio nothing can cut off.
+  // Defaults true: ChatPage.tsx's own established behavior, unchanged.
+  speakReplies?: boolean;
 }
 
 // The real end-to-end streaming adapter (docs/plans/session-b-ui.md step
@@ -118,6 +127,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // speaking" control shown for the PREVIOUS reply would stay visible
       // into this new one until/unless the new reply happens to speak too.
       deps.onSpeakingChange?.(false);
+      const speakReplies = deps.speakReplies ?? true;
       const scheduler = new SentenceSpeechScheduler();
       deps.turnSchedulerRef.current = scheduler;
       scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
@@ -144,6 +154,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       let scanPos = 0;
       let visible = "";
       let insideThink = false;
+      // SHELL-02: the reasoning Element's own part (thread.aui.tsx),
+      // built from the `reasoning` wire event (REASONING-01, wire.ts) -
+      // already tag-split server-side, so unlike `visible` above this
+      // never needs resolveRaw()'s own <think> scanning.
+      let reasoningText = "";
       // How far into `raw` a search for the relevant tag has already come
       // up empty, so the next delta's search resumes from there instead of
       // re-scanning already-confirmed-clean text from `scanPos` every time
@@ -228,6 +243,17 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         }
       }
 
+      // Every yield below replaces the whole message's content (this
+      // file's own header comment), so the reasoning part has to ride
+      // along on every yield once it exists, not just the ones a
+      // `reasoning` event itself triggers.
+      function buildContent(): ThreadAssistantMessagePart[] {
+        const parts: ThreadAssistantMessagePart[] = [];
+        if (reasoningText) parts.push({ type: "reasoning", text: reasoningText });
+        if (visible) parts.push({ type: "text", text: visible });
+        return parts;
+      }
+
       // Consumed here, synchronously, before anything that can throw or
       // abort below: consumeSupersedes() is a single-shot read-and-reset
       // (chatEditSupersedes.ts), so calling it any later - after an
@@ -296,14 +322,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // before there's any visible reply to replace it with - and, if
             // a spoken_cue (below) is still audibly playing, exactly the
             // moment someone without audio needs that indicator most.
-            if (visible) yield { content: [{ type: "text", text: visible }] };
-            const pending = visible.slice(spokenLength);
-            const { chunks, consumed } = splitReadyChunks(pending, spokenLength === 0);
-            // Each chunk speaks its normalized form, never the displayed
-            // one: `visible` (yielded just above) keeps the model's own
-            // written text - the chat bubble - completely untouched.
-            for (const chunk of chunks) scheduler.enqueueSentence(normalizeForSpeech(chunk));
-            spokenLength += consumed;
+            if (visible || reasoningText) yield { content: buildContent() };
+            if (speakReplies) {
+              const pending = visible.slice(spokenLength);
+              const { chunks, consumed } = splitReadyChunks(pending, spokenLength === 0);
+              // Each chunk speaks its normalized form, never the displayed
+              // one: `visible` (yielded just above) keeps the model's own
+              // written text - the chat bubble - completely untouched.
+              for (const chunk of chunks) scheduler.enqueueSentence(normalizeForSpeech(chunk));
+              spokenLength += consumed;
+            }
           } else if (event.type === "spoken_cue") {
             // Spoken only, never displayed as message content and never
             // counted against `spokenLength`: `visible`/the chat bubble and
@@ -314,7 +342,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // scheduler is a plain FIFO queue, so it plays first and the
             // real reply's sentences (enqueued above as they arrive) follow
             // right after.
-            scheduler.enqueueSentence(event.text);
+            if (speakReplies) scheduler.enqueueSentence(event.text);
             // Lane 11 item 1's own decision (chatTurnActivity.ts): a
             // spoken_cue also drives the same transient activity line a
             // `status` event does below - this file's own older comment on
@@ -340,7 +368,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             deps.onReplyState?.("ready");
             const finalText = stripThinking(event.value.reply.text);
             const trailing = finalText.slice(spokenLength).trim();
-            if (trailing) {
+            if (trailing && speakReplies) {
               // Nothing was spoken incrementally yet (an immediate plugin/
               // safety reply, which never emits a "delta" at all, or a
               // short model reply that streamed as a single final flush):
@@ -365,6 +393,12 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // thread.
             if (event.value.crisis_resources) deps.onCrisisResources(event.value.crisis_resources);
             if (event.value.document_available === true) deps.onResearchDocument?.(event.value.turn_id);
+            // REASONING-02: a tool-calling reply never streams a live
+            // `reasoning` event (its reasoning never rides a visible
+            // span to split out of), so `reasoningText` is still "" here
+            // for exactly that case - `event.value.reasoning` is the
+            // buffered fallback wire.ts's own comment describes.
+            const finalReasoning = reasoningText || event.value.reasoning;
             // Fix B4 (docs/dev.md's "Chat reliability" B4): the same
             // metadata shape chatHistoryAdapter.ts attaches on reload, so
             // chatSourceCaption.tsx renders identically whether a message
@@ -386,7 +420,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // `deriveMemoryStatus` reads an absent/undefined field the
             // same as a freshly-created row's real `null`).
             yield {
-              content: [{ type: "text", text: finalText }],
+              content: [
+                ...(finalReasoning ? [{ type: "reasoning" as const, text: finalReasoning }] : []),
+                { type: "text" as const, text: finalText },
+              ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),
               metadata: {
                 custom: {
@@ -408,29 +445,24 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               },
             };
           } else if (event.type === "reasoning") {
-            // REASONING-01: additive, not yet a rendered Element here
-            // (the reasoning Element's own wiring is a separate item,
-            // the same "nothing drawn anywhere" boundary ARTIFACT-02's
-            // artifact-card left for a later session) - discarded client-
-            // side for now, the same as `signal` above. stripThinking()
-            // below already keeps working unaffected either way: it
-            // strips a `<think>` block from `event.value.reply.text`
-            // itself (the stored row, untouched by this wire split), not
-            // from anything reconstructed out of these delta/reasoning
-            // events.
-            //
-            // Sequence still tracked, exactly like `delta` above, even
-            // though the text itself is thrown away: routes/turn.ts
-            // stamps ONE shared counter across both event types, so a
-            // disconnect landing right after a reasoning event (before
-            // the next delta) would otherwise leave this tracker stale
-            // and cause a resume to redeliver already-seen events (a
-            // review caught this - harmless today since they're discarded
-            // again, but a real gap once a reasoning Element actually
-            // renders this content and needs exactly-once delivery).
-            if (event.sequence !== undefined && event.sequence > lastAcknowledgedSequence) {
+            // SHELL-02: rendered by the reasoning Element (thread.aui.tsx)
+            // via buildContent() above - REASONING-01 left this discarded
+            // client-side until a reasoning Element actually existed to
+            // render it; it does now. stripThinking() below is unaffected
+            // either way: it strips a `<think>` block from
+            // `event.value.reply.text` itself (the stored row), not from
+            // anything reconstructed out of these delta/reasoning events.
+            if (event.sequence !== undefined) {
+              if (event.sequence <= lastAcknowledgedSequence) continue;
               lastAcknowledgedSequence = event.sequence;
             }
+            deps.onReplyState?.("responding");
+            reasoningText += event.text;
+            if (activityShown) {
+              activityShown = false;
+              yield { metadata: { custom: {} } };
+            }
+            yield { content: buildContent() };
             continue;
           } else {
             sawTerminalEvent = true;

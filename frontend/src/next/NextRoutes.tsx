@@ -7,6 +7,7 @@ import { useShellNext } from "@/next/useShellNext";
 import { useNextLook } from "@/next/useNextLook";
 import { useNextAppearance } from "@/next/useNextAppearance";
 import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
+import { NextChatPage } from "@/next/pages/NextChatPage";
 import { NextAppsPage } from "@/next/pages/NextAppsPage";
 import { NextPeoplePage } from "@/next/pages/NextPeoplePage";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
@@ -23,18 +24,13 @@ import type { Roster } from "@/lib/api";
  * views on their own demo data. Redirects to `/` when the flag is off,
  * so the URL itself never leaks a preview nobody turned on.
  *
- * `/next/chat` is not wired here yet: the Elements
- * (ui/src/elements/thread.aui.tsx) read a field
- * (`ThreadMessage.metadata.modality`) that `@assistant-ui/react@0.15.18`
- * predates, and this repo's frontend and backend share one bun
- * workspace lockfile - bumping `@assistant-ui/react` far enough to
- * reach it (0.15.21) drags its own newer `zod` dependency across the
- * whole workspace, which breaks unrelated backend code built against
- * an older zod (@modelcontextprotocol/sdk, @hono/zod-openapi). Session
- * B's own item is already reworking the chat's wire shapes against
- * these same Elements (see the plan's "chat's wiring table"), so this
- * is flagged back to the coordinator to decide alongside that work
- * rather than force-upgraded here. */
+ * `/next/chat` (CHAT-SDK-01 landed the `@assistant-ui/react@0.15.21`
+ * bump the Elements need; SHELL-02 is the wiring): the plan's own
+ * "chat's wiring table" first slice - the Elements thread and composer
+ * on Home's existing streaming adapter, real turns, reply text and
+ * reasoning rendering. NextChatPage.tsx's own header names what's
+ * still a follow-up slice (history, thread list, attachments,
+ * suggestions, tools, artifacts, read-aloud). */
 // HOME-UI-04d: `useNextAppearance` calls the vendored `useTheme()`, so
 // it has to run inside `<ThemeProvider>`, not above it - a small inner
 // component rather than inlining the hook call in `NextRoutes` itself,
@@ -50,6 +46,7 @@ function NextRoutesInner({ person }: { person: Roster }) {
       </Route>
       <Route element={<FullLayout />}>
         <Route index element={<NextDashboardPage person={person} />} />
+        <Route path="chat" element={<NextChatPage />} />
         <Route path="apps" element={<NextAppsPage />} />
         <Route path="people" element={<NextPeoplePage />} />
         <Route path="settings" element={<NextSettingsPage />} />
