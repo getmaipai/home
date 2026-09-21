@@ -75,7 +75,7 @@ Elements use).
 ## Step 1: the visual stand-up (one session-day, no wiring)
 
 Behind one household setting, `ui.shell.next` (a spec key, off by
-default), a second route tree at `/next/*` mounts the template's
+default; it governs the chat too, there is no separate chat flag), a second route tree at `/next/*` mounts the template's
 FullLayout with Home's sidebar items as data (Home, Chat, Apps;
 Household: People; System: Settings; Manage: Engines, Updates,
 Repairs, Backups; the labels and routes only), and the template's
@@ -109,9 +109,12 @@ each lands.
 | `/next/updates`, `/next/repairs`, `/next/backups` | data-tables, cards | the routes HOME-STACK-05 landed | `apps/settings/UpdatesSection.tsx`, repairs, backups pages |
 | `/next/sign-in` | auth view | Home's sign-in and passkeys | `apps/auth/*` |
 
-When the last row lands, `ui.shell.next` defaults on, `/next` becomes
-`/`, and the old shell, the Radix set, the kit's blocks and the
-hand-built chat are deleted in one commit a release later.
+One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
+the chat move together. There is no `ui.chat.next`; `ui.shell.next`
+governs both, the `/next/chat` row is part of the same stand-up, and
+the day the flag defaults on, `/next` becomes `/` for every page
+including Chat. The old shell and the old chat are deleted together,
+one commit, a release later.
 
 ## Sessions and order
 
