@@ -22,7 +22,7 @@ Settings are split into two tabs at the top of the page. **Household** holds sha
 Switch to the **Me** tab for your own personal preferences:
 
 - **Appearance**, **Personality**, **Voice**: how MaiPai looks and sounds when it talks to you.
-- **Look**: pick the color scheme of the whole app. Studio is the standard look. Calm is softer. The other seven are ready-made color sets (Neutral, Stone, Zinc, Mauve, Olive, Mist, Taupe). Light and dark mode both follow whichever one you pick.
+- **Look**: pick the color scheme of the whole app. Studio is the standard look, the same as the design it comes from. Calm is the same colors with rounder corners. Navy is MaiPai's own blue-black set. The other seven are ready-made color sets (Neutral, Stone, Zinc, Mauve, Olive, Mist, Taupe). Light and dark mode both follow whichever one you pick.
 - **My notifications**: how you're notified. This includes linking your own Telegram chat.
 - **Voices**: browse and pick a speaking voice, or clone your own.
 - **PIN / password**: change how you sign in.
