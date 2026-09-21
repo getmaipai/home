@@ -13,6 +13,10 @@ Open **Settings**, then **Repairs** (under Household). MaiPai checks its own hea
 
 If your device shows a plain dark screen saying "Can't reach MaiPai right now," it isn't connected to your home network - the hub itself may be off, or you're away from home. Nothing works without that connection, since everything MaiPai does lives on your own hub. Reconnect to your home Wi-Fi, or try again once you're back in range.
 
+## If MaiPai looks out of date
+
+MaiPai updates itself the next time you open it. If a page still looks old after an update, reload it once. If it still looks old, close every MaiPai tab, then open it again. You will not lose anything; your chats and settings are saved on the hub, not in the browser.
+
 ## If Chat won't send a message or answer
 
 - Check Repairs first. MaiPai may have already spotted the problem.
