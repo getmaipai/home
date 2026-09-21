@@ -16,6 +16,10 @@ import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
 import { NextAppsPage } from "@/next/pages/NextAppsPage";
 import { NextPeoplePage } from "@/next/pages/NextPeoplePage";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
+import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
+import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
+import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
+import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
 import type { Roster } from "@/lib/api";
 
@@ -53,6 +57,10 @@ export function NextRoutes({ person }: { person: Roster }) {
         <Route path="apps" element={<NextAppsPage />} />
         <Route path="people" element={<NextPeoplePage />} />
         <Route path="settings" element={<NextSettingsPage />} />
+        <Route path="engines" element={<NextEnginesPage />} />
+        <Route path="updates" element={<NextUpdatesPage />} />
+        <Route path="repairs" element={<NextRepairsPage />} />
+        <Route path="backups" element={<NextBackupsPage />} />
       </Route>
     </Routes>
   );
