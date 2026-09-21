@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requireAuth, requireRole } from "@/middleware/auth";
-import { listPackageIds, loadPackage, runPlugin } from "@/lib/plugins";
+import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
@@ -19,7 +19,11 @@ pluginsRoutes.get("/", requireAuth, async (c) => {
     .map((id) => loadPackage(id))
     .filter((r) => r.ok)
     .map((r) => (r as { ok: true; value: { manifest: PackageManifest } }).value.manifest);
-  const rows = manifests.map((manifest) => {
+  const actor = c.get("person");
+  // APPS-VIS-01: a person lists only what they may invoke, the same
+  // floor runPlugin() checks; both shells read this one route.
+  const visibleManifests = manifests.filter((manifest) => meetsMinRole(actor.role, manifest.min_role ?? "child"));
+  const rows = visibleManifests.map((manifest) => {
     const status = statuses.get(manifest.id);
     return {
       ...manifest,
