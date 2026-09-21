@@ -30,40 +30,11 @@ import { syncStackHealthIssues } from "@/lib/stackHealthSync";
 import { listIssues } from "@/lib/issues";
 import type { PersonRow } from "@/types";
 import type { HealthItem } from "@/lib/stack/types";
-
-export interface DashboardActivityRow {
-  turn_id: string;
-  person_id: string;
-  display_name: string;
-  created_at: string;
-  surface: string;
-  source: string;
-}
-
-export interface DashboardTurnsPerDay {
-  date: string;
-  count: number;
-}
-
-export interface DashboardEngineCounts {
-  critical: number;
-  error: number;
-  warning: number;
-  total: number;
-}
-
-export interface Dashboard {
-  people_count: number;
-  updates_available: boolean;
-  recent_activity: DashboardActivityRow[];
-  turns_per_day: DashboardTurnsPerDay[];
-  /** Owner/admin only - absent (not null, not zero) for anyone else. */
-  repairs_open?: number;
-  /** Owner/admin only. `null` means owner/admin, but no Stack is
-   * configured for this household (the common case today) - distinct
-   * from the field being absent for a non-admin viewer. */
-  engines?: DashboardEngineCounts | null;
-}
+// The wire shape lives in @/wire, not here (its own header: alias-free,
+// so frontend/src/lib/api.ts can import it too) - re-exported from this
+// file so every other backend caller keeps importing from lib/dashboard.ts.
+import type { Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts } from "@/wire";
+export type { Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts } from "@/wire";
 
 const RECENT_ACTIVITY_LIMIT = 10;
 const TURNS_PER_DAY_WINDOW_DAYS = 30;

@@ -490,3 +490,43 @@ export interface NotificationDeliveryView {
   memoryIds: string[] | null;
   toast: boolean;
 }
+
+// GET /api/dashboard (SHELL-01): mirrors lib/dashboard.ts's own Dashboard/
+// DashboardActivityRow/DashboardTurnsPerDay/DashboardEngineCounts (hand-
+// copied here, same reason as every other type on this file - lib/
+// dashboard.ts imports "@/..."-aliased modules frontend's tsconfig can't
+// resolve, so this alias-free file is the one both sides import from;
+// lib/dashboard.ts re-exports these rather than redefining them).
+export interface DashboardActivityRow {
+  turn_id: string;
+  person_id: string;
+  display_name: string;
+  created_at: string;
+  surface: string;
+  source: string;
+}
+
+export interface DashboardTurnsPerDay {
+  date: string;
+  count: number;
+}
+
+export interface DashboardEngineCounts {
+  critical: number;
+  error: number;
+  warning: number;
+  total: number;
+}
+
+export interface Dashboard {
+  people_count: number;
+  updates_available: boolean;
+  recent_activity: DashboardActivityRow[];
+  turns_per_day: DashboardTurnsPerDay[];
+  /** Owner/admin only - absent (not null, not zero) for anyone else. */
+  repairs_open?: number;
+  /** Owner/admin only. `null` means owner/admin, but no Stack is
+   * configured for this household (the common case today) - distinct
+   * from the field being absent for a non-admin viewer. */
+  engines?: DashboardEngineCounts | null;
+}

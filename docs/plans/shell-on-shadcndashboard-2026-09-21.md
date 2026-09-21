@@ -118,6 +118,30 @@ each lands.
 | `/next/updates`, `/next/repairs`, `/next/backups` | data-tables, cards | the routes HOME-STACK-05 landed | `apps/settings/UpdatesSection.tsx`, repairs, backups pages |
 | `/next/sign-in` | auth view | Home's sign-in and passkeys | `apps/auth/*` |
 
+**SHELL-01's own named gap (found landing the row, 2026-09-21):** the
+modern dashboard's widgets (`@maipai/ui/src/dashboard/components/
+dashboards/modern/*`) take no data at all - not one accepts a prop or
+calls a hook of its own, and neither does anything else in the vendored
+`ui/src/dashboard` tree (`useSWR`/`global-fetcher` appear nowhere in
+it). `chance` and the MSW `api/mocks` tree, both stripped at vendoring
+(`ui/docs/dashboard-upstream.md`'s own "Stripped" list), were the real
+data layer even upstream - these widgets are demo compositions with
+hardcoded numbers, not components in the "as shipped" sense the no-
+hand-built-UI rule protects, since editing one to accept a prop would
+be forking a vendored file. Resolution (the owner's own ruling, with a
+reference picture - shadcn's own dashboard-01 block is the density
+wanted): Home composes its own page from the SAME shipped primitives
+those widgets are built from (`Card`, the chart wrapper under
+`components/ui/chart`, `Table`, as shipped), mirroring each vendored
+widget's own JSX 1:1, one file per widget under `frontend/src/next/
+pages/dashboard/`. Only widgets with a real Home counterpart exist:
+the greeting, people count, updates available, repairs open and engine
+health (owner/admin only - the wire itself omits those fields for
+anyone else, so their presence in the response is the visibility
+check), turns per day as the chart, recent activity as the table; no
+revenue, sales, orders or profit cards. A vendored widget file is
+never edited or imported once its Home counterpart lands.
+
 One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
 the chat move together. There is no `ui.chat.next`; `ui.shell.next`
 governs both, the `/next/chat` row is part of the same stand-up, and

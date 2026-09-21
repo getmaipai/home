@@ -35,6 +35,10 @@ import type {
   NotificationDeliveryView,
   HealthStatus,
   EngineHealthEntry,
+  Dashboard,
+  DashboardActivityRow,
+  DashboardTurnsPerDay,
+  DashboardEngineCounts,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -58,7 +62,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, Media, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry };
+export type { Roster, TurnValue, Media, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -496,6 +500,11 @@ export const api = {
       body: JSON.stringify({ scope, key }),
     }),
   people: () => request<PersonRosterEntry[]>("/api/people"),
+  // GET /api/dashboard (SHELL-01): every signed-in person's own
+  // household glanceable state; repairs_open/engines are additive
+  // fields present only for owner/admin (absent, not null/zero, for
+  // anyone else - backend/src/lib/dashboard.ts's own header).
+  dashboard: () => request<Dashboard>("/api/dashboard"),
   createPerson: (input: { displayName: string; role: Role; secret?: string }) =>
     request<PersonRosterEntry>("/api/people", {
       method: "POST",
