@@ -16,6 +16,146 @@
         "required": [
           "error"
         ]
+      },
+      "Command": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "minRole": {
+            "type": "string"
+          },
+          "action": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "speech": {
+                "type": "string"
+              },
+              "domain": {
+                "type": "string"
+              },
+              "service": {
+                "type": "string"
+              },
+              "target": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                }
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                }
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "creatorId",
+          "trigger",
+          "minRole",
+          "action",
+          "createdAt"
+        ]
+      },
+      "PrivacyPageData": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "sourceKind": {
+                  "type": "string",
+                  "enum": [
+                    "plugin",
+                    "platform"
+                  ]
+                },
+                "destination": {
+                  "type": "string"
+                },
+                "when": {
+                  "type": "string"
+                },
+                "what": {
+                  "type": "string"
+                },
+                "who": {
+                  "type": "string"
+                },
+                "optIn": {
+                  "type": "boolean"
+                },
+                "retention": {
+                  "type": "string"
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "outbound",
+                    "inbound"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "source",
+                "sourceKind",
+                "destination",
+                "when",
+                "what",
+                "who",
+                "optIn",
+                "retention",
+                "direction"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "offlinePlugins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "connections",
+          "offlinePlugins"
+        ]
       }
     },
     "parameters": {}
@@ -2760,10 +2900,13 @@
                 "properties": {
                   "db_path": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "description": "Absolute path to the legacy app.db file on this same machine.",
+                    "example": "/data/legacy/app.db"
                   },
                   "dry_run": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Default true. A real import (false) additionally refuses without at least one backup already on file."
                   }
                 },
                 "required": [
@@ -3068,7 +3211,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "household"
             },
             "required": true,
             "name": "scope",
@@ -3495,70 +3639,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "creatorId": {
-                        "type": "string"
-                      },
-                      "trigger": {
-                        "type": "string"
-                      },
-                      "minRole": {
-                        "type": "string"
-                      },
-                      "action": {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string"
-                          },
-                          "text": {
-                            "type": "string"
-                          },
-                          "speech": {
-                            "type": "string"
-                          },
-                          "domain": {
-                            "type": "string"
-                          },
-                          "service": {
-                            "type": "string"
-                          },
-                          "target": {
-                            "type": "object",
-                            "additionalProperties": {
-                              "nullable": true
-                            }
-                          },
-                          "data": {
-                            "type": "object",
-                            "additionalProperties": {
-                              "nullable": true
-                            }
-                          }
-                        },
-                        "required": [
-                          "kind"
-                        ],
-                        "additionalProperties": {
-                          "nullable": true
-                        }
-                      },
-                      "createdAt": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "creatorId",
-                      "trigger",
-                      "minRole",
-                      "action",
-                      "createdAt"
-                    ]
+                    "$ref": "#/components/schemas/Command"
                   }
                 }
               }
@@ -3611,70 +3692,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "creatorId": {
-                      "type": "string"
-                    },
-                    "trigger": {
-                      "type": "string"
-                    },
-                    "minRole": {
-                      "type": "string"
-                    },
-                    "action": {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string"
-                        },
-                        "text": {
-                          "type": "string"
-                        },
-                        "speech": {
-                          "type": "string"
-                        },
-                        "domain": {
-                          "type": "string"
-                        },
-                        "service": {
-                          "type": "string"
-                        },
-                        "target": {
-                          "type": "object",
-                          "additionalProperties": {
-                            "nullable": true
-                          }
-                        },
-                        "data": {
-                          "type": "object",
-                          "additionalProperties": {
-                            "nullable": true
-                          }
-                        }
-                      },
-                      "required": [
-                        "kind"
-                      ],
-                      "additionalProperties": {
-                        "nullable": true
-                      }
-                    },
-                    "createdAt": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "creatorId",
-                    "trigger",
-                    "minRole",
-                    "action",
-                    "createdAt"
-                  ]
+                  "$ref": "#/components/schemas/Command"
                 }
               }
             }
@@ -4468,7 +4486,8 @@
             "content": {
               "audio/wav": {
                 "schema": {
-                  "type": "string"
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -6377,7 +6396,8 @@
             "content": {
               "application/octet-stream": {
                 "schema": {
-                  "type": "string"
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -7208,7 +7228,8 @@
             "content": {
               "audio/wav": {
                 "schema": {
-                  "type": "string"
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -7288,7 +7309,8 @@
           "content": {
             "audio/wav": {
               "schema": {
-                "type": "string"
+                "type": "string",
+                "format": "binary"
               }
             }
           }
@@ -7357,78 +7379,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "connections": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "source": {
-                            "type": "string"
-                          },
-                          "sourceKind": {
-                            "type": "string",
-                            "enum": [
-                              "plugin",
-                              "platform"
-                            ]
-                          },
-                          "destination": {
-                            "type": "string"
-                          },
-                          "when": {
-                            "type": "string"
-                          },
-                          "what": {
-                            "type": "string"
-                          },
-                          "who": {
-                            "type": "string"
-                          },
-                          "optIn": {
-                            "type": "boolean"
-                          },
-                          "retention": {
-                            "type": "string"
-                          },
-                          "direction": {
-                            "type": "string",
-                            "enum": [
-                              "outbound",
-                              "inbound"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "source",
-                          "sourceKind",
-                          "destination",
-                          "when",
-                          "what",
-                          "who",
-                          "optIn",
-                          "retention",
-                          "direction"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "offlinePlugins": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": [
-                    "connections",
-                    "offlinePlugins"
-                  ]
+                  "$ref": "#/components/schemas/PrivacyPageData"
                 }
               }
             }
@@ -8575,7 +8526,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "qwen3-8b-instruct-q4_k_m.gguf"
             },
             "required": true,
             "name": "id",
@@ -8840,7 +8792,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "engine.crashed.chat"
             },
             "required": true,
             "name": "code",
@@ -9182,7 +9135,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "llama-server"
             },
             "required": true,
             "name": "name",
@@ -9208,7 +9162,8 @@
                 "type": "object",
                 "properties": {
                   "tag": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Required for rollback; ignored for apply."
                   }
                 }
               }
@@ -9822,7 +9777,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "llama-server"
             },
             "required": true,
             "name": "name",
@@ -9936,7 +9892,8 @@
                   "type": "object",
                   "properties": {
                     "certificate": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "PEM-encoded CA certificate. Never a private key."
                     },
                     "hubName": {
                       "type": "string"
@@ -9970,7 +9927,8 @@
                     },
                     "qrPayload": {
                       "type": "string",
-                      "nullable": true
+                      "nullable": true,
+                      "description": "What a QR code for another device on the LAN should encode - this same endpoint's URL, so scanning it fetches the certificate directly. Rendering the actual QR image is a frontend concern (E's kit); this only supplies the data to encode. Null when no reachable address was detected (no LAN interface up) - there's nothing a QR code from a second device could reach."
                     }
                   },
                   "required": [
@@ -10290,7 +10248,8 @@
                   "label": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 60
+                    "maxLength": 60,
+                    "description": "\"Living room TV\" - shown on the approving phone."
                   },
                   "kind": {
                     "type": "string",
@@ -10321,10 +10280,12 @@
                   "type": "object",
                   "properties": {
                     "code": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "6 characters, no 0/O/1/I - read aloud and typed on an approving phone."
                     },
                     "poll_token": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Known only to this device - present it back to /poll, never shown alongside the code."
                     }
                   },
                   "required": [
@@ -10449,7 +10410,8 @@
                   "totpToken": {
                     "type": "string",
                     "minLength": 6,
-                    "maxLength": 6
+                    "maxLength": 6,
+                    "description": "Required only when the approver has TOTP enabled."
                   }
                 },
                 "required": [
@@ -13968,7 +13930,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "list-a1b2c3"
             },
             "required": true,
             "name": "id",
@@ -13976,7 +13939,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "item-a1b2c3"
             },
             "required": true,
             "name": "itemId",
@@ -14206,7 +14170,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "list-a1b2c3"
             },
             "required": true,
             "name": "id",
@@ -14214,7 +14179,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "item-a1b2c3"
             },
             "required": true,
             "name": "itemId",
@@ -14674,7 +14640,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "weather"
             },
             "required": true,
             "name": "package",
@@ -14682,7 +14649,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "current"
             },
             "required": true,
             "name": "id",
@@ -16897,7 +16865,8 @@
                 "type": "object",
                 "properties": {
                   "targetPath": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "plugins/utilities/weather/0.1.0"
                   },
                   "source": {
                     "anyOf": [
@@ -16917,7 +16886,8 @@
                         "required": [
                           "kind",
                           "dir"
-                        ]
+                        ],
+                        "description": "A local directory holding root.json/targets.json/timestamp.json plus tarballs - dev and testing."
                       },
                       {
                         "type": "object",
@@ -16935,7 +16905,8 @@
                         "required": [
                           "kind",
                           "baseUrl"
-                        ]
+                        ],
+                        "description": "The base URL a published index's files sit under."
                       }
                     ]
                   },
@@ -16960,7 +16931,8 @@
                     ]
                   },
                   "confirmed": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Required to proceed when the update adds permissions beyond what's already installed."
                   }
                 },
                 "required": [
@@ -18412,7 +18384,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "llama-server"
             },
             "required": true,
             "name": "name",
@@ -18480,7 +18453,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "llama-server"
             },
             "required": true,
             "name": "name",
