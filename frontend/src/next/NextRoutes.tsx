@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
+import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 // Vendored, unmodified (docs/dashboard-upstream.md): its own `:root`/`.dark`
 // carry the same hex values as @maipai/ui/src/tokens.css (deliberately kept
 // in sync, see globals.css's own header comment), so this and the kit's
@@ -12,7 +13,7 @@ import "@maipai/ui/src/dashboard/css/globals.css";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { useShellNext } from "@/next/useShellNext";
 import { useNextLook } from "@/next/useNextLook";
-import { useAppearance } from "@/shell/useAppearance";
+import { useNextAppearance } from "@/next/useNextAppearance";
 import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
 import { NextAppsPage } from "@/next/pages/NextAppsPage";
 import { NextPeoplePage } from "@/next/pages/NextPeoplePage";
@@ -42,17 +43,13 @@ import type { Roster } from "@/lib/api";
  * these same Elements (see the plan's "chat's wiring table"), so this
  * is flagged back to the coordinator to decide alongside that work
  * rather than force-upgraded here. */
-export function NextRoutes({ person }: { person: Roster }) {
-  const shellNext = useShellNext();
-  useNextLook(person.id);
-  // The old shell's own `.dark`/`.light` class on <html> (HOME-UI-04b,
-  // useAppearance.ts's own header comment has why the vendored
-  // template - unlike the kit - needs the literal class, not just the
-  // CSS variables): /next mounts no equivalent of its own, so nothing
-  // ever set it here before this.
-  useAppearance(person.id);
-  if (shellNext === "loading") return <RouteSkeleton />;
-  if (shellNext === "off") return <Navigate to="/" replace />;
+// HOME-UI-04d: `useNextAppearance` calls the vendored `useTheme()`, so
+// it has to run inside `<ThemeProvider>`, not above it - a small inner
+// component rather than inlining the hook call in `NextRoutes` itself,
+// which needs to return `<ThemeProvider>` before anything inside it
+// can call a hook that reads from it.
+function NextRoutesInner({ person }: { person: Roster }) {
+  useNextAppearance(person.id);
 
   return (
     <Routes>
@@ -70,5 +67,18 @@ export function NextRoutes({ person }: { person: Roster }) {
         <Route path="backups" element={<NextBackupsPage />} />
       </Route>
     </Routes>
+  );
+}
+
+export function NextRoutes({ person }: { person: Roster }) {
+  const shellNext = useShellNext();
+  useNextLook(person.id);
+  if (shellNext === "loading") return <RouteSkeleton />;
+  if (shellNext === "off") return <Navigate to="/" replace />;
+
+  return (
+    <ThemeProvider>
+      <NextRoutesInner person={person} />
+    </ThemeProvider>
   );
 }

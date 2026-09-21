@@ -300,6 +300,7 @@ const lookReview = process.argv.includes("--look-review");
 const nextStandupReview = process.argv.includes("--next-standup-review");
 const nextSidebarReview = process.argv.includes("--next-sidebar-review");
 const nextLookPresetsReview = process.argv.includes("--next-look-presets-review");
+const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mismatch-review");
 
 interface RouteSpec {
   slug: string;
@@ -2064,6 +2065,54 @@ async function captureNextLookPresets(browser: Browser, sessionValue: string): P
   }
 }
 
+// HOME-UI-04d's own proof: ui.appearance explicitly set opposite the
+// OS's own colorScheme, both directions - the logo (and everything
+// else) must follow the setting, not the media query that used to win
+// for the kit's own CSS variables while the class-driven template
+// parts (the logo among them) followed the setting instead.
+async function captureNextAppearanceMismatch(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextAppearanceMismatch: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const sage = people.find((p) => p.display_name === "Sage");
+  if (!sage) throw new Error("captureNextAppearanceMismatch: seedHousehold() didn't create Sage");
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  for (const setting of ["light", "dark"] as const) {
+    const osPref = setting === "light" ? "dark" : "light";
+    const setAppearance = await fetch(`${BASE_URL}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+      body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.appearance", value: setting }),
+    });
+    if (!setAppearance.ok) throw new Error(`captureNextAppearanceMismatch: seeding ui.appearance=${setting} failed: ${setAppearance.status}`);
+
+    // newContext's own colorScheme sets the OS preference; the PUT
+    // above sets the person's explicit choice - opposite each other
+    // on purpose, this capture's whole point.
+    const context = await newContext(browser, viewport, osPref, sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next`);
+      await page.locator("text=Weekly sales").first().waitFor({ timeout: 15000 });
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`) });
+      console.log(`Wrote ${join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`)}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2597,6 +2646,10 @@ async function main() {
 
     if (nextLookPresetsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview) {
       await captureNextLookPresets(browser, sessionValue);
+    }
+
+    if (nextAppearanceMismatchReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview) {
+      await captureNextAppearanceMismatch(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {
