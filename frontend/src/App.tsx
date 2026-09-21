@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect, useState, type ComponentProps, type ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
 import { SignIn } from "@/shell/SignIn";
 import { AppShell } from "@/shell/AppShell";
+import { useShellNext } from "@/next/useShellNext";
+import { shouldRedirectRootToNext, isRootStillResolving, signOutDestination } from "@/shell/oldShellRedirect";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
 import { ChatPage } from "@/apps/chat/ChatPage";
@@ -53,6 +55,120 @@ const LOADING_PERSON = (
     <Progress mode="spinner" label="Loading MaiPai Home" />
   </div>
 );
+
+// SHELL-FLAG-01: with ui.shell.next on, the whole app is the new shell -
+// "/" redirects there, and signing out from here lands on /next/sign-in
+// instead of this shell's own inline <SignIn/>, which used to happen
+// unconditionally regardless of the flag (found live, 2026-09-21: a
+// person who turned the flag on, then signed out, landed right back on
+// the old dashboard's own sign-in with no way into /next except typing
+// it by hand). useShellNext() and useNavigate() both need a real
+// component under <BrowserRouter/> to call from - App() itself renders
+// BrowserRouter, so it isn't one - which is the only reason this is its
+// own function rather than staying an inline ternary the way it was.
+function OldShellRoutes({
+  person,
+  loadPerson,
+  revalidatePerson,
+  onSignedOut,
+}: {
+  person: Roster | null;
+  loadPerson: () => Promise<void>;
+  revalidatePerson: () => Promise<void>;
+  onSignedOut: () => void;
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const shellNext = useShellNext();
+
+  // A code review caught this: checking the redirect before person, the
+  // first draft made even a signed-out visit to "/" wait on
+  // useShellNext()'s own settings fetch (requireAuth-gated - a
+  // never-authenticated browser only ever gets a 401 from it) before
+  // showing the sign-in form at all, a real extra round trip on top of
+  // the sign-in form's own real work. A signed-out visit never needs
+  // this redirect anyway: it's the sign-out flow below, not "/" itself,
+  // that sends a signed-out person to /next/sign-in once the flag is
+  // known - so this only runs once someone is actually signed in.
+  if (person !== null) {
+    // HOME-UI-04g (in flight, not yet on main) will seed useShellNext()'s
+    // own initial state from its per-browser cache, so this redirect
+    // becomes flash-free with no change here once it lands - today it's
+    // one query tick, usually already warm from HomePage's own identical
+    // settings fetch.
+    if (shouldRedirectRootToNext(location.pathname, shellNext)) return <Navigate to="/next" replace />;
+    if (isRootStillResolving(location.pathname, shellNext)) return <RouteSkeleton />;
+  }
+
+  if (person === null) {
+    return <SignIn onSignedIn={loadPerson} />;
+  }
+
+  return (
+    <AppShell
+      person={person}
+      onSignOut={() =>
+        api.logout().finally(() => {
+          onSignedOut();
+          const destination = signOutDestination(shellNext);
+          if (destination) navigate(destination, { replace: true });
+        })
+      }
+      onPersonChange={revalidatePerson}
+    >
+      <Suspense fallback={<RouteSkeleton />}>
+        <Routes>
+          <Route path="/" element={<HomePage person={person} />} />
+          <Route path="/apps" element={<AppsPage person={person} />} />
+          <Route path="/chat" element={<ChatPage person={person} />} />
+          {/* Conversations is Chat's own thread list now, not a
+              destination of its own (owner ruling, "Navigation,
+              corrected," 2026-09-20) - `?list=1` opens the phone
+              sheet ChatPage.tsx already renders; the desktop
+              column is always visible, so this redirect is
+              already "the list open" there without it. */}
+          <Route path="/conversations" element={<Navigate to="/chat?list=1" replace />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/search" element={<SearchPage person={person} />} />
+          <Route path="/people" element={<PeoplePage person={person} />} />
+          <Route path="/people/:id" element={<PersonProfilePage person={person} />} />
+          {/* Memories belong to a person now (same ruling): both
+              spellings of the old destination redirect to the
+              signed-in person's own Memories tab, so nothing
+              bookmarked breaks. */}
+          <Route path="/memory" element={<MemoriesRedirect selfId={person.id} />} />
+          <Route path="/memories" element={<MemoriesRedirect selfId={person.id} />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route
+            path="/settings"
+            element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
+          >
+            {/* Nested (2026-09-06), not sibling routes: navigating to
+                one of these used to unmount SettingsPage entirely,
+                taking the tree rail/Household-Me switcher/search box
+                down with it. SettingsPage renders these through its
+                own <Outlet/>, so its chrome stays put. */}
+            <Route path="users" element={<UsersPage person={person} />} />
+            <Route path="models" element={<ModelsPage person={person} />} />
+            <Route path="backups" element={<BackupsPage person={person} />} />
+            <Route path="voices" element={<VoicesPage person={person} />} />
+            <Route path="commands" element={<CommandsPage person={person} />} />
+            <Route path="devices" element={<DevicesPage />} />
+            <Route path="repairs" element={<RepairsPage person={person} />} />
+            <Route path="updates" element={<UpdatesPage person={person} />} />
+            {/* No AdminGatedContent wrapper, unlike Repairs
+                and Backups above it: Health is
+                informational for every signed-in household
+                member (app.ts's healthRoute is requireAuth,
+                not requireRole), so HealthSection gates
+                only its own restart control, not the page. */}
+            <Route path="health" element={<HealthSection person={person} />} />
+          </Route>
+        </Routes>
+      </Suspense>
+    </AppShell>
+  );
+}
 
 
 // Lane 10 item 2 (docs/BACKLOG.md's "Real code-splitting for the frontend
@@ -233,65 +349,13 @@ export function App() {
                     element={
                       person === undefined ? (
                         LOADING_PERSON
-                      ) : person === null ? (
-                        <SignIn onSignedIn={loadPerson} />
                       ) : (
-                        <AppShell
+                        <OldShellRoutes
                           person={person}
-                          onSignOut={() => api.logout().finally(() => setPerson(null))}
-                          onPersonChange={revalidatePerson}
-                        >
-                          <Suspense fallback={<RouteSkeleton />}>
-                            <Routes>
-                              <Route path="/" element={<HomePage person={person} />} />
-                              <Route path="/apps" element={<AppsPage person={person} />} />
-                              <Route path="/chat" element={<ChatPage person={person} />} />
-                              {/* Conversations is Chat's own thread list now, not a
-                                  destination of its own (owner ruling, "Navigation,
-                                  corrected," 2026-09-20) - `?list=1` opens the phone
-                                  sheet ChatPage.tsx already renders; the desktop
-                                  column is always visible, so this redirect is
-                                  already "the list open" there without it. */}
-                              <Route path="/conversations" element={<Navigate to="/chat?list=1" replace />} />
-                              <Route path="/notifications" element={<NotificationsPage />} />
-                              <Route path="/search" element={<SearchPage person={person} />} />
-                              <Route path="/people" element={<PeoplePage person={person} />} />
-                              <Route path="/people/:id" element={<PersonProfilePage person={person} />} />
-                              {/* Memories belong to a person now (same ruling): both
-                                  spellings of the old destination redirect to the
-                                  signed-in person's own Memories tab, so nothing
-                                  bookmarked breaks. */}
-                              <Route path="/memory" element={<MemoriesRedirect selfId={person.id} />} />
-                              <Route path="/memories" element={<MemoriesRedirect selfId={person.id} />} />
-                              <Route path="/privacy" element={<PrivacyPage />} />
-                              <Route
-                                path="/settings"
-                                element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-                              >
-                                {/* Nested (2026-09-06), not sibling routes: navigating to
-                                    one of these used to unmount SettingsPage entirely,
-                                    taking the tree rail/Household-Me switcher/search box
-                                    down with it. SettingsPage renders these through its
-                                    own <Outlet/>, so its chrome stays put. */}
-                                <Route path="users" element={<UsersPage person={person} />} />
-                                <Route path="models" element={<ModelsPage person={person} />} />
-                                <Route path="backups" element={<BackupsPage person={person} />} />
-                                <Route path="voices" element={<VoicesPage person={person} />} />
-                                <Route path="commands" element={<CommandsPage person={person} />} />
-                                <Route path="devices" element={<DevicesPage />} />
-                                <Route path="repairs" element={<RepairsPage person={person} />} />
-                                <Route path="updates" element={<UpdatesPage person={person} />} />
-                                {/* No AdminGatedContent wrapper, unlike Repairs
-                                    and Backups above it: Health is
-                                    informational for every signed-in household
-                                    member (app.ts's healthRoute is requireAuth,
-                                    not requireRole), so HealthSection gates
-                                    only its own restart control, not the page. */}
-                                <Route path="health" element={<HealthSection person={person} />} />
-                              </Route>
-                            </Routes>
-                          </Suspense>
-                        </AppShell>
+                          loadPerson={loadPerson}
+                          revalidatePerson={revalidatePerson}
+                          onSignedOut={() => setPerson(null)}
+                        />
                       )
                     }
                   />

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { NextRoutes } from "@/next/NextRoutes";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { Roster } from "@/lib/api";
@@ -143,3 +143,59 @@ describe("NextRoutes appearance", () => {
 // /next/repairs and /next/backups all have real data and their own
 // QueryClient-dependent dedicated test files now (NextEnginesPage.test.tsx,
 // NextUpdatesPage.test.tsx, NextRepairsPage.test.tsx, NextBackupsPage.test.tsx).
+
+// SHELL-FLAG-01's third redirect: signing in at /next/sign-in lands on
+// /next. Already-working behavior (NextRoutesInner's own `path="sign-in"`
+// route, above, redirects an authenticated visit there), proven here
+// with a real destination registered to land on - the file's own
+// earlier appearance tests exercise the identical redirect as a side
+// effect of their own setup but have nothing for it to land on
+// ("renders nothing", their own comment), which proves the Navigate
+// fires but not where it actually goes.
+describe("NextRoutes sign-in redirect (SHELL-FLAG-01)", () => {
+  test("an authenticated visit to /next/sign-in lands on the real /next dashboard, not the sign-in form", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/settings")) {
+        return Promise.resolve(
+          Response.json([
+            { scope: "person:person-abc123", key: "ui.appearance", value: "dark" },
+            { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
+          ]),
+        );
+      }
+      // NextDashboardPage.test.tsx's own minimal shape - the index
+      // route this redirect lands on renders the real dashboard, not a
+      // stub page, so it needs a real Dashboard body to avoid erroring
+      // on RecentActivityTable's own undefined-shaped fallback.
+      if (url.includes("/api/dashboard")) {
+        return Promise.resolve(
+          Response.json({
+            people_count: 1,
+            updates_available: false,
+            recent_activity: [],
+            turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
+          }),
+        );
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/next/sign-in"]}>
+          <Routes>
+            <Route path="/next/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      // The FullLayout's own header chrome (Search....) proves the
+      // dashboard shell mounted; the sign-in form's own field proves
+      // it's NOT still showing the sign-in screen.
+      expect(await view.findByPlaceholderText("Search....")).toBeVisible();
+      expect(view.queryByPlaceholderText("PIN or password")).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
