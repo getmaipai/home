@@ -302,6 +302,7 @@ const nextSidebarReview = process.argv.includes("--next-sidebar-review");
 const nextLookPresetsReview = process.argv.includes("--next-look-presets-review");
 const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mismatch-review");
 const nextPeopleReview = process.argv.includes("--next-people-review");
+const nextDashboardReview = process.argv.includes("--next-dashboard-review");
 
 interface RouteSpec {
   slug: string;
@@ -1878,7 +1879,7 @@ async function captureNextStandup(browser: Browser, sessionValue: string): Promi
   if (!setShellNext.ok) throw new Error(`captureNextStandup: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const pages: Array<{ slug: string; path: string; waitFor: string }> = [
-    { slug: "dashboard", path: "/next", waitFor: "text=Weekly sales" },
+    { slug: "dashboard", path: "/next", waitFor: "text=Stay informed with today's activity" },
     { slug: "apps", path: "/next/apps", waitFor: "table" },
     { slug: "people", path: "/next/people", waitFor: "text=Personal Information" },
     { slug: "settings", path: "/next/settings", waitFor: "text=Default Inputs" },
@@ -1998,7 +1999,7 @@ async function captureNextSidebarReview(browser: Browser, sessionValue: string):
     try {
       const page = await context.newPage();
       await page.goto(`${BASE_URL}/next`);
-      await page.locator("text=Weekly sales").first().waitFor({ timeout: 15000 });
+      await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-sidebar-expanded-desktop-${theme}.png`) });
       console.log(`Wrote ${join(outDir, `next-sidebar-expanded-desktop-${theme}.png`)}`);
@@ -2055,7 +2056,7 @@ async function captureNextLookPresets(browser: Browser, sessionValue: string): P
     try {
       const page = await context.newPage();
       await page.goto(`${BASE_URL}/next`);
-      await page.locator("text=Weekly sales").first().waitFor({ timeout: 15000 });
+      await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-look-${look}-desktop-dark.png`) });
       console.log(`Wrote ${join(outDir, `next-look-${look}-desktop-dark.png`)}`);
@@ -2103,7 +2104,7 @@ async function captureNextAppearanceMismatch(browser: Browser, sessionValue: str
     try {
       const page = await context.newPage();
       await page.goto(`${BASE_URL}/next`);
-      await page.locator("text=Weekly sales").first().waitFor({ timeout: 15000 });
+      await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`) });
       console.log(`Wrote ${join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`)}`);
@@ -2151,6 +2152,46 @@ async function captureNextPeopleReview(browser: Browser, sessionValue: string): 
       await page.close();
     } finally {
       await context.close();
+    }
+  }
+}
+
+/** SHELL-01's own acceptance ("1440 and 390, dark and light, judged
+ * against dashboard-01's rhythm"): both viewports, both themes, of
+ * `/next` itself - the pair to `captureNextPeopleReview` above so the
+ * dashboard composition has the same permanent, re-runnable capture a
+ * live-instance judgment call was originally made from ad hoc. Waits on
+ * the greeting's subtitle rather than any one widget's own text: it
+ * only renders once `useDashboard()`'s `AsyncState` has resolved real
+ * data (`NextDashboardPage.tsx`), and unlike a stat card's value it
+ * never changes across viewport, theme, or role. */
+async function captureNextDashboardReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextDashboardReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next`);
+        await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-dashboard-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
     }
   }
 }
@@ -2696,6 +2737,10 @@ async function main() {
 
     if (nextPeopleReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview) {
       await captureNextPeopleReview(browser, sessionValue);
+    }
+
+    if (nextDashboardReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview) {
+      await captureNextDashboardReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {
