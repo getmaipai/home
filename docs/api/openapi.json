@@ -14755,6 +14755,130 @@
         }
       }
     },
+    "/api/dashboard": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "The household's own glanceable state for the modern dashboard",
+        "description": "Every signed-in person: people_count, updates_available, recent_activity and turns_per_day (scoped through the same canAccessPerson() rule every other read of turn data already uses - an owner/admin sees a child's activity, never a teen's or another adult's). Owner/admin only: repairs_open and engines (Health/Repairs and the Stack are machine internals a child never needs).",
+        "responses": {
+          "200": {
+            "description": "Found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "people_count": {
+                      "type": "integer"
+                    },
+                    "updates_available": {
+                      "type": "boolean"
+                    },
+                    "recent_activity": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "turn_id": {
+                            "type": "string"
+                          },
+                          "person_id": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "surface": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "turn_id",
+                          "person_id",
+                          "display_name",
+                          "created_at",
+                          "surface",
+                          "source"
+                        ]
+                      }
+                    },
+                    "turns_per_day": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "count"
+                        ]
+                      }
+                    },
+                    "repairs_open": {
+                      "type": "integer"
+                    },
+                    "engines": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "critical": {
+                          "type": "integer"
+                        },
+                        "error": {
+                          "type": "integer"
+                        },
+                        "warning": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "critical",
+                        "error",
+                        "warning",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "people_count",
+                    "updates_available",
+                    "recent_activity",
+                    "turns_per_day"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/relationships": {
       "get": {
         "tags": [

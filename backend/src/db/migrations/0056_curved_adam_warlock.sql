@@ -1,0 +1,1 @@
+CREATE INDEX `conversation_turns_person_id_idx` ON `conversation_turns` (`person_id`);

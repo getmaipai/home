@@ -488,6 +488,13 @@ export const conversationTurns = sqliteTable(
     // this, that scan is a full table scan of every turn the household
     // has ever had, not just the still-unjudged ones.
     index("conversation_turns_judge_status_idx").on(table.source, table.judgeStatus),
+    // list()/listConversationTurns()/exportPerson() (conversationHistory.ts)
+    // and lib/dashboard.ts's own recentActivity()/turnsPerDay() all filter
+    // by person_id - a code review on the dashboard item (2026-09-21)
+    // found this was the one column every person-scoped read here
+    // already used with no index behind it, same "full table scan on
+    // every read" gap the two indexes above were each added to close.
+    index("conversation_turns_person_id_idx").on(table.personId),
   ],
 );
 

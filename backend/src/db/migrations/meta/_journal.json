@@ -393,6 +393,13 @@
       "when": 1790000967226,
       "tag": "0055_groovy_expediter",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1790005981591,
+      "tag": "0056_curved_adam_warlock",
+      "breakpoints": true
     }
   ]
 }
