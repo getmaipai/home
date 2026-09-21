@@ -113,7 +113,7 @@ each lands.
 | `/next/chat` | Elements: thread, thread-list-sidebar, composer family, reasoning, tool-call, sources, artifact-card, canvas-split, orb, read-aloud | the existing model, history, thread-list, suggestion, attachment, dictation adapters; the artifact record | `apps/chat/thread.aui.tsx`, `chatDocumentPane.tsx`, the kit's `.aui` files |
 | `/next/apps` | data-tables view (`DataTable`) | packages list (`GET /api/plugins`); install and remove stay on the old route (see the row's own named gap below) | not yet - `apps/library/AppsPage.tsx` still owns install/remove, `ThingsTable` retires once it does |
 | `/next/people` | user-profile (own profile card), data-tables (`DataTable`) | the household (`GET /api/people`); the signed-in person's own profile only (see the row's own named gap below) | not yet - viewing another person's own profile and the Memories tab still need `apps/people/*`, `apps/memories/*` |
-| `/next/settings` | form-layouts in tabs and cards | the settings renderer's keys by section and scope | `apps/settings/*`, `apps/privacy/*` |
+| `/next/settings` | form-layouts in tabs and cards (`Tabs`, `Card`) | the settings registry (`GET /api/settings/registry`, `GET`/`PUT`/`reset /api/settings`) by section and scope; every other management page stays on the old route (see the row's own named gap below) | not yet - only the registry-driven inline keys moved, `apps/settings/*` still owns every dedicated management page |
 | `/next/engines` | data-tables, cards | the Engines API (HOME-STACK-04a) | none (new) |
 | `/next/updates`, `/next/repairs`, `/next/backups` | data-tables, cards | the routes HOME-STACK-05 landed | `apps/settings/UpdatesSection.tsx`, repairs, backups pages |
 | `/next/sign-in` | auth view | Home's sign-in and passkeys | `apps/auth/*` |
@@ -198,6 +198,51 @@ list reuses `/next/apps`'s own `DataTable` pattern exactly (a real
 unwired) - `GET /api/people` is unscoped by design (`PeoplePage.tsx`'s
 own "a plain directory, readable by anyone signed in" comment), so
 nothing was invented to filter it.
+
+**SHELL-05's own named gap (found landing the row, 2026-09-21):** the
+template's own form-layouts view (`@maipai/ui/src/dashboard/components/
+form/index.tsx`) is the same shape as the dashboard's demo widgets and
+the profile view - zero data-binding surface, every field a local
+`useState` seeded with demo values. Composed instead from the template's
+own individual form primitives (`Input`, `Select`, `Switch`, `Button`,
+all under `.../dashboard/components/ui/*`) through one new mapping,
+`NextSettingField.tsx`: the registry's own selector vocabulary
+(boolean/select/number/text/secret today; duration/time/entity/area/
+person/media typed but unbuilt, same as the kit's own pre-existing
+`SettingField.tsx`) to the primitive that renders it, one definition,
+reused by every key rather than a per-key component. That existing kit
+file (`@maipai/ui/src/settings/SettingField.tsx`, home/kit-authored, not
+a vendored snapshot) already solved this exact mapping against the
+kit's own pre-shadcndashboard primitives - `NextSettingField.tsx`
+mirrors its selector-by-selector logic (the draft/commit/reset cycle,
+the write-only secret flow) rather than reinventing it, reusing its two
+pure exported helpers (`titleCaseOption`, `localeDisplayName`)
+directly. The grouping logic itself (`groupSettings()`, `sectionTitle()`
+- three disclosure levels, expert filtered out, advanced folds at three
+or more) is pure, no-UI, and imported as-is by the new
+`NextSettingsRenderer.tsx` rather than copied a third time; only the
+JSX renders through `Card`/`CardHeader`/`CardTitle` (matching every
+other `/next` page's own section-heading shape) in place of the kit's
+`Section` primitive. A named, accepted duplication until the old shell
+retires: the field-control logic now lives in two files reading the
+identical registry, the same class of cost SHELL-03's `packageState()`/
+`kindStyle()` exports were written to avoid one function at a time -
+here the underlying primitives genuinely differ (pre- and
+post-shadcndashboard), so the two copies can't collapse into one import
+the way those did.
+
+Out of scope for this row, each staying on the old `/settings` route:
+every dedicated management page the registry-driven renderer can't
+draw (Users, Models, Backups, Voices - `VOICE-BROWSER-01`'s own browse
+list among them - Commands, Devices, Repairs, Updates, Health), the
+retired "one section tree" redesign and its link-out cards, Privacy's
+things-table, Voice's top-choices row (all `docs/dev/session-a-
+settings-rulings-2026-09-21.md`), and `@modified`/search filtering
+(docs/SETTINGS.md Rule 5). `/next/settings` is the registry's own
+inline keys only, split Household vs Me exactly as `SettingsPage.tsx`'s
+own tab switcher already does (same two labels, the Household tab
+gated to owner/admin - a non-admin has nothing else to switch to,
+since household-scope writes 403 for anyone else).
 
 One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
 the chat move together. There is no `ui.chat.next`; `ui.shell.next`
