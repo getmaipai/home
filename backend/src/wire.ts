@@ -47,8 +47,13 @@ export interface SpecSheetRow {
 /** The generative-UI contract's structured part: a tool's result, shaped
  * for the one Element that renders it, never Home-drawn prose. `kind`
  * only ever grows (a chart/data-table kind lands the same way once a
- * producer needs it) - never a field Home invents ahead of a real one. */
-export type StructuredPart = { kind: "spec_sheet"; title: string; subtitle?: string; rows: SpecSheetRow[] };
+ * producer needs it) - never a field Home invents ahead of a real one.
+ * `tool_id` (SHELL-02 slice 3): the producing package's own id
+ * (composer.ts's `structuredPartForOutcomes()`, "weather" or
+ * "almanac-date" today) - the frontend's own tool-call message part
+ * needs a real, honest `toolName` to key its Element render on, never
+ * a name it invents. */
+export type StructuredPart = { kind: "spec_sheet"; tool_id: string; title: string; subtitle?: string; rows: SpecSheetRow[] };
 
 export interface TurnReply {
   text: string;

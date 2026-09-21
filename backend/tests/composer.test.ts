@@ -746,6 +746,7 @@ describe("structuredPartForOutcomes", () => {
     const part = structuredPartForOutcomes([fullWeatherOutcome()]);
     expect(part).toEqual({
       kind: "spec_sheet",
+      tool_id: "weather",
       title: "Lantern Bay",
       rows: [
         { label: "Temperature", value: "61°F" },
@@ -761,6 +762,7 @@ describe("structuredPartForOutcomes", () => {
     const almanacOutcome = outcome({ callId: "call-a", packageId: "almanac-date", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Today is Thursday, January 1, 2026." }, data: { date: "Thursday, January 1, 2026", weekday: "Thursday" } } });
     expect(structuredPartForOutcomes([almanacOutcome])).toEqual({
       kind: "spec_sheet",
+      tool_id: "almanac-date",
       title: "Today",
       rows: [
         { label: "Date", value: "Thursday, January 1, 2026" },

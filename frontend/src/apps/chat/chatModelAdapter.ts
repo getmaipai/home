@@ -399,6 +399,19 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // for exactly that case - `event.value.reasoning` is the
             // buffered fallback wire.ts's own comment describes.
             const finalReasoning = reasoningText || event.value.reasoning;
+            // SHELL-02 slice 3: the generative-UI contract's structured
+            // part (weather, almanac-date) arrives as one field on the
+            // done event, not as a real tool-call stream (Home resolves
+            // packages server-side, before the visible reply ever
+            // streams) - built into a real ToolCallMessagePart here,
+            // `toolName` the producing package's own real id
+            // (`structured_part.tool_id`, wire.ts), never a name this
+            // file invents, so the Elements' registered spec-sheet
+            // render (NextChatPage.tsx) and the generic ToolFallback
+            // (any other tool) both key on something honest. No
+            // `args`/`argsText`: the wire never carries the tool's own
+            // call arguments, only its result.
+            const structuredPart = event.value.structured_part;
             // Fix B4 (docs/dev.md's "Chat reliability" B4): the same
             // metadata shape chatHistoryAdapter.ts attaches on reload, so
             // chatSourceCaption.tsx renders identically whether a message
@@ -423,6 +436,18 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               content: [
                 ...(finalReasoning ? [{ type: "reasoning" as const, text: finalReasoning }] : []),
                 { type: "text" as const, text: finalText },
+                ...(structuredPart
+                  ? [
+                      {
+                        type: "tool-call" as const,
+                        toolCallId: `${event.value.turn_id}-structured`,
+                        toolName: structuredPart.tool_id,
+                        args: {},
+                        argsText: "",
+                        result: structuredPart,
+                      },
+                    ]
+                  : []),
               ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),
               metadata: {

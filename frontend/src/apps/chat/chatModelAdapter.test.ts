@@ -502,6 +502,50 @@ describe("createChatModelAdapter reasoning (SHELL-02)", () => {
   });
 });
 
+// SHELL-02 slice 3: weather's and almanac-date's own structured result
+// (wire.ts's `structured_part`) becomes a real ToolCallMessagePart, not
+// Home-drawn prose - `toolName` is the producing package's own real
+// id (`structured_part.tool_id`), so NextChatPage.tsx's registered
+// spec-sheet render (and, for anything else, Thread's own built-in
+// ToolFallback) both key on something honest.
+describe("createChatModelAdapter structured results (SHELL-02 slice 3)", () => {
+  test("a structured_part on the done event becomes a real tool-call part, named for its producing package", async () => {
+    const structuredPart = { kind: "spec_sheet" as const, tool_id: "weather", title: "Lantern Bay", rows: [{ label: "Temperature", value: "61°F" }] };
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "It's 61°F in Lantern Bay." },
+        { type: "done", value: { turn_id: "turn-weather123", reply: { text: "It's 61°F in Lantern Bay." }, source: "plugin", safety: SAFETY, structured_part: structuredPart } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what's the weather")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "text", text: "It's 61°F in Lantern Bay." },
+        { type: "tool-call", toolCallId: "turn-weather123-structured", toolName: "weather", args: {}, argsText: "", result: structuredPart },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a plain-text reply with no structured_part yields no tool-call part", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Basil and parsley are easy herbs." },
+        { type: "done", value: { turn_id: "turn-herbs123", reply: { text: "Basil and parsley are easy herbs." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what herbs should I grow")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([{ type: "text", text: "Basil and parsley are easy herbs." }]);
+    } finally {
+      env.restore();
+    }
+  });
+});
+
 // Lane 11 item 1 (docs/plans/session-b-lane-11-2026-09-13.md): CHAT-16's
 // forward-compatible `status` event (chatTurnActivity.ts's own header on
 // why it's cast this way, not yet a real TurnStreamEvent member) and the

@@ -583,7 +583,7 @@ export function structuredPartForOutcomes(outcomes: readonly ToolExecutionOutcom
   const succeeded = outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded");
   for (const outcome of succeeded) {
     const part = outcome.packageId === "weather" ? weatherSpecSheet(outcome) : outcome.packageId === "almanac-date" ? almanacDateSpecSheet(outcome) : null;
-    if (part) return part;
+    if (part) return { ...part, tool_id: outcome.packageId };
   }
   return null;
 }
@@ -610,7 +610,7 @@ export function artifactForOutcomes(outcomes: readonly ToolExecutionOutcome[]): 
   return null;
 }
 
-function weatherSpecSheet(outcome: Succeeded): StructuredPart | null {
+function weatherSpecSheet(outcome: Succeeded): Omit<StructuredPart, "tool_id"> | null {
   const data = recordData(outcome.result?.data);
   const place = typeof data?.place === "string" ? data.place : null;
   if (!data || !place) return null;
@@ -626,7 +626,7 @@ function weatherSpecSheet(outcome: Succeeded): StructuredPart | null {
   return rows.length > 0 ? { kind: "spec_sheet", title: place, rows } : null;
 }
 
-function almanacDateSpecSheet(outcome: Succeeded): StructuredPart | null {
+function almanacDateSpecSheet(outcome: Succeeded): Omit<StructuredPart, "tool_id"> | null {
   const data = recordData(outcome.result?.data);
   if (!data || typeof data.date !== "string") return null;
   const rows = [

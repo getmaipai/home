@@ -1,18 +1,48 @@
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
+import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, type Roster } from "@/lib/api";
+import { api, type Roster, type StructuredPart } from "@/lib/api";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 const HistoryIcon = getIcon("history");
+
+// SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
+// almanac-date's own structured result (chatModelAdapter.ts's own
+// tool-call part, built from `structured_part`) renders through the
+// shipped Element, never Home-drawn prose. `useAssistantToolUI` is
+// `@assistant-ui/react`'s own deprecated-but-supported render-only
+// registration (its replacement, a client toolkit's own `render`, is
+// shaped for a tool the FRONTEND can invoke - `parameters`, `execute` -
+// which nothing here is: every package these results come from already
+// ran, server-side, before this reply ever streamed). `visibleCount`
+// is the whole row set - `SpecSheet`'s own progressive-reveal knob has
+// nothing to progress against on an already-complete result. Any tool
+// call whose name isn't registered here still renders through Thread's
+// own built-in `ToolFallback` (thread.aui.tsx's default), unchanged.
+const SpecSheetToolRender: ToolCallMessagePartComponent<Record<string, never>, StructuredPart> = ({ result }) => {
+  if (!result) return null;
+  return <SpecSheet title={result.title} subtitle={result.subtitle} rows={result.rows} visibleCount={result.rows.length} />;
+};
+
+function StructuredResultTools() {
+  // `display: "standalone"` (AssistantToolUIProps's own option): without
+  // it, Thread's own chain-of-thought grouping tucks a tool-call part
+  // behind a collapsed "1 tool call" trigger by default (found live -
+  // a weather card nobody can see without an extra click is a real
+  // regression for a family hub, not a cosmetic nit).
+  useAssistantToolUI({ toolName: "weather", render: SpecSheetToolRender, display: "standalone" });
+  useAssistantToolUI({ toolName: "almanac-date", render: SpecSheetToolRender, display: "standalone" });
+  return null;
+}
 
 /** /next/chat: SHELL-02's slice 2 (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's own wiring table) - the Elements thread LIST
@@ -36,9 +66,24 @@ const HistoryIcon = getIcon("history");
  * ("the shared record has no archive state") - that decision predates
  * this slice and isn't this slice's call to revisit.
  *
- * Attachments, suggestions, tools and artifacts are each their own
- * follow-up slice (the wiring table's remaining rows). `speakReplies:
- * false` still holds - no "stop speaking" control on screen yet. */
+ * Slice 3 (tools and generative UI): weather's and almanac-date's own
+ * structured result renders through the shipped `SpecSheet` Element
+ * (`StructuredResultTools` above), keyed on the producing package's
+ * real name - a package with a plain-text result is unaffected, and
+ * every other tool call still renders through Thread's own built-in
+ * `ToolFallback` (running/complete/fallback states, already shipped,
+ * no wiring needed). Known gap, found in review, not this slice's own
+ * call to fix (getmaipai/home#130): `structured_part` is computed
+ * fresh on the live `done` event (chatModelAdapter.ts) but never
+ * persisted - `conversation_turns` has no column for it, so
+ * chatHistoryAdapter.ts's own reload path has nothing to rebuild a
+ * tool-call part from. A spec-sheet card renders for the live turn,
+ * then reverts to plain text the moment the page reloads or the
+ * thread is reopened.
+ *
+ * Attachments, suggestions and artifacts are each their own follow-up
+ * slice (the wiring table's remaining rows). `speakReplies: false`
+ * still holds - no "stop speaking" control on screen yet. */
 // The shipped `<ThreadList>` (thread-list.aui.tsx's own default export)
 // hardcodes its own `<ThreadListNew>` with no way to hand it a click
 // handler - composed here instead from that same file's other exported
@@ -117,6 +162,7 @@ export function NextChatPage({ person }: { person: Roster }) {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
+      <StructuredResultTools />
       <div className="flex h-[calc(100vh-140px)] flex-col">
         <div className="flex items-center border-b border-border pb-2 lg:hidden">
           <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>

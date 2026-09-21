@@ -307,6 +307,7 @@ const nextAppsReview = process.argv.includes("--next-apps-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
+const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 
 interface RouteSpec {
   slug: string;
@@ -2288,6 +2289,57 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   }
 }
 
+/** SHELL-02 slice 3's own stated acceptance ("a real weather turn... the
+ * deterministic capture in screenshot.ts"): the household's own real
+ * weather package, not a scripted LLM reply - `seedHousehold()`'s
+ * `household.home_place` and `seedWeatherCache()`'s own cached
+ * geocode/forecast fixtures (Seattle, already seeded for every run)
+ * let a real question resolve deterministically through the real turn
+ * engine - real data, offline, reproducible, never a Home-fabricated
+ * row. The question includes the place explicitly (a code review
+ * caught the first draft's place-free "What's the weather like
+ * today?" - every one of `weather/manifest.json`'s own routing
+ * patterns requires the literal word "in <place>", so a place-free
+ * question never matches the deterministic floor at all and falls
+ * through to "That lookup didn't work, sorry"; `runFixedTurn.ts`'s own
+ * place-free phrasing is for a household with no `home_place` set,
+ * not this seeded one). Proves the spec-sheet Element renders
+ * standalone (StructuredResultTools' own `display: "standalone"`),
+ * not tucked behind a collapsed "1 tool call" trigger nobody would
+ * click to see today's weather. */
+async function captureNextChatToolsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextChatToolsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "dark", sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/next/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).fill(`What's the weather like in ${WEATHER_HOUSEHOLD_PLACE} today?`);
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    // The spec-sheet Element's own root slot, standalone in the message
+    // flow - not a collapsed "N tool call" trigger needing a click.
+    await page.locator('[data-slot="spec-sheet"]').waitFor({ timeout: 15000 });
+    await settleAnimations(page);
+    const path = join(outDir, `next-chat-tools-${viewport.width}-dark.png`);
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+    await page.close();
+  } finally {
+    await context.close();
+  }
+}
+
 /** SHELL-05's own acceptance ("1440 and 390... captures dark/light"):
  * both viewports, both themes, of `/next/settings`. Waits on "Family
  * name", a real, always-present basic key under Household > System
@@ -2930,6 +2982,10 @@ async function main() {
 
     if (nextEnginesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview) {
       await captureNextEnginesReview(browser, sessionValue);
+    }
+
+    if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
+      await captureNextChatToolsReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {
