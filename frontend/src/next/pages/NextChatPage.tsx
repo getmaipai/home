@@ -12,12 +12,14 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
+import { cn } from "@maipai/ui/src/utils";
 import { api, ApiError, type Roster, type StructuredPart } from "@/lib/api";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 const HistoryIcon = getIcon("history");
+const PanelLeftIcon = getIcon("panel-left");
 
 // SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
 // almanac-date's own structured result (chatModelAdapter.ts's own
@@ -273,6 +275,20 @@ function ArtifactCacheInvalidator() {
 export function NextChatPage({ person }: { person: Roster }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
+  // CHAT-UI-01 finding 4: a ChatGPT-style collapse for the desktop
+  // thread-list column. The shipped Sidebar primitive's own collapsible
+  // modes (threadlist-sidebar.aui.tsx's own composition) render
+  // `position: fixed` against the viewport's own left edge - built for
+  // being the page's ONE top-level sidebar, not a second column nested
+  // beside one that's already there (it would render under or over the
+  // app rail, not after it). Nothing here forks that primitive or
+  // hand-builds a new one: this toggles the same plain column this file
+  // already had, the identical pattern `sheetOpen` already uses for the
+  // phone/tablet Sheet. No hover-peek: the primitive has no such mode to
+  // reach for at all (`SidebarRail`'s own hover only tints its divider
+  // line), so per the instruction that named this gap, it's left
+  // unbuilt rather than hand-rolled.
+  const [railCollapsed, setRailCollapsed] = useState(false);
   // A code review caught this: switching threads (onThreadIdChange,
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
@@ -294,10 +310,21 @@ export function NextChatPage({ person }: { person: Roster }) {
         <StructuredResultTools />
         <ArtifactTool />
         <ArtifactCacheInvalidator />
-        <div className="flex h-[calc(100vh-140px)] flex-col">
-          <div className="flex items-center border-b border-border pb-2 lg:hidden">
-            <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
+        {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
+            fixed height a hard ceiling, not a floor a growing composer
+            or a streaming reply could push past - FullLayout.tsx's own
+            wrapper around Outlet is `min-h-*`, not `h-*`, so any
+            overflow here became real extra page height, and the page
+            gaining and losing scroll range as content settled read as
+            the composer bouncing. The thread viewport (Thread's own
+            child) stays the only real scroller on this page. */}
+        <div data-slot="next-chat-shell" className="flex h-[calc(100vh-140px)] flex-col overflow-hidden">
+          <div className="flex items-center gap-1 border-b border-border pb-2">
+            <Button variant="ghost" size="icon" className="lg:hidden" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
               <HistoryIcon className="size-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="hidden lg:flex" aria-label={railCollapsed ? "Show conversations" : "Hide conversations"} aria-expanded={!railCollapsed} aria-controls="next-chat-rail" onClick={() => setRailCollapsed((collapsed) => !collapsed)}>
+              <PanelLeftIcon className="size-4" />
             </Button>
           </div>
           {banner ? (
@@ -310,7 +337,15 @@ export function NextChatPage({ person }: { person: Roster }) {
                 (the kit's 960px default reopens a squeeze at tablet
                 width), the same reason ChatPage.tsx's own persistent
                 column uses it. */}
-            <div className="hidden w-64 shrink-0 overflow-y-auto border-r border-border pr-2 lg:block">
+            {/* A code review caught this: `railCollapsed ? null : ...`
+                unmounted the div entirely, so the toggle button's own
+                `aria-controls="next-chat-rail"` pointed at an id absent
+                from the DOM the moment it mattered most - the instant a
+                screen reader announces the new collapsed state. Hidden
+                via CSS instead (the same `hidden`/`lg:block` pattern
+                already used for the phone/tablet breakpoint split), so
+                the id always exists. */}
+            <div id="next-chat-rail" className={cn("w-64 shrink-0 overflow-y-auto border-r border-border pr-2", railCollapsed ? "hidden" : "hidden lg:block")}>
               {threadList}
             </div>
             <div className="min-w-0 flex-1">

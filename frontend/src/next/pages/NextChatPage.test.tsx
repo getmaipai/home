@@ -315,3 +315,46 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     }
   });
 });
+
+describe("NextChatPage (CHAT-UI-01 finding 4: the desktop rail collapse)", () => {
+  // Found live with the shell rail collapsed: no fixed Sidebar primitive
+  // here (threadlist-sidebar.aui.tsx's own is `position: fixed` against
+  // the true viewport edge, built to be a page's ONE sidebar, not a
+  // second column nested beside one already there) - this toggles the
+  // same plain column the file already had, the identical pattern
+  // `sheetOpen` uses for the phone/tablet Sheet.
+  test("the toggle hides and restores the desktop thread-list column, leaving the thread itself alone", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const toggle = view.getByRole("button", { name: "Hide conversations" });
+      // Hidden via a CSS class (the same `hidden`/`lg:block` pattern the
+      // phone/tablet split already used), not unmounted - a code review
+      // caught the earlier `railCollapsed ? null : ...` leaving the
+      // toggle's own `aria-controls="next-chat-rail"` pointing at an id
+      // absent from the DOM at the exact moment it announced the new
+      // state. jsdom applies no real stylesheet, so the CSS itself
+      // isn't exercised here (the live check on 8787 is); this proves
+      // the id survives collapsing and the class the CSS keys on
+      // actually flips.
+      const rail = () => document.getElementById("next-chat-rail")!;
+      expect(rail().className).toContain("lg:block");
+      fireEvent.click(toggle);
+      expect(rail().className).not.toContain("lg:block");
+      expect(rail().className).toContain("hidden");
+      expect(view.getByRole("button", { name: "Show conversations" })).toBeVisible();
+      // The composer is still there - collapsing the rail never touches
+      // the thread itself.
+      expect(view.getByLabelText("Message input")).toBeVisible();
+      fireEvent.click(view.getByRole("button", { name: "Show conversations" }));
+      expect(rail().className).toContain("lg:block");
+    } finally {
+      restore();
+    }
+  });
+});

@@ -159,3 +159,50 @@
     color: var(--destructive);
   }
 }
+
+/* CHAT-UI-01 finding 2: FullLayout.tsx's own `.container` (globals.css's
+ * `@utility container { max-w-[1367px] mx-auto }`) wraps every /next
+ * page's <Outlet/>, a fixed cap that's fine for a form or a table but
+ * leaves an ugly, ever-growing dead gutter on /next/chat once the rail
+ * collapses and frees more width than the cap uses - found live,
+ * 2026-09-21, "New Thread" sitting ~75px into empty space instead of
+ * flush against the rail. `:has()` targets the one page that needs the
+ * cap gone (NextChatPage.tsx's own `data-slot="next-chat-shell"` marks
+ * it) without touching the vendored layout file or any other page -
+ * the kit wraps and composes, so this reaches through the one surface
+ * it already exposes (a CSS class) rather than forking the component
+ * that draws it. */
+.container:has([data-slot="next-chat-shell"]) {
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* A code review caught this: the same `.container` also wraps
+ * FullLayout.tsx's own `<Footer/>` (a sibling of `<Outlet/>`, both
+ * direct children), so uncapping the container above stretched the
+ * footer's copyright/links row edge to edge too, inconsistent with
+ * every other /next page's own centered, capped one. Re-applies the
+ * container's own cap to the footer's own wrapper specifically (its
+ * last child) so only the chat content itself grows into the freed
+ * width. */
+.container:has([data-slot="next-chat-shell"]) > :last-child {
+  max-width: 1367px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+/* CHAT-UI-01 finding 3, the other half (NextChatPage.tsx's own
+ * `overflow-hidden` on `next-chat-shell` stops the page from growing
+ * taller than the fixed viewport; this stops the browser's own scroll
+ * chaining once it's already at that boundary): FullLayout.tsx's
+ * Footer sits right below the Outlet, so the page always has a
+ * sliver of its own real scroll range - reaching the bottom of the
+ * thread viewport's own internal scroll and continuing to scroll
+ * chained into that sliver, then rubber-banded back, which read as
+ * the composer bouncing. `overscroll-behavior` has no vendored
+ * counterpart to reach through (it isn't a component prop or a
+ * token), so this is set directly, scoped to the one page it was
+ * found on. */
+html:has([data-slot="next-chat-shell"]) {
+  overscroll-behavior-y: none;
+}
