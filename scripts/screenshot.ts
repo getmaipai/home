@@ -305,6 +305,7 @@ const nextPeopleReview = process.argv.includes("--next-people-review");
 const nextDashboardReview = process.argv.includes("--next-dashboard-review");
 const nextAppsReview = process.argv.includes("--next-apps-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
+const nextEnginesReview = process.argv.includes("--next-engines-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 
 interface RouteSpec {
@@ -2324,6 +2325,44 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
   }
 }
 
+/** SHELL-06's own acceptance ("1440 and 390... captures"): both
+ * viewports, both themes, of `/next/engines`. This seeded demo
+ * household has no Stack configured (the same state the acceptance
+ * asks to prove is honest, not an error), so the real, expected
+ * capture is the calm "No Stack configured" empty state - waited on
+ * directly, since a configured-Stack row table has nothing to seed a
+ * fake one from here. */
+async function captureNextEnginesReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextEnginesReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/engines`);
+        await page.locator("text=No Stack configured").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-engines-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2887,6 +2926,10 @@ async function main() {
 
     if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview) {
       await captureNextSettingsReview(browser, sessionValue);
+    }
+
+    if (nextEnginesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview) {
+      await captureNextEnginesReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

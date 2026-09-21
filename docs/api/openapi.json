@@ -7863,12 +7863,15 @@
         "summary": "Roles, engines and the hardware budget, in one read",
         "responses": {
           "200": {
-            "description": "The Stack's own current state.",
+            "description": "The Stack's own current state, or configured: false with empty/null fields when no Stack is set up.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
                     "roles": {
                       "type": "array",
                       "items": {
@@ -8164,6 +8167,7 @@
                     },
                     "budget": {
                       "type": "object",
+                      "nullable": true,
                       "properties": {
                         "totalMemoryBytes": {
                           "type": "number"
@@ -8277,6 +8281,7 @@
                     }
                   },
                   "required": [
+                    "configured",
                     "roles",
                     "engines",
                     "budget"
@@ -8643,12 +8648,15 @@
         "summary": "The Stack's own health items",
         "responses": {
           "200": {
-            "description": "The Stack's current health list - the same items Repairs already folds in.",
+            "description": "The Stack's current health list - the same items Repairs already folds in - or configured: false with an empty list when no Stack is set up.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
                     "health": {
                       "type": "array",
                       "items": {
@@ -8713,6 +8721,7 @@
                     }
                   },
                   "required": [
+                    "configured",
                     "health"
                   ]
                 }

@@ -114,7 +114,7 @@ each lands.
 | `/next/apps` | data-tables view (`DataTable`) | packages list (`GET /api/plugins`); install and remove stay on the old route (see the row's own named gap below) | not yet - `apps/library/AppsPage.tsx` still owns install/remove, `ThingsTable` retires once it does |
 | `/next/people` | user-profile (own profile card), data-tables (`DataTable`) | the household (`GET /api/people`); the signed-in person's own profile only (see the row's own named gap below) | not yet - viewing another person's own profile and the Memories tab still need `apps/people/*`, `apps/memories/*` |
 | `/next/settings` | form-layouts in tabs and cards (`Tabs`, `Card`) | the settings registry (`GET /api/settings/registry`, `GET`/`PUT`/`reset /api/settings`) by section and scope; every other management page stays on the old route (see the row's own named gap below) | not yet - only the registry-driven inline keys moved, `apps/settings/*` still owns every dedicated management page |
-| `/next/engines` | data-tables, cards | the Engines API (HOME-STACK-04a) | none (new) |
+| `/next/engines` | data-tables (`DataTable`) | `GET /api/engines`, `GET /api/engines/health` (HOME-STACK-04a) - roles by address, engine state, health severities; actions (start/stop/restart, a role switch) stay on the old surface (see the row's own named gap below) | none (new) |
 | `/next/updates`, `/next/repairs`, `/next/backups` | data-tables, cards | the routes HOME-STACK-05 landed | `apps/settings/UpdatesSection.tsx`, repairs, backups pages |
 | `/next/sign-in` | auth view | Home's sign-in and passkeys | `apps/auth/*` |
 
@@ -243,6 +243,34 @@ inline keys only, split Household vs Me exactly as `SettingsPage.tsx`'s
 own tab switcher already does (same two labels, the Household tab
 gated to owner/admin - a non-admin has nothing else to switch to,
 since household-scope writes 403 for anyone else).
+
+**SHELL-06's own named gap (found landing the row, 2026-09-21):**
+`GET /api/engines` had never had a frontend at all - `docs/BACKLOG.md`'s
+own "Old file it retires: none (new)" for this row, confirmed by a grep
+of the whole frontend for `/api/engines` before writing a line, which
+came back empty. Two real sub-gaps found the same way: (1) neither
+`GET /api/engines` nor `GET /api/engines/health` distinguished "no
+Stack configured" (the common case - Jesse's own household) from a
+real failure; both threw the identical Stack-unreachable 503 either
+way, which this row's own acceptance ("the 'No Stack' state must be
+the honest one, not an error") can't be built against. Fixed at the
+source, `backend/src/routes/engines.ts`: both routes now check
+`isStackConfigured()` first and return 200 with `configured: false`
+(empty roles/engines, a null budget, an empty health list) instead of
+a 503 - the identical "null is the real answer, not a fabricated one"
+posture `dashboard.ts`'s own `engineStatusCounts()` already took for
+this exact case, just never extended to these two routes until this
+row needed it. (2) the vendored `DataTable` has the same dead Action
+column every other `/next` table already found (no click handler on
+either icon) - real engine actions (start, stop, restart) and a role
+switch have no shipped table to carry them, so they stay wherever they
+already partly exist (the Stack's own admin surface; Home has never
+built a frontend management page for them either) until one does. This
+row's own scope is the three real read-only tables the acceptance
+names: roles by address, engine state, and health severities. A
+household-memory-budget card (the route's own "cards" half) is a real,
+separate follow-up - not built here since the acceptance didn't ask
+for it and adding it unasked would be inventing scope.
 
 One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
 the chat move together. There is no `ui.chat.next`; `ui.shell.next`

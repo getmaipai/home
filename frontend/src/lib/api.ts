@@ -39,6 +39,13 @@ import type {
   DashboardActivityRow,
   DashboardTurnsPerDay,
   DashboardEngineCounts,
+  StackRoleId,
+  StackRoleInfo,
+  StackEngineInfo,
+  StackBudget,
+  StackHealthItem,
+  EnginesOverview,
+  EnginesHealth,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -62,7 +69,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, Media, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts };
+export type { Roster, TurnValue, Media, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -505,6 +512,12 @@ export const api = {
   // fields present only for owner/admin (absent, not null/zero, for
   // anyone else - backend/src/lib/dashboard.ts's own header).
   dashboard: () => request<Dashboard>("/api/dashboard"),
+  // GET /api/engines, GET /api/engines/health (SHELL-06, HOME-STACK-04a):
+  // owner/admin only. `configured: false` (empty roles/engines, null
+  // budget or an empty health list) is a normal, common household state
+  // (no Stack set up), never an error - routes/engines.ts's own header.
+  engines: () => request<EnginesOverview>("/api/engines"),
+  enginesHealth: () => request<EnginesHealth>("/api/engines/health"),
   createPerson: (input: { displayName: string; role: Role; secret?: string }) =>
     request<PersonRosterEntry>("/api/people", {
       method: "POST",

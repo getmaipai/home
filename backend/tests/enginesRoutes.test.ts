@@ -100,6 +100,16 @@ describe("/api/engines", () => {
     expect(body.budget.pressure).toBe("normal");
   });
 
+  test("GET / with no Stack configured reads configured: false, never an error", async () => {
+    // No configure() call: engines.stack.url stays unset, the default
+    // every household starts in.
+    const { client } = await owner();
+    const res = await client.get("/api/engines");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { configured: boolean; roles: unknown[]; engines: unknown[]; budget: unknown };
+    expect(body).toEqual({ configured: false, roles: [], engines: [], budget: null });
+  });
+
   test("a signed-in non-admin is refused GET /api/engines", async () => {
     configure({});
     const { client } = await owner();
@@ -191,6 +201,13 @@ describe("/api/engines", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { health: Array<{ code: string }> };
     expect(body.health[0]!.code).toBe("engine.crashed.chat");
+  });
+
+  test("GET /health with no Stack configured reads configured: false, an empty list, never an error", async () => {
+    const { client } = await owner();
+    const res = await client.get("/api/engines/health");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ configured: false, health: [] });
   });
 
   test("POST /health/{code}/fix runs the Stack's own fix", async () => {

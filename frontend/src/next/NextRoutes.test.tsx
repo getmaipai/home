@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
@@ -135,8 +134,11 @@ describe("NextRoutes appearance", () => {
 });
 
 describe("next Manage routes", () => {
+  // /next/engines moved off this shared "still a stub" check once
+  // SHELL-06 gave it real data and its own dedicated test file
+  // (NextEnginesPage.test.tsx) - it needs a QueryClientProvider this
+  // bare MemoryRouter render doesn't supply.
   test.each([
-    ["/next/engines", NextEnginesPage],
     ["/next/updates", NextUpdatesPage],
     ["/next/repairs", NextRepairsPage],
     ["/next/backups", NextBackupsPage],

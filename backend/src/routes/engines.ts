@@ -12,7 +12,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
-import { getStackClient } from "@/lib/stackEngine";
+import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
 import { getStackUpdatesState, checkStackUpdates, applyStackEngineUpdate, rollbackStackEngine } from "@/lib/stackUpdates";
 
@@ -212,15 +212,26 @@ const overviewRoute = createRoute({
   summary: "Roles, engines and the hardware budget, in one read",
   middleware: [requireRole("owner", "admin")] as const,
   responses: {
-    200: { content: { "application/json": { schema: z.object({ roles: z.array(RoleInfoSchema), engines: z.array(EngineInfoSchema), budget: BudgetSchema }) } }, description: "The Stack's own current state." },
+    // `configured: false` is a normal, common household state (no
+    // Stack set up yet - engines.stack.url empty), not a failure: it
+    // reads 200 with empty roles/engines and a null budget, the same
+    // "null, not an error" posture dashboard.ts's own
+    // engineStatusCounts() already takes for the identical case, so a
+    // page reading this never has to string-match an error message to
+    // tell "not configured" apart from "configured but unreachable".
+    200: {
+      content: { "application/json": { schema: z.object({ configured: z.boolean(), roles: z.array(RoleInfoSchema), engines: z.array(EngineInfoSchema), budget: BudgetSchema.nullable() }) } },
+      description: "The Stack's own current state, or configured: false with empty/null fields when no Stack is set up.",
+    },
     ...errorResponses({ 403: "Not owner/admin" }),
     ...STACK_ERROR_RESPONSES,
   },
 });
 enginesRoutes.openapi(overviewRoute, async (c) => {
+  if (!isStackConfigured()) return c.json({ configured: false, roles: [], engines: [], budget: null }, 200);
   try {
     const [{ roles }, { engines }, budget] = await Promise.all([getStackClient().roles(), getStackClient().engines(), getStackClient().budget()]);
-    return c.json({ roles, engines, budget }, 200);
+    return c.json({ configured: true, roles, engines, budget }, 200);
   } catch (err) {
     const failure = classifyStackError(err);
     return c.json(failure.body, failure.status);
@@ -302,14 +313,18 @@ const healthRoute = createRoute({
   summary: "The Stack's own health items",
   middleware: [requireRole("owner", "admin")] as const,
   responses: {
-    200: { content: { "application/json": { schema: z.object({ health: z.array(HealthItemSchema) }) } }, description: "The Stack's current health list - the same items Repairs already folds in." },
+    // Same `configured: false` posture as GET / above: no Stack set up
+    // is a normal state, empty health list, never an error.
+    200: { content: { "application/json": { schema: z.object({ configured: z.boolean(), health: z.array(HealthItemSchema) }) } }, description: "The Stack's current health list - the same items Repairs already folds in - or configured: false with an empty list when no Stack is set up." },
     ...errorResponses({ 403: "Not owner/admin" }),
     ...STACK_ERROR_RESPONSES,
   },
 });
 enginesRoutes.openapi(healthRoute, async (c) => {
+  if (!isStackConfigured()) return c.json({ configured: false, health: [] }, 200);
   try {
-    return c.json(await getStackClient().health(), 200);
+    const result = await getStackClient().health();
+    return c.json({ configured: true, ...result }, 200);
   } catch (err) {
     const failure = classifyStackError(err);
     return c.json(failure.body, failure.status);

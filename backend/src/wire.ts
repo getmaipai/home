@@ -530,3 +530,86 @@ export interface Dashboard {
    * from the field being absent for a non-admin viewer. */
   engines?: DashboardEngineCounts | null;
 }
+
+// GET /api/engines and GET /api/engines/health (SHELL-06, HOME-STACK-04a):
+// hand-copied from routes/engines.ts's own zod schemas (RoleInfoSchema,
+// EngineInfoSchema, BudgetSchema, HealthItemSchema) for the same reason
+// as every other type on this file - the frontend can't resolve that
+// route file's own "@/..." imports. routes/engines.ts stays the single
+// source of truth for validation and OpenAPI; these are a plain-TS
+// mirror of its response shape, not re-exported back into it (unlike
+// Dashboard above, nothing on the backend needs these as its own return
+// type - the zod schemas already give the route file its own safety).
+export type StackRoleId = "chat" | "coding" | "judge" | "router" | "embed" | "rerank" | "vision" | "stt" | "tts" | "wakeword" | "image" | "video" | "music";
+
+export interface StackRoleInfo {
+  id: StackRoleId;
+  label: string;
+  wire: "chat" | "embeddings" | "rerank" | "transcription" | "speech" | "job";
+  residency: "resident" | "jit" | "installed";
+  endpoints: string[];
+  quality: ("fast" | "everyday" | "best")[];
+  sharesModelWith: StackRoleId | null;
+  state: { state: "notInstalled" | "installed" | "loaded" | "ready" | "offline"; since: string; checkedAt?: string; reason?: string | null };
+  reason: string | null;
+  model: { id: string; sizeBytes: number | null; measuredFootprintBytes: number | null; measuredContextLength: number | null; estimated: boolean } | null;
+  check: { state: "not checked" | "passed" | "failed" | "skipped"; at: string | null; reason: string | null; stale: boolean };
+}
+
+export interface StackEngineInfo {
+  id: string;
+  name: string;
+  label: string;
+  platform: string;
+  arch: string;
+  verified: boolean;
+  installed: boolean;
+  matchesThisMachine: boolean;
+  running: string | null;
+  currentTag: string | null;
+  newestTag: string | null;
+  current: boolean;
+  notCurrent: boolean;
+  needsRestart: boolean;
+  state: "current" | "notCurrent";
+  stateReason: "newer installed" | "newer available" | null;
+  directory: string;
+  roleState: string;
+  roleReason: string | null;
+}
+
+export interface StackBudget {
+  totalMemoryBytes: number;
+  capBytes: number;
+  freeMemoryBytes: number;
+  availablePercent: number;
+  pressure: "normal" | "warn" | "critical";
+  memoryReadingDegraded: boolean;
+  loaded: Array<{ id: string; kind: "resident" | "jit" | "generator"; peakBytes: number; measured: boolean; lastUsedAt: string; idleTtlSeconds: number; pinned: boolean; pid: number | null }>;
+  queue: Array<{ id: string; position: number; kind: "resident" | "jit" | "generator" }>;
+}
+
+export interface StackHealthItem {
+  code: string;
+  severity: "critical" | "error" | "warning";
+  title: string;
+  text: string;
+  since: string;
+  cause: string;
+  fix?: { label: string; action: "restart_engine" | "free_memory" | "retry_download" | "rollback_update" | "reinstall_engine" | "reinstall_model" };
+}
+
+export interface EnginesOverview {
+  /** false when no Stack is configured for this household (the common
+   * case today) - roles/engines are empty and budget is null, never an
+   * error, the same posture Dashboard's own `engines` field takes. */
+  configured: boolean;
+  roles: StackRoleInfo[];
+  engines: StackEngineInfo[];
+  budget: StackBudget | null;
+}
+
+export interface EnginesHealth {
+  configured: boolean;
+  health: StackHealthItem[];
+}
