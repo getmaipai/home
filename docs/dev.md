@@ -19112,4 +19112,29 @@ Non-streaming `runTurn()`/`POST /api/turn` is unaffected and out of scope: it ha
 
 Checked live against the pinned build actually running on this machine (`llama-server --help` on `/…/home/data/engines/llama-server-b10797-macos-arm64/llama-server`, then a real `curl` against the running chat engine on :8788 with the identical `chat_template_kwargs: {"enable_thinking": true}` request `llm.ts` already sends): **`auto` resolves to clean separation for this model/template** - every streamed chunk's reasoning arrives ONLY in `delta.reasoning_content`, `content` stays empty until reasoning ends, and neither field ever carries a literal `<think>` tag. The non-streaming response shape matches (`message.reasoning_content` alongside `message.content`). So the tag-embedded shape the whole rest of this section explains is not what the live engine actually produces today - it was never exercised because nothing read the field that already carries it separately.
 
-**Implemented as "prefer the engine's separation, tag-parsing as the fallback," per the coordinator's call**: `chatCompleteStream()`/`stackChatDeltas()` (`commons` `spec/llm/ts/client.ts`, `home` `backend/src/lib/llm.ts` - the Stack-routed path is a deliberate verbatim port of the direct client's own logic, kept in sync) synthesize `reasoning_content` into the IDENTICAL `<think>...</think>` shape the rest of the pipeline already expects, the moment it arrives; `complete()`/`completeViaStack()`'s own non-streaming twin (`withSynthesizedThink()`) does the same for a single blocking reply. This is the one and only place either engine behavior is normalized: an engine/template that never populates `reasoning_content` (tags already embedded in `content` instead) passes through completely unchanged, byte-identical to before this item. `wellFormed.ts`, `composeBlocking`, `gateOutputSafety`/`gateGuards`, `holdOpening`, `holdForLookup`, the retry machinery, and `finalize()` stay untouched, exactly as "the smallest change" promised: they only ever see the one uniform `<think>`-embeddable text shape, never `reasoning_content` itself. The wire-boundary split is genuinely engine-agnostic for the identical reason: it splits whatever `<think>` tags arrive, regardless of whether `llm.ts` synthesized them from a separated field or they arrived already embedded from a template that leaks them into `content`. **One real exception a review found** (below): `peekAndHandle()`'s own tool-call-vs-prose disambiguation genuinely needed a small, targeted fix, because reasoning now yields real string chunks where it used to yield nothing at all.
+
+## Home's shell and pages on shadcndashboard, the chat on assistant-ui Elements (2026-09-21)
+
+Why: the hand-built shell and chat of 2026-09-13 to 2026-09-21 were
+ugly and buggy where the shipped components were neither, and every
+hand-built piece cost review rounds a shipped one would not. The
+owner's rule (org CLAUDE.md, principle 6) is no hand-built UI from
+2026-09-21 on: the shell and every non-chat page come from
+`shadcndashboard` as it ships, vendored into the kit
+(`commons/ui/src/dashboard/`), and the chat from assistant-ui's 144
+Elements as they ship (`commons/ui/src/elements/`), styled by the
+tokens alone. The program record with the strip list, the wiring
+tables (SHELL-01 to SHELL-08, the chat's capability-to-Element table),
+the wire contract the Elements expect and the generative-UI rule is
+[docs/plans/shell-on-shadcndashboard-2026-09-21.md](plans/shell-on-shadcndashboard-2026-09-21.md).
+Both surfaces switch together under one setting, `ui.shell.next`
+(System, General, advanced level), which mounts `/next/*`
+(`frontend/src/next/NextRoutes.tsx`) in place of the old shell; the
+look comes from `ui.look` (studio, calm, and shadcn's seven base
+colors, spec-v0.1.12) through the template's own style-variant
+mechanism (`frontend/src/next/useNextLook.ts`). Landed so far:
+HOME-UI-04 (the stand-up, the Manage group on the template's tables
+view), HOME-UI-04b (the flag reachable, the collapsed rail, dark mode,
+the presets, the single border matched to the upstream demo); open:
+HOME-UI-04d (one theme writer), CHAT-SDK-01 (the SDK upgrade the
+Elements need), `/next/chat`, then the SHELL rows.
