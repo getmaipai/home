@@ -43,7 +43,15 @@ string in `scripts/check.sh` and the matching `file:` path in
 `scripts/check.sh` (it creates the new tag's worktree if this is the
 first consumer to ask for it) followed by `bun install --force` in
 `backend/` and `frontend/` (a plain `bun install` doesn't refresh a
-`file:` dependency's snapshot in bun's content-addressed store).
+`file:` dependency's snapshot in bun's content-addressed store). Never
+delete `node_modules` and `bun.lock` to get there: a fresh install floats every dependency
+to its latest compatible version, not just the pin you
+changed (2026-09-21: one recovery from a `bun.lock` merge conflict silently
+moved `@assistant-ui/core` 0.3.17 to 0.3.20 and broke the chat's tests before
+it was caught by diffing against a clean `origin/main` worktree). On a
+lockfile conflict, take `main`'s `bun.lock` whole, then `bun install --force`;
+the diff against a clean `origin/main` worktree before committing is what
+proves only your pin moved.
 
 Commands: from the repo root (the `home/` folder containing `package.json`),
 `bun start` builds and starts the local app in the background and prints
