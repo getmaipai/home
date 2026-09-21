@@ -12,6 +12,10 @@ Chat is where you talk to MaiPai, by typing or by voice.
 
 MaiPai's answer appears right below your message.
 
+## With the new look on
+
+If you turned on **New shell (preview)** in Settings, the chat has a cleaner design. You type in the box at the bottom and press Enter, the same as before. While MaiPai thinks, a small **Reasoning** line appears above the answer. Click it to read how MaiPai got there, or leave it closed. Children do not see this line. Some parts of chat are still being moved to the new look, so if you do not find a button you used before, turn the preview off and it is back.
+
 ## What MaiPai can look up
 
 Ask MaiPai to look something up and you get a real answer, not a guess. Just ask it directly, for example:
