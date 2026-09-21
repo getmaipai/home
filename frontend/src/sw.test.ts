@@ -22,6 +22,7 @@ import { describe, expect, test } from "bun:test";
 // cache returning the first run's already-executed module.
 function fakeServiceWorkerGlobal(userAgent: string) {
   const listenersByType = new Map<string, unknown[]>();
+  const skipWaitingCalls = { count: 0 };
   const fakeSelf = {
     navigator: { userAgent },
     // Empty, not the real build's manifest: this test proves how many
@@ -31,14 +32,19 @@ function fakeServiceWorkerGlobal(userAgent: string) {
     addEventListener(type: string, fn: unknown) {
       listenersByType.set(type, [...(listenersByType.get(type) ?? []), fn]);
     },
-    skipWaiting() {},
+    skipWaiting() {
+      skipWaitingCalls.count += 1;
+    },
     clients: { claim: async () => undefined },
   };
-  return { fakeSelf, listenersByType };
+  return { fakeSelf, listenersByType, skipWaitingCalls };
 }
 
-async function loadSwWithUserAgent(userAgent: string, cacheBuster: string): Promise<Map<string, unknown[]>> {
-  const { fakeSelf, listenersByType } = fakeServiceWorkerGlobal(userAgent);
+async function loadSwWithUserAgent(
+  userAgent: string,
+  cacheBuster: string,
+): Promise<{ fakeSelf: ReturnType<typeof fakeServiceWorkerGlobal>["fakeSelf"]; listenersByType: Map<string, unknown[]>; skipWaitingCalls: { count: number } }> {
+  const { fakeSelf, listenersByType, skipWaitingCalls } = fakeServiceWorkerGlobal(userAgent);
   const previousSelf = (globalThis as { self?: unknown }).self;
   (globalThis as { self?: unknown }).self = fakeSelf;
   try {
@@ -46,7 +52,7 @@ async function loadSwWithUserAgent(userAgent: string, cacheBuster: string): Prom
   } finally {
     (globalThis as { self?: unknown }).self = previousSelf;
   }
-  return listenersByType;
+  return { fakeSelf, listenersByType, skipWaitingCalls };
 }
 
 describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not one that always declines", () => {
@@ -70,12 +76,30 @@ describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not on
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:130.0) Gecko/20100101 Firefox/130.0",
       "ua=firefox",
     );
-    expect(firefoxListeners.get("fetch") ?? []).toHaveLength(0);
+    expect(firefoxListeners.listenersByType.get("fetch") ?? []).toHaveLength(0);
 
     const chromiumListeners = await loadSwWithUserAgent(
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
       "ua=chromium",
     );
-    expect((chromiumListeners.get("fetch") ?? []).length).toBeGreaterThan(0);
+    expect((chromiumListeners.listenersByType.get("fetch") ?? []).length).toBeGreaterThan(0);
+  });
+
+  test("a new worker skips waiting on install (home#128)", async () => {
+    const { fakeSelf, listenersByType, skipWaitingCalls } = await loadSwWithUserAgent(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+      "ua=chromium-install",
+    );
+    const installListeners = listenersByType.get("install") ?? [];
+    expect(installListeners).toHaveLength(1);
+    expect(skipWaitingCalls.count).toBe(0);
+    const previousSelf = (globalThis as { self?: unknown }).self;
+    (globalThis as { self?: unknown }).self = fakeSelf;
+    try {
+      (installListeners[0] as (event: unknown) => void)({});
+    } finally {
+      (globalThis as { self?: unknown }).self = previousSelf;
+    }
+    expect(skipWaitingCalls.count).toBe(1);
   });
 });

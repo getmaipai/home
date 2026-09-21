@@ -99,6 +99,17 @@ if (!PASSTHROUGH) {
 }
 cleanupOutdatedCaches();
 
+// A new worker never waits (getmaipai/home#128, PWA-SW-01): install
+// is followed by `skipWaiting()` unconditionally, so the build that
+// was just fetched is the one that activates on the next load even
+// when no client posts SKIP_WAITING (an older shell, a tab that
+// never sends it). `pwaBoot.ts`'s reload-once guard then brings the
+// tab onto it. The `message` handshake below stays for the client
+// that does post.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
 // The standard `registerType: "autoUpdate"` handshake (vite.config.ts):
 // the client's registration script posts this the moment a new worker
 // is found waiting, so it activates immediately instead of waiting for
