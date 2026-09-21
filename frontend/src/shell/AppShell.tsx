@@ -121,36 +121,38 @@ export const Brand = forwardRef<HTMLAnchorElement, ComponentPropsWithoutRef<"a">
       {/* borderRadius: var(--tile-radius), same token IconTile.tsx draws
           every other tile through - the reference's own gradient product
           tile (owner ruling, "Two looks, one setting": "the logo on a
-          40px gradient tile... 12px radius") in Studio, the circle that
-          shipped in Calm. */}
-      {/* size-10 (40px) is Calm's own tile; Studio's exact 48px mark
-          (owner findings, "The Studio look, the numbers," 2026-09-20
-          18:15) replaces it under studio: - the accent glow already
-          here matches that same finding's "accent glow" on the mark. */}
+          40px gradient tile... 12px radius"), the kit's own default
+          since LOOK-01 (2026-09-21) retired Calm's own circle. */}
+      {/* 48px, the reference's own exact mark size (owner findings, "The
+          Studio look, the numbers," 2026-09-20 18:15) - was gated behind
+          a `studio:` variant, unconditional since LOOK-01 retired the
+          look that gate depended on (this was already every fresh
+          person's own default, so nothing on screen moves). The accent
+          glow already here matches that same finding's "accent glow" on
+          the mark. */}
       <span
-        className="flex size-10 studio:size-12 shrink-0 items-center justify-center bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-1.5"
+        className="flex size-12 shrink-0 items-center justify-center bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-1.5"
         style={{ borderRadius: "var(--tile-radius)", boxShadow: "0 0 16px color-mix(in srgb, var(--hue-violet) 25%, transparent)" }}
       >
         <img src="/brand/maipai-home-icon-light.png" alt="" className="size-full object-contain brand-logo-light" />
         <img src="/brand/maipai-home-icon-dark.png" alt="" className="size-full object-contain brand-logo-dark" />
       </span>
       <span className="min-w-0 group-data-[collapsible=icon]:hidden">
-        {/* text-lg (18px) was Studio's own rough estimate; 19px with
-            -0.4px tracking is the exact reference figure (owner
-            findings, "The Studio look, the numbers," 2026-09-20
-            18:15) - arbitrary values since neither is a Tailwind
-            step. */}
-        <WordmarkText className="block truncate text-base font-semibold tracking-tight studio:text-[19px] studio:tracking-[-0.4px]" />
+        {/* 19px with -0.4px tracking, the reference's own exact figure
+            (owner findings, "The Studio look, the numbers," 2026-09-20
+            18:15) - arbitrary values since neither is a Tailwind step.
+            Unconditional since LOOK-01 the same way the tile above is. */}
+        <WordmarkText className="block truncate text-[19px] font-semibold tracking-[-0.4px]" />
         {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3): a
             compact secondary label under the wordmark, the same category
             as a nav group heading (11px uppercase secondary) or a badge -
             never truncated with an ellipsis (COORDINATOR, 2026-09-20: "the
             tagline wraps to a second line... nothing in the rail is ever
             cut"), wraps onto its own second line instead. */}
-        {/* Studio's own exact 11px, a deliberate type-floor exception too
-            (owner findings, "The Studio look, the numbers," 2026-09-20
-            18:15) - a hair under Calm's own text-xs (12px). */}
-        <span className="block text-xs studio:text-[11px] text-muted-foreground">Your AI. On your terms.</span>
+        {/* The reference's own exact 11px (owner findings, "The Studio
+            look, the numbers," 2026-09-20 18:15), a deliberate type-floor
+            exception too - unconditional since LOOK-01. */}
+        <span className="block text-[11px] text-muted-foreground">Your AI. On your terms.</span>
       </span>
     </Link>
   );
@@ -285,12 +287,18 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
         footer={<HomeFooterBar person={person} />}
         headerTitle={
           <div className="min-w-0">
-            {/* Studio (owner ruling, "Two looks, one setting"): "the page
-                title at 32px semibold with the subtitle at 14px directly
-                under it" - the reference's own larger scale. Calm keeps
-                the size that shipped. */}
-            <h1 className="truncate text-lg font-semibold sm:text-xl studio:text-[32px]">{title}</h1>
-            {subtitle ? <p className="hidden truncate text-sm text-muted-foreground sm:block studio:text-sm">{subtitle}</p> : null}
+            {/* The reference's own larger scale (owner ruling, "Two
+                looks, one setting"): "the page title at 32px semibold
+                with the subtitle at 14px directly under it." Unconditional
+                since LOOK-01 (2026-09-21) retired the look-scoped
+                `studio:` variant this used to render behind - checked
+                live in the built CSS before this edit: `studio:` carries
+                no media-query scope of its own, so it applied at every
+                viewport width, not just `sm:` and up, whenever active -
+                already every fresh person's own default, so nothing on
+                screen moves. */}
+            <h1 className="truncate text-[32px] font-semibold">{title}</h1>
+            {subtitle ? <p className="hidden truncate text-sm text-muted-foreground sm:block">{subtitle}</p> : null}
           </div>
         }
         headerActions={
@@ -302,8 +310,12 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
                 Home keeps its own five controls (PinToggle and ModelPicker
                 are Home's, not the reference's), so the hairline lands
                 where Home's own theme toggle sits, the same relative
-                position the reference's own cluster uses. */}
-            <span aria-hidden className="hidden studio:mx-1 studio:block studio:h-6 studio:w-px studio:bg-border" />
+                position the reference's own cluster uses. Unconditional
+                since LOOK-01 (2026-09-21) retired the look-scoped
+                `studio:` variant this used to render behind - already
+                every fresh person's own default, so nothing on screen
+                moves. */}
+            <span aria-hidden className="mx-1 block h-6 w-px bg-border" />
             <ThemeToggle setAppearance={setAppearance} />
             <NotificationBell />
             <ProfileSwitcher person={person} onSwitched={onPersonChange} onSignOut={onSignOut} />

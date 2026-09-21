@@ -19131,9 +19131,29 @@ the wire contract the Elements expect and the generative-UI rule is
 Both surfaces switch together under one setting, `ui.shell.next`
 (System, General, advanced level), which mounts `/next/*`
 (`frontend/src/next/NextRoutes.tsx`) in place of the old shell; the
-look comes from `ui.look` (studio, calm, and shadcn's seven base
-colors, spec-v0.1.12) through the template's own style-variant
-mechanism (`frontend/src/next/useNextLook.ts`). Landed so far: HOME-UI-04 (the stand-up, the Manage group on the template's tables view), HOME-UI-04b (the flag reachable, the collapsed rail, dark mode, the presets), HOME-UI-04d (one theme writer: the template's own ThemeProvider fed from `ui.appearance`, 95ce9d79), HOME-UI-04e (one Tailwind root, so the vendored pages' responsive classes hold; the template's own palette as the default, navy as a preset; da3acf2c, ui-v0.5.13), the "fewer lines" kit rules (ui-v0.5.15 and ui-v0.5.16, the owner's one deviation, DECISIONS.md 2026-09-21), and SHELL-01's backend (`GET /api/dashboard`, 872a4038). Open: CHAT-SDK-01 (the SDK upgrade the Elements need, pins ui-v0.5.16), `/next/chat`, SHELL-01's page, then the other SHELL rows.
+look comes from `ui.look` (`neutral`, the default, plus shadcn's other
+six base colors and `navy`, MaiPai's own - `studio`/`calm` retired,
+LOOK-01, spec-v0.1.15) through the template's own style-variant
+mechanism (`frontend/src/next/useNextLook.ts`). The old shell's own,
+separate `data-look` attribute mechanism (`@/shell/useLook.ts`, kit
+tokens.css) lost its Studio branch the same way - `data-look` can
+never be "studio" again, so every rule and Tailwind variant gated on
+it (the main nav rail's own geometry, the brand tile, the page title)
+went permanently dead; Studio's own values were promoted to
+unconditional in the same item (ui-v0.5.18) rather than left silently
+reverted to Calm's plainer fallback. Landed so far: HOME-UI-04 (the
+stand-up, the Manage group on the template's tables view), HOME-UI-04b
+(the flag reachable, the collapsed rail, dark mode, the presets),
+HOME-UI-04d (one theme writer: the template's own ThemeProvider fed
+from `ui.appearance`, 95ce9d79), HOME-UI-04e (one Tailwind root, so the
+vendored pages' responsive classes hold; the template's own palette as
+the default, navy as a preset; da3acf2c, ui-v0.5.13), the "fewer lines"
+kit rules (ui-v0.5.15 and ui-v0.5.16, the owner's one deviation,
+DECISIONS.md 2026-09-21), LOOK-01 (studio/calm retired, ui-v0.5.17 and
+0.5.18), CHAT-SDK-01 (the coordinated `@assistant-ui/react` bump the
+Elements need, 0.15.18 to 0.15.21, c413594e), and SHELL-01 (both the
+backend, `GET /api/dashboard`, 872a4038, and the page, a92f7fbc). Open:
+`/next/chat`, then the other SHELL rows.
 
 ## Memory outcomes as notifications (2026-09-21)
 

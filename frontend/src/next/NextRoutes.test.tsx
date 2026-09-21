@@ -56,7 +56,7 @@ describe("NextRoutes appearance", () => {
         return Promise.resolve(
           Response.json([
             { scope: "person:person-abc123", key: "ui.appearance", value: setting },
-            { scope: "person:person-abc123", key: "ui.look", value: "studio" },
+            { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
           ]),
         );
       }
@@ -106,7 +106,7 @@ describe("NextRoutes appearance", () => {
         await settingsGate;
         return Response.json([
           { scope: "person:person-abc123", key: "ui.appearance", value: "light" },
-          { scope: "person:person-abc123", key: "ui.look", value: "studio" },
+          { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
         ]);
       }
       return new Response("{}", { status: 200 });

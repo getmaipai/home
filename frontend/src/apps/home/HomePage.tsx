@@ -626,17 +626,22 @@ export function HomePage({ person }: HomePageProps) {
           a 24px gutter and no max-width column" plus the reference's
           own subtle canvas gradient - the dashboard's own wrapper, not
           every page's, since the ruling's acceptance judges this one
-          route. Calm keeps the centered column that shipped. Phone:
-          16px gutter, no canvas gradient (the ruling's own phone
-          density rules name 16px/12px/20px rhythm, not the Studio
-          desktop treatment). */}
+          route. Phone: 16px gutter, no canvas gradient (the ruling's
+          own phone density rules name 16px/12px/20px rhythm, not the
+          desktop treatment). Unconditional edge-to-edge since LOOK-01
+          (2026-09-21) retired the look-scoped `studio:` variant this
+          used to render behind (checked live in the built CSS: no
+          media-query scope of its own, so it applied at every non-
+          phone width whenever active) and the centered-column fallback
+          it overrode - already every fresh person's own default, so
+          nothing on screen moves. */}
       <div
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see the comment above.
         tabIndex={0}
         style={{ background: phone ? undefined : "var(--canvas-background)" }}
         className={cn(
-          "mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-y-auto",
-          phone ? "gap-5 px-4 py-4" : "gap-6 px-4 py-6 sm:px-8 studio:max-w-none studio:px-6",
+          "flex min-h-0 w-full max-w-none flex-1 flex-col overflow-y-auto",
+          phone ? "gap-5 px-4 py-4" : "gap-6 px-6 py-6",
           FOCUS_RING,
         )}
       >

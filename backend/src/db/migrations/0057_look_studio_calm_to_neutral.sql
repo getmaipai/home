@@ -1,0 +1,14 @@
+-- LOOK-01: ui.look's enum drops "studio" and "calm" (owner ruling -
+-- the default is a named shadcn theme, not a Home name that hides
+-- what it is; "studio"/"calm" were geometry presets over the same
+-- palette, and the template's own default geometry already matches
+-- what "studio" set). Every stored value equal to either is deleted,
+-- not rewritten to an explicit "neutral": deleting falls back to the
+-- key's own declared default (uiKeys.ts), which this same item moves
+-- to "neutral" - the shadcn base-color option carrying the identical
+-- palette "studio" already rendered, so nothing on screen moves for
+-- anyone who had picked it. Matches lib/settings.ts's own
+-- clearMatchingValues() idiom (delete-and-fall-back-to-default), just
+-- as a migration instead of a runtime call, since this needs to catch
+-- every existing row once, not react to a future event.
+DELETE FROM `settings_values` WHERE `key` = 'ui.look' AND `value` IN ('"studio"', '"calm"');

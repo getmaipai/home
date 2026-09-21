@@ -51,40 +51,45 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "profile.appearance",
     honoured_by: ["home"],
   }),
-  // The owner's "Two looks, one setting" ruling (2026-09-20): Studio
-  // matches the reference design exactly and is the hub's own default;
-  // Calm is the softer look HOME-UI-01/02 shipped first, kept as the
-  // escape hatch for anyone who prefers it (its group labels and
-  // header, unlike Studio's, stay at docs/UI.md's own type floor).
-  // Applied live by frontend/src/shell/useLook.ts, the same
-  // read-the-shared-cache pattern useAppearance.ts uses for
-  // `ui.appearance`, through a `data-look` attribute `tokens.css`'s
-  // `studio:` variant and look-scoped tokens key off.
-  //
   // HOME-UI-04b (2026-09-21): the seven shadcn base-color presets
   // (ui.shadcn.com/docs/theming's own current list - Neutral, Stone,
-  // Zinc, Mauve, Olive, Mist, Taupe) join Studio and Calm on the same
-  // enum and the same style-variant mechanism (commons-a/ui/src/
-  // dashboard/css/globals.css), applied on /next only (`useNextLook`)
-  // - the old shell's `useLook` still resolves the value (`Look`
-  // widened to match in `@/shell/useLook.ts`) but has no `.style-<
-  // color>` CSS of its own, so an old-shell person who picked a color
-  // preset just keeps Studio's own palette there until the old shell
+  // Zinc, Mauve, Olive, Mist, Taupe), each a full style-variant preset
+  // (commons-a/ui/src/dashboard/css/globals.css), applied on /next
+  // only (`useNextLook`) - the old shell's `useLook` still resolves
+  // the value (`Look` widened to match in `@/shell/useLook.ts`) but
+  // has no `.style-<color>` CSS of its own, so an old-shell person who
+  // picked a color preset sees no change there until the old shell
   // retires.
   //
-  // HOME-UI-04e (2026-09-21): Studio and Calm's own shared palette
-  // stopped being Home's navy hex set and became the shadcndashboard
-  // template's own default, byte-for-byte (owner ruling, "identical to
-  // the source") - Home's former default survives as its own tenth
-  // option, `navy`, on the same mechanism as the shadcn presets above.
+  // HOME-UI-04e (2026-09-21): the default palette stopped being Home's
+  // navy hex set and became the shadcndashboard template's own
+  // default, byte-for-byte (owner ruling, "identical to the source") -
+  // Home's former default survives as its own option, `navy`, on the
+  // same mechanism as the shadcn presets above.
+  //
+  // LOOK-01 (2026-09-21, owner ruling): "I like the black as the
+  // default, same as the shadcn dashboard example, but we should be
+  // using themes and have a black theme as our default" - the default
+  // is a named shadcn theme, not a Home name that hides what it is.
+  // `studio` and `calm` retire from the enum: they were geometry
+  // presets (a 12px tile vs. a circle) layered over this same shared
+  // palette, and the template's own default geometry already matches
+  // what `studio` set, so neither needs a preset of its own anymore.
+  // `neutral` becomes the default - the exact palette `studio` always
+  // rendered, so nothing on screen moves for anyone already on it.
+  // Stored `studio`/`calm` values migrate to the new default via
+  // db/migrations/0057_look_studio_calm_to_neutral.sql, not a code-
+  // level fallback: lib/settings.ts's own read path decodes whatever's
+  // stored with no re-validation against the current registry, so a
+  // stale row would otherwise read back as a retired value forever.
   SettingsKey.parse({
     key: "ui.look",
     scope: "person",
     selector: "select",
-    range: { options: ["studio", "calm", "neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe", "navy"] },
-    default: "studio",
+    range: { options: ["neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe", "navy"] },
+    default: "neutral",
     label: "Look",
-    help: "Studio matches the reference design exactly. Calm is the same look, rounder tiles. Navy is Home's own blue-black set. The rest are shadcn's own color presets.",
+    help: "Neutral is the standard black-and-white theme, the same as shadcn's own dashboard; the rest are shadcn's other color sets; Navy is MaiPai's own.",
     level: "basic",
     lives_in: "profile.appearance",
     honoured_by: ["home"],
