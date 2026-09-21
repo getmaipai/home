@@ -19141,7 +19141,7 @@ never be "studio" again, so every rule and Tailwind variant gated on
 it (the main nav rail's own geometry, the brand tile, the page title)
 went permanently dead; Studio's own values were promoted to
 unconditional in the same item (ui-v0.5.18) rather than left silently
-reverted to Calm's plainer fallback. Then, the same afternoon: CHAT-SDK-01 (c413594e, ui-v0.5.16), LOOK-01 (5822231a, neutral the named default, ui-v0.5.18), SHELL-02's first three slices of `/next/chat` (68784232 the Elements thread on a real turn with reasoning live; c0469d64 history and the thread list; a slice-3 commit landing tools and generative UI - weather's and almanac-date's own structured result rendering through the shipped `SpecSheet` Element, `display: "standalone"` after finding live that its default tucks the card behind a collapsed "1 tool call" trigger), SHELL-03 `/next/apps` (ebe0ceff, on GET /api/plugins), SHELL-04 `/next/people` (81494595), SHELL-05 `/next/settings` (3d1ff358, the registry renderer on the template's fields), SHELL-06 `/next/engines` (0ecfd157, with the honest "not configured" 200), and PWA-SW-01 (7712ee5f). Open: the chat's remaining slices (artifacts, suggestions and attachments and read-aloud), SHELL-07 and SHELL-08, then SHELL-09, the cutover and the deletion of the old interface. HOME-UI-04 (the
+reverted to Calm's plainer fallback. Then, the same afternoon: CHAT-SDK-01 (c413594e, ui-v0.5.16), LOOK-01 (5822231a, neutral the named default, ui-v0.5.18), SHELL-02's first four slices of `/next/chat` (68784232 the Elements thread on a real turn with reasoning live; c0469d64 history and the thread list; a slice-3 commit landing tools and generative UI - weather's and almanac-date's own structured result rendering through the shipped `SpecSheet` Element, `display: "standalone"` after finding live that its default tucks the card behind a collapsed "1 tool call" trigger; 54ea8fc3 a packageHost fix and b21d9a29 slice 4 itself - artifacts through the shipped `ArtifactCard`/`CanvasSplit` Elements, which also found `write_document` cannot create a document on any real live turn today, a real conversation_turns-ordering bug only 54ea8fc3's own half fixed, filed as getmaipai/home#131), SHELL-03 `/next/apps` (ebe0ceff, on GET /api/plugins), SHELL-04 `/next/people` (81494595), SHELL-05 `/next/settings` (3d1ff358, the registry renderer on the template's fields), SHELL-06 `/next/engines` (0ecfd157, with the honest "not configured" 200), and PWA-SW-01 (7712ee5f). Open: the chat's remaining slices (suggestions and attachments and read-aloud), SHELL-07 and SHELL-08, then SHELL-09, the cutover and the deletion of the old interface. HOME-UI-04 (the
 stand-up, the Manage group on the template's tables view), HOME-UI-04b
 (the flag reachable, the collapsed rail, dark mode, the presets),
 HOME-UI-04d (one theme writer: the template's own ThemeProvider fed
@@ -19163,12 +19163,32 @@ onto `useRemoteThreadListRuntime` over the existing
 `chatThreadListAdapter.ts` and mounted the Elements `ThreadList` -
 open a past conversation, continue it, start a new one, delete one, no
 Pin since the vendored menu is Rename/Archive/Delete not Rename/Pin/
-Delete), and slice 3 (weather's and almanac-date's own structured
-result renders through the shipped `SpecSheet` Element, keyed on the
+Delete), slice 3 (weather's and almanac-date's own structured result
+renders through the shipped `SpecSheet` Element, keyed on the
 producing package's real name, `display: "standalone"` so it isn't
-tucked behind a collapsed "1 tool call" trigger). Open: the rest of
-SHELL-02's own wiring table (artifacts, then suggestions/attachments/
-read-aloud), then the other SHELL rows.
+tucked behind a collapsed "1 tool call" trigger), and slice 4
+(artifacts: `TurnValue.artifact` becomes a real tool-call part
+rendering the shipped `ArtifactCard`, opening `CanvasSplit` beside the
+thread on desktop or a phone/tablet Sheet; a new `GET /api/artifacts/
+{id}/current` route, resolved through the artifact's own Home-internal
+key, is what makes this survive reload unlike #130's `structured_part`
+and what makes a later turn's update replace the open pane on its own,
+no id bookkeeping needed). Found live verifying slice 4, not fixed
+there (getmaipai/home#131): `write_document` cannot actually create a
+document on a real turn - `host.artifact.create()` needs the turn's
+own `conversation_turns` row, but that row is written only after the
+whole turn finishes, well after this tool call already ran, so the
+insert always fails on the table's own foreign key. One layer of it
+(the same method's `conversationId` was ALSO always empty, from an
+equally always-missing DB lookup) is fixed alongside slice 4 -
+`createHost()`/`runPlugin()` now take a bundled `{id, conversationId}`
+straight from the caller's turn context - but the foreign-key ordering
+problem itself is still open, both real fixes it needs (drop the hard
+FK, or give a turn a real row before its own tool outcomes run) named
+in the issue but not attempted, since both are bigger and riskier than
+a `/next/chat` wiring slice's own scope. Open: the rest of SHELL-02's
+own wiring table (suggestions and attachments, then read-aloud), then
+the other SHELL rows.
 
 ## Memory outcomes as notifications (2026-09-21)
 
