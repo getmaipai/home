@@ -47,7 +47,7 @@ import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor, constraints
 import { planFor, planLine } from "@/lib/register";
 import { rungOf, rulesFired, type Rung, type RuleName } from "@/lib/ruleNames";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
-import { buildDocument, projectDocument, planComposition, composedText, composedLog, groundedIn, renderLookupRows, emptyLookupLine, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, structuredPartForOutcomes, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
+import { buildDocument, projectDocument, planComposition, composedText, composedLog, groundedIn, renderLookupRows, emptyLookupLine, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, structuredPartForOutcomes, artifactForOutcomes, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
 import { promptNow } from "@/lib/benchSampling";
 import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
@@ -308,6 +308,9 @@ function logTurnSafely(
   const rung = rungOf(value, meta.outcomes ?? [], meta.signal, { householdSubject: rules.includes("lookup.household_subject") || (meta.subjects ?? []).some((s) => s.type === "household") });
   value.rung = rung;
   value.structured_part = structuredPartForOutcomes(meta.outcomes ?? []) ?? undefined;
+  // ARTIFACT-02: the same unconditional-line, no-new-dispatch hookup
+  // structured_part just took, for write_document's own outcome.
+  value.artifact = artifactForOutcomes(meta.outcomes ?? []) ?? undefined;
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
   // point every runTurnStream() finalize site routes through, so a

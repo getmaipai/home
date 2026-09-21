@@ -1,0 +1,13 @@
+{
+  "id": "write_document",
+  "inputs": [
+    { "name": "title", "selector": "text" },
+    { "name": "kind", "selector": "text" },
+    { "name": "body", "selector": "text" },
+    { "name": "artifact_id", "selector": "text", "required": false }
+  ],
+  "steps": [
+    { "op": "artifact", "as": "result", "title": "{title}", "kind": "{kind}", "body": "{body}", "id_from": "artifact_id" },
+    { "op": "format", "as": "reply", "text": "Here's \"{title}\".", "data": { "artifact_id": "{artifact_id}", "artifact_version": "{artifact_version}" } }
+  ]
+}

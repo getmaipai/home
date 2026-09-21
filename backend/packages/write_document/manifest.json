@@ -1,0 +1,48 @@
+{
+  "id": "write_document",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Write a Document",
+  "description": "Create or edit a document the model writes for you, shown as a card you can read, edit again, and save.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "write me a packing list for the camping trip",
+      "put this recipe in a document I can save",
+      "make a document with these steps",
+      "draft a short story for me as a document",
+      "write that up as a document",
+      "can you turn this into a document"
+    ]
+  },
+  "args": {
+    "type": "object",
+    "required": ["title", "kind", "body"],
+    "properties": {
+      "title": { "type": "string", "minLength": 1 },
+      "kind": { "type": "string", "enum": ["markdown", "code", "html"] },
+      "body": { "type": "string", "minLength": 1 },
+      "artifact_id": { "type": "string", "minLength": 1, "description": "The id of the version being edited. Present only when the model is updating a document it already wrote earlier in this conversation." }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["artifact:write"],
+  "notifications": [],
+  "backup": "hot",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

@@ -588,6 +588,28 @@ export function structuredPartForOutcomes(outcomes: readonly ToolExecutionOutcom
   return null;
 }
 
+/** ARTIFACT-02: `TurnValue.artifact`'s own writer (wire.ts's own comment
+ * on that field: "No writer yet - the turn-engine dispatch that lets the
+ * model actually call the artifact tool live is a separate integration"
+ * - this is that integration). The bundled `write_document` package's
+ * own recipe (`artifact` step then a `format` step) binds
+ * `{artifact_id, artifact_version}` into its result's flat `data` -
+ * exactly the shape `structuredPartForOutcomes()`'s own producers above
+ * already read `result.data` from, so this reads it the identical way,
+ * a sibling reducer rather than folding a second wire field into that
+ * one's own StructuredPart union. */
+export function artifactForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string; version: number } | null {
+  const succeeded = outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded");
+  for (const outcome of succeeded) {
+    if (outcome.packageId !== "write_document") continue;
+    const data = recordData(outcome.result?.data);
+    const id = data?.artifact_id;
+    const version = data?.artifact_version;
+    if (typeof id === "string" && typeof version === "number") return { id, version };
+  }
+  return null;
+}
+
 function weatherSpecSheet(outcome: Succeeded): StructuredPart | null {
   const data = recordData(outcome.result?.data);
   const place = typeof data?.place === "string" ? data.place : null;

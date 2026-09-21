@@ -5444,7 +5444,7 @@ one row of.
 
     Objective: `/next/sign-in` on the template's auth view with Home's real data: Home's sign-in and passkeys. Files: `frontend/src/next/pages/NextSignInPage.tsx`, the sign-in and passkeys route or lib files, and `apps/auth/*` that the row retires. Pattern to mirror: the first landed row; until one lands, `NextAppsPage.tsx` for the mount and the template's own view for the data hooks (SWR through its global-fetcher). Acceptance: the page shows Home's data in the template's view as shipped; nothing Home-drawn (the reviewer's first check); a test per data path; captures at 1440 and 390, both looks and themes, opened and judged. Out of scope: editing any vendored component; the old route, which stays until the switch. Exit check: `bash scripts/check.sh`.
 
-- [ ] **ARTIFACT-02: the `artifact` recipe primitive** (M, high review -
+- [x] **ARTIFACT-02: the `artifact` recipe primitive** (M, high review -
       spans `commons/spec`, both interpreters, and Home) - the sanctioned
       way for the model to create or update a chat artifact live, found
       while landing the artifact data layer (`lib/artifacts.ts`,
@@ -5549,6 +5549,34 @@ one row of.
       until a real reason exists for a second. Check: `spec`'s own
       `bun test`/`pytest` (conformance fixtures), backend's artifact and
       turnEngine tests, `bash scripts/check.sh` in both repos.
+
+      **Landed 2026-09-21** (`commons` `1c1306d`/`spec-v0.1.9` - `spec-
+      v0.1.8` shipped with `spec/package.json`'s own version field still
+      reading `0.1.7`, caught by this repo's own pin-honesty check and
+      fixed same-session by `commons` `3246608`/`spec-v0.1.9`, `v0.1.8`
+      retired unused; `home` this commit). The bundled package/tool is
+      named `write_document`,
+      not `documents` as this item's own prose casually called it:
+      `resolveToolCallsInOrder()`/`selectOfferedTools()` key a model's
+      tool call by the package's own `manifest.id`, so the id had to be
+      the literal tool name for the acceptance criterion's own "nothing
+      extra needs registering" to hold. Its manifest first declared
+      `always_offer: true` (`websearch`'s own pattern) - that put it on
+      every turn's offered-tool list and shifted Tier 2 ranking margins
+      enough to fail 3-5 unrelated tests (LOOKUP-01, hub-named-it);
+      removed, since a document-writing request is nothing like
+      `websearch`'s open-ended fallback role - it ranks normally now.
+      `packageHost.ts`'s `update()` also gained an ownership check this
+      item's own design didn't spell out: `lib/artifacts.ts`'s
+      `updateArtifact()` has none, and `routes/artifacts.ts` is
+      read-only, so this host method was the only place a non-owner
+      could otherwise supersede someone else's artifact by guessing an
+      id - `not_found`, matching the read routes' own "can't see it, so
+      it doesn't exist" convention. A high-effort review on the `commons`
+      side caught a real TS/Python divergence before it shipped (an
+      explicit JSON `null` `artifact_id` created in Python, updated
+      against `null` in TS); fixed and covered by a fifth conformance
+      fixture.
 - [ ] **REASONING-01: stream the model's thinking as its own part** (M) -
       `reasoning` (`assistant-ui.com/elements/reasoning`) binds to a
       `{type: "reasoning", text, status?}` message part; Home has no such

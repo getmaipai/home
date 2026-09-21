@@ -1,0 +1,30 @@
+package: write_document
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: recipe.json; no external network fetch to test
+  routing_examples:
+    met: true
+    note: 6 examples in manifest.json's routing.examples
+  privacy_row_per_data_source:
+    met: true
+    note: no external data_sources; writes to the household's own local database only
+  offline_behavior_stated:
+    met: true
+    note: "offline: full - writes to the local database only"
+  smoke_test:
+    met: true
+    note: recipe conformance; no external fetch to smoke
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth or external service to diagnose
+gold:
+  real_service_verified:
+    met: false
+    note: no external service to verify

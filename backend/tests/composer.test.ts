@@ -33,6 +33,7 @@ import {
   documentEvidenceVersion,
   projectDocumentForChild,
   structuredPartForOutcomes,
+  artifactForOutcomes,
   type ComposerInput,
 } from "@/lib/composer";
 
@@ -780,5 +781,49 @@ describe("structuredPartForOutcomes", () => {
     const part = structuredPartForOutcomes([searchOutcome(), fullWeatherOutcome()]);
     expect(part?.kind).toBe("spec_sheet");
     expect((part as { title: string }).title).toBe("Lantern Bay");
+  });
+});
+
+// ARTIFACT-02: TurnValue.artifact's own writer - a sibling reducer to
+// structuredPartForOutcomes() above, not a case folded into it (they're
+// different wire fields). A review of this item's first pass found
+// wire.ts's own "No writer yet" comment on TurnValue.artifact still
+// true after the recipe/host layer landed: this function, and
+// turnEngine.ts's own one-line hookup beside structured_part, are what
+// closes that gap - covered here since logTurnSafely() itself isn't
+// practically unit-testable in isolation.
+describe("artifactForOutcomes", () => {
+  const writeDocumentOutcome = (data: Record<string, unknown>) =>
+    outcome({
+      callId: "call-d",
+      packageId: "write_document",
+      status: "succeeded",
+      args: { title: "Packing list", kind: "markdown", body: "- tent" },
+      result: { actions: [], reply: { text: 'Here\'s "Packing list".' }, data },
+    });
+
+  test("a succeeded write_document outcome maps onto {id, version}", () => {
+    expect(artifactForOutcomes([writeDocumentOutcome({ artifact_id: "art-abc123", artifact_version: 1 })])).toEqual({
+      id: "art-abc123",
+      version: 1,
+    });
+  });
+
+  test("a producer with no mapping yields no artifact, not an error", () => {
+    expect(artifactForOutcomes([searchOutcome()])).toBeNull();
+  });
+
+  test("no succeeded outcomes yields no artifact", () => {
+    expect(artifactForOutcomes([failedOutcome("I couldn't save that.")])).toBeNull();
+  });
+
+  test("a malformed data shape (missing or wrong-typed fields) yields no artifact, not a throw", () => {
+    expect(artifactForOutcomes([writeDocumentOutcome({ artifact_id: "art-abc123" })])).toBeNull();
+    expect(artifactForOutcomes([writeDocumentOutcome({ artifact_id: 42, artifact_version: 1 })])).toBeNull();
+  });
+
+  test("the first known producer wins when several outcomes succeeded", () => {
+    const result = artifactForOutcomes([searchOutcome(), writeDocumentOutcome({ artifact_id: "art-first01", artifact_version: 1 }), writeDocumentOutcome({ artifact_id: "art-second1", artifact_version: 2 })]);
+    expect(result).toEqual({ id: "art-first01", version: 1 });
   });
 });

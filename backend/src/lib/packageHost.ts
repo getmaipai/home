@@ -55,6 +55,11 @@
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import type { Artifact as ArtifactValue } from "@maipai/spec/gen/ts/artifact.js";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { conversationTurns } from "@/db/schema";
+import { createArtifact, updateArtifact, getArtifactRow } from "@/lib/artifacts";
 import { tryConsume } from "@/lib/rateLimiter";
 import { assertNotPrivateHost, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import * as memory from "@/lib/memory";
@@ -1046,6 +1051,92 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         });
         if (!result.ok) mapWriteFailure(result.status, result.error);
         return result.value.id;
+      },
+    },
+    // ARTIFACT-02: the sanctioned way a Tier 0 recipe writes a live chat
+    // artifact-card/canvas-split document (docs/dev.md's "ARTIFACT-02,
+    // designed"). Synchronous like memory.remember, not fetch: backed by
+    // lib/artifacts.ts's own synchronous SQLite writer, nothing to await.
+    artifact: {
+      create(input: { title: string; kind: string; body: string }): { id: string; version: number } {
+        requirePermission("artifact:write");
+        // turn_id is a required FK on the Artifact record (artifact.schema.json)
+        // - unlike memory.remember's own free-text `source`, there is no
+        // fallback shape for "no turn": a live chat artifact always has one.
+        if (!turnId) {
+          throw new HostError("not_found", "host.artifact.create needs a conversation turn to attach to");
+        }
+        const turn = db.select({ conversationId: conversationTurns.conversationId }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+        if (!turn || !turn.conversationId) {
+          throw new HostError("not_found", `no such conversation turn ${turnId}`);
+        }
+        // The identical provenance FIELD memory.remember() already uses
+        // for its own `source` (docs/dev.md's "Provenance" note) -
+        // unlike remember()'s `turnId ?? package:${manifest.id}`, there
+        // is no fallback branch to write here: the throw above already
+        // guarantees turnId is bound by this point (turn_id is a
+        // required FK, not a free-text field with room for a package-id
+        // shaped placeholder), so provenance is always exactly the turn
+        // id, never a bare `??` expression that can't actually fall
+        // through (a code review flagged the misleading dead branch an
+        // earlier draft carried here).
+        const value = createArtifact({
+          conversationId: turn.conversationId,
+          turnId,
+          kind: input.kind as ArtifactValue["kind"],
+          title: input.title,
+          body: input.body,
+          createdBy: actor.id,
+          provenance: turnId,
+        });
+        return { id: value.id, version: value.version };
+      },
+      // `kind` is deliberately absent: an existing artifact's kind never
+      // changes, and recipe.schema.json's own `kind` field on this step
+      // stays required regardless so the templating layer never needs an
+      // optional-on-update case.
+      update(input: { artifact_id: string; title: string; body: string }): { id: string; version: number } {
+        requirePermission("artifact:write");
+        if (!turnId) {
+          throw new HostError("not_found", "host.artifact.update needs a conversation turn to attach to");
+        }
+        // lib/artifacts.ts's own updateArtifact() has no actor check at
+        // all (it isn't reachable any other way - routes/artifacts.ts is
+        // read-only, this host method is the one write path), so a
+        // household member editing THEIR OWN artifact from a real live
+        // chat could otherwise supersede anyone else's by guessing an id.
+        // not_found (never permission_denied), matching
+        // routes/artifacts.ts's own "can't see it, so it doesn't exist"
+        // convention for someone else's artifact.
+        const owned = getArtifactRow(input.artifact_id);
+        if (!owned || owned.createdBy !== actor.id) {
+          throw new HostError("not_found", `no artifact version ${input.artifact_id}`);
+        }
+        // Same provenance field as create() above, and the same reason
+        // there's no `?? package:${manifest.id}` fallback: turnId is
+        // guaranteed bound by the throw above.
+        const result = updateArtifact({
+          currentId: input.artifact_id,
+          title: input.title,
+          body: input.body,
+          turnId,
+          createdBy: actor.id,
+          provenance: turnId,
+        });
+        if (!result.ok) {
+          // lib/artifacts.ts's own updateArtifact(): 404 for an unknown
+          // version, 409 for one that is no longer current (editing a
+          // historical version is not a supported move) - mapped to the
+          // EXISTING errors.json codes host-emulator.ts's own deterministic
+          // implementation already uses, not a bespoke code.
+          throw new HostError(result.status === 404 ? "not_found" : "invalid_input", result.error);
+        }
+        // OpResult (lib/entities.ts) types `ok` as plain boolean, not a
+        // discriminated literal, so the check above doesn't narrow
+        // `value` away from possibly-undefined - updateArtifact() always
+        // sets it on ok:true (its own last line).
+        const value = result.value!;
+        return { id: value.id, version: value.version };
       },
     },
     action: {

@@ -134,11 +134,11 @@ export interface TurnValue {
    * turn's artifact tool call minted or updated a version, named by its
    * own id and version number (lib/artifacts.ts's ArtifactValue), the
    * same way `document_available` names a COMP-01 document without
-   * carrying its body inline. No writer yet - the turn-engine dispatch
-   * that lets the model actually call the artifact tool live is a
-   * separate integration, named as a gap in the chat program record
-   * (docs/plans/shell-on-shadcndashboard-2026-09-21.md); a client fetches
-   * the full version from GET /api/artifacts/:id. */
+   * carrying its body inline. Written by `lib/composer.ts`'s
+   * `artifactForOutcomes()` (ARTIFACT-02), the bundled `write_document`
+   * package's own outcome, hooked into `turnEngine.ts`'s
+   * `logTurnSafely()` beside `structured_part`; a client fetches the
+   * full version from GET /api/artifacts/:id. */
   artifact?: { id: string; version: number };
   /** STATS-01: optional adult-only engine telemetry, never required. */
   stats?: TurnStats;
