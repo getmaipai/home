@@ -1,11 +1,11 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { api, ApiError, type Roster } from "@/lib/api";
+import { api, type Roster } from "@/lib/api";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
-import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
+import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 
 interface SignInProps {
@@ -18,22 +18,16 @@ interface SignInProps {
 // someone is signed in.
 export function SignIn({ onSignedIn }: SignInProps) {
   const [profiles, setProfiles] = useState<Roster[] | null>(null);
-  const [selected, setSelected] = useState<Roster | null>(null);
-  const [secret, setSecret] = useState("");
   // `error` is reserved for the profile-fetch failure below (there's no
   // picker to show yet, so a full-screen message is the only option). A
   // wrong PIN or a failed direct tap both have a real screen behind them
   // to keep showing - issue #19 found the top-level `if (error)` early
   // return below firing for handleSecretSubmit's own catch too, nuking
   // the whole sign-in screen (profile picker, PIN pad, everything) down
-  // to bare error text with no way back except a refresh. Two more
-  // states, each rendered inline on the screen it belongs to, instead of
-  // funneling every failure through the one state that also controls
-  // whether a picker exists to render at all.
+  // to bare error text with no way back except a refresh. `secretError`/
+  // `tapError` (inside useProfileSignIn) are rendered inline on the
+  // screen each belongs to instead, not funneled through this one state.
   const [error, setError] = useState<string | null>(null);
-  const [secretError, setSecretError] = useState<string | null>(null);
-  const [tapError, setTapError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api
@@ -46,9 +40,9 @@ export function SignIn({ onSignedIn }: SignInProps) {
   // `return` below - React's rules of hooks, not just style (a first pass
   // that put this after the early returns crashed with "Rendered more
   // hooks than during the previous render" the moment profiles finished
-  // loading). See usePinAutoSubmit's own doc comment for what this does
-  // and the infinite-loop bug it exists to close.
-  usePinAutoSubmit({ secret, selected, busy, onSubmit: () => void handleSecretSubmit() });
+  // loading).
+  const { selected, secret, setSecret, secretError, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker } =
+    useProfileSignIn(onSignedIn);
 
   if (error) {
     return (
@@ -64,48 +58,6 @@ export function SignIn({ onSignedIn }: SignInProps) {
         <Progress mode="spinner" label="Loading household" />
       </div>
     );
-  }
-
-  async function handleSecretSubmit(e?: FormEvent) {
-    e?.preventDefault();
-    if (!selected) return;
-    setBusy(true);
-    setSecretError(null);
-    try {
-      await api.verifySecret(selected.id, secret);
-      onSignedIn();
-    } catch (e) {
-      // Whether this call came from the auto-submit effect (which already
-      // flipped autoSubmitDisabledRef before calling this) or a manual
-      // Sign-in click, a wrong PIN just shows the error inline, next to
-      // the PIN field - manual Sign-in keeps working normally either
-      // way, same as before this feature existed.
-      setSecretError(e instanceof ApiError ? e.message : "Sign-in failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleProfileTap(person: Roster) {
-    if (person.hasSecret) {
-      // A stale tapError from a PREVIOUS, unrelated failed tap (a
-      // different no-secret profile) must not resurface on the picker
-      // once this PIN flow ends - clear it here rather than only where
-      // it's set, since this early-return path skips that entirely.
-      setTapError(null);
-      setSelected(person);
-      return;
-    }
-    setBusy(true);
-    setTapError(null);
-    try {
-      await api.select(person.id);
-      onSignedIn();
-    } catch (e) {
-      setTapError(e instanceof ApiError ? e.message : "Sign-in failed");
-    } finally {
-      setBusy(false);
-    }
   }
 
   // A fresh install has nobody signed in and nobody to sign in as: the
@@ -143,7 +95,7 @@ export function SignIn({ onSignedIn }: SignInProps) {
           <Button type="submit" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </Button>
-          <Button type="button" variant="ghost" onClick={() => { setSelected(null); setSecretError(null); setSecret(""); }}>
+          <Button type="button" variant="ghost" onClick={backToPicker}>
             Back
           </Button>
         </form>

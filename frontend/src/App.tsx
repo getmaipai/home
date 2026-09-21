@@ -206,20 +206,24 @@ export function App() {
                   />
                   {/* The shell-on-shadcndashboard stand-up (docs/plans/
                       shell-on-shadcndashboard-2026-09-21.md, step 1): a
-                      second route tree behind ui.shell.next, only once a
-                      person is signed in (the flag itself is a household
-                      setting, so reading it needs a session). NextRoutes
-                      redirects to "/" when the flag is off. */}
+                      second route tree behind ui.shell.next. SHELL-08:
+                      reachable signed out too, not only once a person
+                      is signed in - NextRoutes itself now renders its
+                      own sign-in screen for a null person (the flag
+                      check still works for the realistic case, a real
+                      sign-out from within an already-open /next, since
+                      no reload happens and the settings query stays
+                      warm; a cold, never-authenticated load is its own
+                      named gap, see NextRoutes.tsx's own header).
+                      NextRoutes redirects to "/" when the flag is off. */}
                   <Route
                     path="/next/*"
                     element={
                       person === undefined ? (
                         LOADING_PERSON
-                      ) : person === null ? (
-                        <Navigate to="/" replace />
                       ) : (
                         <Suspense fallback={<RouteSkeleton />}>
-                          <NextRoutes person={person} />
+                          <NextRoutes person={person} onSignedIn={loadPerson} />
                         </Suspense>
                       )
                     }

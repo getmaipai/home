@@ -305,6 +305,54 @@ reads looser (`GET /api/updates` is `requireAuth` only) - matching the
 old page's own visible gate is the parity this row asks for, not a new
 rule.
 
+**SHELL-08's own named gap (found landing the row, 2026-09-21):** the
+row's own ask named "the child's PIN vs an adult's password as the old
+page distinguishes them" - `SignIn.tsx` makes no such distinction.
+Every profile, child or adult, gets the identical
+`<Input type="password">`; `usePinAutoSubmit`'s own 4-digit-numeric
+check is what quietly makes a short PIN feel instant without the UI
+ever needing to know in advance which kind of secret a profile has.
+Built against the real, single field instead of inventing a role-aware
+switch that would diverge from it. Dropped, no counterpart: the
+template's own social sign-in buttons, "Remember this device"
+checkbox, "Forgot password" and "Create an account" links - none of
+these exist in MaiPai's model (a session is a session, an owner/admin
+resets another person's secret, profiles are created in Settings, not
+self-service).
+
+Two real, separate limitations, not built around: (1) `useShellNext()`
+resolves `ui.shell.next` via `GET /api/settings?scope=household`,
+which is `requireAuth` - a genuinely cold, never-authenticated load of
+`/next/sign-in` has no session to read the flag with. Landing this row
+found a second way this bites, not just the cold-browser case: signing
+out invalidates the session server-side, and if anything refetches
+this exact query afterward (found live, capturing this row's own
+screenshot - a background refetch racing `/api/auth/logout`), it now
+401s. `useShellNext()` used to read `!query.data` alone, so either case
+spun `RouteSkeleton` forever with no way out; it now checks
+`query.isError` too and bounces to `/` (the same fallback a resolved-
+false flag already gives), so a real failure no longer hangs, though a
+genuinely cold, never-authenticated visit still has no session to
+resolve the flag with at all - that half needs its own pre-auth path,
+out of this row's scope. The realistic warm path this row's acceptance
+asks for (a sign-out from within an already-open `/next`, not a cold
+browser typing the URL first) still works the way it always did: no
+page reload happens on sign-out - only `App.tsx`'s own
+`setPerson(null)` - so the settings query's cache from before signing
+out stays valid as long as nothing forces a refetch in between.
+(2) No real sign-out control exists yet anywhere in `/next`'s own
+chrome to reach that in-session path from: the vendored `FullLayout`
+header's `Profile.tsx` sheet has a genuine "Log Out" button (a real
+callback-capable shipped part, unlike a dead Action-column icon), but
+it is hardcoded to `<Link to="/auth/auth2/login" />`, the vendored
+demo's own nonexistent route, not Home's real `api.logout()` - and per
+"never edit a vendored file," it can't be forked to point elsewhere.
+Tracked as its own follow-up rather than hand-building a sign-out
+control unasked; SHELL-08's own live verification exercises the
+sign-in half directly and the sign-out half through the old shell's
+already-real control, both landing the same in-session, no-reload
+person state Home actually runs on.
+
 One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
 the chat move together. There is no `ui.chat.next`; `ui.shell.next`
 governs both, the `/next/chat` row is part of the same stand-up, and

@@ -309,6 +309,7 @@ const nextEnginesReview = process.argv.includes("--next-engines-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
+const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
@@ -2596,6 +2597,125 @@ async function captureNextBackupsReview(browser: Browser, sessionValue: string):
   }
 }
 
+/** SHELL-08's own acceptance: both viewports, both themes, of `/next/
+ * sign-in`'s real profile picker. Unlike every other `/next` capture,
+ * this one can't start from a fresh, cookie-only context - `useShellNext()`
+ * needs `GET /api/settings` to resolve, which is `requireAuth` (the
+ * plan doc's own SHELL-08 gap paragraph), so a person has to be signed
+ * IN first for the settings query to warm, then sign OUT in the same
+ * page (no reload, `setPerson(null)` only) the exact way the real app's
+ * own acceptance works. The old shell's real "Sign out" control
+ * (ProfileSwitcher.tsx) does that; a `pushState`+`popstate` pair moves
+ * to `/next/sign-in` client-side after, since no in-app link between
+ * the old and new shells exists yet to click instead - the same
+ * no-reload transition a real browser back/forward or a future cross-
+ * shell link would make. */
+async function captureNextSignInReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextSignInReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const seededPeople = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } });
+  if (!seededPeople.ok) throw new Error(`captureNextSignInReview: people lookup failed: ${seededPeople.status}`);
+  const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((p) => p.display_name === "Sage");
+  if (!sage) throw new Error("captureNextSignInReview: seedHousehold() didn't create Sage");
+
+  const desktopViewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const phoneViewport = VIEWPORTS.find((v) => v.slug === "phone")!;
+
+  for (const theme of THEMES) {
+    // A fresh session per theme, not the shared `sessionValue`: the
+    // real "Sign out" click below calls the real `/api/auth/logout`,
+    // which invalidates whatever session cookie it's handed server-
+    // side - reusing the same one across iterations would 401 every
+    // context after the first sign-out actually runs.
+    const iterationLogin = await fetch(`${BASE_URL}/api/auth/verify-secret`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personId: sage.id, secret: "correcthorsebattery" }),
+    });
+    if (!iterationLogin.ok) throw new Error(`captureNextSignInReview: verify-secret failed: ${iterationLogin.status}`);
+    const iterationCookie = iterationLogin.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+    if (!iterationCookie) throw new Error("captureNextSignInReview: verify-secret carried no session cookie");
+
+    // One context and one real sign-out per theme, not per viewport:
+    // found live, opening the phone-only avatar menu (which folds
+    // Search/Theme/Notifications into the same popover as "Sign out")
+    // can still land a background refetch of this exact household-
+    // settings query right as `/api/auth/logout` invalidates the
+    // session, and `retry: false` means an errored query never
+    // recovers on its own afterward - a real, session-ending race, not
+    // something a retry of the same sign-out fixes. Signing out once on
+    // desktop (no phone-only menu content to race) and then resizing
+    // the same already-signed-out page for the phone screenshot avoids
+    // the race entirely rather than working around it.
+    const context = await newContext(browser, desktopViewport, theme, iterationCookie);
+    try {
+      const page = await context.newPage();
+      // Waits for the real network round trip, not just the header
+      // rendering (which shows before HomePage.tsx's own
+      // useHouseholdSettings() fetch resolves): the household settings
+      // query has to actually be IN the cache before signing out, or
+      // the very next read (NextSignInPage's own useShellNext()) finds
+      // nothing and spins in RouteSkeleton forever - the exact cold-
+      // load gap the plan doc names, just reached a different way
+      // (found live, debugging this capture).
+      const householdSettingsLoaded = page.waitForResponse((res) => res.url().includes("/api/settings") && res.url().includes("scope=household"));
+      await page.goto(`${BASE_URL}/`);
+      await householdSettingsLoaded;
+      const profileTrigger = page.getByRole("button", { name: /Sage, switch profile or sign out/i });
+      await profileTrigger.waitFor({ timeout: 15000 });
+      await profileTrigger.click();
+      await page.getByText("Sign out", { exact: true }).click();
+      // Confirms `person` really went to `null` in React state (no
+      // reload happened, so this same trigger just detaching proves
+      // AppShell unmounted) before trusting the settings cache is
+      // still the one warmed above, not a fresh cold load's own.
+      await profileTrigger.waitFor({ state: "detached", timeout: 15000 });
+      await page.evaluate(() => {
+        history.pushState({}, "", "/next/sign-in");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      await page.getByRole("button", { name: "Sage" }).waitFor({ timeout: 15000 });
+      // A short settle beyond the locator's own resolution: found
+      // live, this capture's own pushState-driven client-side nav (not
+      // a real browser navigation) can have the DOM genuinely updated
+      // a beat before the compositor paints it, so a screenshot taken
+      // the instant the locator resolves can still capture the prior
+      // frame.
+      await page.waitForTimeout(1000);
+      if (!page.url().endsWith("/next/sign-in")) {
+        throw new Error(`captureNextSignInReview: landed on ${page.url()} instead of /next/sign-in`);
+      }
+      await settleAnimations(page);
+      const desktopPath = join(outDir, `next-sign-in-${desktopViewport.width}-${theme}.png`);
+      await page.screenshot({ path: desktopPath, fullPage: false });
+      console.log(`Wrote ${desktopPath}`);
+
+      // Resized, not a fresh phone context: the phone-only avatar menu
+      // content that races the settings query (above) only exists
+      // while that menu is open, already behind us here - so a resize
+      // is the same real, already-signed-in-then-out `/next/sign-in`
+      // render a phone would show, without re-running the sign-out.
+      await page.setViewportSize({ width: phoneViewport.width, height: phoneViewport.height });
+      await settleAnimations(page);
+      const phonePath = join(outDir, `next-sign-in-${phoneViewport.width}-${theme}.png`);
+      await page.screenshot({ path: phonePath, fullPage: true });
+      console.log(`Wrote ${phonePath}`);
+
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -3204,6 +3324,10 @@ async function main() {
 
     if (nextChatArtifactReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview) {
       await captureNextChatArtifactReview(browser, sessionValue);
+    }
+
+    if (nextSignInReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
+      await captureNextSignInReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

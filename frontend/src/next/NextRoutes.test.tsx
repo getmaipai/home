@@ -37,7 +37,14 @@ function makePerson(): Roster {
 // ThemeProvider (mounted in NextRoutes) and useNextAppearance have
 // had a chance to run - stubs matchMedia to the OPPOSITE of the
 // setting each time, so a test that passed by coincidentally matching
-// the OS default would fail here.
+// the OS default would fail here. Still renders at "/sign-in": SHELL-08
+// made an authenticated visit there redirect to "/next" (the
+// dashboard), which this isolated MemoryRouter has no matching route
+// for either, so it renders nothing - exactly what this test wants,
+// since useNextAppearance/useNextLook run in NextRoutesInner before
+// its own <Routes> switch, regardless of which sub-route (if any)
+// ends up matching. Rendering the real dashboard here would need
+// GET /api/dashboard mocked too, which is not what this test is about.
 describe("NextRoutes appearance", () => {
   test.each([
     ["light", true, "light", "dark"],
@@ -62,7 +69,7 @@ describe("NextRoutes appearance", () => {
     try {
       renderWithQueryClient(
         <MemoryRouter initialEntries={["/sign-in"]}>
-          <NextRoutes person={makePerson()} />
+          <NextRoutes person={makePerson()} onSignedIn={() => {}} />
         </MemoryRouter>,
       );
       await waitFor(() => expect(document.documentElement.classList.contains(expectedClass)).toBe(true));
@@ -111,7 +118,7 @@ describe("NextRoutes appearance", () => {
     try {
       renderWithQueryClient(
         <MemoryRouter initialEntries={["/sign-in"]}>
-          <NextRoutes person={makePerson()} />
+          <NextRoutes person={makePerson()} onSignedIn={() => {}} />
         </MemoryRouter>,
       );
       // The fetch is still pending here - nothing should have written

@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
@@ -30,7 +32,27 @@ import type { Roster } from "@/lib/api";
  * streaming adapter, real turns, reply text and reasoning rendering
  * (slice 1), joined by the thread list and history (slice 2).
  * NextChatPage.tsx's own header names what's still a follow-up slice
- * (attachments, suggestions, tools, artifacts, read-aloud). */
+ * (attachments, suggestions, tools, artifacts, read-aloud).
+ *
+ * SHELL-08: `person` is `Roster | null` now, not required - `App.tsx`
+ * used to redirect a signed-out visitor straight to `/` before this
+ * tree ever mounted (its own former comment: "the flag itself is a
+ * household setting, so reading it needs a session"), which meant
+ * `/next/sign-in` was never actually reachable, only a stub with no
+ * props wired. A `null` person renders `NextSignedOutRoutes` instead
+ * of the authenticated tree - `useShellNext()`'s own settings query
+ * still resolves for this case because the household scope is
+ * readable by ANY signed-in person (`assertCanAccessScope`'s own
+ * read branch) and, for the realistic path this row's acceptance
+ * actually asks for (a real sign-out from within an already-open
+ * `/next`, not a cold browser typing the URL first), the query's own
+ * cache from before signing out is still warm - no page reload
+ * happens on a sign-out, only `App.tsx`'s own `setPerson(null)`. A
+ * genuinely cold, never-authenticated load of `/next/sign-in` is a
+ * real, separate, out-of-scope gap: `GET /api/settings` is
+ * `requireAuth`, so nothing can resolve `ui.shell.next` at all before
+ * a session exists - named in the plan doc's own gap paragraph, not
+ * silently left to spin forever unremarked. */
 // HOME-UI-04d: `useNextAppearance` calls the vendored `useTheme()`, so
 // it has to run inside `<ThemeProvider>`, not above it - a small inner
 // component rather than inlining the hook call in `NextRoutes` itself,
@@ -38,12 +60,15 @@ import type { Roster } from "@/lib/api";
 // can call a hook that reads from it.
 function NextRoutesInner({ person }: { person: Roster }) {
   useNextAppearance(person.id);
+  useNextLook(person.id);
 
   return (
     <Routes>
-      <Route path="sign-in" element={<BlankLayout />}>
-        <Route index element={<NextSignInPage />} />
-      </Route>
+      {/* Reachable only while signed out (NextSignedOutRoutes below) -
+          an already-authenticated visit to this URL has nothing to do
+          here, so it bounces to the dashboard instead of a blank
+          no-match. */}
+      <Route path="sign-in" element={<Navigate to="/next" replace />} />
       <Route element={<FullLayout />}>
         <Route index element={<NextDashboardPage person={person} />} />
         <Route path="chat" element={<NextChatPage person={person} />} />
@@ -59,15 +84,42 @@ function NextRoutesInner({ person }: { person: Roster }) {
   );
 }
 
-export function NextRoutes({ person }: { person: Roster }) {
+function NextSignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
+  return (
+    <Routes>
+      <Route path="sign-in" element={<BlankLayout />}>
+        <Route index element={<NextSignInPage onSignedIn={onSignedIn} />} />
+      </Route>
+      {/* Any other /next/* path while signed out (including bare
+          /next) lands on the sign-in screen, not a blank no-match -
+          the same "nothing renders before someone is signed in"
+          posture the old shell's own SignIn.tsx documents. */}
+      <Route path="*" element={<Navigate to="sign-in" replace />} />
+    </Routes>
+  );
+}
+
+export function NextRoutes({ person, onSignedIn }: { person: Roster | null; onSignedIn: () => void }) {
+  const queryClient = useQueryClient();
+  const wasSignedOut = useRef(person === null);
+  // A code review, SHELL-08: `useShellNext()`'s own query, once it 401s
+  // (the race its own doc comment above names), stays in `isError`
+  // forever - `retry: false` and nothing else ever refetches it, so a
+  // person who then signs back in for real would be silently bounced
+  // back to `/` by the stale error, not the fresh, now-valid session.
+  // Invalidated the moment `person` goes from `null` to a real Roster
+  // (a genuine sign-in just completed, not a mere re-render) so the
+  // next read is a fresh one against the new session.
+  useEffect(() => {
+    if (wasSignedOut.current && person !== null) {
+      void queryClient.invalidateQueries({ queryKey: ["settings-values", "household"] });
+    }
+    wasSignedOut.current = person === null;
+  }, [person, queryClient]);
+
   const shellNext = useShellNext();
-  useNextLook(person.id);
   if (shellNext === "loading") return <RouteSkeleton />;
   if (shellNext === "off") return <Navigate to="/" replace />;
 
-  return (
-    <ThemeProvider>
-      <NextRoutesInner person={person} />
-    </ThemeProvider>
-  );
+  return <ThemeProvider>{person === null ? <NextSignedOutRoutes onSignedIn={onSignedIn} /> : <NextRoutesInner person={person} />}</ThemeProvider>;
 }
