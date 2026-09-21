@@ -45,6 +45,15 @@ function lazyNamed<P extends object = Record<string, never>>(
   return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType<P> })));
 }
 
+// Shared between the "/*" and "/next/*" top-level routes below: both show
+// this while `person` is still `undefined` (the initial loadPerson() call
+// hasn't resolved yet).
+const LOADING_PERSON = (
+  <div className="flex h-screen items-center justify-center">
+    <Progress mode="spinner" label="Loading MaiPai Home" />
+  </div>
+);
+
 
 // Lane 10 item 2 (docs/BACKLOG.md's "Real code-splitting for the frontend
 // shell chunk"): every app EXCEPT Home and Chat becomes its own chunk,
@@ -76,6 +85,11 @@ const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWi
   "SetupWizard",
 );
 const NotificationsPage = lazyNamed(() => import("@/apps/notifications/NotificationsPage"), "NotificationsPage");
+// The shell-on-shadcndashboard stand-up (docs/plans/shell-on-shadcndashboard-
+// 2026-09-21.md): its own chunk, not the entry bundle - the vendored kit
+// under it (55 shadcn primitives, the Elements) is real weight nobody
+// pays for until they actually turn ui.shell.next on and visit /next.
+const NextRoutes = lazyNamed(() => import("@/next/NextRoutes"), "NextRoutes");
 const SearchPage = lazyNamed<ComponentProps<typeof import("@/apps/search/SearchPage")["SearchPage"]>>(
   () => import("@/apps/search/SearchPage"),
   "SearchPage",
@@ -187,13 +201,31 @@ export function App() {
                       </Suspense>
                     }
                   />
+                  {/* The shell-on-shadcndashboard stand-up (docs/plans/
+                      shell-on-shadcndashboard-2026-09-21.md, step 1): a
+                      second route tree behind ui.shell.next, only once a
+                      person is signed in (the flag itself is a household
+                      setting, so reading it needs a session). NextRoutes
+                      redirects to "/" when the flag is off. */}
+                  <Route
+                    path="/next/*"
+                    element={
+                      person === undefined ? (
+                        LOADING_PERSON
+                      ) : person === null ? (
+                        <Navigate to="/" replace />
+                      ) : (
+                        <Suspense fallback={<RouteSkeleton />}>
+                          <NextRoutes />
+                        </Suspense>
+                      )
+                    }
+                  />
                   <Route
                     path="/*"
                     element={
                       person === undefined ? (
-                        <div className="flex h-screen items-center justify-center">
-                          <Progress mode="spinner" label="Loading MaiPai Home" />
-                        </div>
+                        LOADING_PERSON
                       ) : person === null ? (
                         <SignIn onSignedIn={loadPerson} />
                       ) : (

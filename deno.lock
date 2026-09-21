@@ -22,7 +22,10 @@
         "npm:@happy-dom/global-registrator@^20.14.0",
         "npm:playwright@^1.48.0",
         "npm:text-readability@^1.1.1"
-      ]
+      ],
+      "overrides": {
+        "zod": "4.5.4"
+      }
     },
     "members": {
       "backend": {
