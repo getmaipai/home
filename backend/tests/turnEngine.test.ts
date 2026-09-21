@@ -2958,21 +2958,38 @@ describe("item 4b: forget in conversation is honored or refused, never 'Got it.'
 
   // The live bench: the same birthday kept twice, from a polite "can you
   // remember" in one conversation and a plain "remember" in another.
-  // Both carry every topic word, so both go, and the next question in a
-  // fresh conversation cannot answer June.
+  // getmaipai/home#132 (CHAT-06, 144906a2): memoryIngestion.ts's
+  // idempotent ingestion now dedupes by scope+person+canonicalized text
+  // ALONE, never by conversation or turn - saying the exact same fact
+  // again, anywhere, is the same active record, "a repeated save yields
+  // one active fact" (CHAT-06's own acceptance). So the two identical
+  // "remember that Marlow's birthday is in June" utterances (`first`
+  // and `second`, byte-identical after the remember package's own
+  // capture) collapse into ONE record, not two - case 1 below. The
+  // `judged` call's own differently-worded text ("Sage remembers
+  // that...") is a genuinely different fact about the same topic, so it
+  // stays its own record - case 2. Both cases still have to disappear
+  // together: "forget what I told you about X" retires every ACTIVE
+  // record whose text is about X, wherever and however many times it
+  // was said, and neither conversation can recall X afterward.
   test("'forget what I told you about X' retires every record about X, across conversations", async () => {
     const { actor } = await owner();
     const { createConversation } = await import("@/lib/conversationHistory");
     const first = createConversation(actor, { surface: "chat" });
     if (!first.ok) throw new Error(first.error);
     await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: first.value.id });
+    const second = createConversation(actor, { surface: "chat" });
+    if (!second.ok) throw new Error(second.error);
+    // Case 1: the identical fact, said again in a different
+    // conversation, is idempotent - still one active record, not two.
+    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: second.value.id });
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text)).length).toBe(1);
+    // Case 2: a genuinely different fact about the same topic (not a
+    // repeat of case 1's own text) is its own record, dedup untouched.
     const older = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, first.value.id)).get()!;
     const judged = remember(actor, { text: "Sage remembers that Marlow's birthday is in June", category: "fact", tier: "durable", scope: "person", person: actor.id, source: older.id, importance: 0.6 });
     expect(judged.ok).toBe(true);
-    const second = createConversation(actor, { surface: "chat" });
-    if (!second.ok) throw new Error(second.error);
-    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: second.value.id });
-    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text)).length).toBe(3);
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text)).length).toBe(2);
     // An earlier exchange that answered June wrote no record, but its
     // episodes would recall the answer for the next question.
     await withStub({ scriptedChatReply: () => "It's in June." }, async () => {
