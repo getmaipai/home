@@ -304,6 +304,7 @@ const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mi
 const nextPeopleReview = process.argv.includes("--next-people-review");
 const nextDashboardReview = process.argv.includes("--next-dashboard-review");
 const nextAppsReview = process.argv.includes("--next-apps-review");
+const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 
 interface RouteSpec {
@@ -2286,6 +2287,43 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   }
 }
 
+/** SHELL-05's own acceptance ("1440 and 390... captures dark/light"):
+ * both viewports, both themes, of `/next/settings`. Waits on "Family
+ * name", a real, always-present basic key under Household > System
+ * (`spec/settings/keys.json`) - the tab a seeded owner/admin session
+ * lands on by default - present only once both the registry and the
+ * household scope's values have actually resolved. */
+async function captureNextSettingsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextSettingsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/settings`);
+        await page.locator("text=Family name").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-settings-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2845,6 +2883,10 @@ async function main() {
 
     if (nextChatReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview) {
       await captureNextChatReview(browser, sessionValue);
+    }
+
+    if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview) {
+      await captureNextSettingsReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {
