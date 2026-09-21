@@ -15,7 +15,7 @@ Settings are split into two tabs at the top of the page. **Household** holds sha
 - **Backups**: run a backup now, or see your backup history.
 - **Repairs**: MaiPai's own health check. Anything that needs attention shows up here with a fix you can apply.
 - **Plugin routing**: see how MaiPai matches your requests to its built-in skills.
-- **New shell (preview)**: try the new look of the app early. It is under System, then General, and needs the Advanced level shown (the level switch is at the top of the settings page). Turn it off to go back. While it is on, the chat also uses its new design.
+- **New shell (preview)**: try the new look of the app early. It is under System, then General, and needs the Advanced level shown (the level switch is at the top of the settings page). Turn it off to go back. While it is on, the chat also uses its new design. With it on, the Home page shows your household at a glance: how many people, whether an update is waiting, what needs a repair, and a chart of how much MaiPai was used each day. The Apps page lists every app you have, with its kind, version and whether it is ready; sort a column by clicking its name.
 
 ## Your own settings
 
