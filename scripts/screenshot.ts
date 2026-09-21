@@ -301,6 +301,7 @@ const nextStandupReview = process.argv.includes("--next-standup-review");
 const nextSidebarReview = process.argv.includes("--next-sidebar-review");
 const nextLookPresetsReview = process.argv.includes("--next-look-presets-review");
 const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mismatch-review");
+const nextPeopleReview = process.argv.includes("--next-people-review");
 
 interface RouteSpec {
   slug: string;
@@ -2113,6 +2114,47 @@ async function captureNextAppearanceMismatch(browser: Browser, sessionValue: str
   }
 }
 
+/** HOME-UI-04e's own acceptance: /next/people (the vendored template's
+ * own user-profile view) at 1440 and 390, dark - proving both fixes at
+ * once. The single-Tailwind-root fix: at 1440, the hero renders as a
+ * row and the two info panels render as two columns (the phone layout,
+ * stacked and single-column, is what the bug forced at every width);
+ * at 390 the phone layout is still correct on its own terms, unrelated
+ * to the bug (sm's own breakpoint is 640px). The palette fix: the page
+ * reads as one flat dark sheet with faint hairlines (the source's own
+ * translucent border), not stacked lit panels (Home's former opaque
+ * navy). Dark only - the acceptance's own pixel probe (body/card/
+ * hairline against the demo) was run in dark; a light capture would
+ * prove nothing this acceptance asks for. */
+async function captureNextPeopleReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextPeopleReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next/people`);
+      await page.locator("text=Personal Information").first().waitFor({ timeout: 15000 });
+      await settleAnimations(page);
+      const path = join(outDir, `next-people-${viewport.width}-dark.png`);
+      await page.screenshot({ path, fullPage: slug === "phone" });
+      console.log(`Wrote ${path}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2650,6 +2692,10 @@ async function main() {
 
     if (nextAppearanceMismatchReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview) {
       await captureNextAppearanceMismatch(browser, sessionValue);
+    }
+
+    if (nextPeopleReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview) {
+      await captureNextPeopleReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

@@ -6,8 +6,8 @@ import { api } from "@/lib/api";
 // settings/uiKeys.ts) - the seven shadcn base-color presets only have
 // CSS on /next (useNextLook), never a `data-look` value here, so an
 // old-shell person who picked one just keeps Studio's palette there
-// until the old shell retires.
-export const LOOKS = ["calm", "studio", "neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe"] as const;
+// until the old shell retires. HOME-UI-04e adds "navy" the same way.
+export const LOOKS = ["calm", "studio", "neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe", "navy"] as const;
 export type Look = (typeof LOOKS)[number];
 
 function isLook(value: unknown): value is Look {

@@ -2,14 +2,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
-// Vendored, unmodified (docs/dashboard-upstream.md): its own `:root`/`.dark`
-// carry the same hex values as @maipai/ui/src/tokens.css (deliberately kept
-// in sync, see globals.css's own header comment), so this and the kit's
-// existing stylesheet coexisting is a values-matching no-op today, not a
-// silent divergence - the plan's own "no page is composed from both [primitive
-// sets]" acknowledges this is a real, temporary cost of the migration
-// (docs/plans/shell-on-shadcndashboard-2026-09-21.md), not an oversight.
-import "@maipai/ui/src/dashboard/css/globals.css";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { useShellNext } from "@/next/useShellNext";
 import { useNextLook } from "@/next/useNextLook";

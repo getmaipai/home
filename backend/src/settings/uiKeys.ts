@@ -71,14 +71,20 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
   // color>` CSS of its own, so an old-shell person who picked a color
   // preset just keeps Studio's own palette there until the old shell
   // retires.
+  //
+  // HOME-UI-04e (2026-09-21): Studio and Calm's own shared palette
+  // stopped being Home's navy hex set and became the shadcndashboard
+  // template's own default, byte-for-byte (owner ruling, "identical to
+  // the source") - Home's former default survives as its own tenth
+  // option, `navy`, on the same mechanism as the shadcn presets above.
   SettingsKey.parse({
     key: "ui.look",
     scope: "person",
     selector: "select",
-    range: { options: ["studio", "calm", "neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe"] },
+    range: { options: ["studio", "calm", "neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe", "navy"] },
     default: "studio",
     label: "Look",
-    help: "Studio matches the reference design exactly. Calm is the softer look Home shipped first. The rest are shadcn's own color presets.",
+    help: "Studio matches the reference design exactly. Calm is the same look, rounder tiles. Navy is Home's own blue-black set. The rest are shadcn's own color presets.",
     level: "basic",
     lives_in: "profile.appearance",
     honoured_by: ["home"],

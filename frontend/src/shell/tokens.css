@@ -4,7 +4,19 @@
  * keeps a second, hand-picked neutral scale beside it. Only what actually
  * carries Home's own product identity is overridden here, each with its
  * own reason, so a reviewer never has to diff this file against the kit's
- * to find out what's actually different. */
+ * to find out what's actually different.
+ *
+ * This is the app's one Tailwind root (HOME-UI-04e, 2026-09-21): the
+ * kit's own `dashboard/css/globals.css` carries the real `@import
+ * "tailwindcss"` now (its own header comment, and tokens.css's, have
+ * why - two separate roots in one build silently broke every `sm:`/
+ * `md:`/`lg:`/`xl:` responsive variant on every /next page). Imported
+ * first, so its `@theme`/`:root`/`.dark` land before this file's own
+ * `@import`ed tokens.css and Home's own overrides below, which both
+ * still need to win the cascade. `/next`'s own `NextRoutes.tsx` used to
+ * import `globals.css` a second time as its own lazy chunk - that
+ * import is gone; this is the only place it's ever loaded now. */
+@import "@maipai/ui/src/dashboard/css/globals.css";
 @import "@maipai/ui/src/tokens.css";
 
 /* Tailwind v4's automatic content detection never scans node_modules
