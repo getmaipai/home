@@ -35,6 +35,8 @@ import { bodyLimit } from "hono/body-limit";
 import { requireApiToken } from "@/middleware/auth";
 import { runTurn, runTurnStream, type Surface } from "@/lib/turnEngine";
 import { personWithinTurnBudget } from "@/lib/llm";
+import { feedThinkSplit, flushThinkSplit, newThinkSplitState, visibleText, thinkingPrefix, type ThinkSpan } from "@/lib/wellFormed";
+import { speakerAgeBand } from "@/lib/ageBand";
 import type { ChatMessage, ChatCompletionResponse, ChatCompletionChunk } from "@maipai/spec/llm/ts/types.js";
 import type { AppEnv } from "@/types";
 
@@ -104,18 +106,42 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
       const chunk: ChatCompletionChunk = { id, model, choices: [{ index: 0, delta, finish_reason: finishReason }] };
       return encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`);
     }
+    // REASONING-01: `reply.text`/`result.tokens` may carry a leading
+    // think block (wellFormed.ts's own contract) since llm.ts started
+    // synthesizing one from the engine's own `reasoning_content` - a
+    // review caught this route forwarding it raw, unstripped, straight
+    // to an external client with no gating at all. Exposed through the
+    // IDENTICAL `reasoning_content` field llama.cpp's own real API
+    // already uses (this route claims that exact wire contract), never
+    // silently dropped - except for a minor's own turn (child or teen,
+    // ageBand.ts's shared band), which never sees it, the same rule the
+    // household's own chat stream applies.
+    const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
+    const thinkSplit = newThinkSplitState();
+    function spanChunks(spans: ThinkSpan[]): Uint8Array[] {
+      const chunks: Uint8Array[] = [];
+      for (const span of spans) {
+        if (span.reasoning) {
+          if (!dropReasoning) chunks.push(sseChunk({ reasoning_content: span.text }, null));
+        } else {
+          chunks.push(sseChunk({ content: span.text }, null));
+        }
+      }
+      return chunks;
+    }
 
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
           controller.enqueue(sseChunk({ role: "assistant" }, null));
           if (result.kind === "immediate") {
-            controller.enqueue(sseChunk({ content: result.value.reply.text }, null));
+            for (const chunk of spanChunks(feedThinkSplit(thinkSplit, result.value.reply.text))) controller.enqueue(chunk);
           } else {
             for await (const token of result.tokens) {
-              controller.enqueue(sseChunk({ content: token }, null));
+              for (const chunk of spanChunks(feedThinkSplit(thinkSplit, token))) controller.enqueue(chunk);
             }
           }
+          for (const chunk of spanChunks(flushThinkSplit(thinkSplit))) controller.enqueue(chunk);
           controller.enqueue(sseChunk({}, "stop"));
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         } finally {
@@ -133,10 +159,16 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
   if (!result.ok) {
     return c.json({ error: { message: result.error, code: result.code } }, result.status);
   }
+  // REASONING-01: same split, same minor-gated drop, as the streaming
+  // branch above - `reply.text` may carry a leading think block, and
+  // `message.reasoning_content` is the identical field a real llama.cpp
+  // non-streaming reply already uses for it.
+  const dropReasoningNonStream = speakerAgeBand(actor, new Date()) !== "adult";
+  const reasoningContent = dropReasoningNonStream ? "" : thinkingPrefix(result.value.reply.text).replace(/<\/?think>/gi, "");
   const response: ChatCompletionResponse = {
     id: chunkId(),
     model,
-    choices: [{ index: 0, message: { role: "assistant", content: result.value.reply.text }, finish_reason: "stop" }],
+    choices: [{ index: 0, message: { role: "assistant", content: visibleText(result.value.reply.text), ...(reasoningContent ? { reasoning_content: reasoningContent } : {}) }, finish_reason: "stop" }],
   };
   return c.json(response);
 });

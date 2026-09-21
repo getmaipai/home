@@ -58,6 +58,88 @@ describe("lib/llm.ts complete()", () => {
   });
 });
 
+/** REASONING-01: points the chat backend at a stub scripted to answer
+ * with `reasoning_content` (spec/llm/ts/stubServer.ts's own
+ * scriptedReasoning option) - proves complete()/startCompleteStream()
+ * synthesize the identical `<think>...</think>` shape wellFormed.ts's
+ * whole downstream contract already expects, confirmed live against the
+ * pinned b10797 build (docs/dev.md's own "one thing worth checking"
+ * section). */
+async function withScriptedReasoning<T>(
+  reasoning: (request: ChatCompletionRequest) => string | undefined,
+  content: (request: ChatCompletionRequest) => string | undefined,
+  fn: () => Promise<T>,
+): Promise<T> {
+  __resetLlmSupervisorForTests();
+  const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+  const stub = startStubLlmServer(0, { scriptedReasoning: reasoning, scriptedChatReply: content });
+  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+  try {
+    return await fn();
+  } finally {
+    stub.stop();
+  }
+}
+
+describe("REASONING-01: reasoning_content synthesis", () => {
+  test("complete() wraps a scripted reasoning_content into <think>...</think> ahead of the content", async () => {
+    const result = await withScriptedReasoning(
+      () => "carry the two",
+      () => "17 times 24 is 408.",
+      () => complete("chat", [{ role: "user", content: "what's 17 times 24" }], { thinking: true }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.text).toBe("<think>carry the two</think>17 times 24 is 408.");
+  });
+
+  test("complete() with no scripted reasoning is unaffected (an engine/template that never separates it)", async () => {
+    const result = await withScriptedReasoning(
+      () => undefined,
+      () => "17 times 24 is 408.",
+      () => complete("chat", [{ role: "user", content: "what's 17 times 24" }]),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.text).toBe("17 times 24 is 408.");
+  });
+
+  test("startCompleteStream() yields the identical synthesized shape as deltas", async () => {
+    const deltas = await withScriptedReasoning(
+      () => "carry the two",
+      () => "17 times 24 is 408.",
+      async () => {
+        const result = await startCompleteStream("chat", [{ role: "user", content: "what's 17 times 24" }], { thinking: true });
+        if (!result.ok) throw new Error(result.error);
+        const collected: string[] = [];
+        for await (const delta of result.tokens) collected.push(delta);
+        return collected;
+      },
+    );
+    expect(deltas.join("")).toBe("<think>carry the two</think>17 times 24 is 408.");
+  });
+
+  // A review's own named failure mode: a literal "</think>" INSIDE the
+  // engine's own reasoning_content must never prematurely close the
+  // synthesized block - if it did, the remainder would be misclassified
+  // as ordinary visible delta, never gated by a minor's own
+  // dropReasoning check downstream (which only ever filters spans
+  // already tagged reasoning).
+  test("a literal </think> inside reasoning_content is neutralized, never closes the block early", async () => {
+    const result = await withScriptedReasoning(
+      () => "the syntax </think> ends a block, but I'm still reasoning",
+      () => "17 times 24 is 408.",
+      () => complete("chat", [{ role: "user", content: "what's 17 times 24" }], { thinking: true }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Exactly one real close tag (the synthesized one at the end of
+    // reasoning), not a spurious early one from the injected text.
+    expect(result.value.text.match(/<\/think>/gi)?.length).toBe(1);
+    expect(result.value.text).toBe("<think>the syntax /think ends a block, but I'm still reasoning</think>17 times 24 is 408.");
+  });
+});
+
 /** Fix E (docs/dev.md's "Chat reliability" - native tool calling): points
  * the chat backend at a fresh stub scripted to answer with a REAL
  * tool_calls reply (spec/llm/ts/stubServer.ts's own scriptedToolCalls

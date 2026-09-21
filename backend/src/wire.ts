@@ -192,6 +192,15 @@ export type TurnStreamEvent =
   /** WIRE-01: immediately after turn_meta, before any status, spoken_cue or delta, on every turn, immediate ones included. */
   | { type: "signal"; signal: TurnSignal }
   | { type: "delta"; text: string; sequence?: number }
+  /** REASONING-01 (docs/plans/shell-on-shadcndashboard-2026-09-21.md's
+   * own wire table): the model's own think-block content, split out of
+   * `delta` at the wire boundary (routes/turn.ts's streamTurnEvents(),
+   * lib/wellFormed.ts's feedThinkSplit()) as it arrives - assistant-ui's
+   * `reasoning` Element's own part shape. Never emitted for a minor's
+   * turn (child or teen, ageBand.ts's shared band - docs/dev.md's own
+   * call: a minor sees the answer, not the model's thinking) - dropped
+   * at that same boundary, not redacted. */
+  | { type: "reasoning"; text: string; sequence?: number }
   /** CHAT-16: frontend chatTurnActivity.ts transient activity contract. */
   | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" | "composing" }
   | { type: "spoken_cue"; text: string }

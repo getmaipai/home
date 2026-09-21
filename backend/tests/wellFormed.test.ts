@@ -1,6 +1,6 @@
 // OUT-01: the well-formed reply rule and its repair, pure.
 import { describe, expect, test } from "bun:test";
-import { repairReply, assessReply, isWellFormed, repairTail, isShortMalformed, SHORT_MALFORMED_CHARS } from "@/lib/wellFormed";
+import { repairReply, assessReply, isWellFormed, repairTail, isShortMalformed, SHORT_MALFORMED_CHARS, feedThinkSplit, flushThinkSplit, newThinkSplitState, visibleText, type ThinkSpan } from "@/lib/wellFormed";
 import { MALFORMED } from "@/lib/guards";
 
 describe("OUT-01: the repair", () => {
@@ -115,5 +115,105 @@ describe("OUT-01: the streaming tail", () => {
     expect(repairTail('He said "', 'fine."')).toBe('fine."');
     expect(repairTail("He said ", 'fine."')).toBe("fine.");
     expect(repairTail("Done. ", " ")).toBe(" ");
+  });
+});
+
+// REASONING-01: the wire-boundary split (routes/turn.ts's own caller) -
+// pure unit coverage of the state machine itself, independent of the
+// stream/HTTP plumbing that uses it.
+describe("REASONING-01: feedThinkSplit/flushThinkSplit", () => {
+  function drain(chunks: string[]): ThinkSpan[] {
+    const state = newThinkSplitState();
+    const spans: ThinkSpan[] = [];
+    for (const chunk of chunks) spans.push(...feedThinkSplit(state, chunk));
+    spans.push(...flushThinkSplit(state));
+    return spans;
+  }
+
+  test("a closed think block bundled with visible text in one chunk splits into two spans", () => {
+    expect(drain(["<think>carry the two</think>17 times 24 is 408."])).toEqual([
+      { reasoning: true, text: "carry the two" },
+      { reasoning: false, text: "17 times 24 is 408." },
+    ]);
+  });
+
+  test("a think block streamed live, one raw delta at a time", () => {
+    expect(drain(["<think>", "carry ", "the ", "two", "</think>", "17 times 24", " is 408."])).toEqual([
+      { reasoning: true, text: "carry " },
+      { reasoning: true, text: "the " },
+      { reasoning: true, text: "two" },
+      { reasoning: false, text: "17 times 24" },
+      { reasoning: false, text: " is 408." },
+    ]);
+  });
+
+  test("no think block at all: plain visible text passes through unchanged", () => {
+    expect(drain(["17 times 24 is 408."])).toEqual([{ reasoning: false, text: "17 times 24 is 408." }]);
+  });
+
+  test("a truncated, never-closed think block: everything is reasoning, flushed at stream end", () => {
+    expect(drain(["<think>carry the two"])).toEqual([{ reasoning: true, text: "carry the two" }]);
+  });
+
+  test("an open tag split across two raw deltas is completed, not leaked as literal text", () => {
+    expect(drain(["some text <thi", "nk>reasoning here</think>more text"])).toEqual([
+      { reasoning: false, text: "some text " },
+      { reasoning: true, text: "reasoning here" },
+      { reasoning: false, text: "more text" },
+    ]);
+  });
+
+  test("a close tag split across two raw deltas is completed, not leaked as literal text", () => {
+    expect(drain(["<think>reasoning here</thi", "nk>more text"])).toEqual([
+      { reasoning: true, text: "reasoning here" },
+      { reasoning: false, text: "more text" },
+    ]);
+  });
+
+  test("visible text just short of a partial tag prefix is held, not lost, when the stream simply ends", () => {
+    // "Hello <" alone could be the start of "<think>" - feedThinkSplit()
+    // correctly holds back just the "<" (the genuine overlap) rather
+    // than risk it turning into a real tag on a later chunk, so this
+    // arrives as two adjacent visible spans, not one; flushThinkSplit()
+    // returns the held-back "<" as ordinary visible text once the stream
+    // actually ends with no tag ever following. Concatenated, the text
+    // is unaffected either way - this is REASONING-01's own "byte-
+    // identical" claim about the visible TEXT, never about wire-event
+    // granularity (docs/dev.md's own section makes the same distinction
+    // for the bundled-chunk case).
+    expect(drain(["Hello <"])).toEqual([
+      { reasoning: false, text: "Hello " },
+      { reasoning: false, text: "<" },
+    ]);
+  });
+
+  // A review caught this splitter not matching THINK_BLOCK_RE's own
+  // `\s*` (visibleText()/the stored final text already strip whitespace
+  // right after a close tag) - without this, a live-streamed reply could
+  // show a stray leading blank line the stored/final text never has.
+  test("whitespace right after a close tag is discarded, matching THINK_BLOCK_RE's own \\s* (the stored/final text)", () => {
+    expect(drain(["<think>carry the two</think>\n\nAnswer"])).toEqual([
+      { reasoning: true, text: "carry the two" },
+      { reasoning: false, text: "Answer" },
+    ]);
+    expect(visibleText("<think>carry the two</think>\n\nAnswer")).toBe("Answer");
+  });
+
+  test("whitespace right after a close tag is discarded even when split across chunks", () => {
+    expect(drain(["<think>carry the two</think>", " ", "\n", "Answer"])).toEqual([
+      { reasoning: true, text: "carry the two" },
+      { reasoning: false, text: "Answer" },
+    ]);
+  });
+
+  test("a close tag followed by ONLY whitespace (no visible text at all) discards it at stream end, no empty span", () => {
+    expect(drain(["<think>carry the two</think>", "   "])).toEqual([{ reasoning: true, text: "carry the two" }]);
+  });
+
+  test("a close tag immediately followed by visible text (no whitespace at all) is unaffected", () => {
+    expect(drain(["<think>carry the two</think>Answer"])).toEqual([
+      { reasoning: true, text: "carry the two" },
+      { reasoning: false, text: "Answer" },
+    ]);
   });
 });

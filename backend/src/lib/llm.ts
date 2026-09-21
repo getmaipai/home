@@ -292,6 +292,40 @@ function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
   };
 }
 
+// REASONING-01 (a review's own named failure mode): a literal
+// `<think>`/`</think>` substring INSIDE reasoning_content itself (the
+// model reasoning about markup, or an adversarial completion) would
+// otherwise create a spurious boundary once feedThinkSplit() re-parses
+// the synthesized text downstream, misclassifying the remainder as
+// ordinary `delta` - never gated by a minor's own dropReasoning check,
+// which only ever filters spans already tagged `reasoning`. Breaks the
+// tag SHAPE (never alters meaning-bearing text otherwise) before
+// reasoning_content ever reaches the synthesized wrapper; the engine's
+// own already-separated reasoning has no legitimate reason to carry
+// this exact markup, so this is always safe. Never applied to `content`:
+// an engine/template that never separates reasoning legitimately leaks
+// real `<think>` markup INTO content (the fallback shape this file still
+// supports unchanged), and neutralizing content unconditionally would
+// break that case. Exported so stackChatDeltas()'s own per-delta twin
+// case applies the identical neutralization.
+const THINK_TAG_RE = /<\/?think>/gi;
+export function neutralizeThinkTags(text: string): string {
+  return text.replace(THINK_TAG_RE, (tag) => tag.replace(/[<>]/g, ""));
+}
+
+/** REASONING-01: the non-streaming twin of stackChatDeltas()'s/
+ * chatCompleteStream()'s own per-chunk synthesis - a single blocking
+ * completion's `message.reasoning_content` (llama.cpp's own
+ * `--reasoning-format deepseek`/`auto` split, confirmed live against
+ * the pinned b10797 build) wrapped into the identical
+ * `<think>...</think>` shape wellFormed.ts's whole downstream contract
+ * already expects around it. `undefined`/empty reasoning_content
+ * (an engine/template that never separates it, tags already embedded
+ * in `content` instead, or reasoning off) returns `content` unchanged. */
+function withSynthesizedThink(content: string, reasoningContent?: string | null): string {
+  return reasoningContent ? `<think>${neutralizeThinkTags(reasoningContent)}</think>${content}` : content;
+}
+
 /** HOME-STACK-02b: role="chat" for every real caller today (turnEngine.ts's
  * own turns and personaJudge.ts/memoryJudge.ts's judge calls all pass
  * "chat" - there is no separate judge role on the wire, only a different
@@ -310,11 +344,11 @@ async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: Llm
     }
     recordStackChatIdentity(result.identity);
     resolveStackOffline(role);
-    const data = result.data as { choices?: Array<{ message: { content: string; tool_calls?: ToolCallWire[] } }>; model?: string };
+    const data = result.data as { choices?: Array<{ message: { content: string; reasoning_content?: string | null; tool_calls?: ToolCallWire[] } }>; model?: string };
     const choice = data.choices?.[0];
     if (!choice) return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: choice.message.content, model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    return { ok: true, value: { text: withSynthesizedThink(choice.message.content, choice.message.reasoning_content), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
   } catch (err) {
     return stackFailureResult(err, role);
   }
@@ -359,7 +393,7 @@ export async function complete(
     // offered on this call at all," never conflated with "offered, and
     // declined."
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: choice.message.content, model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    return { ok: true, value: { text: withSynthesizedThink(choice.message.content, choice.message.reasoning_content), model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
   } catch (err) {
     recoverFromDeadBackend(err);
     const message = err instanceof LlmClientError ? err.message : (err as Error).message;
@@ -414,6 +448,11 @@ async function* stackChatDeltas(
       : [...toolCallsByIndex.entries()]
           .sort(([a], [b]) => a - b)
           .map(([, call]) => ({ id: call.id, type: "function" as const, function: { name: call.name, arguments: call.args } }));
+  // REASONING-01: the identical `reasoning_content` -> synthesized
+  // `<think>...</think>` port as chatCompleteStream()'s own twin case -
+  // this function's own header comment already promises "ported here
+  // verbatim," so this stays in sync with that copy rather than drifting.
+  let reasoningOpen = false;
   const reader = stream.getReader();
   for await (const line of readTextLines(reader)) {
     if (!line.startsWith("data:")) continue;
@@ -434,8 +473,30 @@ async function* stackChatDeltas(
     const finishReason = chunk.choices?.[0]?.finish_reason;
     if (finishReason) stats.stopReason = finishReason;
     const delta = chunk.choices?.[0]?.delta;
+    const reasoning = delta?.reasoning_content;
+    if (reasoning) {
+      if (!reasoningOpen) {
+        yield "<think>";
+        reasoningOpen = true;
+      }
+      // Never `content` here: an engine/template that never separates
+      // reasoning legitimately leaks real `<think>` markup INTO content
+      // (the fallback shape this whole file still supports unchanged) -
+      // neutralizing content unconditionally would break that case.
+      // reasoning_content, by contrast, is only ever populated by the
+      // engine's own already-separated reasoning; it has no legitimate
+      // reason to carry literal tag markup, so it's always safe (and
+      // necessary, for the dropReasoning gate) to neutralize.
+      yield neutralizeThinkTags(reasoning);
+    }
     const content = delta?.content;
-    if (content) yield content;
+    if (content) {
+      if (reasoningOpen) {
+        yield "</think>";
+        reasoningOpen = false;
+      }
+      yield content;
+    }
     for (const fragment of delta?.tool_calls ?? []) {
       const existing = toolCallsByIndex.get(fragment.index) ?? { id: "", name: "", args: "" };
       if (fragment.id) existing.id = fragment.id;

@@ -4,6 +4,8 @@ import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { pickThinkingCue } from "@/lib/replyVariation";
+import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
@@ -29,6 +31,12 @@ interface StreamSubscriber {
 interface ResumeSession {
   token: string;
   ownerId: string;
+  // REASONING-01: a minor's own turn (child or teen, ageBand.ts's shared
+  // band) never emits a `reasoning` event (docs/dev.md's own
+  // "REASONING-01" section) - computed once here from the real actor at
+  // session-construction time, since streamTurnEvents() itself only ever
+  // sees `ownerId`, a bare string.
+  dropReasoning: boolean;
   conversationId: string;
   turnId: string;
   controller: AbortController;
@@ -156,7 +164,7 @@ function closeSubscriber(session: ResumeSession, subscriber: StreamSubscriber): 
 
 function appendSessionEvent(session: ResumeSession, event: TurnStreamEvent): void {
   if (session.terminal) return;
-  const sequence = event.type === "delta" && event.sequence !== undefined ? event.sequence : null;
+  const sequence = (event.type === "delta" || event.type === "reasoning") && event.sequence !== undefined ? event.sequence : null;
   const stored: StoredStreamEvent = { event, sequence, afterSequence: session.sequence, terminal: isTerminalEvent(event) };
   session.events.push(stored);
   if (stored.terminal) session.terminal = true;
@@ -208,8 +216,13 @@ function streamResponse(session: ResumeSession, resumeFrom: number | null): Resp
 function startResumeSession(session: ResumeSession): void {
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal)) {
-        const event = rawEvent.type === "delta" ? { ...rawEvent, sequence: ++session.sequence } : rawEvent;
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning)) {
+        // One shared counter for `delta` and `reasoning` alike (REASONING-01):
+        // a resuming client's own replay filter (shouldDeliver()) needs a
+        // real per-event sequence for both, or a `reasoning` event sitting
+        // between two `delta` sequence numbers would never be redelivered
+        // on a resume exactly at that boundary.
+        const event = rawEvent.type === "delta" || rawEvent.type === "reasoning" ? { ...rawEvent, sequence: ++session.sequence } : rawEvent;
         appendSessionEvent(session, event);
       }
     } catch (err) {
@@ -265,8 +278,45 @@ export async function* streamTurnEvents(
   actorId: string,
   cueDelayMs = THINKING_CUE_DELAY_MS,
   signal?: AbortSignal,
+  // REASONING-01: a minor's turn (child or teen) never emits a
+  // `reasoning` event at all (the coordinator's own call, docs/dev.md's
+  // "REASONING-01" section) - a minor sees the answer, not the model's
+  // thinking. The safety/guard pass upstream (turnEngine.ts) is entirely
+  // unaffected: this drops the already-classified reasoning span at the
+  // OUTPUT boundary, after the combined text has gone through the
+  // identical pass every turn gets.
+  dropReasoning = false,
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
+  // REASONING-01: splits each chunk of the pipeline's own combined text
+  // (a think block, if present, embedded per wellFormed.ts's own
+  // contract) into `reasoning`/`delta` wire events - the one and only
+  // place this split happens; `result.tokens` (turnEngine.ts's whole
+  // pipeline) is never touched, and `fullText` keeps accumulating the
+  // UNSPLIT original chunks, so `finalize()` and the stored row are
+  // unaffected either way (docs/dev.md's own "smallest change" section).
+  const thinkSplit = newThinkSplitState();
+  // Sequence numbers are stamped by the caller (startResumeSession(), one
+  // shared counter for `delta` and `reasoning` alike, so a resuming
+  // client's replay filter works identically for both) - this function
+  // never sets one itself, matching `delta`'s own existing contract.
+  // Shared by the main loop and the end-of-stream flush below (a review
+  // caught these two sites duplicating the identical span-to-event
+  // mapping): each ThinkSpan[] this converts came from either
+  // feedThinkSplit() (mid-stream) or flushThinkSplit() (once, at the
+  // end) - the mapping itself doesn't care which.
+  function* spanEvents(spans: readonly ThinkSpan[]): Generator<TurnStreamEvent, void, void> {
+    for (const span of spans) {
+      if (span.reasoning) {
+        if (!dropReasoning) yield { type: "reasoning", text: span.text };
+      } else {
+        yield { type: "delta", text: span.text };
+      }
+    }
+  }
+  function* splitEvents(text: string): Generator<TurnStreamEvent, void, void> {
+    yield* spanEvents(feedThinkSplit(thinkSplit, text));
+  }
   try {
     const iterator = result.tokens[Symbol.asyncIterator]();
     // FAST-04: start the timer from startedAt (when prepareTurn() began),
@@ -298,7 +348,7 @@ export async function* streamTurnEvents(
     while (!current.done) {
       for (const status of result.status.drain()) yield status;
       fullText += current.value;
-      yield { type: "delta", text: current.value };
+      yield* splitEvents(current.value);
       const nextToken = iterator.next();
       let next = await Promise.race([nextToken, pendingStatus]);
       while (next === "status") {
@@ -308,6 +358,12 @@ export async function* streamTurnEvents(
       }
       current = next;
     }
+    // Whatever feedThinkSplit() was still holding back when the model's
+    // own generation ended (a truncated open think block - the same
+    // "generation cut off mid-reasoning" shape OPEN_THINK_RE already
+    // treats as real and expected - or the last few characters of
+    // visible text that were never actually the start of a tag).
+    yield* spanEvents(flushThinkSplit(thinkSplit));
     while (true) {
       for (const status of result.status.drain()) yield status;
       if (result.status.closed) break;
@@ -502,6 +558,13 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   const session: ResumeSession = {
     token: resumeToken,
     ownerId: actor.id,
+    // The shared, birthdate-aware band (ageBand.ts's own header: role
+    // alone is "an independent, less accurate signal") - a review
+    // caught the first draft reading actor.role directly, which both
+    // excluded teen and could disagree with every other minor-gated
+    // decision on this same turn (host.ts's chat-models gate, turnEngine.ts's
+    // withholdSensitive/mayDefer, composer.ts's child-only projection).
+    dropReasoning: speakerAgeBand(actor, new Date()) !== "adult",
     conversationId: result.conversationId,
     turnId: result.turnId,
     controller: abortController,

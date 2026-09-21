@@ -35,7 +35,7 @@ import {
 } from "@/lib/turnEngine";
 import { deliverableInDenial } from "@/lib/turnContext";
 import { __embedCallCountForTests, __resetEmbedCallCountForTests } from "@/lib/routing";
-import { streamTurnEvents } from "@/routes/turn";
+import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { guardReply } from "@/lib/guards";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -4522,6 +4522,96 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     };
     for await (const _event of streamTurnEvents(result, "test-person", 5)) void _event;
     expect(loggedText).toBe("Real reply only.");
+  });
+
+  // REASONING-01: replays a recorded shape of model output straight
+  // through the real, shipped streamTurnEvents() - the exact same
+  // fixture-driven pattern this describe block's own fakeResult()/
+  // failingTokens() tests already use, not a hand-rolled harness.
+  // fullText/finalize() (the stored row) must see the identical combined
+  // text either way (docs/dev.md's own "byte-identical" decision): these
+  // assertions prove that alongside the new wire events.
+  describe("REASONING-01: the reasoning wire event", () => {
+    async function* tokens(...chunks: string[]): AsyncGenerator<string, SafetyResult | undefined, void> {
+      for (const chunk of chunks) yield chunk;
+      return undefined;
+    }
+
+    test("a think block plus visible text: the visible delta stream is unchanged, reasoning arrives as its own event", async () => {
+      let loggedText = "";
+      const result = fakeResult(tokens("<think>carry the two</think>", "17 times 24 is 408."));
+      result.finalize = (replyText: string) => {
+        loggedText = replyText;
+        return { reply: { text: replyText }, source: "model", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" }, conversation_id: "conv-testfixture", turn_id: "turn-testfixture" };
+      };
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(result, "test-person")) events.push(event);
+
+      const deltaText = events.filter((e): e is Extract<TurnStreamEvent, { type: "delta" }> => e.type === "delta").map((e) => e.text).join("");
+      const reasoningText = events.filter((e): e is Extract<TurnStreamEvent, { type: "reasoning" }> => e.type === "reasoning").map((e) => e.text).join("");
+      expect(deltaText).toBe("17 times 24 is 408."); // byte-identical to a turn with no reasoning at all (below)
+      expect(reasoningText).toBe("carry the two");
+      // The stored row/fullText: the ORIGINAL combined text, think block
+      // embedded, exactly as a turn with no reasoning event ever existed
+      // would have stored it - the wire split changes nothing upstream.
+      expect(loggedText).toBe("<think>carry the two</think>17 times 24 is 408.");
+    });
+
+    test("no think block at all: no reasoning events, delta unchanged from before this item", async () => {
+      let loggedText = "";
+      const result = fakeResult(tokens("17 times 24 is 408."));
+      result.finalize = (replyText: string) => {
+        loggedText = replyText;
+        return { reply: { text: replyText }, source: "model", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" }, conversation_id: "conv-testfixture", turn_id: "turn-testfixture" };
+      };
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(result, "test-person")) events.push(event);
+
+      expect(events.some((e) => e.type === "reasoning")).toBe(false);
+      expect(events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("")).toBe("17 times 24 is 408.");
+      expect(loggedText).toBe("17 times 24 is 408.");
+    });
+
+    test("a truncated, never-closed think block: reasoning gets the partial text, no delta at all", async () => {
+      let loggedText = "";
+      const result = fakeResult(tokens("<think>carry the two"));
+      result.finalize = (replyText: string) => {
+        loggedText = replyText;
+        return { reply: { text: replyText }, source: "model", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" }, conversation_id: "conv-testfixture", turn_id: "turn-testfixture" };
+      };
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(result, "test-person")) events.push(event);
+
+      expect(events.filter((e) => e.type === "reasoning").map((e) => (e as { text: string }).text).join("")).toBe("carry the two");
+      expect(events.some((e) => e.type === "delta")).toBe(false);
+      // Matches the existing, unchanged truncated-think-block contract
+      // (wellFormed.ts's own OPEN_THINK_RE): the stored text still
+      // carries the open, unclosed tag - "no visible text yet," not "no
+      // text at all."
+      expect(loggedText).toBe("<think>carry the two");
+    });
+
+    // The coordinator's own call, docs/dev.md's "REASONING-01" section: a
+    // child sees the answer, not the model's thinking. Safety/guard
+    // scanning (turnEngine.ts, untouched by this item) still saw the full
+    // combined text before this boundary ever ran - this only proves the
+    // OUTPUT-side drop, dropReasoning being the fifth positional arg.
+    test("a child's turn never emits the reasoning event, even though one exists", async () => {
+      let loggedText = "";
+      const result = fakeResult(tokens("<think>carry the two</think>", "17 times 24 is 408."));
+      result.finalize = (replyText: string) => {
+        loggedText = replyText;
+        return { reply: { text: replyText }, source: "model", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" }, conversation_id: "conv-testfixture", turn_id: "turn-testfixture" };
+      };
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(result, "test-child", THINKING_CUE_DELAY_MS, undefined, true)) events.push(event);
+
+      expect(events.some((e) => e.type === "reasoning")).toBe(false);
+      expect(events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("")).toBe("17 times 24 is 408.");
+      // The drop is presentation-only: the stored row still carries the
+      // real reasoning, the same as any other actor's turn would.
+      expect(loggedText).toBe("<think>carry the two</think>17 times 24 is 408.");
+    });
   });
 });
 

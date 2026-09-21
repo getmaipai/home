@@ -75,6 +75,11 @@ const SAFE: SafetyResult = { flagged: false, categories: [], action: "allow", no
 async function withScriptedToolCalls<T>(
   calls: (request: ChatCompletionRequest) => { id: string; name: string; args: string }[] | undefined,
   fn: () => Promise<T>,
+  // REASONING-01: a model may reason before deciding to call a tool - a
+  // review caught peekAndHandle() briefly mistaking that reasoning-only
+  // prefix for "the model answered in prose, not a tool call." Optional,
+  // so every existing caller of this helper is unaffected.
+  reasoning?: (request: ChatCompletionRequest) => string | undefined,
 ): Promise<T> {
   __resetLlmSupervisorForTests();
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
@@ -84,6 +89,7 @@ async function withScriptedToolCalls<T>(
       const scripted = calls(request);
       return scripted?.map((c) => ({ id: c.id, type: "function" as const, function: { name: c.name, arguments: c.args } }));
     },
+    scriptedReasoning: reasoning,
   });
   process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
   try {
@@ -509,6 +515,47 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     // pattern win that happens to name the same package: only
     // resolveToolCalls() ever sets routing.tier "tool".
     expect(result.value.routing?.tier).toBe("tool");
+  });
+
+  // REASONING-01: a review caught peekAndHandle() mistaking a purely-
+  // reasoning prefix (the engine's own reasoning_content, synthesized
+  // into a leading `<think>` chunk by llm.ts) for "the model already
+  // answered in prose, not a tool call" - the exact regression this
+  // proves is fixed, on both the blocking and the streaming path.
+  test("runTurn(): a tool call still runs even when the model reasons first (thinking on)", async () => {
+    const { actor } = await owner();
+    const result = await withScriptedToolCalls(
+      () => [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
+      () => runTurn(actor, "chat", "Friday is pizza night, can you remember that for me", { thinking: true }),
+      () => "the household wants this remembered, so I should call remember",
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("remember");
+    expect(result.value.routing?.tier).toBe("tool");
+  });
+
+  test("runTurnStream(): a tool call still resolves inside the stream even when the model reasons first (thinking on)", async () => {
+    const { actor } = await owner();
+    const { result, deltas, outcome } = await withScriptedToolCalls(
+      () => [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
+      async () => drainStream(await runTurnStream(actor, "chat", "Friday is pizza night, can you remember that for me", { thinking: true })),
+      () => "the household wants this remembered, so I should call remember",
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kind).toBe("stream");
+    if (result.kind !== "stream") return;
+    // The reasoning prefix is neither shown as a delta nor surfaced as a
+    // reasoning event for this turn shape (docs/dev.md's own named,
+    // deliberate scope boundary) - what matters is the tool call still ran.
+    expect(deltas).toEqual([]);
+    expect(outcome && "resolved" in outcome).toBe(true);
+    if (!outcome || !("resolved" in outcome)) return;
+    expect(outcome.resolved.source).toBe("plugin");
+    expect(outcome.resolved.plugin_id).toBe("remember");
+    expect(outcome.resolved.routing?.tier).toBe("tool");
   });
 
   test("runTurn(): every proposed call failing falls back to a second, plain completion - never a fabricated success", async () => {

@@ -109,6 +109,63 @@ describe("POST /v1/chat/completions", () => {
     expect(fullText).toContain("hello there");
   });
 
+  // REASONING-01: a review caught this route forwarding a leading think
+  // block raw, unstripped, to an external client - this proves the fix,
+  // exposed through the identical `reasoning_content` field a real
+  // llama.cpp reply already uses (this route claims that exact contract).
+  describe("REASONING-01: reasoning_content", () => {
+    async function withScriptedReasoning<T>(reasoning: string, content: string, fn: () => Promise<T>): Promise<T> {
+      __resetLlmSupervisorForTests();
+      const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+      const stub = startStubLlmServer(0, { scriptedReasoning: () => reasoning, scriptedChatReply: () => content });
+      process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+      try {
+        return await fn();
+      } finally {
+        stub.stop();
+        delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      }
+    }
+
+    test("non-streaming: reasoning_content arrives separately from content, no raw think tags in either", async () => {
+      const { token } = await ownerWithApiToken();
+      await withScriptedReasoning("carry the two", "17 times 24 is 408.", async () => {
+        const client = new TestClient();
+        const res = await client.request("/v1/chat/completions", {
+          method: "POST",
+          body: { messages: [{ role: "user", content: "what's 17 times 24" }] },
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { choices: { message: { content: string; reasoning_content?: string } }[] };
+        expect(body.choices[0]!.message.content).toBe("17 times 24 is 408.");
+        expect(body.choices[0]!.message.reasoning_content).toBe("carry the two");
+        expect(body.choices[0]!.message.content).not.toContain("<think>");
+      });
+    });
+
+    test("streaming: reasoning_content deltas arrive separately from content deltas, no raw think tags in either", async () => {
+      const { token } = await ownerWithApiToken();
+      await withScriptedReasoning("carry the two", "17 times 24 is 408.", async () => {
+        const client = new TestClient();
+        const res = await client.request("/v1/chat/completions", {
+          method: "POST",
+          body: { messages: [{ role: "user", content: "what's 17 times 24" }], stream: true },
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const text = await res.text();
+        const lines = text.trim().split("\n\n").filter((l) => l.startsWith("data: ") && l !== "data: [DONE]");
+        const chunks = lines.map((l) => JSON.parse(l.slice("data: ".length)) as { choices: { delta: { content?: string; reasoning_content?: string } }[] });
+        const reasoningText = chunks.map((c) => c.choices[0]!.delta.reasoning_content ?? "").join("");
+        const contentText = chunks.map((c) => c.choices[0]!.delta.content ?? "").join("");
+        expect(reasoningText).toBe("carry the two");
+        expect(contentText).toBe("17 times 24 is 408.");
+        expect(contentText).not.toContain("<think>");
+        expect(reasoningText).not.toContain("<think>");
+      });
+    });
+  });
+
   // COR-7 (code review, 2026-09-06): a follow-up review pass on the
   // routes/turn.ts fix found this route had the identical gap - a client
   // (Home Assistant's OpenAI Conversation integration, a scripted tool)

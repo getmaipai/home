@@ -407,6 +407,31 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 },
               },
             };
+          } else if (event.type === "reasoning") {
+            // REASONING-01: additive, not yet a rendered Element here
+            // (the reasoning Element's own wiring is a separate item,
+            // the same "nothing drawn anywhere" boundary ARTIFACT-02's
+            // artifact-card left for a later session) - discarded client-
+            // side for now, the same as `signal` above. stripThinking()
+            // below already keeps working unaffected either way: it
+            // strips a `<think>` block from `event.value.reply.text`
+            // itself (the stored row, untouched by this wire split), not
+            // from anything reconstructed out of these delta/reasoning
+            // events.
+            //
+            // Sequence still tracked, exactly like `delta` above, even
+            // though the text itself is thrown away: routes/turn.ts
+            // stamps ONE shared counter across both event types, so a
+            // disconnect landing right after a reasoning event (before
+            // the next delta) would otherwise leave this tracker stale
+            // and cause a resume to redeliver already-seen events (a
+            // review caught this - harmless today since they're discarded
+            // again, but a real gap once a reasoning Element actually
+            // renders this content and needs exactly-once delivery).
+            if (event.sequence !== undefined && event.sequence > lastAcknowledgedSequence) {
+              lastAcknowledgedSequence = event.sequence;
+            }
+            continue;
           } else {
             sawTerminalEvent = true;
             // SAFETY-01 (#85): a streamed refusal's crisis resources ride

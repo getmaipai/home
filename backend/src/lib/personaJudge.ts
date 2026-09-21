@@ -20,6 +20,7 @@
 // and persona-eval.ts is the only caller of this one.
 import { complete, type LlmMessage } from "@/lib/llm";
 import { composePersonaPrompt, type Persona } from "@/lib/persona";
+import { visibleText } from "@/lib/wellFormed";
 
 export interface JudgedExchange {
   user: string;
@@ -100,7 +101,12 @@ export async function judgePersonaConsistency(persona: Persona, exchanges: reado
   if (!result.ok) return { ok: false, error: result.error };
 
   try {
-    const parsed = JSON.parse(result.value.text) as { verdicts?: unknown };
+    // REASONING-01: this call never requests thinking, so llm.ts's own
+    // synthesis has nothing to add today - visibleText() is a one-line
+    // defense against a future change flipping that (a review's own
+    // named failure mode: a leading <think> block would otherwise break
+    // JSON.parse() here with a generic, misattributed parse failure).
+    const parsed = JSON.parse(visibleText(result.value.text)) as { verdicts?: unknown };
     if (!Array.isArray(parsed.verdicts)) return { ok: false, error: "judge reply had no verdicts array" };
     // Indexed by exchange index, not pushed positionally: a code review
     // (2026-09-06) found the first cut scored matches/verdicts.length

@@ -24,7 +24,7 @@ import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameByI
 import { deleteEntity } from "@/lib/entities";
 import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type HubName, type ResolvedNames, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
-import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
+import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP, feedThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
 import { intentFor, deliverableQuery, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
@@ -6079,7 +6079,28 @@ async function runTurnStreamHoldingLease(
 
   async function* peekAndHandle(): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
     const iterator = started.tokens[Symbol.asyncIterator]();
-    const first = await iterator.next();
+    // REASONING-01 (a review caught this): a model may think before
+    // deciding whether to answer in prose or propose a tool call, and
+    // llm.ts's own reasoning_content synthesis now yields real string
+    // chunks (a synthesized `<think>...`) during that phase - before
+    // this item, reasoning yielded NOTHING at all (content stayed empty
+    // the whole time), so `first.done` genuinely meant "no tool call and
+    // no text yet." A reasoning-only chunk must never look like "the
+    // model already decided to answer in prose" here: skip past any
+    // purely-reasoning prefix, buffering it, and only treat the peek as
+    // real text once a genuinely visible span arrives (or the stream
+    // ends, in which case whatever tool_calls it resolved to still runs
+    // normally - the reasoning that preceded them is not surfaced as a
+    // reasoning wire event for this turn, the same "nothing yielded
+    // during that phase" limitation this turn shape always had).
+    const reasoningPeek = newThinkSplitState();
+    let buffered = "";
+    let first = await iterator.next();
+    while (!first.done) {
+      buffered += first.value;
+      if (feedThinkSplit(reasoningPeek, first.value).some((span) => !span.reasoning)) break;
+      first = await iterator.next();
+    }
 
     if (first.done) {
       const rawCalls = first.value ?? [];
@@ -6136,7 +6157,11 @@ async function runTurnStreamHoldingLease(
     // streaming path stays on the plain gateGuards() catch (a canned
     // honest line, no retry) until a design for "decide whether to retry
     // without blocking the stream" exists; CHAT-17 owns that.
-    const firstText: string = first.value;
+    // `buffered` (not `first.value`): everything peeked so far, including
+    // any purely-reasoning prefix the loop above skipped past - replayed
+    // whole, exactly the shape the rest of the pipeline (gateOutputSafety
+    // onward) already expects a combined think+visible text stream to be.
+    const firstText: string = buffered;
     yield firstText;
     const trailingCalls = yield* iterator;
     // A code review (2026-09-07) correctly flagged that "never happens"

@@ -43,6 +43,131 @@ export function thinkingPrefix(text: string): string {
   const open = text.replace(THINK_BLOCK_RE, "").match(OPEN_THINK_RE)?.[0] ?? "";
   return `${closed}${open}`;
 }
+
+/** REASONING-01: one span of a stream, split on `<think>`/`</think>`
+ * boundaries - `reasoning: true` for a think block's own content (tags
+ * stripped), `reasoning: false` for everything else, in the order it
+ * appeared. */
+export interface ThinkSpan { reasoning: boolean; text: string; }
+
+/** Carries `feedThinkSplit()`'s state across chunks of one stream:
+ * `inThink` mirrors turnEngine.ts's own `holdForLookup()` state machine
+ * (the identical two tag tests), so this agrees with every internal
+ * `<think>` detection the pipeline already does; `buffer` holds back
+ * whatever COULD be the start of a split tag until the next chunk
+ * resolves it (see feedThinkSplit()'s own comment); `skippingCloseWhitespace`
+ * is set the instant a close tag is found, so the whitespace THINK_BLOCK_RE's
+ * own `\s*` already consumes right after `</think>` (a code review caught
+ * this splitter not matching that: a live-streamed reply could show a
+ * stray leading blank line the stored/final text never has) is discarded
+ * here too, never emitted as its own leading-whitespace visible span. */
+export interface ThinkSplitState { inThink: boolean; buffer: string; skippingCloseWhitespace: boolean; }
+export function newThinkSplitState(): ThinkSplitState {
+  return { inThink: false, buffer: "", skippingCloseWhitespace: false };
+}
+
+// Whether the buffer's own TAIL could be the start of `tag` (case-
+// insensitive) - the longest such overlap, or 0 if none of the buffer's
+// trailing characters could possibly begin it. Checked against ONLY the
+// tag relevant to the current state (`</think>` while inThink, `<think>`
+// otherwise): a real chunk boundary is a token boundary, never a
+// semantic one, so a tag can legitimately split across two raw deltas
+// (the same live possibility holdForLookup()'s own accumulate-until-
+// resolved buffer already lives with) - checking the wrong tag here
+// would hold back characters that could never complete anything.
+function partialTagOverlapLength(buffer: string, tag: string): number {
+  const maxLen = Math.min(buffer.length, tag.length - 1);
+  for (let len = maxLen; len > 0; len--) {
+    if (tag.toLowerCase().startsWith(buffer.slice(buffer.length - len).toLowerCase())) return len;
+  }
+  return 0;
+}
+
+/** Feeds one more raw chunk into the splitter, returning zero or more
+ * ready-to-emit spans - PROGRESSIVELY, as reasoning or visible text
+ * accumulates, never waiting for a block's own close tag to arrive
+ * before yielding anything (the whole point of streaming reasoning "as
+ * it arrives," the contract table's own words). Only the trailing
+ * handful of characters that could genuinely be the start of the tag
+ * currently being watched for are ever held back, resolved by whatever
+ * the next chunk brings. REASONING-01's own wire-boundary split
+ * (routes/turn.ts's streamTurnEvents()) is this function's one caller;
+ * nothing upstream (turnEngine.ts, wellFormed.ts's own other functions)
+ * changes - those functions receive the pipeline's combined text exactly
+ * as they always have. */
+export function feedThinkSplit(state: ThinkSplitState, chunk: string): ThinkSpan[] {
+  state.buffer += chunk;
+  const spans: ThinkSpan[] = [];
+  for (;;) {
+    if (state.skippingCloseWhitespace) {
+      const stripped = state.buffer.replace(/^\s+/, "");
+      if (stripped.length === 0) {
+        // Fully whitespace so far (or genuinely empty) - hold: more
+        // whitespace, or the first real visible character, may still be
+        // coming, and either way nothing is ready to emit yet.
+        state.buffer = "";
+        break;
+      }
+      state.buffer = stripped;
+      state.skippingCloseWhitespace = false;
+    }
+    if (state.inThink) {
+      const close = /<\/think>/i.exec(state.buffer);
+      if (close) {
+        const text = state.buffer.slice(0, close.index);
+        if (text) spans.push({ reasoning: true, text });
+        state.buffer = state.buffer.slice(close.index + close[0].length);
+        state.inThink = false;
+        state.skippingCloseWhitespace = true;
+        continue;
+      }
+      const holdBack = partialTagOverlapLength(state.buffer, "</think>");
+      const safe = state.buffer.length - holdBack;
+      if (safe > 0) {
+        spans.push({ reasoning: true, text: state.buffer.slice(0, safe) });
+        state.buffer = state.buffer.slice(safe);
+      }
+      break;
+    }
+    const open = /<think>/i.exec(state.buffer);
+    if (open) {
+      if (open.index > 0) spans.push({ reasoning: false, text: state.buffer.slice(0, open.index) });
+      state.buffer = state.buffer.slice(open.index + open[0].length);
+      state.inThink = true;
+      continue;
+    }
+    const holdBack = partialTagOverlapLength(state.buffer, "<think>");
+    const safe = state.buffer.length - holdBack;
+    if (safe > 0) {
+      spans.push({ reasoning: false, text: state.buffer.slice(0, safe) });
+      state.buffer = state.buffer.slice(safe);
+    }
+    break;
+  }
+  return spans;
+}
+
+/** Whatever's left once the stream itself ends - a truncated open think
+ * block (never closed: the same "generation cut off mid-reasoning" shape
+ * OPEN_THINK_RE already treats as a real, expected case), or the last
+ * few held-back characters of ordinary visible text that were never a
+ * tag after all. */
+export function flushThinkSplit(state: ThinkSplitState): ThinkSpan[] {
+  // Whatever's left is trailing whitespace right after a close tag with
+  // nothing visible ever following (an empty reply after reasoning) -
+  // discarded, the same as THINK_BLOCK_RE's own `\s*` would discard it
+  // from the stored/final text, never emitted as a visible span.
+  if (state.skippingCloseWhitespace) {
+    state.buffer = "";
+    state.skippingCloseWhitespace = false;
+    return [];
+  }
+  if (!state.buffer) return [];
+  const span: ThinkSpan = { reasoning: state.inThink, text: state.buffer };
+  state.buffer = "";
+  return [span];
+}
+
 const WORD_RE = /[\p{L}\p{N}]+(?:['’][\p{L}]+)?/gu;
 /** A malformed output this long or shorter earns one regeneration; a
  * longer one is repaired in place (a long reply with a dangling
