@@ -68,6 +68,15 @@ Elements use).
   runtime and adapters (nothing on the wire changes except the
   artifact record, a separate item); artifact-card and canvas-split
   are the artifact experience.
+- **Generative UI, the output contract** (owner's rule, 2026-09-21
+  04:30): a tool's result is emitted as the structured part the
+  matching shipped Element renders (a chart for numbers over time, a
+  spec sheet for a thing's facts, a data table for a list, sources
+  for citations), never narrated as prose and never drawn by Home.
+  This includes weather: no weather card, chart or component is
+  created anywhere in Home or the kit; the weather tool emits its
+  structured result and the Elements' chart and spec-sheet render it
+  as they ship. The same holds for every tool.
 - **The design doc of 2026-09-20**: its numbers become token targets;
   its component rulings retire. The captures it produced are
   replaced by the stand-up's.
