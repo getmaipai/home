@@ -7652,6 +7652,2028 @@
         }
       }
     },
+    "/api/engines": {
+      "get": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Roles, engines and the hardware budget, in one read",
+        "responses": {
+          "200": {
+            "description": "The Stack's own current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "coding",
+                              "judge",
+                              "router",
+                              "embed",
+                              "rerank",
+                              "vision",
+                              "stt",
+                              "tts",
+                              "wakeword",
+                              "image",
+                              "video",
+                              "music"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "wire": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "embeddings",
+                              "rerank",
+                              "transcription",
+                              "speech",
+                              "job"
+                            ]
+                          },
+                          "residency": {
+                            "type": "string",
+                            "enum": [
+                              "resident",
+                              "jit",
+                              "installed"
+                            ]
+                          },
+                          "endpoints": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "quality": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "fast",
+                                "everyday",
+                                "best"
+                              ]
+                            }
+                          },
+                          "sharesModelWith": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "chat",
+                              "coding",
+                              "judge",
+                              "router",
+                              "embed",
+                              "rerank",
+                              "vision",
+                              "stt",
+                              "tts",
+                              "wakeword",
+                              "image",
+                              "video",
+                              "music",
+                              null
+                            ]
+                          },
+                          "state": {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "notInstalled",
+                                  "installed",
+                                  "loaded",
+                                  "ready",
+                                  "offline"
+                                ]
+                              },
+                              "since": {
+                                "type": "string"
+                              },
+                              "checkedAt": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "since"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "model": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "sizeBytes": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "measuredFootprintBytes": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "measuredContextLength": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "estimated": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "sizeBytes",
+                              "measuredFootprintBytes",
+                              "measuredContextLength",
+                              "estimated"
+                            ]
+                          },
+                          "check": {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "not checked",
+                                  "passed",
+                                  "failed",
+                                  "skipped"
+                                ]
+                              },
+                              "at": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "reason": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "stale": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "at",
+                              "reason",
+                              "stale"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "wire",
+                          "residency",
+                          "endpoints",
+                          "quality",
+                          "sharesModelWith",
+                          "state",
+                          "reason",
+                          "model",
+                          "check"
+                        ]
+                      }
+                    },
+                    "engines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "platform": {
+                            "type": "string"
+                          },
+                          "arch": {
+                            "type": "string"
+                          },
+                          "verified": {
+                            "type": "boolean"
+                          },
+                          "installed": {
+                            "type": "boolean"
+                          },
+                          "matchesThisMachine": {
+                            "type": "boolean"
+                          },
+                          "running": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "currentTag": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "newestTag": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "current": {
+                            "type": "boolean"
+                          },
+                          "notCurrent": {
+                            "type": "boolean"
+                          },
+                          "needsRestart": {
+                            "type": "boolean"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "current",
+                              "notCurrent"
+                            ]
+                          },
+                          "stateReason": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "newer installed",
+                              "newer available",
+                              null
+                            ]
+                          },
+                          "directory": {
+                            "type": "string"
+                          },
+                          "roleState": {
+                            "type": "string"
+                          },
+                          "roleReason": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "label",
+                          "platform",
+                          "arch",
+                          "verified",
+                          "installed",
+                          "matchesThisMachine",
+                          "running",
+                          "currentTag",
+                          "newestTag",
+                          "current",
+                          "notCurrent",
+                          "needsRestart",
+                          "state",
+                          "stateReason",
+                          "directory",
+                          "roleState",
+                          "roleReason"
+                        ]
+                      }
+                    },
+                    "budget": {
+                      "type": "object",
+                      "properties": {
+                        "totalMemoryBytes": {
+                          "type": "number"
+                        },
+                        "capBytes": {
+                          "type": "number"
+                        },
+                        "freeMemoryBytes": {
+                          "type": "number"
+                        },
+                        "availablePercent": {
+                          "type": "number"
+                        },
+                        "pressure": {
+                          "type": "string",
+                          "enum": [
+                            "normal",
+                            "warn",
+                            "critical"
+                          ]
+                        },
+                        "memoryReadingDegraded": {
+                          "type": "boolean"
+                        },
+                        "loaded": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "resident",
+                                  "jit",
+                                  "generator"
+                                ]
+                              },
+                              "peakBytes": {
+                                "type": "number"
+                              },
+                              "measured": {
+                                "type": "boolean"
+                              },
+                              "lastUsedAt": {
+                                "type": "string"
+                              },
+                              "idleTtlSeconds": {
+                                "type": "number"
+                              },
+                              "pinned": {
+                                "type": "boolean"
+                              },
+                              "pid": {
+                                "type": "number",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "peakBytes",
+                              "measured",
+                              "lastUsedAt",
+                              "idleTtlSeconds",
+                              "pinned",
+                              "pid"
+                            ]
+                          }
+                        },
+                        "queue": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "position": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "resident",
+                                  "jit",
+                                  "generator"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "position",
+                              "kind"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "totalMemoryBytes",
+                        "capBytes",
+                        "freeMemoryBytes",
+                        "availablePercent",
+                        "pressure",
+                        "memoryReadingDegraded",
+                        "loaded",
+                        "queue"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "roles",
+                    "engines",
+                    "budget"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/hardware": {
+      "get": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "The Stack's raw hardware read",
+        "responses": {
+          "200": {
+            "description": "Not yet spec'd upstream; passed through as the client returns it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/models": {
+      "get": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "The Stack's installed and available models",
+        "responses": {
+          "200": {
+            "description": "Not yet spec'd upstream; passed through as the client returns it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/models/{id}/actions": {
+      "post": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Load, unload, pin or unpin one model",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "qwen3-8b-instruct-q4_k_m.gguf"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "load",
+                      "unload",
+                      "pin",
+                      "unpin"
+                    ]
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Not yet spec'd upstream; passed through as the client returns it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/health": {
+      "get": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "The Stack's own health items",
+        "responses": {
+          "200": {
+            "description": "The Stack's current health list - the same items Repairs already folds in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "health": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "critical",
+                              "error",
+                              "warning"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "since": {
+                            "type": "string"
+                          },
+                          "cause": {
+                            "type": "string"
+                          },
+                          "fix": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "restart_engine",
+                                  "free_memory",
+                                  "retry_download",
+                                  "rollback_update",
+                                  "reinstall_engine",
+                                  "reinstall_model"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "action"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "title",
+                          "text",
+                          "since",
+                          "cause"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "health"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/health/{code}/fix": {
+      "post": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Run the Stack's own fix for one health item",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "engine.crashed.chat"
+            },
+            "required": true,
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Not yet spec'd upstream; passed through as the client returns it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/updates": {
+      "get": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "The Stack's own engine/model update state",
+        "responses": {
+          "200": {
+            "description": "The last known state - does not itself check the Catalog.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checksEnabled": {
+                      "type": "boolean"
+                    },
+                    "engines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "installed": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "available": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "availableKnown": {
+                            "type": "boolean"
+                          },
+                          "lastChecked": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "installed",
+                          "available",
+                          "availableKnown",
+                          "lastChecked",
+                          "notes"
+                        ]
+                      }
+                    },
+                    "models": {
+                      "type": "object",
+                      "properties": {
+                        "lastChecked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "installed": {
+                                "type": "string"
+                              },
+                              "available": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "installed",
+                              "available"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "lastChecked",
+                        "entries"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "checksEnabled",
+                    "engines",
+                    "models"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/updates/check": {
+      "post": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Ask the Stack to read the Catalog index now",
+        "responses": {
+          "200": {
+            "description": "The state after the check.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checksEnabled": {
+                      "type": "boolean"
+                    },
+                    "engines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "installed": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "available": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "availableKnown": {
+                            "type": "boolean"
+                          },
+                          "lastChecked": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "installed",
+                          "available",
+                          "availableKnown",
+                          "lastChecked",
+                          "notes"
+                        ]
+                      }
+                    },
+                    "models": {
+                      "type": "object",
+                      "properties": {
+                        "lastChecked": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "installed": {
+                                "type": "string"
+                              },
+                              "available": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "installed",
+                              "available"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "lastChecked",
+                        "entries"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "checksEnabled",
+                    "engines",
+                    "models"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/updates/{name}/{action}": {
+      "post": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Apply the Stack's available engine build, or roll back to an installed one",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "llama-server"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apply",
+                "rollback"
+              ]
+            },
+            "required": true,
+            "name": "action",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "description": "Required for rollback; ignored for apply."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "applied": {
+                          "type": "boolean"
+                        },
+                        "tag": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "previous": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "applied",
+                        "tag",
+                        "previous"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "tag": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "tag"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A rollback with no tag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer, or the swap failed and was rolled back",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/settings": {
+      "get": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "The Stack's own settings",
+        "responses": {
+          "200": {
+            "description": "Every stack-owned setting, current and pending values.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "settings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": "string",
+                            "enum": [
+                              "device"
+                            ]
+                          },
+                          "selector": {
+                            "type": "string",
+                            "enum": [
+                              "number",
+                              "select",
+                              "text",
+                              "boolean"
+                            ]
+                          },
+                          "range": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "min": {
+                                    "type": "number"
+                                  },
+                                  "max": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "min",
+                                  "max"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "options": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "label"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "options"
+                                ]
+                              }
+                            ]
+                          },
+                          "default": {
+                            "nullable": true
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "help": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "collapsed": {
+                                "type": "boolean"
+                              },
+                              "order": {
+                                "type": "number"
+                              }
+                            }
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": [
+                              "basic",
+                              "advanced",
+                              "expert"
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "needs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "lives_in": {
+                            "type": "string",
+                            "enum": [
+                              "stack"
+                            ]
+                          },
+                          "honoured_by": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "home",
+                                "bot"
+                              ]
+                            }
+                          },
+                          "needs_restart": {
+                            "type": "boolean"
+                          },
+                          "in_effect": {
+                            "nullable": true
+                          },
+                          "pending": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "scope",
+                          "selector",
+                          "label",
+                          "level",
+                          "lives_in",
+                          "honoured_by",
+                          "needs_restart"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "sections",
+                    "settings"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/settings/apply": {
+      "post": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Apply one or more of the Stack's own settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The settings state after applying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "settings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": "string",
+                            "enum": [
+                              "device"
+                            ]
+                          },
+                          "selector": {
+                            "type": "string",
+                            "enum": [
+                              "number",
+                              "select",
+                              "text",
+                              "boolean"
+                            ]
+                          },
+                          "range": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "min": {
+                                    "type": "number"
+                                  },
+                                  "max": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "min",
+                                  "max"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "options": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "label"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "options"
+                                ]
+                              }
+                            ]
+                          },
+                          "default": {
+                            "nullable": true
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "help": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "collapsed": {
+                                "type": "boolean"
+                              },
+                              "order": {
+                                "type": "number"
+                              }
+                            }
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": [
+                              "basic",
+                              "advanced",
+                              "expert"
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "needs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "lives_in": {
+                            "type": "string",
+                            "enum": [
+                              "stack"
+                            ]
+                          },
+                          "honoured_by": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "home",
+                                "bot"
+                              ]
+                            }
+                          },
+                          "needs_restart": {
+                            "type": "boolean"
+                          },
+                          "in_effect": {
+                            "nullable": true
+                          },
+                          "pending": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "scope",
+                          "selector",
+                          "label",
+                          "level",
+                          "lives_in",
+                          "honoured_by",
+                          "needs_restart"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "sections",
+                    "settings"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/{name}/{action}": {
+      "post": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Start, stop, restart or install one engine",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "llama-server"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "start",
+                "stop",
+                "restart",
+                "install"
+              ]
+            },
+            "required": true,
+            "name": "action",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Not yet spec'd upstream; passed through as the client returns it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The model is not verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/setup/ca": {
       "get": {
         "tags": [
