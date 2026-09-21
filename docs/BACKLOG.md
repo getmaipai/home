@@ -6495,6 +6495,10 @@ approvals are still real, unstarted work for a future session.
       Add `duration`, `time`, `person`, `media` and a secret-entry flow,
       then re-declare the sections that only needed those.
 
+- [ ] **SET-TITLES-01: every settings section has a friendly title** (S)
+
+    Objective: `groupSettings.ts`'s `sectionTitle()` falls back to a group's raw `lives_in` id when `SECTION_TITLES` has no entry for it - found live landing SHELL-05 (2026-09-21), two real sections (`household.storage`, `person.allowance`) render literally as "household.storage" and "person.allowance" instead of a real title, on both the old Settings page and `/next/settings` at once (both read the identical function). Files: `commons/ui/src/settings/groupSettings.ts`'s `SECTION_TITLES` map. Pattern to mirror: the map's own existing entries (e.g. `"household.system": "System"`). Acceptance: `SECTION_TITLES` has an entry for every `lives_in` value the registry (`spec/settings/keys.json`) declares for `home`; a test that derives the registry's own set of `lives_in` ids and asserts each has a real title (not equal to the id itself), so a future key with a new, untitled section fails the gate instead of shipping a raw id. Out of scope: the registry's own `section.id`/`order`/`collapsed` fields (unused by any real key today) and the broader "Rebuild Settings as a real settings editor" item above. Exit check: `bash scripts/check.sh` (commons repo).
+
 - [x] A household-location setting (S-M) - done 2026-09-11. Found live a
       second time on Home itself: with no place configured, the "Today"
       weather card asked a place-free "what's the weather like today?"
