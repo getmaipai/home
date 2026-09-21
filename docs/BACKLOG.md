@@ -284,7 +284,7 @@ not permission to expand scope.
     both turn transports and shared recipe fixtures. Out of scope:
     automatic extraction redesign and admin permission changes. Checks:
     named backend suites, shared recipe fixtures, affected catalog checks
-    if its source changes, and full exit gate.
+    if its source changes, and full exit gate. Landed date unrecorded (no commit names this ID; ticked before 2026-09-21).
 
 <a id="chat-06"></a>
 
@@ -2550,7 +2550,7 @@ stats item text above.
     persists for the person or household scope, an unavailable choice has one
     repair action, and a child sees only the calm default label. Out of scope:
     model downloads and GPU tuning. Exit: backend and frontend tests,
-    responsive screenshots, `bash scripts/check.sh`.
+    responsive screenshots, `bash scripts/check.sh`. Landed date unrecorded (no commit names this ID; ticked before 2026-09-21).
 
 - [x] **CHAT-PARITY-02: temporary chat retention** (S, after CHAT-PARITY-01)
 
@@ -2563,7 +2563,7 @@ stats item text above.
     behavior, temporary turns cannot create durable memory, reload does not
     restore them into normal history, and child UI exposes no retention
     internals. Out of scope: remote provider retention promises. Exit: spec,
-    backend, frontend, and privacy tests, `bash scripts/check.sh`.
+    backend, frontend, and privacy tests, `bash scripts/check.sh`. Landed date unrecorded (no commit names this ID; ticked before 2026-09-21).
 
 - [ ] **CHAT-PARITY-03: household share and local export** (M, after CHAT-PARITY-02)
 
@@ -2801,7 +2801,7 @@ stats item text above.
     the page does not have that; and `who-is-builds-a-card-from-the-page`
     keeps the adult article detail in the document with the child ceiling.
     The package declares the page data source. Exit: targeted tests and
-    `bash scripts/check.sh`.
+    `bash scripts/check.sh`. Landed date unrecorded (no commit names this ID; ticked before 2026-09-21).
 
 <a id="stats-01"></a>
 
@@ -3877,7 +3877,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
     free-association fix in the old backlog (closed by this item; tick
     it and point here). Checks: `cd backend && bun test
     tests/turnEngine.test.ts tests/persona.test.ts`, then the full exit
-    gate.
+    gate. Landed 2026-09-12 at cf253297.
 
 <a id="fast-04"></a>
 
@@ -4221,7 +4221,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
     ingestion service (CHAT-06), profile timing (CHAT-11). Checks: `cd
     backend && bun test tests/memoryJudge.test.ts
     tests/conversationHistory.test.ts tests/scheduler.test.ts`, then the
-    full exit gate.
+    full exit gate. Landed 2026-09-12 at 6fe46a36.
 
 <a id="mem-03"></a>
 
@@ -4335,7 +4335,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
     eight expected turns found; record the table. Out of scope:
     injecting into the prompt (JOIN-01), a reranker (EVAL-04), UI.
     Checks: `cd backend && bun test tests/episodes.test.ts` and the
-    conversations route tests, then the full exit gate.
+    conversations route tests, then the full exit gate. Landed 2026-09-12 at da5209e1.
 
 <a id="mem-05"></a>
 
