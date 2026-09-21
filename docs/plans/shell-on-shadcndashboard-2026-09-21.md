@@ -353,3 +353,4 @@ row; every row is one commit; rollback is the flag. The vendored
 snapshot's upstream drift is a manual merge, on a schedule (the
 monthly dependency sweep), against the pinned sha in the upstream
 note.
+ The end state is SHELL-09 (docs/BACKLOG.md): once the rows are ticked and the owner says cut, `/next` becomes `/`, the flag goes, and the old shell, chat, kit pieces, tokens, look values and spec keys that existed only for the old interface are deleted in one release, so nothing of the hand-built interface survives as dead code or a second theme system.
