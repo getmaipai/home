@@ -1,6 +1,5 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import { CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { DashboardCard } from "@maipai/ui/src/dashboard/components/shared/dashboard-card";
+import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/dashboard/components/ui/table";
 import type { DashboardActivityRow } from "@/lib/api";
 
@@ -12,10 +11,13 @@ const ActivityIcon = getIcon("activity");
  * job for a ten-row table), the per-row avatar image (the wire carries
  * no avatar), the sort-icon affordance (nothing here is sortable yet),
  * and the price/deadline/actions columns, which have no Home
- * counterpart at all. */
+ * counterpart at all.
+ *
+ * DASH-LOOK-01: `Card`, not the vendored `DashboardCard` wrapper - see
+ * `StatCard.tsx`'s own comment for why. */
 export function RecentActivityTable({ rows }: { rows: readonly DashboardActivityRow[] }) {
   return (
-    <DashboardCard className="flex flex-col gap-0!">
+    <Card className="flex flex-col gap-0!">
       <CardHeader className="border-b border-border">
         <CardTitle className="flex items-center gap-2">
           <ActivityIcon size={16} className="text-foreground" />
@@ -58,6 +60,6 @@ export function RecentActivityTable({ rows }: { rows: readonly DashboardActivity
           </Table>
         </div>
       </CardContent>
-    </DashboardCard>
+    </Card>
   );
 }

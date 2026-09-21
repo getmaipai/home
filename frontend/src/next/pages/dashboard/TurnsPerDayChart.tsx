@@ -1,8 +1,7 @@
 import { getIcon } from "@maipai/ui/src/icons";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@maipai/ui/src/dashboard/components/ui/chart";
-import { CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { DashboardCard } from "@maipai/ui/src/dashboard/components/shared/dashboard-card";
+import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { DashboardTurnsPerDay } from "@/lib/api";
 
 // No "trending" icon in the kit's curated registry (@maipai/ui/src/icons) -
@@ -21,10 +20,14 @@ const chartConfig = {
  * to select between) and the vendored file's own hand-rolled animated
  * tooltip content, in favor of the shipped `ChartTooltipContent`
  * primitive - a closer match to "as shipped" than reproducing custom
- * tooltip logic a second time. */
+ * tooltip logic a second time.
+ *
+ * DASH-LOOK-01: `Card`, not the vendored `DashboardCard` wrapper - see
+ * `StatCard.tsx`'s own comment for why (`DashboardCard` flattens the
+ * real surface `Card` already carries). */
 export function TurnsPerDayChart({ series }: { series: readonly DashboardTurnsPerDay[] }) {
   return (
-    <DashboardCard className="flex flex-col gap-0!">
+    <Card className="flex flex-col gap-0!">
       <CardHeader className="border-b border-border">
         <CardTitle className="flex items-center gap-2">
           <HistoryIcon size={16} className="text-muted-foreground" />
@@ -49,6 +52,6 @@ export function TurnsPerDayChart({ series }: { series: readonly DashboardTurnsPe
           </LineChart>
         </ChartContainer>
       </CardContent>
-    </DashboardCard>
+    </Card>
   );
 }

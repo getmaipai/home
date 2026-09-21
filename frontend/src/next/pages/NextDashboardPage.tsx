@@ -1,6 +1,5 @@
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import StyleAwareWrapper from "@maipai/ui/src/dashboard/components/shared/StyleAwareWrapper";
-import StyleDivider from "@maipai/ui/src/dashboard/components/shared/StyleDivider";
 import { ApiError, type Roster, type Dashboard } from "@/lib/api";
 import { useDashboard } from "@/next/useDashboard";
 import { Greeting } from "@/next/pages/dashboard/Greeting";
@@ -41,7 +40,23 @@ import { RecentActivityTable } from "@/next/pages/dashboard/RecentActivityTable"
  * showing forever, with no error text and no retry - `AsyncState`
  * (`@maipai/ui/src/primitives/AsyncState`, the kit's own shared
  * loading/error/data triad, already used by every sibling `/next`-
- * adjacent page) is the shipped fix, not a hand-rolled error branch. */
+ * adjacent page) is the shipped fix, not a hand-rolled error branch.
+ *
+ * DASH-LOOK-01 (Jesse: shaded like Settings and dashboard-01, not
+ * flat): the stat cards and the chart/table panels were rendering
+ * through the vendored shared `DashboardCard` wrapper
+ * (`components/shared/dashboard-card.tsx`, part of the SHELL-01 gap
+ * paragraph's own vendored snapshot), which explicitly overrides
+ * `Card`'s own `bg-card`/`ring-1` with `bg-background`/`ring-0` - the
+ * flat look the template's own demo KPI row wants, not this page's
+ * ask. Each card here now uses the plain `Card` primitive directly
+ * (see each file's own comment) - the real surface was already
+ * there, one layer down. The `StyleDivider` row between the stats and
+ * the chart/table is gone too: it rendered as a dotted decorative
+ * strip (`components/shared/divider`, also vendored), not a plain
+ * rule - with every card now carrying its own visible ring, a divider
+ * between them added a second, competing separator rather than
+ * fixing one; the grid's own gap is enough. */
 export function NextDashboardPage({ person }: { person: Roster }) {
   const query = useDashboard();
 
@@ -84,7 +99,6 @@ export function NextDashboardPage({ person }: { person: Roster }) {
                   <EnginesCard engines={data.engines!} />
                 </div>
               )}
-              <StyleDivider wrapperClassName="col-span-12" />
               <div className="lg:col-span-7 col-span-12">
                 <TurnsPerDayChart series={data.turns_per_day} />
               </div>

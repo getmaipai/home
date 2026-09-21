@@ -1,6 +1,5 @@
 import type { Icon } from "@maipai/ui/src/icons";
-import { CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
-import { DashboardCard } from "@maipai/ui/src/dashboard/components/shared/dashboard-card";
+import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 
 /** The shared shape `PeopleCountCard.tsx`/`UpdatesCard.tsx`/
  * `RepairsCard.tsx`/`EnginesCard.tsx` all mirror - the vendored KPI-card
@@ -16,10 +15,20 @@ import { DashboardCard } from "@maipai/ui/src/dashboard/components/shared/dashbo
  * shares and why, and its own props; only the shared markup moved here.
  * Their own badge (a percent-change delta) and "See Statistics" button
  * are dropped everywhere - the wire carries plain counts, no delta and
- * no statistics page to link to. */
+ * no statistics page to link to.
+ *
+ * DASH-LOOK-01: the plain `Card` primitive, not the vendored shared
+ * `DashboardCard` wrapper - `DashboardCard` (`components/shared/
+ * dashboard-card.tsx`, part of the same vendored snapshot, used by the
+ * template's own modern-dashboard widgets) explicitly overrides Card's
+ * own `bg-card`/`ring-1` with `bg-background`/`ring-0`, the flat KPI-row
+ * look those specific demo widgets wanted - not what Jesse asked for
+ * (shaded like Settings and shadcn's own dashboard-01 block). `Card`
+ * already carries the real surface; no vendored file edited, just a
+ * different vendored primitive. */
 export function StatCard({ label, value, icon: IconComponent }: { label: string; value: React.ReactNode; icon: Icon }) {
   return (
-    <DashboardCard className="py-6">
+    <Card className="py-6">
       <CardContent className="flex justify-between flex-row px-6">
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col gap-1">
@@ -31,6 +40,6 @@ export function StatCard({ label, value, icon: IconComponent }: { label: string;
           </div>
         </div>
       </CardContent>
-    </DashboardCard>
+    </Card>
   );
 }
