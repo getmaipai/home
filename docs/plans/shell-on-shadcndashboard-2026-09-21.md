@@ -137,12 +137,12 @@ named gap, not a Home-drawn substitute.
 | Capability (Home / Stack) | Element(s) | Fed by |
 |---|---|---|
 | The reply text | markdown-text (renderer), message-pair, message-actions, message-timing | the model adapter's text parts |
-| Thinking before the reply | reasoning, thinking-indicator | the reasoning part (`--reasoning` on, streamed) |
+| Thinking before the reply | reasoning, thinking-indicator | the reasoning part (`--reasoning` on, streamed) (landed: REASONING-01, home 57c4b430) |
 | A tool call and its result | tool-call, tool-group, tool-timeline, tool-error, tool-fallback | the tool-call parts the turn engine already emits |
-| A tool result with structure (weather, almanac, lookups, comparisons, procedures) | chart, spec-sheet, data-table, diagram, mermaid-diagram | the structured part per the generative-UI contract; nothing drawn by Home |
+| A tool result with structure (weather, almanac, lookups, comparisons, procedures) | chart, spec-sheet, data-table, diagram, mermaid-diagram | the structured part per the generative-UI contract; nothing drawn by Home (landed for weather and almanac: home af0af0aa) |
 | Image generation (the Stack's `image` role) | image-generation | the image job: queued, progress from the Stack's job events, the finished file |
 | Sources and citations (lookups, knowledge) | sources, inline-citation, document-reference, retrieval-chunks | the citation and evidence data the turn already carries |
-| A generated document or code (artifacts) | artifact-card, canvas-split, code-diff, shiki-highlighter | the artifact record, the model's artifact tool, versions |
+| A generated document or code (artifacts) | artifact-card, canvas-split, code-diff, shiki-highlighter | the artifact record, the model's artifact tool, versions (landed: the record home af0af0aa, the primitive and write_document package home 3ca9aa8e) |
 | Speaking a reply (the `tts` role) | read-aloud | the speech route through the Stack client |
 | Listening (the `stt` role, dictation, the live voice session) | composer-voice, transcription, voice-conversation, orb | the stt socket and the dictation adapter |
 | The wake word and the live connection | connection-state, orb | the wake-word hook and the engine health |
