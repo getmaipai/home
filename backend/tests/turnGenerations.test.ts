@@ -111,6 +111,32 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
     }
   });
 
+  test("LAT-01: max_tokens carries a 512-token THINKING_ALLOWANCE on top of the visible budget when thinking is on, and none when it is off", async () => {
+    const { client } = await owner();
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    // One stub, two turns of the same shape ("hi"): a real reply
+    // immediately either way, so nothing retries and each turn's own
+    // first (and only) request is directly comparable - the difference
+    // between the two isolates THINKING_ALLOWANCE from the plan's own
+    // word budget, which this test does not need to know.
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "Hey!" });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      await readNdjson(await client.post("/api/turn/stream", { text: "hi", thinking: false }));
+      await readNdjson(await client.post("/api/turn/stream", { text: "hi", thinking: true }));
+      const requests = stub.requests();
+      expect(requests).toHaveLength(2);
+      const withoutThinking = requests[0]!.max_tokens;
+      const withThinking = requests[1]!.max_tokens;
+      expect(typeof withoutThinking).toBe("number");
+      expect(withThinking).toBe(withoutThinking! + 512);
+    } finally {
+      stub.stop();
+      __resetLlmSupervisorForTests();
+    }
+  });
+
   test("the persisted row's own stats carry the same generations array", async () => {
     const { client, actor } = await owner();
     __resetLlmSupervisorForTests();

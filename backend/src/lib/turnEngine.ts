@@ -672,6 +672,24 @@ export const PROMPT_SYSTEM_CHAR_BUDGET = 4000;
 // lib/tts.ts's own MAX_TEXT_LENGTH for the identical reason on the
 // output side.
 export const MAX_TURN_TEXT_LENGTH = 8_000;
+// LAT-01 (docs/plans/simple-turn-pipeline-2026-09-22.md, unit U3): with
+// thinking on, the visible-reply budget alone (max_words*1.6 + 32 - 56
+// tokens for a greeting) left no room for the think block itself, so a
+// turn that actually needed to think ran out of cap before any visible
+// text arrived and had to regenerate from scratch with thinking off
+// (LAT-00's own diagnosis: a hidden second generation on "hi"). A flat
+// allowance on top of the same visible budget, not a separate
+// thinking-only cap, so a longer plan still gets more room to think,
+// not just this fixed extra.
+const THINKING_ALLOWANCE = 512;
+
+/** LAT-01: the one formula for a visible reply's own max_tokens, shared
+ * by the streaming and the blocking model-call sites so they can't drift
+ * into two different answers for "how much room does thinking need". */
+function visibleReplyMaxTokens(maxWords: number, thinking: boolean | undefined): number {
+  return Math.ceil(maxWords * 1.6) + 32 + (thinking ? THINKING_ALLOWANCE : 0);
+}
+
 const MAX_MEMORY_SNIPPETS = 5;
 /** #93: the memory block's own line when recall found nothing relevant
  * (exported for the tests and the bench). */
@@ -4747,8 +4765,10 @@ async function runTurnHoldingLease(
     prepared.modelCalls++;
     const completion = await complete("chat", prepared.messages, {
       thinking: opts.thinking,
-      // CHAT-12 reserve plus the ACT-03 plan's word budget.
-      max_tokens: Math.ceil(prepared.plan.max_words * 1.6) + 32,
+      // CHAT-12 reserve plus the ACT-03 plan's word budget - LAT-01's
+      // own THINKING_ALLOWANCE on top when thinking is on, so the think
+      // block has room of its own instead of eating the visible budget.
+      max_tokens: visibleReplyMaxTokens(prepared.plan.max_words, opts.thinking),
       ...(offeringTools ? { tools: prepared.tools, tool_choice: "auto" as const } : {}),
     });
     prepared.timings.first_token_ms = Date.now() - startedAt;
@@ -6262,7 +6282,7 @@ async function runTurnStreamHoldingLease(
   // the two casts.
   const modelPrepared = modelTurn;
   modelTurn.modelCalls++;
-  const initialMaxTokens = Math.ceil(modelPrepared.plan.max_words * 1.6) + 32;
+  const initialMaxTokens = visibleReplyMaxTokens(modelPrepared.plan.max_words, opts.thinking);
   const requestSentMsInitial = Date.now() - startedAt;
   const startResult = await startCompleteStream(
     "chat",
