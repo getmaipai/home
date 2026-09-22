@@ -900,6 +900,163 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
   });
 });
 
+describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
+  const STATS = { prompt_tokens: 120, predicted_tokens: 40, tokens_per_second: 22.4, time_to_first_token_ms: 400, total_time_ms: 2100, context_tokens: 120, context_used_percent: null, cache_reuse_tokens: 30, cache_reuse_percent: 25, engine: "local family.gguf", stop_reason: "stop", thinking: false };
+
+  // stubTurnFetch's own shape (SHELL-02 slice 3, above), plus GET
+  // /api/engines - `enginesResponse` lets each test represent both
+  // "Stack configured with a measured chat role" and "the common case
+  // today, unconfigured" without a second helper.
+  function stubDetailsFetch(streamBody: ReadableStream<Uint8Array>, enginesResponse: unknown): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-details123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json(enginesResponse));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+  }
+
+  // chatMemoryChip.test.tsx's own established fix (also used by
+  // ADMIN-COMPARE-01 below): Radix's DropdownMenu trigger opens on
+  // pointerdown, not a plain click.
+  async function openMoreMenu(view: ReturnType<typeof render>): Promise<void> {
+    const trigger = await view.findByRole("button", { name: "More" });
+    act(() => {
+      fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 });
+      fireEvent.click(trigger);
+    });
+  }
+
+  test("Details reveals the timing stats on click", async () => {
+    // The toggle itself (open/closed, keyed by turnId) is the identical
+    // mechanism `SourcesOpenContext` already has thorough coverage for
+    // above - this proves the reveal's own content, not the toggle
+    // logic a second time.
+    const restore = stubDetailsFetch(
+      ndjsonStream([
+        { type: "delta", text: "It's sunny." },
+        { type: "done", value: { turn_id: "turn-details123", reply: { text: "It's sunny." }, source: "model", safety: SAFETY, stats: STATS } },
+      ]),
+      { configured: false, roles: [], engines: [], budget: null },
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      await view.findByText("It's sunny.");
+      await openMoreMenu(view);
+      const detailsItem = await view.findByText("Details");
+      expect(view.queryByText("First token")).toBeNull();
+      fireEvent.click(detailsItem);
+      expect(await view.findByText("First token")).toBeVisible();
+      expect(view.getByText("0.4s")).toBeVisible();
+      expect(view.getByText("Total")).toBeVisible();
+      expect(view.getByText("2.1s")).toBeVisible();
+      expect(view.getByText("Speed")).toBeVisible();
+      expect(view.getByText("22 tok/s")).toBeVisible();
+      expect(view.getByText("Engine")).toBeVisible();
+      expect(view.getByText("local family.gguf")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("no Details entry at all when the turn carries no stats", async () => {
+    const restore = stubDetailsFetch(
+      ndjsonStream([
+        { type: "delta", text: "It's sunny." },
+        { type: "done", value: { turn_id: "turn-nostats123", reply: { text: "It's sunny." }, source: "model", safety: SAFETY } },
+      ]),
+      { configured: false, roles: [], engines: [], budget: null },
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      await view.findByText("It's sunny.");
+      await openMoreMenu(view);
+      expect(view.queryByText("Details")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("the context bar shows once the Stack reports a measured chat role's context length", async () => {
+    const restore = stubDetailsFetch(
+      ndjsonStream([
+        { type: "delta", text: "It's sunny." },
+        { type: "done", value: { turn_id: "turn-ctx123", reply: { text: "It's sunny." }, source: "model", safety: SAFETY, stats: STATS } },
+      ]),
+      {
+        configured: true,
+        roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: ["everyday"], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, check: { state: "not checked", at: null, reason: null, stale: false } }],
+        engines: [],
+        budget: null,
+      },
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      await view.findByText("It's sunny.");
+      await openMoreMenu(view);
+      fireEvent.click(await view.findByText("Details"));
+      await view.findByText("First token");
+      expect(await view.findByLabelText("Context usage")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("no context bar when the Stack isn't configured - timing stats alone still show", async () => {
+    const restore = stubDetailsFetch(
+      ndjsonStream([
+        { type: "delta", text: "It's sunny." },
+        { type: "done", value: { turn_id: "turn-nostack123", reply: { text: "It's sunny." }, source: "model", safety: SAFETY, stats: STATS } },
+      ]),
+      { configured: false, roles: [], engines: [], budget: null },
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      await view.findByText("It's sunny.");
+      await openMoreMenu(view);
+      fireEvent.click(await view.findByText("Details"));
+      await view.findByText("First token");
+      expect(view.queryByLabelText("Context usage")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
   function makeAdultPerson(): Roster {
     return { ...makePerson(), id: "person-adult456", display_name: "Marlow", role: "adult" };

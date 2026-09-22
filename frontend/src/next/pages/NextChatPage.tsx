@@ -9,6 +9,8 @@ import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { Sources, SourceGlyph } from "@maipai/ui/src/elements/sources";
 import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
+import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
+import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -24,7 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/toolt
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
-import { api, ApiError, isOwnerOrAdminRole, readBareCompareStream, type BareCompareTrace, type Roster, type StructuredPart } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, readBareCompareStream, type BareCompareTrace, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
@@ -46,6 +48,7 @@ const RailToggleIcon = getIcon("message-square");
 // registered fit, chosen over adding a new one to keep this item to the
 // one kit tag it already needed for the action bars themselves.
 const CompareIcon = getIcon("grid-2x2");
+const DetailsIcon = getIcon("gauge");
 
 // SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
 // almanac-date's own structured result (chatModelAdapter.ts's own
@@ -111,11 +114,21 @@ const SourcesOpenContext = createContext<{
   close: (turnId: string) => void;
 }>({ isOpen: () => false, toggle: () => {}, close: () => {} });
 
-/** slice 5(e): the "..." menu's second entry (Details, the stats reveal,
- * is a separate, later item - COORDINATOR named both for this same menu
- * so it's touched once, but Details has nothing to show yet). Admin-only
- * on both sides: hidden here for anyone else, and POST /api/turn/bare
- * itself 403s regardless, so this is convenience, not the real gate. */
+/** Slice 5(d): the "..." menu's second entry, Details (the stats
+ * reveal) - the same lifted-by-turnId shape `SourcesOpenContext` above
+ * already uses, simpler here since the trigger lives inside the "More"
+ * menu itself, not the bar's own row, so it isn't exposed to that
+ * menu's own autohide unmount risk. */
+const DetailsOpenContext = createContext<{
+  isOpen: (turnId: string) => boolean;
+  toggle: (turnId: string) => void;
+}>({ isOpen: () => false, toggle: () => {} });
+
+/** slice 5(e): the "..." menu's second entry (Details, the stats reveal -
+ * slice 5(d), landed 2026-09-22) - COORDINATOR named both for this same
+ * menu so it's touched once. Admin-only on both sides: hidden here for
+ * anyone else, and POST /api/turn/bare itself 403s regardless, so this
+ * is convenience, not the real gate. */
 function CompareWithBareModelMenuItem() {
   const isAdmin = useContext(AdminContext);
   const openCompare = useContext(CompareOpenContext);
@@ -139,8 +152,40 @@ function CompareWithBareModelMenuItem() {
   );
 }
 
+/** Slice 5(d): the "..." menu's own Details entry - no admin gate on
+ * this ONE (unlike Compare above): `TurnStats` (timing, token counts)
+ * isn't sensitive the way "compare against the bare model" is, and
+ * every household member already sees the reply itself. The reveal's
+ * own `ContextDisplay.Bar` piece IS admin-gated further down, since it
+ * needs `api.engines()`, an owner/admin-only route. */
+function MessageDetailsMenuItem() {
+  const { toggle } = useContext(DetailsOpenContext);
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  const stats = useAuiState((s) => s.message.metadata?.custom?.stats as TurnStats | undefined);
+  if (!stats) return null;
+  return (
+    <ActionBarMorePrimitive.Item
+      className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
+      disabled={!turnId}
+      onSelect={(e) => {
+        e.preventDefault();
+        if (!turnId) return;
+        toggle(turnId);
+      }}
+    >
+      <DetailsIcon className="size-4" />
+      Details
+    </ActionBarMorePrimitive.Item>
+  );
+}
+
 function AssistantMoreItems() {
-  return <CompareWithBareModelMenuItem />;
+  return (
+    <>
+      <CompareWithBareModelMenuItem />
+      <MessageDetailsMenuItem />
+    </>
+  );
 }
 
 const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string; version: number }> = ({ result }) => {
@@ -374,6 +419,95 @@ function SourcesFooterContent() {
     <div className="ms-2 pb-2">
       <Sources sources={sources} open={isOpen(turnId)} onOpenChange={() => toggle(turnId)} layout="list" hideTrigger />
     </div>
+  );
+}
+
+function buildTimingStats(stats: TurnStats): TimingStat[] {
+  const list: TimingStat[] = [];
+  if (stats.time_to_first_token_ms !== null) list.push({ label: "First token", value: `${(stats.time_to_first_token_ms / 1000).toFixed(1)}s` });
+  if (stats.total_time_ms !== null) list.push({ label: "Total", value: `${(stats.total_time_ms / 1000).toFixed(1)}s` });
+  if (stats.tokens_per_second !== null) list.push({ label: "Speed", value: `${stats.tokens_per_second.toFixed(0)} tok/s` });
+  if (stats.engine) list.push({ label: "Engine", value: stats.engine });
+  return list;
+}
+
+/** Slice 5(d): admin-only (`api.engines()` itself is owner/admin-gated) -
+ * `modelContextWindow` comes from the currently-loaded chat role's own
+ * `measuredContextLength` (the Stack roles API, the wiring table's own
+ * "Model choice" row's source). No fallback derivation from
+ * `context_used_percent`: that field is a permanent `null` in the
+ * backend today (`turnStats.ts` never computes it - `context_tokens` is
+ * a bare alias for `prompt_tokens`, not a real percentage-of-window
+ * measurement), so dividing by it would be dividing by nothing, not a
+ * real number. When the Stack isn't configured (`roles` empty, the
+ * common case today per `routes/engines.ts`'s own header) or the chat
+ * role's own context length hasn't been measured yet, this piece is
+ * left out rather than shown with an invented window - CTX-SEG-01
+ * (getmaipai/home#133) is the real fix (a segment breakdown that
+ * doesn't need a window at all), and `context-breakdown` replaces this
+ * piece the day it lands. */
+function MessageDetailsContextBar({ stats }: { stats: TurnStats }) {
+  const isAdmin = useContext(AdminContext);
+  // `["engines"]`, not a slice-local key: `NextEnginesPage.tsx` already
+  // queries the identical `api.engines()` call under this exact key - a
+  // review caught the first version using its own `["engines-overview"]`,
+  // which meant an admin who'd already loaded Engines got a second,
+  // independently-caching network round trip here instead of reusing
+  // react-query's own cache entry.
+  const enginesQuery = useQuery({
+    queryKey: ["engines"],
+    queryFn: api.engines,
+    enabled: isAdmin,
+    staleTime: 60_000,
+  });
+  if (!isAdmin) return null;
+  const modelContextWindow = enginesQuery.data?.roles?.find((role) => role.id === "chat")?.model?.measuredContextLength ?? null;
+  if (!modelContextWindow || stats.prompt_tokens === null) return null;
+  // A review caught this: `context_tokens` is a bare alias for
+  // `prompt_tokens` (`turnStats.ts`), not a real total, so using it
+  // alone as `totalTokens` left every turn's own `predicted_tokens`
+  // outside the percent-full reading entirely - the sum of both is
+  // what's actually sitting in context once a reply has generated.
+  // `cachedInputTokens` is left out on purpose: `cache_reuse_tokens` is
+  // ADDITIVE to `prompt_tokens` in this backend's own math
+  // (`turnStats.ts`'s own `cacheDenominator = cacheTokens + promptTokens`),
+  // not a subset of it the way `ContextDisplay`'s own contract assumes a
+  // provider's cached-token count is - mapping it in showed a "Cached
+  // input" segment that could read larger than "Input" itself, a
+  // self-contradictory number for the admin reading it.
+  const usage = {
+    totalTokens: stats.prompt_tokens + (stats.predicted_tokens ?? 0),
+    inputTokens: stats.prompt_tokens,
+    outputTokens: stats.predicted_tokens ?? undefined,
+  };
+  return <ContextDisplay.Bar modelContextWindow={modelContextWindow} usage={usage} />;
+}
+
+function MessageDetailsReveal() {
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  const stats = useAuiState((s) => s.message.metadata?.custom?.stats as TurnStats | undefined);
+  const { isOpen } = useContext(DetailsOpenContext);
+  if (!turnId || !stats || !isOpen(turnId)) return null;
+  const timingStats = buildTimingStats(stats);
+  if (timingStats.length === 0) return null;
+  return (
+    <div className="ms-2 flex flex-col gap-1.5 pb-2">
+      <MessageTiming stats={timingStats} />
+      <MessageDetailsContextBar stats={stats} />
+    </div>
+  );
+}
+
+// One `AssistantMessageFooterExtra` slot, two independent reveals
+// (sources, Details) - each keyed by its own turnId-scoped open state
+// and rendering (or not) on its own, so this wrapper is pure
+// composition, no shared logic between the two.
+function MessageFooterExtra() {
+  return (
+    <>
+      <SourcesFooterContent />
+      <MessageDetailsReveal />
+    </>
   );
 }
 
@@ -736,6 +870,26 @@ export function NextChatPage({ person }: { person: Roster }) {
     }),
     [openSourceIds, toggleSourceOpen, closeSourceOpen],
   );
+  // Slice 5(d): the same lifted-by-turnId shape as sources above, no
+  // `close` needed - the Details trigger lives inside the "More" menu
+  // itself (`MessageDetailsMenuItem`), not the bar's own row, so it's
+  // never exposed to `AssistantActionBar`'s own autohide unmount.
+  const [openDetailsIds, setOpenDetailsIds] = useState<ReadonlySet<string>>(new Set());
+  const toggleDetailsOpen = useCallback((turnId: string) => {
+    setOpenDetailsIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(turnId)) next.delete(turnId);
+      else next.add(turnId);
+      return next;
+    });
+  }, []);
+  const detailsOpenValue = useMemo(
+    () => ({
+      isOpen: (turnId: string) => openDetailsIds.has(turnId),
+      toggle: toggleDetailsOpen,
+    }),
+    [openDetailsIds, toggleDetailsOpen],
+  );
   // CHAT-UI-01 finding 4 / CHAT-UI-02: a ChatGPT-style collapse for the
   // desktop thread-list column. The shipped Sidebar primitive's own
   // collapsible modes (threadlist-sidebar.aui.tsx's own composition)
@@ -1036,6 +1190,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <AdminContext.Provider value={isOwnerOrAdminRole(person.role)}>
       <CompareOpenContext.Provider value={setCompareTarget}>
       <SourcesOpenContext.Provider value={sourcesOpenValue}>
+      <DetailsOpenContext.Provider value={detailsOpenValue}>
         <StructuredResultTools />
         <ArtifactTool />
         <ToolTimelineTool />
@@ -1170,7 +1325,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                 components={{
                   AssistantMoreItems,
                   AssistantActionBarExtra: SourcesActionBarTrigger,
-                  AssistantMessageFooterExtra: SourcesFooterContent,
+                  AssistantMessageFooterExtra: MessageFooterExtra,
                   Indicator: ChatThinkingIndicator,
                 }}
               />
@@ -1217,6 +1372,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
           </SheetContent>
         </Sheet>
+      </DetailsOpenContext.Provider>
       </SourcesOpenContext.Provider>
       </CompareOpenContext.Provider>
       </AdminContext.Provider>
