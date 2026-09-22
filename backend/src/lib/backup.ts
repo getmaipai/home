@@ -19,12 +19,14 @@
 // same "don't front-load speculative infra" call settings.ts's registry
 // made before a second key existed to prove it needed generality.
 import { existsSync, unlinkSync, readdirSync, statSync, copyFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Worker } from "node:worker_threads";
 import { eq } from "drizzle-orm";
 import { backupDir, ensureDataDir } from "@/lib/paths";
 import { randomSuffix } from "@/lib/id";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { db, sqlite } from "@/db";
+import { db, sqlite, dbPath } from "@/db";
 import { backupHealth } from "@/db/schema";
 import { encryptFile, decryptFile } from "@/lib/backupCrypto";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -66,12 +68,30 @@ export function cleanupStaleSnapshots(): number {
  * live"): SQLite's own `VACUUM INTO`, not a raw file copy of `hub.db`
  * (which could catch a WAL-mode database mid-checkpoint and copy an
  * inconsistent set of pages). A concurrent write mid-backup can never
- * produce a half-written snapshot this way. */
-function snapshotToTempFile(): string {
+ * produce a half-written snapshot this way.
+ *
+ * Run in a Worker: a household database is routinely several hundred MB,
+ * and VACUUM INTO rewrites the entire file, so running it synchronously
+ * on the main connection blocked the event loop for the whole snapshot's
+ * duration. The Worker opens its own read-only connection to the same
+ * file and runs VACUUM INTO there, returning the snapshot path. */
+async function snapshotToTempFile(): Promise<string> {
   ensureDataDir(backupDir);
   const tmpPath = join(backupDir, `${SNAPSHOT_PREFIX}${Date.now()}-${randomSuffix(8)}.db`);
-  sqlite.query("VACUUM INTO ?").run(tmpPath);
-  return tmpPath;
+  const workerPath = join(dirname(fileURLToPath(import.meta.url)), "snapshotWorker.ts");
+  const worker = new Worker(workerPath);
+  const resultPromise = new Promise<{ ok: boolean; error?: string }>((resolve, reject) => {
+    worker.once("message", (msg: { ok: boolean; error?: string }) => resolve(msg));
+    worker.once("error", (err) => reject(err));
+  });
+  try {
+    worker.postMessage({ src: dbPath, dst: tmpPath });
+    const result = await resultPromise;
+    if (!result.ok) throw new Error(result.error ?? "snapshot failed");
+    return tmpPath;
+  } finally {
+    worker.terminate();
+  }
 }
 
 // Defined in @/wire (alias-free) so a frontend client can import the real
@@ -104,16 +124,18 @@ export function listBackups(): BackupInfo[] {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** Runs one real backup: snapshot, encrypt, write to the local target. */
-export function runBackup(): BackupInfo {
+/** Runs one real backup: snapshot, encrypt, write to the local target.
+ * Async: the snapshot (VACUUM INTO) runs in a Worker and the encryption
+ * streams, so neither blocks the event loop for the archive's duration. */
+export async function runBackup(): Promise<BackupInfo> {
   cleanupStaleSnapshots();
-  const tmpPath = snapshotToTempFile();
+  const tmpPath = await snapshotToTempFile();
   try {
     const filename = backupFilename(new Date());
-    encryptFile(tmpPath, join(backupDir, filename));
+    await encryptFile(tmpPath, join(backupDir, filename));
     return toInfo(filename);
   } finally {
-    unlinkSync(tmpPath);
+    try { unlinkSync(tmpPath); } catch {}
   }
 }
 
@@ -123,10 +145,10 @@ export function runBackup(): BackupInfo {
  * allowed near it. This is the primitive underneath both, proven by
  * actually opening the restored file and querying it (see
  * tests/backup.test.ts). */
-export function restoreBackup(filename: string, intoPath: string): void {
+export async function restoreBackup(filename: string, intoPath: string): Promise<void> {
   const inPath = join(backupDir, filename);
   if (!existsSync(inPath)) throw new Error(`no such backup: ${filename}`);
-  decryptFile(inPath, intoPath);
+  await decryptFile(inPath, intoPath);
 }
 
 const DAILY_KEEP = 7;
@@ -355,7 +377,7 @@ export async function runBackupAndMirror(opts: { prune?: boolean } = {}): Promis
   const prune = opts.prune ?? true;
   let info: BackupInfo;
   try {
-    info = runBackup();
+    info = await runBackup();
   } catch (err) {
     await recordBackupFailure("local", err instanceof Error ? err.message : String(err));
     throw err;

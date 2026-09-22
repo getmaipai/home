@@ -101,7 +101,7 @@ function copyPersonScopedRows(table: string, whereClause: string, param: string)
  * backup: every insert is `OR IGNORE` against the same primary keys the
  * backup itself assigned, so a repeat restore adds nothing a second
  * time rather than erroring or duplicating. */
-export function restorePersonFromBackup(filename: string, personId: string): PartialRestoreResult {
+export async function restorePersonFromBackup(filename: string, personId: string): Promise<PartialRestoreResult> {
   const livingPerson = sqlite.query("SELECT id FROM people WHERE id = ? AND deleted_at IS NULL").get(personId);
   if (!livingPerson) throw new PartialRestoreRefused("no such person (or they were deleted)");
 
@@ -110,7 +110,7 @@ export function restorePersonFromBackup(filename: string, personId: string): Par
 
   const tmpPath = join(tmpdir(), `maipai-partial-restore-${randomSuffix(8)}.db`);
   try {
-    decryptFile(inPath, tmpPath);
+    await decryptFile(inPath, tmpPath);
   } catch {
     throw new PartialRestoreRefused("that backup could not be read. Try another one.");
   }

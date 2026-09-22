@@ -123,7 +123,7 @@ backupsRoutes.openapi(restoreRoute, async (c) => {
     // regardless, per this block's own comment above.
   }
   try {
-    return c.json({ pending: stageRestore(filename, actor.id) }, 200);
+    return c.json({ pending: await stageRestore(filename, actor.id) }, 200);
   } catch (err) {
     // Only RestoreRefused messages are written for the person reading
     // them, so only those are passed through. A code review (2026-09-05)
@@ -321,7 +321,7 @@ const partialRestoreRoute = createRoute({
     ...errorResponses({ 400: "The archive is refused, or does not contain this person", 403: "Not owner/admin", 404: "No such backup, or no such living person" }),
   },
 });
-backupsRoutes.openapi(partialRestoreRoute, (c) => {
+backupsRoutes.openapi(partialRestoreRoute, async (c) => {
   const { filename, personId } = c.req.valid("param");
   // Same defense-in-depth the full-restore route above already applies:
   // never let a caller-supplied filename reach the filesystem unchecked.
@@ -334,7 +334,7 @@ backupsRoutes.openapi(partialRestoreRoute, (c) => {
     return c.json({ error: `no such backup: ${filename}` }, 404);
   }
   try {
-    return c.json(restorePersonFromBackup(filename, personId), 200);
+    return c.json(await restorePersonFromBackup(filename, personId), 200);
   } catch (err) {
     if (err instanceof PartialRestoreRefused) {
       const notFound = err.message.includes("no such person") || err.message.includes("no such backup");

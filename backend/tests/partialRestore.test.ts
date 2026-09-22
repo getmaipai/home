@@ -62,17 +62,22 @@ describe("restorePersonFromBackup()", () => {
     logTurn(personRow, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-1" });
     setValue(personRow, `person:${person.id}`, "tts.voice_id", "alba");
 
-    const backup = runBackup();
+    const backup = await runBackup();
 
     // Lose it all live: this is the scenario the feature exists for -
     // an accidental forget()/settings reset, not necessarily a delete.
+    // pending_embeddings and pending_memory_work both carry an FK to
+    // memory_records.id, so their queue rows must go first.
+    sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
+    sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
+    sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(person.id);
     deleteEpisodesForPerson(person.id);
     sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(person.id);
     sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(person.id);
     sqlite.query("DELETE FROM settings_values WHERE scope = ?").run(`person:${person.id}`);
 
-    const result = restorePersonFromBackup(backup.filename, person.id);
+    const result = await restorePersonFromBackup(backup.filename, person.id);
     expect(result.memories).toBe(1);
     expect(result.conversations).toBe(1);
     expect(result.conversationThreads).toBe(1);
@@ -107,13 +112,19 @@ describe("restorePersonFromBackup()", () => {
     remember(toPersonRow(a.id), { text: "A's memory", category: "preference", tier: "durable", scope: "person", person: a.id, source: "hub", importance: 0.5 });
     remember(toPersonRow(b.id), { text: "B's memory", category: "preference", tier: "durable", scope: "person", person: b.id, source: "hub", importance: 0.5 });
 
-    const backup = runBackup();
+    const backup = await runBackup();
+    sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(a.id);
+    sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(a.id);
+    sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(a.id);
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(a.id);
     deleteEpisodesForPerson(a.id);
+    sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(b.id);
+    sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(b.id);
+    sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(b.id);
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(b.id);
     deleteEpisodesForPerson(b.id);
 
-    restorePersonFromBackup(backup.filename, a.id);
+    await restorePersonFromBackup(backup.filename, a.id);
     expect((sqlite.query("SELECT COUNT(*) AS n FROM memory_records WHERE person = ?").get(a.id) as { n: number }).n).toBe(1);
     expect((sqlite.query("SELECT COUNT(*) AS n FROM memory_records WHERE person = ?").get(b.id) as { n: number }).n).toBe(0);
   });
@@ -125,11 +136,14 @@ describe("restorePersonFromBackup()", () => {
     const person = (await personRes.json()) as { id: string };
     remember(toPersonRow(person.id), { text: "Bramble likes trains", category: "preference", tier: "durable", scope: "person", person: person.id, source: "hub", importance: 0.5 });
 
-    const backup = runBackup();
+    const backup = await runBackup();
+    sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
+    sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
+    sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(person.id);
 
-    restorePersonFromBackup(backup.filename, person.id);
-    restorePersonFromBackup(backup.filename, person.id);
+    await restorePersonFromBackup(backup.filename, person.id);
+    await restorePersonFromBackup(backup.filename, person.id);
     expect((sqlite.query("SELECT COUNT(*) AS n FROM memory_records WHERE person = ?").get(person.id) as { n: number }).n).toBe(1);
   });
 
@@ -138,27 +152,27 @@ describe("restorePersonFromBackup()", () => {
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const personRes = await owner.post("/api/people", { displayName: "Bramble", role: "teen" });
     const person = (await personRes.json()) as { id: string };
-    const backup = runBackup();
+    const backup = await runBackup();
     await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
 
-    expect(() => restorePersonFromBackup(backup.filename, person.id)).toThrow(PartialRestoreRefused);
+    await expect(restorePersonFromBackup(backup.filename, person.id)).rejects.toThrow(PartialRestoreRefused);
   });
 
   test("refuses a person the backup never contained", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const backup = runBackup();
+    const backup = await runBackup();
     const laterRes = await owner.post("/api/people", { displayName: "Bramble", role: "teen" });
     const later = (await laterRes.json()) as { id: string };
 
-    expect(() => restorePersonFromBackup(backup.filename, later.id)).toThrow(PartialRestoreRefused);
+    await expect(restorePersonFromBackup(backup.filename, later.id)).rejects.toThrow(PartialRestoreRefused);
   });
 
   test("refuses an unknown backup filename", async () => {
     const owner = new TestClient();
     const res = await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const { person } = (await res.json()) as { person: { id: string } };
-    expect(() => restorePersonFromBackup("backup-nope.db.enc", person.id)).toThrow(PartialRestoreRefused);
+    await expect(restorePersonFromBackup("backup-nope.db.enc", person.id)).rejects.toThrow(PartialRestoreRefused);
   });
 });
 
@@ -170,7 +184,10 @@ describe("POST /api/backups/:filename/restore-person/:personId", () => {
     const person = (await personRes.json()) as { id: string };
     remember(toPersonRow(person.id), { text: "Bramble likes trains", category: "preference", tier: "durable", scope: "person", person: person.id, source: "hub", importance: 0.5 });
 
-    const backup = runBackup();
+    const backup = await runBackup();
+    sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
+    sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
+    sqlite.query("DELETE FROM pending_memory_work WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(person.id);
 
     const res = await owner.request(`/api/backups/${backup.filename}/restore-person/${person.id}`, { method: "POST" });
@@ -194,7 +211,7 @@ describe("POST /api/backups/:filename/restore-person/:personId", () => {
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
-    const backup = runBackup();
+    const backup = await runBackup();
 
     const adultClient = new TestClient();
     await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
