@@ -10,8 +10,8 @@ the rows stand as written and this file is the counter-case they must answer.
 ## Why this file exists
 
 The four ARCH rows were written from industry patterns and two adversarial
-rounds, but none of them was checked line by line against what the engine
-does today. This review was. Where it found the rows describing code that
+rounds. Each was checked against the code in places; this review checked
+every cited line, and names where the row and the code disagree. Where it found the rows describing code that
 does not exist, or missing code that does, the record should be corrected
 before any design is built on it.
 
@@ -109,9 +109,11 @@ reranker is an ONNX cross-encoder, not something to write.
 Contradictions in the record: the 2026-09-16 review keeps the three-tier
 router while ARCH-AGENT-01 retires it, both cited as live; the 8B numbers
 versus the p32 row; the temporary-chat "no row" ruling had two uninventoried
-writers (`setReplyConstraint`, `turnEngine.ts:2813`; only `setPendingAsk`
-checks, `conversationHistory.ts:906`) and an artifacts foreign key on the
-provisional turn row (TEMP-CHAT-01's backend half now covers all three);
+writers, `setReplyConstraint` (`turnEngine.ts:2813`) and `queueOpenQuestion`
+(`:2083`, `:2146`), where only `setPendingAsk` checks
+(`conversationHistory.ts:906`), plus an artifacts foreign key on the
+provisional turn row that `write_document` needs (TEMP-CHAT-01's acceptance
+is widened to all of them);
 "the model phrases, it does not judge" is now true only of policy; the
 vendoring rule versus four pending-patch rows at "PR not yet opened"
 (`dev.md`, the pending-patches table); the wake-word ruling cites SAFETY.md,
@@ -128,7 +130,10 @@ while the memory and policy rows treat it as per household; the single turn
 lease and one engine slot, still open since the 2026-09-12 review, when two
 children need to talk at once.
 
-Motivated reasoning: "the controls are exactly ChatGPT's because ChatGPT has
+Motivated reasoning: ROUTE-FIND-03's two failures are cited as the ladder's
+predicted failure mode, but they are a fast-path admission bug and a guard,
+which the row's own "admit by properties" amendment fixes without a loop; the
+loop is justified by two failures the fast-path fix resolves. "The controls are exactly ChatGPT's because ChatGPT has
 none" is imitation, not derivation (the derivable rule is "no control whose
 effect the plan already computes"); "we already hold four of the five pieces"
 rests on manifest descriptions written as store copy (`turnEngine.ts:1209`),
