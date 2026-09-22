@@ -404,6 +404,13 @@ is written to this, and every later unit obeys it.
   "where the time goes", and the replay bench reads it to report quality
   and time per node, so a slow layer and a wrong layer are both named by
   the same record.
+- **Every node has a deadline, and it can be cut.** The budget record gives
+  each node a deadline, and every node's work is abortable through a
+  signal that reaches the engine request. The streaming call already
+  takes a caller's signal with a re-armed idle timeout (COR-7); the
+  non-streaming `chatComplete` has only a flat 120-second timeout and no
+  way for a caller to pass a signal (COR-2), so the spec's chat client
+  gains a signal first (LLM-TIMEOUT-01), then U2 uses it.
 - **Swapping a layer is registration, not surgery.** A better
   implementation of a node registers under the same contract and is
   selected by the model's budget record or a declared setting; it is
