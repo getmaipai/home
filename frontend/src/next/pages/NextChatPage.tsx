@@ -156,7 +156,11 @@ function ArtifactTool() {
 const SourcesToolRender: ToolCallMessagePartComponent<Record<string, never>, Source[]> = ({ result }) => {
   const [open, setOpen] = useState(false);
   if (!result?.length) return null;
-  return <Sources sources={result.map((source) => ({ domain: source.site, title: source.title }))} open={open} onOpenChange={setOpen} />;
+  // Jesse's own comparison (shadcn.io's AI Sources, ChatGPT's placement,
+  // 2026-09-22): `layout="list"` (kit ui-v0.5.26) - a compact one-line-
+  // per-source list once expanded, not the shipped default's two-column
+  // card grid, which read as taking more room than the reply itself.
+  return <Sources sources={result.map((source) => ({ domain: source.site, title: source.title }))} open={open} onOpenChange={setOpen} layout="list" />;
 };
 
 function SourcesTool() {
