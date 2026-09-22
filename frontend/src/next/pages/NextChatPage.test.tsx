@@ -617,6 +617,89 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     }
   });
 
+  test("a click that changes the rail's width animates it", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
+      expect(classes(rail())).toContain("transition-[width]");
+    } finally {
+      restore();
+    }
+  });
+
+  test("hovering the peek open or closed never animates the rail's width - Jesse's third report of this exact bug", async () => {
+    // The report: "when it's collapsed and I mouse out, the right pane
+    // animates when it should just stay still." Starting already
+    // collapsed (no click in this test at all, `stubMatchMedia(true)`
+    // the same way the narrow-viewport tests below do) reproduces that
+    // exactly - `transition-[width]` used to sit on the rail
+    // unconditionally, so leaving the peek (absolute w-64 -> static
+    // w-0, a real in-flow width the chat pane gets squeezed by) animated
+    // too even though nothing about a hover should ever move anything.
+    stubMatchMedia(true);
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const railNode = rail();
+      expect(classes(railNode)).toContain("hidden");
+      expect(classes(railNode)).not.toContain("transition-[width]");
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+      expect(classes(rail())).not.toContain("transition-[width]");
+      // The regression itself.
+      fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
+      expect(classes(rail())).toContain("hidden");
+      expect(classes(rail())).not.toContain("transition-[width]");
+    } finally {
+      restore();
+    }
+  });
+
+  test("the fallback timeout clears the animating flag when no width value actually changes (peeked, then a click that opens it)", async () => {
+    // A code review named this gap: clicking the peeked toggle goes
+    // absolute-w-64 -> static-w-64 - the SAME width value, so no
+    // "width" transitionend ever fires to clear `railWidthAnimating`
+    // the normal way. Only the fallback timeout can, and nothing
+    // exercised that path until now. A real (not fake) timer - no fake-
+    // timer harness is set up in this suite - so this waits for it
+    // rather than asserting instantly; `waitFor`'s own default timeout
+    // comfortably clears the rail's 200ms.
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const railNode = rail();
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
+      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).not.toContain("absolute");
+      expect(classes(rail())).toContain("transition-[width]");
+      await waitFor(() => expect(classes(rail())).not.toContain("transition-[width]"), { timeout: 1000 });
+    } finally {
+      restore();
+    }
+  });
+
   test("the chat pane's own spacing is identical collapsed and peeked - only a click (a real width change) moves it", async () => {
     // Jesse found this: the pane bumped right on hover-in and back on
     // hover-out, reading as a peek that reflows the layout it's meant

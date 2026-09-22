@@ -1092,6 +1092,66 @@ export function NextChatPage({ person }: { person: Roster }) {
   // follows a genuine hand movement reports different ones. Recorded at
   // click time, compared at leave time.
   const suppressPointerOriginRef = useRef<{ x: number; y: number } | null>(null);
+  // Jesse's third report of this exact pane-jitter: `transition-[width]`
+  // used to sit unconditionally on the rail's own base className, so
+  // *any* width change animated - including closing the peek, which
+  // flips the node from `absolute w-64` (out of flow, harmless) to
+  // `static w-0` (in flow, so the chat pane gets squeezed for the
+  // animation's own 200ms). Only a real click should ever ease the
+  // width; hover opening or closing the peek must jump instantly. The
+  // transition classes now ride this flag instead of the base string,
+  // true only across a click-driven width change - `cn()` drops a
+  // falsy entry, so when it's false the transition property is
+  // genuinely absent from the rail's className, not merely overridden.
+  // Must match the rail's own `duration-200` Tailwind class in its
+  // className below - Tailwind's JIT needs that class as a literal
+  // string there, so this can't be interpolated in; a change to one
+  // needs the other updated by hand.
+  const RAIL_WIDTH_TRANSITION_MS = 200;
+  const [railWidthAnimating, setRailWidthAnimating] = useState(false);
+  const railWidthAnimatingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const railWidthAnimatingRafRef = useRef<number | null>(null);
+  const clearRailWidthAnimationTimers = () => {
+    if (railWidthAnimatingRafRef.current !== null) {
+      cancelAnimationFrame(railWidthAnimatingRafRef.current);
+      railWidthAnimatingRafRef.current = null;
+    }
+    if (railWidthAnimatingTimeoutRef.current !== null) {
+      clearTimeout(railWidthAnimatingTimeoutRef.current);
+      railWidthAnimatingTimeoutRef.current = null;
+    }
+  };
+  const stopRailWidthAnimation = () => {
+    clearRailWidthAnimationTimers();
+    setRailWidthAnimating(false);
+  };
+  const startRailWidthAnimation = () => {
+    setRailWidthAnimating(true);
+    clearRailWidthAnimationTimers();
+    // `onTransitionEnd` below is the normal clear path; this is the net
+    // for a transition that never fires - `motion-reduce` drops it, and
+    // a peeked-then-click-to-open goes absolute-w-64 -> static-w-64 (no
+    // width VALUE change at all, so no "width" transitionend either).
+    // A code review caught this racing ahead of the real transition
+    // when it started here synchronously: a CSS transition's own clock
+    // begins at the next paint, not the moment this class flips in JS,
+    // so a plain `setTimeout(200)` fired a few ms before the genuine
+    // transitionend and truncated the animation early on every click,
+    // not just the no-value-change case this fallback exists for.
+    // Deferred one rAF (the same "wait for the committed frame" pattern
+    // this file's own toggle-focus effect above already uses) so the
+    // fallback's own clock starts close to when the real one does.
+    railWidthAnimatingRafRef.current = requestAnimationFrame(() => {
+      railWidthAnimatingRafRef.current = null;
+      railWidthAnimatingTimeoutRef.current = setTimeout(() => {
+        railWidthAnimatingTimeoutRef.current = null;
+        setRailWidthAnimating(false);
+      }, RAIL_WIDTH_TRANSITION_MS);
+    });
+  };
+  useEffect(() => {
+    return () => clearRailWidthAnimationTimers();
+  }, []);
   const openPeekIfCollapsed = () => {
     if (railCollapsed) setRailPeeked(true);
   };
@@ -1119,6 +1179,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   };
   const handleToggleClick = (e: MouseEvent<HTMLButtonElement>) => {
     suppressHoverPeekRef.current = true;
+    startRailWidthAnimation();
     // A review caught this: `e.detail === 0` is a keyboard-synthesized
     // click (Enter/Space on the focused toggle, per spec) - its own
     // `clientX`/`clientY` are always (0, 0), unrelated to wherever the
@@ -1285,7 +1346,11 @@ export function NextChatPage({ person }: { person: Roster }) {
               // itself, present only in the two states that actually
               // have width to put them in.
               className={cn(
-                "overflow-y-auto bg-background transition-[width] duration-200 ease-linear motion-reduce:transition-none",
+                "overflow-y-auto bg-background",
+                // Only a click (`startRailWidthAnimation`) ever puts this
+                // back on the element - see that function's own comment.
+                // Hovering the peek open or closed must jump, never ease.
+                railWidthAnimating && "transition-[width] duration-200 ease-linear motion-reduce:transition-none",
                 railCollapsed
                   ? railPeeked
                     ? "absolute inset-y-0 left-0 z-20 block w-64 border-r border-border pr-2 shadow-lg animate-in slide-in-from-left-4 fade-in motion-reduce:animate-none"
@@ -1294,6 +1359,9 @@ export function NextChatPage({ person }: { person: Roster }) {
               )}
               onPointerLeave={(e) => closeRailPeek(e.relatedTarget)}
               onBlur={(e) => closeRailPeek(e.relatedTarget)}
+              onTransitionEnd={(e) => {
+                if (e.target === e.currentTarget && e.propertyName === "width") stopRailWidthAnimation();
+              }}
             >
               <NextThreadList onNewThread={() => { setSheetOpen(false); setRailPeeked(false); }} collapseToggle={inlineToggle} />
             </div>
