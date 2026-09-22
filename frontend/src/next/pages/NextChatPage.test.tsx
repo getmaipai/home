@@ -498,6 +498,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
   // identically-styled instance positioned at that row's own former
   // top-left. Exactly one of the two is ever mounted at a time.
   const rail = () => document.getElementById("next-chat-rail")!;
+  const pane = () => document.querySelector('[data-slot="next-chat-pane"]')!;
   const classes = (el: Element) => el.className.split(/\s+/);
 
   test("open: the toggle is inline in the column's own header row, beside New Thread, no floating instance", async () => {
@@ -536,7 +537,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       );
       await view.findByLabelText("Message input");
       const openToggle = view.getByRole("button", { name: "Hide conversations" });
-      fireEvent.click(openToggle);
+      fireEvent.click(openToggle, { detail: 1 });
       // Hidden via a CSS class (the same `hidden` pattern the
       // phone/tablet split already used), not unmounted - a code review
       // on an earlier draft caught `railCollapsed ? null : ...` leaving
@@ -576,7 +577,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       );
       await view.findByLabelText("Message input");
       const railNode = rail();
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
       // Two "Show conversations" toggles exist at this point (the inline
       // one, inert inside the now-hidden rail, and the collapsed-only
       // floating one) - the one a real pointer can actually reach is the
@@ -585,7 +586,10 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // A click-triggered "phantom" pointerenter (the browser recomputing
       // hover when this node mounts under a stationary pointer) is
       // suppressed until a real leave - a real hover needs one first.
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body });
+      // clientX/Y differ from the click's own default (0, 0) - a real
+      // leave, not the swap's own incidental one (NextChatPage.tsx's
+      // own comment on why coordinates, not relatedTarget).
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
       fireEvent.pointerEnter(collapsedToggle);
       // Never remounted, never a second column instance - the exact same
       // node that was measured "open" a moment ago.
@@ -613,6 +617,76 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     }
   });
 
+  test("the chat pane's own spacing is identical collapsed and peeked - only a click (a real width change) moves it", async () => {
+    // Jesse found this: the pane bumped right on hover-in and back on
+    // hover-out, reading as a peek that reflows the layout it's meant
+    // to sit ABOVE, not shift. The pane's own spacing is keyed on
+    // `railCollapsed` alone (NextChatPage.tsx's own comment on why) -
+    // this proves it directly, className to className, since happy-dom
+    // computes no real box geometry to measure a pixel rect against.
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const openPaneClasses = classes(pane());
+      expect(openPaneClasses).toContain("ms-4");
+      expect(openPaneClasses).not.toContain("ms-0");
+
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
+      const collapsedPaneClasses = classes(pane());
+      expect(collapsedPaneClasses).toContain("ms-0");
+      expect(collapsedPaneClasses).not.toContain("ms-4");
+
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+      // Peeked now - the pane's own classes must not have changed at
+      // all from the collapsed-not-peeked state above.
+      expect(classes(pane())).toEqual(collapsedPaneClasses);
+
+      fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
+      expect(classes(rail())).toContain("hidden");
+      // Closed again - still identical to the collapsed-not-peeked
+      // snapshot, never having moved through any of this.
+      expect(classes(pane())).toEqual(collapsedPaneClasses);
+    } finally {
+      restore();
+    }
+  });
+
+  test("a keyboard-triggered collapse still clears the peek suppression on the next real leave, not stuck on a meaningless (0, 0) origin", async () => {
+    // A review caught this: a keyboard-synthesized click (Enter/Space on
+    // the focused toggle, `detail: 0` per spec) always reports
+    // `clientX`/`clientY` (0, 0), unrelated to wherever the real mouse
+    // actually is. Comparing a later leave's own real, non-zero
+    // coordinates against that meaningless origin would never match,
+    // permanently blocking a legitimate mouse hover from ever opening
+    // the peek again after a keyboard-driven collapse.
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const openToggle = view.getByRole("button", { name: "Hide conversations" });
+      fireEvent.click(openToggle, { detail: 0 });
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      // A genuine hover a moment later, real (non-zero) coordinates.
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 500, clientY: 500 });
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+    } finally {
+      restore();
+    }
+  });
+
   test("a click on the toggle still pins the column open, peek or not", async () => {
     const restore = stubFetch();
     try {
@@ -622,23 +696,58 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
       // A real hover, not the click's own suppressed phantom enter.
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body });
+      // clientX/Y differ from the click's own default (0, 0) - a real
+      // leave, not the swap's own incidental one (NextChatPage.tsx's
+      // own comment on why coordinates, not relatedTarget).
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
       // Hovering swapped the collapsed-only instance for the inline one
       // now visible inside the peeked rail - that's the live instance a
       // real pointer would be over next, so the click lands on it, not
       // the (now unmounted) collapsed-only button.
-      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }));
+      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
       expect(classes(rail())).toContain("w-64");
       expect(classes(rail())).toContain("lg:block");
       expect(classes(rail())).not.toContain("absolute");
       // Pinning open resets the peek - collapsing again later starts
       // from a real hover, not a stale peek left over from before.
       expect(view.getByRole("button", { name: "Hide conversations" })).toHaveAttribute("aria-expanded", "true");
+    } finally {
+      restore();
+    }
+  });
+
+  test("clicking to collapse still suppresses the peek even when the outgoing toggle fires its own pointerleave as part of the swap", async () => {
+    // A regression Jesse found again after the first fix below: the
+    // outgoing (inline) toggle doesn't just vanish silently when it
+    // becomes `hidden` - a real browser also fires a genuine
+    // `pointerleave` on IT, as part of the very same hit-test
+    // recomputation that fires the phantom `pointerenter` on the
+    // incoming (collapsed) toggle a moment later. `handleToggleLeave`
+    // clears the suppression flag on ANY toggle's pointerleave, so that
+    // genuine-but-incidental leave event cleared the flag before the
+    // phantom enter ever checked it - suppression working exactly as
+    // designed against the phantom enter alone, defeated by an event
+    // the fix's own design didn't account for.
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const openToggle = view.getByRole("button", { name: "Hide conversations" });
+      fireEvent.click(openToggle, { detail: 1 });
+      fireEvent.pointerLeave(openToggle);
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("hidden");
+      expect(classes(rail())).not.toContain("absolute");
     } finally {
       restore();
     }
@@ -662,7 +771,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
       // The phantom pointerenter a real browser fires on the freshly-
       // mounted node, pointer never having actually moved.
@@ -671,7 +780,10 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       expect(classes(rail())).not.toContain("absolute");
       // Moving away for real, then back, is a genuine hover again - the
       // peek opens.
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body });
+      // clientX/Y differ from the click's own default (0, 0) - a real
+      // leave, not the swap's own incidental one (NextChatPage.tsx's
+      // own comment on why coordinates, not relatedTarget).
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
     } finally {
@@ -695,7 +807,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
       collapsedToggle.focus();
       fireEvent.focus(collapsedToggle);
@@ -731,14 +843,17 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
       let collapsedFocusCalled = false;
       collapsedToggle.focus = () => {
         collapsedFocusCalled = true;
       };
       // A real hover, not the click's own suppressed phantom enter.
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body });
+      // clientX/Y differ from the click's own default (0, 0) - a real
+      // leave, not the swap's own incidental one (NextChatPage.tsx's
+      // own comment on why coordinates, not relatedTarget).
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
       expect(collapsedFocusCalled).toBe(false);
@@ -776,7 +891,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
-      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }));
+      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
       expect(classes(rail())).toContain("w-64");
       expect(classes(rail())).not.toContain("absolute");
     } finally {

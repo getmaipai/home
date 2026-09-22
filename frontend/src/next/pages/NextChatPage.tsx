@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolCallMessagePartComponent } from "@assistant-ui/react";
@@ -921,6 +921,23 @@ export function NextChatPage({ person }: { person: Roster }) {
   // no phantom-recomputation risk analogous to a stationary mouse, and
   // must still open the peek immediately.
   const suppressHoverPeekRef = useRef(false);
+  // Jesse found the suppression above regressed: a click-triggered DOM
+  // swap fires a pointerleave on the OUTGOING toggle too, not just a
+  // phantom pointerenter on the incoming one - the same stationary
+  // pointer, no real transition, but `handleToggleLeave` cleared the
+  // suppression flag on ANY leave, so that incidental event raced ahead
+  // of the swap's own phantom enter and defeated it. `relatedTarget`
+  // can't tell the two apart here (an environment quirk found writing
+  // this fix's own test: happy-dom never reports an unspecified
+  // `relatedTarget` as falsy the way a real browser does, so a leave
+  // fired with no real destination is indistinguishable, in a test,
+  // from one with a genuine one). Real pointer MOVEMENT is unambiguous
+  // either way: the incidental leave/enter pair a DOM swap fires under
+  // a stationary pointer report the exact same client coordinates the
+  // click itself had (the OS cursor hasn't moved), while any leave that
+  // follows a genuine hand movement reports different ones. Recorded at
+  // click time, compared at leave time.
+  const suppressPointerOriginRef = useRef<{ x: number; y: number } | null>(null);
   const openPeekIfCollapsed = () => {
     if (railCollapsed) setRailPeeked(true);
   };
@@ -928,7 +945,9 @@ export function NextChatPage({ person }: { person: Roster }) {
     if (suppressHoverPeekRef.current) return;
     openPeekIfCollapsed();
   };
-  const handleToggleLeave = () => {
+  const handleToggleLeave = (e: PointerEvent<HTMLButtonElement>) => {
+    const origin = suppressPointerOriginRef.current;
+    if (origin && e.clientX === origin.x && e.clientY === origin.y) return;
     suppressHoverPeekRef.current = false;
   };
   // Only a genuine interaction with the toggle itself - focusing it or
@@ -944,8 +963,19 @@ export function NextChatPage({ person }: { person: Roster }) {
     pendingToggleFocusRef.current = true;
     openPeekIfCollapsed();
   };
-  const handleToggleClick = () => {
+  const handleToggleClick = (e: MouseEvent<HTMLButtonElement>) => {
     suppressHoverPeekRef.current = true;
+    // A review caught this: `e.detail === 0` is a keyboard-synthesized
+    // click (Enter/Space on the focused toggle, per spec) - its own
+    // `clientX`/`clientY` are always (0, 0), unrelated to wherever the
+    // real mouse actually is, so there's no meaningful origin to compare
+    // a later leave against. `null` here means "no origin recorded" -
+    // `handleToggleLeave`'s own `if (origin && ...)` then clears
+    // suppression on the very first leave that follows, the same
+    // unconditional behavior this mechanism had before the coordinate
+    // check existed, correct for a keyboard-driven collapse where a real
+    // mouse position was never part of the interaction to begin with.
+    suppressPointerOriginRef.current = e.detail === 0 ? null : { x: e.clientX, y: e.clientY };
     pendingToggleFocusRef.current = true;
     if (railCollapsed) {
       setRailCollapsed(false);
@@ -1043,7 +1073,7 @@ export function NextChatPage({ person }: { person: Roster }) {
               <AlertDescription>{banner}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="relative flex min-h-0 flex-1 gap-4">
+          <div className="relative flex min-h-0 flex-1">
             {/* `lg:` not `sm:` - tokens.css's own --breakpoint-lg note
                 (the kit's 960px default reopens a squeeze at tablet
                 width), the same reason ChatPage.tsx's own persistent
@@ -1113,7 +1143,29 @@ export function NextChatPage({ person }: { person: Roster }) {
               <NextThreadList onNewThread={() => { setSheetOpen(false); setRailPeeked(false); }} collapseToggle={inlineToggle} />
             </div>
             {railCollapsed && !railPeeked ? collapsedToggle : null}
-            <div className="min-w-0 flex-1">
+            {/* Jesse found this: the row's own `gap-4` (removed above)
+                used to space the pane off the rail, but `gap` only
+                applies to a FLOW sibling - the rail is flow when open
+                or collapsed-not-peeked (`w-0`, still a real flex
+                participant even at zero width) but `position: absolute`
+                when peeked (removed from flow entirely, so it stops
+                claiming a gap). That flow/absolute swap fired on every
+                hover, not just a click, so the pane's own left edge
+                bumped right on peek-in and back on peek-out even though
+                nothing about the pane itself should move for a pure
+                overlay. Spacing now lives on the pane directly, keyed
+                on `railCollapsed` alone (never `railPeeked`): identical
+                whether collapsed-not-peeked or peeked, and animated in
+                step with the rail's own `transition-[width]` so a real
+                click (the only thing that changes `railCollapsed`)
+                still slides smoothly. */}
+            <div
+              data-slot="next-chat-pane"
+              className={cn(
+                "min-w-0 flex-1 transition-[margin-inline-start] duration-200 ease-linear motion-reduce:transition-none",
+                railCollapsed ? "ms-0" : "ms-4",
+              )}
+            >
               <Thread
                 components={{
                   AssistantMoreItems,
@@ -1127,12 +1179,12 @@ export function NextChatPage({ person }: { person: Roster }) {
               // Desktop only - the phone/tablet Sheet below covers the
               // same panel under `lg:hidden`, mirroring
               // chatDocumentPane.tsx's own split.
-              <div className="hidden w-full max-w-xl shrink-0 overflow-y-auto lg:block">
+              <div className="ms-4 hidden w-full max-w-xl shrink-0 overflow-y-auto lg:block">
                 <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} />
               </div>
             ) : null}
             {compareTarget !== null ? (
-              <div className="hidden w-full max-w-3xl shrink-0 overflow-y-auto lg:block">
+              <div className="ms-4 hidden w-full max-w-3xl shrink-0 overflow-y-auto lg:block">
                 <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} />
               </div>
             ) : null}
