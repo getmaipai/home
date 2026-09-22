@@ -7,6 +7,7 @@ import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { Sources, SourceGlyph } from "@maipai/ui/src/elements/sources";
+import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -166,6 +167,49 @@ const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>
 
 function ArtifactTool() {
   useAssistantToolUI({ toolName: "write_document", render: ArtifactCardToolRender, display: "standalone" });
+  return null;
+}
+
+// TOOL-EVENTS-01's own frontend half, consumer before producer (the same
+// order slice 5(a)'s sources card and slice 4's artifact card landed in):
+// chatModelAdapter.ts already parses tool_call/tool_result/tool_error
+// (spec-v0.1.16) into a `{callId, packageId, state}[]` synthetic tool-
+// call part, `toolName: "tool_timeline"` - fixed, matching the reserved-
+// name list `weather`/`almanac-date`/`sources` already keep (never a
+// package's own id). Nothing in the running app emits it yet (the
+// backend half of TOOL-EVENTS-01 hasn't landed), so this renders nothing
+// live today - covered by chatModelAdapter.test.ts and NextChatPage.
+// test.tsx's own scripted-stream cases instead.
+type TimelineCall = { callId: string; packageId: string; state: "running" | "ok" | "error" };
+const TIMELINE_VERB: Record<TimelineCall["state"], string> = {
+  running: "Running",
+  ok: "Ran",
+  error: "Failed",
+};
+const ToolTimelineIcon = getIcon("wrench");
+const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>, TimelineCall[]> = ({ result }) => {
+  const [open, setOpen] = useState(false);
+  if (!result?.length) return null;
+  const running = result.some((call) => call.state === "running");
+  return (
+    <ToolTimeline
+      steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.packageId, icon: ToolTimelineIcon }))}
+      visibleSteps={result.length}
+      streaming={running}
+      open={open}
+      onOpenChange={setOpen}
+      activeLabel="Working…"
+      restingLabel={`${result.length} tool call${result.length === 1 ? "" : "s"}`}
+      // No producer for a per-file diff-stat summary anywhere in Home
+      // today (the kit's own upstream use is a coding-agent timeline) -
+      // a named gap, not invented data.
+      stats={[]}
+    />
+  );
+};
+
+function ToolTimelineTool() {
+  useAssistantToolUI({ toolName: "tool_timeline", render: ToolTimelineToolRender, display: "standalone" });
   return null;
 }
 
@@ -922,6 +966,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <SourcesOpenContext.Provider value={sourcesOpenValue}>
         <StructuredResultTools />
         <ArtifactTool />
+        <ToolTimelineTool />
         <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own

@@ -607,6 +607,164 @@ describe("createChatModelAdapter sources (slice 5(a))", () => {
   });
 });
 
+// TOOL-EVENTS-01 (spec-v0.1.16): tool_call/tool_result/tool_error aren't
+// emitted by any real package yet (the backend half - docs/dev.md's own
+// handoff note - hasn't landed), so these are scripted the same way
+// slice 5(a)'s sources tests were before CHAT-16 landed emission:
+// consumer before producer, proven against the wire shape spec-v0.1.16
+// promises, not a real turn. Events use `t`, not `type` - a separate
+// discriminant from the rest of this stream (chatModelAdapter.ts's own
+// comment on why).
+describe("createChatModelAdapter tool timeline (TOOL-EVENTS-01, frontend half)", () => {
+  test("a tool_call followed by a tool_result becomes a tool_timeline part, before the text part", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: { query: "tide chart" }, call_id: "call-1" },
+        { t: "tool_result", call_id: "call-1", package_id: "websearch", outcome: { text: "3 results" } },
+        { type: "delta", text: "High tide is at 4pm." },
+        { type: "done", value: { turn_id: "turn-tide999", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("when's high tide")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "tool-call", toolCallId: "turn-tide999-tools", toolName: "tool_timeline", args: {}, argsText: "", result: [{ callId: "call-1", packageId: "websearch", state: "ok" }] },
+        { type: "text", text: "High tide is at 4pm." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a tool_call with no matching result yet stays in the running state", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: {}, call_id: "call-1" },
+        { type: "done", value: { turn_id: "turn-run1", reply: { text: "Still working." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("search")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "tool-call", toolCallId: "turn-run1-tools", toolName: "tool_timeline", args: {}, argsText: "", result: [{ callId: "call-1", packageId: "websearch", state: "running" }] },
+        { type: "text", text: "Still working." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a tool_error marks its call failed", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: {}, call_id: "call-1" },
+        { t: "tool_error", call_id: "call-1", package_id: "websearch", error: "timed out" },
+        { type: "done", value: { turn_id: "turn-err1", reply: { text: "Something went wrong." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("search")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "tool-call", toolCallId: "turn-err1-tools", toolName: "tool_timeline", args: {}, argsText: "", result: [{ callId: "call-1", packageId: "websearch", state: "error" }] },
+        { type: "text", text: "Something went wrong." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("two interleaved tool calls keep call order and resolve independently", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: {}, call_id: "call-1" },
+        { t: "tool_call", package_id: "weather", args: {}, call_id: "call-2" },
+        { t: "tool_result", call_id: "call-2", package_id: "weather", outcome: { text: "61F" } },
+        { t: "tool_result", call_id: "call-1", package_id: "websearch", outcome: { text: "3 results" } },
+        { type: "done", value: { turn_id: "turn-multi1", reply: { text: "Here's what I found." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("search and check weather")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        {
+          type: "tool-call",
+          toolCallId: "turn-multi1-tools",
+          toolName: "tool_timeline",
+          args: {},
+          argsText: "",
+          result: [
+            { callId: "call-1", packageId: "websearch", state: "ok" },
+            { callId: "call-2", packageId: "weather", state: "ok" },
+          ],
+        },
+        { type: "text", text: "Here's what I found." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  // A review caught this: the kit's own ToolTimeline Element used to key
+  // each rendered step by `chip` (the package id) - two calls to the
+  // SAME package in one turn (two separate searches, e.g.) would collide
+  // on an identical React key. Fixed in the kit (key by index, ui-v0.5.28,
+  // the same fix elements/sources.tsx already got for its own domain-key
+  // collision) - this proves the DATA side doesn't collapse the two
+  // calls into one entry, which the render-side key fix depends on.
+  test("two calls to the same package keep two distinct entries", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: { query: "tide chart" }, call_id: "call-1" },
+        { t: "tool_call", package_id: "websearch", args: { query: "moon phase" }, call_id: "call-2" },
+        { t: "tool_result", call_id: "call-1", package_id: "websearch", outcome: { text: "3 results" } },
+        { t: "tool_result", call_id: "call-2", package_id: "websearch", outcome: { text: "1 result" } },
+        { type: "done", value: { turn_id: "turn-samepkg1", reply: { text: "Here's what I found." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("search twice")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        {
+          type: "tool-call",
+          toolCallId: "turn-samepkg1-tools",
+          toolName: "tool_timeline",
+          args: {},
+          argsText: "",
+          result: [
+            { callId: "call-1", packageId: "websearch", state: "ok" },
+            { callId: "call-2", packageId: "websearch", state: "ok" },
+          ],
+        },
+        { type: "text", text: "Here's what I found." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a tool_result for a call_id never seen is ignored, not invented as a step", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_result", call_id: "call-orphan", package_id: "websearch", outcome: { text: "3 results" } },
+        { type: "delta", text: "Here's what I found." },
+        { type: "done", value: { turn_id: "turn-orphan1", reply: { text: "Here's what I found." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("search")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([{ type: "text", text: "Here's what I found." }]);
+    } finally {
+      env.restore();
+    }
+  });
+});
+
 // Lane 11 item 1 (docs/plans/session-b-lane-11-2026-09-13.md): CHAT-16's
 // forward-compatible `status` event (chatTurnActivity.ts's own header on
 // why it's cast this way, not yet a real TurnStreamEvent member) and the

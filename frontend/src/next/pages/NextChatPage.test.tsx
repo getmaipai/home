@@ -322,6 +322,38 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       restore();
     }
   });
+
+  // TOOL-EVENTS-01's own frontend half (2026-09-22): scripted the same
+  // way as the sources tests above, since no real package emits
+  // tool_call/tool_result/tool_error yet (the backend half hasn't
+  // landed) - proves the registration reaches the shipped ToolTimeline
+  // Element, not that a real turn produces one today.
+  test("a turn with tool_call/tool_result events renders through the tool timeline, collapsed by default", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: { query: "tide chart" }, call_id: "call-1" },
+        { t: "tool_result", call_id: "call-1", package_id: "websearch", outcome: { text: "3 results" } },
+        { type: "delta", text: "High tide is at 4pm." },
+        { type: "done", value: { turn_id: "turn-tools123", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "when's high tide");
+      await view.findByText("High tide is at 4pm.");
+      const trigger = view.getByRole("button", { name: /1 tool call/ });
+      expect(trigger).toBeVisible();
+      expect(view.queryByText("websearch")).toBeNull();
+      fireEvent.click(trigger);
+      expect(await view.findByText("websearch")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {

@@ -3,6 +3,7 @@ import { api, readTurnStream, ApiError } from "@/lib/api";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
+import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
@@ -180,6 +181,24 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // `visible`, since the activity is about what's happening BEFORE
       // any real text exists, not about the text itself.
       let activityShown = false;
+      // TOOL-EVENTS-01 (spec-v0.1.16, backend emission not landed yet -
+      // getmaipai/home docs/dev.md's own handoff note): `tool_call`/
+      // `tool_result`/`tool_error` are a SEPARATE event shape from the
+      // rest of this stream, keyed by `t` (spec's own
+      // `stack/ts/turn-stream-event.ts`), not `type` - backend/src/
+      // wire.ts's own `TurnStreamEvent` union (what `readTurnStream`
+      // actually returns today) has no such member yet, so these are
+      // parsed with `safeParse` against the raw event rather than a
+      // branch of the `event.type` chain below, the same
+      // "cast/parse before the backend type has it" shape `status` used
+      // above it (Lane 11 item 1) before it was real either. Consumer
+      // before producer, same as slice 5(a)'s sources card and slice
+      // 4's artifact card: this renders nothing in the app until the
+      // backend half of TOOL-EVENTS-01 lands, proven only by
+      // chatModelAdapter.test.ts's own scripted NDJSON until then.
+      // Insertion order (Map's own iteration order) is step order -
+      // there is no separate sequence field on these events.
+      const toolCalls = new Map<string, { packageId: string; state: "running" | "ok" | "error" }>();
 
       // Resolves as much of `raw.slice(scanPos)` as currently possible into
       // `visible`, holding back only a still-ambiguous suffix that might
@@ -244,6 +263,20 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         }
       }
 
+      // One definition (a review caught this built twice, copy-pasted,
+      // between buildContent() and the done handler below): `turnId`
+      // undefined mid-stream (before turn_meta) or once finalized both
+      // return undefined the same way, so a future shape change only
+      // has one call site to make it in.
+      function toolTimelinePart(turnId: string | undefined): ThreadAssistantMessagePart | undefined {
+        if (toolCalls.size === 0 || !turnId) return undefined;
+        return toolCallPart(
+          `${turnId}-tools`,
+          "tool_timeline",
+          [...toolCalls].map(([callId, call]) => ({ callId, ...call })),
+        );
+      }
+
       // Every yield below replaces the whole message's content (this
       // file's own header comment), so the reasoning part has to ride
       // along on every yield once it exists, not just the ones a
@@ -251,6 +284,12 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       function buildContent(): ThreadAssistantMessagePart[] {
         const parts: ThreadAssistantMessagePart[] = [];
         if (reasoningText) parts.push({ type: "reasoning", text: reasoningText });
+        // Before the text part, like the structured/artifact cards above
+        // (slice 5(e)'s own rule) - a trace of what the model did while
+        // producing this answer reads above its own sentence, the
+        // opposite of sources' "compact card under the reply."
+        const timeline = toolTimelinePart(resumeTurnId);
+        if (timeline) parts.push(timeline);
         if (visible) parts.push({ type: "text", text: visible });
         return parts;
       }
@@ -283,6 +322,32 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // `TurnWithMedia` uses for `media_items` on `TurnValue` below
           // (sources itself is a real field now, no cast needed for it).
           for await (const event of readTurnStream(response)) {
+          // A review caught this: `safeParse` ran on every event
+          // unconditionally, including every `delta` - the hottest path
+          // in this loop, once per streamed chunk. `t` is exclusive to
+          // the three tool events (nothing else on the wire has it), so
+          // this skips the Zod parse entirely for the overwhelming
+          // majority of events that can't possibly match.
+          const toolEvent = "t" in event ? ToolTurnStreamEvent.safeParse(event) : undefined;
+          if (toolEvent?.success) {
+            const e = toolEvent.data;
+            if (e.t === "tool_call") {
+              toolCalls.set(e.call_id, { packageId: e.package_id, state: "running" });
+            } else {
+              // tool_result and tool_error both resolve an existing call;
+              // an unrecognized call_id (a result for a call this stream
+              // never saw start, a stream resumed mid-call) is ignored
+              // rather than inventing a step with no start.
+              const existing = toolCalls.get(e.call_id);
+              if (existing) toolCalls.set(e.call_id, { ...existing, state: e.t === "tool_result" && !e.outcome.error_code ? "ok" : "error" });
+            }
+            if (activityShown) {
+              activityShown = false;
+              yield { metadata: { custom: {} } };
+            }
+            yield { content: buildContent() };
+            continue;
+          }
           if (event.type === "turn_meta") {
             // The contract's first line on every turn (routes/turn.ts).
             // Not consumed yet (chatActionBar.tsx's "Remember this" still
@@ -424,6 +489,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // (NextChatPage.tsx) can fetch the full version and open
             // it in canvas-split on click.
             const artifact = event.value.artifact;
+            // TOOL-EVENTS-01: `toolTimelinePart` (above) is the one
+            // definition, used here and by `buildContent()` mid-stream -
+            // computed once so both the array-spread check and the part
+            // itself read the identical value.
+            const timelinePart = toolTimelinePart(event.value.turn_id);
             // Slice 5(a): `TurnValue.sources` (wire.ts) is a real, typed
             // field now (CHAT-16 landed) - a real ToolCallMessagePart
             // here, the same composition slices 3/4/5(e) already use for
@@ -471,6 +541,14 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 ...(finalReasoning ? [{ type: "reasoning" as const, text: finalReasoning }] : []),
                 ...(structuredPart ? [toolCallPart(`${event.value.turn_id}-structured`, structuredPart.tool_id, structuredPart)] : []),
                 ...(artifact ? [toolCallPart(`${event.value.turn_id}-artifact`, "write_document", artifact)] : []),
+                // TOOL-EVENTS-01: same "before text" placement as the
+                // structured/artifact cards above - a trace of what ran
+                // while this reply was produced reads above its own
+                // sentence, not under it like sources. Empty today (no
+                // caller emits tool_call/tool_result/tool_error yet), so
+                // this never adds a part in the running app until the
+                // backend half lands.
+                ...(timelinePart ? [timelinePart] : []),
                 { type: "text" as const, text: finalText },
                 // Slice 5(a): AFTER the text part, not before - spec.md's
                 // own "a compact card UNDER the reply." The "tool parts
