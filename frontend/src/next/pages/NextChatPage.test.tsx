@@ -1,15 +1,50 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { ReactElement } from "react";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { NextChatPage } from "@/next/pages/NextChatPage";
 import type { Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 import { ndjsonStream } from "../../../tests/ndjsonStream";
 
+// CHAT-UI-03 (6): the rail's own default-collapsed state now reads
+// `window.matchMedia("(max-width: 1024px)")` on mount - happy-dom's own
+// default virtual viewport happens to match that query, which silently
+// flipped every existing test's own "starts open" assumption. Stubbed
+// wide (not matching) by default here so the rest of this file's own
+// tests are unaffected by an environment default they never asked
+// about; `stubMatchMedia(true)` opts a specific test into the narrow
+// case instead.
+function stubMatchMedia(matches: boolean): void {
+  window.matchMedia = mock((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+// A review caught this: `bunfig.toml` preloads happy-dom's `window` once
+// for the whole `bun test` process, so every test FILE in one run shares
+// the same global - `stubMatchMedia` overwriting it here with no restore
+// would leak this file's mock into any file that runs afterward and
+// reads `window.matchMedia` itself. Captured once and restored in
+// `afterEach`, the same way `AudioContext` below is reset per test.
+const ORIGINAL_MATCH_MEDIA = window.matchMedia;
+
+beforeEach(() => {
+  stubMatchMedia(false);
+});
+
 afterEach(() => {
   cleanup();
+  window.matchMedia = ORIGINAL_MATCH_MEDIA;
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
 });
 
@@ -19,7 +54,13 @@ afterEach(() => {
 // test doesn't hang the next on a retry backoff.
 function renderPage(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  // App.tsx's own tree wraps every route in TooltipProvider - the rail
+  // toggle's own tooltip (CHAT-UI-03) needs it too, or Radix throws.
+  return render(
+    <QueryClientProvider client={client}>
+      <TooltipProvider>{ui}</TooltipProvider>
+    </QueryClientProvider>,
+  );
 }
 
 function makePerson(): Roster {
@@ -223,13 +264,15 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     }
   });
 
-  // Slice 5(a): a turn's `sources` renders through the shipped `Sources`
-  // Element (elements/sources.tsx), collapsed by default per spec.md,
-  // under the reply text - the same synthetic-tool-call-part composition
-  // this describe block's own weather case already proves for the
-  // structured card, mapping spec's `Source.site` onto the Element's own
-  // `domain`.
-  test("a turn's sources render through the Sources Element, collapsed, under the reply", async () => {
+  // Slice 5(a), CHAT-UI-03's own sources follow-up (2026-09-22): a
+  // turn's `sources` render through the shipped `Sources` Element
+  // (elements/sources.tsx), its trigger in the assistant message's own
+  // action bar (not a standalone row under the reply text anymore -
+  // Jesse's own screenshots), collapsed by default per spec.md - the
+  // same synthetic-tool-call-part composition this describe block's own
+  // weather case already proves for the structured card, mapping
+  // spec's `Source.site` onto the Element's own `domain`.
+  test("a turn's sources render through a trigger in the action bar, collapsed by default", async () => {
     const SOURCE = { id: "src-tide123", kind: "web" as const, title: "Lantern Bay tide chart", url: "https://example.com/tides", site: "example.com", snippet: null, source: "turn-tide123", created_at: "2026-09-22T00:00:00.000Z", hlc: "1788000000000:0:test" };
     const restore = stubTurnFetch(
       ndjsonStream([
@@ -644,6 +687,35 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
       expect(classes(rail())).toContain("hidden");
       expect(inlineFocusCalled).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test("below the auto-collapse width, the column starts collapsed by default - hover-to-peek and click-to-pin still work", async () => {
+    // CHAT-UI-03 (6): Jesse's own side-by-side against ChatGPT at a
+    // narrow window - ChatGPT collapses its sidebar rather than letting
+    // it cover the conversation; ours kept the column open and cut off
+    // the greeting and composer underneath it. This is a DEFAULT, not a
+    // lock - the same hover/click controls the wide-viewport tests
+    // above already exercise still work identically once collapsed.
+    stubMatchMedia(true);
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      expect(classes(rail())).toContain("hidden");
+      expect(classes(rail())).not.toContain("absolute");
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }));
+      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).not.toContain("absolute");
     } finally {
       restore();
     }

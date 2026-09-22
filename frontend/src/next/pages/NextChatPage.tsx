@@ -1,16 +1,24 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ToolCallMessagePartComponent } from "@assistant-ui/react";
+import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
-import { Sources } from "@maipai/ui/src/elements/sources";
+import { Sources, SourceGlyph } from "@maipai/ui/src/elements/sources";
+// The Elements' own smaller `Button` (not the dashboard `Button` this
+// file otherwise uses), because this one renders as a sibling of Copy/
+// Reload/etc INSIDE the assistant-ui action bar itself (matching what
+// TooltipIconButton, thread.aui.tsx's own action-bar button, wraps) -
+// the dashboard Button belongs to the surrounding page chrome, not this
+// row.
+import { Button as ElementsButton } from "@maipai/ui/src/elements/ui/button";
 import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, CanvasSplitLine, CanvasSplitMessage, CanvasSplitThread } from "@maipai/ui/src/elements/canvas-split";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
@@ -24,7 +32,12 @@ import { messageText } from "@/apps/chat/chatMessageText";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 const HistoryIcon = getIcon("history");
-const PanelLeftIcon = getIcon("panel-left");
+// CHAT-UI-03 (3): the app rail's own toggle (sidebar.tsx's
+// SidebarTrigger) already uses `panel-left` - the chat column's own
+// toggle read as a mistake sharing the identical glyph in a different
+// row/alignment. A distinct one here, never touching the app rail's
+// own (that one stays exactly where the template puts it).
+const RailToggleIcon = getIcon("message-square");
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
 // registered fit, chosen over adding a new one to keep this item to the
@@ -78,6 +91,22 @@ const ArtifactOpenContext = createContext<(id: string) => void>(() => {});
 const AdminContext = createContext(false);
 type CompareTarget = { turnId: string; conversationId: string; ourText: string };
 const CompareOpenContext = createContext<(target: CompareTarget) => void>(() => {});
+
+/** Shared by `SourcesActionBarTrigger` and `SourcesFooterContent` below -
+ * the lifted open/closed state, keyed by `turnId` (see `NextChatPage`'s
+ * own `sourcesOpenValue`). `close` (not just `toggle`) exists for
+ * `SourcesActionBarTrigger`'s own unmount cleanup: `AssistantActionBar`
+ * sits inside `ActionBarPrimitive.Root`'s `autohide="not-last"`
+ * (thread.aui.tsx), which truly unmounts the whole bar - trigger
+ * included - on any earlier message once the pointer/focus leaves it.
+ * Without closing on that unmount, `SourcesFooterContent` (a plain
+ * sibling outside the bar, so it doesn't autohide) would keep the panel
+ * open with its own trigger gone - a review-caught orphaned-open state. */
+const SourcesOpenContext = createContext<{
+  isOpen: (turnId: string) => boolean;
+  toggle: (turnId: string) => void;
+  close: (turnId: string) => void;
+}>({ isOpen: () => false, toggle: () => {}, close: () => {} });
 
 /** slice 5(e): the "..." menu's second entry (Details, the stats reveal,
  * is a separate, later item - COORDINATOR named both for this same menu
@@ -153,18 +182,122 @@ function ArtifactTool() {
 // row by `domain` (`elements/sources.tsx:53`), which collides when a reply
 // cites two different pages on the same site - not deduped here (that
 // would drop a real citation), filed as a kit ask (key by index instead).
-const SourcesToolRender: ToolCallMessagePartComponent<Record<string, never>, Source[]> = ({ result }) => {
-  const [open, setOpen] = useState(false);
-  if (!result?.length) return null;
-  // Jesse's own comparison (shadcn.io's AI Sources, ChatGPT's placement,
-  // 2026-09-22): `layout="list"` (kit ui-v0.5.26) - a compact one-line-
-  // per-source list once expanded, not the shipped default's two-column
-  // card grid, which read as taking more room than the reply itself.
-  return <Sources sources={result.map((source) => ({ domain: source.site, title: source.title }))} open={open} onOpenChange={setOpen} layout="list" />;
-};
+// Reads the CURRENT message's own "sources" tool-call result straight off
+// message state (not a prop) - `SourcesActionBarTrigger` and
+// `SourcesFooterContent` below are both bare `ComponentType` slots (the
+// same `AssistantMoreItems`/`CompareWithBareModelMenuItem` shape a few
+// lines up), rendered by the kit with no props of their own.
+// `.find()`, not `.filter()`: `chatModelAdapter.ts`/`chatHistoryAdapter.ts`
+// both emit at most one "sources" tool-call part per message, from the
+// turn's own single `sources`/`row.sources` array field (never two calls
+// in one turn) - the same "complete snapshot" invariant the comment
+// above cites for the index-key fix.
+// `useAuiState` is a `useSyncExternalStore` selector: it needs the SAME
+// call, with the SAME underlying content, to return the SAME reference,
+// or React sees "changed on every read" and loops rather than settling
+// (found live: this shipped without the cache first and threw "Maximum
+// update depth exceeded" the moment any assistant message rendered).
+// `messageText` a few lines up gets away with no cache because it
+// returns a primitive string, equal by value; an array needs one.
+// Keyed by the tool-call part itself (stable across renders unless its
+// own content changes, same as any other assistant-ui message part) -
+// a cache miss just recomputes, so a wrong assumption about that
+// stability would cost renders, never wrong data.
+const sourcesCache = new WeakMap<object, { domain: string; title: string }[]>();
+const NO_SOURCES: { domain: string; title: string }[] = [];
+function sourcesFromMessage(message: ThreadMessage | undefined): { domain: string; title: string }[] {
+  const part = message?.content.find(
+    (p): p is Extract<ThreadAssistantMessagePart, { type: "tool-call" }> =>
+      p.type === "tool-call" && p.toolName === "sources",
+  );
+  if (!part) return NO_SOURCES;
+  const cached = sourcesCache.get(part);
+  if (cached) return cached;
+  const result = (part.result as Source[] | undefined)?.map((source) => ({ domain: source.site, title: source.title })) ?? NO_SOURCES;
+  sourcesCache.set(part, result);
+  return result;
+}
 
-function SourcesTool() {
-  useAssistantToolUI({ toolName: "sources", render: SourcesToolRender, display: "standalone" });
+// Jesse's own screenshots (2026-09-22): the trigger moves INTO the
+// assistant message's action bar, as the last item after "..." - subtle,
+// the bar's own ghost style, stacked favicons of the first few sources
+// plus the word "Sources", no pill, no count badge, no chevron (the
+// count lives in the tooltip instead). The shipped `Sources` Element
+// bundles its own trigger+content as one `Collapsible`; splitting them
+// across two DOM locations (this bar row vs. the block-level space below
+// the whole footer) needed the kit's own `hideTrigger` prop (ui-v0.5.27)
+// rather than a hand-built collapsible - `SourceGlyph` is the same kit
+// export the content list itself uses, not a second hand-rolled glyph.
+// `Tooltip`/`TooltipTrigger`/`TooltipContent` and the Elements' own
+// `Button` directly, not the kit's `TooltipIconButton` its bar siblings
+// (Copy, Reload, More) use: that wrapper is a fixed square icon button
+// with an sr-only label, and this trigger needs a visible text label
+// ("Sources") beside the icon stack at its own natural width - the same
+// reasoning `inlineToggle`/`collapsedToggle` above already give for not
+// using it on the rail toggle, just on this file's other side of the
+// page. Still every piece a shipped primitive, composed, not forked.
+function SourcesActionBarTrigger() {
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  const sources = useAuiState((s) => sourcesFromMessage(s.message));
+  const { isOpen, toggle, close } = useContext(SourcesOpenContext);
+  // A review caught this: `AssistantActionBar` sits inside
+  // `ActionBarPrimitive.Root`'s `autohide="not-last"` (thread.aui.tsx),
+  // which truly unmounts the whole bar - this trigger included - on any
+  // earlier message once the pointer/focus leaves it. `SourcesFooterContent`
+  // below is a plain sibling outside that root, so it doesn't autohide -
+  // without this, the panel it renders would stay open with its own
+  // trigger gone, no visible way left to close it. Closing on unmount
+  // matches the rest of the bar: every other control in this row already
+  // disappears on the same condition.
+  useEffect(() => {
+    return () => {
+      if (turnId) close(turnId);
+    };
+  }, [turnId, close]);
+  if (!turnId || !sources.length) return null;
+  const open = isOpen(turnId);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <ElementsButton
+          variant="ghost"
+          size="xs"
+          aria-expanded={open}
+          onClick={() => toggle(turnId)}
+          className="text-foreground/60 hover:text-foreground/90"
+        >
+          <span className="flex items-center" aria-hidden="true">
+            {sources.slice(0, 3).map((source, index) => (
+              <SourceGlyph key={index} domain={source.domain} className={index === 0 ? "ring-2 ring-background" : "-ml-1.5 ring-2 ring-background"} />
+            ))}
+          </span>
+          <span>Sources</span>
+        </ElementsButton>
+      </TooltipTrigger>
+      <TooltipContent>{sources.length === 1 ? "1 source" : `${sources.length} sources`}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SourcesFooterContent() {
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  const sources = useAuiState((s) => sourcesFromMessage(s.message));
+  const { isOpen, toggle } = useContext(SourcesOpenContext);
+  if (!turnId || !sources.length) return null;
+  return (
+    <div className="ms-2 pb-2">
+      <Sources sources={sources} open={isOpen(turnId)} onOpenChange={() => toggle(turnId)} layout="list" hideTrigger />
+    </div>
+  );
+}
+
+// The tool call still needs SOME registration or assistant-ui's own
+// fallback UI renders it inline in the message content - same no-op
+// shape as ChatPage.tsx's `SuppressLegacySourcesFallback` (`623878a6`),
+// for the identical reason: the real render now happens in the two
+// slots above, not in the message body.
+function SuppressSourcesFallback() {
+  useAssistantToolUI({ toolName: "sources", render: () => null, display: "standalone" });
   return null;
 }
 
@@ -382,9 +515,12 @@ function NextThreadList({ onNewThread, collapseToggle }: { onNewThread: () => vo
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
   return (
     <ThreadListRoot>
+      {/* CHAT-UI-03 (2): Jesse's own ChatGPT comparison - "New Thread"
+          read as stretched full width beside the toggle; it keeps the
+          Element's own natural button width instead (no `flex-1`). */}
       <div className="flex items-center gap-1">
         {collapseToggle}
-        <ThreadListNew onClick={onNewThread} className="flex-1" />
+        <ThreadListNew onClick={onNewThread} />
       </div>
       {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />
@@ -473,6 +609,47 @@ export function NextChatPage({ person }: { person: Roster }) {
   // versa would be reasonable too, but nothing forces it; both panels
   // rendering at once on a wide enough screen is a fine, harmless state).
   const [compareTarget, setCompareTarget] = useState<CompareTarget | null>(null);
+  // Sources trigger-in-bar (2026-09-22, Jesse's own screenshots): the
+  // trigger lives in the assistant message's own action bar
+  // (`AssistantActionBarExtra`), the compact list it opens renders below
+  // the whole footer row (`AssistantMessageFooterExtra`) - two separate
+  // slots the kit renders at two different points in the same message's
+  // tree, so the open/closed state can't just be a `useState` local to
+  // either one; it's lifted here and keyed by `turnId`, the same id
+  // `CompareWithBareModelMenuItem` already reads off message metadata.
+  const [openSourceIds, setOpenSourceIds] = useState<ReadonlySet<string>>(new Set());
+  // `useCallback` with no deps (not inline closures in the `useMemo`
+  // below): `SourcesActionBarTrigger`'s own unmount-cleanup effect keys
+  // its dependency array on `close`, and `setOpenSourceIds` itself is
+  // already React-stable, so these never need to change identity when
+  // `openSourceIds` does. Found live: without this, EVERY toggle gave
+  // `close` a fresh identity, which re-armed the effect and ran the
+  // OLD closure's cleanup immediately - closing the panel the same
+  // click had just opened.
+  const toggleSourceOpen = useCallback((turnId: string) => {
+    setOpenSourceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(turnId)) next.delete(turnId);
+      else next.add(turnId);
+      return next;
+    });
+  }, []);
+  const closeSourceOpen = useCallback((turnId: string) => {
+    setOpenSourceIds((prev) => {
+      if (!prev.has(turnId)) return prev;
+      const next = new Set(prev);
+      next.delete(turnId);
+      return next;
+    });
+  }, []);
+  const sourcesOpenValue = useMemo(
+    () => ({
+      isOpen: (turnId: string) => openSourceIds.has(turnId),
+      toggle: toggleSourceOpen,
+      close: closeSourceOpen,
+    }),
+    [openSourceIds, toggleSourceOpen, closeSourceOpen],
+  );
   // CHAT-UI-01 finding 4 / CHAT-UI-02: a ChatGPT-style collapse for the
   // desktop thread-list column. The shipped Sidebar primitive's own
   // collapsible modes (threadlist-sidebar.aui.tsx's own composition)
@@ -520,7 +697,21 @@ export function NextChatPage({ person }: { person: Roster }) {
   // against), so the ancestor-chain firing native pointerleave already
   // does works with no dead zone and no manual relatedTarget check
   // needed for this pair.
-  const [railCollapsed, setRailCollapsed] = useState(false);
+  // CHAT-UI-03 (6): Jesse's own side-by-side at a narrow window -
+  // ChatGPT never lets the sidebar cover the conversation, collapsing
+  // it below the width where the rail, the column, and a usable pane
+  // no longer all fit; ours kept both open and let the column cover the
+  // greeting and composer. Below this width the column now starts
+  // collapsed instead of open - a DEFAULT, not a lock: hover-to-peek
+  // and click-to-pin-open still work exactly as at any width, so a
+  // person who wants it open at 768px can still have it. A lazy
+  // initializer, not a resize-reactive effect: this sets where the
+  // column STARTS, once, not an ongoing constraint that would snap a
+  // deliberately-reopened column shut again on a later resize.
+  const RAIL_AUTO_COLLAPSE_MAX_WIDTH = 1024;
+  const [railCollapsed, setRailCollapsed] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(`(max-width: ${RAIL_AUTO_COLLAPSE_MAX_WIDTH}px)`).matches,
+  );
   const [railPeeked, setRailPeeked] = useState(false);
   const closeRailPeek = (relatedTarget: EventTarget | null) => {
     if (!railCollapsed) return;
@@ -680,37 +871,47 @@ export function NextChatPage({ person }: { person: Roster }) {
   const toggleLabel = railCollapsed ? "Show conversations" : "Hide conversations";
   const toggleExpanded = !railCollapsed || railPeeked;
   const inlineToggle = (
-    <Button
-      ref={inlineToggleRef}
-      variant="ghost"
-      size="icon"
-      aria-label={toggleLabel}
-      aria-expanded={toggleExpanded}
-      aria-controls="next-chat-rail"
-      onPointerEnter={handleToggleEnter}
-      onPointerLeave={handleToggleLeave}
-      onFocus={handleToggleFocus}
-      onClick={handleToggleClick}
-    >
-      <PanelLeftIcon className="size-4" />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          ref={inlineToggleRef}
+          variant="ghost"
+          size="icon"
+          aria-label={toggleLabel}
+          aria-expanded={toggleExpanded}
+          aria-controls="next-chat-rail"
+          onPointerEnter={handleToggleEnter}
+          onPointerLeave={handleToggleLeave}
+          onFocus={handleToggleFocus}
+          onClick={handleToggleClick}
+        >
+          <RailToggleIcon className="size-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Conversations</TooltipContent>
+    </Tooltip>
   );
   const collapsedToggle = (
-    <Button
-      ref={collapsedToggleRef}
-      variant="ghost"
-      size="icon"
-      aria-label={toggleLabel}
-      aria-expanded={toggleExpanded}
-      aria-controls="next-chat-rail"
-      className="absolute top-0 left-0 z-20 hidden lg:flex"
-      onPointerEnter={handleToggleEnter}
-      onPointerLeave={handleToggleLeave}
-      onFocus={handleToggleFocus}
-      onClick={handleToggleClick}
-    >
-      <PanelLeftIcon className="size-4" />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          ref={collapsedToggleRef}
+          variant="ghost"
+          size="icon"
+          aria-label={toggleLabel}
+          aria-expanded={toggleExpanded}
+          aria-controls="next-chat-rail"
+          className="absolute top-0 left-0 z-20 hidden lg:flex"
+          onPointerEnter={handleToggleEnter}
+          onPointerLeave={handleToggleLeave}
+          onFocus={handleToggleFocus}
+          onClick={handleToggleClick}
+        >
+          <RailToggleIcon className="size-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Conversations</TooltipContent>
+    </Tooltip>
   );
 
   return (
@@ -718,9 +919,10 @@ export function NextChatPage({ person }: { person: Roster }) {
       <ArtifactOpenContext.Provider value={setOpenArtifactId}>
       <AdminContext.Provider value={isOwnerOrAdminRole(person.role)}>
       <CompareOpenContext.Provider value={setCompareTarget}>
+      <SourcesOpenContext.Provider value={sourcesOpenValue}>
         <StructuredResultTools />
         <ArtifactTool />
-        <SourcesTool />
+        <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
             height a hard ceiling, not a floor a growing composer or a
@@ -783,9 +985,40 @@ export function NextChatPage({ person }: { person: Roster }) {
                 left this element altogether. */}
             <div
               id="next-chat-rail"
+              // CHAT-UI-03 (1): ChatGPT eases both the column and the
+              // chat pane during collapse/expand; this used to jump-cut
+              // (`hidden` <-> `block`, a `display` swap CSS can't
+              // transition). Collapsed-not-peeked is now `w-0
+              // overflow-hidden` instead of `hidden` at the `lg`
+              // breakpoint - still zero width, but a real box a
+              // `transition-[width]` can animate to and from - the
+              // app rail's own duration and curve (`sidebar.tsx`:
+              // `transition-[width] duration-200 ease-linear`), reduced
+              // motion honoured via `motion-reduce:transition-none`.
+              // `inert` (not `aria-hidden` alone) while collapsed-not-
+              // peeked: a zero-width box is still visually reachable by
+              // Tab without it, since `overflow-hidden` doesn't remove
+              // its children from focus order the way `display: none`
+              // used to.
+              inert={railCollapsed && !railPeeked}
+              // A review caught this: `border-r`/`pr-2` used to sit on
+              // this same element unconditionally, alongside the
+              // animated `w-0` - `box-sizing: border-box` can't shrink
+              // a box's own padding/border below 0 along with its
+              // content, so the collapsed-not-peeked state rendered a
+              // persistent ~9px strip with a visible border instead of
+              // truly vanishing (invisible while it was `display: none`,
+              // real once it became a genuine zero-width box). Border
+              // and padding now ride the SAME conditional as the width
+              // itself, present only in the two states that actually
+              // have width to put them in.
               className={cn(
-                "overflow-y-auto border-r border-border bg-background pr-2",
-                railCollapsed ? (railPeeked ? "absolute inset-y-0 left-0 z-20 block w-64 shadow-lg" : "hidden") : "hidden w-64 shrink-0 lg:block",
+                "overflow-y-auto bg-background transition-[width] duration-200 ease-linear motion-reduce:transition-none",
+                railCollapsed
+                  ? railPeeked
+                    ? "absolute inset-y-0 left-0 z-20 block w-64 border-r border-border pr-2 shadow-lg animate-in slide-in-from-left-4 fade-in motion-reduce:animate-none"
+                    : "hidden w-0 lg:block lg:overflow-hidden"
+                  : "hidden w-64 shrink-0 border-r border-border pr-2 lg:block",
               )}
               onPointerLeave={(e) => closeRailPeek(e.relatedTarget)}
               onBlur={(e) => closeRailPeek(e.relatedTarget)}
@@ -794,7 +1027,13 @@ export function NextChatPage({ person }: { person: Roster }) {
             </div>
             {railCollapsed && !railPeeked ? collapsedToggle : null}
             <div className="min-w-0 flex-1">
-              <Thread components={{ AssistantMoreItems }} />
+              <Thread
+                components={{
+                  AssistantMoreItems,
+                  AssistantActionBarExtra: SourcesActionBarTrigger,
+                  AssistantMessageFooterExtra: SourcesFooterContent,
+                }}
+              />
             </div>
             {openArtifactId !== null ? (
               // Desktop only - the phone/tablet Sheet below covers the
@@ -838,6 +1077,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
           </SheetContent>
         </Sheet>
+      </SourcesOpenContext.Provider>
       </CompareOpenContext.Provider>
       </AdminContext.Provider>
       </ArtifactOpenContext.Provider>
