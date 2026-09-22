@@ -13,6 +13,7 @@ import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPo
 import { isOwnerOrAdmin } from "@/lib/access";
 import { getEmbedBackendKind } from "@/lib/embedSupervisor";
 import { embed, type EmbedOpResult } from "@/lib/llm";
+import { trackBackgroundWork } from "@/lib/backgroundWork";
 
 export type PersonRow = typeof people.$inferSelect;
 export type IngestedRecord = typeof memoryRecords.$inferSelect;
@@ -299,16 +300,18 @@ export function ingestMemory(input: IngestInput): IngestResult {
     if (backend === "none" || backend === "starting") {
       queuePendingWork(memoryId, "embed_failed");
     } else {
-      void (async () => {
-        const result: EmbedOpResult = await embed([text]);
-        if (result.ok) {
-          storeEmbeddingInTx(memoryId, result.value.model, result.value.vectors[0]!, result.value.preprocess);
-        } else {
+      trackBackgroundWork(
+        (async () => {
+          const result: EmbedOpResult = await embed([text]);
+          if (result.ok) {
+            storeEmbeddingInTx(memoryId, result.value.model, result.value.vectors[0]!, result.value.preprocess);
+          } else {
+            queuePendingWork(memoryId, "embed_failed");
+          }
+        })().catch(() => {
           queuePendingWork(memoryId, "embed_failed");
-        }
-      })().catch(() => {
-        queuePendingWork(memoryId, "embed_failed");
-      });
+        }),
+      );
     }
   }
 
@@ -415,16 +418,18 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
     if (backend === "none" || backend === "starting") {
       queuePendingWork(memoryId, "embed_failed");
     } else {
-      void (async () => {
-        const res: EmbedOpResult = await embed([text]);
-        if (res.ok) {
-          storeEmbeddingInTx(memoryId, res.value.model, res.value.vectors[0]!, res.value.preprocess);
-        } else {
+      trackBackgroundWork(
+        (async () => {
+          const res: EmbedOpResult = await embed([text]);
+          if (res.ok) {
+            storeEmbeddingInTx(memoryId, res.value.model, res.value.vectors[0]!, res.value.preprocess);
+          } else {
+            queuePendingWork(memoryId, "embed_failed");
+          }
+        })().catch(() => {
           queuePendingWork(memoryId, "embed_failed");
-        }
-      })().catch(() => {
-        queuePendingWork(memoryId, "embed_failed");
-      });
+        }),
+      );
     }
   }
 

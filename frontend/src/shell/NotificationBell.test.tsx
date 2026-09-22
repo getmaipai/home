@@ -1,12 +1,30 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { NotificationBell, NotificationToaster } from "@/shell/NotificationBell";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { NotificationDeliveryView } from "@/lib/api";
 
-afterEach(cleanup);
+afterEach(async () => {
+  cleanup();
+  // getmaipai/home#123: Radix Popper schedules its own position update
+  // (ResizeObserver/rAF) after the popover this file opens in several
+  // tests; a click late in one test can still have that callback
+  // pending at `cleanup()`, and without this flush it fires on the
+  // FIRST tick of the NEXT test instead - landing on a stale fiber
+  // outside `act()` (the "update to ForwardRef(PopperContent) was not
+  // wrapped in act(...)" warning this surfaced as) and, once observed,
+  // turning that next test's own `waitFor()` into a genuine hang
+  // (bun's 5000ms per-test timeout) rather than a normal pass or
+  // assertion failure. One flushed tick here, attributed to the test
+  // that scheduled it, is enough - no real timer (react-query's own
+  // 15s refetchInterval) is touched or cancelled, only pending
+  // microtasks/macrotasks already queued are allowed to run.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+});
 
 // AppShell.tsx mounts both together now (HOME-UI-02f: the toast effect
 // moved out of NotificationBell into its own NotificationToaster, split
@@ -101,11 +119,17 @@ describe("NotificationBell", () => {
       fireEvent.click(await findByRole("button", { name: /Notifications/ }));
       getByText("Model download ready");
       fireEvent.click(getByRole("button", { name: "Dismiss" }));
-      await waitFor(() => expect(queryByText("Model download ready")).toBeNull());
+      // getmaipai/home#123: hit bun's 5000ms default exactly once inside
+      // the full frontend gate (real machine contention from everything
+      // else running that same gate) - passes reliably in isolation, so
+      // this is a real budget problem under load, not a hang, same shape
+      // as the "Dismiss all" test below which already carries its own
+      // explicit waitFor + test timeout for the identical reason.
+      await waitFor(() => expect(queryByText("Model download ready")).toBeNull(), { timeout: 15_000 });
     } finally {
       globalThis.fetch = original;
     }
-  });
+  }, 20_000);
 
   test("dismissing here also invalidates NotificationsPage's own history cache, not just this popover's", async () => {
     // The regression this guards: an earlier version's dismissMutation

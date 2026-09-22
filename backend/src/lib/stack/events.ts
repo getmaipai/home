@@ -17,6 +17,7 @@
 // bridge. Nothing calls startStackEventBridge() from index.ts yet -
 // that wiring is HOME-STACK-02b.
 import { trigger } from "@/lib/notifications";
+import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { StackClient } from "./client";
 
 const INITIAL_BACKOFF_MS = 1_000;
@@ -139,9 +140,11 @@ function handleEvent(
   if (fresh) {
     const mapped = notificationFor(event);
     if (mapped) {
-      trigger(mapped.typeId, mapped.vars)
-        .then(() => undefined)
-        .catch((err: unknown) => console.error(`${LOG_PREFIX} notification for ${event.id} failed: ${(err as Error).message}`));
+      trackBackgroundWork(
+        trigger(mapped.typeId, mapped.vars)
+          .then(() => undefined)
+          .catch((err: unknown) => console.error(`${LOG_PREFIX} notification for ${event.id} failed: ${(err as Error).message}`)),
+      );
     }
   }
   if (onEvent) {

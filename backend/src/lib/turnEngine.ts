@@ -19,6 +19,7 @@ import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Win
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged, trigger } from "@/lib/notifications";
+import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameById, registryNamesFor, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { deleteEntity } from "@/lib/entities";
@@ -3100,7 +3101,11 @@ async function prepareTurn(
   if (worryingConversation(signal, worrySubjects, safety) && !safety.notify_parent && turnId && !notifiedThisTurn.has(`${turnId}:worrying`)) {
     notifiedThisTurn.add(`${turnId}:worrying`);
     fired("worrying");
-    void trigger("child.worrying_conversation", { childName: actor.displayName }, { subjectPersonId: actor.id, subjectTurnId: turnId }).catch((err: unknown) => console.error(`[turn] child.worrying_conversation notification failed: ${(err as Error).message}`));
+    trackBackgroundWork(
+      trigger("child.worrying_conversation", { childName: actor.displayName }, { subjectPersonId: actor.id, subjectTurnId: turnId }).catch((err: unknown) =>
+        console.error(`[turn] child.worrying_conversation notification failed: ${(err as Error).message}`),
+      ),
+    );
   }
   timings.subjects_ms = Math.round(performance.now() - subjectsStart);
   let literalYielded: LiteralYield | null = null;

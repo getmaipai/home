@@ -11,6 +11,7 @@ import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 
 beforeEach(() => {
   resetDb();
@@ -199,6 +200,14 @@ describe("the crisis overlay is not configurable", () => {
       // implied isolation this loop didn't actually have. A fresh
       // resetDb() + actor per iteration makes "after stressing X" mean
       // exactly one setting changed, not "X plus everything before it."
+      //
+      // getmaipai/home#123: the previous iteration's own runTurn() call
+      // (below) can fire a crisis notification that's still in flight
+      // when this line runs - the global afterEach in tests/preload.ts
+      // only drains BETWEEN tests, never between iterations of a loop
+      // inside one test, so this loop needs its own drain or it hits the
+      // identical FOREIGN KEY race the global fix was meant to close.
+      await __drainBackgroundWorkForTests();
       resetDb();
       __resetThrottleForTests();
       const actor = await owner();
@@ -227,7 +236,13 @@ describe("the crisis overlay is not configurable", () => {
       expect(result.value.crisis_resources, `after stressing ${keyDef.key}`).toBeDefined();
       expect(result.value.crisis_resources, `after stressing ${keyDef.key}`).toContain("988");
     }
-  });
+    // getmaipai/home#123: 48 registry keys x (resetDb + a real owner()
+    // setup + a real runTurn()) is genuine work, not a hang - passes
+    // reliably in isolation but hit bun's 5000ms default exactly once
+    // running inside the full gate (real machine contention from
+    // everything else in that same run). Raised, not removed - a test
+    // that hangs for a real reason should still fail loudly.
+  }, 15_000);
 
   test("content-ceiling dial values (spec-level, not yet a household setting) never enter checkSafety() at all - a self-harm turn is identical under every band", async () => {
     // The ceiling isn't wired to any settings key yet (this step's own

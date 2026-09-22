@@ -5,8 +5,10 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach } from "bun:test";
 import { installTestIsolationGuard } from "./isolation";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
+import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 
 process.env.MAIPAI_DATA_DIR = mkdtempSync(join(tmpdir(), "maipai-home-test-"));
 // Its own, independent throwaway directory, not a sibling derived from
@@ -42,3 +44,25 @@ process.env.MAIPAI_TTS_DISABLE_SPAWN = "1";
 // so that class of leak fails the offending test by name instead. The
 // snapshot is taken inside this call, after every assignment above.
 installTestIsolationGuard();
+
+// getmaipai/home#123: a fire-and-forget background job (a crisis
+// notification, an embed job kicked off after a memory write - never
+// awaited in production, lib/backgroundWork.ts's own header explains
+// why) could still be running when the NEXT test's own beforeEach
+// wipes people/sessions, since bun runs every test file in one
+// process with no wait for stray async work between them.
+//
+// A global `beforeEach` here (registered "before any test file's own
+// beforeEach, so it always runs first") was the original shape and
+// measurably did not work: safety.test.ts + updates.test.ts still
+// failed on almost every run (20/20 targeted attempts, not the
+// original issue's intermittent 4/9) - relying on cross-file
+// beforeEach registration order was the wrong guarantee to lean on.
+// `afterEach` sidesteps the question entirely: every afterEach hook
+// for test N, in whatever order among themselves, completes before
+// any beforeEach hook for test N+1 begins - that ordering is the
+// definition of the before/after-each phase boundary, not something
+// registration order can get wrong.
+afterEach(async () => {
+  await __drainBackgroundWorkForTests();
+});

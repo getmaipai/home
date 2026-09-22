@@ -36,6 +36,7 @@ import { sendTelegramMessage } from "@/lib/telegramChannel";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listActivePeople } from "@/lib/access";
 import { getNotificationType, type NotificationChannel, type NotificationType } from "@/lib/notificationTypes";
+import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { PersonRow } from "@/types";
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
@@ -174,8 +175,10 @@ export function notifyIfFlagged(
   logPrefix: string,
 ): void {
   if (!safety.notify_parent) return;
-  trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
-    console.error(`${logPrefix} safety.flagged_turn notification failed: ${(err as Error).message}`),
+  trackBackgroundWork(
+    trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
+      console.error(`${logPrefix} safety.flagged_turn notification failed: ${(err as Error).message}`),
+    ),
   );
 }
 
