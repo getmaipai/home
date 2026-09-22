@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { runBareTurnStream, BareModeForbidden } from "@/lib/turnBareStream";
-import { isOwnerOrAdmin } from "@/lib/access";
+import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -113,14 +113,24 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     continuation_text?: string;
     speaker_evidence?: unknown;
     present?: unknown;
+    temporary?: boolean;
   };
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn evidence", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
+  // TEMP-CHAT-01: the clean 403, checked here even though
+  // resolveOrCreateConversation() (conversationHistory.ts) asserts the
+  // identical thing again on its own construction path - the same
+  // "route-level primary gate, structural backstop underneath"
+  // ADMIN-COMPARE-01 (b) already established for bare mode.
+  if (body.temporary === true && !canHaveTemporaryChat(actor)) {
+    return c.json({ error: "temporary chat is not available for minors" }, 403);
+  }
   const result = await runTurn(actor, surface, body.text ?? "", {
     thinking: body.thinking,
     conversationId: body.conversation_id,
     supersedes: body.supersedes,
+    temporary: body.temporary,
     ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
   });
   if (!result.ok) {
@@ -490,6 +500,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     speaker_evidence?: unknown;
     present?: unknown;
     bare?: boolean;
+    temporary?: boolean;
   };
   if (body.resume_token !== undefined) {
     const session = typeof body.resume_token === "string" ? resumeSessions.get(body.resume_token) : undefined;
@@ -538,6 +549,12 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     if (!isOwnerOrAdmin(actor)) return c.json({ error: "bare mode is owner/admin only" }, 403);
     if (speakerAgeBand(actor, new Date()) !== "adult") return c.json({ error: "bare mode is not available to a minor" }, 403);
   }
+  // TEMP-CHAT-01: same shape as bare mode just above - the route-level
+  // clean 403, checked again as a structural backstop inside
+  // resolveOrCreateConversation() itself.
+  if (body.temporary === true && !canHaveTemporaryChat(actor)) {
+    return c.json({ error: "temporary chat is not available for minors" }, 403);
+  }
   let result: TurnStreamResult;
   try {
     result =
@@ -554,6 +571,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
             // while still going through the exact same model/safety/reply path a
             // typed message does (getmaipai/home BACKLOG, found 2026-09-11).
             ephemeral,
+            temporary: body.temporary,
             signal: abortController.signal,
             ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
           });

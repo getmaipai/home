@@ -117,6 +117,62 @@ describe("packageHost artifact.create/update", () => {
     expect(() => host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" })).toThrow(HostError);
   });
 
+  // TEMP-CHAT-01 (found in the durable-write audit): a temporary
+  // conversation's turnId/conversationId ARE always populated here (the
+  // caller passes them unconditionally either way), so the check above
+  // never catches this case - insertProvisionalTurn() is deliberately
+  // never called for a temporary turn (turnEngine.ts), so there is no
+  // conversation_turns row for createArtifact()'s own foreign key to
+  // attach to. Before this fix that was an uncaught FK violation, not a
+  // clean refusal; this proves it's now the identical HostError shape
+  // the missing-turn case above already uses, so it travels the normal
+  // declined-tool-outcome path a real turn's pipeline already handles,
+  // never an unhandled exception mid-stream.
+  test("a temporary conversation's turn gets a clean refusal, not a foreign-key crash", async () => {
+    const actor = await owner();
+    const { resolveOrCreateConversation } = await import("@/lib/conversationHistory");
+    const conversationResult = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    if (!conversationResult.ok) throw new Error(conversationResult.error);
+    const host = createHost(actor, manifest({ permissions: ["artifact:write"], min_role: "adult" }), [], { id: newConversationTurnId(), conversationId: conversationResult.value.id });
+    expect(() => host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" })).toThrow(HostError);
+    try {
+      host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" });
+    } catch (err) {
+      expect((err as HostError).code).toBe("permission_denied");
+      expect((err as HostError).message).toContain("temporary chat");
+    }
+  });
+
+  // A code review caught this: create()'s own guard didn't carry over to
+  // its sibling. An artifact made earlier in a REAL conversation can
+  // still be reached from a temporary one (a household member editing
+  // their own document mid-temporary-chat) - update()'s own turnId FK
+  // needs THIS turn's own row, which a temporary turn never has,
+  // regardless of which conversation the artifact being edited
+  // originally belonged to.
+  test("update() also gets a clean refusal from a temporary conversation's turn, not a foreign-key crash", async () => {
+    const actor = await owner();
+    const realConversationId = conversationFor(actor);
+    const realTurnId = turnFor(actor, realConversationId);
+    const created = createHost(actor, manifest({ permissions: ["artifact:write"], min_role: "adult" }), [], { id: realTurnId, conversationId: realConversationId }).artifact.create({
+      title: "Packing list",
+      kind: "markdown",
+      body: "- tent",
+    });
+
+    const { resolveOrCreateConversation } = await import("@/lib/conversationHistory");
+    const temporaryResult = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    if (!temporaryResult.ok) throw new Error(temporaryResult.error);
+    const host = createHost(actor, manifest({ permissions: ["artifact:write"], min_role: "adult" }), [], { id: newConversationTurnId(), conversationId: temporaryResult.value.id });
+    expect(() => host.artifact.update({ artifact_id: created.id, title: "Packing list", body: "- tent\n- stove" })).toThrow(HostError);
+    try {
+      host.artifact.update({ artifact_id: created.id, title: "Packing list", body: "- tent\n- stove" });
+    } catch (err) {
+      expect((err as HostError).code).toBe("permission_denied");
+      expect((err as HostError).message).toContain("temporary chat");
+    }
+  });
+
   // getmaipai/home#131 (fixed): the real live-turn shape - a turn id
   // whose only conversation_turns row is the provisional one
   // insertProvisionalTurn() writes at the very start of a real turn

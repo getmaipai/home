@@ -40,7 +40,7 @@ import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands, openQuestions, relationships } from "@/db/schema";
 import { TurnArtifact, type TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 import { newConversationTurnId, newConversationId, newOpenQuestionId } from "@/lib/id";
-import { canAccessPerson } from "@/lib/access";
+import { canAccessPerson, canHaveTemporaryChat } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage } from "@/lib/llm";
@@ -353,13 +353,21 @@ export function resolveSupersedes(supersedes: string | null | undefined, convers
   return superseded && superseded.conversationId === conversationId ? supersedes : null;
 }
 
-export function logTurn(
+export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean };
+
+/** The row a completed turn would produce, with no persistence of its
+ * own - pulled out of logTurn() (TEMP-CHAT-01) so a temporary
+ * conversation's in-memory window can be built from the exact same
+ * shape a real turn's own DB row has, rather than a second hand-kept
+ * copy of what a turn row looks like. logTurn() below is this plus the
+ * actual write. */
+function buildTurnRow(
   actor: PersonRow,
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean } = {},
-): ConversationTurnRow {
+  opts: LogTurnOpts,
+): { row: ConversationTurnRow; supersedes: string | null; branchFrom: string | null; document: TurnArtifactValue | null; credentialTurn: boolean } {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
   // of any detected credential, never the value, whatever path logged
@@ -470,6 +478,17 @@ export function logTurn(
     // that matters.
     status: "done",
   };
+  return { row, supersedes, branchFrom, document, credentialTurn };
+}
+
+export function logTurn(
+  actor: PersonRow,
+  surface: Surface,
+  rawUserText: string,
+  value: TurnValue,
+  opts: LogTurnOpts = {},
+): ConversationTurnRow {
+  const { row, supersedes, branchFrom, document } = buildTurnRow(actor, surface, rawUserText, value, opts);
   // COMP-01: keep the wire response additive and honest about whether this
   // turn has a validated details document stored beside its outcomes.
   value.document_available = Boolean(opts.document);
@@ -483,6 +502,102 @@ export function logTurn(
   // corrected statement's own facts are what the judge extracts next.
   if (supersedes) archiveByProvenance(supersedes);
   return storedRow;
+}
+
+// TEMP-CHAT-01: a temporary conversation's whole life, held only in
+// process memory - never a row in `conversations` or `conversation_turns`,
+// gone on restart. The same in-process pattern routes/turn.ts's
+// resumeSessions/inFlightTurns already use for stream resumption (a
+// second store that did the identical job would be exactly the thing
+// CLAUDE.md principle 1 rules out), not a second kind of state.
+//
+// Every existing `conversation.mode === "temporary"` gate already
+// scattered through this file and turnEngine.ts (logTurnSafely's turn-row
+// skip, insertProvisionalTurn's skip, the rolling-summary skip,
+// appendedAsk's skip, crisis-continuity's skip) fires correctly the
+// moment the `Conversation` object passed around has `mode: "temporary"`
+// set - which is true here whether that object came from a real DB row
+// (the pre-existing, now-retired path) or, as of this change, only ever
+// from here. Nothing about those call sites changes.
+interface TemporaryConversationSession {
+  conversation: Conversation;
+  // Newest last, capped the same way a real conversation's window query
+  // is capped (WINDOW_ROW_FETCH_LIMIT) - far more turns than the window
+  // itself ever reads, so this bound exists only to stop one runaway
+  // temporary chat from growing without limit, not because a real
+  // conversation is expected to reach it.
+  turns: ConversationTurnRow[];
+  lastActivityAt: number;
+}
+// A household is a handful of people, each with at most a few temporary
+// chats open at once in practice; 200 is a wide margin over that, sized
+// to bound worst-case memory from a misbehaving or scripted client, not
+// because normal use is expected to approach it.
+const TEMPORARY_SESSION_MAX = 200;
+// Long enough that a parent who steps away mid-conversation for a coffee
+// doesn't lose it, short enough that a tab left open overnight doesn't
+// hold memory for a day. Matches the order of magnitude of RESUME_TTL_MS
+// (routes/turn.ts, 60s) times two orders - that one bounds "is the
+// client still reading this response", a much shorter question than "is
+// this chat still in use".
+const TEMPORARY_SESSION_IDLE_MS = 2 * 60 * 60 * 1000;
+const temporarySessions = new Map<string, TemporaryConversationSession>();
+
+function pruneTemporarySessions(now: number): void {
+  for (const [id, session] of temporarySessions) {
+    if (now - session.lastActivityAt > TEMPORARY_SESSION_IDLE_MS) temporarySessions.delete(id);
+  }
+}
+
+function evictOldestTemporarySessionIfFull(): void {
+  if (temporarySessions.size < TEMPORARY_SESSION_MAX) return;
+  let oldestId: string | null = null;
+  let oldestAt = Infinity;
+  for (const [id, session] of temporarySessions) {
+    if (session.lastActivityAt < oldestAt) {
+      oldestAt = session.lastActivityAt;
+      oldestId = id;
+    }
+  }
+  if (oldestId) temporarySessions.delete(oldestId);
+}
+
+/** Whether `conversationId` names a live temporary session - the one
+ * signal a caller outside this file (packageHost.ts's artifact/
+ * attachment guards) needs, without reaching into the map itself. */
+export function isTemporaryConversation(conversationId: string): boolean {
+  return temporarySessions.has(conversationId);
+}
+
+function createTemporaryConversation(actor: PersonRow, surface: Surface, companionId?: string | null): Conversation {
+  pruneTemporarySessions(Date.now());
+  evictOldestTemporarySessionIfFull();
+  const record = buildNewConversationRecord(actor, surface, companionId, "temporary");
+  temporarySessions.set(record.id, { conversation: record, turns: [], lastActivityAt: Date.now() });
+  return record;
+}
+
+/** logTurnSafely()'s (turnEngine.ts) own persistence point for a
+ * temporary turn: never the DB, but still remembered for the rest of
+ * this session so the next turn in the same temporary chat has real
+ * context - the gap a naive "just skip persistence" design would have
+ * left (found during TEMP-CHAT-01's design review: a temporary chat
+ * where turn 2 forgets turn 1 is not a privacy feature, it's a broken
+ * chat). Builds the row through the exact same buildTurnRow() a real
+ * turn's DB write uses, so the in-memory window and the DB-backed one
+ * are never two different ideas of what a turn row looks like. */
+export function appendTemporaryTurn(actor: PersonRow, surface: Surface, rawUserText: string, value: TurnValue, opts: LogTurnOpts): void {
+  const session = temporarySessions.get(value.conversation_id);
+  // The session can be gone (an idle expiry, a restart) between this
+  // turn starting and finishing - the reply already streamed to the
+  // client either way, so there's nothing to recover here, only nothing
+  // left to append to.
+  if (!session) return;
+  const { row } = buildTurnRow(actor, surface, rawUserText, value, opts);
+  value.document_available = Boolean(opts.document);
+  session.turns.push(row);
+  if (session.turns.length > WINDOW_ROW_FETCH_LIMIT) session.turns.shift();
+  session.lastActivityAt = Date.now();
 }
 
 /** Persists the local branch picker choice without rewriting any message
@@ -581,6 +696,21 @@ export function presentOf(row: Pick<ConversationTurnRow, "present">): PresentPer
 // checks) - a placeholder safetyAction/replyText from this same turn's
 // own not-yet-finished row must never stand in for real history.
 export function recentTurnSafety(conversationId: string, limit: number): { safetyAction: string; source: string; replyText: string; crisisSignal: boolean }[] {
+  // TEMP-CHAT-01: conversationInCrisis() (turnEngine.ts) reads this to
+  // decide whether the crisis-resources overlay stays up across the
+  // turns right after a self-harm mention - a temporary conversation's
+  // own turns still each run the real safety check and still each set
+  // crisisSignal (buildTurnRow(), unconditionally), so this continuity
+  // read has to see them too, or a temporary chat would silently drop
+  // the overlay one turn after the real, DB-backed pipeline would have
+  // kept it up. Safety is the one thing this feature does not change.
+  const session = temporarySessions.get(conversationId);
+  if (session) {
+    return session.turns
+      .slice(-limit)
+      .reverse()
+      .map((t) => ({ safetyAction: t.safetyAction, source: t.source, replyText: t.replyText, crisisSignal: t.crisisSignal }));
+  }
   return db
     .select({ safetyAction: conversationTurns.safetyAction, source: conversationTurns.source, replyText: conversationTurns.replyText, crisisSignal: conversationTurns.crisisSignal })
     .from(conversationTurns)
@@ -747,7 +877,11 @@ function conversationToDbValues(c: Conversation) {
   };
 }
 
-function insertNewConversation(actor: PersonRow, surface: Surface, companionId?: string | null, mode: Conversation["mode"] = "chat"): Conversation {
+/** The shape a fresh conversation record gets, whichever of its two
+ * homes it's headed for (a real DB row, or - TEMP-CHAT-01 - a
+ * process-memory-only session): one definition of what "new" means,
+ * shared rather than kept twice. Pure: never touches the DB. */
+function buildNewConversationRecord(actor: PersonRow, surface: Surface, companionId: string | null | undefined, mode: Conversation["mode"]): Conversation {
   const now = new Date().toISOString();
   // Set at creation from the person's own persona pick (the contract:
   // "A conversation's companion_id is set at creation from that
@@ -761,7 +895,7 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
   // precedent): the single source of truth for what a valid conversation
   // looks like is the generated Zod schema, not a hand-kept second copy
   // of its rules here.
-  const record = Conversation.parse({
+  return Conversation.parse({
     id: newConversationId(),
     person: actor.id,
     surface,
@@ -777,6 +911,10 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
     created_at: now,
     updated_at: now,
   });
+}
+
+function insertNewConversation(actor: PersonRow, surface: Surface, companionId?: string | null, mode: Conversation["mode"] = "chat"): Conversation {
+  const record = buildNewConversationRecord(actor, surface, companionId, mode);
   try {
     db.insert(conversations).values(conversationToDbValues(record)).run();
   } catch (err) {
@@ -807,8 +945,26 @@ export function resolveOrCreateConversation(
   actor: PersonRow,
   surface: Surface,
   conversationId?: string,
+  opts: { temporary?: boolean } = {},
 ): ConversationOpResult<Conversation> {
   if (conversationId) {
+    // TEMP-CHAT-01: a given id is authoritative regardless of whether
+    // this particular call also asked for `temporary` - once a
+    // temporary chat exists, every later turn against its id is
+    // recognized by the id alone, the same way a real conversation's
+    // mode is a property looked up once, not re-asserted on every
+    // request. Checked before the DB lookup below: a temporary
+    // session's id was never written there, so a DB query would only
+    // waste a round trip on the way to the same 400 the two checks
+    // below already give it correctly.
+    const session = temporarySessions.get(conversationId);
+    if (session) {
+      if (session.conversation.person !== actor.id || session.conversation.surface !== surface) {
+        return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
+      }
+      session.lastActivityAt = Date.now();
+      return { ok: true, value: session.conversation };
+    }
     const row = db.select().from(conversations).where(eq(conversations.id, conversationId)).get();
     // A code review (2026-09-05) found the surface check missing: a
     // conversation_id from this actor's own "chat" conversation passed
@@ -821,6 +977,19 @@ export function resolveOrCreateConversation(
       return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
     }
     return { ok: true, value: toConversationRecord(row) };
+  }
+
+  // TEMP-CHAT-01: no id means a fresh conversation is wanted, same as
+  // the real path below - the role gate is checked here too (the
+  // structural backstop, mirroring ADMIN-COMPARE-01 (b)'s bare-mode
+  // pattern: a route-level check is the primary gate, this one asserts
+  // it again so a future caller that forgets the route-level check
+  // still can't construct a minor's temporary chat).
+  if (opts.temporary) {
+    if (!canHaveTemporaryChat(actor)) {
+      return { ok: false, status: 403, error: "temporary chat is not available for minors" };
+    }
+    return { ok: true, value: createTemporaryConversation(actor, surface) };
   }
 
   const openOnes = db
@@ -1072,14 +1241,24 @@ export function createConversation(
   if (!VALID_MODES.has(mode)) {
     return { ok: false, status: 400, error: `invalid conversation mode: ${mode}` };
   }
-  if (mode === "temporary" && actor.role !== "owner" && actor.role !== "admin" && actor.role !== "adult") {
+  if (mode === "temporary" && !canHaveTemporaryChat(actor)) {
     return { ok: false, status: 403, error: "temporary chat is not available for minors" };
   }
   db.update(conversations)
     .set({ status: "closed", updatedAt: new Date().toISOString(), hlc: nextHlc() })
     .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.status, "open")))
     .run();
-  return { ok: true, value: insertNewConversation(actor, surface, opts.companionId, mode) };
+  // TEMP-CHAT-01: this is the only place a real DB row was ever written
+  // for mode: "temporary" (Chat 55, 2026-09-16) - it still leaked a
+  // conversations row (title: null, but a row all the same: this
+  // person had a conversation, on this surface, at this time - exactly
+  // what "temporary" is supposed to make unanswerable). Routed through
+  // the same in-memory construction resolveOrCreateConversation()'s new
+  // turn-level `temporary` flag uses, so there is one way to get a
+  // temporary conversation, not two designs that happen to agree today
+  // and drift apart later.
+  const value = mode === "temporary" ? createTemporaryConversation(actor, surface, opts.companionId) : insertNewConversation(actor, surface, opts.companionId, mode);
+  return { ok: true, value };
 }
 
 /** Explicitly continue an owned saved conversation. Reading a thread does
@@ -1195,6 +1374,19 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
  * nonexistent - never distinguishing "not yours" from "doesn't exist"
  * (the same information-hiding posture a 404 always gives). */
 export function getConversation(actor: PersonRow, id: string): ConversationOpResult<Conversation> {
+  // TEMP-CHAT-01: a live temporary session was never written to
+  // `conversations`, so the DB lookup below would 404 it every time -
+  // not just on a reload (the product's own promise: "reloading will
+  // not bring these messages back"), but on an ordinary in-tab
+  // navigation away and back to the same still-open chat, which is not
+  // supposed to lose anything. canAccessPerson() isn't needed here the
+  // way it is below: a temporary session is never shared or exported,
+  // so its own person-match check is the whole access rule.
+  const session = temporarySessions.get(id);
+  if (session) {
+    if (session.conversation.person !== actor.id) return { ok: false, status: 404, error: "conversation not found" };
+    return { ok: true, value: session.conversation };
+  }
   const row = db.select().from(conversations).where(eq(conversations.id, id)).get();
   if (!row || row.status === "deleted" || !canAccessPerson(actor, row.personId)) {
     return { ok: false, status: 404, error: "conversation not found" };
@@ -1577,13 +1769,22 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
   // from the model's own context window. An in-flight row's replyText
   // is a placeholder; feeding it back to the model as history would
   // read as the assistant having already answered with nothing.
-  const rows = db
-    .select()
-    .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversation.id), eq(conversationTurns.status, "done")))
-    .orderBy(desc(conversationTurns.createdAt))
-    .limit(WINDOW_ROW_FETCH_LIMIT)
-    .all();
+  // TEMP-CHAT-01: a temporary conversation has no conversation_turns rows
+  // to query - its turns live in temporarySessions instead (appended by
+  // appendTemporaryTurn(), turnEngine.ts's own persistence point for
+  // one). Read from there and feed the identical windowing/redaction/
+  // message-building logic below: one implementation of "what a window
+  // looks like", not two, regardless of where its rows came from.
+  const rows =
+    conversation.mode === "temporary"
+      ? [...(temporarySessions.get(conversation.id)?.turns ?? [])]
+      : db
+          .select()
+          .from(conversationTurns)
+          .where(and(eq(conversationTurns.conversationId, conversation.id), eq(conversationTurns.status, "done")))
+          .orderBy(desc(conversationTurns.createdAt))
+          .limit(WINDOW_ROW_FETCH_LIMIT)
+          .all();
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   // ADMIN-COMPARE-01: a caller reconstructing history as it stood AT a
   // given turn (rather than "now") names that turn's own createdAt here -

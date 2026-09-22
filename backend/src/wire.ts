@@ -452,6 +452,15 @@ export function isOwnerOrAdminRole(role: string): boolean {
   return role === "owner" || role === "admin";
 }
 
+// TEMP-CHAT-01: the same role floor conversationHistory.ts's
+// createConversation() already checked for mode: "temporary" (Chat 55,
+// 2026-09-16) - factored out here, alongside isOwnerOrAdminRole, once a
+// second call site (the new zero-footprint construction path) needed the
+// identical check rather than a hand-copied second version of it.
+export function canHaveTemporaryChatRole(role: string): boolean {
+  return isOwnerOrAdminRole(role) || role === "adult";
+}
+
 /** One row of the "what leaves the house" table
  * (getmaipai/.github/CLAUDE.md > Privacy architecture: "every product
  * keeps a user-tier privacy page with the what-leaves-the-house table:

@@ -54,6 +54,7 @@ import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
   logTurn,
+  appendTemporaryTurn,
   resolveOrCreateConversation,
   buildConversationWindow,
   maybeRefreshConversationSummary,
@@ -326,7 +327,7 @@ function logTurnSafely(
   // stays unconditional, so an ephemeral turn that fails or runs long is
   // still traceable the same way Fix A4/A5 (docs/dev.md, 2026-09-07
   // incident) made every other turn's failure traceable.
-  if (!meta.ephemeral && !meta.temporary) {
+  if (!meta.ephemeral) {
     try {
       // getmaipai/home#78: the row records the reason only when the guard
       // REPLACED the reply; a cut that kept the model's own prefix leaves
@@ -337,16 +338,32 @@ function logTurnSafely(
       // insert, so the judge's queue is keyed on the signal, not on the
       // reply's source.
       // SAFETY-01: the self-harm category on the utterance or on the
-      // reply marks the row, whatever the reply's own action.
+      // reply marks the row, whatever the reply's own action - computed
+      // the identical way for a temporary turn (below) as for a real
+      // one: TEMP-CHAT-01 removes persistence and memory, never safety.
       const crisisSignal = (meta.inputSafety !== undefined && carriesCrisisSignal(meta.inputSafety)) || carriesCrisisSignal(value.safety);
       const plan = meta.plan ?? planFor({ signal: meta.signal, surface, brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", complexity: "standard" }, band: meta.signal.age_band, deferred: false, disclosureWithheld: false });
-      // RVW-1: a repair aimed at the hub corrects the previous reply;
-      // that row is marked before this one is inserted.
-      if (meta.signal.target === "hub" && meta.signal.repair !== "none") markPreviousTurnCorrected(value.conversation_id, value.turn_id);
       const document = meta.outcomes && meta.outcomes.length > 0
         ? buildDocumentForTurn({ turnId: value.turn_id, outcomes: meta.outcomes })
         : null;
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, branchFrom: meta.branchFrom, outcomes: meta.outcomes, document, signal: meta.signal, plan, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present, rung, rules });
+      if (meta.temporary) {
+        // TEMP-CHAT-01: never conversation_turns - appendTemporaryTurn()
+        // remembers it in process memory only, so the next turn in this
+        // same temporary chat still has real context. No
+        // markPreviousTurnCorrected() (that's a DB row's own field) and
+        // no judgeStatusAtInsert() (memoryJudge.ts's queue is itself a
+        // DB scan by conversation_turns row - a turn that's never a row
+        // there is structurally never eligible, judged "skipped" by
+        // never existing rather than by a status column).
+        appendTemporaryTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, branchFrom: meta.branchFrom, outcomes: meta.outcomes, document, signal: meta.signal, plan, judgeStatus: "skipped", subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present, rung, rules });
+      } else {
+        // RVW-1: a repair aimed at the hub corrects the previous reply;
+        // that row is marked before this one is inserted. A DB-only
+        // concern - a temporary conversation's previous turn is never a
+        // row to mark.
+        if (meta.signal.target === "hub" && meta.signal.repair !== "none") markPreviousTurnCorrected(value.conversation_id, value.turn_id);
+        logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, branchFrom: meta.branchFrom, outcomes: meta.outcomes, document, signal: meta.signal, plan, judgeStatus: judgeStatusAtInsert(value, meta.signal), subjects: meta.subjects, crisisSignal, speakerEvidence: meta.speakerEvidence, present: meta.present, rung, rules });
+      }
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
@@ -2819,7 +2836,28 @@ async function prepareTurn(
   // `summaryLine` for the prompt).
   const window = buildConversationWindow(conversation, { supersedes, excludeTurnId: continuation?.fromTurnId });
   const replyConstraint = parseReplyConstraint(text, window.messages.filter((m) => m.role === "assistant").slice(-2).map((m) => m.content));
-  if (replyConstraint) { fired(`constraint.${replyConstraint.kind}`); setReplyConstraint({ conversationId: conversation.id, person: actor.id, ...replyConstraint, setByTurn: turnId }); console.log(`[turn] constraint: ${replyConstraint.kind} ${replyConstraint.value}`); }
+  // TEMP-CHAT-01: found during the durable-write audit - this write had
+  // no ephemeral/temporary gate at all, unlike every other durable write
+  // in this function, so it was leaking a `reply_constraints` row (kind,
+  // value, setByTurn) for a widget query or a temporary conversation
+  // already, pre-existing and unrelated to this change. Its own
+  // conversationId has no DB-level foreign key, so it never crashed -
+  // it just silently outlived the conversation it was supposed to
+  // belong to. Same gate insertProvisionalTurn() already uses just
+  // above prepareTurn()'s own call into here.
+  if (replyConstraint) {
+    // `fired()` is this turn's own operational trace (the rules list on
+    // the `[turn]` log line, RVW-1) - kept unconditional like every
+    // other trace point in this file, so an ephemeral or temporary
+    // turn's constraint is still visible in the log even though nothing
+    // about it is kept past this request. Only the durable write below
+    // is gated.
+    fired(`constraint.${replyConstraint.kind}`);
+    if (!ephemeral && conversation.mode !== "temporary") {
+      setReplyConstraint({ conversationId: conversation.id, person: actor.id, ...replyConstraint, setByTurn: turnId });
+    }
+    console.log(`[turn] constraint: ${replyConstraint.kind} ${replyConstraint.value}`);
+  }
   const subjectsStart = performance.now();
   const { subjects, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried } = resolveTurnSubjects({ actor, text, signal, household, rosterNames, window, conversationId: conversation.id, supersedes, turnId });
   // CHAT-16: an answered ask's own subject (the entity a `who` answer
@@ -4408,7 +4446,7 @@ export async function runTurn(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
+  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; temporary?: boolean } = {},
 ): Promise<TurnOpResult> {
   // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
   if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
@@ -4425,7 +4463,7 @@ export async function runTurn(
   // if none"): a given but invalid/foreign id is a real 400, the same
   // "validate first, prepareTurn assumes valid inputs" shape this
   // function's own surface/text checks above already establish.
-  const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId);
+  const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary === true });
   if (!conversationResult.ok) {
     return { ok: false, status: 400, code: "invalid_input", error: conversationResult.error };
   }
@@ -5379,7 +5417,7 @@ export async function runTurnStream(
   // shows up in the person's real chat history. finalizeReply() (the
   // output safety boundary) and the lease still run for it exactly as
   // for a real turn: only the log write is conditional.
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
 ): Promise<TurnStreamResult> {
   // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
   if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
@@ -5393,7 +5431,7 @@ export async function runTurnStream(
   const invalidContinuation = validateContinuationInput(opts.continuation);
   if (invalidContinuation) return invalidContinuation;
 
-  const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId);
+  const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary === true });
   if (!conversationResult.ok) {
     return { ok: false, status: 400, code: "invalid_input", error: conversationResult.error };
   }
@@ -5427,7 +5465,7 @@ async function runTurnStreamHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
 ): Promise<TurnStreamResult> {
   const branchFrom = resolveSupersedes(opts.continuation?.fromTurnId, conversation.id);
   const continuation = opts.continuation ? { ...opts.continuation, ...(branchFrom ? { fromTurnId: branchFrom } : {}) } : null;

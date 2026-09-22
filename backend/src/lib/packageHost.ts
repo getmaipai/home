@@ -57,6 +57,7 @@ import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulato
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { Artifact as ArtifactValue } from "@maipai/spec/gen/ts/artifact.js";
 import { createArtifact, updateArtifact, getArtifactRow } from "@/lib/artifacts";
+import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { tryConsume } from "@/lib/rateLimiter";
 import { assertNotPrivateHost, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import * as memory from "@/lib/memory";
@@ -1092,6 +1093,24 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         if (!turn?.id || !turn.conversationId) {
           throw new HostError("not_found", "host.artifact.create needs a conversation turn to attach to");
         }
+        // TEMP-CHAT-01: turn.id/turn.conversationId are always populated
+        // for a temporary turn too (runPlugin()'s callers pass them
+        // unconditionally), but insertProvisionalTurn() is deliberately
+        // never called for one, so there's no conversation_turns row for
+        // createArtifact()'s own FK to attach to - an uncaught FK
+        // violation, not the clean refusal the missing-turn case above
+        // gets. A dormant gap before this feature (nothing routed
+        // `ephemeral` here in practice); TEMP-CHAT-01 turns temporary
+        // conversations into something people actually use, which
+        // promotes it from a dormant crash to a routine one, so it's
+        // fixed here rather than left for someone to rediscover.
+        // Thrown the identical way the check above already does - one
+        // shape of refusal, not two - so it travels the same normal
+        // declined-tool-outcome path, never an unhandled exception
+        // mid-stream.
+        if (isTemporaryConversation(turn.conversationId)) {
+          throw new HostError("permission_denied", "Documents aren't available in a temporary chat because nothing is saved.");
+        }
         // The identical provenance FIELD memory.remember() already uses
         // for its own `source` (docs/dev.md's "Provenance" note) -
         // unlike remember()'s `turnId ?? package:${manifest.id}`, there
@@ -1121,6 +1140,15 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         requirePermission("artifact:write");
         if (!turn?.id) {
           throw new HostError("not_found", "host.artifact.update needs a conversation turn to attach to");
+        }
+        // TEMP-CHAT-01 (code review, 2026-09-22): the identical gap
+        // create() just above was fixed for - a new version still needs
+        // a real conversation_turns row for THIS turn's own id to
+        // attach to (updateArtifact()'s turnId FK), and one never
+        // exists for a temporary turn, whatever conversation the
+        // artifact being edited originally belonged to.
+        if (turn.conversationId && isTemporaryConversation(turn.conversationId)) {
+          throw new HostError("permission_denied", "Documents aren't available in a temporary chat because nothing is saved.");
         }
         // lib/artifacts.ts's own updateArtifact() has no actor check at
         // all (it isn't reachable any other way - routes/artifacts.ts is

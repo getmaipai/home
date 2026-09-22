@@ -9,7 +9,7 @@ import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
-import { isOwnerOrAdminRole } from "@/wire";
+import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@/wire";
 
 // The role-string check itself now lives in @/wire (alias-free) so a
 // frontend client can share it too (a code review, 2026-09-04, found a
@@ -17,6 +17,15 @@ import { isOwnerOrAdminRole } from "@/wire";
 // existing PersonRow-based call site here keeps using.
 export function isOwnerOrAdmin(actor: PersonRow): boolean {
   return isOwnerOrAdminRole(actor.role);
+}
+
+// TEMP-CHAT-01: the PersonRow-taking wrapper isOwnerOrAdmin() already is
+// for isOwnerOrAdminRole() - conversationHistory.ts's createConversation()
+// and resolveOrCreateConversation() both gate on this, one definition
+// shared between the old create-first entry point and the new
+// zero-footprint one instead of two copies of "owner, admin, or adult".
+export function canHaveTemporaryChat(actor: PersonRow): boolean {
+  return canHaveTemporaryChatRole(actor.role);
 }
 
 // Batch form, for a caller filtering many records against many different
