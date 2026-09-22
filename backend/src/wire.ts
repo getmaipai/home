@@ -127,6 +127,12 @@ export interface TurnNodeExecution {
   startMs: number;
   endMs: number;
   outcome: { ok: true } | { ok: false; code: string } | { skipped: true; reason: string };
+  /** "Reasoning is a second output" (turn-machine-state-record's owner
+   * ruling): set only on the `model` node's own entry, mirroring
+   * turnMachine/contract.ts's NodeExecution.reasoning structurally
+   * (see this file's own header note on why these two are hand-kept
+   * in step rather than imported). */
+  reasoning?: { emitted: boolean; withheld_for: "minor" | "surface" | "presence" | "gate" | null };
 }
 
 // ADMIN-COMPARE-01: POST /api/turn/bare's own trace and NDJSON event

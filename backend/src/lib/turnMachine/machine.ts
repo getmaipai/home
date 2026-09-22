@@ -74,6 +74,11 @@ interface MachineContext {
   // node, since only ever one is live at a time (the machine is
   // sequential, never parallel across nodes).
   step: unknown;
+  // "Reasoning is a second output": the model node's own extracted
+  // span, carried past `answer` (which overwrites `step`) so
+  // `output_gate` can still gate it - see the `model` state's own
+  // onDone actions.
+  modelReasoning: string | undefined;
 }
 
 function proposalsFrom(policy: PolicyOutput): { toRun: ActionProposal[]; parkedAsk: { prompt: string; proposal: ActionProposal } | null } {
@@ -115,7 +120,17 @@ export const turnMachine = setup({
       return runNode(input.trace, "tool", input.turnState.budget.deadlines_ms.tool, input.turnState, input.abortSignal, { proposals: toRun }, toolNode);
     }),
     answer: fromPromise<AnswerOutput, MachineContext>(({ input }) => runNode(input.trace, "answer", input.turnState.budget.deadlines_ms.model, input.turnState, input.abortSignal, input.step as AnswerInput, answerNode)),
-    output_gate: fromPromise<OutputGateOutput, MachineContext>(({ input }) => runNode(input.trace, "output_gate", input.turnState.budget.deadlines_ms.model, input.turnState, input.abortSignal, { reply: input.step as AnswerOutput }, outputGateNode)),
+    output_gate: fromPromise<OutputGateOutput, MachineContext>(({ input }) =>
+      runNode(
+        input.trace,
+        "output_gate",
+        input.turnState.budget.deadlines_ms.model,
+        input.turnState,
+        input.abortSignal,
+        { reply: input.step as AnswerOutput, reasoningIn: input.modelReasoning, reasoningEmit: input.turnState.reasoning.emit, reasoningWithheldFor: input.turnState.reasoning.withheld_for },
+        outputGateNode,
+      ),
+    ),
   },
   guards: {
     // A guard on an actor's own `onDone` evaluates BEFORE that
@@ -177,10 +192,24 @@ export const turnMachine = setup({
         context.turnState.ask = { kind: "confirm", prompt: parkedAsk.prompt, packageId: parkedAsk.proposal.request.tool, args: parkedAsk.proposal.request.args };
       }
     },
+    // "Reasoning is a second output": output_gate is the one node that
+    // knows the turn's FINAL reasoning outcome (context's own emit/
+    // withheld_for, possibly downgraded to "gate"), but the model
+    // node's own NodeExecution is already written by the time
+    // output_gate runs - "so the replay bench and the weekly report
+    // can prove a minor's row never carried a reasoning event," the
+    // design puts this outcome on the model node's own trace entry
+    // rather than a ninth node, so it's patched onto that entry here,
+    // the one place both the trace and the final outcome are in hand.
+    applyReasoningTrace: ({ context }) => {
+      const output = context.step as OutputGateOutput;
+      const modelEntry = [...context.turnState.nodes].reverse().find((n) => n.node === "model");
+      if (modelEntry) modelEntry.reasoning = output.reasoning;
+    },
   },
 }).createMachine({
   id: "turn",
-  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, forceSearchOnly: false, step: null }),
+  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, forceSearchOnly: false, step: null, modelReasoning: undefined }),
   initial: "safety",
   states: {
     safety: {
@@ -233,10 +262,15 @@ export const turnMachine = setup({
       invoke: {
         src: "model",
         input: ({ context }) => context,
+        // Every branch also stashes the model's own reasoning span
+        // (undefined when `context` said not to emit, or none came
+        // back) on the context's own modelReasoning slot - `answer`'s
+        // own output overwrites `step` before `output_gate` ever runs,
+        // so this is the one place that can still see it there.
         onDone: [
-          { guard: "modelIsToolCalls", actions: assign(({ event }) => ({ step: event.output })), target: "policy" },
-          { guard: "modelIsAnswerFromContext", actions: assign(({ event }) => ({ step: event.output })), target: "answer_from_context_check" },
-          { actions: assign(({ event }) => ({ step: event.output })), target: "answer" },
+          { guard: "modelIsToolCalls", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "policy" },
+          { guard: "modelIsAnswerFromContext", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "answer_from_context_check" },
+          { actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "answer" },
         ],
       },
     },
@@ -292,8 +326,8 @@ export const turnMachine = setup({
         src: "output_gate",
         input: ({ context }) => context,
         onDone: [
-          { guard: "outputRefused", actions: assign(({ event }) => ({ step: event.output })), target: "refused" },
-          { actions: assign(({ event }) => ({ step: event.output })), target: "done" },
+          { guard: "outputRefused", actions: [assign(({ event }) => ({ step: event.output })), "applyReasoningTrace"], target: "refused" },
+          { actions: [assign(({ event }) => ({ step: event.output })), "applyReasoningTrace"], target: "done" },
         ],
       },
     },

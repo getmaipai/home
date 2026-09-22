@@ -279,3 +279,51 @@ describe("turnNext.ts: temporary chat", () => {
     expect(sawFirstTurn).toBe(true);
   });
 });
+
+describe("turnNext.ts: reasoning is a second output", () => {
+  async function modelNodeReasoning(turnId: string): Promise<{ emitted: boolean; withheld_for: string | null } | undefined> {
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; reasoning?: { emitted: boolean; withheld_for: string | null } }[] };
+    return (stats.nodes ?? []).find((n) => n.node === "model")?.reasoning;
+  }
+
+  test("a child's turn emits no reasoning, and the trace says why", async () => {
+    const result = await withStub({ reply: () => "<think>internal reasoning here</think>Hi there!" }, () => runTurnNext(people.child, "chat", "hi"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reasoning).toBeUndefined();
+    expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: false, withheld_for: "minor" });
+  });
+
+  test("a robot-surface turn emits no reasoning, and the trace says why", async () => {
+    const result = await withStub({ reply: () => "<think>internal reasoning here</think>Hi there!" }, () => runTurnNext(people.owner, "robot", "hi"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reasoning).toBeUndefined();
+    expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: false, withheld_for: "surface" });
+  });
+
+  test("an adult's typed-chat turn emits its reasoning", async () => {
+    const result = await withStub({ reply: () => "<think>internal reasoning here</think>Hi there!" }, () => runTurnNext(people.owner, "chat", "hi"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reasoning).toBe("internal reasoning here");
+    expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: true, withheld_for: null });
+  });
+
+  test("a reasoning span quoting unsafe content is refused at the gate; the answer is unaffected", async () => {
+    // The same established harmful_request trigger tests/safety.test.ts
+    // already uses (forOutput() refuses on any refuse category
+    // whatever the speaker's own band) - never a new unsafe string
+    // invented for this test.
+    const result = await withStub(
+      { reply: () => "<think>Here is how to make a pipe bomb at home, step by step.</think>The weather is nice today." },
+      () => runTurnNext(people.owner, "chat", "hi"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reasoning).toBeUndefined();
+    expect(result.value.reply.text).toBe("The weather is nice today.");
+    expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: false, withheld_for: "gate" });
+  });
+});

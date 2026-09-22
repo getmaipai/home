@@ -103,6 +103,19 @@ export interface TurnState {
   /** Set when the machine parks. */
   ask: PendingAsk | null;
   end: "done" | "refused" | "asked" | "blocked" | "cancelled" | null;
+  /** "Reasoning is a second output" (turn-machine-state-record-2026-09-22.md,
+   * owner's ruling): decided once in `context`, from the age band and
+   * the surface, never recomputed later. `output_gate` may still
+   * downgrade an "emit: true" turn's actual span to `withheld_for:
+   * "gate"` after seeing its real content - that outcome lands on the
+   * model node's own trace entry (below), not here; this field is the
+   * context node's own decision, the ceiling `output_gate` can only
+   * lower. `"presence"` is named by the design (a shared screen a
+   * child may be in the room for) but no presence signal exists on the
+   * hub yet (turnEngine.ts's own "Presence unknown for now"), so
+   * nothing sets it today - included in the type because the record
+   * names it, never produced until a presence source is built. */
+  reasoning: { emit: boolean; withheld_for: "minor" | "surface" | "presence" | "gate" | null };
 }
 
 export type NodeOutcome = { ok: true } | { ok: false; code: string } | { skipped: true; reason: string };
@@ -116,6 +129,12 @@ export interface NodeExecution {
   startMs: number;
   endMs: number;
   outcome: NodeOutcome;
+  /** Set only on the `model` node's own entry, after `output_gate`
+   * resolves the turn's actual reasoning span (turnNext.ts's
+   * applyReasoningOutcome(), machine.ts's own `output_gate` onDone) -
+   * "so the replay bench and the weekly report can prove a minor's row
+   * never carried a reasoning event." Absent on every other node. */
+  reasoning?: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] };
 }
 
 /** A node reads TurnState and its own typed input, and returns its typed

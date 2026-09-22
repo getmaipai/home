@@ -22,7 +22,7 @@ import { startCompleteStream } from "@/lib/llm";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
-import { neutralizeThinkTags } from "@/lib/llm";
+import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { contextToMessages } from "../messages";
 import type { Node, TurnState } from "../contract";
 
@@ -64,9 +64,9 @@ export interface ModelInput {
 }
 
 export type ModelOutput =
-  | { kind: "text"; text: string; thinking: boolean }
-  | { kind: "tool_calls"; calls: ToolCall[] }
-  | { kind: "answer_from_context"; quote: string };
+  | { kind: "text"; text: string; thinking: boolean; reasoning?: string }
+  | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string }
+  | { kind: "answer_from_context"; quote: string; reasoning?: string };
 
 /** Whether the utterance is what the interim rule calls "a question
  * about the world" - the signal's own closed-set fields, no new rule. */
@@ -103,7 +103,18 @@ function maxTokensFor(plan: TurnState["plan"]): number | undefined {
 
 interface GenerationAttempt {
   ok: true;
+  /** The person-visible portion only (wellFormed.ts's visibleText()) -
+   * a code review (2026-09-22, the reasoning-gating amendment) caught
+   * this field previously holding neutralizeThinkTags()'s own output:
+   * that helper only defangs a literal `<think>`/`</think>` STRING (so
+   * it can't be mistaken for a real tag later), it does not remove a
+   * think block's CONTENT, so a thinking model's reasoning was landing
+   * directly in what callers treated as the visible reply. */
   text: string;
+  /** wellFormed.ts's own extractReasoningText(), on the SAME raw text
+   * `text` above was derived from - undefined when the generation
+   * carried no think block at all. */
+  reasoning: string | undefined;
   toolCalls: ToolCall[] | undefined;
   thinking: boolean;
 }
@@ -119,7 +130,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
 
   const requestSentMs = Date.now();
   let firstDeltaMs: number | null = null;
-  let text = "";
+  let raw = "";
   let toolCalls: ToolCall[] | undefined;
   try {
     for (;;) {
@@ -129,14 +140,14 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
         break;
       }
       if (firstDeltaMs === null) firstDeltaMs = Date.now() - requestSentMs;
-      text += neutralizeThinkTags(step.value);
+      raw += step.value;
     }
   } catch {
     return { ok: false, code: "generation_failed" };
   }
 
   state.generations.push({ reason, thinking, maxTokens: maxTokensFor(state.plan) ?? null, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats });
-  return { ok: true, text, toolCalls, thinking };
+  return { ok: true, text: visibleText(raw), reasoning: extractReasoningText(raw), toolCalls, thinking };
 }
 
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
@@ -178,14 +189,21 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     if (!attempt.ok) return { outcome: { ok: false, code: attempt.code }, output: { kind: "text", text: "", thinking: false } };
   }
 
+  // "Reasoning is a second output" (the owner's ruling): `context`
+  // already decided whether this turn may emit one at all;
+  // `state.reasoning.emit === false` means "the model node consumes
+  // the spans and emits nothing" - so a withheld turn's reasoning
+  // never even reaches ModelOutput, let alone the trace or the wire.
+  const reasoning = state.reasoning.emit ? attempt.reasoning : undefined;
+
   if (attempt.toolCalls && attempt.toolCalls.length > 0) {
     const contextAnswer = attempt.toolCalls.find((c) => c.tool === ANSWER_FROM_CONTEXT_TOOL_ID);
     if (contextAnswer) {
       const quote = typeof contextAnswer.args === "object" && contextAnswer.args && "quote" in contextAnswer.args ? String((contextAnswer.args as { quote: unknown }).quote) : "";
-      return { outcome: { ok: true }, output: { kind: "answer_from_context", quote } };
+      return { outcome: { ok: true }, output: { kind: "answer_from_context", quote, reasoning } };
     }
-    return { outcome: { ok: true }, output: { kind: "tool_calls", calls: attempt.toolCalls } };
+    return { outcome: { ok: true }, output: { kind: "tool_calls", calls: attempt.toolCalls, reasoning } };
   }
 
-  return { outcome: { ok: true }, output: { kind: "text", text: attempt.text, thinking: attempt.thinking } };
+  return { outcome: { ok: true }, output: { kind: "text", text: attempt.text, thinking: attempt.thinking, reasoning } };
 };

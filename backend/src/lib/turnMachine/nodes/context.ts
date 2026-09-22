@@ -14,7 +14,23 @@ import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConver
 import { recall, getProfileParagraph } from "@/lib/memory";
 import { subjectRosterFor } from "@/lib/subjects";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import type { Node, ContextItem } from "../contract";
+import { speakerAgeBand } from "@/lib/ageBand";
+import type { Node, ContextItem, TurnState } from "../contract";
+
+/** "Reasoning is a second output" (the owner's ruling): decided once,
+ * here, from the age band and the surface - "a minor's turn never
+ * receives reasoning" (turnEngine.ts's own `ageBand === "child" ||
+ * ageBand === "teen"` is the established "not a full adult" check,
+ * reused rather than a second one) and "the typed chat screen is the
+ * only surface that may emit it." Presence is left out on purpose: no
+ * presence signal exists on the hub yet (this file's own header note),
+ * so `"presence"` is never produced until one is built. */
+export function decideReasoning(state: Pick<TurnState, "actor" | "surface">): TurnState["reasoning"] {
+  const band = speakerAgeBand(state.actor, new Date());
+  if (band === "child" || band === "teen") return { emit: false, withheld_for: "minor" };
+  if (state.surface !== "chat") return { emit: false, withheld_for: "surface" };
+  return { emit: true, withheld_for: null };
+}
 
 export interface ContextInput {
   utterance: string;
@@ -30,6 +46,7 @@ export interface ContextOutput {
   conversationId: string;
   temporary: boolean;
   items: ContextItem[];
+  reasoning: TurnState["reasoning"];
 }
 
 let windowItemSeq = 0;
@@ -37,7 +54,7 @@ let windowItemSeq = 0;
 export const contextNode: Node<ContextInput, ContextOutput> = async (state, input) => {
   const resolved = resolveOrCreateConversation(state.actor, state.surface, state.conversationId || undefined, { temporary: input.temporary });
   if (!resolved.ok) {
-    return { outcome: { ok: false, code: String(resolved.status) }, output: { conversationId: state.conversationId, temporary: false, items: [] } };
+    return { outcome: { ok: false, code: String(resolved.status) }, output: { conversationId: state.conversationId, temporary: false, items: [], reasoning: decideReasoning(state) } };
   }
   const conversation = resolved.value;
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
@@ -106,7 +123,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     items.push({ id: `roster-${i}`, text: name, source: "roster", subjects: [], disclosure: "child_ok" });
   });
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items } };
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state) } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -117,4 +134,5 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   state.conversationId = output.conversationId;
   state.temporary = output.temporary;
   state.context = output.items;
+  state.reasoning = output.reasoning;
 }

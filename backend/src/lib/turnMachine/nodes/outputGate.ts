@@ -26,23 +26,68 @@ import { assessReply, repairReply } from "@/lib/wellFormed";
 import { evaluateReply } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
-import type { Node } from "../contract";
+import type { Node, TurnState } from "../contract";
 import type { AnswerOutput } from "./answer";
 
 export interface OutputGateInput {
   reply: AnswerOutput;
+  /** "Reasoning is a second output": the model node's own extracted
+   * span, undefined whenever `context` already decided not to emit
+   * (the model node drops it before this input is even built -
+   * machine.ts's own `answerInputFrom`/output_gate wiring) or the
+   * generation simply carried no think block this turn. */
+  reasoningIn: string | undefined;
+  reasoningEmit: boolean;
+  reasoningWithheldFor: TurnState["reasoning"]["withheld_for"];
 }
 
-export type OutputGateOutput = { refused: true; text: string } | { refused: false; text: string; speech?: string; sources: AnswerOutput["sources"] };
+export type OutputGateOutput =
+  | { refused: true; text: string; reasoning: { emitted: false; withheld_for: TurnState["reasoning"]["withheld_for"] } }
+  | { refused: false; text: string; speech?: string; sources: AnswerOutput["sources"]; reasoningOut?: string; reasoning: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] } };
 
 export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (state, input) => {
   const repaired = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const band = speakerAgeBand(state.actor, new Date());
   const evaluation = evaluateReply({ text: repaired, speech: input.reply.speech }, band);
 
+  // The same safety pass the answer itself gets, over the reasoning
+  // span too ("Reasoning passes the output gate ... before an adult
+  // sees it"). Only ever runs when `context` already said this turn
+  // may emit one AND the model actually produced a span - the false
+  // branches (never asked to emit, or nothing to gate) pass the
+  // context-decided reason straight through, never re-evaluated here.
+  let reasoningOut: string | undefined;
+  let withheldFor = input.reasoningWithheldFor;
+  if (input.reasoningEmit && input.reasoningIn !== undefined) {
+    const reasoningEvaluation = evaluateReply({ text: input.reasoningIn }, band);
+    if (reasoningEvaluation.effective.action === "refuse") {
+      withheldFor = "gate";
+    } else {
+      reasoningOut = input.reasoningIn;
+      withheldFor = null;
+    }
+  } else if (input.reasoningEmit) {
+    // Allowed to emit, but the model produced no think block this turn.
+    withheldFor = null;
+  }
   if (evaluation.effective.action === "refuse") {
-    return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]! } };
+    // A code review caught this reusing the reasoning span's own
+    // withheldFor (from the check above, independent of the ANSWER's
+    // own refusal) verbatim here: a benign span that had already
+    // passed its own gate (withheldFor still null, meaning "nothing
+    // wrong with it") would then be recorded as `withheld_for: null`
+    // on a turn where it was never actually sent - indistinguishable
+    // from "this turn had nothing to withhold" on the trace. The
+    // ANSWER's own refusal is itself an output_gate decision that
+    // drops the reasoning span too (a refused turn never emits one),
+    // so it gets the same "gate" reason whenever there was something
+    // to withhold in the first place (reasoningEmit true) - the
+    // context-decided reason (minor/surface) still wins when emit was
+    // already false, never overwritten by an unrelated answer refusal.
+    const refusedWithheldFor = input.reasoningEmit ? "gate" : withheldFor;
+    return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]!, reasoning: { emitted: false, withheld_for: refusedWithheldFor } } };
   }
 
-  return { outcome: { ok: true }, output: { refused: false, text: repaired, speech: input.reply.speech, sources: input.reply.sources } };
+  const reasoning = { emitted: reasoningOut !== undefined, withheld_for: withheldFor };
+  return { outcome: { ok: true }, output: { refused: false, text: repaired, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning } };
 };

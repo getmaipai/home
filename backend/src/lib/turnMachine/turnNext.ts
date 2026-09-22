@@ -44,7 +44,7 @@ export interface RunTurnNextOpts {
   signal?: AbortSignal;
 }
 
-function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string): TurnValue {
+function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string): TurnValue {
   const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0);
   return {
     reply: { text, speech },
@@ -57,6 +57,10 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // ran or skipped, beside the generations buildTurnStats() already
     // projects above.
     stats: { ...stats, nodes: state.nodes },
+    // REASONING-02's own field, populated only when `context` allowed
+    // emitting this turn AND output_gate's own safety pass over the
+    // span didn't refuse it - the gated span itself, never the raw one.
+    reasoning,
   } as TurnValue;
 }
 
@@ -120,6 +124,18 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     end: null,
     temporary,
     startedAt,
+    // Overwritten by the context node's own decideReasoning() whenever
+    // `context` runs (machine.ts's own applyContext action). A code
+    // review caught the previous comment here claiming nothing reads
+    // this starting value outside `refused`/`blocked` - untrue: a
+    // `commands`-matched turn (machine.ts's own `commandsMatched`
+    // guard) goes straight from `commands` to `answer` to
+    // `output_gate`, skipping `context` entirely, so `output_gate`
+    // reads exactly this default live for that path. `emit: false`
+    // is correct there regardless (a matched command never ran the
+    // model, so there is no reasoning span to gate either way), but it
+    // is load-bearing, not dead.
+    reasoning: { emit: false, withheld_for: null },
   };
 
   const abortSignal = opts.signal ?? new AbortController().signal;
@@ -195,7 +211,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
   } else if (finalState === "blocked") {
     value = buildTurnValue(state, startedAt, "policy", "Keep passwords and keys in Credentials, not in chat.");
   } else {
-    const gateOutput = (finalSnapshot.context as { step: unknown }).step as { refused?: boolean; text?: string; speech?: string };
+    const gateOutput = (finalSnapshot.context as { step: unknown }).step as { refused?: boolean; text?: string; speech?: string; reasoningOut?: string };
     // The last outcome's own `via` (commands.ts/tool.ts both tag it)
     // names which node actually produced the reply - a review caught
     // the previous version guessing "plugin" vs "model" from
@@ -203,7 +219,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     // (recordCommandOutcome, machine.ts, now pushes its outcome too).
     const lastVia = state.outcomes.at(-1)?.via;
     const source: TurnValue["source"] = preConfirmed ? "confirm" : lastVia === "command" || lastVia === "pattern" ? "command" : lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
-    value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech);
+    value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut);
   }
 
   logResult(state, actor, surface, text, value);
