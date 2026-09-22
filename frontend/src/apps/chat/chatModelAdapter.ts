@@ -443,9 +443,17 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // `deriveMemoryStatus` reads an absent/undefined field the
             // same as a freshly-created row's real `null`).
             yield {
+              // slice 5(e): tool parts before the text part - the reference
+              // bar's own ordering ("the structured card FIRST, the prose
+              // after it") falls out of nothing but array order here, since
+              // MessagePrimitive.GroupedParts just renders parts in the
+              // order this content array gives it (thread.aui.tsx's own
+              // switch on part.type, no forced ordering). A review, 2026-09-
+              // 21, found this array put `text` before both tool-call parts,
+              // the opposite of what every reply with a weather card or a
+              // written document actually wants to show.
               content: [
                 ...(finalReasoning ? [{ type: "reasoning" as const, text: finalReasoning }] : []),
-                { type: "text" as const, text: finalText },
                 ...(structuredPart
                   ? [
                       {
@@ -470,6 +478,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                       },
                     ]
                   : []),
+                { type: "text" as const, text: finalText },
               ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),
               metadata: {

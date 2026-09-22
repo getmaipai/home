@@ -79,6 +79,34 @@ export interface TurnStats {
   thinking: boolean;
 }
 
+// ADMIN-COMPARE-01: POST /api/turn/bare's own trace and NDJSON event
+// shapes, shared here (not kept local to routes/turnBare.ts) so the
+// frontend can import them the exact way it already imports every other
+// wire type - directly from this file, never a hand-copied mirror.
+export interface BareCompareTrace {
+  rung: string | null;
+  rules: string[];
+  routing_tier: string | null;
+  routing_score: number | null;
+  guard_reason: string | null;
+  source: string;
+  plugin_id: string | null;
+  command_id: string | null;
+  stats: TurnStats | null;
+  // Re-resolved fresh against the household's CURRENT persona setting,
+  // never stored per-turn (persona.ts's own header) - if the persona
+  // changed since the original turn ran, this reflects today's, not
+  // necessarily what shaped that reply.
+  persona_fragments: string;
+}
+
+export type BareCompareEvent =
+  | { type: "trace"; trace: BareCompareTrace }
+  | { type: "reasoning"; text: string }
+  | { type: "delta"; text: string }
+  | { type: "refused" }
+  | { type: "done" };
+
 export interface TurnValue {
   reply: TurnReply;
   // "confirm" (Session C step 2): a pendingAsk resolved to "no" - the

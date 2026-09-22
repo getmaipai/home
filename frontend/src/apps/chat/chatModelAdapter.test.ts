@@ -509,7 +509,7 @@ describe("createChatModelAdapter reasoning (SHELL-02)", () => {
 // spec-sheet render (and, for anything else, Thread's own built-in
 // ToolFallback) both key on something honest.
 describe("createChatModelAdapter structured results (SHELL-02 slice 3)", () => {
-  test("a structured_part on the done event becomes a real tool-call part, named for its producing package", async () => {
+  test("a structured_part on the done event becomes a real tool-call part, named for its producing package, card before prose", async () => {
     const structuredPart = { kind: "spec_sheet" as const, tool_id: "weather", title: "Lantern Bay", rows: [{ label: "Temperature", value: "61°F" }] };
     const env = stubEnvironment(
       ndjsonStream([
@@ -521,8 +521,8 @@ describe("createChatModelAdapter structured results (SHELL-02 slice 3)", () => {
       const { yields } = await collect([fakeUserMessage("what's the weather")]);
       const last = yields[yields.length - 1];
       expect(last?.content).toEqual([
-        { type: "text", text: "It's 61°F in Lantern Bay." },
         { type: "tool-call", toolCallId: "turn-weather123-structured", toolName: "weather", args: {}, argsText: "", result: structuredPart },
+        { type: "text", text: "It's 61°F in Lantern Bay." },
       ]);
     } finally {
       env.restore();

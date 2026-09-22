@@ -21,35 +21,11 @@ import { resolvePersona, composePersonaPrompt } from "@/lib/persona";
 import { getPersonSettingValue } from "@/lib/settings";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { apiRouter } from "@/lib/openapi";
-import type { TurnStats } from "@/wire";
+import type { BareCompareEvent, BareCompareTrace, TurnStats } from "@/wire";
 
 export const turnBareRoutes = apiRouter();
 
 const BARE_SYSTEM_PROMPT = "You are a helpful assistant.";
-
-type BareCompareTrace = {
-  rung: string | null;
-  rules: string[];
-  routing_tier: string | null;
-  routing_score: number | null;
-  guard_reason: string | null;
-  source: string;
-  plugin_id: string | null;
-  command_id: string | null;
-  stats: TurnStats | null;
-  // Re-resolved fresh against the household's CURRENT persona setting,
-  // never stored per-turn (persona.ts's own header) - if the persona
-  // changed since the original turn ran, this reflects today's, not
-  // necessarily what shaped that reply.
-  persona_fragments: string;
-};
-
-type BareCompareEvent =
-  | { type: "trace"; trace: BareCompareTrace }
-  | { type: "reasoning"; text: string }
-  | { type: "delta"; text: string }
-  | { type: "refused" }
-  | { type: "done" };
 
 const encoder = new TextEncoder();
 function ndjsonLine(event: BareCompareEvent): Uint8Array {

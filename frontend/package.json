@@ -20,7 +20,7 @@
     "@lingui/react": "6.6.0",
     "@maipai/home-backend": "workspace:*",
     "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.15/spec",
-    "@maipai/ui": "file:../../commons-tags/ui-ui-v0.5.23/ui",
+    "@maipai/ui": "file:../../commons-tags/ui-ui-v0.5.25/ui",
     "@radix-ui/react-popover": "^1.1.23",
     "@tanstack/react-query": "5.102.8",
     "assistant-stream": "0.3.44",

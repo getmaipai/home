@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import type { ReactElement } from "react";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { NextChatPage } from "@/next/pages/NextChatPage";
@@ -317,19 +317,27 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
 });
 
 describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail collapse and peek)", () => {
-  // Found live with the shell rail collapsed: no fixed Sidebar primitive
-  // here (threadlist-sidebar.aui.tsx's own is `position: fixed` against
-  // the true viewport edge, built to be a page's ONE sidebar, not a
-  // second column nested beside one already there) - this toggles the
-  // same plain column the file already had, the identical pattern
-  // `sheetOpen` uses for the phone/tablet Sheet. CHAT-UI-02 moved the
-  // toggle itself into the column's own top row (open) or a floating
-  // button over the chat area (collapsed), so the "Hide conversations"
-  // button now lives inside `next-chat-rail` rather than a row above it.
+  // Jesse's literal spec (22:04, refined 22:22): no floating placement
+  // for the column itself - it's one node (`next-chat-rail`) that always
+  // lives in the page's own layout at its own slot: open is normal flow,
+  // collapsed is `hidden`, peeked is the SAME node with `absolute
+  // inset-y-0 left-0` inside the row's own `relative` box, at its normal
+  // open width. happy-dom computes no real box layout, so "the peeked
+  // box equals the open box" is proven structurally here (same node
+  // reference across states, the peeked classes anchoring it to
+  // left-0/inset-y-0 against the same positioned ancestor the open flow
+  // already starts at, the same w-64 sizing class in both) rather than
+  // by a measured rect; the live probe against 8787 is what proves the
+  // actual pixels.
+  // The toggle, per 22:22: open and peeked render it INLINE (true flow,
+  // first cell of the header row, beside New Thread) - only collapsed
+  // (no row left to be inline with) falls back to a second,
+  // identically-styled instance positioned at that row's own former
+  // top-left. Exactly one of the two is ever mounted at a time.
   const rail = () => document.getElementById("next-chat-rail")!;
   const classes = (el: Element) => el.className.split(/\s+/);
 
-  test("open: the toggle sits inside the column's own top row, beside New Thread", async () => {
+  test("open: the toggle is inline in the column's own header row, beside New Thread, no floating instance", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -338,17 +346,24 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      expect(classes(rail())).toContain("lg:block");
+      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).not.toContain("absolute");
       const toggle = view.getByRole("button", { name: "Hide conversations" });
-      // Same row as New Thread, not a row of its own above the column.
-      expect(within(rail()).getByRole("button", { name: "New Thread" }).parentElement).toBe(toggle.parentElement);
+      expect(toggle).toHaveAttribute("aria-controls", "next-chat-rail");
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(classes(toggle)).not.toContain("absolute");
+      // Inside the rail, in the same header row as New Thread - not a
+      // floating sibling, not a row of its own above the column.
+      expect(rail().contains(toggle)).toBe(true);
+      const newThread = within(rail()).getByRole("button", { name: "New Thread" });
+      expect(newThread.parentElement).toBe(toggle.parentElement);
       expect(view.queryByRole("button", { name: "Show conversations" })).toBeNull();
     } finally {
       restore();
     }
   });
 
-  test("collapsed: the toggle floats over the chat area, no row spent, and the peek overlay stays closed until hovered", async () => {
+  test("collapsed: the rail is hidden and out of flow, a second toggle instance takes over at the row's former top-left", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -357,26 +372,29 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
-      // Hidden via a CSS class (the same `hidden`/`lg:block` pattern the
+      const openToggle = view.getByRole("button", { name: "Hide conversations" });
+      fireEvent.click(openToggle);
+      // Hidden via a CSS class (the same `hidden` pattern the
       // phone/tablet split already used), not unmounted - a code review
-      // caught the earlier `railCollapsed ? null : ...` leaving the
-      // toggle's own `aria-controls` pointing at an id absent from the
-      // DOM at the exact moment it announced the new state. jsdom
-      // applies no real stylesheet, so the CSS itself isn't exercised
-      // here (the live check on 8787 is); this proves the ids survive
-      // and the classes the CSS keys on actually flip.
-      expect(classes(rail())).not.toContain("lg:block");
+      // on an earlier draft caught `railCollapsed ? null : ...` leaving
+      // `aria-controls` pointing at an id absent from the DOM at the
+      // exact moment it mattered most.
       expect(classes(rail())).toContain("hidden");
-      const expandToggle = view.getByRole("button", { name: "Show conversations" });
-      expect(expandToggle).toBeVisible();
-      // `aria-controls` names the peek card's own id up front, even
-      // though - unlike the rail - the card itself isn't mounted until
-      // hovering actually opens it (Base UI's HoverCard doesn't render
-      // its content when closed).
-      expect(expandToggle).toHaveAttribute("aria-controls", "next-chat-rail-peek");
+      expect(classes(rail())).not.toContain("absolute");
+      // The inline instance is still mounted inside the now-hidden rail
+      // (happy-dom applies no real stylesheet, so `hidden`'s `display:
+      // none` isn't actually computed here - the live check on 8787 is
+      // what proves it's actually invisible) - both it and the
+      // collapsed-only instance now share the "Show conversations"
+      // label, so this scopes to the one OUTSIDE the rail, the one a
+      // real pointer would actually be able to reach.
+      const allExpandToggles = view.getAllByRole("button", { name: "Show conversations" });
+      expect(allExpandToggles).toHaveLength(2);
+      const expandToggle = allExpandToggles.find((btn) => !rail().contains(btn))!;
+      expect(expandToggle).toBeDefined();
+      expect(classes(expandToggle)).toContain("absolute");
+      expect(expandToggle).toHaveAttribute("aria-controls", "next-chat-rail");
       expect(expandToggle).toHaveAttribute("aria-expanded", "false");
-      expect(peekCard()).toBeNull();
       // The composer is still there - collapsing the rail never touches
       // the thread itself.
       expect(view.getByLabelText("Message input")).toBeVisible();
@@ -385,7 +403,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     }
   });
 
-  test("peeked: hovering the floating toggle shows the thread list as an overlay, and leaving hides it again", async () => {
+  test("peeked: hovering the collapsed toggle repositions the rail onto the open box's own left edge, showing the inline toggle again; leaving closes it", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -394,26 +412,41 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
+      const railNode = rail();
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
-      const expandToggle = view.getByRole("button", { name: "Show conversations" });
-      fireEvent.mouseEnter(expandToggle);
-      // The overlay carries the same NextThreadList composition, portalled
-      // by the shipped HoverCard - its own New Thread button is reachable
-      // once it opens. The rail's own (hidden, still-mounted) instance
-      // means "New Thread" is no longer unique in the whole document, so
-      // this scopes to the peeked card specifically.
-      await waitFor(() => expect(peekCard()).not.toBeNull());
-      expect(within(peekCard()!).getByRole("button", { name: "New Thread" })).toBeVisible();
-      expect(expandToggle).toHaveAttribute("aria-expanded", "true");
-      fireEvent.mouseLeave(expandToggle);
-      await waitFor(() => expect(peekCard()).toBeNull());
-      expect(expandToggle).toHaveAttribute("aria-expanded", "false");
+      // Two "Show conversations" toggles exist at this point (the inline
+      // one, inert inside the now-hidden rail, and the collapsed-only
+      // floating one) - the one a real pointer can actually reach is the
+      // one outside the rail.
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
+      fireEvent.pointerEnter(collapsedToggle);
+      // Never remounted, never a second column instance - the exact same
+      // node that was measured "open" a moment ago.
+      expect(rail()).toBe(railNode);
+      expect(classes(rail())).toEqual(expect.arrayContaining(["absolute", "inset-y-0", "left-0", "w-64"]));
+      // The collapsed-only toggle instance is gone; the inline one, now
+      // visible again inside the peeked rail, is what's on screen.
+      expect(view.queryAllByRole("button", { name: "Show conversations" })).toHaveLength(1);
+      const peekedToggle = within(rail()).getByRole("button", { name: "Show conversations" });
+      expect(classes(peekedToggle)).not.toContain("absolute");
+      expect(peekedToggle).toHaveAttribute("aria-expanded", "true");
+      expect(within(rail()).getByRole("button", { name: "New Thread" })).toBeVisible();
+      // Leaving the rail (the toggle's own real ancestor now) for
+      // something outside it closes the peek.
+      fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
+      expect(classes(rail())).toContain("hidden");
+      expect(classes(rail())).not.toContain("absolute");
+      // Closing re-mounts the collapsed-only instance alongside the
+      // (again inert) inline one - the reachable one, outside the rail,
+      // is what should report closed.
+      const closedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      expect(closedToggle).toHaveAttribute("aria-expanded", "false");
     } finally {
       restore();
     }
   });
 
-  test("a click on the floating toggle still pins the column open, peek or not", async () => {
+  test("a click on the toggle still pins the column open, peek or not", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -423,21 +456,236 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       );
       await view.findByLabelText("Message input");
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
-      const expandToggle = view.getByRole("button", { name: "Show conversations" });
-      fireEvent.mouseEnter(expandToggle);
-      await waitFor(() => expect(peekCard()).not.toBeNull());
-      fireEvent.click(expandToggle);
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+      // Hovering swapped the collapsed-only instance for the inline one
+      // now visible inside the peeked rail - that's the live instance a
+      // real pointer would be over next, so the click lands on it, not
+      // the (now unmounted) collapsed-only button.
+      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }));
+      expect(classes(rail())).toContain("w-64");
       expect(classes(rail())).toContain("lg:block");
-      // Pinning open retires the floating toggle and its overlay -
-      // collapsing again later starts from a real hover, not a stale
-      // peek left over from before this pin.
-      expect(view.queryByRole("button", { name: "Show conversations" })).toBeNull();
+      expect(classes(rail())).not.toContain("absolute");
+      // Pinning open resets the peek - collapsing again later starts
+      // from a real hover, not a stale peek left over from before.
+      expect(view.getByRole("button", { name: "Hide conversations" })).toHaveAttribute("aria-expanded", "true");
+    } finally {
+      restore();
+    }
+  });
+
+  test("keyboard focus on the collapsed toggle opens the peek and moves onto the now-visible inline toggle, not lost to <body>", async () => {
+    // A review on the two-instance toggle caught this: since the inline
+    // and collapsed toggles are separate `Button`s and never both
+    // mounted at once, focusing the one that's visible and triggering
+    // the state change that swaps them unmounts the very node the
+    // browser had focus on - with nothing to transfer it, focus reverts
+    // to `<body>` and the next Tab restarts from the top of the
+    // document instead of continuing into the now-open column.
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      collapsedToggle.focus();
+      fireEvent.focus(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+      expect(document.activeElement).not.toBe(document.body);
+      expect(document.activeElement).toBe(within(rail()).getByRole("button", { name: "Show conversations" }));
+    } finally {
+      restore();
+    }
+  });
+
+  test("mouse-only hover never programmatically focuses the toggle", async () => {
+    // A re-review on the fix above caught this: its first version used
+    // `document.activeElement === document.body` as the signal that
+    // focus needed following - a check that can't tell "the toggle a
+    // person was tabbed onto just unmounted" apart from "nothing has
+    // ever been focused," true for every mouse-only visitor
+    // (`onPointerEnter` shares the same peek-opening logic `onFocus`
+    // does). That would have had keyboard focus silently forced onto
+    // the toggle despite never touching a keyboard. Proven directly
+    // here, on the toggle's own `.focus()` method, rather than on
+    // `document.activeElement` globally: this page has an unrelated,
+    // pre-existing element that already holds focus across renders for
+    // reasons of its own (present before this item, confirmed against
+    // the pre-rebuild file too), so the global active element isn't a
+    // stable signal to assert against in this suite - whether THIS
+    // toggle's own `.focus()` was ever called is.
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      let collapsedFocusCalled = false;
+      collapsedToggle.focus = () => {
+        collapsedFocusCalled = true;
+      };
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+      expect(collapsedFocusCalled).toBe(false);
+      const inlineToggle = within(rail()).getByRole("button", { name: "Show conversations" });
+      let inlineFocusCalled = false;
+      inlineToggle.focus = () => {
+        inlineFocusCalled = true;
+      };
+      fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
+      expect(classes(rail())).toContain("hidden");
+      expect(inlineFocusCalled).toBe(false);
     } finally {
       restore();
     }
   });
 });
 
-function peekCard(): HTMLElement | null {
-  return document.querySelector('[data-slot="hover-card-content"]');
-}
+describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
+  function makeAdultPerson(): Roster {
+    return { ...makePerson(), id: "person-adult456", display_name: "Marlow", role: "adult" };
+  }
+
+  // stubTurnFetch's own shape (SHELL-02 slice 3, above), plus POST
+  // /api/turn/bare - a fresh ndjsonStream() per call, not one shared
+  // stream object, since the panel mounts twice at once (the desktop
+  // pane and the mobile Sheet, the identical doubling ArtifactCanvasPanel
+  // already has) and a stream can only be read once.
+  function stubCompareFetch(bareEvents: unknown[]): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-compare123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/bare")) return Promise.resolve(new Response(ndjsonStream(bareEvents), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes("/api/turn/stream")) {
+        return Promise.resolve(
+          new Response(
+            ndjsonStream([
+              { type: "delta", text: "It's sunny." },
+              { type: "done", value: { turn_id: "turn-compare123", conversation_id: "conv-compare123", reply: { text: "It's sunny." }, source: "model", safety: SAFETY } },
+            ]),
+            { status: 200, headers: { "content-type": "application/x-ndjson" } },
+          ),
+        );
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+  }
+
+  // chatMemoryChip.test.tsx's own established fix: Radix's DropdownMenu
+  // trigger (ActionBarMorePrimitive, radix-ui underneath) opens on
+  // pointerdown, not a plain click - happy-dom's click alone leaves it
+  // closed.
+  async function openMoreMenu(view: ReturnType<typeof render>): Promise<void> {
+    const trigger = await view.findByRole("button", { name: "More" });
+    act(() => {
+      fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 });
+      fireEvent.click(trigger);
+    });
+  }
+
+  const TRACE_EVENT = {
+    type: "trace",
+    trace: {
+      rung: "model_knowledge",
+      rules: ["signal.rule"],
+      routing_tier: null,
+      routing_score: null,
+      guard_reason: null,
+      source: "model",
+      plugin_id: null,
+      command_id: null,
+      stats: { prompt_tokens: 10, predicted_tokens: 5, tokens_per_second: 20, time_to_first_token_ms: 40, total_time_ms: 200, context_tokens: 10, context_used_percent: null, cache_reuse_tokens: null, cache_reuse_percent: null, engine: "local family.gguf", stop_reason: "stop", thinking: true },
+      persona_fragments: "Warm and concise.",
+    },
+  };
+
+  test("the owner sees Compare with the bare model in the More menu, and it opens a two-column view", async () => {
+    const restore = stubCompareFetch([TRACE_EVENT, { type: "delta", text: "It's " }, { type: "delta", text: "probably sunny too." }, { type: "done" }]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      expect(await view.findByText("It's sunny.")).toBeVisible();
+      await openMoreMenu(view);
+      const compareItem = await view.findByText("Compare with the bare model");
+      fireEvent.click(compareItem);
+      // Two mounts at once (the desktop pane and the mobile Sheet) - the
+      // same reason the artifact panel's own test scopes to the dialog.
+      const dialogTitle = await view.findByRole("heading", { name: "Compare with the bare model" });
+      const dialog = within(dialogTitle.closest('[role="dialog"]')!);
+      expect(await dialog.findByText("It's sunny.")).toBeVisible();
+      expect(await dialog.findByText("It's probably sunny too.")).toBeVisible();
+      expect(await dialog.findByText(/Thinking: on/)).toBeVisible();
+      expect(await dialog.findByText(/Rung: model_knowledge/)).toBeVisible();
+      expect(await dialog.findByText(/Warm and concise\./)).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a non-admin household member never sees Compare with the bare model", async () => {
+    const restore = stubCompareFetch([]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makeAdultPerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      expect(await view.findByText("It's sunny.")).toBeVisible();
+      await openMoreMenu(view);
+      // The menu itself still works - Export as Markdown is the kit's
+      // own unconditional item - proven open before asserting the
+      // admin-only item's absence, so a menu that never opened at all
+      // can't read as "correctly hidden."
+      expect(await view.findByText("Export as Markdown")).toBeVisible();
+      expect(view.queryByText("Compare with the bare model")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a refused bare reply shows the refusal, not the unsafe text", async () => {
+    const restore = stubCompareFetch([TRACE_EVENT, { type: "refused" }]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      await openMoreMenu(view);
+      fireEvent.click(await view.findByText("Compare with the bare model"));
+      const dialogTitle = await view.findByRole("heading", { name: "Compare with the bare model" });
+      const dialog = within(dialogTitle.closest('[role="dialog"]')!);
+      expect(await dialog.findByText(/refused/i)).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+});

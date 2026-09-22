@@ -48,6 +48,8 @@ import type {
   StackHealthItem,
   EnginesOverview,
   EnginesHealth,
+  BareCompareEvent,
+  BareCompareTrace,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -71,7 +73,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth };
+export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -358,6 +360,15 @@ async function rawStreamPost(
 export async function* readTurnStream(response: Response): AsyncGenerator<TurnStreamEvent, void, void> {
   for await (const line of readTextLines(response.body!.getReader())) {
     yield JSON.parse(line) as TurnStreamEvent;
+  }
+}
+
+/** ADMIN-COMPARE-01: POST /api/turn/bare's own NDJSON, the readTurnStream
+ * twin for the compare route's much smaller event shape (wire.ts's
+ * BareCompareEvent). */
+export async function* readBareCompareStream(response: Response): AsyncGenerator<BareCompareEvent, void, void> {
+  for await (const line of readTextLines(response.body!.getReader())) {
+    yield JSON.parse(line) as BareCompareEvent;
   }
 }
 
@@ -786,4 +797,9 @@ export const api = {
       undefined,
       signal,
     ),
+  // ADMIN-COMPARE-01: owner/admin only on the server (a 403 for anyone
+  // else, checked before this ever streams); the frontend gate is just
+  // for not showing the action to begin with.
+  compareTurnBare: (conversationId: string, turnId: string, signal?: AbortSignal) =>
+    rawStreamPost("/api/turn/bare", { conversation_id: conversationId, turn_id: turnId }, 0, undefined, signal),
 };

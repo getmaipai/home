@@ -64,12 +64,12 @@ describe("rowsToBranchableMessages", () => {
   // conversationHistory.ts's own reload-path twin of the live `done`
   // event) becomes the same real tool-call part chatModelAdapter.ts
   // builds live, alongside the reply text (not instead of it).
-  test("a row carrying an artifact becomes a real tool-call part alongside the reply text", () => {
+  test("a row carrying an artifact becomes a real tool-call part alongside the reply text, card before prose", () => {
     const row = { ...makeRow("row-1", "Wrote it."), artifact: { id: "art-example123", version: 2 } };
     const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
     expect(items[1]!.message.content).toEqual([
-      { type: "text", text: "Wrote it." },
       { type: "tool-call", toolCallId: "row-1-artifact", toolName: "write_document", args: {}, argsText: "", result: { id: "art-example123", version: 2 } },
+      { type: "text", text: "Wrote it." },
     ]);
   });
 

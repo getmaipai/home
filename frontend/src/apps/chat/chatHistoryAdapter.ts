@@ -124,8 +124,12 @@ export function rowsToBranchableMessages(
       // tool-call part chatModelAdapter.ts builds live, so the
       // artifact-card Element renders identically whether this turn
       // just streamed in or came back from GET /api/conversations/:id/turns.
+      // slice 5(e): the tool-call part rides before the text part, the
+      // same order chatModelAdapter.ts's own live "done" event now uses -
+      // a reloaded reply with an artifact should read identically to one
+      // that just streamed in, card first, prose after.
       content: row.artifact
-        ? [{ type: "text", text: row.replyText }, { type: "tool-call", toolCallId: `${row.id}-artifact`, toolName: "write_document", args: {}, argsText: "", result: row.artifact }]
+        ? [{ type: "tool-call", toolCallId: `${row.id}-artifact`, toolName: "write_document", args: {}, argsText: "", result: row.artifact }, { type: "text", text: row.replyText }]
         : row.replyText,
       createdAt,
       status: { type: "complete", reason: "stop" },
