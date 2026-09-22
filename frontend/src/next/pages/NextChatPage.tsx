@@ -180,7 +180,15 @@ function ArtifactTool() {
 // backend half of TOOL-EVENTS-01 hasn't landed), so this renders nothing
 // live today - covered by chatModelAdapter.test.ts and NextChatPage.
 // test.tsx's own scripted-stream cases instead.
-type TimelineCall = { callId: string; packageId: string; state: "running" | "ok" | "error" };
+// `label` (COORDINATOR, 2026-09-22): spec-v0.1.17 will add an optional
+// human label to `tool_call` (a manifest's own `tool_label`, "Checking
+// the weather for Seattle" - the gap this file's own comment above named
+// back to the lane). Not on the currently pinned spec-v0.1.16 shape, so
+// `chatModelAdapter.ts` never sets it and this always falls back to the
+// package id today - the seam is here so the chip starts reading a real
+// label automatically the moment a later pin bump's adapter change
+// starts providing one, with no render-side change needed then.
+type TimelineCall = { callId: string; packageId: string; label?: string; state: "running" | "ok" | "error" };
 const TIMELINE_VERB: Record<TimelineCall["state"], string> = {
   running: "Running",
   ok: "Ran",
@@ -193,7 +201,7 @@ const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>
   const running = result.some((call) => call.state === "running");
   return (
     <ToolTimeline
-      steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.packageId, icon: ToolTimelineIcon }))}
+      steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.label ?? call.packageId, icon: ToolTimelineIcon }))}
       visibleSteps={result.length}
       streaming={running}
       open={open}
