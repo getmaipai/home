@@ -19572,3 +19572,74 @@ COORDINATOR's ruling on the design question this item raised before any code was
 **Verdict.** f16 is not faster. q8_0 is 4 to 5 percent faster on both sizes and holds the KV cache in half the memory, so the flags stay and `llmSupervisor` is untouched. LAT-03 closes with no change.
 
 **What the run does say.** A fresh one-slot instance prefills at about 405 tok/s where the live hub engine measured 279 cold and 183 effective on the same box the same day. The KV type is not that difference. What is left: the live engine's four slots at `-c 32768`, and, more likely, contention on the machine while the hub's turns ran (the CPU-only 4B judge on 8789 with four threads, other sessions' gates and builds; the 17:55 "hi" also decoded at 27 tok/s against the usual 33 to 40). The fixes that matter for "hi" are the two the latency diagnosis named and PERF-ALERT-01's record carries: the think-exhausted first generation that the opening hold regenerates, and the offered tools block breaking the prefix cache at 567 tokens. An engine-side check, only if the hub's rate stays low after those two land, is a one-slot A/B of `--parallel 4 -c 32768` against `--parallel 1 -c 8192` with this same probe.
+
+## U0a: the owner's replay set, the OLD-path baseline (2026-09-22)
+
+`backend/scripts/bench/datasets/owner-replay.json` (the plan's point 4,
+verbatim: six failed conversations the owner actually had today plus
+thirteen controls, including the tool-call corpus's five negatives) and
+`backend/scripts/bench/replay.ts`, mirroring `conversation.ts`'s own
+runner shape (a pure fixture loader, a dual offline/`--live` entry
+point, the same import-order rule) but driving
+`conversationRunner.ts`/`conversationScore.ts` - one definition, not a
+second harness - three repeats per row, reported as two blocks (failed
+rows must pass, control rows must not regress) instead of one table.
+
+**The live run did not happen today.** `pgrep -fl llama-server` showed
+a side instance already up on port 8798 (another session's own
+benchmark) beside the household's own engines on 8788 (chat) and 8794
+(embed); the org rule is explicit that another session's live bench
+takes priority and 8788's slots are never a bench's. Per the
+coordinator's own fallback, this ran scripted instead: an in-process
+stub (`@maipai/spec`'s `stubServer.ts`, the same double
+`tests/conversationBench.test.ts`'s `withStubBench` already uses)
+answers both the chat and embed endpoints, so the run needs no engine
+at all. The stub never calls a tool on its own - it only echoes - so
+this measures the pipeline's own DETERMINISTIC decisions (the pre-model
+lookup ladder, routing, guards) for real, never a live model's own tool
+choice. That is the real limit of a scripted run; it is not a
+substitute for `--live`, only what is honest to report when no engine
+can be spared. The harness itself is proven correct offline too
+(`backend/tests/ownerReplay.test.ts`, 5 cases: the fixture loads and
+validates, no row names a household member, the JSON-to-runner plumbing
+runs both a control and a multi-turn failed row end to end, and the
+repeat-summary arithmetic is unit-tested directly).
+
+**Scripted baseline, 2026-09-22, 75 turns executed (25 rows x 3
+repeats):**
+
+- **Failed rows (must pass once U2 lands): 0 of 6 clean on every
+  repeat.** Exactly the expected shape - these are today's known bugs.
+  `president-of-france-repeat`: the stuck line still fires on the
+  second "who is the president of France" (`guard.repeat_reply` in the
+  turn log). `apple-announce-this-week`, `president-of-chile-when-born`:
+  no lookup at all under the stub (no tool call, the model's own
+  discretion, which this mode cannot exercise - genuinely untested
+  today, not passing or failing on the merits). `search-mariners-game`:
+  the literal "search" command DOES run websearch (2 of 3 repeats
+  clean), one repeat came back with no sources - see the flake note
+  below. `primetime-trailer-correction`: the "Here's a video, the
+  link's below" line still fires on the correction turn, exactly the
+  D5 bug. `chatgpt-6-luna`: 2 of 3 clean, one repeat's sourced-search
+  turn again hit the flake below.
+- **Control rows (must not regress): 11 of 13 clean on every repeat.**
+  Two known scripted-mode limitations, not regressions: `control-
+  twelve-plus-thirty` needs live arithmetic reasoning the stub's echo
+  can never produce; `control-search-mariners-explicit` hit the same
+  intermittent "no sources on the delivered turn" flake as two failed
+  rows above (1 of 3 repeats clean) - the literal-pattern websearch
+  call itself ran every time, but the fake SearXNG's canned rows did
+  not always reach the reply under repeated back-to-back turns in one
+  process; not chased further today (a scripted-environment artifact,
+  named rather than root-caused, per the fallback's own scope). One
+  real fixture bug found and fixed by this same run:
+  `control-remember-pizza-night` was authored with `toolRan: null`;
+  the remember package genuinely runs on "remember that X" (correct
+  behavior), so the row's own expectation was wrong, not the pipeline -
+  fixed to `toolRan: "remember"`, now clean 3/3.
+
+**Next:** the genuine live OLD-path baseline (every row's real
+tool-calling behavior, not just the deterministic half) is `bun run
+backend/scripts/bench/replay.ts --live` against a spare-port side
+engine, once one is free; U6's own acceptance needs it regardless. The
+scripted numbers above stand as today's record, not a final baseline.

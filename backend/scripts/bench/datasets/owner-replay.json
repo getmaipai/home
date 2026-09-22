@@ -1,0 +1,76 @@
+{
+  "_comment": "U0a (docs/plans/simple-turn-pipeline-2026-09-22.md, point 4 and unit U0a). The owner's own failed turns today, verbatim, plus controls. Loaded by scripts/bench/replay.ts and run through the same fixture-conversation runner conversation.ts's --live mode uses (conversationRunner.ts, conversationScore.ts), three repeats each. Every row's `expect` follows conversationFixture.ts's TurnExpectation shape (JSON-compatible subset only): toolRan, outcomeArgsMatch (websearch's own argument key is `expression`, not `query` - conversationFixture.ts's existing websearch rows confirm this), sourcesNonEmpty, mustContain, mustNotContain. replay.ts adds the universal 'no stuck line, no honesty line' mustNotContain to every turn automatically, so it is not repeated below. No household member is named in any row (the org PII rule and the plan's point 4: 'none of which names a household member').",
+
+  "failed": [
+    {
+      "id": "president-of-france-repeat",
+      "category": "knowledge",
+      "note": "REPLY-FIND-01: a repeated question must get its right answer again, never the stuck line",
+      "turns": [
+        { "say": "who is the president of France", "expect": { "toolRan": "websearch", "sourcesNonEmpty": true } },
+        { "say": "who is the president of France", "expect": {} }
+      ]
+    },
+    {
+      "id": "apple-announce-this-week",
+      "category": "knowledge",
+      "note": "ROUTE-FIND-03 (a) / REPLY-FIND-02: a recent-events question with no search verb is still a search",
+      "turns": [
+        { "say": "what did Apple announce this week", "expect": { "toolRan": "websearch", "sourcesNonEmpty": true } }
+      ]
+    },
+    {
+      "id": "search-mariners-game",
+      "category": "knowledge",
+      "note": "ROUTE-FIND-03 (b): an explicit search command names the game in the query",
+      "turns": [
+        { "say": "search who won the Seattle Mariners game yesterday", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "mariners" } }, "sourcesNonEmpty": true } }
+      ]
+    },
+    {
+      "id": "primetime-trailer-correction",
+      "category": "knowledge",
+      "note": "REPLY-FIND-02 / REPLY-FIND-03: news about a current subject earns a lookup, and a correction keeps the person's own noun in the query",
+      "turns": [
+        { "say": "new trailer for primetime just dropped", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "trailer" } } } },
+        { "say": "no, I was talking about the trailer", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "trailer" } }, "sourcesNonEmpty": true, "mustNotContain": "here's a video, the link's below" } }
+      ]
+    },
+    {
+      "id": "president-of-chile-when-born",
+      "category": "knowledge",
+      "note": "the real trace: 'he born' must never be the query; the pronoun resolves to the person the first lookup found",
+      "turns": [
+        { "say": "who is the president of chile", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "chile" } }, "sourcesNonEmpty": true } },
+        { "say": "when was he born", "expect": {} },
+        { "say": "yes", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "^(?!he born$).*born" } }, "sourcesNonEmpty": true } }
+      ]
+    },
+    {
+      "id": "chatgpt-6-luna",
+      "category": "knowledge",
+      "note": "a bare 'search the web' is a search or a question back, never a definition of the web",
+      "turns": [
+        { "say": "did chatgpt 6 luna come out", "expect": {} },
+        { "say": "search the web", "expect": { "mustNotContain": "world wide web|a global network|collection of websites|browse (the internet|websites)" } },
+        { "say": "search the web for when chatgpt 6 luna releases", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "luna" } }, "sourcesNonEmpty": true } }
+      ]
+    }
+  ],
+
+  "control": [
+    { "id": "control-dune-3", "category": "knowledge", "turns": [{ "say": "when is dune 3 releasing", "expect": {} }] },
+    { "id": "control-carrie-series", "category": "knowledge", "turns": [{ "say": "when is the carrie series releasing", "expect": {} }] },
+    { "id": "control-search-mariners-explicit", "category": "knowledge", "turns": [{ "say": "search the web for who won the Mariners game yesterday", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "mariners" } }, "sourcesNonEmpty": true } }] },
+    { "id": "control-hi", "category": "etiquette", "turns": [{ "say": "hi", "expect": { "toolRan": null } }] },
+    { "id": "control-say-hi", "category": "etiquette", "turns": [{ "say": "say hi", "expect": { "toolRan": null } }] },
+    { "id": "control-twelve-plus-thirty", "category": "tools", "turns": [{ "say": "what's 12 plus 30", "expect": { "mustContain": "42" } }] },
+    { "id": "control-time-in-tokyo", "category": "tools", "turns": [{ "say": "what time is it in tokyo", "expect": {} }] },
+    { "id": "control-remember-pizza-night", "category": "memory", "turns": [{ "say": "remember that pizza night is Friday", "expect": { "toolRan": "remember" } }] },
+    { "id": "control-negative-dye-hair", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "should I dye my hair black", "expect": { "toolRan": null } }] },
+    { "id": "control-negative-spiderman", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "I might go see the new Spiderman movie", "expect": { "toolRan": null } }] },
+    { "id": "control-negative-stephen-king", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "what's the latest Stephen king novel", "expect": { "toolRan": null } }] },
+    { "id": "control-negative-good-morning", "category": "etiquette", "note": "tool-call-corpus negative", "turns": [{ "say": "good morning", "expect": { "toolRan": null } }] },
+    { "id": "control-negative-feeling-down", "category": "etiquette", "note": "tool-call-corpus negative", "turns": [{ "say": "I'm feeling kind of down", "expect": { "toolRan": null } }] }
+  ]
+}
