@@ -21,7 +21,7 @@
       "what's the current price of that",
       "has there been any news about that lately"
     ],
-    "patterns": ["search the web for *", "search online for *"],
+    "patterns": ["search the web for *", "search online for *", "search *", "look up *", "google *"],
     "always_offer": true
   },
   "args": {

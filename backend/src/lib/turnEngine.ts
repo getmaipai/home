@@ -1427,7 +1427,7 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
   const ordered = stack?.[0]?.type === "world" && MEDIA_KINDS.has(stack[0].kind)
     ? [...loaded].sort((a, b) => (a.id === "media-lookup" ? -1 : b.id === "media-lookup" ? 1 : 0))
     : loaded;
-  for (const { id, manifest } of ordered) {
+  packages: for (const { id, manifest } of ordered) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
     // The spec's own kind doc comment (spec/schemas/manifest.schema.json):
     // "a `skill` is plain instructions... composed into the chat model's
@@ -1487,7 +1487,16 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
             return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
           }
           onYield?.({ id, reason: "unresolved_reference" });
-          continue;
+          // ROUTE-FIND-03: an unresolved reference is final for this
+          // package on this utterance - a broader pattern of the SAME
+          // package (websearch's bare "search *" behind "search the web
+          // for *") would otherwise re-match the identical text with a
+          // wider, wrong capture ("the web for that movie" instead of
+          // yielding) rather than genuinely being a different search
+          // intent. Skip this package's remaining patterns entirely,
+          // never retry with a broader capture of the same failed
+          // reference.
+          continue packages;
         }
         // A literal pattern match always wins, immediately - no ranking
         // to report - regardless of which tier this package is (see

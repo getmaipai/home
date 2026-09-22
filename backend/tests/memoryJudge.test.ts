@@ -7,7 +7,7 @@ import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor"
 import { resolveOrCreateConversation, logTurn, turnSignalOf, insertProvisionalTurn } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { judgeTurn, runJudgeBatch, runConsolidation, judgeQueueStats } from "@/lib/memoryJudge";
-import { runTurn, judgeStatusAtInsert } from "@/lib/turnEngine";
+import { runTurn, judgeStatusAtInsert, commandOpeners as commandOpenersFromManifests, loadAllManifests } from "@/lib/turnEngine";
 import { remember, recall, supersede, archiveByProvenance, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
@@ -1011,11 +1011,11 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
   // The real construction path: logTurn() with the signal prepareTurn()
   // computes and the status judgeStatusAtInsert() decides, for any
   // source, the way turnEngine.ts's logTurnSafely() writes every row.
-  function makeSignalledTurn(actor: PersonRow, userText: string, replyText: string, source: TurnValue["source"]) {
+  function makeSignalledTurn(actor: PersonRow, userText: string, replyText: string, source: TurnValue["source"], commandOpeners: ReadonlySet<string> = new Set(["add"])) {
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error("setup failed");
     const turnId = `turn-${Math.random().toString(36).slice(2, 12)}`;
-    const signal = classifyTurnSignal({ text: userText, commandOpeners: new Set(["add"]), ageBand: "adult" });
+    const signal = classifyTurnSignal({ text: userText, commandOpeners, ageBand: "adult" });
     const value: TurnValue = { reply: { text: replyText }, source, safety: SAFE, conversation_id: conv.value.id, turn_id: turnId, ...(source === "plugin" ? { plugin_id: "lists" } : {}) };
     logTurn(actor, "chat", userText, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
     return db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
@@ -1067,6 +1067,29 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
     expect(results[0]!.factsWritten).toBe(1);
     expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, disclosure.id)).get()!.judgeStatus).toBe("done");
     expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, closing.id)).get()!.judgeStatus).toBe("skipped");
+  });
+
+  // ROUTE-FIND-03: a search/look-up/google command is a directive, the
+  // same as any other everyday imperative - never an inform the judge
+  // could mistake for a fact about the household. websearch/manifest.json's
+  // own routing.patterns ("search *", "look up *", "google *") feed
+  // turnEngine.ts's commandOpeners() (routing.ts's commandOpenersFrom())
+  // the real way a running hub builds this set, not a hand-picked one.
+  test("a search/look-up/google command is a directive, never a fact for the judge", async () => {
+    const { actor } = await owner();
+    const openers = commandOpenersFromManifests(loadAllManifests());
+    expect(openers.has("search")).toBe(true);
+    expect(openers.has("look")).toBe(true);
+    expect(openers.has("google")).toBe(true);
+    const search = makeSignalledTurn(actor, "search who won the Seattle Mariners game yesterday", "Searching now.", "plugin", openers);
+    const lookUp = makeSignalledTurn(actor, "look up the score of last night's Mariners game", "Searching now.", "plugin", openers);
+    const google = makeSignalledTurn(actor, "google how the stock market did today", "Searching now.", "plugin", openers);
+    expect(turnSignalOf(search)?.clauses.map((c) => c.act)).toEqual(["directive"]);
+    expect(turnSignalOf(lookUp)?.clauses.map((c) => c.act)).toEqual(["directive"]);
+    expect(turnSignalOf(google)?.clauses.map((c) => c.act)).toEqual(["directive"]);
+    expect(search.judgeStatus).toBe("skipped");
+    expect(lookUp.judgeStatus).toBe("skipped");
+    expect(google.judgeStatus).toBe("skipped");
   });
 
   test("a refusal and a credential turn are never the judge's; a row from before the signal keeps the model-source rule", async () => {

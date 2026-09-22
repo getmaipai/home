@@ -790,7 +790,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
       // REQUEST_RE-matching ("can you ...") so guardCapabilityClaim's
       // OTHER gate (ctx.outcomes/utterance check) doesn't already
       // exempt sentence 0 on its own, independent of replyHasQuestion.
-      const result = await runTurn(actor, "chat", "can you look up the odyssey's rating");
+      const result = await runTurn(actor, "chat", "can you check the odyssey's rating");
       if (!result.ok) throw new Error(result.error);
       const row = db.select({ outcomes: conversationTurns.outcomes }).from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
       const outcomes = row?.outcomes ? (JSON.parse(row.outcomes) as { packageId: string; via?: string }[]) : [];
