@@ -171,24 +171,13 @@
  * it) without touching the vendored layout file or any other page -
  * the kit wraps and composes, so this reaches through the one surface
  * it already exposes (a CSS class) rather than forking the component
- * that draws it. */
+ * that draws it. The container's own last child, FullLayout.tsx's
+ * `<Footer/>` wrapper, is hidden outright rather than re-capped (see
+ * the full-height rule block below) - a full-height chat interface has
+ * no room for its trailing slot at all. */
 .container:has([data-slot="next-chat-shell"]) {
   max-width: none;
   margin-inline: 0;
-}
-
-/* A code review caught this: the same `.container` also wraps
- * FullLayout.tsx's own `<Footer/>` (a sibling of `<Outlet/>`, both
- * direct children), so uncapping the container above stretched the
- * footer's copyright/links row edge to edge too, inconsistent with
- * every other /next page's own centered, capped one. Re-applies the
- * container's own cap to the footer's own wrapper specifically (its
- * last child) so only the chat content itself grows into the freed
- * width. */
-.container:has([data-slot="next-chat-shell"]) > :last-child {
-  max-width: 1367px;
-  width: 100%;
-  margin-inline: auto;
 }
 
 /* CHAT-UI-01 finding 3, the other half (NextChatPage.tsx's own
@@ -205,4 +194,56 @@
  * found on. */
 html:has([data-slot="next-chat-shell"]) {
   overscroll-behavior-y: none;
+}
+
+/* Jesse's own ChatGPT comparison (23:55): the column and the composer
+ * both stopped ~60px short of the window's real bottom edge, a gap
+ * below them neither reaches. Root cause: FullLayout.tsx's own chain
+ * from `SidebarInset` down to the Outlet is a stack of plain block
+ * divs that each shrink-wrap to their own content's height rather than
+ * stretching to fill the flex row above them - `next-chat-shell`'s own
+ * `h-[calc(100vh-140px)]` (NextChatPage.tsx) was a magic-number guess
+ * at the leftover space that never quite matched what the real chain
+ * (header height, `SidebarInset`'s own `m-2` margin, the body div's
+ * `p-4`, the container's own footer slot) actually consumed. Reached
+ * through the identical `data-slot="next-chat-shell"` marker the two
+ * rules above already key on, turning every intervening shrink-wrap
+ * div into a real flex conduit instead: `main` (SidebarInset itself)
+ * gets a real, fixed height, its body div and the container div below
+ * it both become `flex-1 min-h-0` columns, and the Outlet's own
+ * `min-h-[calc(100vh-140px)]` wrapper becomes the same. `next-chat-
+ * shell` (NextChatPage.tsx) then just reads `h-full` off that real
+ * chain instead of its own guessed number. The footer's own trailing
+ * slot (`Footer` itself renders null, but its wrapper's `pt-6` still
+ * claimed real space) is hidden outright - a full-height chat
+ * interface has no room for it, the same reason ChatGPT's own thread
+ * reaches the window's bottom edge with nothing below it. */
+/* A review caught this: `SidebarInset`'s own `m-2` (its component
+ * default is `md:`-gated, but `FullLayout.tsx:19` passes a second,
+ * plain `m-2` in its own `className` - `cn()`'s `twMerge` only dedupes
+ * classes sharing the identical variant chain, so the unconditional one
+ * coexists with the gated one rather than replacing it) is real at
+ * every width, not only at the kit's own `--breakpoint-md` and up. No
+ * media query needed: always subtract the 1rem it claims. */
+main:has([data-slot="next-chat-shell"]) {
+  height: calc(100svh - 1rem);
+}
+main:has([data-slot="next-chat-shell"]) > div {
+  min-height: 0;
+  padding-bottom: 0;
+}
+.container:has([data-slot="next-chat-shell"]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.container:has([data-slot="next-chat-shell"]) > :first-child {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.container:has([data-slot="next-chat-shell"]) > :last-child {
+  display: none;
 }

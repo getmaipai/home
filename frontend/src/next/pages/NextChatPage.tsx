@@ -719,14 +719,20 @@ export function NextChatPage({ person }: { person: Roster }) {
         <SourcesTool />
         <ArtifactCacheInvalidator />
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
-            fixed height a hard ceiling, not a floor a growing composer
-            or a streaming reply could push past - FullLayout.tsx's own
-            wrapper around Outlet is `min-h-*`, not `h-*`, so any
+            height a hard ceiling, not a floor a growing composer or a
+            streaming reply could push past - FullLayout.tsx's own
+            wrapper around Outlet used to be `min-h-*`, not `h-*`, so any
             overflow here became real extra page height, and the page
             gaining and losing scroll range as content settled read as
             the composer bouncing. The thread viewport (Thread's own
-            child) stays the only real scroller on this page. */}
-        <div data-slot="next-chat-shell" className="flex h-[calc(100vh-140px)] flex-col overflow-hidden">
+            child) stays the only real scroller on this page.
+            `h-full`, not a guessed `h-[calc(100vh-Npx)]`: tokens.css's
+            own full-height rule block (keyed on this element's own
+            `data-slot`) turns FullLayout.tsx's entire chain above this
+            div into a real flex conduit down to the true available
+            height, so this just reads it off that chain instead of
+            re-deriving the same number a second, guessable way. */}
+        <div data-slot="next-chat-shell" className="flex h-full flex-col overflow-hidden">
           {/* CHAT-UI-02: the desktop collapse toggle used to live in this
               row on its own, above the column, wasting a full row that
               only ever showed one button (this row's OTHER button, the
