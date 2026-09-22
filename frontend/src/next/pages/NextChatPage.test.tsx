@@ -1450,6 +1450,11 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
   const addMenu = () => addButton().parentElement!.querySelector('[data-slot="composer-menu"]') as HTMLElement;
 
   test("lists the Apps group from a mocked plugins list, icon and description both present", async () => {
+    // Apps sits behind the unwired-controls flag now (found live,
+    // 2026-09-22): this test is about the group's own rendering, not
+    // the default menu's contents - the flag forced on is what the
+    // other unwired items' own tests already do above it.
+    __setUnwiredControlsForTests(true);
     const restore = stubAddMenuFetch();
     try {
       const view = renderPage(
@@ -1469,6 +1474,8 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
   });
 
   test("choosing an app scopes the next turn - the send payload carries package_scope", async () => {
+    // Same reason as the test above: Apps only renders with the flag on.
+    __setUnwiredControlsForTests(true);
     const restore = stubAddMenuFetch(
       ndjsonStream([
         { type: "delta", text: "Sunny today." },
@@ -1510,9 +1517,13 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
       );
       await view.findByLabelText("Message input");
       fireEvent.click(addButton());
-      await within(addMenu()).findByText("Weather");
+      // Apps stays out by default too (found live, 2026-09-22), same
+      // gate as Create image/Web search - "Add photos and files" is
+      // what proves the menu itself opened.
+      await within(addMenu()).findByText("Add photos and files");
       expect(within(addMenu()).queryByText("Create image")).toBeNull();
       expect(within(addMenu()).queryByText("Web search")).toBeNull();
+      expect(within(addMenu()).queryByText("Weather")).toBeNull();
     } finally {
       restore();
     }
@@ -1552,6 +1563,28 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
       // query) while Create image's own extra gate held it back.
       await within(addMenu()).findByText("Web search");
       expect(within(addMenu()).queryByText("Create image")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("the default menu shows exactly photos and files, and camera", async () => {
+    // Flag off (the default), a plugin installed and the image role
+    // ready - the two live-finding conditions (Apps, Create image)
+    // that used to leak into the default menu - to prove both stay
+    // out at once, not just each other's own dedicated test.
+    const restore = stubAddMenuFetch(undefined, true);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      await within(addMenu()).findByText("Add photos and files");
+      const items = Array.from(addMenu().querySelectorAll('[data-slot="composer-menu-item"]')).map((el) => el.textContent);
+      expect(items).toEqual([expect.stringContaining("Add photos and files"), expect.stringContaining("Take a photo")]);
     } finally {
       restore();
     }

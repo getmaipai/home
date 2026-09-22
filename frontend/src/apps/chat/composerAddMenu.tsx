@@ -1,9 +1,10 @@
 "use client";
 
 // SHELL-02 slice 6: the composer's "+" menu (Add: photos and files, a
-// phone's camera, Create image, Web search; Apps: the installed
-// packages) and the context that carries a chosen app into the next
-// send. Composed only from shipped pieces: `ComposerPrimitive` (real
+// phone's camera; behind the unwired-controls flag: Create image, Web
+// search, and Apps - see that flag's own comment below) and the
+// context that carries a chosen app into the next send. Composed only
+// from shipped pieces: `ComposerPrimitive` (real
 // assistant-ui runtime primitives), `elements/composer.tsx`'s
 // `ComposerMenu`/`ComposerMenuItem`/`ComposerAttachButton` (the same
 // presentational primitives `ComposerThinkingControl` in
@@ -36,8 +37,12 @@ import { api, type EnginesOverview, type InstalledPackage } from "@/lib/api";
 // fields `routes/turn.ts` doesn't carry yet (U2's own scope, the old
 // turn path is frozen - see docs/BACKLOG.md's U2 rows); Create image
 // has no generation tool, route, or wire field at all, not just an
-// unready role. All three render and are unit-tested with the flag
-// forced on (`__setUnwiredControlsForTests`, below) - never in a real
+// unready role. Apps joined this list live, 2026-09-22 (Jesse): every
+// installed package listed here (taller than the screen) with no real
+// effect from picking one, the same underlying gap as Web search's -
+// gating the group itself is the honest fix, not just the effect. All
+// four render and are unit-tested with the flag forced on
+// (`__setUnwiredControlsForTests`, below) - never in a real
 // household's default view until their own wire lands.
 let unwiredControlsEnabled = false;
 
@@ -164,7 +169,16 @@ function WebSearchItem({ onSelect }: { onSelect: () => void }) {
 }
 
 function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) {
+  // Found live, 2026-09-22 (Jesse): every installed package (timer,
+  // trivia, math, lock the door, lights off, convert, write a
+  // document, and on) listed here, taller than the screen - and
+  // choosing one does nothing today, since app-scoping's actual
+  // effect on the turn sits behind the same unwired-controls flag as
+  // Create image/Web search (consumePackageScope's own comment,
+  // chatModelAdapter.ts). Gated the same way: the group itself, not
+  // just its effect, until U2 makes scoping real.
   const query = useQuery<InstalledPackage[]>({ queryKey: ["plugins"], queryFn: () => api.plugins() });
+  if (!unwiredControlsAreEnabled()) return null;
   // Every other NextChatPage test's own fetch stub answers an endpoint
   // it doesn't know about with a bare `{}` (its own established
   // convention, e.g. `stubFetch()` above) - this menu now mounts on
