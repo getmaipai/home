@@ -10,6 +10,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DOCS_ONLY=0; if [ "${1:-}" = "--docs" ]; then DOCS_ONLY=1; fi
+GATE_INSTALL="${GATE_INSTALL:-1}"
+
+stage() { now=$(date +%s); [ -n "${STAGE_T:-}" ] && echo "   (${STAGE_NAME}: $((now-STAGE_T))s)" >&2; STAGE_T=$now; STAGE_NAME="$1"; echo "== $1"; }
 
 STANDARDS_REPO="${MAIPAI_STANDARDS_DIR:-../.github}"
 STD_TAG="std-v0.3.0"
@@ -85,10 +88,10 @@ if [ "$DOCS_ONLY" = 0 ]; then
 fi
 
 if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
-  echo "== backend: install"
+  stage "backend: install"
   bun install --silent
 
-  echo "== backend: settings registry, regenerate and check for drift"
+  stage "backend: settings registry, regenerate and check for drift"
   # $SPEC_DIR is a per-tag worktree shared by every consumer pinning
   # spec-v0.1.2 (home, bot, and any other session's check.sh run) - a
   # review on this same item caught an earlier version of this step
@@ -108,7 +111,7 @@ if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
   fi
   rm -rf "$SETTINGS_SCRATCH"
 
-  echo "== backend: API docs, regenerate and check for drift"
+  stage "backend: API docs, regenerate and check for drift"
   (cd backend && bun run gen:api-docs >/dev/null)
   if ! git diff --quiet -- docs/api; then
     echo "docs/api/ is out of date with the route registrations in backend/src/app.ts and its route files. Run 'bun run gen:api-docs' in backend/ and commit the result."
@@ -116,43 +119,47 @@ if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
     exit 1
   fi
 
-  echo "== backend: typecheck"
+  stage "backend: typecheck"
   (cd backend && bunx tsc --noEmit)
 
-  echo "== scripts: typecheck"
+  stage "scripts: typecheck"
   (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
 
-  echo "== scripts: bun test"
+  stage "scripts: bun test"
   (cd scripts && bun test)
 
-  echo "== backend: bun test"
+  stage "backend: bun test"
   (cd backend && bun test)
 fi
 
 if [ "$DOCS_ONLY" = 0 ] && [ -d frontend/src ]; then
-  echo "== frontend: bun test"
+  stage "frontend: bun test"
   (cd frontend && bun test)
 
-  # "lint" is "tsc --noEmit && eslint ." (frontend/package.json), so this
-  # also covers the typecheck; build's own script re-runs tsc as part of
-  # the real compile, which is fine, it's fast and idempotent.
-  echo "== frontend: lint"
-  (cd frontend && bun run lint)
+  # The typecheck runs once here (the frontend's `lint` script is
+  # "tsc --noEmit && eslint ." and `build` is "tsc --noEmit && vite
+  # build", so running both scripts would typecheck three times); the
+  # three steps below keep each tool once, with tsc and eslint cached.
+  stage "frontend: typecheck"
+  (cd frontend && bunx tsc --noEmit)
 
-  echo "== frontend: build (includes typecheck)"
-  (cd frontend && bun run build >/dev/null)
+  stage "frontend: eslint"
+  (cd frontend && bunx eslint . --cache --cache-location .eslintcache)
+
+  stage "frontend: build"
+  (cd frontend && bunx vite build >/dev/null)
 
   # Left out while #43 (the chat contrast failure) was open; #43 closed
   # 2026-09-06 and the timestamp finding it left behind was resolved
   # 2026-09-12 (11e8afd) - back in the gate now that it passes clean
   # (getmaipai/home#55). `a11y` is a repo-root script (package.json),
   # not frontend/'s own - it drives scripts/screenshot.ts directly.
-  echo "== frontend: a11y"
+  stage "frontend: a11y"
   bun run a11y >/dev/null
 fi
 
-echo "== docs: reading-level lint"
-bun install --silent
+stage "docs: reading-level lint"
+[ -n "$GATE_INSTALL" ] && [ "$DOCS_ONLY" = 1 ] && bun install --silent
 bun run scripts/reading-level.ts
 
 if [ "$(cat "$STANDARDS_DIR/standards/VERSION")" != "${STD_TAG#std-v}" ]; then
@@ -160,7 +167,7 @@ if [ "$(cat "$STANDARDS_DIR/standards/VERSION")" != "${STD_TAG#std-v}" ]; then
   exit 1
 fi
 
-echo "== standards core ($STD_TAG)"
+stage "standards core ($STD_TAG)"
 bash "$STANDARDS_DIR/standards/bin/check-core.sh" "$(pwd)"
 
-echo "== all checks passed"
+stage "all checks passed"

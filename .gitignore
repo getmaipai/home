@@ -32,6 +32,10 @@ __pycache__/
 # Bun/TS
 *.tsbuildinfo
 
+# frontend eslint cache (GATE-SPEED-01: the gate's eslint step runs
+# with --cache so a second run doesn't relint the same files)
+.eslintcache
+
 # frontend build output: served by backend/src/app.ts's serveStatic when
 # present, built fresh (bun run build) rather than committed
 frontend/dist/
