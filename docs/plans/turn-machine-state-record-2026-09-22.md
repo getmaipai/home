@@ -63,6 +63,7 @@ interface TurnState {
   reply: { text: string; speech?: string; sources: Source[] } | null;
   ask: PendingAsk | null;         // set when the machine parks
   end: "done" | "refused" | "asked" | "blocked" | "cancelled" | null;
+  reasoning: { emit: boolean; withheld_for: null | "minor" | "surface" | "presence" | "gate" };  // decided in `context`, never later
 }
 
 type NodeOutcome = { ok: true } | { ok: false; code: string } | { skipped: true; reason: string };
@@ -89,12 +90,12 @@ entry and exit is an inspection event the trace writer records.
 |---|---|---|---|
 | `safety` | `safety` | the utterance, the age band, the conversation's crisis state, temporary mode | `refused` (a refuse category, the fixed refusal line, the crisis overlay when due); `blocked` (the credential line); else `commands` |
 | `commands` | `commands` | the utterance against the closed exact-match set (household commands, the bundled closed intents: lights, timers, lists, reminders, "what time is it", "remember that", "forget that", the almanac) | `answer` with the package's reply and outcome; else `context` |
-| `context` | `context` | the window (in-process for a temporary chat), the memories as dated and labeled items, the episodes, the profile line, the clock, the roster, the disclosure filter for this reader and the presence on this surface | `model` |
-| `model` | `model` | `messages` built from the context list, the fixed tool set, `tool_choice` per the interim rule, the plan's `max_tokens` plus the thinking budget | a tool call: `policy`; text: `answer`; no visible text: one regeneration with thinking off, then `answer` |
+| `context` | `context` | the window (in-process for a temporary chat), the memories as dated and labeled items, the episodes, the profile line, the clock, the roster, the disclosure filter for this reader and the presence on this surface | `model`; sets `reasoning.emit` (false, with `withheld_for`, when the speaker is a minor, the surface is not a typed chat screen, or presence says a child may be in the room) |
+| `model` | `model` | `messages` built from the context list, the fixed tool set, `tool_choice` per the interim rule, the plan's `max_tokens` plus the thinking budget | a tool call: `policy`; text: `answer`; no visible text: one regeneration with thinking off, then `answer`; reasoning spans go to the wire only when `reasoning.emit` is true, and only after `output_gate` has passed them; otherwise they are consumed and dropped inside the node |
 | `policy` | `policy` | each `ActionProposal`: the manifest's `min_role`, `consequential`, `permissions`; the grounding of the arguments against the context list (a set check); the household-subject rule for a search; temporary mode (no `memory:write`); the crisis state (no lookups) | `tool` for an allowed read-only request; `asked` (the machine parks with a pending ask) for a consent or a confirmation; `answer` with the refusal line for `min_role`; for a side-effecting request the executor runs the typed plan and returns its outcome to `tool` |
 | `tool` | `tool` | `runPlugin` under the tool deadline; the outcome recorded in model order | `model` while `rounds` remain; else `answer` |
 | `answer` | `answer` | the model's final text or the package reply, the outcomes' sources, the surface's projection (`reply.speech`), the plan's budget | `output_gate` |
-| `output_gate` | `output_gate` | every streamed sentence through `gateOutputSafety`; the honesty invariant (an action claim needs a succeeded outcome); the malformed repair | `done`; `refused` when the output floor refuses |
+| `output_gate` | `output_gate` | every streamed sentence through `gateOutputSafety`; the honesty invariant (an action claim needs a succeeded outcome); the malformed repair | `done`; `refused` when the output floor refuses; reasoning spans pass the same safety gate and the disclosure filter as the answer before any `reasoning` event, and a span the gate refuses sets `withheld_for: "gate"` |
 | `asked`, `done`, `refused`, `blocked`, `cancelled` | terminal | | the turn row and the trace are written; `asked` stores the pending ask and the next turn's `safety` state consumes it first |
 
 Transitions the model may drive (`model` to `policy`, the second round)
@@ -127,7 +128,7 @@ default per model is set from it.
 - The wire, per state: `turn_meta` and `signal` first (as today); `status`
   with `stage` on `context` ("thinking"), `policy` and `tool` ("lookup" or
   "tool"), `answer` ("composing"); `tool_call`, `tool_result`, `tool_error`
-  from `policy` and `tool`; `reasoning` and `delta` from `model` and
+  from `policy` and `tool`; `reasoning` (only when `reasoning.emit` is true and the span passed the gate) and `delta` from `model` and
   `answer`; `structured_part`, `artifact` and `sources` from `answer`;
   `done` or `error`. No new event type.
 
@@ -149,6 +150,39 @@ row, which is how a slow layer and a wrong layer are both named.
   today; the machine's abort signal is the one the route already owns.
 - **A temporary chat** runs the whole machine over the in-process
   window; `context` reads no table and `policy` refuses `memory:write`.
+
+## Reasoning is a second output (owner's ruling, 2026-09-22)
+
+The model's thinking is not private scratch. Anything the hub sends to a
+client is visible in it, and a thinking stream can hold what the answer
+was built to withhold: a parent's own words about Santa, a recalled memory
+a child may not read, the reasoning behind a redirect line. So reasoning
+is a second output with the same rules as the first, and one more.
+
+- **A minor's turn never receives reasoning.** `context` sets
+  `reasoning.emit` false with `withheld_for: "minor"` from the age band,
+  and the `model` node consumes the spans and emits nothing; there is no
+  client-side hide, because a hidden stream is still a sent stream.
+- **Reasoning passes the output gate and the disclosure filter before an
+  adult sees it.** The same `gateOutputSafety` pass and the same
+  ARCH-POLICY-01 boundary that filter the answer filter each reasoning
+  span, including a recalled memory quoted inside the thinking; a
+  refused span sets `withheld_for: "gate"` and the rest of the stream
+  stops.
+- **No non-chat surface shows reasoning.** Voice, glance, and a shared
+  screen where the presence input says a child may be in the room set
+  `withheld_for: "surface"` or `"presence"`; the typed chat screen is the
+  only surface that may emit it.
+- **The trace records the withholding.** The model node's `NodeExecution`
+  carries `reasoning: { emitted, withheld_for }`, so the replay bench and
+  the weekly report can prove a minor's row never carried a reasoning
+  event, and PERF-ALERT-01's stage split can tell a withheld stream from
+  a slow one.
+
+The decision is made once, in `context`, before the model runs, and is
+never recomputed by a later node. The thinking budget in the model's
+budget record is unchanged by this: the model may still think; the hub
+decides who sees it.
 
 ## What the machine never does
 
@@ -204,6 +238,7 @@ the flip.
 - A scripted test per continuation: a consequential proposal parks in
   `asked` and resumes on "yes"; a household-subject search asks; a
   temporary chat writes no row and carries its second turn's context.
+- A test per withholding reason: a child's turn emits no `reasoning` event and its trace says `withheld_for: "minor"`; a robot-surface turn the same with `"surface"`; an adult typed turn whose reasoning quotes an adult-only memory has that span refused with `"gate"` and the answer unaffected.
 - A test that `budget.model_transitions: false` runs the machine end to
   end with no tool call and no branch on surface or device.
 - The interim rule's row: "who is the president of chile" runs the search
