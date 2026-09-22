@@ -6,6 +6,7 @@ import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
+import { Sources } from "@maipai/ui/src/elements/sources";
 import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, CanvasSplitLine, CanvasSplitMessage, CanvasSplitThread } from "@maipai/ui/src/elements/canvas-split";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -14,6 +15,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
 import { api, ApiError, isOwnerOrAdminRole, readBareCompareStream, type BareCompareTrace, type Roster, type StructuredPart } from "@/lib/api";
+import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
@@ -135,6 +137,30 @@ const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>
 
 function ArtifactTool() {
   useAssistantToolUI({ toolName: "write_document", render: ArtifactCardToolRender, display: "standalone" });
+  return null;
+}
+
+// Slice 5(a): the kit's own `Sources` (elements/sources.tsx), used exactly
+// as it ships - never the retired page's `blocks/chat/SourcesCard`, the
+// pre-2026-09-21 kit block this shell rebuild is retiring page by page.
+// Its own `Source` shape (`{domain, title}`) is narrower than spec's real
+// citation record - `domain` reads spec's `site` field (source.schema.json's
+// own description of `site`: "the hostname a citation chip shows," exactly
+// what `domain` means here); `url`/`snippet`/`kind`/`id` have nowhere to go
+// in the shipped card. Two real gaps in the shipped Element itself, named
+// in docs/dev.md rather than reached around: its rows are `<div>`s with no
+// `href` (a source can't be opened - filed as a kit ask), and it keys each
+// row by `domain` (`elements/sources.tsx:53`), which collides when a reply
+// cites two different pages on the same site - not deduped here (that
+// would drop a real citation), filed as a kit ask (key by index instead).
+const SourcesToolRender: ToolCallMessagePartComponent<Record<string, never>, Source[]> = ({ result }) => {
+  const [open, setOpen] = useState(false);
+  if (!result?.length) return null;
+  return <Sources sources={result.map((source) => ({ domain: source.site, title: source.title }))} open={open} onOpenChange={setOpen} />;
+};
+
+function SourcesTool() {
+  useAssistantToolUI({ toolName: "sources", render: SourcesToolRender, display: "standalone" });
   return null;
 }
 
@@ -595,12 +621,38 @@ export function NextChatPage({ person }: { person: Roster }) {
   // while collapsed; the click always pins the rail fully open
   // (independent of hover) and clears `railPeeked` so a later collapse
   // never mounts already "peeked" from a stale hover.
-  const handleToggleEnter = () => {
+  // A real defect Jesse found (Firefox, hard reload): clicking the open
+  // toggle to collapse it left the pointer sitting over the exact spot
+  // where the collapsed toggle instance now mounts - a browser
+  // recomputes what's under a stationary pointer whenever the DOM
+  // changes there, so it fired a "phantom" pointerenter on the new node
+  // with no real mouse movement, which `handleToggleEnter` read as a
+  // hover and immediately re-opened the peek, undoing the collapse's own
+  // visible effect in the same frame (from Jesse's own eyes, the click
+  // did nothing). `suppressHoverPeekRef` closes this: every click (either
+  // direction, collapsing or pinning open - the SAME phantom-enter risk
+  // exists for the inline/collapsed instance swap either way) sets it,
+  // and only a REAL pointer-leave of whichever toggle instance is
+  // currently mounted clears it, so the peek stays suppressed until the
+  // pointer genuinely leaves and a later hover is a real one again. Only
+  // `onPointerEnter` is gated by it - a genuine keyboard Tab onto the
+  // toggle right after that same click (`handleToggleFocus` below) has
+  // no phantom-recomputation risk analogous to a stationary mouse, and
+  // must still open the peek immediately.
+  const suppressHoverPeekRef = useRef(false);
+  const openPeekIfCollapsed = () => {
     if (railCollapsed) setRailPeeked(true);
+  };
+  const handleToggleEnter = () => {
+    if (suppressHoverPeekRef.current) return;
+    openPeekIfCollapsed();
+  };
+  const handleToggleLeave = () => {
+    suppressHoverPeekRef.current = false;
   };
   // Only a genuine interaction with the toggle itself - focusing it or
   // clicking it - ever sets the pending-focus flag the effect above
-  // reads; `onPointerEnter` (a passive hover) shares `handleToggleEnter`
+  // reads; `onPointerEnter` (a passive hover) shares `openPeekIfCollapsed`
   // for opening the peek but never touches the flag, exactly the
   // distinction the re-review's two false-positive cases needed.
   const handleToggleFocus = (e: FocusEvent<HTMLButtonElement>) => {
@@ -609,9 +661,10 @@ export function NextChatPage({ person }: { person: Roster }) {
       return;
     }
     pendingToggleFocusRef.current = true;
-    handleToggleEnter();
+    openPeekIfCollapsed();
   };
   const handleToggleClick = () => {
+    suppressHoverPeekRef.current = true;
     pendingToggleFocusRef.current = true;
     if (railCollapsed) {
       setRailCollapsed(false);
@@ -631,6 +684,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       aria-expanded={toggleExpanded}
       aria-controls="next-chat-rail"
       onPointerEnter={handleToggleEnter}
+      onPointerLeave={handleToggleLeave}
       onFocus={handleToggleFocus}
       onClick={handleToggleClick}
     >
@@ -647,6 +701,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       aria-controls="next-chat-rail"
       className="absolute top-0 left-0 z-20 hidden lg:flex"
       onPointerEnter={handleToggleEnter}
+      onPointerLeave={handleToggleLeave}
       onFocus={handleToggleFocus}
       onClick={handleToggleClick}
     >
@@ -661,6 +716,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <CompareOpenContext.Provider value={setCompareTarget}>
         <StructuredResultTools />
         <ArtifactTool />
+        <SourcesTool />
         <ArtifactCacheInvalidator />
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
             fixed height a hard ceiling, not a floor a growing composer

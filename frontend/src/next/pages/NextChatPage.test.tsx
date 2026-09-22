@@ -222,6 +222,63 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       restore();
     }
   });
+
+  // Slice 5(a): a turn's `sources` renders through the shipped `Sources`
+  // Element (elements/sources.tsx), collapsed by default per spec.md,
+  // under the reply text - the same synthetic-tool-call-part composition
+  // this describe block's own weather case already proves for the
+  // structured card, mapping spec's `Source.site` onto the Element's own
+  // `domain`.
+  test("a turn's sources render through the Sources Element, collapsed, under the reply", async () => {
+    const SOURCE = { id: "src-tide123", kind: "web" as const, title: "Lantern Bay tide chart", url: "https://example.com/tides", site: "example.com", snippet: null, source: "turn-tide123", created_at: "2026-09-22T00:00:00.000Z", hlc: "1788000000000:0:test" };
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { type: "delta", text: "High tide is at 4pm." },
+        { type: "done", value: { turn_id: "turn-tide123", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY, sources: [SOURCE] } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "when's high tide");
+      await view.findByText("High tide is at 4pm.");
+      const trigger = view.getByRole("button", { name: /Sources/ });
+      expect(trigger).toBeVisible();
+      // Collapsed by default - the source's own title isn't in the DOM
+      // yet (a Collapsible unmounts its own content when closed).
+      expect(view.queryByText("Lantern Bay tide chart")).toBeNull();
+      fireEvent.click(trigger);
+      expect(await view.findByText("Lantern Bay tide chart")).toBeVisible();
+      // `domain` reads spec's `site`, not `url` or `id`.
+      expect(view.getByText("example.com")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a reply with no sources renders no Sources trigger", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { type: "delta", text: "Basil and parsley are easy herbs." },
+        { type: "done", value: { turn_id: "turn-herbs456", reply: { text: "Basil and parsley are easy herbs." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what herbs should I grow");
+      await view.findByText("Basil and parsley are easy herbs.");
+      expect(view.queryByRole("button", { name: /Sources/ })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
@@ -419,6 +476,10 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // floating one) - the one a real pointer can actually reach is the
       // one outside the rail.
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
+      // A click-triggered "phantom" pointerenter (the browser recomputing
+      // hover when this node mounts under a stationary pointer) is
+      // suppressed until a real leave - a real hover needs one first.
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body });
       fireEvent.pointerEnter(collapsedToggle);
       // Never remounted, never a second column instance - the exact same
       // node that was measured "open" a moment ago.
@@ -457,6 +518,8 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       await view.findByLabelText("Message input");
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      // A real hover, not the click's own suppressed phantom enter.
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body });
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
       // Hovering swapped the collapsed-only instance for the inline one
@@ -470,6 +533,41 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // Pinning open resets the peek - collapsing again later starts
       // from a real hover, not a stale peek left over from before.
       expect(view.getByRole("button", { name: "Hide conversations" })).toHaveAttribute("aria-expanded", "true");
+    } finally {
+      restore();
+    }
+  });
+
+  test("clicking to collapse with the pointer still over the toggle's spot does not immediately re-open the peek", async () => {
+    // A real defect Jesse found (Firefox, hard reload): a browser
+    // recomputes what's under a stationary pointer whenever the DOM
+    // changes there - clicking the open toggle unmounts it and mounts
+    // the collapsed instance at the identical screen position, so the
+    // browser fires a "phantom" pointerenter on the new node with no
+    // real mouse movement. Before the fix, that read as a hover and
+    // immediately re-opened the peek, undoing the collapse's own
+    // visible effect in the same frame - from Jesse's own eyes, the
+    // click did nothing.
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      // The phantom pointerenter a real browser fires on the freshly-
+      // mounted node, pointer never having actually moved.
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("hidden");
+      expect(classes(rail())).not.toContain("absolute");
+      // Moving away for real, then back, is a genuine hover again - the
+      // peek opens.
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body });
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
     } finally {
       restore();
     }
@@ -533,6 +631,8 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       collapsedToggle.focus = () => {
         collapsedFocusCalled = true;
       };
+      // A real hover, not the click's own suppressed phantom enter.
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body });
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
       expect(collapsedFocusCalled).toBe(false);

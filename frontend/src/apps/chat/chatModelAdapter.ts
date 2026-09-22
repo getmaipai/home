@@ -4,7 +4,8 @@ import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { messageText } from "@/apps/chat/chatMessageText";
-import type { TurnWithMedia, TurnWithSources } from "@/apps/chat/chatCitations";
+import { toolCallPart } from "@/apps/chat/chatToolCallPart";
+import type { TurnWithMedia } from "@/apps/chat/chatCitations";
 import { CURRENT_LOCAL_VISION_CAPABILITY, IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 
@@ -279,7 +280,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // Lane 11 item 1's own forward-compatible cast (chatTurnActivity.ts's
           // header): `status` isn't a real TurnStreamEvent member on the wire
           // yet, the same "cast the whole event, not just a field" shape
-          // `TurnWithSources` uses for `sources` on `TurnValue` below.
+          // `TurnWithMedia` uses for `media_items` on `TurnValue` below
+          // (sources itself is a real field now, no cast needed for it).
           for await (const event of readTurnStream(response)) {
           if (event.type === "turn_meta") {
             // The contract's first line on every turn (routes/turn.ts).
@@ -422,6 +424,19 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // (NextChatPage.tsx) can fetch the full version and open
             // it in canvas-split on click.
             const artifact = event.value.artifact;
+            // Slice 5(a): `TurnValue.sources` (wire.ts) is a real, typed
+            // field now (CHAT-16 landed) - a real ToolCallMessagePart
+            // here, the same composition slices 3/4/5(e) already use for
+            // a reply-level extra Thread has no slot for - fixed
+            // `toolName: "sources"`, never the producing package's own
+            // name (`weather` is already SpecSheet's registration;
+            // WEATHER-GEN-01 will give the weather package its own
+            // `sources` structured part later, a real collision
+            // otherwise). NextChatPage.tsx maps spec's `Source{site,
+            // title, ...}` onto the kit Element's own `{domain, title}`
+            // at render time, so this array is passed through exactly as
+            // the wire gives it.
+            const sources = event.value.sources;
             // Fix B4 (docs/dev.md's "Chat reliability" B4): the same
             // metadata shape chatHistoryAdapter.ts attaches on reload, so
             // chatSourceCaption.tsx renders identically whether a message
@@ -454,31 +469,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // written document actually wants to show.
               content: [
                 ...(finalReasoning ? [{ type: "reasoning" as const, text: finalReasoning }] : []),
-                ...(structuredPart
-                  ? [
-                      {
-                        type: "tool-call" as const,
-                        toolCallId: `${event.value.turn_id}-structured`,
-                        toolName: structuredPart.tool_id,
-                        args: {},
-                        argsText: "",
-                        result: structuredPart,
-                      },
-                    ]
-                  : []),
-                ...(artifact
-                  ? [
-                      {
-                        type: "tool-call" as const,
-                        toolCallId: `${event.value.turn_id}-artifact`,
-                        toolName: "write_document",
-                        args: {},
-                        argsText: "",
-                        result: artifact,
-                      },
-                    ]
-                  : []),
+                ...(structuredPart ? [toolCallPart(`${event.value.turn_id}-structured`, structuredPart.tool_id, structuredPart)] : []),
+                ...(artifact ? [toolCallPart(`${event.value.turn_id}-artifact`, "write_document", artifact)] : []),
                 { type: "text" as const, text: finalText },
+                // Slice 5(a): AFTER the text part, not before - spec.md's
+                // own "a compact card UNDER the reply." The "tool parts
+                // before text" rule above was about the structured
+                // reference card specifically (a weather card reads
+                // above its own sentence), not every tool part; sources
+                // are a footer, not a header.
+                ...(sources?.length ? [toolCallPart(`${event.value.turn_id}-sources`, "sources", sources)] : []),
               ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),
               metadata: {
@@ -489,11 +489,12 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   turnId: event.value.turn_id,
                   conversationId,
                   documentAvailable: event.value.document_available === true,
-                  // Lane 10 item 1: not on TurnValue yet, same
-                  // forward-compatible read chatHistoryAdapter.ts uses,
-                  // so a live reply carries sources the moment CHAT-16
-                  // emits them with no adapter change needed then.
-                  sources: (event.value as TurnWithSources).sources,
+                  // A real TurnValue field now (CHAT-16 landed) - kept
+                  // on metadata.custom for chatSourceCaption.tsx's own
+                  // retired-page read and for symmetry with
+                  // chatHistoryAdapter.ts's reload-path row, alongside
+                  // the real tool-call part above.
+                  sources,
                   media: event.value.media,
                   media_items: (event.value as TurnWithMedia).media_items,
                   stats: event.value.stats,

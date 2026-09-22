@@ -3,7 +3,7 @@ import { ChildBand } from "@maipai/ui/src/blocks/chat/ChildBand";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AssistantRuntimeProvider, useAui, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, useAssistantToolUI, useAui, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
@@ -56,6 +56,25 @@ function SttAutoSend({ sendRef }: { sendRef: MutableRefObject<(() => void) | nul
       sendRef.current = null;
     };
   }, [sendRef, aui]);
+  return null;
+}
+
+// A code review on slice 5(a) caught this: chatModelAdapter.ts/
+// chatHistoryAdapter.ts are shared with `/next/chat` (NextChatPage.tsx),
+// so this page now receives the same `toolName: "sources"` tool-call
+// part unconditionally too - with no registered `toolUI` for it here,
+// Thread's own chain-of-thought grouping tucks it behind a collapsed
+// "1 tool call" trigger by default (SpecSheetToolRender's own comment,
+// NextChatPage.tsx, on why `display: "standalone"` matters), a new,
+// extraneous button under this page's own already-correct `SourcesCard`
+// (fed separately from `metadata.custom.sources`, untouched by slice
+// 5(a)) - one click away from `ToolFallback`'s raw-JSON dump. This page
+// doesn't need a second rendering of the same data - `SourcesCard`
+// already has it - so the part is suppressed outright, `display:
+// "standalone"` so it renders nothing directly rather than sitting
+// inside a group whose own trigger would still show.
+function SuppressLegacySourcesFallback() {
+  useAssistantToolUI({ toolName: "sources", render: () => null, display: "standalone" });
   return null;
 }
 
@@ -484,6 +503,7 @@ export function ChatPage({ person }: ChatPageProps) {
             <ChatDocumentOpenContext.Provider value={setDocumentTurnId}>
               <AssistantRuntimeProvider runtime={runtime}>
                 <SttAutoSend sendRef={sttAutoSendRef} />
+                <SuppressLegacySourcesFallback />
                 <Page title="Chat" hideTitle>
                   {/* Keep the chat controls in normal flow above the thread.
                       The opaque, non-shrinking header is deliberately not a

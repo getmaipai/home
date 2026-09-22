@@ -546,6 +546,67 @@ describe("createChatModelAdapter structured results (SHELL-02 slice 3)", () => {
   });
 });
 
+// Slice 5(a): CHAT-16's `TurnValue.sources` becomes a real ToolCallMessagePart
+// too - `toolName: "sources"`, AFTER the text part (spec.md's "a compact card
+// under the reply," the opposite order from the structured card above, which
+// reads before the prose).
+describe("createChatModelAdapter sources (slice 5(a))", () => {
+  const SOURCE = { id: "src-abc123", kind: "web" as const, title: "Lantern Bay tide chart", url: "https://example.com/tides", site: "example.com", snippet: null, source: "turn-tide123", created_at: "2026-09-22T00:00:00.000Z", hlc: "1788000000000:0:test" };
+
+  test("sources on the done event become a real tool-call part after the text part", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "High tide is at 4pm." },
+        { type: "done", value: { turn_id: "turn-tide123", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY, sources: [SOURCE] } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("when's high tide")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([{ type: "text", text: "High tide is at 4pm." }, { type: "tool-call", toolCallId: "turn-tide123-sources", toolName: "sources", args: {}, argsText: "", result: [SOURCE] }]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a reply with no sources yields no sources tool-call part", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Basil and parsley are easy herbs." },
+        { type: "done", value: { turn_id: "turn-herbs456", reply: { text: "Basil and parsley are easy herbs." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what herbs should I grow")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([{ type: "text", text: "Basil and parsley are easy herbs." }]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a structured_part and sources on the same reply: structured card first, text, then sources", async () => {
+    const structuredPart = { kind: "spec_sheet" as const, tool_id: "weather", title: "Lantern Bay", rows: [{ label: "Temperature", value: "61°F" }] };
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "It's 61°F in Lantern Bay." },
+        { type: "done", value: { turn_id: "turn-weather789", reply: { text: "It's 61°F in Lantern Bay." }, source: "plugin", safety: SAFETY, structured_part: structuredPart, sources: [SOURCE] } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what's the weather")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "tool-call", toolCallId: "turn-weather789-structured", toolName: "weather", args: {}, argsText: "", result: structuredPart },
+        { type: "text", text: "It's 61°F in Lantern Bay." },
+        { type: "tool-call", toolCallId: "turn-weather789-sources", toolName: "sources", args: {}, argsText: "", result: [SOURCE] },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+});
+
 // Lane 11 item 1 (docs/plans/session-b-lane-11-2026-09-13.md): CHAT-16's
 // forward-compatible `status` event (chatTurnActivity.ts's own header on
 // why it's cast this way, not yet a real TurnStreamEvent member) and the

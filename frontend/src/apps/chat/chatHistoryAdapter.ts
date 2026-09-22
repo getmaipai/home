@@ -1,5 +1,6 @@
 import { ExportedMessageRepository, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
+import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 
 export type FeedbackVerdict = "positive" | "negative";
 
@@ -128,9 +129,19 @@ export function rowsToBranchableMessages(
       // same order chatModelAdapter.ts's own live "done" event now uses -
       // a reloaded reply with an artifact should read identically to one
       // that just streamed in, card first, prose after.
-      content: row.artifact
-        ? [{ type: "tool-call", toolCallId: `${row.id}-artifact`, toolName: "write_document", args: {}, argsText: "", result: row.artifact }, { type: "text", text: row.replyText }]
-        : row.replyText,
+      // slice 5(a): `sources`, unlike `structured_part` (getmaipai/home#130's
+      // still-open reload gap), genuinely survives reload - the column
+      // already exists (`row.sources`) - so the same tool-call part
+      // chatModelAdapter.ts builds live rides AFTER the text part here
+      // too, the identical ordering (spec.md's "under the reply").
+      content:
+        row.artifact || row.sources?.length
+          ? [
+              ...(row.artifact ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
+              { type: "text" as const, text: row.replyText },
+              ...(row.sources?.length ? [toolCallPart(`${row.id}-sources`, "sources", row.sources)] : []),
+            ]
+          : row.replyText,
       createdAt,
       status: { type: "complete", reason: "stop" },
       // Fix B4 (docs/dev.md's "Chat reliability" B4): chatSourceCaption.tsx

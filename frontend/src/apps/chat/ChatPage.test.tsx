@@ -548,6 +548,37 @@ test("a [7] marker with only one source stays plain text, not a chip", async () 
   }
 });
 
+// A review on slice 5(a) caught this: chatModelAdapter.ts (shared by this
+// page and NextChatPage.tsx) now yields a real `toolName: "sources"`
+// tool-call part alongside the metadata field this page's own SourcesCard
+// already reads - with nothing registered for that name here, Thread's own
+// ToolFallback (thread.aui.tsx:677) rendered it as a raw JSON dump, a new
+// box under the properly-rendered SourcesCard above. Suppressed via a
+// no-op `useAssistantToolUI` registration (ChatPage.tsx's own
+// SuppressLegacySourcesFallback) rather than duplicated.
+test("a reply with sources never renders the raw tool-call fallback - SourcesCard alone", async () => {
+  (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  const restore = stubFetchWithSources("It'll be sunny [1].", [WEATHER_SOURCE]);
+  try {
+    const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+    await sendMessage(view, "what's the weather");
+    await view.findByText(/It'll be sunny/);
+    // A review found this: an UNREGISTERED tool-call part doesn't render
+    // ToolFallback's own raw-JSON dump immediately (found live, testing
+    // this exact assertion first - Thread's own chain-of-thought grouping
+    // tucks any tool-call part behind a collapsed "1 tool call" trigger by
+    // default, the identical mechanism NextChatPage.tsx's own comment on
+    // `display: "standalone"` already names). The regression is that
+    // collapsed trigger's own presence - a new, extraneous button under a
+    // sourced reply that wasn't there before, one click away from the raw
+    // JSON dump underneath it.
+    expect(document.querySelector('[data-slot="tool-group-root"]')).toBeNull();
+    expect(document.querySelector('[data-slot="tool-group-trigger"]')).toBeNull();
+  } finally {
+    restore();
+  }
+});
+
 test("a reply with no sources renders no chip and no SourcesCard", async () => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
   const restore = stubFetch();

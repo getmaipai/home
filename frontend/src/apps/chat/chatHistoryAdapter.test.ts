@@ -78,6 +78,27 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.content).toBe("just a reply");
   });
 
+  // Slice 5(a): unlike `structured_part` (getmaipai/home#130's still-open
+  // reload gap), `sources` genuinely survives reload - the column already
+  // exists on the row - so the same real tool-call part chatModelAdapter.ts
+  // builds live rides here too, AFTER the reply text (spec.md's "a compact
+  // card under the reply," the opposite order from the artifact card above).
+  test("a row carrying sources becomes a real tool-call part after the reply text", () => {
+    const sources: Source[] = [{ id: "src-1", kind: "web", title: "A page", url: "https://example.com/a", site: "example.com", snippet: null, source: "row-1", created_at: "2026-09-13T00:00:00Z", hlc: "1757000000000:0:abc123" }];
+    const row = { ...makeRow("row-1", "High tide is at 4pm."), sources };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "text", text: "High tide is at 4pm." },
+      { type: "tool-call", toolCallId: "row-1-sources", toolName: "sources", args: {}, argsText: "", result: sources },
+    ]);
+  });
+
+  test("a row with an empty sources array keeps the plain reply text, unchanged", () => {
+    const row = { ...makeRow("row-1", "just a reply"), sources: [] };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toBe("just a reply");
+  });
+
   test("a row without sources leaves metadata.custom.sources undefined, not a crash", () => {
     const items = flatten(rowsToBranchableMessages([makeRow("row-1", "a reply")], "Nova", "conv-example123"));
     expect(items[1]!.message.metadata!.custom!.sources).toBeUndefined();

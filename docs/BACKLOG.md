@@ -288,7 +288,7 @@ not permission to expand scope.
 
  - [ ] **TOOL-EVENTS-01: the wire streams a tool call's lifecycle** (M). When the turn engine routes to a package (weather, almanac, a lookup) it emits a `tool_call` event at the start (tool_id, a human label the manifest supplies such as "Checking the weather for Seattle", the args it can show) and a `tool_result` or `tool_error` at the end, before the done event, on minors' turns too; the reasoning event is the pattern. Spec first (the event shapes in the wire, a spec tag), then `backend/src/routes/turn.ts` and `turnEngine.ts`, tests for start, end and error ordering. Fed to the Elements' tool-timeline by SHELL-02 slice 5. Exit: `bash scripts/check.sh`.
 
- - [ ] **WEATHER-GEN-01: the weather package emits richer structured parts** (M). Beside its `spec_sheet` (current conditions) the package emits a `chart` part (the next 24 hours' temperature series), a `data_table` part (the 7-day forecast: day, conditions, high, low) and `sources` (the provider it queried, the citation shape CHAT-16 uses), from data it already fetches. The part kinds and shapes join StructuredPart in the spec with fixtures, shaped exactly as the `chart`, `data-table` and `sources` Elements take their data (read the vendored Element props first), so the frontend registration is a pass-through and nothing is drawn by Home. Files: `backend/packages/weather/*`, `commons/spec/records/structured-part*`, tests. Exit: `bash scripts/check.sh`.
+ - [ ] **WEATHER-GEN-01: the weather package emits richer structured parts** (M). Beside its `spec_sheet` (current conditions) the package emits a `chart` part (the next 24 hours' temperature series), a `data_table` part (the 7-day forecast: day, conditions, high, low) and `sources` (the provider it queried, the citation shape CHAT-16 uses), from data it already fetches. The part kinds and shapes join StructuredPart in the spec with fixtures, shaped exactly as the `chart`, `data-table` and `sources` Elements take their data (read the vendored Element props first), so the frontend registration is a pass-through and nothing is drawn by Home. Files: `backend/packages/weather/*`, `commons/spec/records/structured-part*`, tests. **Note, slice 5(a) (2026-09-22)**: `toolName: "sources"` is now registered on `NextChatPage.tsx` for the turn-LEVEL `TurnValue.sources` card (docs/dev.md) - if this item's own weather-package `sources` structured part lands as its own separately-registered tool call, it needs a different `toolName` (or a merge into the turn-level list instead of a second registration), not a collision on the same name. Exit: `bash scripts/check.sh`.
 
 - [ ] **WEATHER-ICONS-01: animated weather icons and condition backgrounds on the weather card** (S-M, after WEATHER-GEN-01). Objective: the weather parts carry a condition code, and the card renders an animated icon for it plus a condition background (the old Home's weather app did this well: amCharts' animated SVG weather icons, downloaded at build time by `scripts/fetch-third-party.mjs` with pinned sha256 sums per file and the licence file kept beside them, never tracked; and `WeatherHeroBg.tsx`'s CSS-animated rain, snow and cloud layers over a gradient chosen by condition and time of day; both in `legacy-backups/home-legacy.git`, reference only, the fetch pattern and the effect parameters are the hard-won part). Rule kept: the icon set is a download, pinned and checksummed (the org's third-party rule), rendered as an `<img>` in the Elements' own card slot; the background is tokens and CSS on the card the Element renders, no hand-built component. Applies to the chat's weather card, the dashboard's Today card (DASH-CARDS-01) and the glance surface. Acceptance: every condition the package can emit maps to an icon and a background (a test over the mapping), day and night variants, reduced-motion honoured, the fetch verified against the sums in the gate, captures of three conditions. Exit: `bash scripts/check.sh`.
 
@@ -5081,6 +5081,17 @@ alongside the first sourced skill, not before it.
       app, because CHAT-16 hasn't started emitting `sources` on a turn -
       that's the one piece left, Session A's own work, wired to the
       exact shape above.
+
+      **Status, 2026-09-22 (slice 5(a))**: the sources CARD is landed on
+      `/next/chat` (docs/dev.md, "Slice 5(a)") - `Sources` (the new kit
+      Element, `elements/sources.tsx`, not the old `SourcesCard` this
+      note describes above, which belongs to the now-retired page). The
+      `[N]` MARKER half described in this item is still exactly what's
+      missing: `inline-citation.tsx` (the new kit's own would-be
+      replacement for the old marker/chip rewrite) is a static demo with
+      no exported way to place a marker in dynamic text, and `Thread`
+      has no text/markdown slot to reach one through even if it were -
+      filed as `getmaipai/commons#8`. This item stays open for that half.
 - [ ] **Favicon fetch-once, cache, and reuse for citation/source chips**
       (S) - doesn't exist yet, but legacy had a complete, two-layer
       version worth reusing as-is (hard-won resolver/cache logic, not
