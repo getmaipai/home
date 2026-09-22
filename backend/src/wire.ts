@@ -82,6 +82,21 @@ export interface TurnStats {
    * every existing reader); this is the full history, so a turn that
    * spent a hidden second (or third) generation shows it. */
   generations: TurnGeneration[];
+  /** U2 (turn-machine-state-record-2026-09-22.md, "What every turn
+   * writes"): one entry per node the new path (turnNext.ts) ran or
+   * skipped, in order, beside `generations` above - "one trace, not a
+   * second log." Absent (undefined, never an empty array standing in
+   * for "didn't run") on every row the old path (turnEngine.ts) still
+   * produces; PERF-ALERT-01's stage split and `scripts/bench/replay.ts`
+   * both read this only when it's present. Deliberately structural,
+   * the same reason TurnGeneration above is hand-declared rather than
+   * imported: this file stays alias-free (frontend/src/lib/api.ts
+   * imports it directly), so it never reaches into
+   * turnMachine/contract.ts's own NodeExecution, which pulls in
+   * backend-only modules by "@/..." alias frontend cannot resolve.
+   * turnMachine/trace.ts's own NodeExecution shape and this one are
+   * kept in step by hand, not by a shared import. */
+  nodes?: TurnNodeExecution[];
 }
 
 /** LAT-00: one real model call, projected to plain values for the wire -
@@ -100,6 +115,18 @@ export interface TurnGeneration {
    * time its own tokens were consumed (null if none ever were). */
   request_sent_ms: number;
   first_delta_ms: number | null;
+}
+
+/** U2's own per-node trace entry, TurnGeneration's structural twin -
+ * see TurnStats.nodes's own doc comment for why this is hand-declared
+ * rather than imported. */
+export interface TurnNodeExecution {
+  node: "safety" | "commands" | "context" | "model" | "policy" | "tool" | "answer" | "output_gate";
+  impl: string;
+  version: string;
+  startMs: number;
+  endMs: number;
+  outcome: { ok: true } | { ok: false; code: string } | { skipped: true; reason: string };
 }
 
 // ADMIN-COMPARE-01: POST /api/turn/bare's own trace and NDJSON event

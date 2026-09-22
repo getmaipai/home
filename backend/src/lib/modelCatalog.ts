@@ -58,6 +58,28 @@ export const CATALOG: ModelCapabilities[] = [
       head_dim: 128,
       max_context: 32768,
     },
+    // U2a/U2b (turn-machine-state-record-2026-09-22.md, "The budget
+    // record"): the 8B's starting values, read by turnMachine's model
+    // and tool nodes through budget.ts. measured.rewrite_pass_rate is
+    // not yet run for this model (measured.on says so); everything
+    // else is the ARCH-MEASURE-01 tool-calling bench, 2026-09-22, 50
+    // repeats (0 false calls in 50, 19 fitting searches in 50).
+    turn_budget: {
+      rounds: 1,
+      tools_offered: ["recall", "remember", "remind", "timer", "weather", "websearch"],
+      always_search: true,
+      answer_from_context_tool: true,
+      model_transitions: true,
+      context_tokens: 4000,
+      thinking_budget_tokens: 512,
+      deadlines_ms: { model: 20000, tool: 10000, total: 45000 },
+      measured: {
+        false_call_rate: 0,
+        inverse_miss_rate: 0.62,
+        rewrite_pass_rate: 0,
+        on: "ARCH-MEASURE-01 tool-calling bench, 2026-09-22, 50 repeats (0 false calls in 50, 19 fitting searches in 50); rewrite_pass_rate not yet measured for this model, recorded 0 pending the query-rewrite bench",
+      },
+    },
   }),
   // Not run by anything yet (image role, implemented: false). Recorded so
   // the LoRA-ecosystem tradeoff Jesse and this session worked through

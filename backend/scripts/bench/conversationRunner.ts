@@ -13,6 +13,8 @@ import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
 import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, notePendingLookup, type TurnStreamResult, lookupQueryFor } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { resolveNames } from "@/lib/unknownNames";
@@ -327,7 +329,14 @@ async function driveTurn(
   const elapsed = () => performance.now() - t0;
   let result: TurnStreamResult;
   try {
-    result = await runTurnStream(actor, opts.surface ?? "chat", say, { conversationId: opts.conversationId, supersedes: opts.supersedes, signal: controller.signal });
+    // U2d's own acceptance ("the replay set on the new path with the
+    // flag on"): reads the real household setting, never a bench-only
+    // flag, so a replay run exercises exactly what a household turn
+    // would - turnNext.ts's own TurnStreamResult is always "immediate"
+    // (its own header note), which this function already handles below.
+    result = getHouseholdSettingValue("turn.pipeline.next") === true
+      ? await runTurnNext(actor, opts.surface ?? "chat", say, { conversationId: opts.conversationId, signal: controller.signal })
+      : await runTurnStream(actor, opts.surface ?? "chat", say, { conversationId: opts.conversationId, supersedes: opts.supersedes, signal: controller.signal });
   } catch (err) {
     return { value: null, text: "", timings: { firstDeltaMs: null, firstSentenceMs: null, totalMs: elapsed() }, error: (err as Error).message, interrupted: false, spokenCue: null };
   }

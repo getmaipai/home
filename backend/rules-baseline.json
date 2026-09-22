@@ -9,5 +9,19 @@
   "replyConstraints.ts": 10,
   "unspokenArgs.ts": 10,
   "composer.ts": 21,
-  "turnNext.ts": 0
+  "turnMachine/contract.ts": 0,
+  "turnMachine/budget.ts": 0,
+  "turnMachine/messages.ts": 0,
+  "turnMachine/deadline.ts": 0,
+  "turnMachine/machine.ts": 0,
+  "turnMachine/trace.ts": 0,
+  "turnMachine/turnNext.ts": 0,
+  "turnMachine/nodes/safety.ts": 0,
+  "turnMachine/nodes/commands.ts": 0,
+  "turnMachine/nodes/context.ts": 0,
+  "turnMachine/nodes/model.ts": 0,
+  "turnMachine/nodes/policy.ts": 0,
+  "turnMachine/nodes/tool.ts": 0,
+  "turnMachine/nodes/answer.ts": 0,
+  "turnMachine/nodes/outputGate.ts": 0
 }

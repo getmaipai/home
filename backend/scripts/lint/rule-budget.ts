@@ -31,9 +31,37 @@ import ts from "typescript";
 import { RULE_NAMES } from "../../src/lib/ruleNames.js";
 
 /** The turn-path files the budget covers, relative to `backend/src/lib/`.
- * `turnNext.ts` does not exist yet (it is U2's file); it is listed here
- * so its baseline of 0 is enforced the moment it is created. */
-export const TURN_PATH_FILES: readonly string[] = ["turnEngine.ts", "turnContext.ts", "guards.ts", "unknownNames.ts", "turnSignal.ts", "utteranceShape.ts", "routing.ts", "replyConstraints.ts", "unspokenArgs.ts", "composer.ts", "turnNext.ts"];
+ * U2's own turnMachine/ files (turn-machine-state-record-2026-09-22.md's
+ * own words: "The rule-budget lint baseline for turnMachine/ is zero")
+ * join this list at the baseline of 0 they start and stay at - not just
+ * `turnNext.ts`, every node and the machine definition itself. */
+export const TURN_PATH_FILES: readonly string[] = [
+  "turnEngine.ts",
+  "turnContext.ts",
+  "guards.ts",
+  "unknownNames.ts",
+  "turnSignal.ts",
+  "utteranceShape.ts",
+  "routing.ts",
+  "replyConstraints.ts",
+  "unspokenArgs.ts",
+  "composer.ts",
+  "turnMachine/contract.ts",
+  "turnMachine/budget.ts",
+  "turnMachine/messages.ts",
+  "turnMachine/deadline.ts",
+  "turnMachine/machine.ts",
+  "turnMachine/trace.ts",
+  "turnMachine/turnNext.ts",
+  "turnMachine/nodes/safety.ts",
+  "turnMachine/nodes/commands.ts",
+  "turnMachine/nodes/context.ts",
+  "turnMachine/nodes/model.ts",
+  "turnMachine/nodes/policy.ts",
+  "turnMachine/nodes/tool.ts",
+  "turnMachine/nodes/answer.ts",
+  "turnMachine/nodes/outputGate.ts",
+];
 
 /** Modules the lint never scans at all, whatever they contain: the
  * safety floor and the other invariants RULES-AND-LEARNED-COMPONENTS.md
