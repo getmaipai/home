@@ -126,7 +126,7 @@ LOOKUP-HEAD-01's implementation and the interim rule's replacement; it is
 judged with the other two tracks, and the routing-corpus bar from the
 2026-09-16 review (five macro-F1 points over the rules) applies.
 
-**Status, 2026-09-22 evening: phase 0 is running; (a) has its verdict** (dev.md, "ARCH-BUILD-01: the buy-or-build verdict": XState v5 runs U2's machine, LangGraph and the in-house TurnGraph are rejected, Cedar waits for the policy record), so U2's state record can be written. Session A builds and
+**Status, 2026-09-22 evening: phase 0 is running; (a) and (c) have their verdicts** ((c) in dev.md, "Track 3: the local decider verdict": the interim rule stays the one-line act-and-target rule for now; DeBERTa fine-tuned on household labels is LOOKUP-HEAD-01's path, not a zero-shot shadow run) (dev.md, "ARCH-BUILD-01: the buy-or-build verdict": XState v5 runs U2's machine, LangGraph and the in-house TurnGraph are rejected, Cedar waits for the policy record), so U2's state record can be written. Session A builds and
 measures the spike and records numbers only (in the scratch folder, not
 the repo); Session B runs the per-model benches; this session writes the
 verdict table in dev.md from A's data and amends the ARCH rows, and has
