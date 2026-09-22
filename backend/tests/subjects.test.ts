@@ -494,7 +494,8 @@ describe("recall and the prompt know whose fact it is", () => {
     expect(matches.length).toBe(1);
     expect(matches[0]!.record.text).toBe("Quill likes seltzer");
     const parts = buildPromptParts(actor, "what does Quill drink", matches);
-    expect(parts.context).toContain("- Quill likes seltzer (about Quill (your coworker); as of");
+    expect(parts.context).toContain("- remembered ");
+    expect(parts.context).toMatch(/- remembered \w+ \d{1,2}: Quill likes seltzer \(about Quill \(your coworker\); as of/);
   });
 
   test("an unconfirmed inferred relation is never said to the model (the name alone), and is plain once an adult confirms it", async () => {
