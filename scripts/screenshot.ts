@@ -2253,13 +2253,16 @@ async function captureNextAppsReview(browser: Browser, sessionValue: string): Pr
 }
 
 /** SHELL-02's first slice, its own stated acceptance ("captures 1440
- * dark only for this slice"): a real turn against the real dev engine
- * (not a mocked stream, the same "real household showed real data"
- * standard `captureNextDashboardReview`/`captureNextAppsReview` hold
- * to), with the reasoning Element expanded so the capture actually
- * shows what the slice proves - not just the collapsed trigger every
- * reply always renders regardless of whether reasoning ever wired up
- * to anything. */
+ * dark only for this slice"), extended 2026-09-22 to also capture
+ * phone (390): a live finding on the reasoning card's left edge and
+ * width against the reply text needed both to judge. A real turn
+ * against the real dev engine (not a mocked stream, the same "real
+ * household showed real data" standard
+ * `captureNextDashboardReview`/`captureNextAppsReview` hold to), with
+ * the reasoning Element expanded so the capture actually shows what
+ * the slice proves - not just the collapsed trigger every reply
+ * always renders regardless of whether reasoning ever wired up to
+ * anything. */
 async function captureNextChatReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2271,27 +2274,29 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   });
   if (!setShellNext.ok) throw new Error(`captureNextChatReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
-  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
-  const context = await newContext(browser, viewport, "dark", sessionValue);
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/next/chat`);
-    await page.getByRole("textbox", { name: "Message input" }).fill("What's 2 plus 2?");
-    await page.getByRole("button", { name: "Send message", exact: true }).click();
-    // Wait for the turn to fully finish (Stop generating appears, then
-    // reverts) before expanding Reasoning - otherwise the capture can
-    // land mid-stream, before the model's own reasoning has finished
-    // building up.
-    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
-    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
-    await page.getByRole("button", { name: "Reasoning" }).click();
-    await settleAnimations(page);
-    const path = join(outDir, `next-chat-${viewport.width}-dark.png`);
-    await page.screenshot({ path });
-    console.log(`Wrote ${path}`);
-    await page.close();
-  } finally {
-    await context.close();
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).fill("What's 2 plus 2?");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      // Wait for the turn to fully finish (Stop generating appears, then
+      // reverts) before expanding Reasoning - otherwise the capture can
+      // land mid-stream, before the model's own reasoning has finished
+      // building up.
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      await page.getByRole("button", { name: "Reasoning" }).click();
+      await settleAnimations(page);
+      const path = join(outDir, `next-chat-${viewport.width}-dark.png`);
+      await page.screenshot({ path, fullPage: slug === "phone" });
+      console.log(`Wrote ${path}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
   }
 }
 

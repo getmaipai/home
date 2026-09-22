@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent, type PropsWithChildren, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DismissableLayer } from "radix-ui/internal";
 import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolCallMessagePartComponent } from "@assistant-ui/react";
-import { Thread } from "@maipai/ui/src/elements/thread.aui";
+import { Thread, type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
+import { ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "@maipai/ui/src/elements/reasoning.aui";
 import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
@@ -413,6 +414,28 @@ function ChatThinkingIndicator() {
       aria-live="polite"
       label={slow ? "Still working. This is taking longer than usual." : (activity ?? "Thinking…")}
     />
+  );
+}
+
+// Live finding, 2026-09-22 (Jesse): the shipped `Thread`'s own default
+// reasoning-group rendering (no `variant` passed to `ReasoningRoot`)
+// renders the "outline" variant - a bordered, padded card whose left
+// edge and width don't match the reply text beside it. The shipped
+// Element's own `ghost` variant is the flush, borderless look (its own
+// `mb-4 w-full` base only) - the same look `Thread`'s default already
+// gives `ToolGroupRoot` two cases over in its own switch. Composed
+// through the documented `components.ReasoningGroup` slot (never a
+// fork of the vendored file): the shipped Root/Trigger/Content/Text
+// primitives, unstyled beyond the variant choice.
+function NextReasoningGroup({ children, group }: PropsWithChildren<{ group: ThreadGroupPart }>) {
+  const running = group.status.type === "running";
+  return (
+    <ReasoningRoot streaming={running} variant="ghost">
+      <ReasoningTrigger active={running} />
+      <ReasoningContent aria-busy={running}>
+        <ReasoningText>{children}</ReasoningText>
+      </ReasoningContent>
+    </ReasoningRoot>
   );
 }
 
@@ -1756,6 +1779,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   Indicator: ChatThinkingIndicator,
                   ComposerExtra: ComposerThinkingControl,
                   ComposerAddAttachmentOverride: ComposerAddMenu,
+                  ReasoningGroup: NextReasoningGroup,
                 }}
               />
             </div>
