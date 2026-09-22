@@ -4,7 +4,7 @@ import { dataDir } from "@/lib/paths";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
-import { __clearPendingSummaryRefreshesForTests, __resetOrdinaryToolSetForTests, __resetOutputNotificationsForTests } from "@/lib/turnEngine";
+import { __clearPendingSummaryRefreshesForTests, __resetOrdinaryToolSetForTests, __resetOutputNotificationsForTests, __resetStickyOfferedToolsForTests } from "@/lib/turnEngine";
 import { __resetPackageCachesForTests } from "@/lib/plugins";
 import { __resetSkillCacheForTests } from "@/lib/skills";
 import {
@@ -169,6 +169,9 @@ export function resetDb(): void {
   // ROUTE-02: the ordinary tool set is read from routing stats once per
   // installed set (boot); a fresh database is a fresh boot.
   __resetOrdinaryToolSetForTests();
+  // LAT-02/U1: the sticky per-conversation offered-tool set is keyed by
+  // conversation id, which a fresh database starts issuing from scratch.
+  __resetStickyOfferedToolsForTests();
   __resetOutputNotificationsForTests(); // CHAT-02: once-per-turn notification keys
   db.delete(idSequences).run();
   db.delete(sessions).run();

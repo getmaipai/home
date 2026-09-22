@@ -45,7 +45,7 @@ import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor, constraintsFor } from "@/lib/replyConstraints";
 import { planFor, planLine } from "@/lib/register";
-import { rungOf, rulesFired, type Rung, type RuleName } from "@/lib/ruleNames";
+import { rungOf, rulesFired, isTypedSourcePackage, type Rung, type RuleName } from "@/lib/ruleNames";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import { buildDocument, projectDocument, planComposition, composedText, composedLog, groundedIn, renderLookupRows, emptyLookupLine, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, structuredPartForOutcomes, artifactForOutcomes, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
 import { promptNow } from "@/lib/benchSampling";
@@ -1348,6 +1348,138 @@ export function selectOfferedTools(ranked: readonly RankedCandidate[], shape: Ut
   const earned = shape === "command" ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED) : placed ? ranked.filter((r) => r.id === placed.id) : [];
   const extras = earned.filter((r) => !ordinarySet.has(r.id));
   return [...ordinary, ...extras].map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
+}
+
+// LAT-02 (docs/plans/simple-turn-pipeline-2026-09-22.md, unit U1, "a
+// cache-stable prompt"): the offered tool set stays stable within a
+// conversation, so the prompt cache survives. Qwen3's template renders
+// `tools` inside the first system message, ahead of the whole
+// conversation history, so any change to the offered set invalidates
+// the cached prefix for everything behind it - measured live,
+// 2026-09-22: 9 of 12 turns pinned `cache_reuse_tokens` at 567 because
+// selectOfferedTools()'s own per-turn "earned" extra changed turn to
+// turn (the same conversation re-sent with two tools reordered cached
+// exactly 567). Monotonic per conversation, not a floor change: once a
+// candidate is earned, it stays offered for the rest of that
+// conversation - the ordinary set is untouched (already cache-stable,
+// ROUTE-02), sorted, and only grows. selectOfferedTools() itself keeps
+// deciding what ONE turn's own utterance would earn on its own -
+// scripts/bench/tool-calling.ts's routed pass and every existing
+// tier2.test.ts case still exercise exactly that function, unchanged -
+// this wraps it one level up.
+//
+// Bounded and pruned, the same shape as conversationHistory.ts's own
+// `temporarySessions` (a code review, 2026-09-22, caught an earlier
+// version of this comment claiming that precedent without actually
+// following it: `resumeSessions`/`inFlightTurns` are deleted per turn,
+// which this map cannot be - it exists to persist ACROSS turns - and
+// an un-evicted map keyed by every conversation a household ever has
+// grows without bound over a long-running process). A conversation
+// idle past STICKY_OFFERED_IDLE_MS is pruned (losing only cache warmth,
+// never correctness: the next turn re-earns from scratch); the map
+// never grows past STICKY_OFFERED_MAX, evicting the least recently
+// touched conversation first.
+const STICKY_OFFERED_MAX = 2000;
+const STICKY_OFFERED_IDLE_MS = 24 * 60 * 60 * 1000;
+interface StickyOffered {
+  ids: Set<string>;
+  lastActivityAt: number;
+}
+const stickyOfferedIds = new Map<string, StickyOffered>();
+
+function pruneStickyOffered(now: number): void {
+  for (const [id, entry] of stickyOfferedIds) {
+    if (now - entry.lastActivityAt > STICKY_OFFERED_IDLE_MS) stickyOfferedIds.delete(id);
+  }
+}
+
+function evictOldestStickyOfferedIfFull(): void {
+  if (stickyOfferedIds.size < STICKY_OFFERED_MAX) return;
+  let oldestId: string | null = null;
+  let oldestAt = Infinity;
+  for (const [id, entry] of stickyOfferedIds) {
+    if (entry.lastActivityAt < oldestAt) {
+      oldestAt = entry.lastActivityAt;
+      oldestId = id;
+    }
+  }
+  if (oldestId) stickyOfferedIds.delete(oldestId);
+}
+
+export function __resetStickyOfferedToolsForTests(): void {
+  stickyOfferedIds.clear();
+}
+
+/** Whether a package is safe to keep offered after the turn that
+ * earned it, without re-reading the utterance: a pure typed-source
+ * lookup (ruleNames.ts's own `isTypedSourcePackage`, plus websearch)
+ * answers a question and changes nothing, so a stale or irrelevant
+ * argument on a later turn costs an unhelpful answer, never a wrong
+ * real-world effect. Everything else - `remember` (a write), `timer`/
+ * `remind` (schedule something real), `lock-doors`/`lights-on` (a
+ * device), `list-add` (a durable edit) - keeps deciding fresh every
+ * turn, the same as before this item. Found live by this item's own
+ * tests: with `timer` or `lock-doors` persisted from an earlier turn,
+ * a later, unrelated turn (a cancelled ask's stray "ten minutes," a
+ * plain "did you lock it") could still fire it - a real behavior
+ * regression (a stale argument or an unasked-for action reachable long
+ * after the turn that asked for it), not a synthetic-stub artifact:
+ * `consequential` alone (lock-doors) was not a wide enough gate, since
+ * `timer` triggers the identical class of bug without being
+ * consequential itself. */
+function isStickyEligible(packageId: string, consequential: boolean | undefined): boolean {
+  return !consequential && (packageId === "websearch" || isTypedSourcePackage(packageId));
+}
+
+/** The turn's actual offered set: this turn's own earned candidates
+ * (selectOfferedTools(), unchanged) unioned into the conversation's
+ * sticky set and returned whole, ordinary first in id order then every
+ * earned-so-far extra in id order - the same shape selectOfferedTools()
+ * itself returns, just monotonic across turns instead of live per
+ * turn for the packages isStickyEligible() allows. `ranked` already
+ * carries every role-eligible package each turn (routeSemantic()'s own
+ * `eligible` list), so a candidate earned on an earlier turn always
+ * resolves to a real ToolSpec even on a turn whose own utterance would
+ * not have earned it.
+ *
+ * A sticky id that has since joined the ordinary set (an install or an
+ * update changed `ordinaryToolIdsForInstalled()`'s own memoized key
+ * mid-conversation - rare, but the ordinary set is real per-installed-
+ * set state, not immutable) is dropped from the extras and from the
+ * sticky set itself here, never offered twice (a code review,
+ * 2026-09-22: the first version only skipped ADDING an ordinary id to
+ * `sticky`, never removed one already there from an earlier turn). */
+export function stickyOfferedTools(conversationId: string, ranked: readonly RankedCandidate[], shape: UtteranceShape, ordinaryIds: readonly string[]): ToolSpec[] {
+  const now = Date.now();
+  pruneStickyOffered(now);
+  const earnedThisTurn = selectOfferedTools(ranked, shape, ordinaryIds);
+  const ordinarySet = new Set(ordinaryIds);
+  let entry = stickyOfferedIds.get(conversationId);
+  if (!entry) {
+    evictOldestStickyOfferedIfFull();
+    entry = { ids: new Set<string>(), lastActivityAt: now };
+    stickyOfferedIds.set(conversationId, entry);
+  }
+  entry.lastActivityAt = now;
+  const sticky = entry.ids;
+  for (const id of ordinarySet) sticky.delete(id); // no longer an "extra" - promoted to ordinary
+  const byId = new Map(ranked.map((r) => [r.id, r] as const));
+  const liveOnlyIds = new Set<string>();
+  for (const t of earnedThisTurn) {
+    if (ordinarySet.has(t.id)) continue;
+    if (isStickyEligible(t.id, byId.get(t.id)?.manifest.consequential)) {
+      sticky.add(t.id);
+    } else {
+      liveOnlyIds.add(t.id);
+    }
+  }
+  const ordinary = earnedThisTurn.filter((t) => ordinarySet.has(t.id));
+  const extraIds = [...new Set([...sticky, ...liveOnlyIds])].filter((id) => !ordinarySet.has(id)).sort((a, b) => a.localeCompare(b));
+  const extras = extraIds
+    .map((id) => byId.get(id))
+    .filter((r): r is RankedCandidate => r !== undefined)
+    .map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
+  return [...ordinary, ...extras];
 }
 
 /** ROUTE-01: one `[route]` line per routing decision, the bot's router
@@ -3381,7 +3513,7 @@ async function prepareTurn(
   // comment below is the history of the always-offer set, kept because
   // its reasoning (the offer costs prompt tokens, not a round trip; the
   // model's own judgment is the gate) is what ROUTE-01 generalized.
-  const tools = continuation || inCrisis ? [] : selectOfferedTools(ranked, shape, ordinaryToolIdsForInstalled(effectiveLoaded));
+  const tools = continuation || inCrisis ? [] : stickyOfferedTools(conversation.id, ranked, shape, ordinaryToolIdsForInstalled(effectiveLoaded));
   logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), outscoredBySkill, literalYielded, tier0Miss?.packageId ?? null);
   // manifest.routing.always_offer (spec/schemas/manifest.schema.json,
   // Fix E's own addition - a code review, 2026-09-07, found the first

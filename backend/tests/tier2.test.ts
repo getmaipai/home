@@ -30,6 +30,8 @@ import {
   runTurn,
   runTurnStream,
   selectOfferedTools,
+  stickyOfferedTools,
+  __resetStickyOfferedToolsForTests,
   ordinaryToolIds,
   routeSemantic,
   loadAllManifests,
@@ -1122,6 +1124,113 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
     expect(typeof record.margin).toBe("number");
     expect(record.offered).toContain("websearch");
     expect(JSON.stringify(record)).not.toContain("plumber"); // ids and numbers, never the utterance
+  });
+});
+
+// LAT-02/U1 (docs/plans/simple-turn-pipeline-2026-09-22.md): the
+// offered set stays stable within a conversation, so the prompt cache
+// survives. selectOfferedTools() itself, and every test above, is
+// unchanged - stickyOfferedTools() wraps it with a per-conversation
+// union.
+describe("LAT-02/U1: the sticky per-conversation offered set", () => {
+  const manifest = (id: string, always_offer = false) => ({ id, description: id, args: {}, routing: always_offer ? { always_offer: true } : {} }) as unknown as RankedCandidate["manifest"];
+  const ranked: RankedCandidate[] = [
+    { id: "remember", score: 0.41, manifest: manifest("remember") },
+    { id: "recall", score: 0.33, manifest: manifest("recall") },
+    { id: "define", score: 0.2, manifest: manifest("define") },
+    { id: "trivia", score: 0.1, manifest: manifest("trivia") },
+    { id: "websearch", score: 0.05, manifest: manifest("websearch", true) },
+  ];
+  const alwaysOnly = ["websearch"];
+
+  beforeEach(() => __resetStickyOfferedToolsForTests());
+
+  test("two consecutive command-shaped turns in the same conversation earning the same candidate produce the identical tools block", () => {
+    const first = stickyOfferedTools("conv-a", ranked, "command", alwaysOnly);
+    const second = stickyOfferedTools("conv-a", ranked, "command", alwaysOnly);
+    expect(first.map((t) => t.id)).toEqual(second.map((t) => t.id));
+    expect(first).toEqual(second);
+  });
+
+  test("a lookup candidate earned on turn 1 stays offered on turn 2, even when turn 2's own utterance would not have earned it", () => {
+    // Turn 1: a command shape earns the top three plus always-offer -
+    // "remember" and "recall" are earned live this turn too (returned
+    // below), but only "define" (a typed-source lookup, isStickyEligible())
+    // carries into a later turn; stickyOfferedTools() sorts the sticky
+    // extras by id (never by score), the same stability convention the
+    // ordinary set already uses, so this is not selectOfferedTools()'s
+    // own score order.
+    const turn1 = stickyOfferedTools("conv-b", ranked, "command", alwaysOnly);
+    expect(turn1.map((t) => t.id)).toEqual(["websearch", "define", "recall", "remember"]);
+    // Turn 2: a question shape that Tier 1 placed nothing for would, on
+    // its own, offer only the always-offer set (selectOfferedTools()'s
+    // own rule, proven in ROUTE-01 above) - the sticky set keeps the
+    // one lookup candidate turn 1 earned, a superset of the always-offer
+    // set, but "remember" and "recall" are gone: they were never sticky.
+    const turn2 = stickyOfferedTools("conv-b", ranked, "question", alwaysOnly);
+    expect(turn2.map((t) => t.id)).toEqual(["websearch", "define"]);
+    expect(selectOfferedTools(ranked, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]); // the un-wrapped function is unaffected
+  });
+
+  test("a later turn earning one more lookup candidate only grows the set, in id order after the ordinary prefix", () => {
+    const turn1 = stickyOfferedTools("conv-c", ranked, "question", alwaysOnly); // earns nothing beyond always-offer
+    expect(turn1.map((t) => t.id)).toEqual(["websearch"]);
+    const placed: RankedCandidate[] = [{ id: "define", score: 0.8, manifest: manifest("define") }, ...ranked.filter((r) => r.id !== "define")];
+    const turn2 = stickyOfferedTools("conv-c", placed, "question", alwaysOnly); // Tier 1 placed "define" this turn
+    expect(turn2.map((t) => t.id)).toEqual(["websearch", "define"]);
+    const turn3 = stickyOfferedTools("conv-c", ranked, "question", alwaysOnly); // back to earning nothing new - "define" stays
+    expect(turn3.map((t) => t.id)).toEqual(["websearch", "define"]);
+  });
+
+  // Found live by this item's own gate run (conversationBench.test.ts's
+  // "consequential-once" and "never-mind-on-an-ask" rows): a package
+  // that WRITES or ACTS (remember, timer, lock-doors) must never stay
+  // reachable past the turn that earned it, or a later, unrelated turn
+  // can fire it with a stale or absent argument - `consequential` alone
+  // was not a wide enough gate (`timer` is not consequential and still
+  // triggers the identical class of bug), so isStickyEligible() allows
+  // only a typed-source lookup (websearch, or ruleNames.ts's own
+  // isTypedSourcePackage: define/convert/math/trivia/weather/news/
+  // sports/currency/knowledge/media-lookup/almanac*), never a write or
+  // an action.
+  test("a write package (remember, earned but not a lookup) is offered live but never made sticky", () => {
+    const writeHeavy: RankedCandidate[] = [
+      { id: "remember", score: 0.9, manifest: manifest("remember") },
+      { id: "websearch", score: 0.05, manifest: manifest("websearch", true) },
+    ];
+    const turn1 = stickyOfferedTools("conv-g", writeHeavy, "command", alwaysOnly);
+    expect(turn1.map((t) => t.id)).toEqual(["websearch", "remember"]); // earned live this turn
+    const turn2 = stickyOfferedTools("conv-g", ranked, "question", alwaysOnly); // an unrelated later turn
+    expect(turn2.map((t) => t.id)).toEqual(["websearch"]); // "remember" did not persist
+  });
+
+  test("two different conversations never share a sticky set", () => {
+    stickyOfferedTools("conv-d", ranked, "command", alwaysOnly);
+    const other = stickyOfferedTools("conv-e", ranked, "question", alwaysOnly);
+    expect(other.map((t) => t.id)).toEqual(["websearch"]);
+  });
+
+  // A code review (2026-09-22) on this item: a sticky id that later
+  // joins the ordinary set (an install changed ordinaryToolIdsForInstalled()'s
+  // own memoized key mid-conversation) must never be offered twice.
+  test("a sticky candidate that later joins the ordinary set is never offered twice", () => {
+    const turn1 = stickyOfferedTools("conv-h", ranked, "command", alwaysOnly); // earns "define" (sticky)
+    expect(turn1.map((t) => t.id)).toContain("define");
+    // A later turn's ordinary set now includes "define" too (as if a
+    // usage-stats change promoted it - ROUTE-02's own mechanism).
+    const widerOrdinary = ["define", "websearch"];
+    const turn2 = stickyOfferedTools("conv-h", ranked, "question", widerOrdinary);
+    const ids = turn2.map((t) => t.id);
+    expect(ids.filter((id) => id === "define").length).toBe(1);
+    expect(ids).toEqual(["define", "websearch"]);
+  });
+
+  test("a candidate already in the ordinary set is never duplicated into the sticky extras", () => {
+    const top: RankedCandidate[] = [{ id: "websearch", score: 0.9, manifest: manifest("websearch", true) }, ...ranked.filter((r) => r.id !== "websearch")];
+    const turn1 = stickyOfferedTools("conv-f", top, "command", alwaysOnly);
+    expect(turn1.map((t) => t.id)).toEqual(["websearch", "recall", "remember"]); // extras sorted by id
+    const turn2 = stickyOfferedTools("conv-f", ranked, "question", alwaysOnly);
+    expect(turn2.map((t) => t.id).filter((id) => id === "websearch").length).toBe(1);
   });
 });
 
