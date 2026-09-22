@@ -59,6 +59,7 @@
       "frontend": {
         "packageJson": {
           "dependencies": [
+            "npm:@assistant-ui/core@0.3.20",
             "npm:@assistant-ui/react-markdown@~0.14.14",
             "npm:@assistant-ui/react@0.15.21",
             "npm:@happy-dom/global-registrator@^20.14.0",

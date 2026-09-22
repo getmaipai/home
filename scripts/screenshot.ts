@@ -313,6 +313,7 @@ const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
+const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 
 interface RouteSpec {
   slug: string;
@@ -2345,6 +2346,43 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   }
 }
 
+/** SHELL-02 slice 6's own stated capture: the composer's "+" menu open,
+ * the Apps group visible (a bundled package always installed, so the
+ * group never renders empty here) - the default-visible set only
+ * (photos and files, camera, Apps): Create image, Web search and the
+ * voice waveform stay behind NEXT_CHAT_UNWIRED_CONTROLS_ENABLED
+ * (composerAddMenu.tsx), unset in a real run, so this capture shows
+ * exactly what a real household sees. */
+async function captureNextChatComposerReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextChatComposerReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "dark", sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/next/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ timeout: 5000 });
+    await page.getByText("Weather", { exact: true }).waitFor({ timeout: 5000 });
+    await settleAnimations(page);
+    const path = join(outDir, `next-chat-composer-${viewport.width}-dark.png`);
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+    await page.close();
+  } finally {
+    await context.close();
+  }
+}
+
 /** SHELL-02 slice 4's own stated acceptance ("a real 'write me a short
  * note about X' turn... the deterministic capture"): "pizza night" is
  * the stub model's own scripted `scriptedToolCalls` branch (main()'s
@@ -3328,6 +3366,10 @@ async function main() {
 
     if (nextSignInReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
       await captureNextSignInReview(browser, sessionValue);
+    }
+
+    if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview) {
+      await captureNextChatComposerReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

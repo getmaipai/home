@@ -31,7 +31,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/toolt
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
-import { api, ApiError, isOwnerOrAdminRole, readBareCompareStream, type BareCompareTrace, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, readBareCompareStream, type BareCompareTrace, type InstalledPackage, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
@@ -39,6 +39,12 @@ import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
+import { ComposerAddMenu, PackageScopeContext } from "@/apps/chat/composerAddMenu";
+import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
+import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
+import { createSttSocket } from "@/lib/voice/sttSocket";
+import { CURRENT_LOCAL_VISION_CAPABILITY } from "@/apps/chat/visionCapability";
+import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assistant-ui/core";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 const HistoryIcon = getIcon("history");
@@ -941,8 +947,39 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   const [bareMode, setBareMode] = useState(false);
   const bareModeRef = useRef(false);
   bareModeRef.current = bareMode;
+  // SHELL-02 slice 6: the Apps menu's choice (composerAddMenu.tsx's
+  // `PackageScopeContext`), single-shot like `thinkingRef` above.
+  const [packageScope, setPackageScope] = useState<InstalledPackage | null>(null);
+  const packageScopeRef = useRef<InstalledPackage | null>(null);
+  packageScopeRef.current = packageScope;
 
   const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
+  // SHELL-02 slice 6: the same real adapters ChatPage.tsx's composer
+  // already uses - images plus, new here, text/Markdown files through
+  // the shipped `SimpleTextAttachmentAdapter` (client-side only, no
+  // route: it reads the file's own text, same as the image adapter
+  // reads bytes into a data URL, no backend change needed). PDF and
+  // office documents stay unbuilt: `documentExtraction.ts`'s Tika path
+  // exists server-side but nothing wires it to a route or the turn
+  // (COMPOSER-DOC-ATTACH-01, docs/BACKLOG.md) - a real gap, not this
+  // slice's UI-composition scope.
+  const imageAttachmentAdapter = useMemo(() => createLocalImageAttachmentAdapter({ capability: () => CURRENT_LOCAL_VISION_CAPABILITY }), []);
+  const attachmentsAdapter = useMemo(() => new CompositeAttachmentAdapter([imageAttachmentAdapter, new SimpleTextAttachmentAdapter()]), [imageAttachmentAdapter]);
+  const dictationAdapter = useMemo(
+    () =>
+      createSttDictationAdapter({
+        createSocket: createSttSocket,
+        turnSchedulerRef,
+        // Unlike ChatPage.tsx's own dictation, no auto-send here yet -
+        // the brief for this slice is "speech into the text box", not
+        // the old page's own send-on-final behavior; a household member
+        // reviews and sends it themselves. Real either way: the
+        // transcript lands in the composer through the adapter's own
+        // `onSpeech`, independent of this callback.
+        onFinalReady: () => {},
+      }),
+    [],
+  );
 
   // A named, `use`-prefixed function, not an inline arrow - ChatPage.tsx's
   // own comment on why: `useRemoteThreadListRuntime` calls `runtimeHook`
@@ -965,6 +1002,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
             return value;
           },
           consumeSupersedes: () => undefined,
+          consumePackageScope: () => {
+            const value = packageScopeRef.current?.id;
+            packageScopeRef.current = null;
+            setPackageScope(null);
+            return value;
+          },
           isBareMode: () => bareModeRef.current,
           onCrisisResources: setBanner,
           turnSchedulerRef,
@@ -982,7 +1025,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     // the speech adapter is new (chatSpeechAdapter.ts), the identical
     // POST /api/tts pieces chatListenStore.ts's own "Listen" replay
     // already uses, wired through the runtime instead of a second store.
-    const adapters = useMemo(() => ({ feedback: createChatFeedbackAdapter(), speech: createChatSpeechAdapter() }), []);
+    // A review caught this: an empty deps array here is harmless today
+    // only because both adapters are themselves already stably
+    // memoized - but it defeats exhaustive-deps' own future
+    // protection for no reason, since listing them doesn't actually
+    // trigger the "outer-scope value" warning either.
+    const adapters = useMemo(() => ({ feedback: createChatFeedbackAdapter(), speech: createChatSpeechAdapter(), attachments: attachmentsAdapter, dictation: dictationAdapter }), [attachmentsAdapter, dictationAdapter]);
     return useLocalRuntime(chatModelAdapter, { adapters });
   }
 
@@ -999,7 +1047,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     },
   });
 
-  return { runtime, banner, thinking, setThinking, bareMode, setBareMode };
+  return { runtime, banner, thinking, setThinking, bareMode, setBareMode, packageScope, setPackageScope };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1232,7 +1280,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, bareMode, setBareMode } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, bareMode, setBareMode, packageScope, setPackageScope } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1245,6 +1293,7 @@ export function NextChatPage({ person }: { person: Roster }) {
     [thinking, setThinking],
   );
   const bareModeValue = useMemo(() => ({ on: bareMode, toggle: () => setBareMode((value) => !value) }), [bareMode, setBareMode]);
+  const packageScopeValue = useMemo(() => ({ scope: packageScope, setScope: setPackageScope }), [packageScope, setPackageScope]);
   // One base element, rendered at the phone/tablet Sheet and the
   // collapsed rail's own peek overlay - ChatPage.tsx's own fix for
   // exactly this (a code review caught two call sites drifting once one
@@ -1483,6 +1532,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <DetailsOpenContext.Provider value={detailsOpenValue}>
       <ThinkingModeContext.Provider value={thinkingModeValue}>
       <BareModeContext.Provider value={bareModeValue}>
+      <PackageScopeContext.Provider value={packageScopeValue}>
         <StructuredResultTools />
         <ArtifactTool />
         <ToolTimelineTool />
@@ -1640,6 +1690,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   AssistantMessageFooterExtra: MessageFooterExtra,
                   Indicator: ChatThinkingIndicator,
                   ComposerExtra: ComposerThinkingControl,
+                  ComposerAddAttachmentOverride: ComposerAddMenu,
                 }}
               />
             </div>
@@ -1685,6 +1736,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
           </SheetContent>
         </Sheet>
+      </PackageScopeContext.Provider>
       </BareModeContext.Provider>
       </ThinkingModeContext.Provider>
       </DetailsOpenContext.Provider>

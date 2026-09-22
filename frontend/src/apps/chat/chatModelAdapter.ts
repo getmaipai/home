@@ -64,6 +64,16 @@ export interface ChatModelAdapterDeps {
   // edit once this one's been read.
   consumeSupersedes(): string | undefined;
   consumeContinuation?(): PendingContinuation | undefined;
+  // SHELL-02 slice 6: reads AND resets the composer's Apps-menu choice
+  // (composerAddMenu.tsx's `PackageScopeContext`), the same single-shot
+  // shape as `consumeSupersedes()` - a choice ridden on the next send,
+  // then cleared, never a mode a later message inherits by accident.
+  // Undefined for any surface with no Apps menu. Carried on the wire as
+  // an additive field the old turn path doesn't read yet (see
+  // `api.streamTurn`'s own comment) - present here so the choice's own
+  // test can assert the outgoing payload without the flag it's gated
+  // behind changing how a real send behaves today.
+  consumePackageScope?(): string | undefined;
   getConversationId?(): Promise<string>;
   // 4.3: "offer, never block" - a crisis-resources banner rides alongside
   // the reply, not as part of the message content assistant-ui renders.
@@ -336,6 +346,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             resumeToken,
             turnId: resumeTurnId,
             resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
+            packageScope: reconnectAttempts === 0 ? deps.consumePackageScope?.() : undefined,
           });
           for await (const event of readTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event

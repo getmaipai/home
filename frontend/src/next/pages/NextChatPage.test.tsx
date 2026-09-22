@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { NextChatPage } from "@/next/pages/NextChatPage";
+import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
 import type { Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 import { ndjsonStream, staggeredNdjsonStream } from "../../../tests/ndjsonStream";
@@ -1174,24 +1175,6 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
 });
 
 describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () => {
-  // stubTurnFetch's own shape (SHELL-02 slice 3, above) - unchanged, no
-  // engines stub needed here (no model picker: COORDINATOR ruled it out
-  // of this slice, MODEL-SEL-01).
-  function stubTurnFetch(streamBody: ReadableStream<Uint8Array>): () => void {
-    const original = globalThis.fetch;
-    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
-    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-thinking123", status: "open", surface: "chat" }));
-      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
-      return Promise.resolve(new Response("{}", { status: 200 }));
-    }) as unknown as typeof fetch;
-    return () => {
-      globalThis.fetch = original;
-    };
-  }
-
   async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
     fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
     const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
@@ -1203,8 +1186,13 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
   // toggle is a CSS class, not a conditional render) - a plain
   // getByRole/getByText query would find the trigger AND the "Instant"
   // menu item both, so every query here goes through data-slot instead.
+  // SHELL-02 slice 6 added a second `ComposerMenu` beside this one (the
+  // composer's "+" menu) sharing the identical `data-slot="composer-menu"`
+  // (the kit's own attribute, not distinguishable by name) - `menu()`
+  // scopes to the trigger's own wrapper instead of the whole document,
+  // same fix the new menu's own tests use.
   const trigger = () => document.querySelector('[data-slot="composer-model-trigger"]') as HTMLButtonElement;
-  const menu = () => document.querySelector('[data-slot="composer-menu"]') as HTMLElement;
+  const menu = () => trigger().parentElement!.querySelector('[data-slot="composer-menu"]') as HTMLElement;
   const menuItems = () => within(menu()).getAllByRole("button");
 
   test("the trigger defaults to Instant, beside a two-entry Instant/Thinking menu - no separate model picker", async () => {
@@ -1295,6 +1283,21 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     }
   });
 
+  function stubTurnFetch(streamBody: ReadableStream<Uint8Array>): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-thinking123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
   test("sending a message consumes the mode and resets it to Instant - per-turn, never remembered across turns (PERSIST-CONV-01 is the real persistence, not built here)", async () => {
     const restore = stubTurnFetch(
       ndjsonStream([
@@ -1315,6 +1318,146 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       await sendMessage(view, "explain it");
       await view.findByText("Sure.");
       expect(trigger()).toHaveTextContent("Instant");
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
+  const PLUGIN = { id: "pkg-weather", version: "1.0.0", kind: "plugin", category: "lookup", display: "Weather", description: "Checks the local forecast.", tool_label: null, author: "MaiPai", license: "AGPL-3.0", installed_version: "1.0.0", latest_version: "1.0.0", channel: "stable" as const, status: "enabled" as const, smoke: { last_run_at: null, ok: null, message: null } };
+  const IMAGE_ROLE = { id: "image", label: "image", wire: "chat" as const, residency: "resident" as const, endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready" as const, since: "2026-09-22T00:00:00.000Z" }, reason: null, model: null, check: { state: "not checked" as const, at: null, reason: null, stale: false } };
+
+  afterEach(() => __setUnwiredControlsForTests(false));
+
+  function stubAddMenuFetch(streamBody?: ReadableStream<Uint8Array>, imageRoleReady = false): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-addmenu1", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/plugins")) return Promise.resolve(Response.json([PLUGIN]));
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: imageRoleReady, roles: imageRoleReady ? [IMAGE_ROLE] : [], engines: [], budget: null }));
+      if (streamBody && url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  const addButton = () => document.querySelector('[aria-label="Add"]') as HTMLButtonElement;
+  // Two `ComposerMenu` instances share the row (mine and
+  // `ComposerThinkingControl`'s own) - both carry the identical
+  // `data-slot="composer-menu"` (the kit's own attribute, not
+  // distinguishable by name), so the query is scoped to the trigger's
+  // own `DismissableLayer.Root` wrapper rather than the document.
+  const addMenu = () => addButton().parentElement!.querySelector('[data-slot="composer-menu"]') as HTMLElement;
+
+  test("lists the Apps group from a mocked plugins list, icon and description both present", async () => {
+    const restore = stubAddMenuFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      await within(addMenu()).findByText("Weather");
+      expect(within(addMenu()).getByText("Checks the local forecast.")).toBeTruthy();
+      // kindStyle("plugin") -> the puzzle IconTile, not a bare glyph.
+      expect(addMenu().querySelector("svg.lucide-puzzle")).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
+  test("choosing an app scopes the next turn - the send payload carries package_scope", async () => {
+    const restore = stubAddMenuFetch(
+      ndjsonStream([
+        { type: "delta", text: "Sunny today." },
+        { type: "done", value: { turn_id: "turn-addmenu1", reply: { text: "Sunny today." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      const weatherItem = await within(addMenu()).findByText("Weather");
+      fireEvent.click(weatherItem);
+      // The menu closes on selection, same as an Apps or Thinking pick.
+      expect(addMenu()).not.toHaveAttribute("data-open");
+      fireEvent.change(await view.findByLabelText("Message input"), { target: { value: "what's the weather" } });
+      const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+      await waitFor(() => expect(send.disabled).toBe(false));
+      fireEvent.click(send);
+      await view.findByText("Sunny today.");
+      const call = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls.find((c: unknown[]) => (typeof c[0] === "string" ? c[0] : (c[0] as URL | Request).toString()).includes("/api/turn/stream"));
+      const body = JSON.parse((call![1] as RequestInit).body as string);
+      expect(body.package_scope).toBe("pkg-weather");
+    } finally {
+      restore();
+    }
+  });
+
+  test("Create image and Web search stay out of the menu by default, even with the image role ready", async () => {
+    const restore = stubAddMenuFetch(undefined, true);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      await within(addMenu()).findByText("Weather");
+      expect(within(addMenu()).queryByText("Create image")).toBeNull();
+      expect(within(addMenu()).queryByText("Web search")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("Create image and Web search render with the unwired-controls flag forced on - Create image also needs the image role ready", async () => {
+    __setUnwiredControlsForTests(true);
+    const restore = stubAddMenuFetch(undefined, true);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      await within(addMenu()).findByText("Web search");
+      expect(within(addMenu()).getByText("Create image")).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
+  test("Create image stays out even with the flag on, when the image role isn't ready", async () => {
+    __setUnwiredControlsForTests(true);
+    const restore = stubAddMenuFetch(undefined, false);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      // Web search has no role of its own to wait on - present as soon
+      // as the flag is, proving the menu itself rendered (not a stale
+      // query) while Create image's own extra gate held it back.
+      await within(addMenu()).findByText("Web search");
+      expect(within(addMenu()).queryByText("Create image")).toBeNull();
     } finally {
       restore();
     }

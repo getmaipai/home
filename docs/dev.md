@@ -19666,3 +19666,171 @@ The spike's data is Session A's, in `data-scratch/arch-build-01-measurements.md`
 **Caveats on the record.** The network-block measurement was `lsof` snapshots, not an enforced block, because the shared machine's networking could not be cut under other sessions; the adopted candidate has no network code path, and the rejected one is not adopted, so no decision rests on it. The Cedar table row is A's final fold; if its numbers move, the deferral does not.
 
 Engine for the framework runs: the hub's own chat engine on 8788 (b10797, qwen3-8b-instruct-q4-k-m); the spikes' side runs on a spare port with the same build; Apple M4 Pro, 20-core GPU, 24 GB.
+
+## Slice 6: the composer's "+" menu, and the one-attach-control kit patch it needed (2026-09-22)
+
+Owner's spec (relayed via the coordinator): the "+" button opens a
+grouped menu - Add (photos and files, a phone's camera, Create image,
+Web search) and Apps (the installed packages, choosing one scopes the
+turn) - plus two voice controls at the composer's right (a dictation
+mic, a waveform+chevron for a live voice conversation).
+
+**The one real structural blocker, found reading the kit before writing
+anything:** the vendored `elements/thread.aui.tsx`'s `ComposerAction`
+hardcoded a bare `<ComposerAddAttachment />` immediately left of the
+`ComposerExtra` slot - putting a grouped menu there too would have put
+two "+"-shaped controls side by side, the shipped one-click file picker
+and this slice's own menu. A five-minute check of upstream
+assistant-ui's own Elements catalog (`packages/ui/src/components/
+react/assistant-ui/elements/`, via `gh api`) found no shipped
+add-menu Element to adopt instead. So: commons gained a sixth
+`ThreadComponents` append point, `ComposerAddAttachmentOverride?:
+ComponentType`, the same shape `ComposerExtra`/`Indicator`/
+`AssistantActionBarExtra`/`AssistantMessageFooterExtra` already
+established (commons commit d438eac, tag `ui-v0.5.34`, pins bumped in
+`scripts/check.sh` and `frontend/package.json`) - when set, it replaces
+the bare button outright rather than rendering beside it. Recorded in
+`ui/docs/dashboard-upstream.md`'s pending-patches table and
+`ui/CHANGELOG.md`; handed to home-37 (already mid-PR on
+assistant-ui/assistant-ui#8003, "Thread: five append points for
+product-specific controls") to add as the PR's sixth.
+
+**The menu (`frontend/src/apps/chat/composerAddMenu.tsx`, new):**
+composed entirely from shipped pieces - `elements/composer.tsx`'s
+`ComposerAttachButton`/`ComposerMenu`/`ComposerMenuItem` (the exact
+primitives `ComposerThinkingControl`, right above this in the file,
+already established, same `DismissableLayer` dismiss pattern), the
+kit's `IconTile`/`getIcon`, and `apps/library/AppsPage.tsx`'s own
+`kindStyle()` for a package's icon (manifests carry no icon field -
+reusing the one real derivation the app already has beats inventing a
+second one). Real, default-visible pieces:
+
+- **Add photos and files**: `ComposerPrimitive.AddAttachment asChild`,
+  wired to the runtime's own attachments adapter -
+  `CompositeAttachmentAdapter([imageAttachmentAdapter, new
+  SimpleTextAttachmentAdapter()])` in `useNextChatRuntime`. The text
+  adapter is genuinely new capability, not scaffolding: it reads a
+  file's own text client-side, same as the image adapter reads bytes
+  into a data URL, no route needed either way.
+- **Take a photo**: no shipped Element or primitive exposes the file
+  input's native `capture` attribute - checked directly against
+  `@assistant-ui/react`'s own `ComposerAddAttachment.js` source (it
+  builds its own hidden input with no way to set one). Composed from
+  the same public `useComposerAddAttachment()` hook that primitive
+  calls internally (`@assistant-ui/core/react` - added as a direct
+  `frontend/package.json` dependency at the exact version
+  `@assistant-ui/react` already pins internally, `0.3.20`, a two-line
+  `bun.lock` diff, verified clean against `origin/main`), adding only
+  the native attribute. `sm:hidden` (capture has no meaning on a
+  desktop file dialog).
+- **Apps**: `GET /api/plugins`, filtered to `status: "enabled"`.
+
+**Behind a new module-level flag (default off), built and unit-tested
+with it forced on - never a button with nothing behind it in a real
+household's default view** (the owner's ruling, relayed 2026-09-22,
+after a first pass would have shipped Create image whenever a role
+reports ready with still no generation tool behind it). A review
+caught the flag as first written: a bare `export const ... = false`
+with no code path anywhere that ever set it `true`, so "unit-tested
+with it forced on" had nothing in the tree to prove it - fixed with a
+`__setUnwiredControlsForTests(enabled)` setter (the same
+`__resetXForTests` shape `llmSupervisor.ts`/`documentExtraction.ts`
+already use) and real tests exercising both states:
+
+- **Create image**: gated on the `image` role's `state.state ===
+  "ready"` - but a grep of the whole backend for `generate_image`/
+  `image_generation`/`create_image` at slice 6 time found nothing at
+  all, no tool, no route, no wire field, not just an unready role.
+  Role-readiness alone would have been safe today (every household
+  without a Stack, which the engines route's own doc comment says is
+  every household today, never reports a ready role) but not the day a
+  Stack does - the flag is the guard against that day arriving before
+  the real tool does.
+- **Web search** as an explicit tool, and an app's actual effect on the
+  turn: neither has a `routes/turn.ts` field. Choosing an app still
+  does something real and testable, though - `consumePackageScope()`
+  (`chatModelAdapter.ts`, the same single-shot `consumeSupersedes()`
+  shape) threads the chosen package's id into `api.streamTurn`'s new
+  `packageScope` opt, sent as an additive `package_scope` field
+  (`routes/turn.ts` doesn't read it yet, per Compatibility) - real
+  enough for `NextChatPage.test.tsx`'s own "choosing an app scopes the
+  next turn" test to assert the actual outgoing payload, with no
+  turnEngine.ts touch and no flag needed for the Apps group itself
+  (COMPOSER-TOOL-SCOPE tracked under U2's own turn-request fields,
+  docs/BACKLOG.md).
+
+**PDF and office documents** stay out of the Add menu entirely, not
+flagged: `documentExtraction.ts`'s Tika path (ATT-01b) and
+`attachments.ts`'s `createAttachment`/`readAttachment` (ATT-01c) both
+exist, fully built, server-side - but nothing wires either to a route
+or to a turn's own content parts (a grep for both across every route
+file came back empty). A real, separate gap, filed as
+COMPOSER-DOC-ATTACH-01 (docs/BACKLOG.md), not this slice's scope to
+close.
+
+**The dictation mic needed no new UI at all.** `useNextChatRuntime`
+was missing the real adapters `ChatPage.tsx` already had -
+`imageAttachmentAdapter`/`dictationAdapter` (`createSttDictationAdapter`
+over the real STT socket, `onFinalReady` a no-op here since this
+slice's own brief is "speech into the text box", not the old page's
+auto-send). Once passed to `useLocalRuntime`'s `adapters`, the kit's
+own `ComposerAction` renders the shipped Dictate/StopDictation buttons
+automatically (`s.thread.capabilities.dictation`) - the control was
+already built and already styled, invisible only because nothing had
+supplied a real adapter.
+
+**The waveform+chevron** (`frontend/src/apps/chat/
+composerVoiceControls.tsx`, new) is HANDSFREE-01's own row (b), not
+this slice's to finish: built and unit-tested standalone (`VoiceOrb`
+for the waveform, a chevron listing `GET /api/voice/catalog` the same
+way Settings' own `VoiceCatalogSection.tsx` already displays it - the
+file's basename as the name, `titleCaseOption` on the collection, no
+second naming scheme), gated on both `stt` and `tts` roles reporting
+`ready`. Not mounted in the real composer: `ComposerAction`'s right
+group (the dictate mic, Send) has no append point the way the left
+group now does, and there is no live voice session for it to drive
+either way - upstream assistant-ui does carry a runtime-wired
+`voice.aui.tsx`/`voice-conversation.aui.tsx`/`createVoiceSession()`
+(found during the same catalog check that ruled out an add-menu
+Element) that the vendored snapshot never picked up, worth a look when
+HANDSFREE-01 builds the real session. Recorded as HANDSFREE-01's own
+gap (docs/BACKLOG.md): a `ComposerExtraEnd`-shaped right-side slot,
+same commons recipe, cut when that item lands.
+
+**A real regression caught before landing:** every pre-existing
+`NextChatPage.test.tsx` test now renders this menu too (it mounts on
+every page render), and several of those tests' own fetch stubs answer
+an unmocked `/api/plugins`/`/api/engines` with a bare `{}` (their own
+established shortcut for "anything else"). `AppsGroup`/`readyRole`
+both hardened against a non-array response for exactly that reason -
+a real case this component meets on nearly every existing test, not a
+hypothetical. Separately, `ComposerThinkingControl`'s own `menu()` test
+helper broke the same way slice 6's own tests would have: two
+`ComposerMenu` instances now share the identical `data-slot=
+"composer-menu"` (the kit's own attribute, not distinguishable by
+name), so a bare `document.querySelector` started returning this
+slice's menu instead of the thinking control's - fixed by scoping both
+helpers to their own trigger's parent wrapper, not the whole document.
+
+**The medium review (four findings, all fixed) before landing:**
+`readyRole()` was defined verbatim in both new files - extracted to
+`frontend/src/apps/chat/engineRoles.ts`, the one real drift risk a
+future HANDSFREE-01 change to what "ready" means would otherwise have
+to catch twice. The unwired-controls flag's own missing override is
+above. "Take a photo"'s cleanup relied on the file input's own
+`cancel` event, which has patchy cross-browser support (Safari only
+since 16.4) - a person closing the camera sheet without picking
+anything could leave the hidden input attached to `document.body`
+forever on an affected browser; fixed with a `window` `focus` listener
+(the cross-browser signal a native picker closed, chosen or not),
+idempotent against the real pick's own cleanup. `openCamera()` also
+had a harmless but confusing double `appendChild` on the same node -
+the second call was a no-op re-insertion; removed.
+
+Tests: `composerAddMenu`'s Apps group, the scoping payload, and the
+unwired-controls flag off/on (including Create image's own extra role
+gate on top of the flag) - four cases, `NextChatPage.test.tsx`.
+`composerVoiceControls.test.tsx`'s three role-gating cases.
+`scripts/screenshot.ts` gained `--next-chat-composer-review` (1440,
+dark, the menu open, the Apps group visible - the default-visible set
+only, the flag unset). Full suite: 642 frontend tests, 0 failures.
