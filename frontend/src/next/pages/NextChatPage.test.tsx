@@ -1140,6 +1140,154 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
   });
 });
 
+describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () => {
+  // stubTurnFetch's own shape (SHELL-02 slice 3, above) - unchanged, no
+  // engines stub needed here (no model picker: COORDINATOR ruled it out
+  // of this slice, MODEL-SEL-01).
+  function stubTurnFetch(streamBody: ReadableStream<Uint8Array>): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-thinking123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+  }
+
+  // `ComposerMenu`'s items are always mounted (the kit's own `open`
+  // toggle is a CSS class, not a conditional render) - a plain
+  // getByRole/getByText query would find the trigger AND the "Instant"
+  // menu item both, so every query here goes through data-slot instead.
+  const trigger = () => document.querySelector('[data-slot="composer-model-trigger"]') as HTMLButtonElement;
+  const menu = () => document.querySelector('[data-slot="composer-menu"]') as HTMLElement;
+  const menuItems = () => within(menu()).getAllByRole("button");
+
+  test("the trigger defaults to Instant, beside a two-entry Instant/Thinking menu - no separate model picker", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      expect(trigger()).toHaveTextContent("Instant");
+      const items = menuItems();
+      expect(items).toHaveLength(2);
+      expect(items[0]).toHaveTextContent("Instant");
+      expect(items[1]).toHaveTextContent("Thinking");
+    } finally {
+      restore();
+    }
+  });
+
+  test("clicking the trigger opens the menu; picking Thinking updates the trigger and closes it", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      expect(menu()).not.toHaveAttribute("data-open");
+      // A review caught this: `ComposerMenu`'s own `open` only ever
+      // toggles opacity/scale, never unmounts its children - closed, the
+      // two menu buttons stayed reachable by Tab and in the
+      // accessibility tree, ahead of Send. `inert` closes that gap
+      // (happy-dom's own role queries don't actually enforce `inert`'s
+      // effect - `menuItems()` above still finds them regardless - so
+      // this checks the attribute directly rather than relying on a
+      // query the test environment doesn't model faithfully).
+      expect(menu()).toHaveAttribute("inert");
+      fireEvent.click(trigger());
+      expect(menu()).toHaveAttribute("data-open");
+      expect(menu()).not.toHaveAttribute("inert");
+      fireEvent.click(menuItems()[1]!);
+      expect(trigger()).toHaveTextContent("Thinking");
+      expect(menu()).not.toHaveAttribute("data-open");
+      expect(menu()).toHaveAttribute("inert");
+    } finally {
+      restore();
+    }
+  });
+
+  test("clicking outside the control closes the menu without changing the mode", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(trigger());
+      expect(menu()).toHaveAttribute("data-open");
+      fireEvent.pointerDown(document.body);
+      expect(menu()).not.toHaveAttribute("data-open");
+      expect(trigger()).toHaveTextContent("Instant");
+    } finally {
+      restore();
+    }
+  });
+
+  test("Escape closes the menu without changing the mode", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(trigger());
+      expect(menu()).toHaveAttribute("data-open");
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(menu()).not.toHaveAttribute("data-open");
+      expect(trigger()).toHaveTextContent("Instant");
+    } finally {
+      restore();
+    }
+  });
+
+  test("sending a message consumes the mode and resets it to Instant - per-turn, never remembered across turns (PERSIST-CONV-01 is the real persistence, not built here)", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { type: "delta", text: "Sure." },
+        { type: "done", value: { turn_id: "turn-thinking123", reply: { text: "Sure." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(trigger());
+      fireEvent.click(menuItems()[1]!);
+      expect(trigger()).toHaveTextContent("Thinking");
+      await sendMessage(view, "explain it");
+      await view.findByText("Sure.");
+      expect(trigger()).toHaveTextContent("Instant");
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
   function makeAdultPerson(): Roster {
     return { ...makePerson(), id: "person-adult456", display_name: "Marlow", role: "adult" };

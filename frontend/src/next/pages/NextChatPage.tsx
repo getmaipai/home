@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { DismissableLayer } from "radix-ui/internal";
 import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
@@ -11,6 +12,7 @@ import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
+import { ComposerMenu, ComposerModelItem, ComposerModelTrigger } from "@maipai/ui/src/elements/composer";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -123,6 +125,75 @@ const DetailsOpenContext = createContext<{
   isOpen: (turnId: string) => boolean;
   toggle: (turnId: string) => void;
 }>({ isOpen: () => false, toggle: () => {} });
+
+/** RESP-04, item (f): the composer's own response-mode control -
+ * `ComposerExtra` (thread.aui.tsx) is a bare `ComponentType` slot with
+ * no props, the same reason `ArtifactOpenContext`/`AdminContext` above
+ * exist. Per-turn only (COORDINATOR, 2026-09-22): no backend field
+ * persists a choice across turns yet (PERSIST-CONV-01), so this mirrors
+ * ChatPage.tsx's own "Think longer" - reset to Instant right after
+ * `consumeThinking()` reads it, never carried to the next message. */
+const ThinkingModeContext = createContext<{
+  mode: "instant" | "thinking";
+  setMode: (mode: "instant" | "thinking") => void;
+}>({ mode: "instant", setMode: () => {} });
+
+const THINKING_MODE_LABEL: Record<"instant" | "thinking", string> = { instant: "Instant", thinking: "Thinking" };
+const THINKING_MODE_OPTIONS: readonly { key: "instant" | "thinking" }[] = [{ key: "instant" }, { key: "thinking" }];
+
+/** RESP-04 (f): folds "Instant"/"Thinking" into one composer control,
+ * per the item's own explicit fallback - `reasoning-effort.tsx`'s
+ * `spent`/`budget` assume a reasoning-token-budget concept `TurnStats`
+ * has no field for, so it doesn't fit; a second control was never
+ * built. Composed from `composer.tsx`'s own trigger/menu/item
+ * primitives, used exactly as they ship - `ComposerMenu` is a plain
+ * controlled `div` with no built-in dismiss behavior, and open/close is
+ * `DismissableLayer.Root` (`radix-ui/internal`, already a dependency),
+ * not a hand-rolled `pointerdown`/`keydown` pair: a review caught the
+ * hand-rolled version as a "no hand-built UI" defect (platform
+ * principle 6), and `Popover` - the pattern the old `ChatPage.tsx`'s
+ * own "Think longer" toggle used for this exact per-turn concept - was
+ * ruled out, not just skipped: `Popover.Content` renders through
+ * `@radix-ui/react-popper`'s `useFloating`, which sets its own inline
+ * `transform`/position style on the floating element even without a
+ * `Portal`, and that would override `ComposerMenu`'s own `absolute
+ * bottom-full` composer-anchored positioning (design-resolver,
+ * 2026-09-22 - see `docs/dev.md`). `DismissableLayer` has no
+ * positioning opinion of its own, so `ComposerMenu` renders exactly as
+ * shipped either way. Owner ruling (COORDINATOR, 2026-09-22): a control
+ * with fewer than two selectable entries renders nothing at all, never
+ * a disabled trigger - always true here (Instant/Thinking is a fixed
+ * pair), but the composition is written so the option count drives the
+ * render, not a hardcoded assumption. */
+function ComposerThinkingControl() {
+  const { mode, setMode } = useContext(ThinkingModeContext);
+  const [open, setOpen] = useState(false);
+  if (THINKING_MODE_OPTIONS.length < 2) return null;
+  return (
+    <DismissableLayer.Root className="relative" onDismiss={open ? () => setOpen(false) : undefined}>
+      <ComposerModelTrigger model={THINKING_MODE_LABEL[mode]} open={open} onClick={() => setOpen((value) => !value)} />
+      {/* A review caught this: `ComposerMenu`'s own `open` only ever
+          toggles opacity/scale (CSS), never unmounts its children - a
+          closed menu's two buttons stayed in tab order and in the
+          accessibility tree, reachable before Send. `inert` (the same
+          fix already used on the rail above) removes both while closed,
+          same as a real hidden menu should. */}
+      <ComposerMenu open={open} inert={!open}>
+        {THINKING_MODE_OPTIONS.map((option) => (
+          <ComposerModelItem
+            key={option.key}
+            entry={{ name: THINKING_MODE_LABEL[option.key], meta: "" }}
+            selected={option.key === mode}
+            onClick={() => {
+              setMode(option.key);
+              setOpen(false);
+            }}
+          />
+        ))}
+      </ComposerMenu>
+    </DismissableLayer.Root>
+  );
+}
 
 /** slice 5(e): the "..." menu's second entry (Details, the stats reveal -
  * slice 5(d), landed 2026-09-22) - COORDINATOR named both for this same
@@ -752,6 +823,14 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  // RESP-04 (f): the composer's thinking-mode control. Read via a ref
+  // inside the adapter (ChatPage.tsx's own `thinkingRef` - the adapter
+  // itself is memoized on `[aui]` alone, so a plain closure over
+  // `thinking` state would go stale the moment this re-renders without
+  // `aui` changing).
+  const [thinking, setThinking] = useState(false);
+  const thinkingRef = useRef(false);
+  thinkingRef.current = thinking;
 
   const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
 
@@ -769,7 +848,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
             await api.resumeConversation(remoteId);
             return remoteId;
           },
-          consumeThinking: () => true,
+          consumeThinking: () => {
+            const value = thinkingRef.current;
+            thinkingRef.current = false;
+            setThinking(false);
+            return value;
+          },
           consumeSupersedes: () => undefined,
           onCrisisResources: setBanner,
           turnSchedulerRef,
@@ -801,7 +885,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     },
   });
 
-  return { runtime, banner };
+  return { runtime, banner, thinking, setThinking };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1034,11 +1118,18 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
   });
+  const thinkingModeValue = useMemo(
+    () => ({
+      mode: (thinking ? "thinking" : "instant") as "instant" | "thinking",
+      setMode: (mode: "instant" | "thinking") => setThinking(mode === "thinking"),
+    }),
+    [thinking, setThinking],
+  );
   // One base element, rendered at the phone/tablet Sheet and the
   // collapsed rail's own peek overlay - ChatPage.tsx's own fix for
   // exactly this (a code review caught two call sites drifting once one
@@ -1275,6 +1366,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <CompareOpenContext.Provider value={setCompareTarget}>
       <SourcesOpenContext.Provider value={sourcesOpenValue}>
       <DetailsOpenContext.Provider value={detailsOpenValue}>
+      <ThinkingModeContext.Provider value={thinkingModeValue}>
         <StructuredResultTools />
         <ArtifactTool />
         <ToolTimelineTool />
@@ -1418,6 +1510,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   AssistantActionBarExtra: SourcesActionBarTrigger,
                   AssistantMessageFooterExtra: MessageFooterExtra,
                   Indicator: ChatThinkingIndicator,
+                  ComposerExtra: ComposerThinkingControl,
                 }}
               />
             </div>
@@ -1463,6 +1556,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
           </SheetContent>
         </Sheet>
+      </ThinkingModeContext.Provider>
       </DetailsOpenContext.Provider>
       </SourcesOpenContext.Provider>
       </CompareOpenContext.Provider>
