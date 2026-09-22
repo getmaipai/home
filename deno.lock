@@ -52,6 +52,7 @@
             "npm:sherpa-onnx-node@^1.13.7",
             "npm:tar@^7.5.22",
             "npm:typescript@^5.9.3",
+            "npm:xstate@5",
             "npm:zod@4"
           ]
         }
