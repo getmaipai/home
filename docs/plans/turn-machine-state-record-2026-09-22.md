@@ -179,6 +179,11 @@ is a second output with the same rules as the first, and one more.
   event, and PERF-ALERT-01's stage split can tell a withheld stream from
   a slow one.
 
+- **A minor has no thinking control.** A minor's typed chat shows no
+  Instant or Thinking control; the hub decides thinking for a minor from
+  the budget record, a minor's request never carries `thinking`, and the
+  backend ignores the field on a minor's turn if a client sends it.
+
 The decision is made once, in `context`, before the model runs, and is
 never recomputed by a later node. The thinking budget in the model's
 budget record is unchanged by this: the model may still think; the hub
