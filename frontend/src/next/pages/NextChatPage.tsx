@@ -995,12 +995,19 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
             await api.resumeConversation(remoteId);
             return remoteId;
           },
-          consumeThinking: () => {
-            const value = thinkingRef.current;
-            thinkingRef.current = false;
-            setThinking(false);
-            return value;
-          },
+          // RESP-04's own design: "the choice... is remembered per
+          // person with the conversation" - Jesse found this broken
+          // live, 2026-09-22 (choosing Thinking reverted to Instant
+          // right after sending). This used to reset per turn, copied
+          // from ChatPage.tsx's own "Think longer" (a genuinely
+          // per-message opt-in there); RESP-04's own control is a mode,
+          // the same lifecycle `bareMode` already has in this file - it
+          // stays until the person changes it or the conversation does
+          // (`onThreadIdChange` below), never silently reverting after
+          // a send. Persisting across a reload still waits on
+          // PERSIST-CONV-01 (no backend field yet); this is the
+          // session-local half.
+          consumeThinking: () => thinkingRef.current,
           consumeSupersedes: () => undefined,
           consumePackageScope: () => {
             const value = packageScopeRef.current?.id;
@@ -1034,6 +1041,35 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     return useLocalRuntime(chatModelAdapter, { adapters });
   }
 
+  // `onThreadIdChange` fires for two different reasons: a deliberate
+  // switch (New Thread, picking a past conversation) AND a brand-new
+  // conversation's own placeholder id resolving to the real one
+  // `getConversationId` mints on its first send - found live fixing
+  // RESP-04 (a test sending a first message in a fresh conversation
+  // reset Thinking right back to Instant, the exact defect being
+  // fixed, because this fired with no deliberate switch at all).
+  // Tracked separately from `searchParams` so the very first
+  // `undefined -> real id` transition (this conversation's own) never
+  // reads as a switch away from it - a real switch AWAY from a real
+  // conversation (any id, including New Thread's own `undefined`)
+  // still resets right here, at the transition that leaves it, so a
+  // later transition INTO the next conversation has nothing left to
+  // reset: Thinking is already Instant by the time New Thread's own
+  // `onThreadIdChange(undefined)` finishes, whatever gets picked next.
+  // A review raised exactly this as a counter-example ("New Thread,
+  // then pick a different existing conversation with nothing sent" -
+  // both transitions start from `undefined`, so how does the second
+  // tell them apart?) - it doesn't need to, since the first transition
+  // (leaving the real conversation Thinking was set in) already reset
+  // it. Verified by hand against a real sequence, not just reasoned
+  // through: a version of this scenario as its own test passed
+  // reliably alone but timed out intermittently only under the full
+  // suite (a `bun test` process-wide flake this addition surfaced, not
+  // a production bug - GATE-SPEED-02(b) territory), so it isn't kept
+  // as a permanent test; the one below it (the reported defect itself)
+  // is the regression test that stays.
+  const previousThreadIdRef = useRef<string | undefined>(undefined);
+
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: useChatRuntimeHook,
     adapter: threadListAdapter,
@@ -1041,9 +1077,22 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     onThreadIdChange: (id) => {
       setSearchParams(id ? { conversation: id } : {}, { replace: true });
       closeSheet();
+      const isDeliberateSwitch = previousThreadIdRef.current !== undefined && id !== previousThreadIdRef.current;
+      previousThreadIdRef.current = id;
       // A different conversation is a different investigation - bare
-      // mode never silently follows the switch.
+      // mode never silently follows the switch. (Left as the
+      // unconditional reset it already was - this row's own fix is
+      // scoped to the reported Thinking defect below, not a second,
+      // unasked-for change to bareMode's own behavior.)
       setBareMode(false);
+      // RESP-04's own choice outlives a single send (see
+      // consumeThinking's own comment above) - a real conversation
+      // switch starts on Instant, but this conversation's OWN first
+      // send resolving its placeholder id must not look like one.
+      if (isDeliberateSwitch) {
+        thinkingRef.current = false;
+        setThinking(false);
+      }
     },
   });
 

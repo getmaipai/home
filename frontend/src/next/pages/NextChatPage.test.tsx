@@ -1283,14 +1283,33 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     }
   });
 
-  function stubTurnFetch(streamBody: ReadableStream<Uint8Array>): () => void {
+  // Found live, 2026-09-22 (Jesse): choosing Thinking reverted to
+  // Instant right after sending - a defect against RESP-04's own
+  // design ("the choice... is remembered per person with the
+  // conversation"). `consumeThinking` used to reset the mode per turn,
+  // copied from ChatPage.tsx's own per-message "Think longer" toggle;
+  // this control is a mode, the same `bareMode` lifecycle already has
+  // in this file - it survives a send, and resets only on a real
+  // conversation change. A fresh stream per call (`stubMultiTurnFetch`
+  // below): a single, once-consumed `ReadableStream` can't answer a
+  // second `/api/turn/stream` post.
+  function stubMultiTurnFetch(): () => void {
     const original = globalThis.fetch;
     (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let turnCount = 0;
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-thinking123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-thinking456", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes("/api/turn/stream")) {
+        turnCount++;
+        const text = `Reply ${turnCount}.`;
+        const body = ndjsonStream([
+          { type: "delta", text },
+          { type: "done", value: { turn_id: `turn-thinking${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
+        ]);
+        return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     return () => {
@@ -1298,13 +1317,14 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     };
   }
 
-  test("sending a message consumes the mode and resets it to Instant - per-turn, never remembered across turns (PERSIST-CONV-01 is the real persistence, not built here)", async () => {
-    const restore = stubTurnFetch(
-      ndjsonStream([
-        { type: "delta", text: "Sure." },
-        { type: "done", value: { turn_id: "turn-thinking123", reply: { text: "Sure." }, source: "model", safety: SAFETY } },
-      ]),
-    );
+  function turnRequestBodies(): Array<Record<string, unknown>> {
+    return (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
+      .filter((c: unknown[]) => (typeof c[0] === "string" ? c[0] : (c[0] as URL | Request).toString()).includes("/api/turn/stream"))
+      .map((c: unknown[]) => JSON.parse((c[1] as RequestInit).body as string));
+  }
+
+  test("the mode survives a send within the same conversation, and resets to Instant only when the conversation changes", async () => {
+    const restore = stubMultiTurnFetch();
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -1315,13 +1335,28 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       fireEvent.click(trigger());
       fireEvent.click(menuItems()[1]!);
       expect(trigger()).toHaveTextContent("Thinking");
+
       await sendMessage(view, "explain it");
-      await view.findByText("Sure.");
-      expect(trigger()).toHaveTextContent("Instant");
+      await view.findByText("Reply 1.");
+      // Still Thinking, and the second send in the same conversation
+      // still carries thinking: true - the defect this test closes.
+      expect(trigger()).toHaveTextContent("Thinking");
+      await sendMessage(view, "and then?");
+      await view.findByText("Reply 2.");
+      expect(trigger()).toHaveTextContent("Thinking");
+      const bodies = turnRequestBodies();
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0]!.thinking).toBe(true);
+      expect(bodies[1]!.thinking).toBe(true);
+
+      // A new conversation starts on Instant.
+      fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New Thread" }));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
     } finally {
       restore();
     }
   });
+
 });
 
 describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
