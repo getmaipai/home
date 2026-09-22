@@ -258,6 +258,11 @@ async function spawnLlamaServer(
     healthCheck: () => client.health(),
     timeoutMs: 60_000,
     label: "llama-server",
+    // LAT-00: the engine's own stdout ("neither shows in the logs
+    // today") - a rotating file beside hub.log, so the generations
+    // recorded on the wire can be cross-checked against what the
+    // engine itself reported (prompt/predicted token counts, timings).
+    logName: "engine",
   });
   return { proc, client, pid: proc.pid, kind, modelId };
 }

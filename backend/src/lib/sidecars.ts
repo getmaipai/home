@@ -23,6 +23,8 @@ import { promisify } from "node:util";
 import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { withTimeout } from "@maipai/core/src/withTimeout";
+import { createLogger } from "@maipai/core/src/log";
+import { logsDir } from "@/lib/paths";
 import type { EngineHealthEntry, EngineHealthKind } from "@/wire";
 
 const execFileAsync = promisify(execFile);
@@ -310,6 +312,47 @@ export interface SpawnAndWaitOptions {
   minUptimeMs?: number;
   /** Used only in error messages. */
   label: string;
+  /** LAT-00: when given, stdout/stderr are piped (not inherited) and every
+   * line is mirrored to the real terminal (unchanged debug visibility
+   * under `bun run dev`) AND appended to a rotating `<logName>.log`
+   * beside hub.log - SERVICES.md's own "one rotating file per engine"
+   * requirement, using hub.log's own rotation (`@maipai/core/src/log`'s
+   * createLogger, size-and-days rotated), not a second implementation of
+   * it. Omitted, behavior is unchanged (`stdout`/`stderr: "inherit"`) -
+   * every sidecar caller except the chat engine's own spawn. */
+  logName?: string;
+}
+
+// LAT-00: a piped stream (never "inherit") loses the child's own line
+// buffering, so a chunk can split mid-line - buffered here and flushed
+// one real line at a time, the same shape a terminal would have shown.
+// Code review: stdout and stderr each run their own independently-
+// scheduled loop of this, both calling the SAME logger - safe, not by
+// luck: createLogger's own appendLine() writes with appendFileSync (a
+// synchronous syscall), so one call always finishes its rotate-then-
+// write before the event loop can start the other, the same guarantee
+// that already makes every other caller of a shared logger safe. What
+// isn't guaranteed is which of two lines emitted at nearly the same
+// instant on DIFFERENT streams lands first in the file - each stream's
+// own line order is preserved, cross-stream order is not, a cosmetic
+// limit nothing here reads programmatically.
+async function pipeAndLog(stream: ReadableStream<Uint8Array>, terminal: NodeJS.WriteStream, logger: ReturnType<typeof createLogger>): Promise<void> {
+  const decoder = new TextDecoder();
+  let buffered = "";
+  try {
+    for await (const chunk of stream) {
+      terminal.write(chunk);
+      buffered += decoder.decode(chunk, { stream: true });
+      const lines = buffered.split("\n");
+      buffered = lines.pop() ?? "";
+      for (const line of lines) logger.appendLine(line);
+    }
+  } catch {
+    // best-effort, matching createLogger's own appendLine contract - a
+    // read failure on a dying process's stream must never throw into the
+    // caller's own health-poll loop
+  }
+  if (buffered) logger.appendLine(buffered);
 }
 
 /** The shared low-level primitive every process-shaped supervisor in this
@@ -324,10 +367,15 @@ export async function spawnAndWaitHealthy(
   if (opts.port) await freePort(opts.port);
   const proc = Bun.spawn(opts.command, {
     cwd: opts.cwd,
-    stdout: "inherit",
-    stderr: "inherit",
+    stdout: opts.logName ? "pipe" : "inherit",
+    stderr: opts.logName ? "pipe" : "inherit",
     ...(opts.env ? { env: opts.env } : {}),
   });
+  if (opts.logName) {
+    const logger = createLogger(logsDir, opts.logName);
+    void pipeAndLog(proc.stdout as ReadableStream<Uint8Array>, process.stdout, logger);
+    void pipeAndLog(proc.stderr as ReadableStream<Uint8Array>, process.stderr, logger);
+  }
   const timeoutMs = opts.timeoutMs ?? 60_000;
   const minUptimeMs = opts.minUptimeMs ?? 0;
   const spawnedAt = Date.now();

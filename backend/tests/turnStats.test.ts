@@ -41,7 +41,7 @@ describe("STATS-01 turn stats", () => {
       for await (const _delta of started.tokens) {
         // consume the body so the final telemetry frame is observed
       }
-      const stats = buildTurnStats(started.stats, { ...emptyTimings(), first_token_ms: 120 }, 100, 1_000, { host: "local", build: "b10797-test", model: "family.gguf", healthy: true }, true);
+      const stats = buildTurnStats([{ reason: "initial", thinking: true, maxTokens: null, requestSentMs: 0, firstDeltaMs: 50, stats: started.stats }], { ...emptyTimings(), first_token_ms: 120 }, 100, 1_000, { host: "local", build: "b10797-test", model: "family.gguf", healthy: true }, true);
       expect(stats.prompt_tokens).toBe(143);
       expect(stats.predicted_tokens).toBe(37);
       expect(stats.tokens_per_second).toBe(185);
@@ -58,7 +58,7 @@ describe("STATS-01 turn stats", () => {
   });
 
   test("a stream without timing data yields nulls, never NaN", () => {
-    const stats = buildTurnStats({ usage: null, timings: null, stopReason: null }, { ...emptyTimings(), first_token_ms: null }, 100, 90, null, undefined);
+    const stats = buildTurnStats([{ reason: "initial", thinking: false, maxTokens: null, requestSentMs: 0, firstDeltaMs: null, stats: { usage: null, timings: null, stopReason: null } }], { ...emptyTimings(), first_token_ms: null }, 100, 90, null, undefined);
     expect(stats.prompt_tokens).toBeNull();
     expect(stats.predicted_tokens).toBeNull();
     expect(stats.tokens_per_second).toBeNull();
@@ -67,6 +67,28 @@ describe("STATS-01 turn stats", () => {
     expect(stats.cache_reuse_tokens).toBeNull();
     expect(stats.cache_reuse_percent).toBeNull();
     expect(stats.thinking).toBe(false);
-    expect(Object.values(stats).every((value) => typeof value !== "number" || Number.isFinite(value))).toBe(true);
+    expect(Object.entries(stats).every(([key, value]) => key === "generations" || typeof value !== "number" || Number.isFinite(value))).toBe(true);
+  });
+
+  test("LAT-00: every generation is projected, oldest first, summary fields read from the last", () => {
+    const stats = buildTurnStats(
+      [
+        { reason: "initial", thinking: true, maxTokens: 56, requestSentMs: 5, firstDeltaMs: null, stats: { usage: null, timings: { prompt_n: 300, cache_n: 0, predicted_n: 56, predicted_ms: 400, predicted_per_second: 140 }, stopReason: "length" } },
+        { reason: "think_exhausted", thinking: false, maxTokens: 96, requestSentMs: 410, firstDeltaMs: 480, stats: { usage: null, timings: { prompt_n: 300, cache_n: 300, predicted_n: 12, predicted_ms: 90, predicted_per_second: 133 }, stopReason: "stop" } },
+      ],
+      { ...emptyTimings(), first_token_ms: 480 },
+      0,
+      600,
+      null,
+      true,
+    );
+    expect(stats.generations).toHaveLength(2);
+    expect(stats.generations[0]).toMatchObject({ reason: "initial", thinking: true, max_tokens: 56, prompt_n: 300, predicted_n: 56, request_sent_ms: 5, first_delta_ms: null });
+    expect(stats.generations[1]).toMatchObject({ reason: "think_exhausted", thinking: false, max_tokens: 96, prompt_n: 300, cache_n: 300, predicted_n: 12, request_sent_ms: 410, first_delta_ms: 480 });
+    // The summary fields still describe the LAST generation - the one
+    // that actually produced what the household heard - unchanged
+    // meaning from before this test's own second generation existed.
+    expect(stats.predicted_tokens).toBe(12);
+    expect(stats.stop_reason).toBe("stop");
   });
 });

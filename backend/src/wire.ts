@@ -77,6 +77,29 @@ export interface TurnStats {
   // rest of this already-JSON stats blob (no migration: the same reason
   // every other field here needed none).
   thinking: boolean;
+  /** LAT-00: every real model call this turn made, oldest first - the
+   * fields above summarize the LAST one (unchanged shape/meaning for
+   * every existing reader); this is the full history, so a turn that
+   * spent a hidden second (or third) generation shows it. */
+  generations: TurnGeneration[];
+}
+
+/** LAT-00: one real model call, projected to plain values for the wire -
+ * see turnEngine.ts's GenerationRecord for the working shape this comes
+ * from (a live stats reference, read once settled). */
+export interface TurnGeneration {
+  reason: string;
+  thinking: boolean;
+  max_tokens: number | null;
+  prompt_n: number | null;
+  cache_n: number | null;
+  prompt_ms: number | null;
+  predicted_n: number | null;
+  predicted_ms: number | null;
+  /** From turn start: when this call's request went out, and the first
+   * time its own tokens were consumed (null if none ever were). */
+  request_sent_ms: number;
+  first_delta_ms: number | null;
 }
 
 // ADMIN-COMPARE-01: POST /api/turn/bare's own trace and NDJSON event

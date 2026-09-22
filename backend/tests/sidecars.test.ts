@@ -21,6 +21,7 @@ import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { join } from "node:path";
 import { getChatClient, getChatLivePid, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { logsDir } from "@/lib/paths";
 
 beforeEach(() => {
   resetDb();
@@ -91,6 +92,38 @@ describe("spawnAndWaitHealthy", () => {
       }),
     ).rejects.toThrow(/exited early/);
     expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  // LAT-00: the engine's own stdout, "neither shows in the logs today" -
+  // a rotating file beside hub.log (reusing hub.log's own createLogger,
+  // never a second rotation implementation), while still visible in the
+  // terminal (unchanged debug visibility under `bun run dev`).
+  test("logName pipes stdout/stderr into a rotating <logName>.log, still visible on the real terminal", async () => {
+    const port = 39202;
+    const proc = await spawnAndWaitHealthy({
+      command: ["bun", "-e", `console.log("hello from the engine"); console.error("a warning"); Bun.serve({ port: ${port}, fetch: () => new Response("ok") });`],
+      port,
+      healthCheck: () => fetch(`http://127.0.0.1:${port}`).then(() => true, () => false),
+      label: "logged test server",
+      logName: "test-engine",
+    });
+    try {
+      expect(proc.exitCode).toBeNull();
+      // The write is async (a piped stream, read line by line) - polled
+      // rather than a fixed sleep, the same reasoning every other
+      // eventually-consistent check in this suite already uses.
+      const logPath = join(logsDir, "test-engine.log");
+      let content = "";
+      for (let i = 0; i < 30; i++) {
+        content = await Bun.file(logPath).text().catch(() => "");
+        if (content.includes("hello from the engine")) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(content).toContain("hello from the engine");
+      expect(content).toContain("a warning");
+    } finally {
+      proc.kill();
+    }
   });
 });
 

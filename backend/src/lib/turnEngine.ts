@@ -193,7 +193,84 @@ function validateContinuationInput(continuation: TurnContinuation | undefined): 
 // (Fix C, shipped in the same change as this line: guards.ts's
 // `guardReply()` for the non-streaming path, `gateGuards()`'s own
 // `onGuardHit` callback for the streaming path).
+// LAT-00: one entry per real model call a turn makes, oldest first -
+// the diagnosis (Fable, 2026-09-22) was that "hi" spends a hidden second
+// generation (thinking eating the token cap, LAT-01) with nothing in the
+// logs to show it, since the turn kept only its LAST generation's stats.
+// `reason` says why this call happened: "initial" (the turn's first),
+// "think_exhausted"/"fragment" (holdOpening's own regeneration after an
+// empty or malformed first reply - the two are told apart by whether the
+// prior generation ran with thinking on, LAT-01's own diagnosis that
+// thinking on is what lets the think block eat the whole token cap
+// before any visible text arrives; a failed thinking-off generation is a
+// genuinely malformed reply instead),
+// "no_tools_retry" (every proposed tool call failed, so the model tries
+// again without any offered), "composition" (a package's own answer
+// phrased by a second call), or `guard:<name>` (a guard's own retry,
+// REG-01's statement-turn regeneration today).
+export type TurnGenerationReason = "initial" | "think_exhausted" | "fragment" | "no_tools_retry" | "composition" | `guard:${string}`;
+
+interface GenerationRecord {
+  reason: TurnGenerationReason;
+  thinking: boolean;
+  /** The request's own `max_tokens`, or null when the call let the
+   * engine's own default apply (most retries don't set one) - recorded
+   * as sent, never guessed. */
+  maxTokens: number | null;
+  /** From turn start (the same clock `TurnTimings.first_token_ms`
+   * already uses), when this call's own request actually went out. */
+  requestSentMs: number;
+  /** From turn start, the first time THIS generation's own tokens are
+   * consumed - null until stampFirstDelta() below sees one, which never
+   * happens for a call whose tokens are discarded unread (none today,
+   * but the type says so honestly rather than assuming). */
+  firstDeltaMs: number | null;
+  /** The engine's own per-call telemetry - a live reference to the exact
+   * object llm.ts's startCompleteStream() returned for this call
+   * (already fresh per call there, never shared or reused), so it holds
+   * this generation's real numbers once the stream finishes, whatever
+   * order generations are read back in. */
+  stats: ChatCompletionStreamStats;
+}
+
+// LAT-00: a transparent pass-through wrapper - every downstream gate,
+// guard and hold sees the identical stream, timed without being told.
+// Stamps `record.firstDeltaMs` the first time (and only the first time)
+// this specific generation's own tokens are pulled, which is never the
+// same moment as the turn's own first token (OUT-01's
+// `prepared.timings.first_token_ms`): a turn that regenerates has one
+// first-token but several first-deltas, one per call.
+async function* stampFirstDelta<T>(gen: AsyncGenerator<string, T, void>, record: GenerationRecord, startedAt: number): AsyncGenerator<string, T, void> {
+  const it = gen[Symbol.asyncIterator]();
+  try {
+    let step = await it.next();
+    if (!step.done && record.firstDeltaMs === null) record.firstDeltaMs = Date.now() - startedAt;
+    while (!step.done) {
+      yield step.value;
+      step = await it.next();
+    }
+    return step.value;
+  } finally {
+    // Code review: a bare manual `it.next()` loop, without this, drops
+    // the wrapped generator's own close on the floor - a consumer that
+    // stops early (a `for await...break`, an abort) used to close the
+    // real token stream automatically through direct `for await`/
+    // `yield*`; this generator's own `finally` runs on every exit
+    // (normal completion, an early return(), a thrown error), so
+    // closing it here always closes the one it wraps too. The exact
+    // failure holdForLookup()'s own comment already documents for a JS
+    // generator closed without this: llama-server left generating an
+    // abandoned reply server-side because nothing told it to stop.
+    if (it.return) await it.return(undefined as unknown as T);
+  }
+}
+
 interface TurnLogRecord {
+  /** LAT-00: when this line was written - the [turn] line had no
+   * timestamp of its own before this, only whatever the surrounding
+   * console/log-file machinery stamped on it (or didn't, for a plain
+   * test run reading console output directly). */
+  timestamp: string;
   turn_id: string;
   conversation_id: string;
   surface: Surface;
@@ -240,6 +317,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
   // ASK-02: the world kind, or the kinds an unresolved name hinted.
   const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form, ...(s.type === "world" ? { kind: s.kind } : s.type === "unresolved" && s.candidate_kinds.length > 0 ? { kind: s.candidate_kinds.join("/") } : {}) }));
   const record: TurnLogRecord = {
+    timestamp: new Date().toISOString(),
     turn_id: value.turn_id,
     conversation_id: value.conversation_id,
     surface,
@@ -301,14 +379,14 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; branchFrom?: string | null; ephemeral?: boolean; temporary?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; streamStats?: ChatCompletionStreamStats; thinking?: boolean },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; branchFrom?: string | null; ephemeral?: boolean; temporary?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; generations?: readonly GenerationRecord[]; thinking?: boolean },
 ): void {
   // RVW-1: the answering rung, read once here from the delivered value,
   // the retained outcomes and the signal, and the rules that fired (the
   // engine's, then every guard hit); both ride on the wire (the value
   // is the one returned to the caller), the `[turn]` line and the row.
   const rules = rulesFired(meta.rules ?? [], meta.guardHits, meta.signal.source);
-  if (meta.streamStats) value.stats = buildTurnStats(meta.streamStats, meta.timings, meta.startedAt, Date.now(), getActiveChatEngineIdentity(), meta.thinking);
+  if (meta.generations && meta.generations.length > 0) value.stats = buildTurnStats(meta.generations, meta.timings, meta.startedAt, Date.now(), getActiveChatEngineIdentity(), meta.thinking);
   const rung = rungOf(value, meta.outcomes ?? [], meta.signal, { householdSubject: rules.includes("lookup.household_subject") || (meta.subjects ?? []).some((s) => s.type === "household") });
   value.rung = rung;
   value.structured_part = structuredPartForOutcomes(meta.outcomes ?? []) ?? undefined;
@@ -1755,8 +1833,12 @@ type PreparedTurn =
       compose?: TurnValue;
       /** CHAT-16: the composer's decision on this turn, for the log. */
       composed?: ComposedRecord;
-      /** STATS-01: the latest model stream's engine-owned telemetry. */
-      streamStats?: ChatCompletionStreamStats;
+      /** LAT-00: every model call this turn has actually made, oldest
+       * first - replaces the single `streamStats` field a caller used to
+       * overwrite on each new generation, which meant a hidden second
+       * (or third) generation's own timings were never visible anywhere,
+       * only whichever one happened to run last. */
+      generations: GenerationRecord[];
       /** K6: the turn's phases; created by the run function that owns
        * the abort signal. */
       machine?: TurnMachine;
@@ -3343,7 +3425,7 @@ async function prepareTurn(
   // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
   // seen on both paths.
   timings.prompt_ms = Math.round(performance.now() - promptStart);
-  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, plan, timings, unknownAsk, modelCalls: 0, rules, ...(composeDirect ? { compose: composeDirect } : {}) };
+  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, plan, timings, unknownAsk, modelCalls: 0, generations: [], rules, ...(composeDirect ? { compose: composeDirect } : {}) };
 }
 
 /** CHAT-16 (K2): whether a direct route's plugin reply is one the
@@ -5547,6 +5629,7 @@ async function runTurnStreamHoldingLease(
     const record = (fellBack: boolean, mode: "composition" | "grounded_fallback" = "composition", ungrounded?: string) => {
       modelTurn.composed = { mode, model_calls: 1, ...(fellBack ? { fell_back: true } : {}), ...(ungrounded ? { ungrounded } : {}), ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
     };
+    const requestSentMs = Date.now() - startedAt;
     const started = await startCompleteStream("chat", plan.messages, { thinking: false }, opts.signal);
     if (!started.ok) {
       console.log(`[turn] the composition on turn ${modelTurn.turnId} failed to start: ${started.error}; the direct replies stand`);
@@ -5554,7 +5637,9 @@ async function runTurnStreamHoldingLease(
       yield `${plan.fallback.text} `;
       return undefined;
     }
-    modelTurn.streamStats = started.stats;
+    const generation: GenerationRecord = { reason: "composition", thinking: false, maxTokens: null, requestSentMs, firstDeltaMs: null, stats: started.stats };
+    modelTurn.generations.push(generation);
+    const compositionTokens = stampFirstDelta(started.tokens, generation, startedAt);
     // The composition's own opening hold (OUT-01's rule, in one place
     // for both paths: the promise path's composition runs inside the
     // lookup hold, past holdOpening()): the first chunk is held until it
@@ -5566,7 +5651,7 @@ async function runTurnStreamHoldingLease(
     let buffer = "";
     let released = false;
     try {
-      for await (const delta of started.tokens) {
+      for await (const delta of compositionTokens) {
         sent += delta;
         if (holdForGrounding) continue;
         if (released) {
@@ -5842,15 +5927,27 @@ async function runTurnStreamHoldingLease(
       if (mayRetry && generations < 2 && !composedFrom) {
         generations++;
         modelTurn.modelCalls++;
+        // LAT-00/LAT-01: told apart from a generic malformed fragment by
+        // the generation this one is replacing - LAT-01's own diagnosis
+        // is that thinking on is exactly what lets the think block eat
+        // the whole token cap before any visible text arrives ("hi"'s
+        // hidden second generation), so a failed generation that ran
+        // with thinking on is read as starved by its own think block;
+        // one that already ran with thinking off and still failed
+        // assessReply() is a genuinely malformed reply instead.
+        const priorGeneration = modelTurn.generations[modelTurn.generations.length - 1];
+        const reason: TurnGenerationReason = priorGeneration?.thinking === true ? "think_exhausted" : "fragment";
+        const requestSentMs = Date.now() - startedAt;
         const again = await startCompleteStream("chat", modelMessages, { thinking: false, max_tokens: RETRY_TOKEN_CAP }, opts.signal);
         if (again.ok) {
-          modelTurn.streamStats = again.stats;
+          const generation: GenerationRecord = { reason, thinking: false, maxTokens: RETRY_TOKEN_CAP, requestSentMs, firstDeltaMs: null, stats: again.stats };
+          modelTurn.generations.push(generation);
           // A regeneration that fails before it has put anything on the
           // wire (an idle timeout, the engine restarting) is not the
           // turn's failure: the first generation finished, and the
           // malformed line is the answer; after its first yield a
           // failure is the stream's, as for any reply.
-          const nested = holdOpening(again.tokens, false);
+          const nested = holdOpening(stampFirstDelta(again.tokens, generation, startedAt), false);
           let first: IteratorResult<string, ToolCall[] | undefined | { resolved: TurnValue }>;
           try {
             first = await nested.next();
@@ -5938,11 +6035,18 @@ async function runTurnStreamHoldingLease(
               generations++;
               modelTurn.modelCalls++;
               const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => modelMessages.some((m) => m.content.toLowerCase().includes(p.toLowerCase()))) : null;
+              // LAT-00: the same condition order that picked `note` below
+              // names the reason this generation exists - one guard
+              // retry, one label, not two independent readings of
+              // guardHits that could disagree.
+              const guardReason = retryPhrase ? "banned_phrase" : guardHits.some(isRepeatReason) ? "repeat" : guardHits.includes("example_parrot") ? "example_parrot" : "statement";
               const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
+              const requestSentMs = Date.now() - startedAt;
               const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: note }], { thinking: false }, opts.signal);
               if (!again.ok) return null;
-              modelTurn.streamStats = again.stats;
-              return gateOutputSafety(holdOpening(again.tokens, false), actor, prepared.turnId);
+              const generation: GenerationRecord = { reason: `guard:${guardReason}`, thinking: false, maxTokens: null, requestSentMs, firstDeltaMs: null, stats: again.stats };
+              modelTurn.generations.push(generation);
+              return gateOutputSafety(holdOpening(stampFirstDelta(again.tokens, generation, startedAt), false), actor, prepared.turnId);
             },
           ),
         ),
@@ -5969,7 +6073,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats, thinking: opts.thinking });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
           return outcome.resolved;
         }
         // CHAT-16 (K2, K6): the composition's deltas were the stream:
@@ -5981,7 +6085,7 @@ async function runTurnStreamHoldingLease(
           const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace);
           finalized = composedValue;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats, thinking: opts.thinking });
+          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
           return composedValue;
         }
         const outputSafety = outcome;
@@ -6067,7 +6171,7 @@ async function runTurnStreamHoldingLease(
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
         }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats, thinking: opts.thinking });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
         return value;
       },
     };
@@ -6087,6 +6191,7 @@ async function runTurnStreamHoldingLease(
 
   if (!offeringTools) {
     modelTurn.modelCalls++;
+    const requestSentMsNoTools = Date.now() - startedAt;
     const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
     if (!started.ok) {
       // An engine-down failure here is still a real, finished turn; the
@@ -6098,8 +6203,9 @@ async function runTurnStreamHoldingLease(
       // fails, it's a real down-engine case, not a request-shape one.
       return { ok: false, status: 503, code: "unavailable", error: started.error };
     }
-    modelTurn.streamStats = started.stats;
-    return buildStreamResult(started.tokens);
+    const generation: GenerationRecord = { reason: "initial", thinking: opts.thinking === true, maxTokens: null, requestSentMs: requestSentMsNoTools, firstDeltaMs: null, stats: started.stats };
+    modelTurn.generations.push(generation);
+    return buildStreamResult(stampFirstDelta(started.tokens, generation, startedAt));
   }
 
   // Fix E: `tools` rides on the SAME completion call that would
@@ -6156,20 +6262,24 @@ async function runTurnStreamHoldingLease(
   // the two casts.
   const modelPrepared = modelTurn;
   modelTurn.modelCalls++;
+  const initialMaxTokens = Math.ceil(modelPrepared.plan.max_words * 1.6) + 32;
+  const requestSentMsInitial = Date.now() - startedAt;
   const startResult = await startCompleteStream(
     "chat",
     modelPrepared.messages,
-    { thinking: opts.thinking, tools: modelPrepared.tools, tool_choice: "auto", max_tokens: Math.ceil(modelPrepared.plan.max_words * 1.6) + 32 },
+    { thinking: opts.thinking, tools: modelPrepared.tools, tool_choice: "auto", max_tokens: initialMaxTokens },
     draftAbort.signal,
   );
   if (!startResult.ok) {
     return { ok: false, status: 503, code: "unavailable", error: startResult.error }; // released by the caller's finally
   }
   const started = startResult as Extract<typeof startResult, { ok: true }>;
-  modelTurn.streamStats = started.stats;
+  const initialGeneration: GenerationRecord = { reason: "initial", thinking: opts.thinking === true, maxTokens: initialMaxTokens, requestSentMs: requestSentMsInitial, firstDeltaMs: null, stats: started.stats };
+  modelTurn.generations.push(initialGeneration);
+  const initialTokens = stampFirstDelta(started.tokens, initialGeneration, startedAt);
 
   async function* peekAndHandle(): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
-    const iterator = started.tokens[Symbol.asyncIterator]();
+    const iterator = initialTokens[Symbol.asyncIterator]();
     // REASONING-01 (a review caught this): a model may think before
     // deciding whether to answer in prose or propose a tool call, and
     // llm.ts's own reasoning_content synthesis now yields real string
@@ -6225,12 +6335,14 @@ async function runTurnStreamHoldingLease(
         // ordinary reply goes through.
         generations++; // OUT-01: the opening hold may not regenerate after this
         modelTurn.modelCalls++;
+        const requestSentMsRetry = Date.now() - startedAt;
         const retry = await startCompleteStream("chat", modelPrepared.messages, { thinking: opts.thinking }, opts.signal);
         // buildStreamResult()'s guardFirstStep() catches this (nothing
         // has been yielded yet) and marks the turn finished.
         if (!retry.ok) throw new StreamUnavailable(retry.error);
-        modelTurn.streamStats = retry.stats;
-        yield* retry.tokens;
+        const retryGeneration: GenerationRecord = { reason: "no_tools_retry", thinking: opts.thinking === true, maxTokens: null, requestSentMs: requestSentMsRetry, firstDeltaMs: null, stats: retry.stats };
+        modelTurn.generations.push(retryGeneration);
+        yield* stampFirstDelta(retry.tokens, retryGeneration, startedAt);
         return undefined;
       }
       // No tool call was ever proposed AND no text streamed either (a
