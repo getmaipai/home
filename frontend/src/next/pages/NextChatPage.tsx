@@ -409,7 +409,12 @@ export function NextChatPage({ person }: { person: Roster }) {
                 <HoverCard open={railPeeked} onOpenChange={setRailPeeked}>
                   <HoverCardTrigger
                     render={<DashboardButton variant="ghost" size="icon" />}
-                    className="absolute top-2 left-2 z-20 hidden lg:flex"
+                    // z-[60]: above HoverCardContent's own shipped z-50, so
+                    // the toggle stays visible and clickable over the
+                    // peeked column rather than being painted under it -
+                    // ChatGPT's own placement keeps the collapse control
+                    // reachable the whole time the sidebar is peeked open.
+                    className="absolute top-2 left-2 z-[60] hidden lg:flex"
                     aria-label="Show conversations"
                     aria-controls="next-chat-rail-peek"
                     aria-expanded={railPeeked}
@@ -426,7 +431,14 @@ export function NextChatPage({ person }: { person: Roster }) {
                   >
                     <PanelLeftIcon className="size-4" />
                   </HoverCardTrigger>
-                  <HoverCardContent id="next-chat-rail-peek" align="start" className="w-64 max-h-[60vh] overflow-y-auto">
+                  <HoverCardContent
+                    id="next-chat-rail-peek"
+                    side="bottom"
+                    align="start"
+                    sideOffset={-40}
+                    alignOffset={0}
+                    className="h-[calc(100vh-140px)] w-64 overflow-y-auto rounded-none border-r border-border bg-background pr-2 shadow-none ring-0"
+                  >
                     {threadList}
                   </HoverCardContent>
                 </HoverCard>
