@@ -177,7 +177,11 @@ function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) 
   // Create image/Web search (consumePackageScope's own comment,
   // chatModelAdapter.ts). Gated the same way: the group itself, not
   // just its effect, until U2 makes scoping real.
-  const query = useQuery<InstalledPackage[]>({ queryKey: ["plugins"], queryFn: () => api.plugins() });
+  // A code review caught this: fetching the plugins list unconditionally
+  // meant every household's default menu open (the flag off) still hit
+  // /api/plugins for a group it was about to render as null - `enabled`
+  // is the query's own way to not run at all, not just discard the result.
+  const query = useQuery<InstalledPackage[]>({ queryKey: ["plugins"], queryFn: () => api.plugins(), enabled: unwiredControlsAreEnabled() });
   if (!unwiredControlsAreEnabled()) return null;
   // Every other NextChatPage test's own fetch stub answers an endpoint
   // it doesn't know about with a bare `{}` (its own established
