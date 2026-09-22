@@ -5,6 +5,7 @@
   "category": "Info",
   "display": "Today's Date",
   "description": "Say today's date.",
+  "tool_label": "Looking up today's date",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

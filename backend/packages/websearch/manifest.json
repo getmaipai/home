@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Web Search",
   "description": "Search the web through your own search server and sum up what it finds.",
+  "tool_label": "Searching the web for {expression}",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

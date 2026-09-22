@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Weather",
   "description": "Get the weather for a named place: temperature, conditions, today's high and low, and the chance of rain.",
+  "tool_label": "Checking the weather in {place}",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
