@@ -66,6 +66,65 @@ question stays about 5 seconds. On the Studio both roughly divide by three,
 and the design does not change; only the interim rule relaxes once the
 bigger model is measured searching on its own.
 
+## Phase 0: the tests before the build
+
+Jesse asked whether the models and the stack he recommended were tested
+first. Two things run before any loop or state code is written, and their
+results are inputs to the build, not afterthoughts.
+
+**(a) ARCH-BUILD-01, the buy-or-build spike** (M, two to three days,
+Opus: it is judgment over measurements). It compares four ways to run the
+new pipeline's loop and state on one representative turn (safety, model,
+tool, model, output gate): today's engine, LangGraph JS embedded in our
+Bun process (never its server), an in-house `TurnGraph` state machine,
+and XState v5 (the maintained TypeScript state-machine library, no
+telemetry, runs on Bun). Cedar is spiked as the authorization evaluator
+behind one `authorize()` call, and Home Assistant stays the device
+runtime (already the case). Letta's memory-block and archival concepts are
+read for ARCH-MEM-01's record, not run. The measurements, per candidate:
+boot and one real turn under Bun, install size and cold start; what breaks
+with the network blocked (anything that phones home fails outright); how
+many existing turn-engine lines become unnecessary versus merely wrapped;
+what we lose if the project changes direction, and what an exit looks
+like; whether the spec declares and the library evaluates, or the library
+becomes a second source of truth; whether it runs, or is cleanly absent,
+on the robot's Pi. The routing corpus, the safety corpus and the replay
+set run through all four. Verdict per candidate: adopt, adopt partially,
+reject, with one paragraph each in dev.md. The verdict decides U2's
+orchestration; no unit that writes loop or state code starts before it.
+
+**(b) ARCH-MEASURE-01, the per-model capability numbers** (M, Sonnet).
+The tool-calling bench on the fixed pipeline at ten repeats per model:
+the 8B and 4B are done today (below); Session B runs the 1.7B, the 27B
+(in lane C's boundary window) and the robot-class model, on the same
+commands, so nothing is redone. Plus the query-rewrite bench (15 two-turn
+conversations with a pronoun in the second turn, ten repeats, pass when
+the model's own search words carry the referent, the bar 90 percent of
+rows at 9 of 10), taken from the paused REPLY-FIND-05 work. Together they
+fill each model's budget record in the catalog: false-call rate, inverse
+miss rate, rewrite pass rate, and from those the rounds, the offered set,
+whether the always-search rule is on, and whether model-driven moves are
+on at all.
+
+Answered already: the 8B makes 0 false tool calls in 100 negative repeats
+on both prompt shapes; the 4B makes 0 in 50 on the bare prompt and 5 in
+50 on the production prompt; three of three world questions without a
+search verb went unsearched on the 8B live today (the inverse miss); the
+prefix cache breaks at 567 tokens whenever the tools block changes; the
+routing corpus passes 169 of 170 rows on the embedding path.
+
+**Status, 2026-09-22 evening: phase 0 is running.** Session A builds and
+measures the spike and records numbers only (in the scratch folder, not
+the repo); Session B runs the per-model benches; this session writes the
+verdict table in dev.md from A's data and amends the ARCH rows, and has
+stopped its own bench runs so the two do not compete for the machine.
+
+**What can start today, gated on nothing:** U0 (the replay set and the
+no-new-rules lint), U1 (the cache-stable prompt), U3 (the thinking
+budget), U5 (dated memory lines). **Gated on (a):** U2 and everything
+after it. **Gated on (b):** U2's two-model acceptance, the budget records,
+the flip, and the interim rule's relaxation on the Studio.
+
 ## The detail
 
 ### 1. What stays in code
@@ -218,14 +277,32 @@ deletion is reverted and the row becomes a unit, never a new rule.
 Each is one backlog item. Floors: Sonnet where there is a verification
 loop; Opus only for the one design record. Codex takes the S items.
 
-- **U0, the replay set and its runner** (S, Sonnet). The fixture above,
-  `scripts/bench/replay.ts` mirroring `conversation.ts`'s runner, run on
-  the old path today and recorded in dev.md as the baseline.
-- **U1, a cache-stable prompt** (S, Codex). The tool set is fixed per
+- **U0, the replay set and the no-new-rules lint** (S each, Sonnet;
+  starts today). The fixture above, `scripts/bench/replay.ts` mirroring
+  `conversation.ts`'s runner, run on the old path today and recorded in
+  dev.md as the baseline. And the lint, enforced by the gate and not by
+  memory: `backend/scripts/lint/rule-budget.ts`, run by `scripts/check.sh`,
+  counts regex literals (`/.../flags`, `new RegExp(`) and word lists (an
+  array of three or more string literals) per turn-path file
+  (`turnEngine.ts`, `turnContext.ts`, `guards.ts`, `unknownNames.ts`,
+  `turnSignal.ts`, `utteranceShape.ts`, `routing.ts`, `replyConstraints.ts`,
+  `unspokenArgs.ts`, `composer.ts`, and the new `turnNext.ts`) against a
+  committed baseline `backend/rules-baseline.json`; it fails when a
+  file's count exceeds its baseline unless every new line carries
+  `// rule: <name>` naming a key in `ruleNames.ts` (the counter row the
+  `[turn]` line already records hits for); the baseline may only go down,
+  and a deleting commit lowers it. Protected modules are allow-listed
+  (the safety signals in commons, `consentVocab.ts`,
+  `memoryContentPolicy.ts`, `childDisclosure.ts`, `contentCeiling.ts`,
+  `almanacCompute.ts`, `commands.ts`). Test: a fixture file with one
+  unmarked regex fails the lint; the same line with a counter-row marker
+  passes.
+- **U1, a cache-stable prompt** (S, Codex; starts today). The tool set is fixed per
   model budget and sorted; the window precedes the context message. Test:
   two consecutive turns produce the same tools block. Acceptance:
   `cache_reuse_tokens` grows with conversation length on the dev hub.
-- **U2, the one-call loop, the new path's core** (M, Sonnet; the loop's
+- **U2, the one-call loop, the new path's core** (M, Sonnet; gated on
+  ARCH-BUILD-01's verdict, which picks its orchestration; the loop's
   state record written first, Opus, half a day). `turnNext.ts` beside
   `turnEngine.ts`: safety, the exact commands, the context list, one model
   call with tools, the model's own tool arguments as the query (grounded
@@ -240,16 +317,19 @@ loop; Opus only for the one design record. Codex takes the S items.
   set on the new path, and the same replay set run through the same code
   on the 8B and the 4B with only the budget record differing, both
   recorded in dev.md.
-- **U3, the thinking budget and the generation record** (S, Codex).
+- **U3, the thinking budget and the generation record** (S, Codex;
+  starts today).
   LAT-00 landed the record; the budget is LAT-01: thinking on never cuts
   the visible answer. Acceptance: "hi" with thinking on is one generation.
-- **U4, the answer register by surface** (M, Sonnet). RESP-01's two
+- **U4, the answer register by surface** (M, Sonnet; after U2). RESP-01's two
   halves on the new path: the written policy for a typed screen, the
   spoken policy for voice, the plan's budget as the only length. The
   written-set bench and the seeded voice set.
-- **U5, memory lines dated and labeled** (S, Codex). REPLY-FIND-04 on the
+- **U5, memory lines dated and labeled** (S, Codex; starts today, on
+  the context list both paths share). REPLY-FIND-04 on the
   new path's context list.
-- **U6, the flip** (S, the coordinator's call on the numbers). The
+- **U6, the flip** (S, the coordinator's call on the numbers; gated on
+  ARCH-MEASURE-01's budget records for the models in the house). The
   replay set report on both paths, the default flipped, the old chat page
   unchanged.
 - **D1 to D9, the deletions** (S each, Codex), one family per commit in
@@ -282,15 +362,52 @@ policy rows, the UI program.
 
 ### 9. What ARCH-MEASURE-01 still has to answer
 
-Answered today, enough to start U0 to U3 now: the 8B makes 0 false tool
-calls in 100 negative repeats on both prompt shapes; the 4B makes 0 in 50
-on the bare prompt and 5 in 50 on the production prompt; the prefix-cache
-question is settled by the 567 evidence; the routing corpus passes 169 of
-170 rows on the embedding path today (the trimmed corpus after D7 keeps
-the exact-match rows only).
+See phase 0 at the top: the 8B and 4B numbers are in, and they are enough
+to start U0, U1, U3 and U5 today. Still owed before the flip: the 27B's
+inverse-miss rate (it sets when the interim rule relaxes on the Studio),
+the query-rewrite bench (U2's own acceptance), and the 1.7B numbers (the
+robot's floor, not the hub's).
 
-Still needed before the flip, not before the build: the 27B's inverse-miss
-rate on the replay set, which sets when the interim rule relaxes on the
-Studio; the query-rewrite bench (15 two-turn rows, 10 repeats, the 90
-percent bar), which is U2's own acceptance; the 1.7B numbers, which
-matter for the robot's floor and not for the hub.
+### 10. End-state inventory
+
+Every word-rule family in the turn path, what happens to it, and what
+replaces it. Line counts are today's function and regex lengths, rounded.
+"Nothing" means the behaviour it policed cannot occur on the new path.
+
+| File | Symbols | Lines | Replacement |
+|---|---|---|---|
+| `turnContext.ts` | `lookupDecision`, `exactFieldOf`, `lookupRequest`, `deliverableQuery`, `deliverableInDenial`, `pictureDeliverableFor`, `CURRENCY_MARK_RE`, `FIELD_STOP_RE`, `LOOKUP_REQUEST_RE`, `ACTION_REQUEST_RE`, `PICTURE_FOLLOWUP_RE` | ~220 | The model's tool call in the one call; the interim always-search rule; then LOOKUP-HEAD-01 |
+| `turnEngine.ts` | `lookupQueryFor` and its seven regexes, `runForcedLookup`, `notePendingLookup`, `lookupConsent`, `LOOKUP_IMPERATIVE_RE`, `worldAnswerQuery`, `holdForLookup`, the lookup branch of `resolvePendingAsk`, `composeDeliverable`, `deliverableKind`, the `IMAGE_*_RE` set, the world-subject capture family (`REFERS_BACK_RE`, `PRONOUN_RE`, `QUESTION_CAPTURE_RE`, `DETERMINER_KIND_RE`, `BARE_KIND_RE`) | ~550 | The model writes the query from the window; the pending ask keeps only consent and confirmation |
+| `turnEngine.ts`, `routing.ts` | Tier 1 as decider: `routeSemantic`, `selectOfferedTools`, `pickTier1Winner`, `ensureRoutingEmbeddings`, `scoreByEmbedding`, the thresholds | ~400 | A fixed offered set per model budget; the embed engine keeps serving memory recall |
+| `utteranceShape.ts`, `turnEngine.ts` | `utteranceShape`, `commandOpenersFrom`, `commandOpeners`, `COURTESY_PREFIX`, `EXCLAMATIVE_RE` | ~230 | Nothing; the exact commands need no shape, the signal's act covers the rest |
+| `guards.ts` | the draft reader: `readLookupDraft`, `lookupShapeOf`, `hedgedFactShape`, `LOOKUP_PROMISE_RE`, `LOOKUP_OFFER_RE`, `HEDGE_MARK_RE`, `CHECKABLE_VALUE_RE`, `FALSE_CAPABILITY_RE`, `RECALL_CHECK_RE`, `LOOKUP_OBJECT_RE` | ~120 | Nothing; the search decision is made before the model speaks |
+| `guards.ts` | the repeat family: `isRepeatReply`, `guardRepeatSentence`, `guardRepeatQuestion`, `normalizeForRepeat`, `repeatRetryNote`, `REPEAT_REQUEST_RE`, `OBJECTION_RE`, `CHAT_LOOP` | ~100 | Nothing |
+| `guards.ts` | the register family: `guardAssistantRegister`, `isRegisterSentence`, `stripRegisterTail`, `isRegisterSkip`, `REGISTER_*_RE`, `CLOSER_*_RE`, `ACK_*_RE`, `GREETING_*_RE`, `TAG_QUESTION_RE`, `ADDRESSEE_TAIL_RE`, `RECIPROCAL_RE`; `guardPlaceholderEcho` | ~240 | The written and spoken policies in the prompt; the malformed repair |
+| `guards.ts` | the world half of `guardInvention` (`CLAIMED_EXPERIENCE_RE`, `CONSUMPTION_EXPERIENCE_RE`, `PLANNED_EXPERIENCE_RE`, `LOCATION_CLAIM_RE`, `ACTIVITY_CLAIM_RE`, `PERSON_TRAIT_RE` and kin) | ~150 | Sources: a world answer without a search carries none and says so |
+| `unknownNames.ts` | the world half: `worldAnswer`, `properNounsIn`'s world branch of `candidatesIn` and `resolveNames`, `WORLD_KIND_RE`, `WORLD_KIND_NOUN_RE`, `WORLD_MARK_RE`, `KIND_NOUN_AFTER_RE`, `LOWER_TITLE_RE`, `LOWER_TITLE_FOR_RE`, `PRODUCT_NOUN_RE`, `DETERMINER_BEFORE_RE`, `LOCALITY_RE`, `THIRD_PERSON_PRONOUN_RE` | ~300 | The model resolves names and pronouns from the window |
+| `replyConstraints.ts` | `SHAPE_LIST`, `SHAPE_NUMBER`, `SHAPE_LINE`, `LENGTH_WORDS`, the "shorter" parse | ~30 | The model reads "shorter" in the window; the plan's budget bounds it; banned phrases stay |
+| `unspokenArgs.ts` | the utterance-only grounding for read-only tools | ~150 | A window check of about 40 lines: an argument must come from the conversation |
+| the websearch manifest | the `search *`, `look up *`, `google *` patterns | 3 | The model; a search verb with nothing after it is answered with a question, never a definition |
+
+About 2,300 lines in all. Reviewed after the flip, not deleted with it:
+`composer.ts` (it composes package results, which stay), and the
+open-class half of `turnSignal.ts` (the emotion and stance regexes),
+which LOOKUP-HEAD-01's head replaces on the 2026-09-16 bar.
+
+Stays deterministic on purpose, per RULES-AND-LEARNED-COMPONENTS.md:
+
+| What | Where | Why it stays |
+|---|---|---|
+| The safety floor, in and out | `commons/spec/safety/ts/signals.ts` (494 lines), `safety.ts`, `gateOutputSafety` | Non-removable architecture; identical in every house |
+| The crisis state and its stop | `CRISIS_STOP_RE`, the crisis branch of `prepareTurn` | Offer, never block |
+| The credential catch | `memoryContentPolicy.ts` | Nothing downstream may see a password |
+| Consent and confirmation | `consentVocab.ts` (`AFFIRMATIVE_RE`, `NEGATIVE_RE`), the pending-ask protocol's consent and confirm kinds, the action executor | A yes is a yes by rule, never by a model's reading |
+| Household privacy and disclosure | `memory.ts` `canRead`, `childDisclosure.ts`, `contentCeiling.ts`, the household-subject guard, temporary mode | Filtered before the prompt, never left to the model |
+| The household half of name resolution | `unknownNames.ts`: `parseWhoAnswer`, `applyWhoAnswer`, the relation frames | It writes entity records, a consent path |
+| The exact commands and household commands | `matchPattern` for closed intents whose argument is the remainder by definition ("remember that *", "add * to the list", "set a timer for *"), `commands.ts` | Instant, exact, testable; never a wildcard on a lookup |
+| The almanac | `almanacCompute.ts` | Computed, not recalled |
+| The argument quantity check for actions | `unspokenArgs.ts`'s number and duration matching | The executor runs what was said, never what was inferred |
+| The honesty invariant | the `outcomes` check at the boundary | An action claim needs a package that ran |
+| The reply plan's budget and child band | `register.ts` | The one place length is decided |
+| The closed-set half of the turn signal | `turnSignal.ts`: greeting, closing, correction, household, hub-blame | Closed sets with a counter row, read by the interim rule |
+| Malformed-reply repair | `wellFormed.ts` | A cut-off reply is regenerated once |
