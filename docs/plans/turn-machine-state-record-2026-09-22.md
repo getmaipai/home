@@ -184,6 +184,16 @@ is a second output with the same rules as the first, and one more.
   the budget record, a minor's request never carries `thinking`, and the
   backend ignores the field on a minor's turn if a client sends it.
 
+- **The stored turn holds the visible answer only.** Today the turn
+  row's reply text holds the whole generation, and a reload rendered
+  `<think>` text verbatim. Reasoning, when emitted, is its own
+  spec-shaped field or part on the turn (spec first), never stored for a
+  minor's turn, and the reload path renders it through the same
+  Reasoning Element as the live stream, so the withholding decision
+  holds on reload and in every client. Old rows with inline think text
+  are stripped on read. (U2e on the new path; the old path's fix is part
+  of the safety exception.)
+
 The decision is made once, in `context`, before the model runs, and is
 never recomputed by a later node. The thinking budget in the model's
 budget record is unchanged by this: the model may still think; the hub
