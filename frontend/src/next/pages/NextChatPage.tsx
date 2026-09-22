@@ -1108,9 +1108,24 @@ export function NextChatPage({ person }: { person: Roster }) {
   // string there, so this can't be interpolated in; a change to one
   // needs the other updated by hand.
   const RAIL_WIDTH_TRANSITION_MS = 200;
+  // A hard, rAF-independent ceiling - found live on 8787 (2026-09-22),
+  // not by either review pass: this session's own automation tab is
+  // genuinely backgrounded (`document.visibilityState === "hidden"`,
+  // `document.hasFocus() === false`), and `requestAnimationFrame`
+  // confirmed NOT firing within 1000ms there - the spec's own throttle
+  // for a tab that isn't actively painting. The rAF-deferred fallback
+  // below would never run in that state, leaving `railWidthAnimating`
+  // stuck true (silently reintroducing the original bug for hover on
+  // that tab) until the next real click's own transitionend happened to
+  // clear it. A plain `setTimeout`, scheduled with no rAF in between,
+  // always eventually fires regardless of tab visibility - padded well
+  // past the transition's real ~200ms so it never wins the race in the
+  // normal foregrounded case.
+  const RAIL_WIDTH_ANIMATION_BACKSTOP_MS = 600;
   const [railWidthAnimating, setRailWidthAnimating] = useState(false);
   const railWidthAnimatingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const railWidthAnimatingRafRef = useRef<number | null>(null);
+  const railWidthAnimatingBackstopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearRailWidthAnimationTimers = () => {
     if (railWidthAnimatingRafRef.current !== null) {
       cancelAnimationFrame(railWidthAnimatingRafRef.current);
@@ -1119,6 +1134,10 @@ export function NextChatPage({ person }: { person: Roster }) {
     if (railWidthAnimatingTimeoutRef.current !== null) {
       clearTimeout(railWidthAnimatingTimeoutRef.current);
       railWidthAnimatingTimeoutRef.current = null;
+    }
+    if (railWidthAnimatingBackstopRef.current !== null) {
+      clearTimeout(railWidthAnimatingBackstopRef.current);
+      railWidthAnimatingBackstopRef.current = null;
     }
   };
   const stopRailWidthAnimation = () => {
@@ -1148,6 +1167,10 @@ export function NextChatPage({ person }: { person: Roster }) {
         setRailWidthAnimating(false);
       }, RAIL_WIDTH_TRANSITION_MS);
     });
+    railWidthAnimatingBackstopRef.current = setTimeout(() => {
+      railWidthAnimatingBackstopRef.current = null;
+      setRailWidthAnimating(false);
+    }, RAIL_WIDTH_ANIMATION_BACKSTOP_MS);
   };
   useEffect(() => {
     return () => clearRailWidthAnimationTimers();
