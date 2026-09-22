@@ -44,6 +44,7 @@ import { checkForAppUpdate } from "@/lib/updates";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { stackUpdatesEnabled, checkStackUpdates, runStackReadinessCheck, sweepStackStorage } from "@/lib/stackUpdates";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { sweepFavicons } from "@/lib/favicons";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
@@ -307,6 +308,14 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // matches their age).
   "people.apply_age_band_changes": async () => {
     await applyAgeBandChanges();
+  },
+  // SRC-ICON-01: the favicon cache's own daily sweep (lib/favicons.ts) -
+  // an entry nobody has opened in 30 days goes, and the whole cache
+  // stays under its 20 MB ceiling. Same daily cadence as the other
+  // per-day maintenance jobs above; a favicon changing that rarely
+  // needs no tighter check.
+  "favicons.sweep": () => {
+    sweepFavicons();
   },
   // Step 8: reminders/timers (packageHost.ts's `reminders.set`/
   // `timers.set`, scheduled via scheduleCoreJob above) fire by raising

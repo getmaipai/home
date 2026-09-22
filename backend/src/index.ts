@@ -233,6 +233,10 @@ ensureCoreJob("householdCa.check_leaf_expiry", "every:1d");
 // both.
 ensureCoreJob("people.disable_expired_guests", "every:1d");
 ensureCoreJob("people.apply_age_band_changes", "every:1d");
+// SRC-ICON-01: the source favicon cache's own daily sweep -
+// lib/scheduler.ts's own CORE_JOBS entry, lib/favicons.ts for the
+// expiry and size-cap mechanics.
+ensureCoreJob("favicons.sweep", "every:1d");
 
 // A code review (2026-09-06) found the "Renew now" Repairs fix silently
 // broken across a restart: registerRenewFixHandler() was only ever

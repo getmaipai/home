@@ -14906,6 +14906,60 @@
         }
       }
     },
+    "/api/favicon": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "A cited site's own icon, fetched and cached by the hub - never a third-party call from the browser",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "wikipedia.org"
+            },
+            "required": true,
+            "name": "domain",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The icon's own bytes, as fetched or served from cache.",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "The site has no icon (or none this route accepts), also cached so it's asked at most once."
+          },
+          "400": {
+            "description": "domain is not a valid, public hostname",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/dashboard": {
       "get": {
         "tags": [

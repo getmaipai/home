@@ -264,15 +264,16 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     }
   });
 
-  // Slice 5(a), CHAT-UI-03's own sources follow-up (2026-09-22): a
-  // turn's `sources` render through the shipped `Sources` Element
-  // (elements/sources.tsx), its trigger in the assistant message's own
-  // action bar (not a standalone row under the reply text anymore -
-  // Jesse's own screenshots), collapsed by default per spec.md - the
-  // same synthetic-tool-call-part composition this describe block's own
-  // weather case already proves for the structured card, mapping
-  // spec's `Source.site` onto the Element's own `domain`.
-  test("a turn's sources render through a trigger in the action bar, collapsed by default", async () => {
+  // SRC-ICON-01 (2026-09-22, supersedes the CHAT-UI-03 sources follow-up
+  // this test used to cover): a turn's `sources` render through the
+  // vendored `Source`/`SourceIcon`/`SourceTitle` (elements/sources.aui.tsx),
+  // its trigger in the assistant message's own action bar, collapsed by
+  // default per spec.md - the same synthetic-tool-call-part composition
+  // this describe block's own weather case already proves for the
+  // structured card. The owner's whole ask: a source opens its own page,
+  // and shows the site's icon fetched through the hub, never the
+  // browser calling the site directly.
+  test("a turn's sources render as a link to their own page with the hub's own favicon, collapsed by default", async () => {
     const SOURCE = { id: "src-tide123", kind: "web" as const, title: "Lantern Bay tide chart", url: "https://example.com/tides", site: "example.com", snippet: null, source: "turn-tide123", created_at: "2026-09-22T00:00:00.000Z", hlc: "1788000000000:0:test" };
     const restore = stubTurnFetch(
       ndjsonStream([
@@ -280,6 +281,27 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
         { type: "done", value: { turn_id: "turn-tide123", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY, sources: [SOURCE] } },
       ]),
     );
+    // happy-dom has no real image decoder - `<img src>` always ends up
+    // "failed" (SourceIcon's own letter-fallback branch), same class of
+    // gap `sttSocket.test.ts`'s own header names for a real WebSocket.
+    // Fighting that (stubbing `complete`, blocking the error event) still
+    // lands on the fallback, so this captures the `src` the component
+    // actually assigned instead of reading it back off a real `<img>` -
+    // proves the SAME thing (SourceIcon was handed the hub's own favicon
+    // URL, never the shipped third-party default), without depending on
+    // an image decoder this environment doesn't have. Restored after so
+    // no later test's own `<img>` inherits this.
+    const capturedImgSrcs: string[] = [];
+    const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src")!;
+    Object.defineProperty(HTMLImageElement.prototype, "src", {
+      configurable: true,
+      get() {
+        return capturedImgSrcs.at(-1) ?? "";
+      },
+      set(value: string) {
+        capturedImgSrcs.push(value);
+      },
+    });
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -294,10 +316,21 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       // yet (a Collapsible unmounts its own content when closed).
       expect(view.queryByText("Lantern Bay tide chart")).toBeNull();
       fireEvent.click(trigger);
-      expect(await view.findByText("Lantern Bay tide chart")).toBeVisible();
-      // `domain` reads spec's `site`, not `url` or `id`.
-      expect(view.getByText("example.com")).toBeVisible();
+      const row = view.getByText("Lantern Bay tide chart").closest("a");
+      expect(row).not.toBeNull();
+      // Opens the source's own page - the privacy promise on
+      // source.schema.json's own `url` field: `rel`/`referrerPolicy`
+      // both withhold the referrer, `target="_blank"` never navigates
+      // the chat away.
+      expect(row).toHaveAttribute("href", "https://example.com/tides");
+      expect(row).toHaveAttribute("target", "_blank");
+      expect(row).toHaveAttribute("rel", "noopener noreferrer");
+      expect(row).toHaveAttribute("referrerpolicy", "no-referrer");
+      // The site's icon through the hub's own route, never the site's
+      // own URL or the shipped default (a third-party favicon service).
+      expect(capturedImgSrcs).toContain(`/api/favicon?domain=${encodeURIComponent("example.com")}`);
     } finally {
+      Object.defineProperty(HTMLImageElement.prototype, "src", originalSrcDescriptor);
       restore();
     }
   });

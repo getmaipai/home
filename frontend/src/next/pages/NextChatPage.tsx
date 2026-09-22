@@ -7,7 +7,9 @@ import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
-import { Sources, SourceGlyph } from "@maipai/ui/src/elements/sources";
+import { Source, SourceIcon, SourceTitle } from "@maipai/ui/src/elements/sources.aui";
+import { Collapsible, CollapsibleContent } from "@maipai/ui/src/ui/collapsible";
+import { collapsePanel } from "@maipai/ui/src/elements/surfaces";
 import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
@@ -30,7 +32,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
 import { api, ApiError, isOwnerOrAdminRole, readBareCompareStream, type BareCompareTrace, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
-import type { Source } from "@maipai/spec/gen/ts/source.js";
+import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
@@ -407,19 +409,21 @@ function ChatThinkingIndicator() {
   );
 }
 
-// Slice 5(a): the kit's own `Sources` (elements/sources.tsx), used exactly
-// as it ships - never the retired page's `blocks/chat/SourcesCard`, the
-// pre-2026-09-21 kit block this shell rebuild is retiring page by page.
-// Its own `Source` shape (`{domain, title}`) is narrower than spec's real
-// citation record - `domain` reads spec's `site` field (source.schema.json's
-// own description of `site`: "the hostname a citation chip shows," exactly
-// what `domain` means here); `url`/`snippet`/`kind`/`id` have nowhere to go
-// in the shipped card. Two real gaps in the shipped Element itself, named
-// in docs/dev.md rather than reached around: its rows are `<div>`s with no
-// `href` (a source can't be opened - filed as a kit ask), and it keys each
-// row by `domain` (`elements/sources.tsx:53`), which collides when a reply
-// cites two different pages on the same site - not deduped here (that
-// would drop a real citation), filed as a kit ask (key by index instead).
+// SRC-ICON-01: `elements/sources.tsx`'s own `Sources` card (Slice 5(a))
+// had no `href` (a source could never be opened) and rendered a bare
+// letter glyph for every row, never the site's real icon - both filed
+// as kit asks in docs/dev.md. Fixed at the source: `sources.aui.tsx`
+// (vendored from assistant-ui, c-99e5a) gives `Source` (a real `<a
+// target="_blank" rel="noopener noreferrer">`) and `SourceIcon` (a
+// favicon `<img>` with a letter fallback on error), composed by hand
+// below inside the kit's own `Collapsible` - see `SourcesFooterContent`.
+// `domain` still reads spec's `site` field (source.schema.json's own
+// description: "the hostname a citation chip shows"); `url` now carries
+// straight through instead of being dropped. Keyed by `url`, not index or
+// domain: `composer.ts`'s `sourceRows()` already dedupes by `url`
+// (`byUrl.has(source.url)`), so it's a stable, collision-free key, unlike
+// `domain` (two pages on the same site) or index (would miskey across a
+// re-render that reorders).
 // Reads the CURRENT message's own "sources" tool-call result straight off
 // message state (not a prop) - `SourcesActionBarTrigger` and
 // `SourcesFooterContent` below are both bare `ComponentType` slots (the
@@ -441,9 +445,14 @@ function ChatThinkingIndicator() {
 // own content changes, same as any other assistant-ui message part) -
 // a cache miss just recomputes, so a wrong assumption about that
 // stability would cost renders, never wrong data.
-const sourcesCache = new WeakMap<object, { domain: string; title: string }[]>();
-const NO_SOURCES: { domain: string; title: string }[] = [];
-function sourcesFromMessage(message: ThreadMessage | undefined): { domain: string; title: string }[] {
+interface ChatSource {
+  domain: string;
+  title: string;
+  url: string;
+}
+const sourcesCache = new WeakMap<object, ChatSource[]>();
+const NO_SOURCES: ChatSource[] = [];
+function sourcesFromMessage(message: ThreadMessage | undefined): ChatSource[] {
   const part = message?.content.find(
     (p): p is Extract<ThreadAssistantMessagePart, { type: "tool-call" }> =>
       p.type === "tool-call" && p.toolName === "sources",
@@ -451,21 +460,30 @@ function sourcesFromMessage(message: ThreadMessage | undefined): { domain: strin
   if (!part) return NO_SOURCES;
   const cached = sourcesCache.get(part);
   if (cached) return cached;
-  const result = (part.result as Source[] | undefined)?.map((source) => ({ domain: source.site, title: source.title })) ?? NO_SOURCES;
+  const result = (part.result as SpecSource[] | undefined)?.map((source) => ({ domain: source.site, title: source.title, url: source.url })) ?? NO_SOURCES;
   sourcesCache.set(part, result);
   return result;
+}
+
+// The hub's own favicon route (SRC-ICON-01 part 2, backend/src/routes/
+// favicon.ts): never the upstream Element's default (a third-party
+// `icons.duckduckgo.com` call straight from the browser, exactly what
+// the privacy promise on source.schema.json's own `url` field rules
+// out) - `SourceIcon`'s `faviconUrl` prop swaps that default for this.
+function faviconUrl(domain: string): string {
+  return `/api/favicon?domain=${encodeURIComponent(domain)}`;
 }
 
 // Jesse's own screenshots (2026-09-22): the trigger moves INTO the
 // assistant message's action bar, as the last item after "..." - subtle,
 // the bar's own ghost style, stacked favicons of the first few sources
 // plus the word "Sources", no pill, no count badge, no chevron (the
-// count lives in the tooltip instead). The shipped `Sources` Element
-// bundles its own trigger+content as one `Collapsible`; splitting them
-// across two DOM locations (this bar row vs. the block-level space below
-// the whole footer) needed the kit's own `hideTrigger` prop (ui-v0.5.27)
-// rather than a hand-built collapsible - `SourceGlyph` is the same kit
-// export the content list itself uses, not a second hand-rolled glyph.
+// count lives in the tooltip instead). Splitting the trigger and the
+// open content across two DOM locations (this bar row vs. the block-
+// level space below the whole footer) means composing the kit's own
+// `Collapsible` directly here rather than the shipped `Sources` card's
+// own bundled trigger+content - `SourceIcon` is the same kit export the
+// open content list below uses, not a second hand-rolled glyph.
 // `Tooltip`/`TooltipTrigger`/`TooltipContent` and the Elements' own
 // `Button` directly, not the kit's `TooltipIconButton` its bar siblings
 // (Copy, Reload, More) use: that wrapper is a fixed square icon button
@@ -506,7 +524,7 @@ function SourcesActionBarTrigger() {
         >
           <span className="flex items-center" aria-hidden="true">
             {sources.slice(0, 3).map((source, index) => (
-              <SourceGlyph key={index} domain={source.domain} className={index === 0 ? "ring-2 ring-background" : "-ml-1.5 ring-2 ring-background"} />
+              <SourceIcon key={source.url} url={source.url} faviconUrl={faviconUrl} className={index === 0 ? "ring-2 ring-background" : "-ml-1.5 ring-2 ring-background"} />
             ))}
           </span>
           <span>Sources</span>
@@ -517,6 +535,20 @@ function SourcesActionBarTrigger() {
   );
 }
 
+// SRC-ICON-01: composed straight from the vendored Elements, no hand-
+// built row - `Source` (a real `<a>`, target `_blank`, `rel="noopener
+// noreferrer"` by default) plus an explicit `referrerPolicy="no-referrer"`
+// (source.schema.json's own privacy promise on `url`: "a cited site
+// learns nothing from the click but the click" - `rel="noreferrer"`
+// alone already withholds the Referer header in every evergreen
+// browser, but the schema names both attributes and this sets both
+// rather than leaning on the overlap), `SourceIcon` pointed at the
+// hub's own favicon route (never the shipped default, `faviconUrl`
+// above), `SourceTitle`. The chip look (`variant`/`size` untouched) is
+// the shipped Element's own, not a custom row shape - the kit's
+// `Collapsible`/`CollapsibleContent` (the same primitive the old
+// `Sources` card built on) gives the open/close chrome, styled with the
+// same `collapsePanel` token that card's own content panel used.
 function SourcesFooterContent() {
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   const sources = useAuiState((s) => sourcesFromMessage(s.message));
@@ -524,7 +556,18 @@ function SourcesFooterContent() {
   if (!turnId || !sources.length) return null;
   return (
     <div className="ms-2 pb-2">
-      <Sources sources={sources} open={isOpen(turnId)} onOpenChange={() => toggle(turnId)} layout="list" hideTrigger />
+      <Collapsible open={isOpen(turnId)} onOpenChange={() => toggle(turnId)}>
+        <CollapsibleContent className={cn(collapsePanel, "outline-none")}>
+          <div className="flex flex-wrap gap-1.5 pt-2.5" data-slot="sources-list">
+            {sources.map((source) => (
+              <Source key={source.url} href={source.url} referrerPolicy="no-referrer" variant="secondary">
+                <SourceIcon url={source.url} faviconUrl={faviconUrl} />
+                <SourceTitle>{source.title}</SourceTitle>
+              </Source>
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

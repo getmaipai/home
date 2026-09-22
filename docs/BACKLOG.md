@@ -5122,37 +5122,58 @@ alongside the first sourced skill, not before it.
       that's the one piece left, Session A's own work, wired to the
       exact shape above.
 
-      **Status, 2026-09-22 (slice 5(a))**: the sources CARD is landed on
-      `/next/chat` (docs/dev.md, "Slice 5(a)") - `Sources` (the new kit
-      Element, `elements/sources.tsx`, not the old `SourcesCard` this
-      note describes above, which belongs to the now-retired page). The
-      `[N]` MARKER half described in this item is still exactly what's
-      missing: `inline-citation.tsx` (the new kit's own would-be
-      replacement for the old marker/chip rewrite) is a static demo with
-      no exported way to place a marker in dynamic text, and `Thread`
-      has no text/markdown slot to reach one through even if it were -
-      filed as `getmaipai/commons#8`. This item stays open for that half.
-- [ ] **Favicon fetch-once, cache, and reuse for citation/source chips**
-      (S) - doesn't exist yet, but legacy had a complete, two-layer
-      version worth reusing as-is (hard-won resolver/cache logic, not
-      feature scope, so this one IS a real port candidate per
-      `getmaipai/.github`): client-side, `faviconCache.ts` kept an
-      in-memory + `localStorage` cache (7-day TTL, `data:` URLs, in-flight
-      dedup so concurrent callers for the same domain share one fetch);
-      server-side, `/api/img` (`imageProxy.ts`) never let the browser hit
-      a third-party favicon host directly, fetching once through an
-      SSRF-guarded proxy, disk-caching bytes keyed by a URL hash with a
-      negative-result cache for confirmed-missing icons, and a periodic
-      size-bounded sweep. Confirmed by 2026-09-06 research this isn't just
-      a performance nicety: browser favicon caches are a known privacy/
-      fingerprinting vector (persist separately from cookies/history,
-      survive some browsers' private-mode and cache-clears), and a raw
-      `<img src="https://icons.duckduckgo.com/...">` leaks the household's
-      IP and Referer to every cited domain on every reply - exactly the
-      leak class the legacy proxy's own comment already named as its first
-      reason for existing. Wire this in as part of the citation-chip work
-      above, not standalone - a favicon cache with nothing to cache is
-      pointless work today.
+      **Status, 2026-09-22 (slice 5(a), superseded same day by
+      SRC-ICON-01 below)**: the sources CARD is landed on `/next/chat`
+      (docs/dev.md, "Slice 5(a)") - `Sources` (the new kit Element,
+      `elements/sources.tsx`, not the old `SourcesCard` this note
+      describes above, which belongs to the now-retired page), rows
+      with no `href` and a bare letter glyph. SRC-ICON-01 replaces that
+      row's own composition with `sources.aui.tsx`'s `Source`/
+      `SourceIcon`/`SourceTitle` (a real link, a real favicon through
+      the hub); `elements/sources.tsx`'s grid/list layouts stay in the
+      kit for a caller that still wants them, just no longer this
+      page's own. The `[N]` MARKER half described in this item is still
+      exactly what's missing: `inline-citation.tsx` (the new kit's own
+      would-be replacement for the old marker/chip rewrite) is a static
+      demo with no exported way to place a marker in dynamic text, and
+      `Thread` has no text/markdown slot to reach one through even if
+      it were - filed as `getmaipai/commons#8`. This item stays open
+      for that half.
+- [x] **Favicon fetch-once, cache, and reuse for citation/source chips**
+      (S) - superseded by SRC-ICON-01 below, landed 2026-09-22: a
+      server-only cache (no client-side `localStorage` layer - legacy's
+      two-layer shape wasn't needed once the hub's own route already
+      answers a repeat request from disk), still hitting the exact
+      privacy concern this item named (a raw `<img src="https://
+      icons.duckduckgo.com/...">` leaking the household's IP and
+      Referer to every cited domain).
+- [x] **SRC-ICON-01: sources open their page and show the site's icon**
+      (S), landed 2026-09-22: `elements/sources.tsx`'s own `Sources`
+      card had no `href` (a source could never be opened) and no real
+      favicon (a bare letter glyph always) - both filed as kit asks.
+      Fixed by vendoring assistant-ui's own citation chip,
+      `sources.aui.tsx` (`ui/src/elements/`, commons `ui-v0.5.33` -
+      `ui-v0.5.32` was cut without bumping `ui/package.json`'s own
+      version field, caught live by home's own tag/version match check;
+      `ui-v0.5.33` is one commit later with just that version bump,
+      `ui-v0.5.32` left dead, never a valid pin):
+      `Source` (a real `<a target="_blank" rel="noopener noreferrer">`),
+      `SourceIcon` (a favicon `<img>` with a letter fallback on error),
+      `SourceTitle`, composed in `NextChatPage.tsx`'s
+      `SourcesFooterContent`/`SourcesActionBarTrigger` inside the kit's
+      own `Collapsible`. The favicon itself never comes from the
+      browser: `GET /api/favicon?domain=<host>`
+      (`backend/src/routes/favicon.ts`, `lib/favicons.ts`) fetches
+      `/favicon.ico` then `/apple-touch-icon.png` through the hub (10s
+      timeout, 64 KB cap, image content types only, the shared SSRF
+      guard `@maipai/core/src/ssrfGuard`'s `assertNotPrivateHost`
+      rejecting a private IP or `localhost`), disk-caches the result
+      (found or confirmed-absent) under `<dataDir>/favicons/`, and
+      sweeps it daily (`favicons.sweep`, `lib/scheduler.ts`): an entry
+      unused for 30 days is deleted, the whole cache stays under 20 MB.
+      `sourcesFromMessage()` keeps `url` (dropped before); `Source` is
+      keyed by `url`, not `domain` (two pages on the same site used to
+      collide) or index. See `docs/dev.md`, "SRC-ICON-01."
 
 ## Integrations
 
