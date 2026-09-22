@@ -870,11 +870,16 @@ describe("CHAT-18: the turn lease on every exit path", () => {
     const other = acquireTurnLease(); // another user's turn, mid-flight
     let fullText = "";
     for await (const delta of result.tokens) fullText += delta;
+    // getmaipai/home#131: insertProvisionalTurn() already wrote this
+    // turn's own row during prepareTurn(), well before this point - the
+    // real thing this test checks is that calling finalize() twice
+    // still logs exactly once (an UPSERT on that same row both times),
+    // not that a row appears here for the first time.
     const before = db.select().from(conversationTurns).all().length;
     const a = result.finalize(fullText);
     const b = result.finalize(fullText);
     expect(b).toBe(a);
-    expect(db.select().from(conversationTurns).all().length).toBe(before + 1);
+    expect(db.select().from(conversationTurns).all().length).toBe(before);
     expect(activeTurnCount()).toBe(1); // the other user's lease is untouched
     other.release();
     expect(activeTurnCount()).toBe(0);

@@ -1079,10 +1079,16 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // verifying SHELL-02 slice 4: every test that passed before
         // this fix had pre-inserted the row itself,
         // packageHostArtifact.test.ts's own turnFor(), which no real
-        // turn ever does up front). The row not existing yet is itself
-        // a real, deeper gap this fix doesn't close (getmaipai/home#131):
-        // createArtifact() below still fails its own foreign-key
-        // constraint against conversationTurns until that's fixed.
+        // turn ever does up front). getmaipai/home#131 closed the
+        // deeper gap this fix alone didn't: `createArtifact()` below
+        // used to fail its own foreign-key constraint against
+        // conversationTurns, since that row genuinely didn't exist yet
+        // at this point in a real turn - turnEngine.ts's `prepareTurn()`
+        // now writes a real, minimal row for this exact turn id before
+        // anything else runs (conversationHistory.ts's
+        // `insertProvisionalTurn()`), so the FK this insert needs is
+        // always satisfied by the time any tool outcome, this one
+        // included, can possibly run.
         if (!turn?.id || !turn.conversationId) {
           throw new HostError("not_found", "host.artifact.create needs a conversation turn to attach to");
         }

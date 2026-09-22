@@ -1466,8 +1466,17 @@ function isSkippedTurn(turnId: string): boolean {
 // marked the ineligible ones skipped at insert), so a disclosure beside
 // a package answer is judged (CHAT-07's gap). A row written before the
 // signal existed keeps the old rule, model turns only.
+// getmaipai/home#131: excludes status="running" - insertProvisionalTurn()
+// (conversationHistory.ts) writes a real row with source: "model" (a
+// placeholder) and judgeStatus left at its default null the moment a
+// turn starts, which is exactly this query's own shape. turnActiveWithin()
+// (turnActivity.ts) gates the judge's own scheduler tick against a live
+// TurnLease, but that lease releases once the token stream ends, before
+// finalize()/logTurn() necessarily runs - a slow or delayed finalize can
+// leave a stale "running" row queryable here for longer than the lease
+// gate covers. Excluded here directly rather than relying on that timing.
 function pendingTurnWhere() {
-  return and(or(isNotNull(conversationTurns.signal), eq(conversationTurns.source, "model")), isNull(conversationTurns.judgeStatus), notInArray(conversationTurns.id, supersededTurnIdsQuery()));
+  return and(or(isNotNull(conversationTurns.signal), eq(conversationTurns.source, "model")), isNull(conversationTurns.judgeStatus), eq(conversationTurns.status, "done"), notInArray(conversationTurns.id, supersededTurnIdsQuery()));
 }
 function markSkipped(turnId: string): void {
   db.update(conversationTurns).set({ judgeStatus: "skipped", hlc: nextHlc() }).where(and(eq(conversationTurns.id, turnId), isNull(conversationTurns.judgeStatus))).run();

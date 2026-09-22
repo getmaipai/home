@@ -59,6 +59,7 @@ import {
   maybeRefreshConversationSummary,
   getPendingAsk,
   setPendingAsk,
+  insertProvisionalTurn,
   recentTurnSafety,
   markPreviousTurnCorrected,
   turnRowsById,
@@ -2485,6 +2486,35 @@ async function prepareTurn(
   continuation: TurnContinuation | null = null,
 ): Promise<PreparedTurn> {
   const turnId = newConversationTurnId();
+  // getmaipai/home#131: a real row for this exact id, before anything
+  // else - including the safety check below - runs, so a package's
+  // recipe (write_document's host.artifact.create() named the bug) has
+  // a real FK target the moment the model calls it, not just once the
+  // whole turn finishes and logTurn() would otherwise insert the row
+  // for the first time. logTurn() (conversationHistory.ts's
+  // insertTurnAndBumpConversation) finds this same row by id and
+  // updates it in place; insertProvisionalTurn()'s own doc comment has
+  // the full account of what every other reader of this table needs to
+  // filter to skip a still-"running" row like this one.
+  //
+  // The same two gates logTurnSafely() already applies at the OTHER
+  // end of this same turn (never logging an ephemeral widget query or a
+  // temporary conversation's turn) apply here first: this function
+  // would otherwise write the one real row logTurnSafely() then
+  // correctly never touches, leaving an orphaned "running" row neither
+  // side ever finishes. Best-effort like logTurn() itself
+  // (logTurnSafely()'s own try/catch): a write failure here must never
+  // turn an otherwise-successful generation into a reported one - the
+  // turn still needs a provisional row for mid-turn tool calls to work
+  // against, but its absence (a broken FK on a conversation the caller
+  // never actually persisted, say) is a degraded turn, not a failed one.
+  if (!ephemeral && conversation.mode !== "temporary") {
+    try {
+      insertProvisionalTurn(actor, surface, conversation.id, turnId, text);
+    } catch (err) {
+      console.error(`[turn] insertProvisionalTurn failed, tool calls needing this turn's own row will fail their own way: ${(err as Error).message}`);
+    }
+  }
   // Stamps conversation_id/turn_id exactly once, rather than at each of
   // this function's five immediate-return sites (a code review,
   // 2026-09-05, found the two fields copy-pasted into every one of

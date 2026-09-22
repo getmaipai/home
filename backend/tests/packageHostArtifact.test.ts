@@ -8,12 +8,18 @@
 // a non-owner cannot supersede someone else's artifact through this
 // path. `conversationId` is passed straight through from the caller's
 // own turn context (bundled with the turn id, `{id, conversationId}`),
-// never looked up from a `conversation_turns` row keyed on turnId - a
-// live turn's own row doesn't exist yet at this point in the turn
-// (getmaipai/home#131, still open: `turnFor()` below pre-inserts that
-// row so `createArtifact()`'s own foreign key doesn't fail here either,
-// which is exactly why no test in this file reproduces #131 itself -
-// see that issue for the real-turn repro).
+// never looked up from a `conversation_turns` row keyed on turnId.
+//
+// getmaipai/home#131 (fixed): a live turn's own row didn't exist yet at
+// this point in the turn - `turnFor()` below pre-inserts a COMPLETE,
+// already-finished row, the shape every test in this file except one
+// uses, which is exactly why the real bug went uncaught until a real
+// runTurn() hit it live. The one test that reproduces the real shape
+// (below) uses `insertProvisionalTurn()` instead - the same function
+// `turnEngine.ts`'s `prepareTurn()` now calls at the very start of a
+// real turn, before the safety check, before any tool call - to prove
+// this against production's own real precondition, not a hand-rolled
+// approximation of it.
 import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
@@ -22,7 +28,7 @@ import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { newConversationTurnId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { resolveOrCreateConversation } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, insertProvisionalTurn } from "@/lib/conversationHistory";
 import { getArtifactRow, visibleArtifactRow } from "@/lib/artifacts";
 import { createHost } from "@/lib/packageHost";
 import { runPlugin } from "@/lib/plugins";
@@ -111,32 +117,29 @@ describe("packageHost artifact.create/update", () => {
     expect(() => host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" })).toThrow(HostError);
   });
 
-  // getmaipai/home#131: a real live turn calls this with a turnId whose
-  // own conversation_turns row genuinely doesn't exist yet (logTurn()
-  // only writes it once the whole turn finishes, after this call ran) -
-  // every OTHER test in this file uses turnFor() to pre-insert that row
-  // first, which is exactly why the bug this reproduces went uncaught
-  // until a real runTurn() call hit it live. This only proves what THIS
-  // diff fixed (create() no longer throws the misleading `not_found` a
-  // stale conversationTurns-by-turnId lookup used to raise here, since
-  // conversationId now comes from the caller directly) - it does not
-  // yet pass end to end, and isn't expected to until #131's own fix
-  // lands: the insert below still fails, on the artifacts table's own
-  // real foreign key against conversation_turns, a different and honest
-  // failure, not the old "no such conversation turn" one.
-  test("a turn with no conversation_turns row yet (the real live-turn shape) fails on the real FK, not the old not_found lookup - getmaipai/home#131", () => {
+  // getmaipai/home#131 (fixed): the real live-turn shape - a turn id
+  // whose only conversation_turns row is the provisional one
+  // insertProvisionalTurn() writes at the very start of a real turn
+  // (status "running", placeholder replyText/source), never the
+  // complete, already-"done" row turnFor() fabricates for every other
+  // test in this file. Before the fix, this exact shape failed
+  // create()'s own insert on the artifacts table's real foreign key
+  // against conversation_turns, since no row existed at all yet; now
+  // one does, so create() succeeds and attaches to it correctly.
+  test("a real live turn's provisional row (status running) lets host.artifact.create() attach mid-turn - getmaipai/home#131", () => {
     const actor = child();
     const conversationId = conversationFor(actor);
-    const unloggedTurnId = newConversationTurnId(); // never inserted into conversation_turns
-    const host = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: unloggedTurnId, conversationId });
-    let caught: unknown;
-    try {
-      host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" });
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeDefined();
-    expect(caught).not.toBeInstanceOf(HostError);
+    const turnId = newConversationTurnId();
+    insertProvisionalTurn(actor, "chat", conversationId, turnId, "write me a packing list");
+    const host = createHost(actor, manifest({ permissions: ["artifact:write"] }), [], { id: turnId, conversationId });
+    const result = host.artifact.create({ title: "Packing list", kind: "markdown", body: "- tent" });
+    expect(result.version).toBe(1);
+    const stored = getArtifactRow(result.id);
+    expect(stored?.turnId).toBe(turnId);
+    // The provisional row itself is still "running" - creating the
+    // artifact mid-turn doesn't finalize the turn; only logTurn() does.
+    const turnRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    expect(turnRow?.status).toBe("running");
   });
 
   test("create() writes a real first version with the turn's own conversation and provenance", () => {

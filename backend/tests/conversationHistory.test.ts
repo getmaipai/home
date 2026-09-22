@@ -24,6 +24,8 @@ import {
   chooseConversationTurn,
   getPendingAsk,
   setPendingAsk,
+  insertProvisionalTurn,
+  markPreviousTurnCorrected,
 } from "@/lib/conversationHistory";
 import { createArtifact } from "@/lib/artifacts";
 import { newConversationTurnId } from "@/lib/id";
@@ -209,6 +211,47 @@ describe("logTurn's supersedes option (getmaipai/home#60)", () => {
     expect(rows.find((row) => row.id === "turn-follow")?.parentTurnId).toBe("turn-edit");
     expect(rows.find((row) => row.id === "turn-next")?.parentTurnId).toBe("turn-first");
     expect(rows).toHaveLength(4);
+  });
+
+  // getmaipai/home#131 (a review finding on the fix itself): a real,
+  // genuinely concurrent turn on the same conversation - nothing
+  // serializes those - can still be "running" (insertProvisionalTurn()'s
+  // own placeholder row) while a person picks a different branch.
+  // chooseConversationTurn()'s own sibling query must never touch that
+  // row's branchChosen: it isn't a real branch member yet, and
+  // logTurn()'s own eventual upsert would silently overwrite whatever
+  // this set anyway, hiding the bug rather than fixing it.
+  test("choosing a branch never touches a still-running sibling's own row", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const value = (turnId: string, text: string): TurnValue => ({ reply: { text }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
+    logTurn(actor, "chat", "first", value("turn-choose-first", "first answer"));
+    logTurn(actor, "chat", "edit", value("turn-choose-edit", "edited answer"), { supersedes: "turn-choose-first" });
+    insertProvisionalTurn(actor, "chat", conv.value.id, "turn-choose-running", "still in flight");
+
+    const chosen = chooseConversationTurn(actor, "turn-choose-first");
+    expect(chosen.ok).toBe(true);
+    const running = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-choose-running")).get()!;
+    expect(running.status).toBe("running");
+    expect(running.branchChosen).toBe(true); // insertProvisionalTurn()'s own schema default, untouched
+  });
+
+  // getmaipai/home#131 (the same review): a repair signal's own
+  // "mark the previous turn corrected" write must skip a genuinely
+  // concurrent turn's still-running row - it would otherwise sort as
+  // the newest OTHER turn by createdAt and get marked corrected instead
+  // of the real, already-finished previous one.
+  test("marking the previous turn corrected skips a still-running row on the same conversation", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "first", { reply: { text: "first answer" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-corrected-real-previous" });
+    insertProvisionalTurn(actor, "chat", conv.value.id, "turn-corrected-running", "still in flight");
+    const corrected = markPreviousTurnCorrected(conv.value.id, "turn-corrected-current");
+    expect(corrected).toBe("turn-corrected-real-previous");
+    const running = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-corrected-running")).get()!;
+    expect(running.correctedNextTurn).toBeNull();
   });
 
   // A code review (2026-09-13) found `supersedes` reached the DB straight

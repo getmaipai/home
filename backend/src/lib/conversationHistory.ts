@@ -204,10 +204,17 @@ function newestBranchRow(rows: ConversationTurnRow[]): ConversationTurnRow | und
 }
 
 function selectedBranchChild(conversationId: string, parentTurnId: string | null): ConversationTurnRow | undefined {
+  // getmaipai/home#131: excludes a still-"running" provisional row (this
+  // turn's own, or - nothing serializes same-conversation turns - a
+  // genuinely concurrent one) from the branch walk. Without this, once
+  // logTurn() finalizes a row that already exists (the provisional
+  // insert, not a fresh INSERT), this same query - run again inside
+  // logTurn()'s own branchParentFor() - would find the row finalizing
+  // itself as a "sibling," producing a self-referencing parentTurnId.
   const siblings = db
     .select()
     .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(parentTurnId)))
+    .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(parentTurnId), eq(conversationTurns.status, "done")))
     .all();
   return newestBranchRow(siblings.filter((sibling) => sibling.branchChosen)) ?? newestBranchRow(siblings);
 }
@@ -241,11 +248,29 @@ function branchWinner(rows: Array<{ id: string; hlc: string }>): string | null {
   }, null);
 }
 
+// getmaipai/home#131: in a real turn, `row.id` already has a row in
+// `conversation_turns` by the time this runs - insertProvisionalTurn()
+// (below) wrote it, status "running", the moment the turn started,
+// precisely so a mid-turn write like host.artifact.create() has a real
+// FK target. The finalize write below is an upsert, not a plain insert
+// or a plain update, on purpose: production always has the provisional
+// row to update in place, but plenty of tests call logTurn() directly
+// with a turn id nothing pre-inserted (a hand-picked id like
+// "turn-original") - an upsert serves both without forcing every such
+// test to first call insertProvisionalTurn() itself just to satisfy an
+// implementation detail its own assertions don't care about.
+//
+// Every query here that reads "the other turns in this conversation"
+// excludes status="done" rows only on purpose (not an id exclusion): a
+// genuinely concurrent turn on the same conversation - nothing
+// serializes those - would also be "running" right now and must be
+// excluded the same way this turn's own row is, or the branch-winner
+// walk treats an unfinished sibling as a real one.
 const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnRow, conversationId: string) => {
   const siblings = db
     .select({ id: conversationTurns.id, hlc: conversationTurns.hlc, branchChosen: conversationTurns.branchChosen })
     .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(row.parentTurnId)))
+    .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(row.parentTurnId), eq(conversationTurns.status, "done")))
     .all();
   const chosenCandidates = siblings.filter((sibling) => sibling.branchChosen).map(({ id, hlc }) => ({ id, hlc }));
   if (row.branchChosen) chosenCandidates.push({ id: row.id, hlc: row.hlc });
@@ -254,14 +279,64 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
   if (branchChosen && siblings.length > 0) {
     db.update(conversationTurns)
       .set({ branchChosen: false })
-      .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(row.parentTurnId)))
+      .where(and(eq(conversationTurns.conversationId, conversationId), sameBranchParent(row.parentTurnId), eq(conversationTurns.status, "done")))
       .run();
   }
-  const storedRow = { ...row, branchChosen };
-  db.insert(conversationTurns).values(storedRow).run();
+  // Finalizes the provisional row in place when a real turn already
+  // wrote one (turning "running" into "done"); inserts fresh when
+  // nothing did (a test calling logTurn() directly, or any future
+  // caller that skips insertProvisionalTurn() - never expected to
+  // happen in production, since prepareTurn() always calls it first,
+  // but not something this write should silently corrupt if it does).
+  const storedRow = { ...row, branchChosen, status: "done" as const };
+  db.insert(conversationTurns).values(storedRow).onConflictDoUpdate({ target: conversationTurns.id, set: storedRow }).run();
   db.update(conversations).set({ updatedAt: row.createdAt, hlc: nextHlc() }).where(eq(conversations.id, conversationId)).run();
   return storedRow;
 });
+
+/** getmaipai/home#131: called once, at the very start of `turnEngine.ts`'s
+ * `prepareTurn()` (right after `newConversationTurnId()` mints the id),
+ * before anything else - including the safety check - runs. Writes a
+ * real, minimal row so the turn's own id satisfies `artifacts.turnId`'s
+ * hard FK the moment a package's recipe might call `host.artifact.create()`
+ * or `.update()`, which can happen well before the turn finishes (a
+ * model-routed turn resolves tool calls before it ever composes a reply).
+ * `logTurn()` (`insertTurnAndBumpConversation` above) finds this exact
+ * row by id and UPDATEs it in place with the turn's real, final values
+ * rather than inserting a second row - `status` is the only field this
+ * function's own value survives all the way to a live read: every real
+ * reader of "this conversation's turns" (`buildConversationWindow()`,
+ * `selectedBranchChild()`) filters `status = "done"` and skips this row
+ * entirely until that update happens.
+ *
+ * Every column not passed here either has a schema default (`branchChosen`,
+ * `safetyFlagged`, `minorSpeaker`, `crisisSignal`, `judgeAttempts`) or is
+ * genuinely unknown yet (`replyText`, the real `safetyAction`) and gets a
+ * placeholder that `logTurn()` always overwrites - never read while
+ * `status` is "running", so the exact placeholder value doesn't matter
+ * beyond satisfying the column's own NOT NULL. `userText` is redacted the
+ * same way `logTurn()` redacts it (CHAT-03): the safety/credential checks
+ * that decide whether this turn needs the stronger `CREDENTIAL_REDACTION`
+ * marker haven't run yet at this point, so the general span-redaction is
+ * the safe default; `logTurn()`'s own final write may replace it with the
+ * stronger marker, never the other way around. */
+export function insertProvisionalTurn(actor: PersonRow, surface: Surface, conversationId: string, turnId: string, rawUserText: string): void {
+  db.insert(conversationTurns)
+    .values({
+      id: turnId,
+      personId: actor.id,
+      surface,
+      conversationId,
+      userText: redactCredentials(rawUserText),
+      replyText: "",
+      source: "model",
+      safetyAction: "allow",
+      createdAt: new Date().toISOString(),
+      hlc: nextHlc(),
+      status: "running",
+    })
+    .run();
+}
 
 /** getmaipai/home#60: `supersedes` reaches here from `POST /api/turn(/
  * stream)`'s own request body (`routes/turn.ts`) by way of `runTurn()`/
@@ -384,6 +459,12 @@ export function logTurn(
     speakerEvidence: opts.speakerEvidence ? JSON.stringify(opts.speakerEvidence) : null,
     present: opts.present ? JSON.stringify(opts.present) : null,
     hlc: nextHlc(),
+    // getmaipai/home#131: this function always finalizes a turn -
+    // insertTurnAndBumpConversation's own storedRow sets this again
+    // explicitly, but `row` is typed as the full ConversationTurnRow
+    // shape, so it needs a real value here too, not just at the point
+    // that matters.
+    status: "done",
   };
   // COMP-01: keep the wire response additive and honest about whether this
   // turn has a validated details document stored beside its outcomes.
@@ -408,10 +489,15 @@ export function chooseConversationTurn(actor: PersonRow, turnId: string): Conver
   if (!target || !target.conversationId || !canAccessPerson(actor, target.personId)) {
     return { ok: false, status: 404, error: "Turn not found" };
   }
+  // getmaipai/home#131: excludes status="running" for the same reason
+  // insertTurnAndBumpConversation's own sibling query does - a
+  // genuinely concurrent turn on the same conversation (nothing
+  // serializes those) could be mid-flight right now, and its
+  // placeholder row is not a real branch member yet.
   const siblings = db
     .select()
     .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, target.conversationId), sameBranchParent(target.parentTurnId)))
+    .where(and(eq(conversationTurns.conversationId, target.conversationId), sameBranchParent(target.parentTurnId), eq(conversationTurns.status, "done")))
     .all();
   sqlite.transaction(() => {
     for (const sibling of siblings) {
@@ -430,10 +516,16 @@ export function chooseConversationTurn(actor: PersonRow, turnId: string): Conver
  * the previous reply is the one it corrected. Returns the id marked,
  * or null when the conversation had no earlier turn. */
 export function markPreviousTurnCorrected(conversationId: string, beforeTurnId: string): string | null {
+  // getmaipai/home#131: excludes status="running" - `beforeTurnId`'s own
+  // exclusion only rules out the turn asking for the correction, not a
+  // DIFFERENT, genuinely concurrent turn on the same conversation still
+  // mid-flight (nothing serializes two turns on one conversation). Its
+  // placeholder row would otherwise sort as "the newest other turn" by
+  // createdAt and get marked corrected instead of the real previous one.
   const previous = db
     .select({ id: conversationTurns.id })
     .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversationId), not(eq(conversationTurns.id, beforeTurnId))))
+    .where(and(eq(conversationTurns.conversationId, conversationId), not(eq(conversationTurns.id, beforeTurnId)), eq(conversationTurns.status, "done")))
     .orderBy(desc(conversationTurns.createdAt), desc(conversationTurns.hlc))
     .limit(1)
     .get();
@@ -478,11 +570,17 @@ export function presentOf(row: Pick<ConversationTurnRow, "present">): PresentPer
 
 /** SAFETY-01: the safety action, source and reply of the conversation's
  * latest turns, newest first, for the crisis state and the stop rule. */
+// getmaipai/home#131: excludes status="running" for the same reason
+// lastTurnSubjects() does - called from inside prepareTurn(), after
+// this turn's own provisional row already exists, to check the
+// CONVERSATION's recent safety history (the crisis-state and stop-rule
+// checks) - a placeholder safetyAction/replyText from this same turn's
+// own not-yet-finished row must never stand in for real history.
 export function recentTurnSafety(conversationId: string, limit: number): { safetyAction: string; source: string; replyText: string; crisisSignal: boolean }[] {
   return db
     .select({ safetyAction: conversationTurns.safetyAction, source: conversationTurns.source, replyText: conversationTurns.replyText, crisisSignal: conversationTurns.crisisSignal })
     .from(conversationTurns)
-    .where(eq(conversationTurns.conversationId, conversationId))
+    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done")))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(limit)
     .all();
@@ -517,12 +615,20 @@ export function turnSubjectsOf(row: Pick<ConversationTurnRow, "subjects">): Subj
 
 /** ASK-01: the subjects of the conversation's latest turn, for the
  * carry (a turn that names nobody keeps talking about what the last
- * one did). */
+ * one did).
+ *
+ * getmaipai/home#131: excludes status="running" - this reads "the
+ * previous turn" from INSIDE prepareTurn(), after insertProvisionalTurn()
+ * has already written the CURRENT turn's own row (a real one, but
+ * status "running", `subjects: null` until logTurn() finishes it).
+ * Without this filter, since that row is now the newest by createdAt,
+ * every one of these "last turn" reads would find the current turn
+ * asking about itself instead of skipping to the real previous one. */
 export function lastTurnSubjects(conversationId: string): SubjectRef[] {
   const row = db
     .select({ subjects: conversationTurns.subjects })
     .from(conversationTurns)
-    .where(eq(conversationTurns.conversationId, conversationId))
+    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done")))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(1)
     .get();
@@ -531,12 +637,14 @@ export function lastTurnSubjects(conversationId: string): SubjectRef[] {
 
 /** Finding 60 addendum: the latest inline picture payload is the small
  * continuation state for "show me more"; the full result stays in the
- * turn row's bounded media JSON, never in prompt history. */
+ * turn row's bounded media JSON, never in prompt history. Excludes a
+ * "running" row for the same reason `lastTurnSubjects()` does
+ * (getmaipai/home#131). */
 export function lastTurnMedia(conversationId: string): { media?: Media; media_items?: Media[] } {
   const row = db
     .select({ media: conversationTurns.media })
     .from(conversationTurns)
-    .where(eq(conversationTurns.conversationId, conversationId))
+    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done")))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(1)
     .get();
@@ -546,12 +654,14 @@ export function lastTurnMedia(conversationId: string): { media?: Media; media_it
 /** CHAT-13 (chunk C): the subjects of the conversation's last two turns,
  * newest first, for the carried-unresolved decay (dev.md section 16
  * part 5 rule 4): a carried `unresolved` entry drops when it appears on
- * both stacks and the utterance does not re-mention it. */
+ * both stacks and the utterance does not re-mention it. Excludes a
+ * "running" row for the same reason `lastTurnSubjects()` does
+ * (getmaipai/home#131). */
 export function lastTurnIds(conversationId: string, n = 2): string[] {
   const rows = db
     .select({ id: conversationTurns.id })
     .from(conversationTurns)
-    .where(eq(conversationTurns.conversationId, conversationId))
+    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done")))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(n)
     .all();
@@ -562,7 +672,7 @@ export function lastTwoTurnsSubjects(conversationId: string): SubjectRef[][] {
   const rows = db
     .select({ subjects: conversationTurns.subjects })
     .from(conversationTurns)
-    .where(eq(conversationTurns.conversationId, conversationId))
+    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done")))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(2)
     .all();
@@ -1456,10 +1566,17 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
   // one-word turns, so this never changes which turns end up in the
   // window for any real conversation - it only stops the query (and the
   // JS sort) from growing with the conversation's entire lifetime.
+  // getmaipai/home#131: excludes a still-"running" provisional row (this
+  // turn's own - inserted by insertProvisionalTurn() before this same
+  // function runs, so it already exists here - or a genuinely
+  // concurrent turn on the same conversation, which nothing serializes)
+  // from the model's own context window. An in-flight row's replyText
+  // is a placeholder; feeding it back to the model as history would
+  // read as the assistant having already answered with nothing.
   const rows = db
     .select()
     .from(conversationTurns)
-    .where(eq(conversationTurns.conversationId, conversation.id))
+    .where(and(eq(conversationTurns.conversationId, conversation.id), eq(conversationTurns.status, "done")))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(WINDOW_ROW_FETCH_LIMIT)
     .all();
@@ -1551,10 +1668,14 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
   // reason: this job runs after every turn, so summary_through_turn is
   // always recent in practice - WINDOW_ROW_FETCH_LIMIT is generous
   // headroom, not a tight fit.
+  // getmaipai/home#131: excludes status="running" - this runs off a
+  // debounced timer (scheduleSummaryRefresh()), not inline with the
+  // turn that scheduled it, so a newer turn on the same conversation
+  // can genuinely be in flight by the time this fires.
   const rows = db
     .select()
     .from(conversationTurns)
-    .where(eq(conversationTurns.conversationId, conversationId))
+    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done")))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(WINDOW_ROW_FETCH_LIMIT)
     .all();

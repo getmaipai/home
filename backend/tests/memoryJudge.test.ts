@@ -4,7 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
-import { resolveOrCreateConversation, logTurn, turnSignalOf } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, logTurn, turnSignalOf, insertProvisionalTurn } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { judgeTurn, runJudgeBatch, runConsolidation, judgeQueueStats } from "@/lib/memoryJudge";
 import { runTurn, judgeStatusAtInsert } from "@/lib/turnEngine";
@@ -1067,6 +1067,24 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
     expect(legacyModel.signal).toBeNull();
     expect(legacyPlugin.signal).toBeNull();
     expect(judgeQueueStats().pending).toBe(1); // the pre-signal model row only
+  });
+
+  // getmaipai/home#131 (a review finding on the fix itself): a real
+  // in-flight turn's provisional row (source "model", judgeStatus null
+  // by construction - insertProvisionalTurn()'s own placeholder shape)
+  // would otherwise match pendingTurnWhere()'s exact filter. The
+  // TurnLease-based gate in runJudgeBatch() covers the common case, but
+  // this proves the query itself never counts a "running" row, not just
+  // that the scheduler happens not to call it while one exists.
+  test("a still-running provisional row is never counted as judge-pending", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error("setup failed");
+    const done = makeSignalledTurn(actor, "add oat milk to the list, and I prefer that brand", "Added oat milk.", "plugin");
+    expect(judgeQueueStats().pending).toBe(1);
+    insertProvisionalTurn(actor, "chat", conv.value.id, `turn-${Math.random().toString(36).slice(2, 12)}`, "a turn still in flight");
+    expect(judgeQueueStats().pending).toBe(1); // unchanged - the running row is invisible to the queue
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, done.id)).get()!.judgeStatus).toBeNull();
   });
 
   test("a policy row keeps no named subject: the one text the signal carries goes with the redacted words", async () => {

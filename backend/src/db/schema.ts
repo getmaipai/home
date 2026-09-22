@@ -489,6 +489,24 @@ export const conversationTurns = sqliteTable(
     // individual turns carry a real clock stamp too, not just the
     // conversation thread they belong to.
     hlc: text("hlc").notNull(),
+    // getmaipai/home#131: "running" the moment insertProvisionalTurn()
+    // (lib/conversationHistory.ts) writes this row - the exact point a
+    // real turn's own id first satisfies the FK any mid-turn write
+    // (host.artifact.create() included) needs - "done" once logTurn()
+    // updates the same row in place with the completed turn's real
+    // values. Every reader of this table that scans by conversation_id
+    // or person_id rather than this exact id (buildConversationWindow(),
+    // the branch-sibling queries, recentTurnSafety(), the memory judge's
+    // queue, retention/summarization) must exclude "running" rows - a
+    // still-in-flight turn is not yet real history, its replyText/
+    // source/safetyAction are placeholders, and treating it as a
+    // finished sibling corrupts the branch-winner walk (a self-
+    // referencing parentTurnId) as much as it would leak a blank reply
+    // into the model's own context window. Defaults to "done" so every
+    // pre-existing row, and every test that inserts a complete row
+    // directly (bypassing prepareTurn()/logTurn() entirely), keeps
+    // reading as finished history with no migration backfill needed.
+    status: text("status").notNull().default("done"), // "running" | "done"
   },
   // buildConversationWindow() and maybeRefreshConversationSummary() (step 3)
   // both filter by conversation_id on every model-routed turn - the
