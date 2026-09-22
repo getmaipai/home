@@ -293,6 +293,13 @@ export interface RunDeps {
   /** Fire the due scheduled jobs, as the hub's own minute tick does;
    * the default runs the real scheduler with the real package runner. */
   tickScheduler?: (now: Date) => Promise<void>;
+  /** U2d's own live-hub protocol (replay.ts's --hub-live,
+   * liveHubQuiet.ts): called once before each turn's own driveTurn(),
+   * so a run against the household's real 127.0.0.1:8788 waits for
+   * real household activity to go quiet first. undefined for every
+   * other run (the stub tests, a side-instance --live run) - those
+   * never touch the shared engine this exists to protect. */
+  beforeTurn?: () => Promise<void>;
 }
 
 // The hub registers every package's notification types at boot
@@ -678,6 +685,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     // boundary (the read, the forced lookup, the guards); without one
     // (the stub tests) it is pasted as before.
     if (turn.seedReply !== undefined && deps.proxy) deps.proxy.scriptNextReply(turn.seedReply);
+    if (deps.beforeTurn) await deps.beforeTurn();
     const driven = turn.seedReply !== undefined && !deps.proxy ? seedTurn(actor, turn.say, turn.seedReply, conversationId) : await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt, surface: conv.surface });
     await deps.proxy?.settled(); // the teed reply text lands a tick after the client's read
     // An interrupted turn logs no [turn] line today (nothing is

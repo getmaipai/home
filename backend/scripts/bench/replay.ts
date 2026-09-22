@@ -13,8 +13,10 @@
 // (conversationRunner.ts, conversationScore.ts - one definition, never
 // a second harness):
 //
-//   bun run backend/scripts/bench/replay.ts          scripted (default)
-//   bun run backend/scripts/bench/replay.ts --live    a real engine
+//   bun run backend/scripts/bench/replay.ts                     scripted (default), old path
+//   bun run backend/scripts/bench/replay.ts --live               a side engine, a spare port
+//   bun run backend/scripts/bench/replay.ts --hub-live           U2d's own acceptance run only
+//   bun run backend/scripts/bench/replay.ts --hub-live --new     ...on the new path (turn.pipeline.next)
 //
 // Scripted mode needs no engine at all: it starts one in-process stub
 // (@maipai/spec's own stubServer, the same double
@@ -32,7 +34,11 @@
 // bench's). `--live` needs MAIPAI_LLAMA_SERVER_URL (a side instance, a
 // spare port, never 8788) and MAIPAI_EMBED_URL already set to a
 // running engine, the same contract every live bench in this
-// directory holds.
+// directory holds. `--hub-live` is the one exception, U2d's own
+// acceptance run: it targets 127.0.0.1:8788 (defaultable, no env var
+// required) under the task brief's protocol (liveHubQuiet.ts - a gate
+// check before starting, one request at a time, a 30s quiet wait after
+// any real household [turn] line), never used for an ordinary bench.
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -106,6 +112,19 @@ export function loadFixture(path: string = join(import.meta.dir, "datasets", "ow
 
 const REPEATS = 3;
 const LIVE = process.argv.includes("--live");
+// U2d's own acceptance run only: the household's real, already-running
+// engine at 127.0.0.1:8788, under the task brief's protocol (one
+// request at a time - this script is inherently sequential - a gate
+// check before starting, and a 30s quiet wait after any real household
+// [turn] line), never the bare --live mode above, which stays pointed
+// at a side instance on a spare port per this file's own header.
+const HUB_LIVE = process.argv.includes("--hub-live");
+// U2's own acceptance ("the replay set on the new path with the flag
+// on"): flips the real household setting turn.pipeline.next, the same
+// one conversationRunner.ts's driveTurn() already reads, rather than a
+// bench-only branch - a replay run is either the old path's turn or
+// the new path's turn, exactly as a real household turn would be.
+const NEW_PATH = process.argv.includes("--new");
 
 interface RowVerdict {
   id: string;
@@ -146,6 +165,11 @@ if (import.meta.main) {
 }
 
 async function runMain(): Promise<void> {
+  if (HUB_LIVE) {
+    const { refuseIfGateRunning } = await import("./liveHubQuiet");
+    refuseIfGateRunning("replay --hub-live");
+  }
+
   const fixture = loadFixture();
 
   let ownDataDir: string | null = null;
@@ -156,7 +180,13 @@ async function runMain(): Promise<void> {
 
   let stub: { url: string; stop: () => void } | null = null;
   let proxy: RecordingProxy | null = null;
-  if (LIVE) {
+  if (HUB_LIVE) {
+    const upstream = process.env.MAIPAI_LLAMA_SERVER_URL ?? "http://127.0.0.1:8788";
+    if (!process.env.MAIPAI_EMBED_URL) process.env.MAIPAI_EMBED_URL = "http://127.0.0.1:8794";
+    const { startRecordingProxy } = await import("./recordingProxy");
+    proxy = startRecordingProxy(upstream);
+    process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
+  } else if (LIVE) {
     const upstream = process.env.MAIPAI_LLAMA_SERVER_URL;
     if (!upstream) {
       console.error("replay --live refused: MAIPAI_LLAMA_SERVER_URL is not set; the live run connects only to an engine already running, on a spare port, never 8788's.");
@@ -183,11 +213,17 @@ async function runMain(): Promise<void> {
 
   await startBench();
 
+  if (NEW_PATH) {
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    setHouseholdSettingValue("turn.pipeline.next", true);
+  }
+
   console.log("\n## Run header\n");
   console.log(
     JSON.stringify(
       {
-        mode: LIVE ? "live" : "scripted (no live model - see file header)",
+        mode: HUB_LIVE ? "hub-live (127.0.0.1:8788, waits for household quiet)" : LIVE ? "live" : "scripted (no live model - see file header)",
+        path: NEW_PATH ? "new (turn.pipeline.next)" : "old (turnEngine.ts)",
         date: new Date().toISOString(),
         chat: process.env.MAIPAI_LLAMA_SERVER_URL,
         embed: process.env.MAIPAI_EMBED_URL,
@@ -200,6 +236,8 @@ async function runMain(): Promise<void> {
     ),
   );
   console.log("");
+
+  const beforeTurn = HUB_LIVE ? (await import("./liveHubQuiet")).waitForHubQuiet.bind(null, undefined, (msg: string) => console.log(msg.replace("live-hub-quiet", "replay --hub-live"))) : undefined;
 
   const log = runner.captureTurnLog();
   const people = runner.createBenchPeople();
@@ -224,6 +262,7 @@ async function runMain(): Promise<void> {
             drainJudge: async () => {},
             backdate: (days, turnIds) => runner.backdateBenchRows(people, days, turnIds),
             homeAssistant,
+            beforeTurn,
           })
           .catch((err: Error) => {
             console.error(`[replay] ${row.id} repeat ${repeat} threw: ${err.message}`);
@@ -259,5 +298,5 @@ async function runMain(): Promise<void> {
   if (stub) stub.stop();
   if (ownDataDir) rmSync(ownDataDir, { recursive: true, force: true });
 
-  finishBench({ executed: allScores.length, engine: LIVE ? `live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : "scripted (stub, no live model)" });
+  finishBench({ executed: allScores.length, engine: HUB_LIVE ? `hub-live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : LIVE ? `live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : "scripted (stub, no live model)" });
 }
