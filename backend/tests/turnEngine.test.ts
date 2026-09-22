@@ -2340,6 +2340,40 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
     expect(prompt).toContain("Prefer these facts over guessing when they're relevant.");
   });
 
+  test("U5 (REPLY-FIND-04): each recalled memory renders as 'remembered <Mon D>:' followed by the text", async () => {
+    const { actor } = await owner();
+    const created = remember(actor, {
+      text: "the household calendar rule about pizza night",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.8,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    db.update(memoryRecords).set({ createdAt: sevenDaysAgo }).where(eq(memoryRecords.id, created.value.id)).run();
+    const second = remember(actor, {
+      text: "another rule about pizza night at home",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.8,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+
+    const matches = recall(actor, "pizza night", { bumpUsage: false });
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+    const prompt = buildSystemPrompt(actor, "what's the calendar rule", matches);
+    const rememberedLines = prompt.split("\n").filter((l) => l.startsWith("- remembered "));
+    expect(rememberedLines.length).toBeGreaterThanOrEqual(2);
+    expect(prompt).toMatch(/- remembered \w+ \d{1,2}: the household calendar rule about pizza night \(/);
+    expect(prompt).toMatch(/- remembered \w+ \d{1,2}: another rule about pizza night at home \(/);
+  });
+
   test("per-section budgets: rules and companion sections never exceed their own caps even with an artificially tiny one", () => {
     // capSection() itself is the real unit under test (above); this
     // proves buildSystemPrompt() actually calls it for these two

@@ -893,7 +893,7 @@ function daysAgoLabel(iso: string, now: Date): string {
 function memoryBulletLine(match: RecallMatch, locale: string, now: Date, subjectLabels: ReadonlyMap<string, string> = new Map()): string {
   const label = match.record.subject_id ? subjectLabels.get(match.record.subject_id) : undefined;
   const about = label ? `about ${label}; ` : "";
-  return `- ${match.record.text} (${about}as of ${formatShortDate(match.record.created_at, locale)}, ${daysAgoLabel(match.record.created_at, now)})`;
+  return `- remembered ${formatShortDate(match.record.created_at, locale)}: ${match.record.text} (${about}as of ${formatShortDate(match.record.created_at, locale)}, ${daysAgoLabel(match.record.created_at, now)})`;
 }
 
 function subjectLabelsFor(actor: PersonRow, matches: RecallMatch[]): Map<string, string> {
