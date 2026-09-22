@@ -85,6 +85,20 @@ already expects, not a mode.
    from the corpus gets replies judged for completeness against the
    ChatGPT bar by the same judge the benches use; the "shorter" and
    "tell me more" overrides work on both surfaces.
+   Amended 2026-09-22 (ARCH-AMEND-01, after the independent review's
+   finding 3): the typed-screen cap does not live in `persona.ts`. It is
+   the act table in `register.ts`'s `planFor` (a question is capped at
+   two sentences and 60 words) and both generation paths set
+   `max_tokens` from that plan, so a policy paragraph alone cannot
+   deliver the written register. RESP-01 now does both: `planFor`
+   derives the budget from the surface class (written: the information
+   need, no act cap; spoken: today's table; glance: the card) and the
+   persona policy splits as described above. One plan, the spec's
+   ReplyPlan, is the only place length is decided; the overrides
+   ("shorter", "tell me more") hold for the turn and the next three
+   rather than for the rest of the conversation. The BACKLOG row is
+   the current text.
+
 2. **RESP-02, the spoken projection (M).** `reply.speech` becomes the
    voice contract: one to three sentences that answer, plus the offer
    when the written answer is longer than what was spoken; produced by
