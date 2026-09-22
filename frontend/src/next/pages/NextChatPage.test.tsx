@@ -7,7 +7,7 @@ import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { NextChatPage } from "@/next/pages/NextChatPage";
 import type { Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
-import { ndjsonStream } from "../../../tests/ndjsonStream";
+import { ndjsonStream, staggeredNdjsonStream } from "../../../tests/ndjsonStream";
 
 // CHAT-UI-03 (6): the rail's own default-collapsed state now reads
 // `window.matchMedia("(max-width: 1024px)")` on mount - happy-dom's own
@@ -350,6 +350,37 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       expect(view.queryByText("websearch")).toBeNull();
       fireEvent.click(trigger);
       expect(await view.findByText("websearch")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  // Slice 5(c), "thinking before the reply" (2026-09-22): unlike the
+  // tool timeline above, `status` is a real wire event already (CHAT-16,
+  // done 2026-09-15) - this is live-rendering behavior today, not
+  // scaffolding, so it's tested with a genuinely staggered stream
+  // (`staggeredNdjsonStream`) to observe the indicator's text mid-turn,
+  // not just the final settled content.
+  test("a status event shows its text as a thinking indicator before the reply arrives, then clears", async () => {
+    const { stream, release } = staggeredNdjsonStream(
+      [{ type: "status", text: "Checking that for you.", stage: "lookup" }],
+      [
+        { type: "delta", text: "High tide is at 4pm." },
+        { type: "done", value: { turn_id: "turn-status123", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY } },
+      ],
+    );
+    const restore = stubTurnFetch(stream);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "when's high tide");
+      expect(await view.findByText("Checking that for you.")).toBeVisible();
+      release();
+      await view.findByText("High tide is at 4pm.");
+      expect(view.queryByText("Checking that for you.")).toBeNull();
     } finally {
       restore();
     }

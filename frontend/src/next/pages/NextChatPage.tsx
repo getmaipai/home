@@ -8,6 +8,7 @@ import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { Sources, SourceGlyph } from "@maipai/ui/src/elements/sources";
 import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
+import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -30,6 +31,7 @@ import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
+import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 const HistoryIcon = getIcon("history");
@@ -219,6 +221,38 @@ const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>
 function ToolTimelineTool() {
   useAssistantToolUI({ toolName: "tool_timeline", render: ToolTimelineToolRender, display: "standalone" });
   return null;
+}
+
+// Slice 5(c), "thinking before the reply" (2026-09-22): `/chat`'s own
+// hand-rolled thread.aui.tsx already has this exact behavior (its own
+// "indicator" case, `useTurnActivity()` plus a 45s "still working"
+// timer) - `status` IS a real wire event (CHAT-16, `backend/src/wire.ts`,
+// BACKLOG.md's own "Engine emits `status` events at lookup start" item,
+// done 2026-09-15), unlike TOOL-EVENTS-01's tool events. `/next/chat`
+// just never got this port. The kit's own `ThinkingIndicator` Element
+// (thinking-indicator.tsx) replaces its bare pulsing dot via the new
+// `Indicator` slot (ui-v0.5.29) - ported, not reinvented: same signal,
+// same 45s threshold, real Element instead of hand-drawn `<span>●</span>`
+// prose. No `elapsed`: Home has no turn-elapsed source for a running
+// message today (the message-timing row owns finished-turn timing) - a
+// named gap, not invented data.
+function ChatThinkingIndicator() {
+  const running = useAuiState((s) => s.message.status?.type === "running");
+  const activity = useTurnActivity();
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (!running) return;
+    const timer = setTimeout(() => setSlow(true), 45_000);
+    return () => clearTimeout(timer);
+  }, [running]);
+  return (
+    <ThinkingIndicator
+      role="status"
+      aria-live="polite"
+      label={slow ? "Still working. This is taking longer than usual." : (activity ?? "Thinking…")}
+    />
+  );
 }
 
 // Slice 5(a): the kit's own `Sources` (elements/sources.tsx), used exactly
@@ -1085,6 +1119,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   AssistantMoreItems,
                   AssistantActionBarExtra: SourcesActionBarTrigger,
                   AssistantMessageFooterExtra: SourcesFooterContent,
+                  Indicator: ChatThinkingIndicator,
                 }}
               />
             </div>

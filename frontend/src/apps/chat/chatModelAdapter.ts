@@ -316,11 +316,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             turnId: resumeTurnId,
             resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
           });
-          // Lane 11 item 1's own forward-compatible cast (chatTurnActivity.ts's
-          // header): `status` isn't a real TurnStreamEvent member on the wire
-          // yet, the same "cast the whole event, not just a field" shape
-          // `TurnWithMedia` uses for `media_items` on `TurnValue` below
-          // (sources itself is a real field now, no cast needed for it).
           for await (const event of readTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
           // unconditionally, including every `delta` - the hottest path
@@ -418,11 +413,12 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             activityShown = true;
             yield { metadata: { custom: { activity: event.text } } };
           } else if (event.type === "status") {
-            // Additive, CHAT-16 (Session A): not yet a real TurnStreamEvent
-            // member (chatTurnActivity.ts's header) - `stage` isn't read
-            // here, since the activity line shows the event's own text
-            // verbatim, the same "no spinner icon invented" instruction
-            // that also means no per-stage icon or color.
+            // CHAT-16 (Session A): a real TurnStreamEvent member
+            // (backend/src/wire.ts, BACKLOG.md's "Engine emits `status`
+            // events at lookup start," done 2026-09-15). `stage` isn't
+            // read here, since the activity line shows the event's own
+            // text verbatim, the same "no spinner icon invented"
+            // instruction that also means no per-stage icon or color.
             activityShown = true;
             yield { metadata: { custom: { activity: event.text } } };
           } else if (event.type === "done") {

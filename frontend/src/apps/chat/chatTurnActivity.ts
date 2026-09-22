@@ -1,13 +1,5 @@
 import { useAuiState } from "@assistant-ui/react";
 
-/** backend/src/wire.ts's `TurnStreamEvent` doesn't have a `status` member
- * yet (CHAT-16, Session A: a typed source, then websearch through the
- * household's SearXNG, before the engine answers) - forward-compatible
- * narrow cast, the same shape lane 10 used for `sources` on `TurnValue`
- * (chatCitations.ts's own `TurnWithSources`), gone the moment the real
- * member lands on `TurnStreamEvent` itself. */
-export type TurnStatusEvent = { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" | "composing" };
-
 /** Lane 11 item 1's own design decision (docs/dev/session-b.md): a
  * `status` event and a `spoken_cue` event both drive this SAME transient
  * line, not two separate ones - the comment chatModelAdapter.ts already

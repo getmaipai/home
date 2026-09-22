@@ -372,7 +372,7 @@ named gap, not a Home-drawn substitute.
 | Capability (Home / Stack) | Element(s) | Fed by |
 |---|---|---|
 | The reply text | markdown-text (renderer), message-pair, message-actions, message-timing | the model adapter's text parts |
-| Thinking before the reply | reasoning, thinking-indicator | the reasoning part (`--reasoning` on, streamed) (landed: REASONING-01, home 57c4b430) |
+| Thinking before the reply | reasoning, thinking-indicator | the reasoning part (`--reasoning` on, streamed) (landed: REASONING-01, home 57c4b430). **`thinking-indicator` landed 2026-09-22 (slice 5(c))**: the kit's own `elements/thread.aui.tsx` gained an `Indicator` slot (`ui-v0.5.29`, an upstream-bound patch) whose default now renders the shipped `ThinkingIndicator` Element instead of a hand-drawn dot; `NextChatPage.tsx` overrides it with `ChatThinkingIndicator`, porting `/chat`'s own `status`/`spoken_cue`-driven activity line and 45s "still working" timer - `status` turned out to already be a real wire event (CHAT-16, 2026-09-15), so this is live-rendering behavior, not scaffolding, proven by a genuinely staggered-stream test. See `docs/dev.md`. |
 | A tool call and its result | tool-call, tool-group, tool-timeline, tool-error, tool-fallback | the tool-call parts the turn engine already emits |
 | A tool result with structure (weather, almanac, lookups, comparisons, procedures) | chart, spec-sheet, data-table, diagram, mermaid-diagram | the structured part per the generative-UI contract; nothing drawn by Home (landed for weather and almanac: home af0af0aa) |
 | Image generation (the Stack's `image` role) | image-generation | the image job: queued, progress from the Stack's job events, the finished file |
