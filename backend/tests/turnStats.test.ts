@@ -41,7 +41,7 @@ describe("STATS-01 turn stats", () => {
       for await (const _delta of started.tokens) {
         // consume the body so the final telemetry frame is observed
       }
-      const stats = buildTurnStats(started.stats, { ...emptyTimings(), first_token_ms: 120 }, 100, 1_000, { host: "local", build: "b10797-test", model: "family.gguf", healthy: true });
+      const stats = buildTurnStats(started.stats, { ...emptyTimings(), first_token_ms: 120 }, 100, 1_000, { host: "local", build: "b10797-test", model: "family.gguf", healthy: true }, true);
       expect(stats.prompt_tokens).toBe(143);
       expect(stats.predicted_tokens).toBe(37);
       expect(stats.tokens_per_second).toBe(185);
@@ -51,13 +51,14 @@ describe("STATS-01 turn stats", () => {
       expect(stats.cache_reuse_percent).toBeCloseTo(89.0, 1);
       expect(stats.engine).toBe("local b10797-test family.gguf");
       expect(stats.stop_reason).toBe("stop");
+      expect(stats.thinking).toBe(true);
     } finally {
       engine.stop();
     }
   });
 
   test("a stream without timing data yields nulls, never NaN", () => {
-    const stats = buildTurnStats({ usage: null, timings: null, stopReason: null }, { ...emptyTimings(), first_token_ms: null }, 100, 90, null);
+    const stats = buildTurnStats({ usage: null, timings: null, stopReason: null }, { ...emptyTimings(), first_token_ms: null }, 100, 90, null, undefined);
     expect(stats.prompt_tokens).toBeNull();
     expect(stats.predicted_tokens).toBeNull();
     expect(stats.tokens_per_second).toBeNull();
@@ -65,6 +66,7 @@ describe("STATS-01 turn stats", () => {
     expect(stats.total_time_ms).toBeNull();
     expect(stats.cache_reuse_tokens).toBeNull();
     expect(stats.cache_reuse_percent).toBeNull();
+    expect(stats.thinking).toBe(false);
     expect(Object.values(stats).every((value) => typeof value !== "number" || Number.isFinite(value))).toBe(true);
   });
 });

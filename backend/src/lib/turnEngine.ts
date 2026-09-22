@@ -297,14 +297,14 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; branchFrom?: string | null; ephemeral?: boolean; temporary?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; streamStats?: ChatCompletionStreamStats },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; branchFrom?: string | null; ephemeral?: boolean; temporary?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; streamStats?: ChatCompletionStreamStats; thinking?: boolean },
 ): void {
   // RVW-1: the answering rung, read once here from the delivered value,
   // the retained outcomes and the signal, and the rules that fired (the
   // engine's, then every guard hit); both ride on the wire (the value
   // is the one returned to the caller), the `[turn]` line and the row.
   const rules = rulesFired(meta.rules ?? [], meta.guardHits, meta.signal.source);
-  if (meta.streamStats) value.stats = buildTurnStats(meta.streamStats, meta.timings, meta.startedAt, Date.now(), getActiveChatEngineIdentity());
+  if (meta.streamStats) value.stats = buildTurnStats(meta.streamStats, meta.timings, meta.startedAt, Date.now(), getActiveChatEngineIdentity(), meta.thinking);
   const rung = rungOf(value, meta.outcomes ?? [], meta.signal, { householdSubject: rules.includes("lookup.household_subject") || (meta.subjects ?? []).some((s) => s.type === "household") });
   value.rung = rung;
   value.structured_part = structuredPartForOutcomes(meta.outcomes ?? []) ?? undefined;
@@ -5885,7 +5885,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats, thinking: opts.thinking });
           return outcome.resolved;
         }
         // CHAT-16 (K2, K6): the composition's deltas were the stream:
@@ -5897,7 +5897,7 @@ async function runTurnStreamHoldingLease(
           const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace);
           finalized = composedValue;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
+          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats, thinking: opts.thinking });
           return composedValue;
         }
         const outputSafety = outcome;
@@ -5983,7 +5983,7 @@ async function runTurnStreamHoldingLease(
           if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
         }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, streamStats: modelTurn.streamStats, thinking: opts.thinking });
         return value;
       },
     };

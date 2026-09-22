@@ -72,6 +72,11 @@ export interface TurnStats {
   cache_reuse_percent: number | null;
   engine: string | null;
   stop_reason: string | null;
+  // ADMIN-COMPARE-01: whether this turn's own completion ran with
+  // thinking on - read back for the "ours" trace column, alongside the
+  // rest of this already-JSON stats blob (no migration: the same reason
+  // every other field here needed none).
+  thinking: boolean;
 }
 
 export interface TurnValue {

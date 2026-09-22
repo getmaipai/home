@@ -14,6 +14,7 @@ export function buildTurnStats(
   startedAt: number,
   finishedAt: number,
   identity: EngineIdentity | null | undefined,
+  thinking: boolean | undefined,
 ): TurnStats {
   const promptTokens = finite(stream?.usage?.prompt_tokens) ?? finite(stream?.timings?.prompt_n);
   const predictedTokens = finite(stream?.usage?.completion_tokens) ?? finite(stream?.timings?.predicted_n);
@@ -36,5 +37,6 @@ export function buildTurnStats(
     cache_reuse_percent: cacheDenominator > 0 ? cacheTokens! / cacheDenominator * 100 : null,
     engine: identity ? formatEngineIdentity(identity) : null,
     stop_reason: stream?.stopReason ?? null,
+    thinking: thinking === true,
   };
 }

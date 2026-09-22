@@ -587,7 +587,15 @@ export function lastTwoTurnsSubjects(conversationId: string): SubjectRef[][] {
 // own aggregation query) reads the raw camelCase row directly instead -
 // there's no reason to round-trip a full record validation for a value
 // nothing outside this file ever sees.
-function toConversationRecord(row: ConversationRow): Conversation {
+// ADMIN-COMPARE-01: exported so the bare-compare route can build a real
+// Conversation for buildConversationWindow() from its own unrestricted
+// row lookup - getConversation()'s own canAccessPerson() check is a
+// household-member visibility rule (an owner/admin only inherits a
+// CHILD's records through it), narrower than this route's own gate
+// (isOwnerOrAdmin, checked once at the route's own top), so reusing
+// getConversation() here would 404 an admin comparing a teen's or
+// another adult's conversation for no reason the spec asked for.
+export function toConversationRecord(row: ConversationRow): Conversation {
   return Conversation.parse({
     id: row.id,
     person: row.personId,
@@ -1440,7 +1448,7 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
  * more would exceed it. Whatever's older than what fit is represented by
  * the conversation's own rolling `summary` as one line instead, when one
  * exists. */
-export function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null } = {}): ConversationWindow {
+export function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null } = {}): ConversationWindow {
   // Bounded, not the full history (a code review, 2026-09-05, found this
   // fetching and re-sorting every turn ever logged, on every model-
   // routed turn): WINDOW_ROW_FETCH_LIMIT is far more than the token
@@ -1456,7 +1464,14 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
     .limit(WINDOW_ROW_FETCH_LIMIT)
     .all();
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const liveRows = excludeSupersededRows(rows, opts.supersedes, opts.excludeTurnId);
+  // ADMIN-COMPARE-01: a caller reconstructing history as it stood AT a
+  // given turn (rather than "now") names that turn's own createdAt here -
+  // excludeTurnId alone only drops the one named row by id, leaving
+  // every row that came after it in the window right alongside the ones
+  // that came before, which is not "the same history" for a turn that
+  // isn't the conversation's newest.
+  const scoped = opts.beforeCreatedAt ? rows.filter((r) => r.createdAt < opts.beforeCreatedAt!) : rows;
+  const liveRows = excludeSupersededRows(scoped, opts.supersedes, opts.excludeTurnId);
   if (liveRows.length === 0) return { messages: [], turnIds: [], droppedOlder: false };
 
   const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);
