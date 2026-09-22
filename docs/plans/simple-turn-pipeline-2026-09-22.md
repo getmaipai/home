@@ -383,6 +383,34 @@ inverse-miss rate (it sets when the interim rule relaxes on the Studio),
 the query-rewrite bench (U2's own acceptance), and the 1.7B numbers (the
 robot's floor, not the hub's).
 
+### 11. Layers you can watch and swap (an owner requirement for U2's record)
+
+Jesse's words: "then we can understand errors, delays, etc per layer and
+more easily swap layers for better ones in the future." U2's state record
+is written to this, and every later unit obeys it.
+
+- **Every layer is a node with a typed contract.** Safety, commands,
+  context, the model call, tools, answer, output gate: each is one node
+  with a declared input type and output type, and nothing else crosses
+  between them. A node knows nothing about its neighbours' internals.
+- **Every turn carries a per-node trace.** For each node: its name, the
+  implementation id and version that ran, start and end in milliseconds,
+  the outcome (ok, skipped, or error with a code), and under the model
+  node the generations LAT-00 already records (one entry per model call,
+  with its reason and the engine's own timings). This extends LAT-00's
+  generations array on the turn's stored stats and the `[turn]` line; it
+  is not a second log.
+- **One trace, every reader.** PERF-ALERT-01's stage split reads it for
+  "where the time goes", and the replay bench reads it to report quality
+  and time per node, so a slow layer and a wrong layer are both named by
+  the same record.
+- **Swapping a layer is registration, not surgery.** A better
+  implementation of a node registers under the same contract and is
+  selected by the model's budget record or a declared setting; it is
+  proven on the replay set with the per-node report, and no caller
+  changes. The decider from phase 0's track 3, a different search
+  package, or a new output checker each arrive this way.
+
 ### 10. End-state inventory
 
 Every word-rule family in the turn path, what happens to it, and what
