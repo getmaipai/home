@@ -55,6 +55,14 @@
         { "say": "search the web", "expect": { "mustNotContain": "world wide web|a global network|collection of websites|browse (the internet|websites)" } },
         { "say": "search the web for when chatgpt 6 luna releases", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "luna" } }, "sourcesNonEmpty": true } }
       ]
+    },
+    {
+      "id": "corey-feldman-michael-jackson-friendship",
+      "category": "knowledge",
+      "note": "the real trace, 19:18 today: the old path answered from model memory, hedging ('I think... I'm not sure of all the exact reasons'), with no search - a public-figures question the model itself hedges on is still a world question",
+      "turns": [
+        { "say": "why did corey feldmans friendship end with michael jackson", "expect": { "toolRan": "websearch", "sourcesNonEmpty": true, "mustNotContain": "i think|i'm not sure|not sure of all the exact reasons" } }
+      ]
     }
   ],
 
