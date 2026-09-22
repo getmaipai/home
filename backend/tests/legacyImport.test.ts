@@ -218,7 +218,7 @@ describe("runLegacyImport()", () => {
   test("a real import writes people, memories, and paired conversation turns", async () => {
     const { ownerRow, willowId } = await ownerAndMatch();
     const dbPath = buildLegacyFixture();
-    runBackup();
+    await runBackup();
 
     const result = runLegacyImport(ownerRow, { dbPath, dryRun: false });
     expect(result.dryRun).toBe(false);

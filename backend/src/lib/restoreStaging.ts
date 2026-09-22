@@ -187,11 +187,11 @@ function verifyRestorable(path: string): void {
  * restart. Verifies before it commits to anything: a backup that fails
  * any check leaves no staged file behind, so a failed attempt cannot
  * quietly become a pending restore. */
-export function stageRestore(
+export async function stageRestore(
   filename: string,
   stagedByPersonId: string,
   dir: string = dataDir,
-): PendingRestore {
+): Promise<PendingRestore> {
   const inPath = join(backupDir, filename);
   if (!existsSync(inPath)) throw new RestoreRefused(`no such backup: ${filename}`);
   // One at a time. Without this, staging a second backup silently
@@ -215,7 +215,7 @@ export function stageRestore(
     stagedByPersonId,
   };
   try {
-    decryptFile(inPath, pendingDbPath(dir));
+    await decryptFile(inPath, pendingDbPath(dir));
     verifyRestorable(pendingDbPath(dir));
     // The meta write is inside the guard too. Outside it, a failure here
     // (disk full, permissions) left a full copy of the database staged

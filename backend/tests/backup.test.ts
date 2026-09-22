@@ -11,6 +11,7 @@ import { encryptFile } from "@/lib/backupCrypto";
 import { CURRENT_SCHEMA_VERSION } from "@/db/schema-version";
 import { backupDir, dataDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { sqlite } from "@/db";
 
 // backupDir is a real filesystem directory, not a DB table resetDb()
 // clears: unlike every other test file, this one has to clean up its own
@@ -40,16 +41,38 @@ async function owner() {
 }
 
 describe("runBackup() / restoreBackup()", () => {
+  test("a running backup does not block unrelated request handling on the event loop", async () => {
+    const client = await owner();
+    // Seed a large BLOB so the backup takes over 500 ms.
+    const big = "x".repeat(300 * 1024 * 1024); // 300 MB
+    sqlite.query(
+      "INSERT INTO memory_records (id, record_kind, text, category, tier, status, scope, source, importance, created_at, last_used_at, hlc) VALUES (?, 'episodic', ?, 'facts', 'core', 'active', 'household', 'hub', 1.0, datetime('now'), datetime('now'), 'hlc-seed')"
+    ).run("seed-1", big);
+    const backupStart = Date.now();
+    const backupPromise = runBackup();
+    const t0 = Date.now();
+    // An unrelated request should complete immediately while the backup is
+    // still working in a worker thread / streaming cipher.
+    const res = await client.get("/api/people");
+    const elapsed = Date.now() - t0;
+    const info = await backupPromise;
+    const backupElapsed = Date.now() - backupStart;
+    console.log(`  [exit-check] backup: ${backupElapsed} ms, ${info.bytes} bytes; request: ${elapsed} ms`);
+    expect(res.status).toBe(200);
+    // The request must not have waited on the backup's heavy work.
+    expect(elapsed).toBeLessThan(100);
+  });
+
   test("a real backup restores into a valid, queryable database with the real data", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     expect(info.filename).toMatch(/^backup-.*\.db\.enc$/);
     expect(info.bytes).toBeGreaterThan(0);
     expect(existsSync(join(backupDir, info.filename))).toBe(true);
 
     const restoreDir = mkdtempSync(join(tmpdir(), "maipai-restore-test-"));
     const restoredPath = join(restoreDir, "restored.db");
-    restoreBackup(info.filename, restoredPath);
+    await restoreBackup(info.filename, restoredPath);
 
     const restored = new Database(restoredPath, { readonly: true });
     const row = restored.query("SELECT display_name FROM people WHERE display_name = ?").get("Sage") as
@@ -61,18 +84,18 @@ describe("runBackup() / restoreBackup()", () => {
 
   test("a tampered archive fails to decrypt rather than silently restoring garbage", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const path = join(backupDir, info.filename);
     const bytes = readFileSync(path);
     bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 0xff; // flip the last ciphertext byte
     writeFileSync(path, bytes);
 
     const restoreDir = mkdtempSync(join(tmpdir(), "maipai-restore-test-"));
-    expect(() => restoreBackup(info.filename, join(restoreDir, "restored.db"))).toThrow();
+    await expect(restoreBackup(info.filename, join(restoreDir, "restored.db"))).rejects.toThrow();
   });
 
-  test("restoring an unknown backup throws instead of silently doing nothing", () => {
-    expect(() => restoreBackup("does-not-exist.db.enc", "/tmp/whatever.db")).toThrow();
+  test("restoring an unknown backup throws instead of silently doing nothing", async () => {
+    await expect(restoreBackup("does-not-exist.db.enc", "/tmp/whatever.db")).rejects.toThrow();
   });
 });
 
@@ -96,7 +119,7 @@ describe("cleanupStaleSnapshots()", () => {
 
   test("never touches a real, finished backup", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     cleanupStaleSnapshots();
     expect(existsSync(join(backupDir, info.filename))).toBe(true);
   });
@@ -106,7 +129,7 @@ describe("cleanupStaleSnapshots()", () => {
     const stalePath = join(backupDir, ".snapshot-1700000000000-deadbeef.db");
     writeFileSync(stalePath, "leftover from a crash");
 
-    runBackup();
+    await runBackup();
     expect(existsSync(stalePath)).toBe(false);
   });
 });
@@ -114,9 +137,9 @@ describe("cleanupStaleSnapshots()", () => {
 describe("listBackups()", () => {
   test("lists real backups, newest first", async () => {
     await owner();
-    const first = runBackup();
+    const first = await runBackup();
     await new Promise((r) => setTimeout(r, 5));
-    const second = runBackup();
+    const second = await runBackup();
 
     const listed = listBackups();
     expect(listed[0]!.filename).toBe(second.filename);
@@ -129,8 +152,8 @@ describe("listBackups()", () => {
 // file's mtime, not mocked) and asserts the exact grandfather-father-son
 // keep set.
 describe("pruneBackups()", () => {
-  function backupAt(daysAgo: number): string {
-    const info = runBackup();
+  async function backupAt(daysAgo: number): Promise<string> {
+    const info = await runBackup();
     const path = join(backupDir, info.filename);
     const when = new Date(Date.now() - daysAgo * 86_400_000);
     utimesSync(path, when, when);
@@ -141,7 +164,7 @@ describe("pruneBackups()", () => {
     await owner();
     // 20 backups, one per day for 20 days: day 0 (today) through day 19.
     const filenames: string[] = [];
-    for (let d = 0; d < 20; d++) filenames.push(backupAt(d));
+    for (let d = 0; d < 20; d++) filenames.push(await backupAt(d));
 
     const result = pruneBackups();
     const survivors = new Set(listBackups().map((b) => b.filename));
@@ -156,8 +179,8 @@ describe("pruneBackups()", () => {
 
   test("multiple backups on the same day only ever keep one", async () => {
     await owner();
-    const a = backupAt(0);
-    const b = runBackup().filename; // also "today", no utimesSync: real mtime, same day as `a`
+    const a = await backupAt(0);
+    const b = (await runBackup()).filename; // also "today", no utimesSync: real mtime, same day as `a`
     pruneBackups();
     const survivors = new Set(listBackups().map((x) => x.filename));
     expect(survivors.has(a) || survivors.has(b)).toBe(true);
@@ -166,15 +189,15 @@ describe("pruneBackups()", () => {
 
   test("a backup far outside every window is deleted", async () => {
     await owner();
-    const old = backupAt(400); // well past 7 daily + 4 weekly + 3 monthly
-    backupAt(0); // fills today's daily slot first, since listBackups() sorts newest-first
+    const old = await backupAt(400); // well past 7 daily + 4 weekly + 3 monthly
+    await backupAt(0); // fills today's daily slot first, since listBackups() sorts newest-first
     pruneBackups();
     expect(listBackups().some((b) => b.filename === old)).toBe(false);
   });
 
   test("backup.max_total_gb defaulting to 0 adds no extra pruning beyond the tiers", async () => {
     await owner();
-    for (let d = 0; d < 5; d++) backupAt(d);
+    for (let d = 0; d < 5; d++) await backupAt(d);
     pruneBackups();
     expect(listBackups().length).toBe(5); // all 5 fit inside the 7-daily tier alone
   });
@@ -184,7 +207,7 @@ describe("pruneBackups()", () => {
   test("a size cap trims the tiered-kept set further, oldest pruned first", async () => {
     await owner();
     const filenames: string[] = [];
-    for (let d = 0; d < 5; d++) filenames.push(backupAt(d)); // days 0-4: all land in the daily tier
+    for (let d = 0; d < 5; d++) filenames.push(await backupAt(d)); // days 0-4: all land in the daily tier
     const beforeCap = listBackups();
     expect(beforeCap.length).toBe(5);
     const totalBytes = beforeCap.reduce((sum, b) => sum + b.bytes, 0);
@@ -213,8 +236,8 @@ describe("pruneBackups()", () => {
   // opposite of what a backup feature exists to guarantee.
   test("a cap smaller than even the newest backup still leaves at least one", async () => {
     await owner();
-    backupAt(1);
-    const newest = backupAt(0);
+    await backupAt(1);
+    const newest = await backupAt(0);
     // 1 byte: guaranteed smaller than any real backup file.
     setHouseholdSettingValue("backup.max_total_gb", 1 / (1024 * 1024 * 1024));
 
@@ -257,13 +280,13 @@ describe("GET /api/backups and POST /api/backups/run", () => {
 /** Builds an encrypted archive from a database this test wrote by hand,
  * so the verification checks can be driven with files a real backup
  * could never produce (a future schema version, an empty roster). */
-function fakeBackup(name: string, build: (db: Database) => void): string {
+async function fakeBackup(name: string, build: (db: Database) => void): Promise<string> {
   const path = join(dataDir, `${name}.db`);
   rmSync(path, { force: true });
   const db2 = new Database(path);
   build(db2);
   db2.close();
-  encryptFile(path, join(backupDir, `${name}.db.enc`));
+  await encryptFile(path, join(backupDir, `${name}.db.enc`));
   rmSync(path, { force: true });
   return `${name}.db.enc`;
 }
@@ -271,10 +294,10 @@ function fakeBackup(name: string, build: (db: Database) => void): string {
 describe("staged restore", () => {
   test("stages a real backup and reports which one is waiting", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
 
     expect(pendingRestore()).toBeNull();
-    const staged = stageRestore(info.filename, "person-123");
+    const staged = await stageRestore(info.filename, "person-123");
     expect(staged.filename).toBe(info.filename);
     expect(staged.stagedByPersonId).toBe("person-123");
     expect(pendingRestore()?.filename).toBe(info.filename);
@@ -284,8 +307,8 @@ describe("staged restore", () => {
 
   test("cancelling leaves nothing staged and nothing on disk", async () => {
     await owner();
-    const info = runBackup();
-    stageRestore(info.filename, "person-123");
+    const info = await runBackup();
+    await stageRestore(info.filename, "person-123");
 
     expect(cancelPendingRestore()).toBe(true);
     expect(pendingRestore()).toBeNull();
@@ -294,8 +317,8 @@ describe("staged restore", () => {
     expect(cancelPendingRestore()).toBe(false);
   });
 
-  test("refuses a backup that is not there, without staging anything", () => {
-    expect(() => stageRestore("does-not-exist.db.enc", "person-123")).toThrow(/no such backup/);
+  test("refuses a backup that is not there, without staging anything", async () => {
+    await expect(stageRestore("does-not-exist.db.enc", "person-123")).rejects.toThrow(/no such backup/);
     expect(pendingRestore()).toBeNull();
   });
 
@@ -304,36 +327,36 @@ describe("staged restore", () => {
   // in would trip that guard at the next boot, AFTER the live database
   // had already been moved aside: a hub that will not start, from a
   // button labelled "restore".
-  test("refuses a backup from a newer version of MaiPai Home", () => {
-    const name = fakeBackup("from-the-future", (d) => {
+  test("refuses a backup from a newer version of MaiPai Home", async () => {
+    const name = await fakeBackup("from-the-future", (d) => {
       d.exec("CREATE TABLE people (id TEXT PRIMARY KEY, display_name TEXT, deleted_at TEXT)");
       d.exec("INSERT INTO people (id, display_name) VALUES ('p1', 'Sage')");
       d.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION + 5}`);
     });
 
-    expect(() => stageRestore(name, "person-123")).toThrow(/newer version of MaiPai Home/);
+    await expect(stageRestore(name, "person-123")).rejects.toThrow(/newer version of MaiPai Home/);
     expect(pendingRestore()).toBeNull();
     expect(existsSync(join(dataDir, "hub.db.pending-restore"))).toBe(false);
   });
 
   // A restore that leaves nobody able to sign in locks the family out of
   // their own hub, with no way back through the UI.
-  test("refuses a backup with nobody in it", () => {
-    const name = fakeBackup("nobody-home", (d) => {
+  test("refuses a backup with nobody in it", async () => {
+    const name = await fakeBackup("nobody-home", (d) => {
       d.exec("CREATE TABLE people (id TEXT PRIMARY KEY, display_name TEXT, deleted_at TEXT)");
       d.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION}`);
     });
 
-    expect(() => stageRestore(name, "person-123")).toThrow(/no people/);
+    await expect(stageRestore(name, "person-123")).rejects.toThrow(/no people/);
     expect(pendingRestore()).toBeNull();
   });
 
-  test("refuses something that is not a database at all", () => {
+  test("refuses something that is not a database at all", async () => {
     writeFileSync(join(dataDir, "junk.bin"), Buffer.from("not a database, just some bytes"));
-    encryptFile(join(dataDir, "junk.bin"), join(backupDir, "junk.db.enc"));
+    await encryptFile(join(dataDir, "junk.bin"), join(backupDir, "junk.db.enc"));
     rmSync(join(dataDir, "junk.bin"), { force: true });
 
-    expect(() => stageRestore("junk.db.enc", "person-123")).toThrow(/not a MaiPai Home backup/);
+    await expect(stageRestore("junk.db.enc", "person-123")).rejects.toThrow(/not a MaiPai Home backup/);
     expect(pendingRestore()).toBeNull();
     expect(existsSync(join(dataDir, "hub.db.pending-restore"))).toBe(false);
   });
@@ -347,7 +370,7 @@ describe("staged restore", () => {
   // would be reproducing the bug, not covering it.
   test("applying a staged restore swaps the database in and keeps the old one", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const dir = mkdtempSync(join(tmpdir(), "maipai-apply-test-"));
     try {
       // A stand-in for the live database, holding data the backup does
@@ -358,7 +381,7 @@ describe("staged restore", () => {
       live.exec("INSERT INTO people (id, display_name) VALUES ('p9', 'Juniper')");
       live.close();
 
-      stageRestore(info.filename, "person-123", dir);
+      await stageRestore(info.filename, "person-123", dir);
       const applied = applyPendingRestore(dir);
       expect(applied?.filename).toBe(info.filename);
       expect(pendingRestore(dir)).toBeNull();
@@ -390,14 +413,14 @@ describe("staged restore", () => {
   // in place, SQLite would replay it on top of the restored file.
   test("applying clears the replaced database's journal files", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const dir = mkdtempSync(join(tmpdir(), "maipai-apply-wal-test-"));
     try {
       writeFileSync(join(dir, "hub.db"), Buffer.from("old database"));
       writeFileSync(join(dir, "hub.db-wal"), Buffer.from("stale journal"));
       writeFileSync(join(dir, "hub.db-shm"), Buffer.from("stale shm"));
 
-      stageRestore(info.filename, "person-123", dir);
+      await stageRestore(info.filename, "person-123", dir);
       applyPendingRestore(dir);
 
       expect(existsSync(join(dir, "hub.db-wal"))).toBe(false);
@@ -428,7 +451,7 @@ describe("the restore routes", () => {
   // including the roster that decides who is an admin at all.
   test("only the owner may stage or cancel a restore", async () => {
     const ownerClient = await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const child = await childOf(ownerClient);
 
     expect((await child.post(`/api/backups/${info.filename}/restore`, {})).status).toBe(403);
@@ -438,7 +461,7 @@ describe("the restore routes", () => {
 
   test("staging, reading back, and cancelling, all through the API", async () => {
     const client = await owner();
-    const info = runBackup();
+    const info = await runBackup();
 
     const before = await client.get("/api/backups/restore/pending");
     expect(((await before.json()) as { pending: unknown }).pending).toBeNull();
@@ -467,7 +490,7 @@ describe("the restore routes", () => {
   // read.
   test("restoring an earlier-today backup never prunes that same backup away first", async () => {
     const client = await owner();
-    const older = runBackup();
+    const older = await runBackup();
     // Same calendar day as the fresh safety backup the restore route is
     // about to take, which is exactly the collision: the daily
     // retention tier keeps only one backup per day, and listBackups()
@@ -497,7 +520,7 @@ describe("the restore routes", () => {
   // to be told to update first.
   test("explains why a backup was refused, in words a parent can act on", async () => {
     const client = await owner();
-    const name = fakeBackup("api-from-the-future", (d) => {
+    const name = await fakeBackup("api-from-the-future", (d) => {
       d.exec("CREATE TABLE people (id TEXT PRIMARY KEY, display_name TEXT, deleted_at TEXT)");
       d.exec("INSERT INTO people (id, display_name) VALUES ('p1', 'Sage')");
       d.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION + 5}`);
@@ -515,11 +538,11 @@ describe("the restore routes", () => {
 describe("what a restore refuses to do", () => {
   test("will not stage a second restore over one already waiting", async () => {
     await owner();
-    const first = runBackup();
-    const second = runBackup();
-    stageRestore(first.filename, "person-123");
+    const first = await runBackup();
+    const second = await runBackup();
+    await stageRestore(first.filename, "person-123");
 
-    expect(() => stageRestore(second.filename, "person-123")).toThrow(/already waiting/);
+    await expect(stageRestore(second.filename, "person-123")).rejects.toThrow(/already waiting/);
     // The confirmed one is untouched, not silently replaced or wiped.
     expect(pendingRestore()?.filename).toBe(first.filename);
     cancelPendingRestore();
@@ -527,14 +550,14 @@ describe("what a restore refuses to do", () => {
 
   // Every sign-in path filters tombstones out, so a backup whose people
   // are all soft-deleted has nobody who can sign in.
-  test("counts only living people, not tombstones", () => {
-    const name = fakeBackup("all-tombstones", (d) => {
+  test("counts only living people, not tombstones", async () => {
+    const name = await fakeBackup("all-tombstones", (d) => {
       d.exec("CREATE TABLE people (id TEXT PRIMARY KEY, display_name TEXT, deleted_at TEXT)");
       d.exec("INSERT INTO people VALUES ('p1', 'Sage', '2026-09-05T00:00:00.000Z')");
       d.exec(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION}`);
     });
 
-    expect(() => stageRestore(name, "person-123")).toThrow(/no people/);
+    await expect(stageRestore(name, "person-123")).rejects.toThrow(/no people/);
   });
 
   // decryptFile's writeFileSync never fsyncs, so a power cut right after
@@ -543,7 +566,7 @@ describe("what a restore refuses to do", () => {
   // refuse to start at all.
   test("refuses at boot to apply a staged file that went bad, and leaves the live database alone", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const dir = mkdtempSync(join(tmpdir(), "maipai-bad-staged-"));
     try {
       const live = new Database(join(dir, "hub.db"));
@@ -551,7 +574,7 @@ describe("what a restore refuses to do", () => {
       live.exec("INSERT INTO people VALUES ('p9', 'Juniper', NULL)");
       live.close();
 
-      stageRestore(info.filename, "person-123", dir);
+      await stageRestore(info.filename, "person-123", dir);
       // Truncated after staging, the way a power cut would.
       writeFileSync(join(dir, "hub.db.pending-restore"), Buffer.from("half a fi"));
 
@@ -573,7 +596,7 @@ describe("what a restore refuses to do", () => {
   // that is supposed to be the way back holds A's data.
   test("a second restore does not clobber the first pre-restore copy", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const dir = mkdtempSync(join(tmpdir(), "maipai-second-restore-"));
     try {
       const original = new Database(join(dir, "hub.db"));
@@ -581,9 +604,9 @@ describe("what a restore refuses to do", () => {
       original.exec("INSERT INTO people VALUES ('p9', 'TheOriginal', NULL)");
       original.close();
 
-      stageRestore(info.filename, "person-123", dir);
+      await stageRestore(info.filename, "person-123", dir);
       applyPendingRestore(dir);
-      stageRestore(info.filename, "person-123", dir);
+      await stageRestore(info.filename, "person-123", dir);
       applyPendingRestore(dir);
 
       const kept = new Database(join(dir, "hub.db.pre-restore"), { readonly: true });
@@ -613,10 +636,10 @@ describe("what a restore refuses to do", () => {
   // exactly that crash point.
   test("a crash between renaming the main file and its own WAL/SHM does not split them on retry", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const dir = mkdtempSync(join(tmpdir(), "maipai-restore-crash-"));
     try {
-      stageRestore(info.filename, "person-123", dir);
+      await stageRestore(info.filename, "person-123", dir);
 
       // State left behind by a crashed first application attempt: the
       // main file already renamed to the pre-restore slot, its own -wal
@@ -642,14 +665,14 @@ describe("what a restore refuses to do", () => {
   // checkpoint. Deleting it emptied the one undo a family has.
   test("the replaced database keeps its journal, so the undo copy is complete", async () => {
     await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const dir = mkdtempSync(join(tmpdir(), "maipai-wal-keep-"));
     try {
       writeFileSync(join(dir, "hub.db"), Buffer.from("old database"));
       writeFileSync(join(dir, "hub.db-wal"), Buffer.from("committed but not yet checkpointed"));
       writeFileSync(join(dir, "hub.db-shm"), Buffer.from("shm"));
 
-      stageRestore(info.filename, "person-123", dir);
+      await stageRestore(info.filename, "person-123", dir);
       applyPendingRestore(dir);
 
       // Moved alongside the database they belong to, under SQLite's own
@@ -668,7 +691,7 @@ describe("what a restore refuses to do", () => {
   // in a browser.
   test("a raw crypto or filesystem error never reaches the browser", async () => {
     const client = await owner();
-    const info = runBackup();
+    const info = await runBackup();
     const path = join(backupDir, info.filename);
     const bytes = readFileSync(path);
     bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 0xff;

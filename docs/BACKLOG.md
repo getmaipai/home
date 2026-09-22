@@ -9320,15 +9320,21 @@ it stays visible on the dashboard, not just in the tracker.
       defer to) ever fires. Regression test in
       `tests/conversationHistory.test.ts` proves both halves with a real,
       sped-up timer (`__setSummaryRefreshDelayForTests()`).
-- [ ] **Backups block the event loop** (M, `getmaipai/home#46`) -
-      `lib/backup.ts`'s `runBackup()` runs SQLite's `VACUUM INTO` and
-      `backupCrypto.ts`'s whole-file AES encrypt/decrypt synchronously,
-      called from both a request handler and the scheduler - every
-      other request stalls for the duration on a large database.
-      Acceptance: a backup/restore no longer blocks concurrent request
-      handling (moved off the main thread, or chunked/async I/O).
-      Exit check: a test that starts a backup and confirms an unrelated
-      request completes without waiting on it.
+- [x] **Backups block the event loop** (M, done 2026-09-22,
+      `getmaipai/home#46`) - `lib/backup.ts`'s `runBackup()` ran
+      SQLite's `VACUUM INTO` and `backupCrypto.ts`'s whole-file AES
+      encrypt/decrypt synchronously on the main thread, stalling every
+      other request for the duration on a large database. Fixed by
+      running `VACUUM INTO` in a `node:worker_threads` worker with its
+      own SQLite connection and replacing the whole-file AES
+      encrypt/decrypt with streaming `node:crypto` cipher + `node:fs`
+      streams. Measured: a 300 MB backup (315 MB encrypted) takes 656
+      ms on the worker while an unrelated `GET /api/people` completes
+      in 2 ms on the main thread. Exit check: `backup.test.ts`'s
+      "a running backup does not block unrelated request handling on
+      the event loop" seeds a 300 MB BLOB into `memory_records`,
+      starts `runBackup()`, and asserts the unrelated request returns
+      200 in under 100 ms.
 - [x] **`memorializePerson()` isn't atomic** (S, done 2026-09-06,
       `getmaipai/home#49`) - had the same multi-statement-with-no-
       transaction shape `deletePerson()` had before COR-5's fix

@@ -51,4 +51,4 @@ export const db = drizzle(sqlite, { schema });
 migrate(db, { migrationsFolder });
 stampSchemaVersion(sqlite);
 
-export { sqlite };
+export { sqlite, dbPath };
