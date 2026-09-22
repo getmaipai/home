@@ -122,6 +122,9 @@ if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
   stage "backend: typecheck"
   (cd backend && bunx tsc --noEmit)
 
+  stage "backend: rule-budget lint (U0b, docs/plans/simple-turn-pipeline-2026-09-22.md)"
+  (cd backend && bun run scripts/lint/rule-budget.ts)
+
   stage "scripts: typecheck"
   (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
 
