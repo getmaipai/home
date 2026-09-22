@@ -4,6 +4,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError, isOwnerOrAdminRole, type Issue, type Roster } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/repairs: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/repairs` through the template's
@@ -37,6 +38,7 @@ function toRow(issue: Issue): Row {
 }
 
 export function NextRepairsPage({ person }: { person: Roster }) {
+  useDocumentTitle("Repairs");
   const canManage = isOwnerOrAdminRole(person.role);
   const query = useQuery<Issue[]>({ queryKey: ["repairs"], queryFn: () => api.repairs(), enabled: canManage });
 

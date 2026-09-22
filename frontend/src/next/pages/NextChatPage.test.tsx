@@ -187,6 +187,65 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   });
 });
 
+// c-99f5: the tab's title. No conversation open yet -> "Chat"; the open
+// conversation's own title once one is (and the hook restores the prior
+// title when the page unmounts).
+describe("NextChatPage (c-99f5: the tab's document title)", () => {
+  test("no conversation open yet, the tab title is Chat", async () => {
+    const restore = stubFetch();
+    const previousTitle = document.title;
+    try {
+      document.title = "Before";
+      renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => {
+        expect(document.title).toBe("Chat · MaiPai Home");
+      });
+    } finally {
+      document.title = previousTitle;
+      restore();
+    }
+  });
+
+  test("the open conversation's title is the tab title, and unmount restores it", async () => {
+    const original = globalThis.fetch;
+    const conversation = { id: "conv-titled123", title: "Garden plans", surface: "chat", created_at: "2026-09-07T00:00:00Z", pinned: false };
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations/conv-titled123/resume")) {
+        return Promise.resolve(Response.json(conversation));
+      }
+      if (url.includes("/api/conversations/conv-titled123")) {
+        return Promise.resolve(Response.json(conversation));
+      }
+      if (url.includes("/api/conversations")) {
+        return Promise.resolve(Response.json([conversation]));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    const previousTitle = document.title;
+    try {
+      document.title = "Before";
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat?conversation=conv-titled123"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => {
+        expect(document.title).toBe("Garden plans · MaiPai Home");
+      });
+      cleanup();
+      expect(document.title).toBe("Before");
+    } finally {
+      document.title = previousTitle;
+      globalThis.fetch = original;
+    }
+  });
+});
+
 const SAFETY = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" };
 
 describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {

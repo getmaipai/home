@@ -5,6 +5,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
 import { NextManageSection } from "@/next/pages/settings/NextManageSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/settings: SHELL-05's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - docs/SETTINGS.md's generic renderer
@@ -28,6 +29,7 @@ import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
  * their permanent nav entry, so the Household tab's own bottom section
  * is now their real way back, not a settings key at all. */
 export function NextSettingsPage({ person }: { person: Roster }) {
+  useDocumentTitle("Settings");
   const canManageHousehold = isOwnerOrAdminRole(person.role);
   const [tab, setTab] = useState<"household" | "me">(canManageHousehold ? "household" : "me");
   const SettingsIcon = getIcon("settings");

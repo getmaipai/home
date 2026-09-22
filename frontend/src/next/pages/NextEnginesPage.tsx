@@ -4,6 +4,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/engines: SHELL-06's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/engines` and `GET /api/engines/
@@ -84,6 +85,7 @@ function toHealthRow(item: StackHealthItem): HealthRow {
 }
 
 export function NextEnginesPage() {
+  useDocumentTitle("Engines");
   const overviewQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
   const healthQuery = useQuery<EnginesHealth>({ queryKey: ["engines-health"], queryFn: () => api.enginesHealth() });
 

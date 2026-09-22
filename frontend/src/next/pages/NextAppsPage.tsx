@@ -5,6 +5,7 @@ import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/ca
 import { getIcon } from "@maipai/ui/src/icons";
 import { kindStyle, packageState } from "@/apps/library/AppsPage";
 import { api, ApiError, type InstalledPackage } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/apps: SHELL-03's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - GET /api/plugins (the same real listing
@@ -53,6 +54,7 @@ function toRow(pkg: InstalledPackage): AppRow {
 }
 
 export function NextAppsPage() {
+  useDocumentTitle("Apps");
   const query = useQuery<InstalledPackage[]>({ queryKey: ["plugins"], queryFn: () => api.plugins() });
 
   return (

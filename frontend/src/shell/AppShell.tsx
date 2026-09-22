@@ -20,6 +20,7 @@ import { PhoneHeaderExtras } from "@/shell/PhoneHeaderExtras";
 import { HubStatusCard } from "@/shell/HubStatusCard";
 import { HomeFooterBar } from "@/shell/HomeFooterBar";
 import { routeHeader } from "@/shell/routeHeader";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useSearchCommand } from "@/shell/search/useSearchCommand";
 import type { SearchResultItem } from "@/shell/search/providers";
 import type { Roster } from "@/lib/api";
@@ -267,6 +268,7 @@ export function AppShell({ person, onSignOut, onPersonChange, children }: AppShe
   ];
 
   const { title, subtitle } = routeHeader(location.pathname, person);
+  useDocumentTitle(title);
 
   return (
     <>

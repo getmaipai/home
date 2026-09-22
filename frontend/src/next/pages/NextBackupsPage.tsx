@@ -5,6 +5,7 @@ import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/Dat
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/backups: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/backups` through the template's
@@ -45,6 +46,7 @@ function toRow(backup: BackupInfo): Row {
 }
 
 export function NextBackupsPage({ person }: { person: Roster }) {
+  useDocumentTitle("Backups");
   const canManage = isOwnerOrAdminRole(person.role);
   const backupsQuery = useQuery<BackupInfo[]>({ queryKey: ["backups"], queryFn: () => api.backups(), enabled: canManage });
   const pendingQuery = useQuery<{ pending: PendingRestore | null }>({ queryKey: ["backups-pending"], queryFn: () => api.pendingRestore(), enabled: canManage });

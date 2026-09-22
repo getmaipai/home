@@ -45,6 +45,7 @@ import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
 import { CURRENT_LOCAL_VISION_CAPABILITY } from "@/apps/chat/visionCapability";
 import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assistant-ui/core";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 const HistoryIcon = getIcon("history");
@@ -1114,6 +1115,20 @@ function ArtifactCacheInvalidator() {
   return null;
 }
 
+/** c-99f5: the tab's own title for this page - the open conversation's
+ * title instead of a flat "Chat", so a tab opened on a past conversation
+ * names that conversation. `s.threadListItem` is the threads scope's main
+ * (open) item - read globally from the runtime state, no list-item context
+ * needed - so this sits beside ArtifactCacheInvalidator's own side-effect
+ * mount inside the provider. Falls back to "Chat" while no conversation is
+ * open yet, and re-renders on thread switch and rename alike (the rename
+ * path re-sets the item's own title through the adapter). */
+function ChatDocumentTitle() {
+  const title = useAuiState((s) => s.threadListItem.title) ?? "Chat";
+  useDocumentTitle(title);
+  return null;
+}
+
 export function NextChatPage({ person }: { person: Roster }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
@@ -1587,6 +1602,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <ToolTimelineTool />
         <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />
+        <ChatDocumentTitle />
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
             height a hard ceiling, not a floor a growing composer or a
             streaming reply could push past - FullLayout.tsx's own

@@ -6,6 +6,7 @@ import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/Dat
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { ROLE_LABELS } from "@/apps/people/roles";
 import { api, ApiError, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/people: SHELL-04's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - one route, two of the template's own
@@ -51,6 +52,7 @@ function toRow(p: PersonRosterEntry): PersonRow {
 }
 
 export function NextPeoplePage({ person }: { person: Roster }) {
+  useDocumentTitle("People");
   const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
 
   return (

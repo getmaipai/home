@@ -9,6 +9,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import FullLogo from "@maipai/ui/src/dashboard/layouts/full/shared/logo/FullLogo";
 import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
 import { api, ApiError, type Roster } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/sign-in: SHELL-08's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - the real profile picker and secret entry
@@ -49,6 +50,7 @@ import { api, ApiError, type Roster } from "@/lib/api";
  * layer down - only the profiles-fetch strategy still differs (this
  * page's own `useQuery`+`AsyncState` vs. `SignIn.tsx`'s plain effect). */
 export function NextSignInPage({ onSignedIn }: { onSignedIn: () => void }) {
+  useDocumentTitle("Sign in");
   const profilesQuery = useQuery<Roster[]>({ queryKey: ["auth-profiles"], queryFn: () => api.profiles() });
   const { selected, secret, setSecret, secretError, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker } =
     useProfileSignIn(onSignedIn);
