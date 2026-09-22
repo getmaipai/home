@@ -229,7 +229,7 @@ describe("NextChatPage (c-99f5: the tab's document title)", () => {
     const previousTitle = document.title;
     try {
       document.title = "Before";
-      const view = renderPage(
+      renderPage(
         <MemoryRouter initialEntries={["/next/chat?conversation=conv-titled123"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
