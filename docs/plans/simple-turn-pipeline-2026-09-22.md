@@ -113,6 +113,19 @@ search verb went unsearched on the 8B live today (the inverse miss); the
 prefix cache breaks at 567 tokens whenever the tools block changes; the
 routing corpus passes 169 of 170 rows on the embedding path.
 
+**(c) Track 3, the local decider candidates** (M, Sonnet). The Jev-style
+local reproductions named in `stack/docs/plans/jev-and-yue-2026-09-20.md`
+(jeff/GliFormer at about 400M, openjev, open-jev-deberta) measured as the
+"is this a question about the world, and should it search" decider,
+against the routing corpus, A's draft rows, the owner's failed turns and
+the labels already on the hub's rows, compared with the rule ladder and
+with the 8B's own tool choice: accuracy, calibration of the probability,
+latency per decision, and resident memory as the robot proxy, since a
+decider of this size runs on the Pi where the 8B cannot. A winner here is
+LOOKUP-HEAD-01's implementation and the interim rule's replacement; it is
+judged with the other two tracks, and the routing-corpus bar from the
+2026-09-16 review (five macro-F1 points over the rules) applies.
+
 **Status, 2026-09-22 evening: phase 0 is running.** Session A builds and
 measures the spike and records numbers only (in the scratch folder, not
 the repo); Session B runs the per-model benches; this session writes the
@@ -122,7 +135,8 @@ stopped its own bench runs so the two do not compete for the machine.
 **What can start today, gated on nothing:** U0 (the replay set and the
 no-new-rules lint), U1 (the cache-stable prompt), U3 (the thinking
 budget), U5 (dated memory lines). **Gated on (a):** U2 and everything
-after it. **Gated on (b):** U2's two-model acceptance, the budget records,
+after it. **Gated on (c):** which decider the interim rule becomes,
+never whether the loop is built. **Gated on (b):** U2's two-model acceptance, the budget records,
 the flip, and the interim rule's relaxation on the Studio.
 
 ## The detail
@@ -192,7 +206,8 @@ Three answers, in the order they arrive.
   over-searches a little ("why is the sky blue" gets a search), which
   costs seconds, never a wrong answer.
 - **Next (the learned head, ROUTER-RLCD-01 then LOOKUP-HEAD-01).** A small
-  calibrated classifier (a ModernBERT-class head, about 30 ms) trained on
+  calibrated classifier (a ModernBERT-class head or one of phase 0's
+  track 3 candidates, about 30 ms, small enough for the Pi) trained on
   the hub's own rows, which already carry the label "which rung answered"
   and "was the next turn a correction". It replaces the interim rule and
   the open-class half of the signal when it beats them on the routing
