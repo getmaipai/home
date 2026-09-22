@@ -22,5 +22,5 @@ export function EnginesCard({ engines }: { engines: DashboardEngineCounts | null
   // `total`, the one field meant to be authoritative.
   const issues = engines?.total ?? 0;
   const value = engines === null ? "No Stack" : issues > 0 ? `${issues} issue${issues === 1 ? "" : "s"}` : "Healthy";
-  return <StatCard label="Engines" value={value} icon={CpuIcon} />;
+  return <StatCard label="Engines" value={value} icon={CpuIcon} to="/next/engines" />;
 }

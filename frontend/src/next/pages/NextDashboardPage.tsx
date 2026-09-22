@@ -1,5 +1,4 @@
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import StyleAwareWrapper from "@maipai/ui/src/dashboard/components/shared/StyleAwareWrapper";
 import { ApiError, type Roster, type Dashboard } from "@/lib/api";
 import { useDashboard } from "@/next/useDashboard";
 import { Greeting } from "@/next/pages/dashboard/Greeting";
@@ -56,7 +55,21 @@ import { RecentActivityTable } from "@/next/pages/dashboard/RecentActivityTable"
  * strip (`components/shared/divider`, also vendored), not a plain
  * rule - with every card now carrying its own visible ring, a divider
  * between them added a second, competing separator rather than
- * fixing one; the grid's own gap is enough. */
+ * fixing one; the grid's own gap is enough.
+ *
+ * The grid container itself: `StyleAwareWrapper`'s own
+ * `lyraClassName="grid grid-cols-12 p-px gap-px bg-border"` (the
+ * SHELL-01 gap paragraph's choice) is the hairline-grid pattern
+ * (ui-v0.5.15's own `bg-border`-through-a-1px-gap seam) built for a
+ * flat, ringless tile row - once every card carries its own visible
+ * ring, a 1px gap reads as the cards touching, not seamed.
+ * `StyleAwareWrapper`'s own `defaultClassName` prop has never actually
+ * applied (it always renders `lyraClassName` regardless of look - a
+ * dead prop, not something to route around), so keeping the wrapper
+ * only added an unused indirection on top of the wrong spacing; a
+ * plain grid `div` with dashboard-01's own real gutter (`gap-4`)
+ * replaces it - the same gutter the stat row and the chart/table row
+ * both now sit in, since they share this one grid container. */
 export function NextDashboardPage({ person }: { person: Roster }) {
   const query = useDashboard();
 
@@ -82,7 +95,7 @@ export function NextDashboardPage({ person }: { person: Roster }) {
             <div className="pb-4">
               <Greeting displayName={person.display_name} />
             </div>
-            <StyleAwareWrapper lyraClassName="grid grid-cols-12 p-px gap-px bg-border" defaultClassName="grid grid-cols-12 gap-4">
+            <div className="grid grid-cols-12 gap-4">
               <div className="lg:col-span-3 col-span-6">
                 <PeopleCountCard count={data.people_count} />
               </div>
@@ -105,7 +118,7 @@ export function NextDashboardPage({ person }: { person: Roster }) {
               <div className="lg:col-span-5 col-span-12">
                 <RecentActivityTable rows={data.recent_activity} />
               </div>
-            </StyleAwareWrapper>
+            </div>
           </div>
         );
       }}

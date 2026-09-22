@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Roster, ResolvedSetting } from "@/lib/api";
@@ -77,7 +78,15 @@ describe("NextSettingsPage", () => {
       "person:person-abc123": [makeValue(appearance, "system")],
     });
     try {
-      renderWithQueryClient(<NextSettingsPage person={makePerson()} />);
+      // NextManageSection (the Household tab's own bottom section,
+      // ui-v0.5.23) renders real react-router-dom Links - a router
+      // context is needed the moment this renders, not just when a
+      // link is clicked.
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Household"));
       expect(document.body.textContent).toContain("Me");
       const meTab = Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Me");
@@ -99,6 +108,34 @@ describe("NextSettingsPage", () => {
     }
   });
 
+  // ui-v0.5.23's rail restructuring dropped the permanent Engines/
+  // Updates/Repairs/Backups nav entries - this is their real way back,
+  // so a real href to each real route is the acceptance, not just that
+  // the section renders.
+  test("the Household tab's own Manage section links to all four routes", async () => {
+    const { restore } = mockSettingsFetch([], { household: [], "person:person-abc123": [] });
+    try {
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(document.body.textContent).toContain("Manage"));
+      for (const [title, href] of [
+        ["Engines", "/next/engines"],
+        ["Updates", "/next/updates"],
+        ["Repairs", "/next/repairs"],
+        ["Backups", "/next/backups"],
+      ] as const) {
+        const link = Array.from(document.querySelectorAll("a")).find((a) => a.textContent?.includes(title));
+        expect(link).toBeDefined();
+        expect(link!.getAttribute("href")).toBe(href);
+      }
+    } finally {
+      restore();
+    }
+  });
+
   test("a household boolean key folded under advanced toggles once expanded", async () => {
     const b1 = makeKey({ key: "household.adv1", label: "Advanced One", level: "advanced", scope: "household", lives_in: "household.system" });
     const b2 = makeKey({ key: "household.adv2", label: "Advanced Two", level: "advanced", scope: "household", lives_in: "household.system" });
@@ -108,7 +145,11 @@ describe("NextSettingsPage", () => {
       "person:person-abc123": [],
     });
     try {
-      renderWithQueryClient(<NextSettingsPage person={makePerson()} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Show 3 advanced settings"));
       expect(document.body.textContent).not.toContain("New shell (preview)");
       const showAdvanced = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("Show 3 advanced settings"));

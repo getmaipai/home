@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Dashboard, Roster } from "@/lib/api";
@@ -49,7 +50,11 @@ describe("NextDashboardPage", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
     try {
-      renderWithQueryClient(<NextDashboardPage person={makePerson()} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextDashboardPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Something broke"));
       expect(document.body.textContent).toContain("Try again");
     } finally {
@@ -66,7 +71,11 @@ describe("NextDashboardPage", () => {
       turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
     });
     try {
-      renderWithQueryClient(<NextDashboardPage person={makePerson()} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextDashboardPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Nova"));
       expect(document.body.textContent).toContain("4"); // people_count
       expect(document.body.textContent).toContain("Up to date"); // updates_available: false
@@ -85,12 +94,28 @@ describe("NextDashboardPage", () => {
       engines: { critical: 1, error: 0, warning: 2, total: 3 },
     });
     try {
-      renderWithQueryClient(<NextDashboardPage person={makePerson()} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextDashboardPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Repairs"));
       expect(document.body.textContent).toContain("3"); // repairs_open
       expect(document.body.textContent).toContain("Engines");
       expect(document.body.textContent).toContain("3 issues"); // 1 critical + 0 error + 2 warning
       expect(document.body.textContent).toContain("Available"); // updates_available: true
+      // ui-v0.5.23's rail restructuring dropped these three routes'
+      // permanent nav entry - the stat cards are now their real way
+      // back, not just a status glance.
+      for (const [label, href] of [
+        ["Updates", "/next/updates"],
+        ["Repairs", "/next/repairs"],
+        ["Engines", "/next/engines"],
+      ] as const) {
+        const card = Array.from(document.querySelectorAll("a")).find((a) => a.textContent?.includes(label));
+        expect(card).toBeDefined();
+        expect(card!.getAttribute("href")).toBe(href);
+      }
     } finally {
       restore();
     }
@@ -108,7 +133,11 @@ describe("NextDashboardPage", () => {
       turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
     });
     try {
-      renderWithQueryClient(<NextDashboardPage person={makePerson()} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextDashboardPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("People"));
       expect(document.body.textContent).not.toContain("Repairs");
       expect(document.body.textContent).not.toContain("Engines");
@@ -125,7 +154,11 @@ describe("NextDashboardPage", () => {
       turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
     });
     try {
-      renderWithQueryClient(<NextDashboardPage person={makePerson()} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextDashboardPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Recent activity"));
       expect(document.body.textContent).toContain("chat");
       expect(document.body.textContent).not.toContain("Nothing yet");
@@ -142,7 +175,11 @@ describe("NextDashboardPage", () => {
       turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
     });
     try {
-      renderWithQueryClient(<NextDashboardPage person={makePerson()} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextDashboardPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Nothing yet"));
     } finally {
       restore();
@@ -159,7 +196,11 @@ describe("NextDashboardPage", () => {
       engines: null,
     });
     try {
-      renderWithQueryClient(<NextDashboardPage person={makePerson()} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextDashboardPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Engines"));
       expect(document.body.textContent).toContain("No Stack");
     } finally {

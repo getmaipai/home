@@ -3,6 +3,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@maipai/ui/src/dashboa
 import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
+import { NextManageSection } from "@/next/pages/settings/NextManageSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 /** /next/settings: SHELL-05's own row (docs/plans/shell-on-shadcndashboard-
@@ -16,13 +17,16 @@ import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
  *
  * Out of scope, named here rather than silently dropped: the retired
  * "one section tree" redesign (docs/dev/session-a-settings-rulings-
- * 2026-09-21.md) - link-out cards to Users/Models/Backups/Voices/
- * Commands/Devices/Repairs/Updates, the Privacy things-table, Voice's
- * top-choices row, `@modified`/search filtering. This row is the
- * registry-driven keys only, the same ones `SettingsRenderer.tsx`
- * already draws inline on the old page; every dedicated management
- * page (VOICE-BROWSER-01 among them) stays reachable only from the old
- * shell until its own row moves it. */
+ * 2026-09-21.md) - link-out cards to Users/Models/Voices/Commands/
+ * Devices, the Privacy things-table, Voice's top-choices row,
+ * `@modified`/search filtering. This row is the registry-driven keys
+ * only, the same ones `SettingsRenderer.tsx` already draws inline on
+ * the old page; every dedicated management page (VOICE-BROWSER-01
+ * among them) stays reachable only from the old shell until its own
+ * row moves it - Backups/Repairs/Updates/Engines are the one exception
+ * (`NextManageSection`, below): ui-v0.5.23's rail restructuring dropped
+ * their permanent nav entry, so the Household tab's own bottom section
+ * is now their real way back, not a settings key at all. */
 export function NextSettingsPage({ person }: { person: Roster }) {
   const canManageHousehold = isOwnerOrAdminRole(person.role);
   const [tab, setTab] = useState<"household" | "me">(canManageHousehold ? "household" : "me");
@@ -44,6 +48,7 @@ export function NextSettingsPage({ person }: { person: Roster }) {
           </TabsList>
           <TabsContent value="household" className="flex flex-col gap-4">
             <NextSettingsRenderer scope="household" scopeValue="household" />
+            <NextManageSection />
           </TabsContent>
           <TabsContent value="me" className="flex flex-col gap-4">
             <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
