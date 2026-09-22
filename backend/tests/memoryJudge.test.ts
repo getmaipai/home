@@ -1036,6 +1036,25 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
     expect(turnSignalOf(disclosure)?.clauses.map((c) => c.act)).toEqual(["directive", "inform"]);
     expect(judgeQueueStats().pending).toBe(1);
 
+    // ADMIN-COMPARE-01 (b): a bare-mode turn is a diagnostic, never
+    // remembered. logTurn() marks it judgeStatus: "skipped" at write
+    // time (the same as `closing`/`question`/`bare` above), but
+    // pendingTurnWhere() also excludes it by eq(bare, false) directly -
+    // proven here by constructing a row that carries a real, judge-
+    // eligible signal AND bare: true AND a null judgeStatus (the state
+    // a write path that forgot the explicit skip would leave), so only
+    // the bare exclusion, not the judgeStatus one, could be keeping it
+    // out of the queue.
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error("setup failed");
+    const bareTurnId = "turn-bare-judge-gate";
+    const bareSignal = classifyTurnSignal({ text: "I prefer oat milk, always have", commandOpeners: new Set(["add"]), ageBand: "adult" });
+    logTurn(actor, "chat", "I prefer oat milk, always have", { reply: { text: "Noted." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: bareTurnId }, { signal: bareSignal, bare: true });
+    const bareRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, bareTurnId)).get()!;
+    expect(bareRow.bare).toBe(true);
+    expect(bareRow.judgeStatus).toBeNull();
+    expect(judgeQueueStats().pending).toBe(1); // unchanged - the bare row never joins the queue despite its own eligible signal and null judgeStatus
+
     const results = await withScriptedJudge(
       (_schemaName, request) => {
         const userText = request.messages[request.messages.length - 1]!.content;

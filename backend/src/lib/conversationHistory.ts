@@ -358,7 +358,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -399,6 +399,10 @@ export function logTurn(
     commandId: value.command_id ?? null,
     safetyFlagged: value.safety.flagged,
     safetyAction: value.safety.action,
+    // ADMIN-COMPARE-01 (b): the durable record of which turns ran the
+    // bare-mode bypass - the switch itself is ephemeral, this column is
+    // not.
+    bare: opts.bare ?? false,
     // Session C step 7: real age-band accuracy, not the role proxy -
     // the same fix evaluateSafety() itself got. Uses the safety check's
     // own timestamp rather than a fresh `new Date()` so this reflects

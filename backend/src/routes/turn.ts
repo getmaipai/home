@@ -3,6 +3,8 @@ import { bodyLimit } from "hono/body-limit";
 import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
+import { runBareTurnStream, BareModeForbidden } from "@/lib/turnBareStream";
+import { isOwnerOrAdmin } from "@/lib/access";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -487,6 +489,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     ephemeral?: boolean;
     speaker_evidence?: unknown;
     present?: unknown;
+    bare?: boolean;
   };
   if (body.resume_token !== undefined) {
     const session = typeof body.resume_token === "string" ? resumeSessions.get(body.resume_token) : undefined;
@@ -526,20 +529,38 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   // but a dropped response body only detaches its subscriber. The explicit
   // cancel route fires this signal when the person really stops the turn.
   const abortController = new AbortController();
-  const result = await runTurnStream(actor, surface, body.text ?? "", {
-    thinking: body.thinking,
-    conversationId: body.conversation_id,
-    supersedes: body.supersedes,
-    continuation: body.continuation_text === undefined ? undefined : { fromTurnId: body.continuation_of, assistantText: body.continuation_text },
-    // A widget's own fixed-utterance query (Home's weather card), never a
-    // household member's own words: skips logTurnSafely() only, so it
-    // never lands in a person's real chat history or the episode store,
-    // while still going through the exact same model/safety/reply path a
-    // typed message does (getmaipai/home BACKLOG, found 2026-09-11).
-    ephemeral,
-    signal: abortController.signal,
-    ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
-  });
+  // ADMIN-COMPARE-01 (b): a route-level branch, never a condition inside
+  // runTurnStream()/turnEngine.ts itself - checked here (the normal,
+  // clean-403 path) even though runBareTurnStream() asserts the
+  // identical two things again on its own (the structural backstop, not
+  // the primary gate).
+  if (body.bare === true) {
+    if (!isOwnerOrAdmin(actor)) return c.json({ error: "bare mode is owner/admin only" }, 403);
+    if (speakerAgeBand(actor, new Date()) !== "adult") return c.json({ error: "bare mode is not available to a minor" }, 403);
+  }
+  let result: TurnStreamResult;
+  try {
+    result =
+      body.bare === true
+        ? await runBareTurnStream(actor, body.text ?? "", body.conversation_id, abortController.signal)
+        : await runTurnStream(actor, surface, body.text ?? "", {
+            thinking: body.thinking,
+            conversationId: body.conversation_id,
+            supersedes: body.supersedes,
+            continuation: body.continuation_text === undefined ? undefined : { fromTurnId: body.continuation_of, assistantText: body.continuation_text },
+            // A widget's own fixed-utterance query (Home's weather card), never a
+            // household member's own words: skips logTurnSafely() only, so it
+            // never lands in a person's real chat history or the episode store,
+            // while still going through the exact same model/safety/reply path a
+            // typed message does (getmaipai/home BACKLOG, found 2026-09-11).
+            ephemeral,
+            signal: abortController.signal,
+            ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
+          });
+  } catch (err) {
+    if (err instanceof BareModeForbidden) return c.json({ error: err.message }, 403);
+    throw err;
+  }
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }

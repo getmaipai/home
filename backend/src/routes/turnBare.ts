@@ -15,8 +15,8 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { db } from "@/db";
 import { conversations, conversationTurns, people } from "@/db/schema";
 import { buildConversationWindow, toConversationRecord } from "@/lib/conversationHistory";
-import { startCompleteStream, type LlmMessage } from "@/lib/llm";
-import { gateOutputSafety, StreamSafetyRefusal } from "@/lib/turnEngine";
+import { startBareCompletion } from "@/lib/bareCompletion";
+import { StreamSafetyRefusal } from "@/lib/turnEngine";
 import { resolvePersona, composePersonaPrompt } from "@/lib/persona";
 import { getPersonSettingValue } from "@/lib/settings";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
@@ -24,8 +24,6 @@ import { apiRouter } from "@/lib/openapi";
 import type { BareCompareEvent, BareCompareTrace, TurnStats } from "@/wire";
 
 export const turnBareRoutes = apiRouter();
-
-const BARE_SYSTEM_PROMPT = "You are a helpful assistant.";
 
 const encoder = new TextEncoder();
 function ndjsonLine(event: BareCompareEvent): Uint8Array {
@@ -87,9 +85,12 @@ turnBareRoutes.post("/", requireAuth, async (c) => {
   // since it (if this isn't the conversation's newest) right in the
   // window alongside it.
   const window = buildConversationWindow(conversation, { excludeTurnId: turnId, beforeCreatedAt: turnRow.createdAt });
-  const messages: LlmMessage[] = [{ role: "system", content: BARE_SYSTEM_PROMPT }, ...window.messages, { role: "user", content: turnRow.userText }];
-
-  const started = await startCompleteStream("chat", messages, { thinking: true });
+  // startBareCompletion() already runs gateOutputSafety() internally,
+  // age-banded off `speakerRow` (the original turn's own speaker, not
+  // the admin doing the comparing) - the same call this route made
+  // inline before the extraction, now the one place either bare-mode
+  // caller can get it from.
+  const started = await startBareCompletion(window.messages, turnRow.userText, speakerRow, turnId);
   if (!started.ok) {
     return c.json({ error: started.error, code: started.code }, started.status);
   }
@@ -112,16 +113,11 @@ turnBareRoutes.post("/", requireAuth, async (c) => {
       controller.enqueue(ndjsonLine({ type: "trace", trace }));
       const thinkState = newThinkSplitState();
       try {
-        // The minor safety pass: unconditional, never gated on bare mode
-        // itself - the same gateOutputSafety() a real turn's own stream
-        // runs, age-banded off the original speaker via `actor` here.
-        // The original turnId rides along too, the same as every real
-        // turn's own call - it's only used to dedupe a parent
-        // notification per turn (notifyOncePerTurn), not written
-        // anywhere, so reusing the real id a flagged sentence here
-        // dedupes correctly instead of notifying once per sentence.
-        const gated = gateOutputSafety(started.tokens, speakerRow, turnId);
-        for await (const chunk of gated) {
+        // The minor safety pass already ran, inside startBareCompletion()
+        // - unconditional, never gated on bare mode itself, age-banded
+        // off the original speaker. `started.tokens` is that gated
+        // stream, not raw model output.
+        for await (const chunk of started.tokens) {
           for (const span of feedThinkSplit(thinkState, chunk)) {
             controller.enqueue(ndjsonLine(span.reasoning ? { type: "reasoning", text: span.text } : { type: "delta", text: span.text }));
           }

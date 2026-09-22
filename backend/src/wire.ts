@@ -180,6 +180,12 @@ export interface TurnValue {
   artifact?: { id: string; version: number };
   /** STATS-01: optional adult-only engine telemetry, never required. */
   stats?: TurnStats;
+  /** ADMIN-COMPARE-01 (b): true when this turn ran the bare-mode bypass
+   * (no persona, no routing, no packages - the minor safety pass always
+   * runs regardless). Additive and unset on every turn before this;
+   * `conversation_turns.bare` is the same signal on a reloaded history
+   * row, so a caller need not distinguish a live turn from a reload. */
+  bare?: boolean;
   /** REASONING-02: the reasoning that led to a tool call, on a turn
    * that resolved to one (peekAndHandle()'s streaming path, runTurn()'s
    * blocking twin) - the same tag-stripped string a live `reasoning`

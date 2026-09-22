@@ -50,6 +50,12 @@ export interface ChatModelAdapterDeps {
   onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
   onSpeechError?(): void;
   consumeThinking(): boolean;
+  // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - unlike
+  // `consumeThinking()`, bare mode is meant to stay on across every send
+  // in the conversation until the admin turns it off themselves
+  // (NextChatPage.tsx's own ephemeral, session-local switch). Undefined
+  // for any surface that never offers it.
+  isBareMode?(): boolean;
   // getmaipai/home#60: reads AND resets the "which turn is this Update
   // replacing" ref that thread.aui.tsx's EditComposer sets right before
   // its own Send click reaches assistant-ui's real send callback
@@ -307,8 +313,23 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         let conversationId = await deps.getConversationId?.();
         abortSignal.throwIfAborted();
         while (!sawTerminalEvent) {
+          const bare = deps.isBareMode?.() ?? false;
+          // A review caught this: consumeThinking() isn't a pure read -
+          // it resets the composer's own Instant/Thinking selection
+          // (NextChatPage.tsx). Bare mode's own completion ignores
+          // `thinking` entirely (bareCompletion.ts hardcodes it on), so
+          // calling this for a bare send used to flip the composer back
+          // to Instant for a value the request never even looked at -
+          // a confusing side effect on a choice this send didn't use.
           const response = await api.streamTurn(text, abortSignal, {
-            thinking: reconnectAttempts === 0 ? deps.consumeThinking() : undefined,
+            thinking: reconnectAttempts === 0 && !bare ? deps.consumeThinking() : undefined,
+            // `undefined`, not `false`, when a surface has no bare-mode
+            // concept at all (ChatPage.tsx's own adapter never sets
+            // isBareMode) - `false` would still ride the request body
+            // (JSON.stringify only drops `undefined`), a field on every
+            // surface's request that only NextChatPage's own admin
+            // diagnostic ever means anything.
+            bare: bare || undefined,
             conversationId,
             supersedes,
             continuation,
@@ -572,6 +593,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   media: event.value.media,
                   media_items: (event.value as TurnWithMedia).media_items,
                   stats: event.value.stats,
+                  bare: event.value.bare === true,
                 },
               },
             };

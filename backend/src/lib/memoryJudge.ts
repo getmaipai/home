@@ -1476,7 +1476,13 @@ function isSkippedTurn(turnId: string): boolean {
 // leave a stale "running" row queryable here for longer than the lease
 // gate covers. Excluded here directly rather than relying on that timing.
 function pendingTurnWhere() {
-  return and(or(isNotNull(conversationTurns.signal), eq(conversationTurns.source, "model")), isNull(conversationTurns.judgeStatus), eq(conversationTurns.status, "done"), notInArray(conversationTurns.id, supersededTurnIdsQuery()));
+  // ADMIN-COMPARE-01 (b): a bare turn is a diagnostic, not something the
+  // household should remember - `logTurn()` marks it `judgeStatus:
+  // "skipped"` at insert (the same "ineligible ones skipped at insert"
+  // pattern this comment block already describes), so `isNull(judgeStatus)`
+  // alone already excludes it; `eq(bare, false)` here is a second, direct
+  // guard that stays correct even if a future write path forgets that.
+  return and(or(isNotNull(conversationTurns.signal), eq(conversationTurns.source, "model")), isNull(conversationTurns.judgeStatus), eq(conversationTurns.status, "done"), eq(conversationTurns.bare, false), notInArray(conversationTurns.id, supersededTurnIdsQuery()));
 }
 function markSkipped(turnId: string): void {
   db.update(conversationTurns).set({ judgeStatus: "skipped", hlc: nextHlc() }).where(and(eq(conversationTurns.id, turnId), isNull(conversationTurns.judgeStatus))).run();

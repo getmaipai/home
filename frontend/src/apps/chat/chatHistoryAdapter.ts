@@ -167,6 +167,7 @@ export function rowsToBranchableMessages(
           media: row.media,
           media_items: row.media_items,
           stats: row.stats,
+          bare: row.bare,
         },
       },
     };

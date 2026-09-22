@@ -1426,4 +1426,103 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
       restore();
     }
   });
+
+  test("a non-admin household member never sees the bare-mode switch either", async () => {
+    const restore = stubCompareFetch([]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makeAdultPerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      await openMoreMenu(view);
+      expect(await view.findByText("Export as Markdown")).toBeVisible();
+      expect(view.queryByText("Turn on bare mode for this conversation")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("the switch turns on the persistent banner (no dismiss control) and carries bare: true on the next request", async () => {
+    // Radix's DropdownMenu (ActionBarMorePrimitive underneath) is flaky
+    // to reopen a second time in happy-dom (chatMemoryChip.test.tsx's
+    // own established finding) - this test opens the menu exactly once,
+    // matching that precedent, rather than reopening to also assert the
+    // item's own label flip or the off-path, which the toggle's own
+    // trivial symmetry (BareModeContext's `toggle` is a plain boolean
+    // flip) doesn't need a second, flake-prone round trip to prove.
+    const restore = stubCompareFetch([]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      await view.findByText("It's sunny.");
+      expect(view.queryByText("Bare mode is on")).toBeNull();
+      await openMoreMenu(view);
+      fireEvent.click(await view.findByText("Turn on bare mode for this conversation"));
+      // COORDINATOR, 2026-09-22: "a persistent visible marker... not a
+      // toast" - present, role="status", and (the real point) no button
+      // anywhere in it to dismiss it - the switch is the only way off.
+      const banner = (await view.findByText("Bare mode is on")).closest('[role="status"]') as HTMLElement;
+      expect(banner).toBeVisible();
+      expect(within(banner).queryByRole("button")).toBeNull();
+
+      // Sending now must carry bare: true on the real request - the
+      // LAST matching call, since the first send (above, bare mode
+      // still off) also hit this same URL. sendMessage() only awaits
+      // the click, not the reply, so the fetch itself can still be a
+      // tick away when it returns - waited for directly rather than
+      // raced.
+      await sendMessage(view, "and now?");
+      const streamCallsFor = () => (globalThis.fetch as unknown as { mock: { calls: [RequestInfo | URL, RequestInit | undefined][] } }).mock.calls.filter(([input]) => (typeof input === "string" ? input : input.toString()).includes("/api/turn/stream"));
+      await waitFor(() => expect(streamCallsFor().length).toBeGreaterThan(1));
+      const streamCalls = streamCallsFor();
+      const sentBody = JSON.parse((streamCalls[streamCalls.length - 1]![1]!.body as string) ?? "{}");
+      expect(sentBody.bare).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  test("a bare turn's own reply carries the bare-model badge", async () => {
+    const restore = stubCompareFetch([]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather");
+      await view.findByText("It's sunny.");
+      expect(view.queryByText("Bare model")).toBeNull();
+      await openMoreMenu(view);
+      fireEvent.click(await view.findByText("Turn on bare mode for this conversation"));
+      globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-compare123", status: "open", surface: "chat" }));
+        if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+        if (url.includes("/api/turn/stream")) {
+          return Promise.resolve(
+            new Response(
+              ndjsonStream([
+                { type: "delta", text: "The bare model says hi." },
+                { type: "done", value: { turn_id: "turn-bare999", conversation_id: "conv-compare123", reply: { text: "The bare model says hi." }, source: "model", safety: SAFETY, bare: true } },
+              ]),
+              { status: 200, headers: { "content-type": "application/x-ndjson" } },
+            ),
+          );
+        }
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }) as unknown as typeof fetch;
+      await sendMessage(view, "and now?");
+      await view.findByText("The bare model says hi.");
+      expect(await view.findByText("Bare model")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
 });

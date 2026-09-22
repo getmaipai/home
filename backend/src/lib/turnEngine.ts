@@ -139,7 +139,9 @@ export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
  * duplication class this file's own notifyIfFlagged() extraction just
  * fixed for the notify_parent blocks). Both callers' own failure shape is
  * this identical TurnFailure, so one function serves either. */
-function validateTurnInput(surface: Surface, text: string): TurnFailure | null {
+// Exported for turnBareStream.ts (ADMIN-COMPARE-01 b): the identical
+// surface/length checks every turn gets, unrelated to persona/routing.
+export function validateTurnInput(surface: Surface, text: string): TurnFailure | null {
   if (!IMPLEMENTED_SURFACES.has(surface)) {
     return { ok: false, status: 400, code: "unsupported_surface", error: `the ${surface} surface is not implemented on this host build yet (4.5)` };
   }
@@ -431,7 +433,12 @@ const CRISIS_RESOURCES_TEXT =
  * side's" had no non-streaming twin, leaving runTurn() with the
  * identical silent-drop bug the review's other finding had just fixed
  * in the stream. */
-function deriveCrisisResources(safety: SafetyResult): string | undefined {
+// Exported for turnBareStream.ts (ADMIN-COMPARE-01 b): crisis resources
+// ("offer, never block") are the safety floor's own promise, not a
+// persona flavor, so a bare turn's own minimal finalize still needs
+// this - unlike finalizeReply() below, which a bare turn must NOT call
+// (it persona-varies refusal and constant-reply text).
+export function deriveCrisisResources(safety: SafetyResult): string | undefined {
   // CHAT-02: the crisis text follows the self_harm category, not only the
   // allow_with_resources action, so a refused reply that also mentioned
   // self-harm keeps its resources ("offer, never block").

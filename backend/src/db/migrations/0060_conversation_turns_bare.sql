@@ -1,0 +1,1 @@
+ALTER TABLE `conversation_turns` ADD `bare` integer DEFAULT false NOT NULL;

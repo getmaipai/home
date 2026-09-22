@@ -374,6 +374,16 @@ export const conversationTurns = sqliteTable(
     commandId: text("command_id"),
     safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
     safetyAction: text("safety_action").notNull(), // "allow" | "allow_with_resources" | "refuse"
+    // ADMIN-COMPARE-01 (b): true when this turn ran the bare-mode
+    // bypass (no persona, no routing, no packages - the minor safety
+    // pass is never part of the bypass, it runs unconditionally either
+    // way). The switch itself is ephemeral, session-local React state
+    // on the admin's own screen, never persisted or synced - this
+    // column is the durable record of which turns were bare, written
+    // once at logTurn() time, never derived or backfilled later.
+    // Hub-internal like judgeStatus/outcomes/stats below, not part of
+    // the synced conversation record.
+    bare: integer("bare", { mode: "boolean" }).notNull().default(false),
     // Captured at write time, not re-derived by joining to `people` later:
     // a person's role can change, and this must reflect who they were when
     // they spoke, the same "recorded, not recomputed" reasoning

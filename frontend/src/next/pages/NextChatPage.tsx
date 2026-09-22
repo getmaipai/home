@@ -21,7 +21,8 @@ import { ComposerMenu, ComposerModelItem, ComposerModelTrigger } from "@maipai/u
 // row.
 import { Button as ElementsButton } from "@maipai/ui/src/elements/ui/button";
 import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, CanvasSplitLine, CanvasSplitMessage, CanvasSplitThread } from "@maipai/ui/src/elements/canvas-split";
-import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
@@ -138,6 +139,14 @@ const ThinkingModeContext = createContext<{
   setMode: (mode: "instant" | "thinking") => void;
 }>({ mode: "instant", setMode: () => {} });
 
+/** ADMIN-COMPARE-01 (b): the compare-with-bare-model switch, a
+ * conversation-wide sibling to feature (a)'s one-message
+ * `CompareOpenContext` above - same menu, same concept family
+ * (COORDINATOR, 2026-09-22: "(a) is 'compare this one message', (b) is
+ * 'compare everything from here on'"). Session-local only; see
+ * `useNextChatRuntime`'s own `bareMode` state for why. */
+const BareModeContext = createContext<{ on: boolean; toggle: () => void }>({ on: false, toggle: () => {} });
+
 const THINKING_MODE_LABEL: Record<"instant" | "thinking", string> = { instant: "Instant", thinking: "Thinking" };
 const THINKING_MODE_OPTIONS: readonly { key: "instant" | "thinking" }[] = [{ key: "instant" }, { key: "thinking" }];
 
@@ -250,10 +259,37 @@ function MessageDetailsMenuItem() {
   );
 }
 
+/** ADMIN-COMPARE-01 (b): the conversation-wide sibling to
+ * CompareWithBareModelMenuItem above, same menu, same concept family
+ * (COORDINATOR, 2026-09-22). Admin-only for the identical reason - the
+ * backend 403s a non-admin's `bare: true` request regardless, this is
+ * convenience. Unlike Compare above, this one doesn't need a
+ * per-message turnId: it toggles a conversation-wide switch, so it
+ * renders (and reads the same on-state) on every assistant message's
+ * own menu. */
+function BareModeSwitchMenuItem() {
+  const isAdmin = useContext(AdminContext);
+  const { on, toggle } = useContext(BareModeContext);
+  if (!isAdmin) return null;
+  return (
+    <ActionBarMorePrimitive.Item
+      className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
+      onSelect={(e) => {
+        e.preventDefault();
+        toggle();
+      }}
+    >
+      <CompareIcon className="size-4" />
+      {on ? "Turn off bare mode for this conversation" : "Turn on bare mode for this conversation"}
+    </ActionBarMorePrimitive.Item>
+  );
+}
+
 function AssistantMoreItems() {
   return (
     <>
       <CompareWithBareModelMenuItem />
+      <BareModeSwitchMenuItem />
       <MessageDetailsMenuItem />
     </>
   );
@@ -569,13 +605,33 @@ function MessageDetailsReveal() {
   );
 }
 
-// One `AssistantMessageFooterExtra` slot, two independent reveals
-// (sources, Details) - each keyed by its own turnId-scoped open state
-// and rendering (or not) on its own, so this wrapper is pure
-// composition, no shared logic between the two.
+/** ADMIN-COMPARE-01 (b): "the conversation history's own 'bare model'
+ * badge on the message" - reads straight off the turn's own metadata
+ * (chatModelAdapter.ts's live done-event mapping and
+ * chatHistoryAdapter.ts's reload-path row both carry `bare`, the same
+ * `conversation_turns.bare` column either way), so the badge shows
+ * whether a live turn or one scrolled back to. No admin gate needed: a
+ * bare turn can only ever exist inside a conversation the admin who
+ * triggered it owns (resolveOrCreateConversation()'s own per-actor
+ * check), so no other household member's history can ever carry one. */
+function BareModelBadge() {
+  const bare = useAuiState((s) => s.message.metadata?.custom?.bare === true);
+  if (!bare) return null;
+  return (
+    <Badge variant="destructive" className="mb-1">
+      Bare model
+    </Badge>
+  );
+}
+
+// One `AssistantMessageFooterExtra` slot, three independent reveals
+// (the bare-model badge, sources, Details) - each keyed by its own
+// state and rendering (or not) on its own, so this wrapper is pure
+// composition, no shared logic between them.
 function MessageFooterExtra() {
   return (
     <>
+      <BareModelBadge />
       <SourcesFooterContent />
       <MessageDetailsReveal />
     </>
@@ -831,6 +887,17 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   const [thinking, setThinking] = useState(false);
   const thinkingRef = useRef(false);
   thinkingRef.current = thinking;
+  // ADMIN-COMPARE-01 (b): bare mode. Deliberately session-local, never
+  // consumed/reset per turn the way `thinking` is - it stays on for
+  // every send until the admin turns it off, or the conversation
+  // changes (below), whichever comes first. COORDINATOR's own ruling:
+  // a mode that silently changes what the assistant IS must not be
+  // able to outlive the investigation that turned it on - reloading
+  // the page or switching conversations both end that investigation,
+  // so neither carries it forward.
+  const [bareMode, setBareMode] = useState(false);
+  const bareModeRef = useRef(false);
+  bareModeRef.current = bareMode;
 
   const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
 
@@ -855,6 +922,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
             return value;
           },
           consumeSupersedes: () => undefined,
+          isBareMode: () => bareModeRef.current,
           onCrisisResources: setBanner,
           turnSchedulerRef,
           speakReplies: false,
@@ -882,10 +950,13 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     onThreadIdChange: (id) => {
       setSearchParams(id ? { conversation: id } : {}, { replace: true });
       closeSheet();
+      // A different conversation is a different investigation - bare
+      // mode never silently follows the switch.
+      setBareMode(false);
     },
   });
 
-  return { runtime, banner, thinking, setThinking };
+  return { runtime, banner, thinking, setThinking, bareMode, setBareMode };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1118,7 +1189,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, bareMode, setBareMode } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1130,6 +1201,7 @@ export function NextChatPage({ person }: { person: Roster }) {
     }),
     [thinking, setThinking],
   );
+  const bareModeValue = useMemo(() => ({ on: bareMode, toggle: () => setBareMode((value) => !value) }), [bareMode, setBareMode]);
   // One base element, rendered at the phone/tablet Sheet and the
   // collapsed rail's own peek overlay - ChatPage.tsx's own fix for
   // exactly this (a code review caught two call sites drifting once one
@@ -1367,6 +1439,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <SourcesOpenContext.Provider value={sourcesOpenValue}>
       <DetailsOpenContext.Provider value={detailsOpenValue}>
       <ThinkingModeContext.Provider value={thinkingModeValue}>
+      <BareModeContext.Provider value={bareModeValue}>
         <StructuredResultTools />
         <ArtifactTool />
         <ToolTimelineTool />
@@ -1399,6 +1472,19 @@ export function NextChatPage({ person }: { person: Roster }) {
               <HistoryIcon className="size-4" />
             </Button>
           </div>
+          {bareMode ? (
+            // COORDINATOR, 2026-09-22: "while it is on, it is obvious...
+            // a persistent visible marker on the conversation for as
+            // long as bare mode is active, not a toast." No dismiss
+            // control - the switch itself is the only way off, the same
+            // way the wake-word invariants treat a mode that changes
+            // behavior.
+            <Alert variant="destructive" className="mx-4 mt-2 mb-2" role="status">
+              <CompareIcon className="size-4" />
+              <AlertTitle>Bare mode is on</AlertTitle>
+              <AlertDescription>Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards.</AlertDescription>
+            </Alert>
+          ) : null}
           {banner ? (
             <Alert className="mx-4 mt-2 mb-2">
               <AlertDescription>{banner}</AlertDescription>
@@ -1556,6 +1642,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
           </SheetContent>
         </Sheet>
+      </BareModeContext.Provider>
       </ThinkingModeContext.Provider>
       </DetailsOpenContext.Provider>
       </SourcesOpenContext.Provider>
