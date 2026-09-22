@@ -82,6 +82,23 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai",
     honoured_by: ["home"],
   }),
+  // U2 (docs/plans/turn-machine-state-record-2026-09-22.md, "The
+  // setting"): off keeps runTurnStream() (turnEngine.ts); on runs the
+  // new turnNext.ts machine instead. The route reads it per turn; the
+  // flip (U6) changes the default only. honoured_by carries "bot" too
+  // (the design record's own words) since the robot runs the identical
+  // machine, just with model_transitions off in its budget record.
+  SettingsKey.parse({
+    key: "turn.pipeline.next",
+    scope: "household",
+    selector: "boolean",
+    default: false,
+    label: "Use the new reply engine",
+    help: "Off keeps today's engine. On uses the rebuilt one; it must pass the same tests on this hub before it becomes the default.",
+    level: "advanced",
+    lives_in: "household.ai",
+    honoured_by: ["home", "bot"],
+  }),
   SettingsKey.parse({
     key: "engines.stack.url",
     scope: "household",
