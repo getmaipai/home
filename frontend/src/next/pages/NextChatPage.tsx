@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ToolCallMessagePartComponent } from "@assistant-ui/react";
@@ -8,6 +8,8 @@ import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, CanvasSplitLine, CanvasSplitMessage, CanvasSplitThread } from "@maipai/ui/src/elements/canvas-split";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@maipai/ui/src/dashboard/components/ui/hover-card";
+import { Button as DashboardButton } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -200,12 +202,21 @@ function ArtifactCanvasPanel({ artifactId, onClose }: { artifactId: string; onCl
 // (radix-ui's composeEventHandlers, confirmed in the installed
 // package) - both fire, so this changes nothing about starting a new
 // thread itself.
-function NextThreadList({ onNewThread }: { onNewThread: () => void }) {
+// CHAT-UI-02: the desktop rail-collapse toggle rides in this row,
+// beside New Thread, rather than a row of its own above the column -
+// `collapseToggle` is only ever passed by the persistent desktop rail's
+// own instance (the mobile Sheet and the collapsed-rail's peek overlay
+// render this same component without it, since neither has a "collapse"
+// of its own to offer).
+function NextThreadList({ onNewThread, collapseToggle }: { onNewThread: () => void; collapseToggle?: ReactNode }) {
   const [search, setSearch] = useState("");
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
   return (
     <ThreadListRoot>
-      <ThreadListNew onClick={onNewThread} />
+      <div className="flex items-center gap-1">
+        <ThreadListNew onClick={onNewThread} className="flex-1" />
+        {collapseToggle}
+      </div>
       {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />
     </ThreadListRoot>
@@ -275,20 +286,32 @@ function ArtifactCacheInvalidator() {
 export function NextChatPage({ person }: { person: Roster }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
-  // CHAT-UI-01 finding 4: a ChatGPT-style collapse for the desktop
-  // thread-list column. The shipped Sidebar primitive's own collapsible
-  // modes (threadlist-sidebar.aui.tsx's own composition) render
-  // `position: fixed` against the viewport's own left edge - built for
-  // being the page's ONE top-level sidebar, not a second column nested
-  // beside one that's already there (it would render under or over the
-  // app rail, not after it). Nothing here forks that primitive or
-  // hand-builds a new one: this toggles the same plain column this file
-  // already had, the identical pattern `sheetOpen` already uses for the
-  // phone/tablet Sheet. No hover-peek: the primitive has no such mode to
-  // reach for at all (`SidebarRail`'s own hover only tints its divider
-  // line), so per the instruction that named this gap, it's left
-  // unbuilt rather than hand-rolled.
+  // CHAT-UI-01 finding 4 / CHAT-UI-02: a ChatGPT-style collapse for the
+  // desktop thread-list column. The shipped Sidebar primitive's own
+  // collapsible modes (threadlist-sidebar.aui.tsx's own composition)
+  // render `position: fixed` against the viewport's own left edge -
+  // built for being the page's ONE top-level sidebar, not a second
+  // column nested beside one that's already there (it would render
+  // under or over the app rail, not after it). Nothing here forks that
+  // primitive or hand-builds a new one: this toggles the same plain
+  // column this file already had, the identical pattern `sheetOpen`
+  // already uses for the phone/tablet Sheet. Collapsed, hover-to-peek
+  // (CHAT-UI-02, a ruled requirement) is the shipped `HoverCard`
+  // (`@base-ui/react/preview-card` underneath) around the same toggle,
+  // not hand-rolled mouseenter/mouseleave state - a review on the first
+  // draft's own hand-rolled version caught real bugs the shipped
+  // primitive doesn't have: a dead zone in the gap between the button
+  // and the floating panel (a plain wrapper's hover box excludes an
+  // absolutely positioned descendant, so the pointer crossing that gap
+  // read as leaving), and no keyboard/focus equivalent at all. Base UI's
+  // own hover interaction (floating-ui's safe-polygon logic) closes both
+  // gaps for free - `railPeeked` itself is still just a mirror of that,
+  // not a second implementation of it: `onOpenChange` reports Base UI's
+  // own computed open state (hover, focus, or close, whichever reason),
+  // kept only so `aria-expanded` on the trigger can be accurate, the
+  // same contract the open-state toggle beside New Thread already has.
   const [railCollapsed, setRailCollapsed] = useState(false);
+  const [railPeeked, setRailPeeked] = useState(false);
   // A code review caught this: switching threads (onThreadIdChange,
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
@@ -297,12 +320,25 @@ export function NextChatPage({ person }: { person: Roster }) {
     setSheetOpen(false);
     setOpenArtifactId(null);
   });
-  // One element, rendered at both the desktop rail and the phone/tablet
-  // Sheet below - ChatPage.tsx's own fix for exactly this (a code
-  // review caught the two call sites drifting once one grew props the
-  // other didn't).
+  // One base element, rendered at the phone/tablet Sheet and the
+  // collapsed rail's own peek overlay - ChatPage.tsx's own fix for
+  // exactly this (a code review caught two call sites drifting once one
+  // grew props the other didn't). The persistent desktop rail gets its
+  // own instance below, since it alone carries the collapse toggle.
   const threadList = <NextThreadList onNewThread={() => setSheetOpen(false)} />;
   const closeArtifact = () => setOpenArtifactId(null);
+  const railToggle = (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Hide conversations"
+      aria-expanded={!railCollapsed}
+      aria-controls="next-chat-rail"
+      onClick={() => setRailCollapsed(true)}
+    >
+      <PanelLeftIcon className="size-4" />
+    </Button>
+  );
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -319,12 +355,16 @@ export function NextChatPage({ person }: { person: Roster }) {
             the composer bouncing. The thread viewport (Thread's own
             child) stays the only real scroller on this page. */}
         <div data-slot="next-chat-shell" className="flex h-[calc(100vh-140px)] flex-col overflow-hidden">
-          <div className="flex items-center gap-1 border-b border-border pb-2">
-            <Button variant="ghost" size="icon" className="lg:hidden" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
+          {/* CHAT-UI-02: the desktop collapse toggle used to live in this
+              row on its own, above the column, wasting a full row that
+              only ever showed one button (this row's OTHER button, the
+              mobile Sheet trigger, is `lg:hidden` - nothing here has ever
+              been visible on desktop). It now rides inside the column's
+              own top row (NextThreadList, open) or floats over the chat
+              area (collapsed), so this row is mobile-only. */}
+          <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
+            <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
               <HistoryIcon className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="hidden lg:flex" aria-label={railCollapsed ? "Show conversations" : "Hide conversations"} aria-expanded={!railCollapsed} aria-controls="next-chat-rail" onClick={() => setRailCollapsed((collapsed) => !collapsed)}>
-              <PanelLeftIcon className="size-4" />
             </Button>
           </div>
           {banner ? (
@@ -346,9 +386,51 @@ export function NextChatPage({ person }: { person: Roster }) {
                 already used for the phone/tablet breakpoint split), so
                 the id always exists. */}
             <div id="next-chat-rail" className={cn("w-64 shrink-0 overflow-y-auto border-r border-border pr-2", railCollapsed ? "hidden" : "hidden lg:block")}>
-              {threadList}
+              <NextThreadList onNewThread={() => setSheetOpen(false)} collapseToggle={railToggle} />
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="relative min-w-0 flex-1">
+              {/* CHAT-UI-02: collapsed, the same toggle floats top-left
+                  over the thread's own top padding instead of a row.
+                  HoverCard (Base UI's PreviewCard) drives the peek: it
+                  opens on hover AND focus, closes on pointer-leave with
+                  no dead zone between trigger and content (floating-ui's
+                  safe-polygon tracking, not a hand-rolled mouseenter/
+                  mouseleave pair). `open`/`onOpenChange` are controlled
+                  only so `aria-expanded` can reflect Base UI's own
+                  decision - the hover/focus/close logic itself stays
+                  entirely inside the primitive. A click on the trigger
+                  still pins the column open, independent of the hover
+                  card's own open state (a plain onClick alongside it,
+                  composed the same way ThreadListPrimitive.New's own
+                  onClick is), and resets `railPeeked` so a later
+                  collapse never mounts already "open" from a stale
+                  peek. */}
+              {railCollapsed && (
+                <HoverCard open={railPeeked} onOpenChange={setRailPeeked}>
+                  <HoverCardTrigger
+                    render={<DashboardButton variant="ghost" size="icon" />}
+                    className="absolute top-2 left-2 z-20 hidden lg:flex"
+                    aria-label="Show conversations"
+                    aria-controls="next-chat-rail-peek"
+                    aria-expanded={railPeeked}
+                    // This is a standing app control a person deliberately
+                    // reaches for, not a link preview - the shipped default
+                    // (600ms open, 300ms close) is tuned for the latter and
+                    // would read as sluggish here.
+                    delay={0}
+                    closeDelay={0}
+                    onClick={() => {
+                      setRailCollapsed(false);
+                      setRailPeeked(false);
+                    }}
+                  >
+                    <PanelLeftIcon className="size-4" />
+                  </HoverCardTrigger>
+                  <HoverCardContent id="next-chat-rail-peek" align="start" className="w-64 max-h-[60vh] overflow-y-auto">
+                    {threadList}
+                  </HoverCardContent>
+                </HoverCard>
+              )}
               <Thread />
             </div>
             {openArtifactId !== null ? (

@@ -316,14 +316,20 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
   });
 });
 
-describe("NextChatPage (CHAT-UI-01 finding 4: the desktop rail collapse)", () => {
+describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail collapse and peek)", () => {
   // Found live with the shell rail collapsed: no fixed Sidebar primitive
   // here (threadlist-sidebar.aui.tsx's own is `position: fixed` against
   // the true viewport edge, built to be a page's ONE sidebar, not a
   // second column nested beside one already there) - this toggles the
   // same plain column the file already had, the identical pattern
-  // `sheetOpen` uses for the phone/tablet Sheet.
-  test("the toggle hides and restores the desktop thread-list column, leaving the thread itself alone", async () => {
+  // `sheetOpen` uses for the phone/tablet Sheet. CHAT-UI-02 moved the
+  // toggle itself into the column's own top row (open) or a floating
+  // button over the chat area (collapsed), so the "Hide conversations"
+  // button now lives inside `next-chat-rail` rather than a row above it.
+  const rail = () => document.getElementById("next-chat-rail")!;
+  const classes = (el: Element) => el.className.split(/\s+/);
+
+  test("open: the toggle sits inside the column's own top row, beside New Thread", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -332,29 +338,106 @@ describe("NextChatPage (CHAT-UI-01 finding 4: the desktop rail collapse)", () =>
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
+      expect(classes(rail())).toContain("lg:block");
       const toggle = view.getByRole("button", { name: "Hide conversations" });
+      // Same row as New Thread, not a row of its own above the column.
+      expect(within(rail()).getByRole("button", { name: "New Thread" }).parentElement).toBe(toggle.parentElement);
+      expect(view.queryByRole("button", { name: "Show conversations" })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("collapsed: the toggle floats over the chat area, no row spent, and the peek overlay stays closed until hovered", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
       // Hidden via a CSS class (the same `hidden`/`lg:block` pattern the
       // phone/tablet split already used), not unmounted - a code review
       // caught the earlier `railCollapsed ? null : ...` leaving the
-      // toggle's own `aria-controls="next-chat-rail"` pointing at an id
-      // absent from the DOM at the exact moment it announced the new
-      // state. jsdom applies no real stylesheet, so the CSS itself
-      // isn't exercised here (the live check on 8787 is); this proves
-      // the id survives collapsing and the class the CSS keys on
-      // actually flips.
-      const rail = () => document.getElementById("next-chat-rail")!;
-      expect(rail().className).toContain("lg:block");
-      fireEvent.click(toggle);
-      expect(rail().className).not.toContain("lg:block");
-      expect(rail().className).toContain("hidden");
-      expect(view.getByRole("button", { name: "Show conversations" })).toBeVisible();
+      // toggle's own `aria-controls` pointing at an id absent from the
+      // DOM at the exact moment it announced the new state. jsdom
+      // applies no real stylesheet, so the CSS itself isn't exercised
+      // here (the live check on 8787 is); this proves the ids survive
+      // and the classes the CSS keys on actually flip.
+      expect(classes(rail())).not.toContain("lg:block");
+      expect(classes(rail())).toContain("hidden");
+      const expandToggle = view.getByRole("button", { name: "Show conversations" });
+      expect(expandToggle).toBeVisible();
+      // `aria-controls` names the peek card's own id up front, even
+      // though - unlike the rail - the card itself isn't mounted until
+      // hovering actually opens it (Base UI's HoverCard doesn't render
+      // its content when closed).
+      expect(expandToggle).toHaveAttribute("aria-controls", "next-chat-rail-peek");
+      expect(expandToggle).toHaveAttribute("aria-expanded", "false");
+      expect(peekCard()).toBeNull();
       // The composer is still there - collapsing the rail never touches
       // the thread itself.
       expect(view.getByLabelText("Message input")).toBeVisible();
-      fireEvent.click(view.getByRole("button", { name: "Show conversations" }));
-      expect(rail().className).toContain("lg:block");
+    } finally {
+      restore();
+    }
+  });
+
+  test("peeked: hovering the floating toggle shows the thread list as an overlay, and leaving hides it again", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      const expandToggle = view.getByRole("button", { name: "Show conversations" });
+      fireEvent.mouseEnter(expandToggle);
+      // The overlay carries the same NextThreadList composition, portalled
+      // by the shipped HoverCard - its own New Thread button is reachable
+      // once it opens. The rail's own (hidden, still-mounted) instance
+      // means "New Thread" is no longer unique in the whole document, so
+      // this scopes to the peeked card specifically.
+      await waitFor(() => expect(peekCard()).not.toBeNull());
+      expect(within(peekCard()!).getByRole("button", { name: "New Thread" })).toBeVisible();
+      expect(expandToggle).toHaveAttribute("aria-expanded", "true");
+      fireEvent.mouseLeave(expandToggle);
+      await waitFor(() => expect(peekCard()).toBeNull());
+      expect(expandToggle).toHaveAttribute("aria-expanded", "false");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a click on the floating toggle still pins the column open, peek or not", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      const expandToggle = view.getByRole("button", { name: "Show conversations" });
+      fireEvent.mouseEnter(expandToggle);
+      await waitFor(() => expect(peekCard()).not.toBeNull());
+      fireEvent.click(expandToggle);
+      expect(classes(rail())).toContain("lg:block");
+      // Pinning open retires the floating toggle and its overlay -
+      // collapsing again later starts from a real hover, not a stale
+      // peek left over from before this pin.
+      expect(view.queryByRole("button", { name: "Show conversations" })).toBeNull();
     } finally {
       restore();
     }
   });
 });
+
+function peekCard(): HTMLElement | null {
+  return document.querySelector('[data-slot="hover-card-content"]');
+}
