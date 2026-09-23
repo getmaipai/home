@@ -589,7 +589,13 @@ export function identityLine(persona: Persona): string {
   return `You are ${persona.display_name}, a private, self-hosted AI assistant for this household.`;
 }
 
-export const STABLE_SYSTEM_SUFFIX = [
+// The raw array, exported alongside the joined STABLE_SYSTEM_SUFFIX
+// below (PARITY-BISECT-03): the bench isolates each of these six
+// sentences on its own, one at a time, so the written suffix
+// PREFIX-CLASS-01's own per-class table needs is measured evidence,
+// not a guess - the joined constant stays byte-identical, this is
+// purely an additional way to read the same six strings.
+export const STABLE_SYSTEM_SUFFIX_SENTENCES = [
   "Be warm, concise and honest. Nothing you say leaves this house.",
   "Requests already blocked by the household's safety rules never reach you; answer anything else helpfully and honestly.",
   // getmaipai/home#67, live-found 2026-09-07: a household member asks
@@ -619,7 +625,8 @@ export const STABLE_SYSTEM_SUFFIX = [
   "You can't watch, taste or visit things yourself; if someone asks whether you have, say so, and still tell them what you know about it.",
   "When someone tells you what they're doing or watching, respond to it the way a friend would, with something you know about it or a question about it, not a sign-off.",
   "Facts about this household, its people, their plans and this home, are the one thing you answer only from what you were told here; never guess one.",
-].join(" ");
+];
+export const STABLE_SYSTEM_SUFFIX = STABLE_SYSTEM_SUFFIX_SENTENCES.join(" ");
 
 // The speech register is now the selected Persona (lib/persona.ts,
 // 2026-09-05): what used to be a single fixed NATURAL_REGISTER_POLICY
