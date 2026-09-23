@@ -258,6 +258,7 @@ const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const chatListReview = process.argv.includes("--chat-list-review");
 const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-alignment-review");
+const chatFindBubbleHoverWidthReview = process.argv.includes("--chat-find-bubble-hover-width-review");
 const chatHeaderTitleReview = process.argv.includes("--chat-header-title-review");
 const nextPageHeaderIconReview = process.argv.includes("--next-page-header-icon-review");
 const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
@@ -1916,6 +1917,70 @@ async function verifyChatFindHeaderAlignment(browser: Browser, sessionValue: str
     } finally {
       await context.close();
     }
+  }
+}
+
+/** CHAT-FIND-0923-04 ("a sent message's bubble must not resize on
+ * hover"): real proof of the `w-fit` fix in ui-v0.5.47
+ * (thread.aui.tsx's own comment on the bubble div explains the CSS
+ * Grid mechanism). A real user turn, not a fixture: the bubble is
+ * only reproducibly a "tight pill" against real rendered text, and
+ * the action bar only genuinely mounts/unmounts through
+ * `ActionBarPrimitive.Root`'s own `autohide="not-last"` once a second
+ * (assistant) message exists to make the user one no longer the
+ * last. Same real getBoundingClientRect() proof as
+ * verifyChatFindHeaderAlignment above, for the same happy-dom reason. */
+async function verifyChatFindBubbleHoverWidth(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`verifyChatFindBubbleHoverWidth: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const context = await newContext(browser, { slug: "wide", width: 1440, height: 1000 }, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.goto(`${BASE_URL}/next/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).fill("hi");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    // Wait for the reply to finish, so the user bubble is no longer the
+    // last message and `autohide="not-last"` actually autohides it -
+    // otherwise the action bar never unmounts and the "at rest" width
+    // below would already include it, hiding the bug this exists to catch.
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+
+    const userMessageRoot = page.locator('[data-slot="aui_user-message-root"]').first();
+    await userMessageRoot.waitFor();
+    const bubble = userMessageRoot.locator(".aui-user-message-content").first();
+    await settleAnimations(page);
+
+    const restWidth = await bubble.evaluate((el) => el.getBoundingClientRect().width);
+    const restFile = join(outDir, "chat-find-bubble-hover-width-rest.png");
+    await page.screenshot({ path: restFile, fullPage: false });
+    console.log(`Wrote ${restFile}`);
+
+    await userMessageRoot.hover();
+    await page.getByRole("button", { name: "Edit" }).waitFor({ timeout: 5000 });
+    await settleAnimations(page);
+    const hoverWidth = await bubble.evaluate((el) => el.getBoundingClientRect().width);
+    const hoverFile = join(outDir, "chat-find-bubble-hover-width-hover.png");
+    await page.screenshot({ path: hoverFile, fullPage: false });
+    console.log(`Wrote ${hoverFile}`);
+
+    if (Math.abs(restWidth - hoverWidth) > 0.5) {
+      throw new Error(
+        `verifyChatFindBubbleHoverWidth: bubble resized on hover - rest ${restWidth}px, hovered ${hoverWidth}px`,
+      );
+    }
+    console.log(`bubble width unchanged: rest ${restWidth}px, hovered ${hoverWidth}px`);
+  } finally {
+    await context.close();
   }
 }
 
@@ -3757,6 +3822,10 @@ async function main() {
       await verifyChatFindHeaderAlignment(browser, sessionValue);
     }
 
+    if (!a11yOnly && chatFindBubbleHoverWidthReview) {
+      await verifyChatFindBubbleHoverWidth(browser, sessionValue);
+    }
+
     if (!a11yOnly && chatHeaderTitleReview) {
       await captureChatHeaderTitleReview(browser, sessionValue);
     }
@@ -3769,7 +3838,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatFindHeaderAlignmentReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
