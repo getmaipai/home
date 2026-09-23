@@ -20947,3 +20947,61 @@ on - `chatModelAdapter.ts`'s `consumeThinking()` already sends it on
 the OLD path unconditionally, so once the new path is the household's
 real default this needs no frontend change at all; named here only
 because it was checked, not assumed.
+
+## DEADLINE-01: a failed generation never delivers an empty reply (2026-09-23)
+
+The second diagnosed cause from "U6 rerun ruling" (a): `president-of-
+france-repeat` repeat 3 delivered `""` in exactly 20,015ms - the 8B
+budget's `deadlines_ms.model` (20,000). The generation hit the model
+node's own deadline, `runOneGeneration` returned `{ ok: false, code }`,
+and `modelNode`'s early return sent `{ kind: "text", text: "" }`
+straight through `answerInputFrom()`'s `model_text` mapping - a real,
+silent empty reply, indistinguishable from the model having genuinely
+said nothing. ENGINE-CONTRACT-02's own `requiredButMissing` check sits
+after that return and never ran, so a forced turn whose generation
+failed outright got no builder-row fallback either.
+
+**The fix, in the model node's own two failure sites (the initial
+generation and its "one regeneration, thinking off" retry).**
+`ModelOutput` gains a `model_failed` kind, threaded through
+`answerInputFrom()` (machine.ts) into a new `AnswerInput` variant
+`answer.ts` renders with the shared `COMPOSE_FAILURE_LINE` (`"Sorry, I
+couldn't do that."`, the identical line `composer.ts`'s own all-failed
+batch already uses - imported, not re-typed, so the two copies can't
+drift) - a real, honest line, never empty text. On a forced turn
+(`tool_choice === "required"`, whether the interim rule or an explicit
+`forceSearchOnly`), the SAME builder row ENGINE-CONTRACT-02 already
+built for "the model produced no query" runs first instead: a
+generation that never finished is one more way that happens, not a
+different problem needing a second fallback.
+
+**A medium-adjacent finding a low review still caught: don't corrupt
+the required-miss count.** The first cut of the forced-turn branch
+called the existing builder-fallback helper unchanged, which marks the
+outcome `required_miss: true` - the exact flag `interimRuleMeasure`
+and the replay bench already read as "a successful generation whose
+cache state disagreed with required" (`contract.ts`'s own `NodeOutcome`
+doc). A genuine infrastructure failure (a dead engine, a timeout) is a
+different failure mode wearing the same flag, and would have silently
+corrupted that measurement while dropping the real failure code
+entirely. Fixed: `builderFallbackOutput()` takes an optional
+`failureCode`; DEADLINE-01's two call sites pass `attempt.code`,
+producing `{ ok: false, code }` on the model node's own trace entry
+while still returning the builder's `tool_calls` output - the
+machine's own routing (`modelIsToolCalls`) reads `output.kind` only,
+never `outcome.ok`, so the search still runs either way, and the trace
+now tells a real failure apart from a cache-state required-miss.
+
+**Verified:** two new tests in `turnNext.test.ts` ("DEADLINE-01, a
+failed generation never delivers an empty reply"), against a
+genuinely dead `MAIPAI_LLAMA_SERVER_URL` (a real, closed port - a real
+connection refusal, not a mock): an ordinary question gets the fixed
+`COMPOSE_FAILURE_LINE`, never an empty string; a forced (interim-rule)
+question's failed generation still runs the builder row's real search
+(proven via the fake SearXNG's own query log and the stored `builder`
+outcome), with the model node's own trace entry showing `ok: false`
+and a real `code`, never `required_miss: true`. Full backend suite
+(3916/3916) and `tsc --noEmit` green. Review: low, one finding-free
+re-review of the fix hunks after two real findings on the first pass
+(the required_miss corruption above, and the hardcoded fixed line
+where `COMPOSE_FAILURE_LINE` already existed).

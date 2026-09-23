@@ -19,6 +19,7 @@ import { conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
+import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 
 let people: BenchPeople;
 
@@ -819,6 +820,68 @@ describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-te
       expect(result.value.plugin_id).toBe("websearch");
     } finally {
       CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
+      searxng.stop();
+    }
+  });
+});
+
+// DEADLINE-01 (dev.md "U6 rerun ruling" (a)): a generation that never
+// finishes at all (the model node's own deadline, a dead engine) used
+// to deliver an empty string through answer as if the model had
+// genuinely said nothing - a genuinely dead MAIPAI_LLAMA_SERVER_URL
+// (a closed, real port - a real connection refusal, not a mock) drives
+// runOneGeneration's own `started.ok === false` path directly, no
+// scripting needed.
+describe("turnNext.ts: DEADLINE-01, a failed generation never delivers an empty reply", () => {
+  async function deadEngineUrl(): Promise<string> {
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {});
+    const url = stub.url;
+    stub.stop();
+    return url;
+  }
+
+  test("an ordinary question whose generation fails gets the model_failed fixed line, never an empty reply", async () => {
+    process.env.MAIPAI_LLAMA_SERVER_URL = await deadEngineUrl();
+    __resetLlmSupervisorForTests();
+    const result = await runTurnNext(people.owner, "chat", "how do I make a paper airplane");
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe(COMPOSE_FAILURE_LINE);
+    expect(result.value.reply.text.length).toBeGreaterThan(0);
+  });
+
+  test("an interim-rule turn whose forced generation fails still runs the builder row's real search", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    process.env.MAIPAI_LLAMA_SERVER_URL = await deadEngineUrl();
+    __resetLlmSupervisorForTests();
+    try {
+      const result = await runTurnNext(people.owner, "chat", "who is the president of chile");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      // The forced call failed outright (the same dead engine), so the
+      // builder row ran the search for real - proven by the search
+      // itself, not by the final reply text (the phrasing round hits
+      // the identical dead engine and also fails, delivering the fixed
+      // model_failed line as the turn's own honest outcome - a fully
+      // dead engine breaking both rounds, not a bug in the fallback).
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
+      expect(outcomes.some((o) => o.callId === "builder" && o.args?.expression === "who is the president of chile")).toBe(true);
+      // A review caught the first cut marking this required_miss: true,
+      // the same flag ENGINE-CONTRACT-02 uses for "a successful
+      // generation whose cache state disagreed with required" - a
+      // genuine generation failure is a different thing and must never
+      // be counted there; the model node's own trace entry keeps the
+      // real failure code instead.
+      const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; code?: string; required_miss?: boolean } }[] };
+      const modelOutcomes = (stats.nodes ?? []).filter((n) => n.node === "model").map((n) => n.outcome ?? {});
+      expect(modelOutcomes[0]?.required_miss).toBeUndefined();
+      expect(modelOutcomes[0]?.ok).toBe(false);
+      expect(modelOutcomes[0]?.code).toBeDefined();
+    } finally {
       searxng.stop();
     }
   });

@@ -394,6 +394,10 @@ function answerInputFrom(context: MachineContext): AnswerInput {
     const s = step as ModelOutput;
     if (s.kind === "text") return { kind: "model_text", text: s.text };
     if (s.kind === "answer_from_context") return { kind: "context_quote", quote: s.quote };
+    // DEADLINE-01: a generation that never finished at all - kept
+    // distinct from "text" with an empty string, which used to reach
+    // here and deliver a real, silent empty reply.
+    if (s.kind === "model_failed") return { kind: "model_failed" };
   }
   if (context.turnState.outcomes.length > 0) {
     const lastText = context.turnState.outcomes.at(-1)?.userMessage ?? "";

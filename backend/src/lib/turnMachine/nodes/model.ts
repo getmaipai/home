@@ -24,7 +24,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { contextToMessages } from "../messages";
-import type { Node, TurnState } from "../contract";
+import type { Node, TurnState, NodeOutcome } from "../contract";
 
 export const ANSWER_FROM_CONTEXT_TOOL_ID = "answer_from_this_conversation";
 
@@ -66,7 +66,14 @@ export interface ModelInput {
 export type ModelOutput =
   | { kind: "text"; text: string; thinking: boolean; reasoning?: string }
   | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string }
-  | { kind: "answer_from_context"; quote: string; reasoning?: string };
+  | { kind: "answer_from_context"; quote: string; reasoning?: string }
+  // DEADLINE-01 (dev.md "U6 rerun ruling" (a)): a generation that never
+  // finished at all (the model node's own deadline, a dead engine) -
+  // distinct from `text` with an empty string, which `answerInputFrom()`
+  // used to receive for this case and pass straight through as a real,
+  // silent empty reply. `answer.ts` renders this with a fixed line,
+  // never empty text.
+  | { kind: "model_failed"; reasoning?: string };
 
 /** Whether the utterance is what the interim rule calls "a question
  * about the world" - the signal's own closed-set fields, no new rule. */
@@ -156,6 +163,33 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   return { ok: true, text: visibleText(raw), reasoning: extractReasoningText(raw), toolCalls, thinking };
 }
 
+/** ENGINE-CONTRACT-02's builder row, shared by every path that reaches
+ * it: a required call the model missed (no call, an invalid one), and
+ * now DEADLINE-01's own case (the generation never finished at all on
+ * a forced turn) - the design's builder exists for exactly "the model
+ * produced no query," and a deadline is one more way that happens.
+ * `otherCalls` preserves a legitimate sibling call (weather, say) a
+ * successful-but-incomplete generation made alongside a bad websearch
+ * one; a failed generation has none to preserve. */
+/** A review caught the first cut of DEADLINE-01's own use of this
+ * helper marking a genuine generation failure (a deadline, a dead
+ * engine - no generation record even pushed) `required_miss: true`,
+ * the identical flag `interimRuleMeasure`/the replay bench already
+ * read as "a successful generation whose cache state disagreed with
+ * required" (contract.ts's own NodeOutcome doc). Folding a real
+ * infrastructure failure into that count would corrupt the
+ * measurement and silently drop the real failure code. `failureCode`,
+ * passed only from DEADLINE-01's own call sites, keeps the outcome
+ * honest (`{ ok: false, code }`, the same shape a failed node always
+ * reports) while still returning the builder's `tool_calls` output -
+ * the machine's own routing (`modelIsToolCalls`) reads `output.kind`
+ * only, never `outcome.ok`, so the search still runs either way. */
+function builderFallbackOutput(utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, failureCode?: string): { outcome: NodeOutcome; output: ModelOutput } {
+  const builderCall: ToolCall = { tool: "websearch", args: { expression: utterance }, id: "builder" };
+  const outcome: NodeOutcome = failureCode !== undefined ? { ok: false, code: failureCode } : { ok: true, required_miss: true };
+  return { outcome, output: { kind: "tool_calls", calls: [...otherCalls, builderCall], reasoning } };
+}
+
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
   const messages: LlmMessage[] = contextToMessages(state.context, input.utterance);
   state.messages = messages;
@@ -191,7 +225,14 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   const minorThinkingOff = state.reasoning.withheld_for === "minor" && !state.budget.thinking_for_minors;
   const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, interimRuleApplies ? "interim_rule" : "model", signal);
-  if (!attempt.ok) return { outcome: { ok: false, code: attempt.code }, output: { kind: "text", text: "", thinking: false } };
+  // DEADLINE-01: a generation that never finished (the model node's
+  // own deadline, a dead engine) is one more way "the model produced
+  // no query" happens - on a forced turn (tool_choice required), the
+  // builder row runs exactly as it does for a missed or invalid call
+  // below; otherwise the turn gets a real, fixed model_failed line,
+  // never the empty string this used to deliver silently through
+  // `answer` as if the model had genuinely said nothing.
+  if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code) : { outcome: { ok: false, code: attempt.code }, output: { kind: "model_failed" } };
 
   // State table, `model`'s own exits: "no visible text: one
   // regeneration with thinking off, then answer." A tool call always
@@ -199,7 +240,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // that came back with neither text nor a tool call retries.
   if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && thinkingOn) {
     attempt = await runOneGeneration(state, messages, tools, tool_choice, false, "model_retry_no_thinking", signal);
-    if (!attempt.ok) return { outcome: { ok: false, code: attempt.code }, output: { kind: "text", text: "", thinking: false } };
+    if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code) : { outcome: { ok: false, code: attempt.code }, output: { kind: "model_failed" } };
   }
 
   // "Reasoning is a second output" (the owner's ruling): `context`
@@ -247,9 +288,8 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // alongside an invalid websearch call would have silently lost that
     // other call too. Only the websearch call is replaced; every other
     // call the model made this round still runs.
-    const builderCall: ToolCall = { tool: "websearch", args: { expression: input.utterance }, id: "builder" };
     const otherCalls = (attempt.toolCalls ?? []).filter((c) => c.tool !== "websearch");
-    return { outcome: { ok: true, required_miss: true }, output: { kind: "tool_calls", calls: [...otherCalls, builderCall], reasoning } };
+    return builderFallbackOutput(input.utterance, otherCalls, reasoning);
   }
 
   if (attempt.toolCalls && attempt.toolCalls.length > 0) {

@@ -8,6 +8,7 @@
 // never has to know which one ran).
 import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
+import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 
 /** The reasons `policy` can refuse a proposal WITHOUT parking an ask
  * (consent_needed/confirm_needed always carry one, so machine.ts's
@@ -31,7 +32,12 @@ export type AnswerInput =
   // no producer here at all - it fell through to the empty-text
   // fallback below, an empty reply where the state table promises "the
   // refusal line for min_role."
-  | { kind: "policy_refused"; reason: PolicyRefusedReason };
+  | { kind: "policy_refused"; reason: PolicyRefusedReason }
+  // DEADLINE-01: the model node's own generation never finished (a
+  // deadline, a dead engine) on a turn where the builder row wasn't a
+  // fit either (tool_choice not "required") - a real, honest line,
+  // never the empty string this case used to deliver silently.
+  | { kind: "model_failed" };
 
 export interface AnswerOutput {
   text: string;
@@ -96,5 +102,11 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       const sources = input.outcomes.flatMap((o) => o.sources ?? []);
       return { outcome: { ok: true }, output: { text: input.text, sources } };
     }
+    // DEADLINE-01: the same shared line composer.ts's own all-failed
+    // batch already uses for a technical failure - the identical
+    // "something broke, not a refusal" case, one level up, imported
+    // rather than re-typed so the two copies can't drift.
+    case "model_failed":
+      return { outcome: { ok: true }, output: { text: COMPOSE_FAILURE_LINE, sources: [] } };
   }
 };
