@@ -65,4 +65,61 @@ describe("planFor", () => {
     const line = planLine(planFor(input(signal)), signal);
     expect(line).toContain("acknowledge the feeling first"); expect(line).toContain("no question");
   });
+
+  // U4/RESP-01: no surfaceClass pins today's exact numbers, so
+  // turnEngine.ts's four call sites (none of which pass it) keep
+  // running the frozen path's own act table unchanged.
+  test("with no surfaceClass, every act keeps today's numbers", () => {
+    expect(planFor(input(base("question"))).max_words).toBe(60);
+    expect(planFor(input(base("inform"))).max_words).toBe(30);
+    expect(planFor(input(base("greeting"))).max_words).toBe(15);
+  });
+
+  test("surfaceClass: spoken is identical to no surfaceClass", () => {
+    expect(planFor(input(base("question"), { surfaceClass: "spoken" })).max_words).toBe(60);
+  });
+
+  describe("the written class (a typed screen: chat, tv)", () => {
+    test("a written question with no evidence: 220 words, 14 sentences", () => {
+      const plan = planFor(input(base("question"), { surfaceClass: "written" }));
+      expect(plan.max_words).toBe(220); expect(plan.max_sentences).toBe(14);
+    });
+    test("a written question with a source, a deliverable, or two choices gets room: 360 words, 24 sentences", () => {
+      const withSource = planFor(input(base("question"), { surfaceClass: "written", evidence: { choices: 0, sources: 1, deliverable: false } }));
+      expect(withSource.max_words).toBe(360); expect(withSource.max_sentences).toBe(24);
+      const withDeliverable = planFor(input(base("question"), { surfaceClass: "written", evidence: { choices: 0, sources: 0, deliverable: true } }));
+      expect(withDeliverable.max_words).toBe(360);
+      const withChoices = planFor(input(base("question"), { surfaceClass: "written", evidence: { choices: 2, sources: 0, deliverable: false } }));
+      expect(withChoices.max_words).toBe(360);
+    });
+    test("a written inform is 90 words, 6 sentences", () => {
+      const plan = planFor(input(base("inform"), { surfaceClass: "written" }));
+      expect(plan.max_words).toBe(90); expect(plan.max_sentences).toBe(6);
+    });
+    test("a written greeting keeps the reaction shape: 15 words, 1 sentence - 'hi' still gets 'hey'", () => {
+      const plan = planFor(input(base("greeting"), { surfaceClass: "written" }));
+      expect(plan.max_words).toBe(15); expect(plan.max_sentences).toBe(1);
+      expect(plan.moves.react).toBe("required");
+    });
+    test("brevity on the written class uses the spoken table for that turn", () => {
+      const plan = planFor(input(base("question"), { surfaceClass: "written", brevity: true }));
+      expect(plan.max_words).toBe(60);
+    });
+    test("the child band's cap holds on the written class too", () => {
+      const plan = planFor(input(base("question"), { surfaceClass: "written", band: "child" }));
+      expect(plan.max_words).toBe(40);
+    });
+    test("planLine on the written class names no sentence count", () => {
+      const signal = base("inform");
+      const line = planLine(planFor(input(signal, { surfaceClass: "written" })), signal, "written");
+      expect(line).not.toContain("sentence");
+      expect(line).toContain("as long as it needs, structured where it helps");
+    });
+  });
+
+  describe("the glance class (a shared overlay)", () => {
+    test("keeps today's numbers, same as spoken", () => {
+      expect(planFor(input(base("question"), { surfaceClass: "glance" })).max_words).toBe(60);
+    });
+  });
 });

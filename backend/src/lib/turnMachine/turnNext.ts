@@ -28,6 +28,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { resolvePersona } from "@/lib/persona";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
+import { surfaceClassOf } from "@/lib/surfaceClass";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
 import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
@@ -43,6 +44,10 @@ export interface RunTurnNextOpts {
   conversationId?: string;
   temporary?: boolean;
   signal?: AbortSignal;
+  // U4/RESP-01 point 1: additive, forces the spoken register for a
+  // dictated chat turn - unwired to any client today (no dictation
+  // marker exists yet), plumbed and tested ahead of a real caller.
+  spoken?: boolean;
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
@@ -106,9 +111,14 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
   const band = speakerAgeBand(actor, new Date());
   const signal = classifyTurnSignal({ text, ageBand: band });
   const persona = resolvePersona(getHouseholdSettingValue("persona.active_id"));
+  // U4/RESP-01: computed once, the register's only length authority -
+  // never recomputed by a later node, the same "decided once" shape
+  // `reasoning.emit` already follows in `context`.
+  const surfaceClass = surfaceClassOf(surface, opts.spoken === true);
   const plan = planFor({
     signal,
     surface,
+    surfaceClass,
     brevity: false,
     evidence: { choices: 0, sources: 0, deliverable: false },
     companion: { directness: "direct", engagement: persona.engagement, complexity: persona.complexity },

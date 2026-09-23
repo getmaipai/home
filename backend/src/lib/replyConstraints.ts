@@ -1,9 +1,9 @@
 // CONS-01 (docs/dev.md section 16 part 9, rule 2): deterministic reply
 // constraints, kept in the forget-command parser's family. Length asks use
 // six characters per word as the schema's character-budget conversion.
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, not } from "drizzle-orm";
 import { db } from "@/db";
-import { replyConstraints } from "@/db/schema";
+import { replyConstraints, conversationTurns } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 
 export type ReplyConstraintRow = typeof replyConstraints.$inferSelect;
@@ -51,8 +51,48 @@ export function setReplyConstraint(input: { conversationId: string; person: stri
   return row;
 }
 
-export function constraintsFor(conversationId: string): ReplyConstraintRow[] {
-  return db.select().from(replyConstraints).where(eq(replyConstraints.conversationId, conversationId)).all();
+// U4/RESP-01, ARCH-AMEND-01's accepted design ("reply constraints decay
+// by turn count"): a length or shape ask holds for the turn that set it
+// and the next three done turns of that conversation, never longer - a
+// banned phrase never decays. Optional and backward compatible: with no
+// `currentTurnId` this returns every row exactly as before, which is
+// what the frozen path's one call site (turnEngine.ts, no decay) keeps
+// getting.
+const LENGTH_SHAPE_TURN_WINDOW = 3;
+
+/** Counts every OTHER done turn since the setting turn - the setting
+ * turn's own row and the turn being evaluated right now are both
+ * excluded by id, never by a timestamp comparison alone: the setting
+ * turn's own `createdAt` is written at the end of its request, a few
+ * lines after `setAt` is captured, so a strict "after setAt" test can
+ * count the setting turn against its own window (caught writing the
+ * test for this, not live). The current turn (not yet logged at
+ * production's own read point, but already logged in a fixture that
+ * inserts it first) is turn number `count + 1` after the setting one,
+ * so the window holds while `count + 1 <= 3`, i.e. `count < 3`.
+ *
+ * Caller contract (a code review, 2026-09-22): `currentTurnId` must be
+ * the conversation's own newest turn - there is no upper bound on the
+ * count besides excluding that one id, so a caller evaluating an OLDER
+ * turn out of order (a replay tool, a backfill, two turns raced) would
+ * count every later turn too and expire the constraint early. No
+ * caller does this today (turnNext.ts always evaluates the turn it is
+ * currently producing), so this is a documented invariant, not a
+ * defensive check against a reachable case. */
+function stillWithinWindow(row: ReplyConstraintRow, currentTurnId: string): boolean {
+  if (row.kind === "banned_phrase" || row.setByTurn === null) return true;
+  const doneTurnsAfter = db
+    .select({ id: conversationTurns.id })
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, row.conversationId), eq(conversationTurns.status, "done"), gte(conversationTurns.createdAt, row.setAt), not(eq(conversationTurns.id, currentTurnId)), not(eq(conversationTurns.id, row.setByTurn))))
+    .all();
+  return doneTurnsAfter.length < LENGTH_SHAPE_TURN_WINDOW;
+}
+
+export function constraintsFor(conversationId: string, currentTurnId?: string): ReplyConstraintRow[] {
+  const rows = db.select().from(replyConstraints).where(eq(replyConstraints.conversationId, conversationId)).all();
+  if (currentTurnId === undefined) return rows;
+  return rows.filter((row) => stillWithinWindow(row, currentTurnId));
 }
 
 export function bannedPhrasesFor(conversationId: string): string[] {

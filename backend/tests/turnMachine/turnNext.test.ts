@@ -382,3 +382,37 @@ describe("turnNext.ts: reasoning is a second output", () => {
     expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: false, withheld_for: "gate" });
   });
 });
+
+describe("turnNext.ts: U4, the answer register by surface", () => {
+  async function firstGenerationMaxTokens(turnId: string): Promise<number | null | undefined> {
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { max_tokens: number | null }[] };
+    return stats.generations?.[0]?.max_tokens;
+  }
+
+  // "how do I make a paper airplane" (a self-target question, checked
+  // live against classifyTurnSignal): never the world, so the interim
+  // always-search rule never fires on it and no command or almanac
+  // pattern claims it either - the plain one-call path on both
+  // surfaces, isolating the register's own effect on max_tokens from
+  // the tool-calling machinery.
+  test("a typed chat question's completion runs with the written plan's max_tokens, not today's 120", async () => {
+    const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.owner, "chat", "how do I make a paper airplane"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    // Written, no evidence (turnNext.ts's own plan is computed once,
+    // upfront, with evidence hardcoded to zero - the 360/24 evidence-
+    // boosted row is unreachable on this path today, a separate gap
+    // named in the done report, not this test's job to close): 220
+    // words * model.ts's own maxTokensFor ceiling (max_words * 2) = 440.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(440);
+  });
+
+  test("a robot question's completion keeps today's spoken plan, unchanged", async () => {
+    const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    // Spoken keeps the act table exactly: a question is 60 words * 2 = 120.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(120);
+  });
+});
