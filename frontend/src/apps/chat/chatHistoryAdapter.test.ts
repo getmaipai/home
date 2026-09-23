@@ -78,6 +78,33 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.content).toBe("just a reply");
   });
 
+  // REASONING-04 (safety ruling, 2026-09-22): a reloaded adult turn shows
+  // the answer and a Reasoning block, never "<think>" - conversationHistory.ts's
+  // own read-side gate is what ensures `row.reasoning` is only ever
+  // present when it should be; this proves the reload path renders it
+  // through the same Reasoning Element a live turn uses (reasoning-part
+  // first, chatModelAdapter.ts's own live ordering), not that it's a raw
+  // string sitting in the reply text.
+  test("a row carrying reasoning becomes a real reasoning part before the reply text - a reloaded adult turn shows the answer and a Reasoning block, never <think>", () => {
+    const row = { ...makeRow("row-1", "17 times 24 is 408."), reasoning: "carry the two" };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "reasoning", text: "carry the two" },
+      { type: "text", text: "17 times 24 is 408." },
+    ]);
+    const text = JSON.stringify(items[1]!.message.content);
+    expect(text).not.toContain("<think>");
+  });
+
+  // A minor's own row never carries `reasoning` at all (conversationHistory.ts's
+  // write path, REASONING-04) - a reloaded child turn shows the answer
+  // and no reasoning, the plain reply text unchanged, same as any other
+  // row with nothing extra to attach.
+  test("a row with no reasoning shows the answer and no reasoning - a reloaded child turn", () => {
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "17 times 24 is 408.")], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toBe("17 times 24 is 408.");
+  });
+
   // Slice 5(a): unlike `structured_part` (getmaipai/home#130's still-open
   // reload gap), `sources` genuinely survives reload - the column already
   // exists on the row - so the same real tool-call part chatModelAdapter.ts

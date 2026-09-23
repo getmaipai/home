@@ -134,9 +134,17 @@ export function rowsToBranchableMessages(
       // already exists (`row.sources`) - so the same tool-call part
       // chatModelAdapter.ts builds live rides AFTER the text part here
       // too, the identical ordering (spec.md's "under the reply").
+      // REASONING-04 (safety ruling, 2026-09-22): a reload renders a
+      // stored reasoning value through the same Reasoning Element a live
+      // turn just streamed into - reasoning-part-first, the identical
+      // ordering chatModelAdapter.ts's own live "done" event already
+      // uses. Never present for a minor's own turn (conversationHistory.ts's
+      // read-side gate, gated on the READING actor, never even stored for
+      // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.artifact || row.sources?.length
+        row.reasoning || row.artifact || row.sources?.length
           ? [
+              ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               ...(row.artifact ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
               { type: "text" as const, text: row.replyText },
               ...(row.sources?.length ? [toolCallPart(`${row.id}-sources`, "sources", row.sources)] : []),

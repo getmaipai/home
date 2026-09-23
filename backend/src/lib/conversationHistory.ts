@@ -42,6 +42,7 @@ import { TurnArtifact, type TurnArtifact as TurnArtifactValue } from "@maipai/sp
 import { newConversationTurnId, newConversationId, newOpenQuestionId } from "@/lib/id";
 import { canAccessPerson, canHaveTemporaryChat } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage } from "@/lib/llm";
 import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
@@ -393,6 +394,25 @@ function buildTurnRow(
   const supersedes = resolveSupersedes(opts.supersedes, value.conversation_id);
   const branchFrom = resolveSupersedes(opts.branchFrom, value.conversation_id);
   const parentTurnId = branchParentFor(value.conversation_id, supersedes ?? branchFrom);
+  // REASONING-04 (safety ruling, 2026-09-22): a prose reply's own think
+  // block traveled intact in reply_text (wellFormed.ts's own header: "a
+  // think block travels intact in reply.text by the pipeline's contract"
+  // - true of the in-memory TurnValue the route/stream still split from
+  // independently, never true of the STORED row from here on), so a page
+  // reload rendered the raw <think>...</think> tags verbatim - the wire
+  // split changed nothing about what got persisted. Split here instead,
+  // the same extractReasoningText()/visibleText() the live paths already
+  // use, so the stored row carries only the visible answer, same as a
+  // tool-resolved turn's reasoning already lived in its own column
+  // (REASONING-02) rather than embedded in reply_text.
+  const minorSpeaker = speakerAgeBand(actor, new Date(value.safety.checked_at)) !== "adult";
+  // A code review caught this: splitting BEFORE redaction would store an
+  // echoed credential inside a think block verbatim in the new
+  // `reasoning` column, bypassing the exact protection replyText already
+  // gets - redact the WHOLE raw text once, then split the redacted
+  // result, so both halves see the identical credential door.
+  const redactedReply = redactCredentials(value.reply.text);
+  const proseReasoning = value.reasoning === undefined ? extractReasoningText(redactedReply) : undefined;
   const row: ConversationTurnRow = {
     id: value.turn_id,
     personId: actor.id,
@@ -400,8 +420,10 @@ function buildTurnRow(
     conversationId: value.conversation_id,
     userText,
     // The reply side too (a package answer that echoes a credential would
-    // otherwise land in reply_text and its episode embedding).
-    replyText: redactCredentials(value.reply.text),
+    // otherwise land in reply_text and its episode embedding). REASONING-04:
+    // visibleText() strips a prose reply's own think block first (a no-op
+    // for every other shape) - the stored row never carries it.
+    replyText: visibleText(redactedReply),
     source: value.source,
     pluginId: value.plugin_id ?? null,
     commandId: value.command_id ?? null,
@@ -415,7 +437,7 @@ function buildTurnRow(
     // the same fix evaluateSafety() itself got. Uses the safety check's
     // own timestamp rather than a fresh `new Date()` so this reflects
     // the actor's age at the moment the turn was actually checked.
-    minorSpeaker: speakerAgeBand(actor, new Date(value.safety.checked_at)) !== "adult",
+    minorSpeaker,
     createdAt: value.safety.checked_at,
     // Session C step 1: null for every non-plugin turn (value.routing
     // only exists on a "plugin" source).
@@ -446,10 +468,16 @@ function buildTurnRow(
     sources: value.sources ? JSON.stringify(value.sources) : null,
     media: value.media ? JSON.stringify(value.media_items?.length ? { ...value.media, media_items: value.media_items } : value.media) : null,
     stats: value.stats ? JSON.stringify(value.stats) : null,
-    // REASONING-02: null for every prose reply - only a tool-call
-    // resolution ever sets value.reasoning (turnEngine.ts's
-    // peekAndHandle()/runTurn()).
-    reasoning: value.reasoning ?? null,
+    // REASONING-02 (tool-call reasoning) and REASONING-04 (a prose
+    // reply's own think block, extracted above): the row itself always
+    // keeps it, same as REASONING-02's own tested contract - the drop is
+    // presentation-only, gated at READ time by the READING actor's own
+    // band (listConversationTurns() below), never by this row's own
+    // minorSpeaker. A minor never sees their own reasoning back; an
+    // owner/admin still does, the same parental-oversight floor this
+    // file's "owner/admin see a child's turns in full" rule already
+    // holds everywhere else.
+    reasoning: value.reasoning ?? proseReasoning ?? null,
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
     // row (CHAT-03) they are approximate, and a `policy` turn is skipped
@@ -1472,8 +1500,14 @@ export function listConversationTurns(
   // reading a child's turns keeps seeing everything, matching this
   // file's established "owner/admin see a child's turns in full" rule -
   // the point is never showing a minor's own reasoning back to THEM,
-  // not withholding it from a parent's oversight.
-  const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
+  // not withholding it from a parent's oversight. A review caught this
+  // missing the surface half of the same rule routes/turn.ts's own
+  // dropReasoning just gained - reasoning is a disclosure surface built
+  // for typed chat's own Reasoning Element, never sent for a row from
+  // any other surface, adult reader or not (checked per row below,
+  // never the reading actor's own current surface, since a row is what
+  // it was spoken on, not what the reader happens to be viewing from).
+  const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
   // artifacts.ts's own visibleArtifactRow() access check, inlined
   // rather than called per row (it would re-fetch the same turn row
   // `r` already is): a child sees an artifact only from their own
@@ -1484,7 +1518,19 @@ export function listConversationTurns(
   return { ok: true, value: rows.map((r) => {
     const { media: rawMedia, reasoning, ...row } = r;
     const artifact = actor.role === "child" && r.safetyAction === "refuse" ? undefined : artifactByTurn.get(r.id);
-    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== null && !dropReasoning ? { reasoning } : {}), ...(artifact ? { artifact } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    // REASONING-04: a row written before the same item split a prose
+    // reply's own think block into this column still carries it inline
+    // in reply_text - stripped here, on every read, so an old row heals
+    // itself with no migration (the coordinator's own "strip on read").
+    // Reconstructed as a real `reasoning` value too, the row itself
+    // always keeping it (REASONING-02's own tested contract, extended
+    // here to an old row) - dropReasoningForActor/dropReasoningForRow
+    // below is what stops a minor seeing their own back, or any row
+    // from a non-chat surface reaching anyone.
+    const legacyReasoning = reasoning === null ? extractReasoningText(r.replyText) : undefined;
+    const effectiveReasoning = reasoning ?? legacyReasoning ?? null;
+    const dropReasoningForRow = dropReasoningForActor || r.surface !== "chat";
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(effectiveReasoning !== null && !dropReasoningForRow ? { reasoning: effectiveReasoning } : {}), ...(artifact ? { artifact } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -1973,14 +2019,18 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const capped = rows.slice(0, LIST_CAP);
   const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
-  // REASONING-02: this is the chat history adapter's real source (this
-  // function's own header above) - the same reader-gated minor
-  // projection as listConversationTurns() above, for the identical
-  // reason (see its own comment).
-  const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
+  // REASONING-02/04: the same reader-gated minor projection as
+  // listConversationTurns() above, for the identical reason (see its
+  // own comment) - including the surface half a review caught missing
+  // here too, and the same legacy-row healing (a prose think block
+  // stripped/reconstructed on read, no migration).
+  const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
   return capped.map((r) => {
     const { media: rawMedia, reasoning, ...row } = r;
-    return { ...row, sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== null && !dropReasoning ? { reasoning } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    const legacyReasoning = reasoning === null ? extractReasoningText(r.replyText) : undefined;
+    const effectiveReasoning = reasoning ?? legacyReasoning ?? null;
+    const dropReasoningForRow = dropReasoningForActor || r.surface !== "chat";
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(effectiveReasoning !== null && !dropReasoningForRow ? { reasoning: effectiveReasoning } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 
