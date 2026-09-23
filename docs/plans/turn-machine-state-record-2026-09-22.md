@@ -93,7 +93,7 @@ entry and exit is an inspection event the trace writer records.
 | `commands` | `commands` | the utterance against the closed exact-match set (household commands, the bundled closed intents: lights, timers, lists, reminders, "what time is it", "remember that", "forget that", the almanac) | `answer` with the package's reply and outcome; else `context` |
 | `context` | `context` | the window (in-process for a temporary chat), the memories as dated and labeled items, the episodes, the profile line, the clock, the roster, the disclosure filter for this reader and the presence on this surface | `model`; sets `reasoning.emit` (false, with `withheld_for`, when the speaker is a minor, the surface is not a typed chat screen, or presence says a child may be in the room) |
 | `model` | `model` | `messages` built from the context list, the fixed tool set, `tool_choice` per the interim rule, the plan's `max_tokens` plus the thinking budget | a tool call: `policy`; text: `answer`; no visible text: one regeneration with thinking off, then `answer`; reasoning spans go to the wire only when `reasoning.emit` is true, and only after `output_gate` has passed them; otherwise they are consumed and dropped inside the node |
-| `policy` | `policy` | each `ActionProposal`: the manifest's `min_role`, `consequential`, `permissions`; the grounding of the arguments against the context list (a set check); the household-subject rule for a search; temporary mode (no `memory:write`); the crisis state (no lookups) | `tool` for an allowed read-only request; `asked` (the machine parks with a pending ask) for a consent or a confirmation; `answer` with the refusal line for `min_role`; for a side-effecting request the executor runs the typed plan and returns its outcome to `tool` |
+| `policy` | `policy` | each `ActionProposal`: the manifest's `min_role`, `consequential`, `permissions`; the grounding of the arguments against the context list (term-level, see "Grounding, stated exactly"); the household-subject rule for a search; temporary mode (no `memory:write`); the crisis state (no lookups) | `tool` for an allowed read-only request; `asked` (the machine parks with a pending ask) for a consent or a confirmation; `answer` with the refusal line for `min_role`; for a side-effecting request the executor runs the typed plan and returns its outcome to `tool` |
 | `tool` | `tool` | `runPlugin` under the tool deadline; the outcome recorded in model order | `model` while `rounds` remain; else `answer` |
 | `answer` | `answer` | the model's final text or the package reply, the outcomes' sources, the surface's projection (`reply.speech`), the plan's budget | `output_gate` |
 | `output_gate` | `output_gate` | every streamed sentence through `gateOutputSafety`; the honesty invariant (an action claim needs a succeeded outcome); the malformed repair | `done`; `refused` when the output floor refuses; reasoning spans pass the same safety gate and the disclosure filter as the answer before any `reasoning` event, and a span the gate refuses sets `withheld_for: "gate"` |
@@ -116,6 +116,25 @@ utterance keeps the search off (the household-subject rule). The
 quiet-window run of 2026-09-22 (rule on and off, ten repeats) records
 the cost of the redundant searches and the miss rate, and the rule's
 default per model is set from it.
+
+## Grounding, stated exactly (2026-09-22, after U2d's first live run)
+
+The policy node's grounding check is term-level, never a substring
+match. A tool call's string argument passes when it shares at least one
+content term with the grounding set: the utterance, the window's user
+turns, and the names the hub itself said (`hubNames`); content terms are
+case-folded, stop words dropped, compared on the same prefix the repeat
+guard already uses, and a number, a year or a date the model adds ("president
+of Chile 2026") never counts against it. The check refuses exactly two
+things: a bare pronoun as the whole argument, and zero overlap (an
+invented topic). A rephrase is the model's job and passes by design; a
+literal-substring rule refuses real queries and control rows alike,
+which is what U2d's first live run showed (new path 0 of 7 failed rows
+and 8 of 13 controls, old path 2 of 6 and 12 of 13), so that reading is
+wrong and this paragraph is the contract. One argument is a substring
+check on purpose: `answer_from_this_conversation`'s quote must be a line
+of the context list, compared after whitespace and case folding, because
+its whole meaning is "this line answers it".
 
 ## What every turn writes
 
