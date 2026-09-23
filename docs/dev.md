@@ -21850,3 +21850,71 @@ meet the bare floor where the bare model does, the interim rule's
 trigger is the layer at fault (a conceptual question with no fresh
 fact needs no lookup), and that is a design question for the flip,
 raised by this row, not decided here.
+
+## The interim rule's trigger, decided (2026-09-23)
+
+The question the knowledge-hijack record left open: a conceptual
+question with no fresh fact ("what is technical benchmarking and why
+do you need it") is `question` with `target: world`, so the interim
+rule forces a web search and phrases from results, and the bare model
+answers it better from what it knows. Narrow the trigger, or keep it?
+
+**Decision: the trigger stays "question plus world", and the reply
+floor is met in the phrasing round, not by searching less.** Three
+reasons, weighed as the coordinator asked.
+
+1. The family failure is the stale fact stated as if current, and
+   nothing behind the forced search catches it. The output gate's
+   honesty invariant is structural (a text reply never claims an
+   action); it does not, and must not by rule, read a reply for a
+   stale name or date. The forced search plus "the results win" is the
+   only floor under a fresh-fact question today.
+2. The model's own choice cannot be the decider yet: the 8B under
+   `auto` searched 19 of 50 fitting rows (ARCH-MEASURE-01), a 62 percent
+   miss on exactly the questions where a miss is the worse failure;
+   and there is no classifier head (`classifyTurnSignal` is protocol,
+   rule and fallback). A freshness axis on the signal without a head
+   would be a word rule ("latest", "current", an office title), which
+   the owner's rule forbids.
+3. The cost of keeping it is bounded and already on the queue: after
+   FORCED-CALL-01 a forced call is about a second, the search under a
+   second, one more prefill; two to three seconds on top of a complete
+   answer the floor requires anyway. The cost of narrowing is a wrong
+   answer in a kitchen with no gate behind it.
+
+**What changes so the floor holds under the trigger** (folded into
+PHRASE-01 and WRITTEN-PARITY-01, no new row): the phrasing round runs
+as PHRASE-01's continuation of the forced call's full prompt (the
+stable prefix, the plan line "as long as it needs, structured where it
+helps"), and its composition instruction on the written class reads,
+in substance: answer completely from what you know, structured where
+it helps; use the results as support; any specific current fact (who
+holds an office, a date, a number, a price, a score, what is latest)
+comes from the results or is left out; where the results contradict
+what you know, the results win; where the results do not bear on the
+question, answer from what you know and say nothing about searching.
+The spoken class keeps its one-to-three-sentence form with the same
+substance rule. The old instruction's "from the tool results above ...
+if the results don't answer the question, say so plainly" was written
+for a lookup, and on a conceptual question it is what produced a
+snippet-shaped reply.
+
+**How it is measured, so the decision can be reversed by evidence,
+never by a rule.** The written set gains a row pair under
+WRITTEN-PARITY-01: the benchmarking words (conceptual; the bar is the
+bare floor on the parity column) and "who is the president of France"
+typed (fresh; the bar is the results winning: the name in the reply
+appears in the search outcome's sources, the scorer's existing
+`names grounded` check against the outcome text, never the model's
+own). Both must pass on the same instruction. If the conceptual row
+cannot meet the floor on the 8B under this instruction across three
+repeats with the person reading each failure, the finding is about
+the phrasing round's prompt, and it comes back here; the trigger does
+not narrow by a rule.
+
+**The exit from the interim rule** is the one the plan already names:
+LOOKUP-HEAD-01, a calibrated head over labelled rows deciding whether
+a turn needs a lookup, replaces "question plus world" when it clears
+its bar; until then `always_search` stays true on every surface class,
+written included, because the stale-fact failure is the same typed or
+spoken.

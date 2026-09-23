@@ -116,7 +116,7 @@ skeleton run recycled a hallucinated name that way.** Reuse of an
 earlier answer returns only around previously retrieved evidence (a
 succeeded outcome on this conversation) with a freshness window, which
 is a later item; until then the interim rule is plain forced search, and
-`budget.answer_from_context_tool` is false everywhere. When the escape
+`budget.answer_from_context_tool` is false everywhere. **The trigger stays "question plus world" on every surface class (decided 2026-09-23, dev.md "The interim rule's trigger, decided"): a conceptual question is searched too, and the reply floor is met in the phrasing round, which answers completely from what the model knows with the results as support and the results winning on any current fact; the trigger narrows only when LOOKUP-HEAD-01's head replaces it, never by a word rule.** When the escape
 returns it is the second tool of the same forced call (one argument: the quoted line
 of the context list it answers from). `policy` verifies the quote is in
 the list (a set check); a quote that is not there is an ungrounded
