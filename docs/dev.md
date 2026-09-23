@@ -22973,6 +22973,75 @@ implementation) is the next item, landed separately (one commit per
 logical change): this commit is the measurement and the ruling record
 only.
 
+## PREFIX-CLASS-01: the shipped composition does not clear the tier-1 bar - the system role itself, not just content, suppresses this model (2026-09-23, blocked)
+
+Built the ruling's own composition for real: `persona.ts` gained
+descriptive-voice written twins for every dial (`FORMALITY_FRAGMENT_
+WRITTEN` rewritten, `COMPLEXITY_FRAGMENT_WRITTEN`/`FILLER_FRAGMENT_
+WRITTEN` added, `ENGAGEMENT_FRAGMENT_WRITTEN` rewritten) plus two new
+written-only policy twins (`INFORMATION_HANDLING_POLICY_WRITTEN`,
+`WRITTEN_VOICE_POLICY`), folded into `composePersonaPrompt`'s own
+written branch; `turnEngine.ts` gained `stableSuffixFor(surfaceClass)`
+(only suffix sentences 1, 2, 3 on written) and `buildStablePrefix()`'s
+written branch now composes identity + `stableSuffixFor("written")` +
+the descriptive voice, nothing else. Spoken stays byte-identical
+(verified: 365 existing tests plus new ones, all green, no regression).
+All content-level, and content-correct - a medium code review (two
+passes, 125k + review time) caught the real problem before this landed:
+**the code's own comments claimed this is "PARITY-BISECT-04's own arm e
+composition, measured at 0.48x/0.37x," which is false.** Arm e was
+measured with that content folded into the final USER message, no
+system role at all (`parity-bisect4-stages.ts`'s `armE`:
+`stage(name, null, ...)`). `turnMachine/messages.ts` still sends
+`buildStablePrefix()`'s output as the SYSTEM message, unchanged - the
+same content, a different role, never actually measured that way.
+
+**Verified live, and the review's doubt was right.** A new script
+(`scripts/bench/prefix-class-01-verify.ts`) calls the real, unmodified
+`buildStablePrefix(DEFAULT_PERSONA, "written")` directly as the system
+message, exactly the shape `messages.ts` sends, with the real five-tool
+block and thinking off, same five seeds:
+
+| question | floor avg | shipped avg | ratio | headings | lists | lowercase |
+|---|---|---|---|---|---|---|
+| prompt-cache | 806.8 | 116.6 | 0.14x | no | no | 0/5 |
+| benchmarking-words | 633.0 | 164.4 | 0.26x | no | yes | 0/5 |
+
+**Neither question clears the tier-1 acceptance bar (0.35x) this same
+commit just wrote into BACKLOG.md.** Worse: this is BELOW the plain
+ceiling arm's own numbers (0.51x/0.53x - identity plus the three
+suffix sentences alone, no voice, no policies, no tools, same system
+role) measured in the prior PARITY-BISECT-04 round. Adding the
+descriptive-voice fragments and the real tool block, while keeping the
+system role, made the reply shorter, not longer. The one shape that
+ever cleared close to the target was arm e, and the one thing arm e
+changed that no other arm changed was removing the system role
+entirely - convergent with PARITY-BISECT-01's own first and most basic
+finding, "the mere presence of a system message collapses the reply,
+not its content." Two confounds sit between this verification and a
+clean single-variable answer, named plainly rather than glossed over:
+(1) the system-role placement (the one arm e changed); (2) the exact
+wording of the descriptive-voice fragments differs slightly from arm
+e's own hand-built text (`FORMALITY_FRAGMENT_WRITTEN.casual` now reads
+"The reply reads in a relaxed, friendly tone..." where arm e's own
+script said "MaiPai writes in a relaxed, friendly tone..." - the same
+meaning, a different subject). (1) is almost certainly the dominant
+cause given the scale of the drop and its consistency with BISECT-01;
+(2) is not ruled out and would need its own isolated arm to clear.
+
+**Not landed. `persona.ts`, `turnEngine.ts`, the new tests, and
+`scripts/bench/prefix-class-01-verify.ts` stay uncommitted in
+`home-b-prefix-class-01`** (the content-level fix, correct on its own
+terms, content-tested, 365+ existing tests green, no spoken
+regression) - not thrown away, since the content direction is real and
+already measured as helping in arm e's own context, just not sufficient
+alone in the system role. This is a design question past this item's
+own scope: whether a written-adult turn's stable prefix belongs in the
+system role at all on this tier, which touches `messages.ts`'s own
+cache-stable ordering (U1) and every other `buildStablePrefix` consumer
+(the old path's `buildSystemPrompt`, `personaJudge.ts`), not a content
+edit. Reported to the coordinator as blocked rather than decided here.
+
 ## FLAKE-FORCED-01: the required_miss test is deterministic (2026-09-23)
 
 Root cause, traced while landing OPENER-01: `packageHost.ts`'s own
