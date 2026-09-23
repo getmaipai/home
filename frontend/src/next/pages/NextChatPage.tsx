@@ -436,7 +436,15 @@ function NextReasoningGroup({ children, group }: PropsWithChildren<{ group: Thre
     <ReasoningRoot streaming={running} variant="ghost">
       <ReasoningTrigger active={running} />
       <ReasoningContent aria-busy={running}>
-        <ReasoningText>{children}</ReasoningText>
+        {/* Live finding, 2026-09-22 (Jesse, in Firefox): the shipped
+            ReasoningText carries `ps-6` (room under the trigger's own
+            icon+label) but no `pe-*` at all - wrapped text can reach
+            the exact right edge of the scrollable content, worse once
+            `overflow-y-auto`'s own scrollbar claims some of that width.
+            A small `pe-2` through the Element's own exposed className,
+            never a fork of the file - just enough buffer that the last
+            character on a wrapped line never touches the edge. */}
+        <ReasoningText className="pe-2">{children}</ReasoningText>
       </ReasoningContent>
     </ReasoningRoot>
   );

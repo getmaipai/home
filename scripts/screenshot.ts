@@ -35,7 +35,7 @@
 // `--chat-stats-review` runs one dedicated adult-only chat capture with the
 // advanced reply-details popover open, plus the normal chat accessibility
 // checks; it is intentionally separate from the ordinary matrix shots.
-import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
+import { chromium, firefox, webkit, type Browser, type BrowserContext } from "playwright";
 import { findOverflowingPanels } from "./panelOverflow";
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
@@ -85,6 +85,10 @@ let DATA_DIR: string;
 let BASE_URL: string;
 const ROOT = join(import.meta.dir, "..");
 const useWebkit = process.argv.includes("--webkit");
+// Live finding 2026-09-22: a reasoning-clipping report needed verifying
+// in the browser Jesse actually uses - headless only (this file's own
+// rule), Playwright's own firefox channel.
+const useFirefox = process.argv.includes("--firefox");
 
 // backend/ and frontend/ pin the same @maipai/spec tag, so backend's
 // package.json is as good a source as either for the worktree this
@@ -2352,13 +2356,14 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   }
 }
 
-/** SHELL-02 slice 6's own stated capture: the composer's "+" menu open,
- * the Apps group visible (a bundled package always installed, so the
- * group never renders empty here) - the default-visible set only
- * (photos and files, camera, Apps): Create image, Web search and the
- * voice waveform stay behind NEXT_CHAT_UNWIRED_CONTROLS_ENABLED
- * (composerAddMenu.tsx), unset in a real run, so this capture shows
- * exactly what a real household sees. */
+/** SHELL-02 slice 6's own stated capture: the composer's "+" menu open -
+ * the default-visible set only (photos and files, camera): Apps, Create
+ * image, Web search and the voice waveform all stay behind
+ * NEXT_CHAT_UNWIRED_CONTROLS_ENABLED (composerAddMenu.tsx, Apps joined
+ * live 2026-09-22), unset in a real run, so this capture shows exactly
+ * what a real household sees. Live finding 2026-09-22: the row layout
+ * itself was oversized and still truncated - both viewports now, not
+ * desktop only, since that's a width claim. */
 async function captureNextChatComposerReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2370,22 +2375,24 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
   });
   if (!setShellNext.ok) throw new Error(`captureNextChatComposerReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
-  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
-  const context = await newContext(browser, viewport, "dark", sessionValue);
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/next/chat`);
-    await page.getByRole("textbox", { name: "Message input" }).waitFor();
-    await page.getByRole("button", { name: "Add", exact: true }).click();
-    await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ timeout: 5000 });
-    await page.getByText("Weather", { exact: true }).waitFor({ timeout: 5000 });
-    await settleAnimations(page);
-    const path = join(outDir, `next-chat-composer-${viewport.width}-dark.png`);
-    await page.screenshot({ path });
-    console.log(`Wrote ${path}`);
-    await page.close();
-  } finally {
-    await context.close();
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+      await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ timeout: 5000 });
+      await page.getByText("Add photos and files", { exact: true }).waitFor({ timeout: 5000 });
+      await settleAnimations(page);
+      const path = join(outDir, `next-chat-composer-${viewport.width}-dark.png`);
+      await page.screenshot({ path, fullPage: slug === "phone" });
+      console.log(`Wrote ${path}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
   }
 }
 
@@ -3338,7 +3345,7 @@ async function main() {
       if (!searchSetting.ok) throw new Error(`seed picture search fixture failed: ${searchSetting.status}`);
     }
 
-    const launchedBrowser = await (useWebkit ? webkit : chromium).launch();
+    const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
     if (!a11yOnly && pictureReview) {
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
