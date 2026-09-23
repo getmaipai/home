@@ -20138,6 +20138,119 @@ nothing about `required`, which this finding now does.
    is unrecorded, and its abort check's verdict is still open (it needs
    the warm short median the latency half produces).
 
+## GROUND-01: the live acceptance rerun (2026-09-23)
+
+Point 2 of ENGINE-CONTRACT-01's own ruling above: the rerun runs now,
+not held, with the harness recording `cached_tokens`, `prompt_tokens`
+and `required_honored` per request and a row classed engine
+(ENGINE-CONTRACT-01) excluded from the grounding pass bar rather than
+counted as an ordinary failure. Engine: llama-server b10797-832fd6f17;
+model: `qwen3-8b-instruct-q4-k-m.gguf`; hardware: a MacBook Pro, Apple
+Silicon (arm64), macOS 27. Both paths run the identical
+`owner-replay.json` fixture, 3 repeats, `--hub-live`, one request at a
+time, 30s quiet wait after any real household `[turn]` line - no gate
+ran beside either. Full per-row detail and the full scored table:
+`data-scratch/ground01-rerun-new.log`, `data-scratch/ground01-rerun-old.log`
+(git-ignored, kept for reference).
+
+### Failed rows (must pass), both paths
+
+| row | old path | new path |
+|---|---|---|
+| president-of-france-repeat | FAIL (1/3 clean) | ok* (2/3 clean, 1/3 engine miss) |
+| apple-announce-this-week | ok (3/3) | ok (3/3) |
+| search-mariners-game | ok (3/3) | ok (3/3) |
+| primetime-trailer-correction | FAIL (0/3) | FAIL (0/3) |
+| president-of-chile-when-born | FAIL (0/3) | FAIL (0/3) |
+| president-of-chile-hallucinated-name-followup | FAIL (0/3) | FAIL (0/3, 2/3 engine misses) |
+| chatgpt-6-luna | ok (3/3) | ok (3/3) |
+| corey-feldman-michael-jackson-friendship | FAIL (2/3 clean) | ok (3/3) |
+
+Old path: 3/8 clean. New path: 5/8 clean on the grounding bar (4/8 with
+zero engine misses).
+
+### Control rows (must not regress), both paths
+
+| row | old path | new path |
+|---|---|---|
+| control-dune-3 | ok | ok |
+| control-carrie-series | ok | ok |
+| control-search-mariners-explicit | ok | FAIL (2/3 clean) |
+| control-hi | ok | ok |
+| control-say-hi | ok | ok |
+| control-twelve-plus-thirty | ok | ok |
+| control-time-in-tokyo | ok | ok |
+| control-remember-pizza-night | ok | ok |
+| control-negative-dye-hair | ok | ok |
+| control-negative-spiderman | ok | FAIL (2/3 clean) |
+| control-negative-stephen-king | FAIL (0/3, both paths) | FAIL (0/3) |
+| control-negative-good-morning | ok | ok |
+| control-negative-feeling-down | ok | FAIL (2/3 clean) |
+
+Old path: 12/13 clean. New path: 9/13 clean on the grounding bar (9/13
+with zero engine misses).
+
+**Reading the numbers.** The category/read_page grounding defect
+GROUND-01 fixed is gone from both paths' failure detail - no row on
+either run fails with "category"/"read_page" as the refusing argument,
+and `president-of-chile-when-born`'s own turn 1 (the row the original
+diagnosis quoted verbatim) now grounds and searches on both paths. Three
+control rows regress new-path-only, none of them on a grounding-refusal
+detail: `control-search-mariners-explicit` and the hallucinated-name
+follow-up both show `outcome args match (observed: websearch/tool_call
+{})` - a real websearch outcome with an EMPTY args object, not a refusal
+and not a grounding mismatch; `control-negative-spiderman` and
+`control-negative-feeling-down` show the model calling `recall` (not
+websearch) on a row meant to call nothing. Both are real gaps, neither
+is the grounding defect this item fixed - named here, not fixed in this
+session (out of GROUND-01's own scope), each worth its own item.
+`president-of-chile-when-born`'s own remaining failure is turn 3 ("yes")
+not triggering a search on either path - a confirmation-continuation
+gap, also pre-existing and orthogonal to grounding.
+`primetime-trailer-correction` and `corey-feldman-...` fail the same way
+on the old path too (the model answering from its own memory with no
+tool call at all, a signal/routing question, not a grounding one).
+`control-negative-stephen-king` over-searches on both paths (a real
+false-positive predating this item).
+
+### ENGINE-CONTRACT-01 miss share (new path)
+
+3/33 forced repeats classified engine (tool_choice required not
+honoured) - under the one-third threshold, so no `cache_prompt: false`
+rerun was run for the grounding reading (ruling point 2(c)).
+
+A second, narrower measurement disagrees sharply:
+`interimRuleMeasure.ts` at 5 repeats (`INTERIM_REPEATS=5`,
+`data-scratch/ground01-interim-measure.log`), always_search on, the
+same `qwen3-8b-instruct-q4-k-m.gguf` build:
+
+| conversation | required_miss | forced calls | pass | searched | median TTFT |
+|---|---|---|---|---|---|
+| chile (who's the president of chile / when was he born / yes) | 30% | 10 | 100% | 40% | 8755ms |
+| france (who's the president of France, asked twice) | 60% | 10 | 80% | 40% | 15478ms |
+
+The France row asks the identical question twice in one conversation -
+exactly ENGINE-CONTRACT-01's own worst case (a full-prefix KV-cache
+hit on the second call), which the replay set's mixed bag of
+mostly-first-in-conversation forced calls dilutes. Both numbers are
+inside the "about one in five" a cold cache alone would predict at
+temperature 0.7 only for chile; France's 60% is well above it, matching
+the diagnosis's own "the second world question in a conversation" being
+the worst case, not the average one. `answer_from_context` in this
+script's own summary line (27%/60%) is now a red herring, read
+literally: `answer_from_context_tool` is false in every real budget
+(GROUND-01's own fix), so the tool is never offered - the heuristic
+("an interim_rule generation with no websearch outcome") is catching
+required-misses instead, since neither currently results in a search.
+Time-to-first-token is reported from every row above (this script does
+not yet separate clean rows from a `[turn]`-line-interrupted repeat;
+none were flagged this run).
+
+Per the ruling, this narrower number does not by itself trigger the
+conditional `cache_prompt: false` rerun (that threshold is scoped to
+the replay set's own forced-row share); it is reported as evidence for
+ENGINE-CONTRACT-02's own urgency, which is the next item.
+
 ## VOICE-LIVE-01b: the overview route only ever knew about a Stack (2026-09-23)
 
 Live finding, same evening as VOICE-LIVE-01: Jesse reloaded 8787 (no Stack configured - this hub runs Home's own supervisors) and saw no waveform button in the composer. Traced to `backend/src/routes/engines.ts`'s overview route: `if (!isStackConfigured()) return c.json({configured: false, roles: [], engines: [], budget: null}, 200);` - `roles` was unconditionally empty whenever no Stack existed, so every frontend gate reading it (`readyRole()`, `frontend/src/apps/chat/engineRoles.ts`) could never see `stt`/`tts` as ready, no matter how healthy Home's own supervisors actually were. The identical gate silently hides `CreateImageItem` in `composerAddMenu.tsx`. VOICE-LIVE-01's own acceptance test mocked the overview response directly, so it never exercised this real code path.
