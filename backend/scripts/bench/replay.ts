@@ -17,6 +17,7 @@
 //   bun run backend/scripts/bench/replay.ts --live               a side engine, a spare port
 //   bun run backend/scripts/bench/replay.ts --hub-live           U2d's own acceptance run only
 //   bun run backend/scripts/bench/replay.ts --hub-live --new     ...on the new path (turn.pipeline.next)
+//   bun run backend/scripts/bench/replay.ts --hub-live --keep-data   ...and keep the isolated data dir's turn traces after
 //
 // Scripted mode needs no engine at all: it starts one in-process stub
 // (@maipai/spec's own stubServer, the same double
@@ -125,6 +126,15 @@ const HUB_LIVE = process.argv.includes("--hub-live");
 // bench-only branch - a replay run is either the old path's turn or
 // the new path's turn, exactly as a real household turn would be.
 const NEW_PATH = process.argv.includes("--new");
+// U6 rerun (dev.md 2026-09-23, "the flip did not hold"): the bench's
+// own isolated MAIPAI_DATA_DIR is a mkdtempSync temp dir, deleted once
+// the run finishes - a real row failure that needs the turn's own
+// stats.nodes[] trace to diagnose (an engine-classed miss whose own
+// check also failed, the president-of-france-repeat case) had nothing
+// left to read by the time anyone looked. `--keep-data` skips that
+// deletion and prints the kept directory's path instead, so the next
+// rerun that hits a case worth tracing doesn't lose it.
+const KEEP_DATA = process.argv.includes("--keep-data");
 
 interface RowVerdict {
   id: string;
@@ -341,7 +351,8 @@ async function runMain(): Promise<void> {
   runner.cleanupBenchPeople(people);
   if (proxy) proxy.stop();
   if (stub) stub.stop();
-  if (ownDataDir) rmSync(ownDataDir, { recursive: true, force: true });
+  if (ownDataDir && !KEEP_DATA) rmSync(ownDataDir, { recursive: true, force: true });
+  if (ownDataDir && KEEP_DATA) console.log(`\n--keep-data: turn traces kept at ${ownDataDir}`);
 
   finishBench({ executed: allScores.length, engine: HUB_LIVE ? `hub-live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : LIVE ? `live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : "scripted (stub, no live model)" });
 }
