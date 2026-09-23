@@ -256,6 +256,7 @@ const chatResearchReview = process.argv.includes("--chat-research-review");
 const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
+const chatHeaderTitleReview = process.argv.includes("--chat-header-title-review");
 const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
 const settingsReview = process.argv.includes("--settings-review");
 const pictureReview = process.argv.includes("--picture-review");
@@ -1733,6 +1734,28 @@ async function captureShellRail(browser: Browser, sessionValue: string, theme: "
   }
 }
 
+/** A real conversation with a real title, the recipe every capture
+ * needing one uses: POST then PATCH, no fabricated fixture shape.
+ * Throws with the capture's own name in the message on either call
+ * failing, so a seeding failure reads as "captureX: ..." rather than a
+ * bare fetch error several frames up. */
+async function seedTitledConversation(callerName: string, cookie: Record<string, string>, title: string): Promise<{ id: string }> {
+  const created = await fetch(`${BASE_URL}/api/conversations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ surface: "chat" }),
+  });
+  if (!created.ok) throw new Error(`${callerName}: creating the conversation failed: ${created.status}`);
+  const row = (await created.json()) as { id: string };
+  const renamed = await fetch(`${BASE_URL}/api/conversations/${row.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ title }),
+  });
+  if (!renamed.ok) throw new Error(`${callerName}: setting the title failed: ${renamed.status}`);
+  return row;
+}
+
 /** HOME-UI-02e part two's own acceptance (COORDINATOR: "Captures at
  * 1440 and 390 with the list open and a selection active") - the
  * thread list's own restored multi-select, seeded with two real chat
@@ -1745,21 +1768,8 @@ async function captureChatThreadActionsReview(browser: Browser, sessionValue: st
   mkdirSync(outDir, { recursive: true });
   const cookie = { Cookie: `session=${sessionValue}` };
 
-  async function seedConversation(title: string): Promise<void> {
-    const created = await fetch(`${BASE_URL}/api/conversations`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...cookie },
-      body: JSON.stringify({ surface: "chat" }),
-    });
-    const row = (await created.json()) as { id: string };
-    await fetch(`${BASE_URL}/api/conversations/${row.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", ...cookie },
-      body: JSON.stringify({ title }),
-    });
-  }
-  await seedConversation("Weekend garden plans");
-  await seedConversation("Shopping list ideas");
+  await seedTitledConversation("captureChatThreadActionsReview", cookie, "Weekend garden plans");
+  await seedTitledConversation("captureChatThreadActionsReview", cookie, "Shopping list ideas");
 
   for (const viewport of [VIEWPORTS.find((v) => v.slug === "desktop")!, VIEWPORTS.find((v) => v.slug === "phone")!]) {
     const context = await newContext(browser, viewport, "dark", sessionValue);
@@ -2354,6 +2364,58 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
     await page.close();
   } finally {
     await context.close();
+  }
+}
+
+/** CHAT-HEADER-03's own stated acceptance: "a 60-character title reads
+ * whole at 1440 and truncates with an ellipsis at 390, captured light
+ * and dark." A real conversation, seeded the same way
+ * captureChatThreadActionsReview does (POST then PATCH the title, no
+ * fabricated fixture shape), opened directly via `?conversation=<id>`
+ * (`NextChatPage.tsx`'s own `searchParams.get("conversation")`) so the
+ * header shows this exact title, not whatever conversation happened
+ * to be most recent. */
+async function captureChatHeaderTitleReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureChatHeaderTitleReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  // Exactly 60 characters, the acceptance's own number. Persona-roster
+  // names only (CLAUDE.md's Privacy rules), not the real people the
+  // owner's own live example named.
+  const title = "Why did Bramble and Juniper stop being friends after school?";
+  if (title.length !== 60) throw new Error(`captureChatHeaderTitleReview: fixture title is ${title.length} characters, not 60`);
+  const row = await seedTitledConversation("captureChatHeaderTitleReview", cookie, title);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/next/chat?conversation=${row.id}`);
+        // The same title also appears as a thread-list row in the rail
+        // (`#next-chat-rail`) - scoped to the header's own <nav> (no
+        // aria-label, unlike the sidebar's "Main navigation") to get
+        // the header's copy specifically.
+        await page.getByRole("navigation").getByRole("button", { name: title }).waitFor();
+        await settleAnimations(page);
+        const path = join(outDir, `chat-header-title-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
   }
 }
 
@@ -3519,11 +3581,15 @@ async function main() {
       await captureChatThreadActionsReview(browser, sessionValue);
     }
 
+    if (!a11yOnly && chatHeaderTitleReview) {
+      await captureChatHeaderTitleReview(browser, sessionValue);
+    }
+
     if (!a11yOnly && phoneHeaderFoldReview) {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;

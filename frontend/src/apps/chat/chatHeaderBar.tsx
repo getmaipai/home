@@ -20,6 +20,37 @@
 // header comment), and that primitive needs an AuiProvider ancestor;
 // data.onStartTemporary (chatHeaderData.tsx) already does the real
 // thread switch, from inside the tree that has one.
+//
+// CHAT-HEADER-03: the title used to cap at a fixed max-w-64 (256px)
+// regardless of how much room the header actually had - the template's
+// own left/right header groups (commons Header.tsx) had no flex-grow/
+// shrink participation of their own, so a flex row with two non-
+// growing children just leaves empty space between them rather than
+// letting either claim it. Mirrors the template's own flex-sizing
+// convention down the whole chain instead: Header.tsx's left group
+// (`flex-auto min-w-0`, `ui-v0.5.38`; `flex-nowrap` below the `sm`
+// breakpoint, `ui-v0.5.39` - a review found `flex-wrap` alone forced
+// a long title to wrap the whole row at 390px instead of truncating
+// on its own line, both fixes documented in that file's own comments),
+// this component's own root div (`flex-1`), and the title button
+// itself (`flex-1`, replacing `max-w-64`) - the title now grows to
+// whatever the header has left after the fixed sidebar trigger and
+// the fixed right-side icons, truncating only once it must.
+//
+// Known gap for CHAT-HEADER-02 (planned: an app icon in this same
+// slot): the title Button's own `flex-1` sets flex-shrink:1 via the
+// `flex` shorthand, but the kit's shared `buttonVariants` base class
+// also carries an unconditional `shrink-0` that tailwind-merge does
+// not dedupe against `flex-1` (different utility groups) and that
+// wins the cascade - confirmed with a real computed-style check
+// (2026-09-23 review). Today this never triggers a real bug: the
+// title's own flex-basis is 0%, so this nested row is always in the
+// "grow" branch, never the "shrink" branch, regardless of shrink:0.
+// If a further fixed-width sibling ever makes this row's own available
+// space genuinely too tight for the chevron's own minimum width, this
+// title's flex-shrink:0 would leave the chevron with nowhere to go -
+// CHAT-HEADER-02 needs to re-check this when it adds that sibling,
+// not assumed fixed by this comment alone.
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -72,7 +103,7 @@ function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename
       ref={inputRef}
       aria-label="Rename conversation"
       value={value}
-      className="h-8 max-w-64 text-base"
+      className="h-8 min-w-0 flex-1 text-base"
       onChange={(event) => setValue(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {
@@ -111,11 +142,11 @@ export function ChatHeaderBar() {
   const title = data.title || "New Chat";
 
   return (
-    <div className="flex min-w-0 items-center gap-1">
+    <div className="flex min-w-0 flex-1 items-center gap-1">
       <Button
         type="button"
         variant="ghost"
-        className="min-w-0 max-w-64 justify-start truncate px-2 text-base font-medium"
+        className="min-w-0 flex-1 justify-start truncate px-2 text-base font-medium"
         onClick={() => setRenaming(true)}
       >
         {title}

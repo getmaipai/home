@@ -59,6 +59,34 @@ describe("ChatHeaderBar", () => {
     expect(await view.findByText("What's 2 plus 2?")).toBeVisible();
   });
 
+  // CHAT-HEADER-03: the title used to cap at a fixed max-w-64 no matter
+  // how much room the header actually had - happy-dom computes no real
+  // layout, so this can only prove the classes that make the title
+  // grow into the header's free space and truncate only once it must
+  // are present, not the actual pixel behavior (that's the captures at
+  // 1440/390 the item's own exit line asks for).
+  test("the title grows to fill the header's free space (flex-1, min-w-0, truncate - no fixed max-w-64)", async () => {
+    const view = renderBar(baseData({ title: "What's 2 plus 2?" }));
+    const title = await view.findByText("What's 2 plus 2?");
+    expect(title.className).toContain("flex-1");
+    expect(title.className).toContain("min-w-0");
+    expect(title.className).toContain("truncate");
+    expect(title.className).not.toContain("max-w-64");
+  });
+
+  // A review (2026-09-23): the rename Input kept the old fixed
+  // max-w-64 while the display-mode title grew via flex-1, so opening
+  // rename on a wide header with a long title would visibly snap the
+  // header's own width down to 256px and back on commit/cancel/blur.
+  test("the rename input grows the same way the title does, no layout snap on entering rename", async () => {
+    const view = renderBar(baseData({ title: "Old title" }));
+    fireEvent.click(await view.findByText("Old title"));
+    const input = await view.findByLabelText("Rename conversation");
+    expect(input.className).toContain("flex-1");
+    expect(input.className).toContain("min-w-0");
+    expect(input.className).not.toContain("max-w-64");
+  });
+
   // Acceptance: "an untitled conversation shows the same placeholder
   // the thread list uses, never a blank bar."
   test("an untitled conversation shows the New Chat placeholder, never a blank bar", async () => {
