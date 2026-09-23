@@ -22751,3 +22751,64 @@ for a single named fragment - every piece needs its own written
 wording, which is exactly PREFIX-CLASS-01's own scope already. Not
 diagnosing further per the coordinator's own stop-here instruction;
 Fable's own to rule on.
+
+## FLAKE-FORCED-01: the required_miss test is deterministic (2026-09-23)
+
+Root cause, traced while landing OPENER-01: `packageHost.ts`'s own
+`SEARXNG_RATE_LIMIT` token bucket (`capacity: 10, refillPerSecond: 0.5`,
+module-global, keyed `SEARXNG_RATE_LIMIT_KEY`) is never reset between
+tests in `turnNext.test.ts`, `ownerReplay.test.ts` or
+`conversationBench.test.ts` - each starts a real, unmocked `withStub`
+turn that can hit a real websearch/web-fetch call, and the bucket drains
+across the file's own tests (a ~2 s file run against a 0.5/s refill
+never catches up). The FORCED-CALL-01 `required_miss` case sits late
+enough in `turnNext.test.ts`'s own sequence (roughly a dozen prior
+"who is the president of chile" turns, several genuinely calling
+`websearch`) that its own builder search gets rejected before it ever
+reaches the fetch layer: `HostError("rate_limited", "Web search is
+rate-limited - try again shortly")`, `errorCode: "400"` - which is
+exactly why the fake SearXNG in issue 137's own comment "never received
+the request." Not port or socket exhaustion, not test-content position
+magic: a real, named rejection from a real, shared rate limiter every
+other real-tool-call suite in this repo already resets
+(`packageHost.test.ts`, `turnEngine.test.ts` both call
+`__resetRateLimiterForTests()` in their own `beforeEach`) and these
+three did not.
+
+Traced this specifically after OPENER-01's own full gate turned up the
+same failure deterministically instead of occasionally: removing the
+new COMMAND-FAIL-01 test from `turnNext.test.ts` entirely (making the
+file byte-identical to `origin/main`'s) and rerunning against OPENER-01's
+production code alone still failed at the same point, ruling out the
+new test as the cause. OPENER-01's runtime gate is, by design, sending
+more of the file's other utterances through a real model/tool round
+instead of firing a command pattern blindly - correct behavior that
+simply consumes more of the same already-marginal, never-reset bucket
+earlier in the file than `main`'s prior (less correct) pattern-firing
+did, turning a timing-dependent occasional flake into a deterministic
+one. `classifyTurnSignal`'s own output for "who is the president of
+chile" is unchanged with or without the `commandOpeners` wiring
+(`primary_act: "question"`, `target: "world"`, verified both by calling
+the function directly and by the turn's own node trace showing
+`required_miss: true` on the model node - the forced-call abort fired
+exactly as designed), and no manifest pattern matches that utterance at
+all (`matchPattern` checked against every installed package's real,
+unedited patterns) - the commands node was never the mechanism.
+
+Fix: `__resetRateLimiterForTests()` (from `@/lib/rateLimiter`) added to
+the `beforeEach` in all three files, the same shape
+`packageHost.test.ts`/`turnEngine.test.ts` already use - "fix the test's
+own construction," no timeout widened, no retry added. Verified: 10
+consecutive clean runs of `turnNext.test.ts` alone (39/39 each time),
+`ownerReplay.test.ts` + `conversationBench.test.ts` green, one clean
+full `scripts/check.sh`. Root cause and fix also posted to issue 137
+(the FORCED-CALL-01 comment there had reached a different, incorrect
+theory - port/socket exhaustion - this corrects it with the named
+rejection). Files: `backend/tests/turnMachine/turnNext.test.ts`,
+`backend/tests/ownerReplay.test.ts`, `backend/tests/conversationBench.test.ts`.
+Out of scope, flagged rather than chased: issue 137's other five
+timing/port-sensitive flakes may share this same shared-rate-limiter
+class (any file exercising `packageHost.ts`, `voiceCatalog.ts`,
+`telegramChannel.ts` or `updates.ts` without a reset in its own
+`beforeEach`) - not checked here, noted on the issue for whoever picks
+those up next.

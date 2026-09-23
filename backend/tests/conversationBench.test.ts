@@ -10,6 +10,7 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { CONVERSATIONS, CREDENTIAL_LINE, type BenchConversation } from "../scripts/bench/conversationFixture";
 import { scoreTurn as scoreTurnBare, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence, EPISODES_HEADER_TEXT, wellFormedTotals } from "../scripts/bench/conversationScore";
@@ -29,10 +30,16 @@ const scoreTurn = (conv: BenchConversation, index: number, turn: BenchTurn, obse
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 
+// FLAKE-FORCED-01 (issue #137): the searxng/web-fetch token bucket
+// (packageHost.ts's own SEARXNG_RATE_LIMIT, module-global) drains
+// across this file's real-tool-call tests same as turnNext.test.ts's;
+// reset it here too, the same shape packageHost.test.ts and
+// turnEngine.test.ts already use.
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
+  __resetRateLimiterForTests();
 });
 
 afterEach(() => {

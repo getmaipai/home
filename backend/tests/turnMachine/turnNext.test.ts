@@ -8,6 +8,7 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeople, type FakeSearxng } from "../../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -24,10 +25,20 @@ import { remember, embedMemoryRecordSafely } from "@/lib/memory";
 
 let people: BenchPeople;
 
+// FLAKE-FORCED-01 (issue #137): the searxng/web-fetch token bucket
+// (packageHost.ts's own SEARXNG_RATE_LIMIT, module-global, capacity
+// 10, refillPerSecond 0.5) drains across this file's real-tool-call
+// tests since nothing reset it - later tests that need a real search
+// (the interim rule's required_miss case among them) got "rate-
+// limited" instead, reading as a timing-dependent flake under load and
+// actually failing deterministically once enough of this file's own
+// tests fall through to a real websearch call. Reset it here, the same
+// shape packageHost.test.ts and turnEngine.test.ts already use.
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
+  __resetRateLimiterForTests();
   people = createBenchPeople();
   // A real, measured budget lives on the 8B catalog entry (U2a); tests
   // select it by id so `resolveTurnBudget()` reads the same record
