@@ -21005,3 +21005,26 @@ and a real `code`, never `required_miss: true`. Full backend suite
 re-review of the fix hunks after two real findings on the first pass
 (the required_miss corruption above, and the hardcoded fixed line
 where `COMPOSE_FAILURE_LINE` already existed).
+
+## VOICE-LIVE-05: the orb reads the primary token, gains flair, and its own measured frame cost (2026-09-23)
+
+Landed `0241b703` (commons `ui-v0.5.42`, this repo's own pin bump and the gear). Full story of the restyle and the false-positive review finding in commons's own history (`4190c40`); this section is the verification: the captures, the recording, and the per-frame measurement.
+
+**The speaking color was genuinely ours to move.** `voice-conversation.tsx` has zero `@assistant-ui` imports anywhere in it - a MaiPai-original Element, not a fork of an upstream component, so "restyled only through the tokens they read" and "otherwise noted as an upstream ask" both point the same direction: fix it at the source, the same posture VOICE-LIVE-01/04b already established for cutting real kit changes rather than working around a gap. `bg-blue-500 dark:bg-blue-400` read no token at all; `bg-primary` reads `tokens.css`'s own `--primary`, which is already the identical value in light and dark (`#21a6ff` in both `:root` and `.dark`), so the fix is simpler than the original too - one class, not a light/dark pair.
+
+**Two flair touches, both CSS `@keyframes`, zero JS per frame beyond what already existed:** a slow `hue-rotate` drift on the outer ring while thinking (`voice-hue-drift`, 4s ease-in-out infinite), and a single expanding/fading ring the moment speaking starts (`voice-ripple`, 0.6s ease-out) - the conditional render's own mount/unmount replays it on every fresh "speaking" entry, no key needed (a review caught a comment that claimed otherwise; the mechanism is the conditional render, not a key - fixed).
+
+**Per-frame cost, measured twice, both times near zero:** a bare `requestAnimationFrame` delta reads the display's own vsync floor (16.67ms at 60Hz) regardless of how cheap the work inside each frame is, so the honest number is an A/B delta - the same page, same tab, 120-frame samples idle (voice session closed) versus active (listening, real mic levels from the fake WAV driving the ring's own re-renders), `addedMs = active.mean - idle.mean`:
+
+| run | idle mean | active mean | added |
+|---|---|---|---|
+| 1 | 16.82ms | 16.61ms | **-0.21ms** |
+| 2 | 16.83ms | 16.61ms | **-0.21ms** |
+
+Negative and reproducible - the animation's own cost is indistinguishable from measurement noise, nowhere near the 2ms bar. (Each run's own idle sample shows one janky outlier frame around page load, 69-79ms, real browser noise unrelated to this feature - the mean is what the bar is about, and it never moves.)
+
+**Captures and the recording, real headless Chromium against the live hub (`bun restart` first, the standing rule from VOICE-LIVE-04's own miss - this session never skipped it):** the fake WAV drives a real live-voice turn end to end - listening, a real turn through the resident 8B, speaking, the transcript landing in the thread. Eight stills (light/dark × 1440/390, `listening` and `speaking`) plus one WebM recording (a fresh session, listening through several seconds of real "speaking") sent directly to Jesse. This item's own acceptance names his judgment of the recording as the bar, not a thing this session can certify itself - the row stays unticked until he's opened it.
+
+**The gear:** composerVoiceControls.tsx's own trailing waveform pill is the only way in; `liveVoiceSession.tsx` now has the only way back out, to Settings > Voice (VOICE-LIVE-03b's own note that voice/microphone choice lives there and nothing else outside Settings should reach it). The Element has no slot for an extra control, so it's composed just outside the card (`TooltipIconButton asChild` wrapping a `Link`), never forked into the shipped Element. A review flagged this as a likely Radix Slot crash (two children reaching `Slot.Root`); traced through `@radix-ui/react-slot`'s real source and confirmed it's exactly what `Slot.Slottable` exists for (the sr-only tooltip span merges into the Link's own children via `cloneElement`, never counted against the "one child" rule) - corroborated by this session's own test rendering the link for real and finding it by role and name.
+
+Verified: `bunx tsc --noEmit` clean, full frontend suite (717/717) green, `bash scripts/check.sh` green in both commons and this repo. Review: low each pass (commons: one comment-accuracy finding fixed; this repo: one finding checked against source and not applied, see above).
