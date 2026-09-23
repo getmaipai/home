@@ -116,6 +116,13 @@ export interface TurnState {
    * the state must actually carry to be checkable, not re-derived per
    * node from the conversation id's own DB row. */
   temporary: boolean;
+  /** RESP-01's flag (U4/VOICE-LIVE-02): forces the spoken register
+   * regardless of `surface` (a dictated or spoken chat turn is read, not
+   * seen) and, per the state record's own "no non-chat surface shows
+   * reasoning" - a voice session has nowhere to put a Reasoning Element
+   * whatever `surface` says - withholds reasoning the same as a
+   * non-chat surface does (`decideReasoning`, `nodes/context.ts`). */
+  spoken: boolean;
   /** Built from context, never from anything else. */
   messages: LlmMessage[];
   proposals: ActionProposal[];

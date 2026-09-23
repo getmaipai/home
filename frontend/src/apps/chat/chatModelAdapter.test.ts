@@ -549,6 +549,84 @@ describe("createChatModelAdapter reasoning (SHELL-02)", () => {
       env.restore();
     }
   });
+
+  // VOICE-LIVE-02: consumeSpoken() is the one place `spoken: true` ever
+  // reaches the wire - RESP-01's own flag, read once per send and reset,
+  // the same single-shot shape consumeTemporary()/consumePackageScope()
+  // already establish.
+  test("consumeSpoken() arms spoken: true on the request, once, then resets", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Hi!" },
+        { type: "done", value: { reply: { text: "Hi!" }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      let spoken = true;
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        consumeSupersedes: () => undefined,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+        consumeSpoken: () => {
+          const value = spoken || undefined;
+          spoken = false;
+          return value;
+        },
+      });
+      const options = { messages: [fakeUserMessage("hi")], runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => fakeUserMessage("hi") } as unknown as ChatModelRunOptions;
+      const yields: ChatModelRunResult[] = [];
+      for await (const r of runAdapter(adapter, options)) yields.push(r);
+      expect(env.turnBodies[0]).toMatchObject({ spoken: true });
+    } finally {
+      env.restore();
+    }
+  });
+
+  // VOICE-LIVE-02: `speakReplies` also accepts a getter, read fresh
+  // every send - the live voice session flips it on only while it's
+  // open; a typed message sent while it's closed never speaks.
+  test("speakReplies as a function is read per send, not fixed at adapter creation", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "First sentence." },
+        { type: "done", value: { reply: { text: "First sentence." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      let liveOpen = false;
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        consumeSupersedes: () => undefined,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+        speakReplies: () => liveOpen,
+      });
+      const options = { messages: [fakeUserMessage("hi")], runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => fakeUserMessage("hi") } as unknown as ChatModelRunOptions;
+      const yields: ChatModelRunResult[] = [];
+      for await (const r of runAdapter(adapter, options)) yields.push(r);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(env.ttsCalls).toEqual([]);
+
+      liveOpen = true;
+      const env2 = stubEnvironment(
+        ndjsonStream([
+          { type: "delta", text: "Second sentence." },
+          { type: "done", value: { reply: { text: "Second sentence." }, source: "model", safety: SAFETY } },
+        ]),
+      );
+      try {
+        const yields2: ChatModelRunResult[] = [];
+        for await (const r of runAdapter(adapter, { ...options, messages: [fakeUserMessage("hi again")] } as ChatModelRunOptions)) yields2.push(r);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(env2.ttsCalls.length).toBeGreaterThan(0);
+      } finally {
+        env2.restore();
+      }
+    } finally {
+      env.restore();
+    }
+  });
 });
 
 // SHELL-02 slice 3: weather's and almanac-date's own structured result

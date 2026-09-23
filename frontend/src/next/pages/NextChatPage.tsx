@@ -45,6 +45,8 @@ import { ComposerAddMenu, PackageScopeContext, unwiredControlsAreEnabled } from 
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
+import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
+import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
@@ -969,6 +971,26 @@ function NextThreadList({ onNewThread, collapseToggle }: { onNewThread: () => vo
 
 function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
+  // VOICE-LIVE-02: true only while the live voice session (below) is
+  // open - the one gate on `speakReplies` above, and `spokenNextRef` the
+  // one flag `consumeSpoken` reads and clears, the same single-shot
+  // shape `temporaryNextRef`/`packageScopeRef` already use.
+  const liveVoiceActiveRef = useRef(false);
+  const spokenNextRef = useRef(false);
+  // VOICE-LIVE-02: chatModelAdapter.ts's own onSpeakingChange, relayed as
+  // real state so LiveVoiceSession (a sibling component, not inside this
+  // hook) can react to the live scheduler's own start/end - nothing else
+  // in this file reads it today, so no other caller changes.
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  // A code review caught this: `isSpeaking` alone misses the case where a
+  // reply never spoke at all (empty, or every sentence's TTS failed) -
+  // onFirstAudio never fires, so onSpeakingChange(false) arrives with
+  // React state ALREADY false, a same-value setState that never
+  // re-renders and never re-runs LiveVoiceSession's own effect, leaving
+  // the call stuck on "Thinking" forever. Bumped on every `false` call
+  // regardless of the previous value, so LiveVoiceSession can depend on
+  // this instead of `isSpeaking` alone to notice "speaking is over."
+  const [speakingEndedAt, setSpeakingEndedAt] = useState(0);
   const [banner, setBanner] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   // RESP-04 (f): the composer's thinking-mode control. Read via a ref
@@ -1110,10 +1132,27 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
             setTemporaryNext(false);
             return value;
           },
+          // VOICE-LIVE-02: armed once, right before the live voice
+          // session's own aui.composer.send() for its final transcript -
+          // the single-shot shape every other per-send choice here
+          // already uses.
+          consumeSpoken: () => {
+            const value = spokenNextRef.current || undefined;
+            spokenNextRef.current = false;
+            return value;
+          },
           isBareMode: () => bareModeRef.current,
           onCrisisResources: setBanner,
+          onSpeakingChange: (speaking) => {
+            setIsSpeaking(speaking);
+            if (!speaking) setSpeakingEndedAt((n) => n + 1);
+          },
           turnSchedulerRef,
-          speakReplies: false,
+          // VOICE-LIVE-02: on only for the one send the live voice
+          // session itself makes (liveVoiceActiveRef, set while the
+          // session is open) - a typed message never speaks, unchanged
+          // from today's `false`.
+          speakReplies: () => liveVoiceActiveRef.current,
         }),
       [aui],
     );
@@ -1223,7 +1262,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     setTemporaryNext(true);
   }
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, armTemporaryChat };
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, armTemporaryChat, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1323,6 +1362,12 @@ export function NextChatPage({ person }: { person: Roster }) {
   // render would remount this subtree (losing the chevron's own open/
   // close state) every time, not just when person.id actually changes.
   const BoundComposerVoiceControls = useMemo(() => () => <ComposerVoiceControls personId={person.id} />, [person.id]);
+  // VOICE-LIVE-02: owned here (not inside useNextChatRuntime) since both
+  // the composer's own waveform button (via VoiceSessionProvider,
+  // composerVoiceControls.tsx's zero-prop slot needs a context to reach
+  // it) and LiveVoiceSession itself (a direct prop, mounted below) read
+  // the identical state.
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
   // ADMIN-COMPARE-01: the identical desktop-pane/mobile-sheet split
@@ -1537,7 +1582,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, armTemporaryChat } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, armTemporaryChat, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1791,6 +1836,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <ThinkingModeContext.Provider value={thinkingModeValue}>
       <BareModeContext.Provider value={bareModeValue}>
       <PackageScopeContext.Provider value={packageScopeValue}>
+      <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
         <StructuredResultTools />
         <ArtifactTool />
         <ToolTimelineTool />
@@ -1801,6 +1847,15 @@ export function NextChatPage({ person }: { person: Roster }) {
           temporaryAllowed={canHaveTemporaryChatRole(person.role)}
           onStartTemporary={armTemporaryChat}
           shareAllowed={unwiredControlsAreEnabled()}
+        />
+        <LiveVoiceSession
+          open={voiceOpen}
+          onOpenChange={setVoiceOpen}
+          turnSchedulerRef={turnSchedulerRef}
+          liveVoiceActiveRef={liveVoiceActiveRef}
+          spokenNextRef={spokenNextRef}
+          isSpeaking={isSpeaking}
+          speakingEndedAt={speakingEndedAt}
         />
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
             height a hard ceiling, not a floor a growing composer or a
@@ -2016,6 +2071,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
           </SheetContent>
         </Sheet>
+      </VoiceSessionProvider>
       </PackageScopeContext.Provider>
       </BareModeContext.Provider>
       </ThinkingModeContext.Provider>

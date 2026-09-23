@@ -21,6 +21,7 @@
 // within one. This is the same tradeoff the legacy hub's own backend
 // made (one JSON payload per sentence, not streamed either).
 import { api } from "@/lib/api";
+import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 
 const MAX_PARALLEL_FETCHES = 2;
 
@@ -43,6 +44,13 @@ function fixWavHeaderSize(bytes: Uint8Array): void {
 
 export class SentenceSpeechScheduler {
   private readonly audioContext: AudioContext;
+  // VOICE-LIVE-02: every scheduled sentence routes through this one gain
+  // node (never straight to `destination`) so `audioLevelMeter.ts`'s own
+  // meter can tap ONE stable node across sentence boundaries - a plain
+  // pass-through (gain 1), not a volume control; the same meter shape
+  // mic-capture.ts's own stream already uses.
+  private readonly playbackBus: GainNode;
+  private readonly meter: LevelMeter;
   private nextStartTime = 0;
   private scheduledCount = 0;
   private finishedCount = 0;
@@ -68,6 +76,16 @@ export class SentenceSpeechScheduler {
     // a code review, 2026-09-04, flagged the risk of creating one after
     // an awaited fetch instead).
     this.audioContext = new AudioContext({ latencyHint: "interactive" });
+    this.playbackBus = this.audioContext.createGain();
+    this.playbackBus.connect(this.audioContext.destination);
+    this.meter = createLevelMeter(this.audioContext, this.playbackBus);
+  }
+
+  /** The current playback level, 0 to 1 (audioLevelMeter.ts's own RMS
+   * meter, tapping `playbackBus`) - 0 whenever nothing is currently
+   * playing (silent audio centers on 128, the same as true silence). */
+  readLevel(): number {
+    return this.stopped ? 0 : this.meter.read();
   }
 
   private async acquireFetchSlot(): Promise<void> {
@@ -126,7 +144,7 @@ export class SentenceSpeechScheduler {
   private scheduleBuffer(audioBuffer: AudioBuffer): void {
     const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(this.audioContext.destination);
+    source.connect(this.playbackBus);
     const startTime = Math.max(this.audioContext.currentTime, this.nextStartTime);
     source.start(startTime);
     this.scheduledCount++;
@@ -161,6 +179,7 @@ export class SentenceSpeechScheduler {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    this.meter.stop();
     this.audioContext.close().catch(() => {});
   }
 }

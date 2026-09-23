@@ -148,6 +148,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     ask: null,
     end: null,
     temporary,
+    spoken: opts.spoken === true,
     startedAt,
     // Overwritten by the context node's own decideReasoning() whenever
     // `context` runs (machine.ts's own applyContext action). A code

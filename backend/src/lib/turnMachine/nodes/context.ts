@@ -22,13 +22,19 @@ import type { Node, ContextItem, TurnState } from "../contract";
  * receives reasoning" (turnEngine.ts's own `ageBand === "child" ||
  * ageBand === "teen"` is the established "not a full adult" check,
  * reused rather than a second one) and "the typed chat screen is the
- * only surface that may emit it." Presence is left out on purpose: no
- * presence signal exists on the hub yet (this file's own header note),
- * so `"presence"` is never produced until one is built. */
-export function decideReasoning(state: Pick<TurnState, "actor" | "surface">): TurnState["reasoning"] {
+ * only surface that may emit it." VOICE-LIVE-02: a spoken turn is
+ * withheld the same way even when `surface` is literally "chat" (a
+ * live voice session posts on the chat surface too) - the state
+ * record's own words name "voice" as one of the surfaces that never
+ * shows reasoning, and there is nowhere for a spoken reply to put a
+ * Reasoning Element regardless of which surface field it arrived on.
+ * Presence is left out on purpose: no presence signal exists on the
+ * hub yet (this file's own header note), so `"presence"` is never
+ * produced until one is built. */
+export function decideReasoning(state: Pick<TurnState, "actor" | "surface" | "spoken">): TurnState["reasoning"] {
   const band = speakerAgeBand(state.actor, new Date());
   if (band === "child" || band === "teen") return { emit: false, withheld_for: "minor" };
-  if (state.surface !== "chat") return { emit: false, withheld_for: "surface" };
+  if (state.surface !== "chat" || state.spoken) return { emit: false, withheld_for: "surface" };
   return { emit: true, withheld_for: null };
 }
 

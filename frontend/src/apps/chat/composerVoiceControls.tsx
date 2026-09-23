@@ -9,12 +9,11 @@
 // flag, since it isn't gated by that flag at all. VOICE-LIVE-01
 // (commons ui-v0.5.36) cut the `ComposerExtraEnd` slot `ComposerAction`'s
 // right group (the dictate mic, Send) was missing - `NextChatPage.tsx`
-// mounts this component there now. The real live voice session this
-// control has nothing to drive yet (the vendored kit only carries the
-// presentational `elements/voice.tsx`/`voice-conversation.tsx`, not
-// upstream's runtime-wired `voice.aui.tsx`/`voice-conversation.aui.tsx`
-// and `createVoiceSession()`) is VOICE-LIVE-02's own scope, not this
-// file's.
+// mounts this component there now. The waveform button opens the real
+// live voice session (VOICE-LIVE-02, `liveVoiceSession.tsx`) through
+// `voiceSessionContext.tsx`'s `open`/`setOpen` - this file only renders
+// the trigger and the chevron's voice/microphone menus, never the
+// session itself.
 import { useEffect, useState } from "react";
 import { DismissableLayer } from "radix-ui/internal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,15 +23,16 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { titleCaseOption } from "@maipai/ui/src/settings/SettingField";
 import { readyRole } from "@/apps/chat/engineRoles";
+import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
 import { api, type EnginesOverview, type ResolvedSetting } from "@/lib/api";
 import { readMicDevicePreference, writeMicDevicePreference } from "@/lib/voice/micDevicePreference";
 
 const ChevronDownIcon = getIcon("chevron-down");
 
-/** The waveform button: opens the live voice conversation mode (not
- * built here - see the file comment). `VoiceOrb`'s own `idle` state,
- * the same Element HANDSFREE-01's real session drives through its
- * `state`/`volume` props once it exists. */
+/** The waveform button: opens the live voice conversation mode
+ * (VOICE-LIVE-02, `liveVoiceSession.tsx`, via `onClick`). `VoiceOrb`'s
+ * own `idle` state here - the real session drives its own `mode`/
+ * `amplitude` props once open. */
 function WaveformButton({ onClick }: { onClick: () => void }) {
   return (
     <Button type="button" variant="ghost" size="icon-sm" aria-label="Start a voice conversation" onClick={onClick} className="overflow-hidden rounded-full p-0">
@@ -225,10 +225,17 @@ function VoiceChevron({ personId }: { personId: string }) {
 export function ComposerVoiceControls({ personId }: { personId: string }) {
   const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
   const overview = enginesQuery.data;
+  // VOICE-LIVE-02: `null` here (no VoiceSessionProvider in this tree)
+  // means this component was mounted somewhere other than NextChatPage's
+  // own composer - the waveform still renders (readyRole alone still
+  // gates it), but presses nothing, the same "absent, not a crash"
+  // posture the rest of this file already takes for a role that isn't
+  // ready.
+  const session = useVoiceSession();
   if (!readyRole(overview, "stt") || !readyRole(overview, "tts")) return null;
   return (
     <div className="flex items-center gap-1">
-      <WaveformButton onClick={() => {}} />
+      <WaveformButton onClick={() => session?.setOpen(true)} />
       <VoiceChevron personId={personId} />
     </div>
   );

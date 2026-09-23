@@ -366,6 +366,18 @@ describe("turnNext.ts: reasoning is a second output", () => {
     expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: true, withheld_for: null });
   });
 
+  // VOICE-LIVE-02: a live voice session posts on surface "chat" too (the
+  // same route, the same conversation), so the surface field alone can't
+  // gate this - the state record's own "voice never shows reasoning"
+  // has to reach a spoken turn even when `surface === "chat"`.
+  test("an adult's SPOKEN chat turn emits no reasoning, and the trace says why", async () => {
+    const result = await withStub({ reply: () => "<think>internal reasoning here</think>Hi there!" }, () => runTurnNext(people.owner, "chat", "hi", { spoken: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reasoning).toBeUndefined();
+    expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: false, withheld_for: "surface" });
+  });
+
   test("a reasoning span quoting unsafe content is refused at the gate; the answer is unaffected", async () => {
     // The same established harmful_request trigger tests/safety.test.ts
     // already uses (forOutput() refuses on any refuse category

@@ -49,6 +49,14 @@ export interface MicCaptureOptions {
    * error, never silently fall back to a different microphone than the
    * one the household member actually chose. */
   deviceId?: string;
+  /** VOICE-LIVE-02: called once, synchronously, right after the mic's own
+   * `MediaStreamAudioSourceNode` connects to the capture worklet - lets a
+   * caller tap the identical stream for its own purposes (an
+   * AnalyserNode-based level meter, `audioLevelMeter.ts`) without a
+   * second `getUserMedia` call or a second `AudioContext`: a Web Audio
+   * node only ever connects within the context that created it, and this
+   * function creates its own. */
+  onSource?: (context: AudioContext, source: MediaStreamAudioSourceNode) => void;
 }
 
 export async function startMicCapture(options: MicCaptureOptions): Promise<MicCaptureHandle> {
@@ -126,6 +134,7 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
   };
 
   source.connect(worklet);
+  options.onSource?.(context, source);
 
   const stop = () => {
     try {

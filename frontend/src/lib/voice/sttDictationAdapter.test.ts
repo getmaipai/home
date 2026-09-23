@@ -20,6 +20,17 @@ class FakeAudioContext {
   createMediaStreamSource() {
     return { connect() {}, disconnect() {} };
   }
+  // VOICE-LIVE-02: this same global fake also stands in for the
+  // AudioContext a real SentenceSpeechScheduler constructs (the barge-in
+  // tests below build one to exercise its own stop() call) - its own
+  // playback bus and level meter, unused by anything these tests assert
+  // on, only present so the constructor doesn't throw.
+  createGain() {
+    return { connect: () => {} };
+  }
+  createAnalyser() {
+    return { fftSize: 0, smoothingTimeConstant: 0, frequencyBinCount: 128, connect: () => {}, disconnect: () => {}, getByteTimeDomainData: (data: Uint8Array) => data.fill(128) };
+  }
   close() {
     return Promise.resolve();
   }

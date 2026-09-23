@@ -35,6 +35,25 @@ export class FakeAudioContext {
     };
     return source;
   }
+  // VOICE-LIVE-02: sentenceSpeechScheduler.ts's own playback bus (a
+  // pass-through gain node between every scheduled sentence and
+  // `destination`, so audioLevelMeter.ts's own analyser has one stable
+  // node to tap) and audioLevelMeter.ts's own analyser - neither
+  // asserted on directly here (nothing in this suite reads a real
+  // level), only present so the constructor and readLevel() don't throw.
+  createGain() {
+    return { connect: () => {} };
+  }
+  createAnalyser() {
+    return {
+      fftSize: 0,
+      smoothingTimeConstant: 0,
+      frequencyBinCount: 128,
+      connect: () => {},
+      disconnect: () => {},
+      getByteTimeDomainData: (data: Uint8Array) => data.fill(128),
+    };
+  }
   close() {
     return Promise.resolve();
   }

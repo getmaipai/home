@@ -102,6 +102,13 @@ export interface ChatModelAdapterDeps {
   // chosen for), never a mode a later message inherits. Undefined for
   // any surface with no temporary-chat entry.
   consumeTemporary?(): boolean | undefined;
+  // VOICE-LIVE-02: reads AND resets the live voice session's own
+  // "this send is spoken" choice, the same single-shot shape as
+  // consumeTemporary()/consumePackageScope() - only meaningful on the
+  // one send the live voice session itself makes (its own final
+  // transcript, sent via aui.composer.send()), never a mode a later
+  // typed message inherits after the call ends.
+  consumeSpoken?(): boolean | undefined;
   getConversationId?(): Promise<string>;
   // 4.3: "offer, never block" - a crisis-resources banner rides alongside
   // the reply, not as part of the message content assistant-ui renders.
@@ -133,7 +140,12 @@ export interface ChatModelAdapterDeps {
   // control on screen yet, so false here skips every enqueueSentence()
   // call rather than have a turn autoplay audio nothing can cut off.
   // Defaults true: ChatPage.tsx's own established behavior, unchanged.
-  speakReplies?: boolean;
+  // VOICE-LIVE-02: also accepts a getter, read fresh every send - the
+  // live voice session flips this on only while it's open (NextChatPage
+  // passes `false` today; a live call needs the identical scheduler this
+  // adapter already drives, on only for the turn it itself sent, off
+  // again the moment the call ends, never a second speech pipeline).
+  speakReplies?: boolean | (() => boolean);
 }
 
 // The real end-to-end streaming adapter (docs/plans/session-b-ui.md step
@@ -173,7 +185,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // speaking" control shown for the PREVIOUS reply would stay visible
       // into this new one until/unless the new reply happens to speak too.
       deps.onSpeakingChange?.(false);
-      const speakReplies = deps.speakReplies ?? true;
+      const speakReplies = typeof deps.speakReplies === "function" ? deps.speakReplies() : (deps.speakReplies ?? true);
       const scheduler = new SentenceSpeechScheduler();
       deps.turnSchedulerRef.current = scheduler;
       scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
@@ -376,6 +388,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
             packageScope: reconnectAttempts === 0 ? deps.consumePackageScope?.() : undefined,
             temporary: reconnectAttempts === 0 ? deps.consumeTemporary?.() : undefined,
+            spoken: reconnectAttempts === 0 ? deps.consumeSpoken?.() : undefined,
           });
           for await (const event of readTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
