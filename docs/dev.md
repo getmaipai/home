@@ -21516,3 +21516,104 @@ real signal that the forced-search path itself isn't the slow part.
 on this machine if a specific turn's own trace is needed next). Full
 raw log: `data-scratch/u6-rerun-2-interleaved.log` (git-ignored, kept
 for reference; 1,596 lines, 168 cases executed).
+
+## U6 rerun 2 ruling: what the ratios are, and what the cache misses are (2026-09-23)
+
+Read from `data-scratch/u6-rerun-2-interleaved.log`'s own per-turn
+node lines and generation lines (`safety` through `output_gate` per new
+turn; `generation "<reason>": prompt_n cache_n prompt_ms predicted_ms`
+on both paths), paired per row and repeat with the load line at each
+step. **U6 stays not yet**, on the two failed conditions, and both
+fail on design, not on the spike.
+
+### (1) Plain-turn speed: the spike hit both sides; the failures are three design costs
+
+The load spike (steps 66 to 88: `control-hi`, `control-say-hi`,
+`control-twelve-plus-thirty`, `control-time-in-tokyo`, 15.3 to 28.5)
+sat on both halves of each interleaved pair, and the pairs inside it
+are not the failures: `control-hi` 0.82x, `control-say-hi` 1.88x. The
+pairs that fail carry their cause in their own generation lines:
+
+| pair | old | new | the new path's own lines |
+|---|---|---|---|
+| `control-twelve-plus-thirty` r2, r3 | 0.6 to 0.8 s | 11.4 to 12.1 s | the forced generation on a fully cached prompt (`prompt_n` 229, `cache_n` 228, `prompt_ms` 36 to 41) decoding a knowledge answer for 11 to 11.6 s: a required miss, FORCED-CALL-01 and SIGNAL-02 |
+| `search-mariners-game` r2 | 0.5 s | 8.3 s | the forced call in 0.9 s, then the phrasing round: a 47-token prompt (`cache_n` 46) decoding for 7.3 s |
+| `corey-feldman-...` r1 | 2.4 s | 18.5 s | the forced call in 1.0 s, then the phrasing round: a 52-token prompt decoding for 16.7 s |
+| `president-of-france-repeat` r2, r3 | 3.6 to 5.3 s | 26 to 26.6 s | each turn a forced call (2 to 10 s) plus a phrasing round (3.3 to 3.7 s) |
+| `control-negative-dye-hair` r1 | 0.8 s | 7.8 s | one offered generation, `prompt_n` 498, decoding for 6.6 s; the old path's reply to the same words decoded in 0.5 s |
+
+So: the forced call's miss (FORCED-CALL-01, in build); the phrasing
+round after a search, a 45-to-52-token cold prompt with no system
+message, no tools, no plan line and no composition instruction,
+writing 100 to 300 tokens where the old path's `composition` call
+(the same websearch result, a `synthesis_hint` recipe) writes one line
+in 0.3 to 0.5 s of decode on a 567-to-883-token cached prefix
+(`PHRASE-01`, below); and the plain reply's own length, unconstrained
+because nothing in the new path's prompt says who is speaking, in what
+register or how long (`U4b`, already named, now measured: 6.6 s of
+decode against 0.5). The spike inflated absolute numbers inside its
+window and nothing else.
+
+**The 42.22x is arithmetic, not a turn.** The worst per-conversation
+pair in the log is 20.2x (`control-twelve-plus-thirty` r3). The bar's
+per-turn ratio (`replay.ts`, `worstPlainRatio`) divides the new path's
+wall clock by the old path's on every non-forced turn, including
+`control-remember-pizza-night`, where both paths are command-matched in
+single-digit milliseconds (old 8 and 56 ms) and the new path's harness
+overhead alone is a few hundred. The bar gains an absolute allowance
+(a pair passes at a ratio of 1.25 or a difference under 300 ms) and
+prints the worst pair by name, so the next FAIL line can be read.
+
+### (2) Cache: yes, the shapes alternate, and here is the exact mechanism
+
+`messages.ts`'s stable message holds `profile` and `roster` only
+(`isStableContext`), three tokens on the bench household, and the Qwen3
+template renders the tools block right after it inside the same system
+message. So the prompt's head is the tools block, and there are three
+shapes: the forced call (one tool), an offered turn (five tools), and
+the phrasing round (no tools, no system message at all: 45 to 52
+tokens). One slot holds one prefix; each generation evicts the last
+shape's. On a forced row the sequence forced, phrasing, forced gives
+`cache_n` 3 then 51 (`president-of-france-repeat` r1: 226/3, then 400/51),
+and the seven "not rising" rows are exactly the multi-turn rows whose
+turns alternate shapes. Identical prompts across repeats hit in full
+(228 of 229, 499 of 500), which is NEXT-CACHE-01 working as built; the
+prefix it protects is just three tokens long on this household.
+
+Fix, `PHRASE-01`: the phrasing round is a continuation of the forced
+call's prompt, never a fresh one: the same messages, then the
+assistant message carrying the tool call and the `tool` message
+carrying the result (the shape `composer.ts` already builds for the
+old path's composition call), the same `tools` block, `tool_choice:
+"none"`, the plan line and the composer's own `compositionInstruction`,
+capped by LAT-01's formula. Then a turn's two generations share their
+prefix, and the next turn's forced call shares it again. And one tools
+block per budget on every generation (the fixed sorted set U1 named,
+`tool_choice` carrying the difference: `required`, `auto`, `none`) so
+the offered and forced shapes match too. That second half changes the
+forced call's semantics (required over five tools, not one), so it is
+gated: the tool-calling bench at 50 repeats must show the fitting rate
+and the false-call rate no worse than the one-tool numbers (19 of 50,
+0 of 50); if it is worse, the forced call keeps its one-tool block and
+only the continuation lands, which is the larger half of the win.
+
+### (3) The flip line
+
+Not yet, on two fails. Rerun 3 runs when FORCED-CALL-01,
+CONTEXT-RECALL-01, PHRASE-01 and U4b have landed (SIGNAL-02 too if it
+has; otherwise the two computed rows are excluded from the speed bar
+and counted separately), with the bar's absolute allowance and the
+worst pair named, under a hold that stops every process on the box:
+the lanes' typechecks and headless repros included, enforced by
+stopping their turns, not by asking. The bar itself is unchanged
+otherwise: the five rows clean with no engine-classed row and no empty
+reply, the three controls 3/3, forced-search median under 10 s, plain
+turns within 1.25x or 300 ms, `cached_tokens` rising on every
+multi-turn row.
+
+### (4) The household default
+
+Off, as ruled on the owner's live turns; nothing in this run changes
+that. Turn 3's class of turn (`control-hi` 0.82x, `control-negative-
+spiderman` 1.19x, `control-negative-feeling-down` 1.37x) is already at
+parity where none of the three costs applies.
