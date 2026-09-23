@@ -137,6 +137,95 @@ check on purpose: `answer_from_this_conversation`'s quote must be a line
 of the context list, compared after whitespace and case folding, because
 its whole meaning is "this line answers it".
 
+## The live grounding refusals of 2026-09-22 late: diagnosis and work order
+
+After the term-level fix (c09ac25b, d0cd09bb) the live replay still ended
+nearly every world question, control rows included, on the policy
+refusal line "I don't actually have that in this conversation, so I won't
+guess." (new path 0 of 7 failed rows and 8 of 13 controls; old path 2 of
+6 and 12 of 13), while the three unit cases pass. No live trace was
+available to this diagnosis: `hub.log` carries no new-path turn lines,
+the replay's raw output was not found under `data-scratch`, and
+`u2-notes.md` is empty, so what follows is read from the code with the
+causes ranked, and the first item of the work order is the trace that
+makes the cause certain on the next run.
+
+**Where the line comes from.** `nodes/answer.ts` `policyRefusalLine()`
+prints that sentence for every `ungrounded_args` decision, and
+`nodes/policy.ts` produces `ungrounded_args` from four different
+branches: the answer-from-context tool reaching policy (line 133 area), a
+tool whose manifest does not load (the `loadManifestOnly` failure), the
+`argsGrounded()` false, and nothing else distinguishes them in the trace.
+The unit test (`tests/turnMachine/policy.test.ts`) exercises only
+`argsGrounded()` with `{ expression }`.
+
+**Cause 1, most likely: every string argument must pass on its own.**
+`argsGrounded()` (`nodes/policy.ts` line 80) loops over every string
+value in `args` and returns false on the first one with no shared term.
+The websearch manifest declares three arguments: `expression`,
+`category` (an enum, `images`) and `read_page`. Under `--jinja`
+tool calling the engine constrains the call to that schema, and the old
+path had to add `noteIgnoredModelWebsearchCategory()` because the 8B
+does send `category`; a call `{ expression: "president of Chile 2026",
+category: "images" }` grounds its expression and is refused on
+`category`, since "images" is never in the utterance. The same holds for
+any second string field a package declares. The test
+`argsGrounded({ expression: "president of Chile 2026" }, [...])` cannot
+see it. This explains a refusal on Dune and Chile alike whenever the
+model fills the second field.
+
+**Cause 2, a cost not a refusal: the utterance is not in the context list
+the quote check reads.** `nodes/context.ts` builds the list from the
+window's prior messages, memories, profile, clock and roster; the
+current utterance is `state.utterance` and is not an item. The guard
+`contextQuoteGrounded` (`machine.ts` line 150) checks the quote against
+`context` only, so a model that answers from context by quoting the
+question itself is sent to the forced search retry (`forceSearchOnly`),
+which then meets cause 1 again. Not the refusal, but it doubles the
+model calls on exactly these rows.
+
+**Cause 3, checked and not it:** the arguments reach policy as parsed
+objects (`startCompleteStream`'s generator returns
+`toolCallFromWire` results; `runOneGeneration` keeps `step.value`), the
+tokenizer (`lib/text.ts` `tokenize`) folds case and drops only a short
+stop list that contains none of the query words in the failing rows,
+and `groundingSourceTexts()` does include the utterance.
+
+**Work order, GROUND-01 (S, Sonnet: a live verification loop; after the
+weekly reset).** Files: `backend/src/lib/turnMachine/nodes/policy.ts`,
+`contract.ts`, `machine.ts`, `nodes/answer.ts`, `trace.ts`,
+`backend/scripts/bench/interimRuleMeasure.ts`,
+`backend/tests/turnMachine/policy.test.ts`.
+1. Split the reason: `PolicyDecision.reason` gains `unknown_tool` and
+   `context_tool_in_policy`; `ungrounded_args` keeps only the
+   `argsGrounded` false, and the policy node's trace entry records
+   `{ arg, terms, source_term_count }` for the refusing argument (terms,
+   never the raw values). The refusal line stays one sentence; the trace
+   is what changes.
+2. Ground the query, not every field: `argsGrounded()` checks only the
+   arguments the manifest schema types as free strings (`type: "string"`
+   without `enum`), skips enum-typed and boolean fields, and a call with
+   no free-string argument passes. Tests in these exact words:
+   `argsGrounded({ expression: "president of Chile 2026", category:
+   "images" }, ["who is the president of chile"])` is true;
+   `argsGrounded({ expression: "he born" }, [...])` stays false;
+   `argsGrounded({ expression: "how to pick a lock" }, ["when is dune 3
+   releasing"])` stays false; the schema passed in comes from the loaded
+   manifest, so the test loads `websearch`'s real manifest.
+3. The quote check reads the utterance too: `contextQuoteGrounded`
+   compares against `state.utterance` and the context list; a test where
+   the model quotes the question verbatim answers from context without
+   the forced retry.
+4. The bench counts a search by outcome: `interimRuleMeasure.ts` marks a
+   row searched only when the `tool` node's trace entry has `outcome.ok`
+   and a websearch proposal ran, never by the node's presence in the
+   trace (U2e's completeness fix makes presence always true). Test: a
+   scripted trace with a skipped tool node counts as not searched.
+Acceptance: the live replay rerun on the 8B, each refusal (if any) carrying
+the refusing argument's terms in its trace; the Dune and Chile rows pass;
+the control rows match or beat the old path; then U6's recommendation is
+re-read from that run. Exit: `scripts/check.sh`.
+
 ## What every turn writes
 
 - `stats.nodes[]`: one `NodeExecution` per node that ran or was skipped,
