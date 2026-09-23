@@ -19860,3 +19860,41 @@ Two gaps in the track's own report, recorded here: the 8B baseline was not obtai
 ## Firefox not verified: Playwright Firefox does not launch headless on the dev machine (2026-09-22)
 
 A live finding (the reasoning card's right edge clipping in Firefox) needed a Firefox capture to confirm - `scripts/screenshot.ts` gained `--firefox` (mirrors `--webkit` exactly: `firefox.launch()` from `playwright`, no other change to the pipeline), but Playwright's own Firefox build fails to launch headless on this machine: `Could not find profile folder`, immediately after `*** You are running in headless mode.`. Survives a full reinstall (the cached build deleted and re-downloaded clean, same failure) and there is no quarantine attribute on the app bundle. A known machine finding, not a code defect (2026-09-13): revisit on a machine where Playwright Firefox launches, or when this machine's install is repaired some other way. Until then, `--firefox` exists and works in principle for whoever gets there; the reasoning-clipping fix itself (`ReasoningText`'s own `pe-2`, NextChatPage.tsx) was verified in Chromium at 1440 and 390 and by code inspection of the shipped Element's own missing right padding, not by a Firefox capture.
+
+## ARCH-MEASURE-01: the per-model budget verdict (2026-09-22)
+
+Written at 22:45 from exactly what was measured; the results file's quiet-window header read "STATUS: FINAL" at that moment. Sources: `data-scratch/arch-measure/results.md` (the tool-calling bench at ten repeats per row on the fixed pipeline, the inverse-miss rows included; the query-rewrite bench; the routing corpus), `data-scratch/skeleton-results.md` (the bare skeleton on the live 8B), the track-3 verdict above, and U2d's live replay run relayed by the coordinator. Engine build b10797, models `qwen3-8b-instruct-q4-k-m.gguf`, `qwen3-4b-q4-k-m.gguf`, `qwen3-1.7b-q8-0.gguf`, side instances on a spare port with the hub's flags and one slot, Apple M4 Pro, 20-core GPU, 24 GB. The 27B is dropped (a coding fine-tune at 3.4 bits on another build, and its routed rows never replied). Latency was not measured tonight for any model; the 8B's numbers stand from LAT-00 to LAT-03 (183 tok/s effective prefill live, 405 on a fresh one-slot instance, 36 tok/s decode) and the skeleton (2.5 s median, 3.9 s p90 to first visible token).
+
+**Measured.**
+
+| Model | False calls, bare prompt (50 negatives) | False calls, production prompt, outside always-offer (50) | Fitting searches called (50, the inverse miss) | Query rewrite (15 rows, 10 repeats) |
+|---|---|---|---|---|
+| 8B | 0 (0%) | 0 (0%) | 19 (38%) | not usable: 4 of 15 rows attempted under a running gate, one row lost to contention entirely |
+| 4B | 0 (0%) | 5 (10%) | 19 (38%), unconfirmed: inherited from a pre-crash log and identical to the 8B's figure; a confirming run is owed | not measured (5 rows in a run whose engine died) |
+| 1.7B | 0 (0%) | 0 (0%) | 0 (0%), two independent runs agree | 5 of 15 rows clean: 9, 5, 0, 6, 4 of 10; rows 6 to 15 not attempted |
+
+**Derivation rules, fixed before the numbers.** `always_search` is on when a model calls a fitting search in fewer than 95 percent of repeats (an inverse miss over one in twenty). `model_transitions` is on when the model's false-call rate on the production prompt is at or under 2 percent (Fix E's bar) and its query rewrite passes 90 percent of rows at 9 of 10; an unmeasured rewrite takes the conservative value and the cell is marked. `rounds` is 1 when `model_transitions` is on, else 0; 2 only when a replay or corpus row needs it, and none does. `thinking_for_minors` is false everywhere (the reasoning ruling). `context_tokens` is the prompt budget the engine assembles today (about 4,000 characters of system prompt plus the window); deadlines are the state record's starting values.
+
+**The budget records, starting values.**
+
+| Field | 8B (`qwen3-8b-instruct-q4-k-m`) | 4B (`qwen3-4b-q4-k-m`) | 1.7B (`qwen3-1.7b-q8-0`) |
+|---|---|---|---|
+| `always_search` | on (19 of 50) | on (19 of 50, unconfirmed) | on (0 of 50) |
+| `model_transitions` | on, provisional: false calls 0 percent, rewrite pending a quiet run | off: false calls 10 percent on the production prompt fail the 2 percent bar; rewrite not measured | off: rewrite 5 rows at 24 of 50, under the bar; and 0 fitting searches means the model never chooses a tool on its own |
+| `rounds` | 1 | 0 | 0 |
+| `tools_offered` | the ordinary set (recall, remember, websearch) plus the installed packages' fixed sorted set per U1 | the same set, unused while `model_transitions` is off | the same, unused |
+| `answer_from_context_tool` | on | off (no model-driven transitions) | off |
+| `thinking_for_minors` | false | false | false |
+| `context_tokens` | 4,000 | 4,000 | 2,048 (an 8K context engine) |
+| deadlines (model, tool, total) | 20 s, 10 s, 45 s | 20 s, 10 s, 45 s | 20 s, 10 s, 45 s |
+| measured on | 2026-09-22, b10797 | 2026-09-22, b10797, one row unconfirmed | 2026-09-22, b10797 |
+
+What "off" means for the 4B and the 1.7B: the machine runs identically, the model node runs with `tool_choice: "none"`, the interim rule's forced search is still the engine's (always-search on means the search runs with the model writing nothing), so a world question still gets a sourced answer from the engine-built fallback query, and the model phrases. That is the robot-class shape, and the 1.7B is the first model measured into it.
+
+**Which catalog records the U2 session fills.** The catalog holds one chat record today, the 8B (`modelCatalog.ts`, id `qwen3-8b-instruct-q4-k-m`); it gets the 8B column as `turn_budget` (spec first, U2a). The 4B and the 1.7B are files on disk (the 4B serves the judge role, the 1.7B is unassigned), not catalog chat records; they get records only if they are offered as chat models, and until then a model without a record runs with `model_transitions` off, which their numbers say is right anyway. The 4B column above is the record to write if it is offered.
+
+**The query-rewrite acceptance** (U2's own number for "the model writes the query") is pending a quiet 8B run of all 15 rows; the four attempted rows scored 3 of 4, 4 of 4, contended, 9 of 9 among the repeats that replied, which is consistent with passing and proves nothing at this sample. The 1.7B's five rows (24 of 50) say a 1.7B-class model does not write queries reliably, which its budget already reflects.
+
+**U6, the flip: not yet.** U2d's live replay tonight: the old path passed 2 of 6 failed rows and 12 of 13 controls (solid); the new path passed 0 of 7 failed rows and 8 of 13 controls, under a grounding check built as a literal substring match that the state record never meant (it refused rephrased queries and control rows alike; the record now states the term-level contract, 2a28e4e8). The recommendation is to rerun U2d after that fix and decide on the rerun; tonight's numbers are recorded as they are and do not count against the design. The flip's bar is unchanged: every failed row passes on the new path, no control row regresses, and "hi" is under the skeleton's 2.5 s median.
+
+**Still owed, as MEASURE-02:** the 8B query-rewrite on all 15 rows in a gate-free window; the 1.7B rewrite rows 6 to 15; a confirming 4B tool-calling run (its inverse-miss row) and its rewrite; latency per model with the LAT-03 probe; the Studio's model on arrival. None of these blocks U2's build; the 8B rewrite blocks U2d's acceptance and the 4B confirmation blocks its record.
