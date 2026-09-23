@@ -13,6 +13,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
+import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import { StackError } from "@/lib/stack/errors";
 import { getStackUpdatesState, checkStackUpdates, applyStackEngineUpdate, rollbackStackEngine } from "@/lib/stackUpdates";
 
@@ -228,7 +229,13 @@ const overviewRoute = createRoute({
   },
 });
 enginesRoutes.openapi(overviewRoute, async (c) => {
-  if (!isStackConfigured()) return c.json({ configured: false, roles: [], engines: [], budget: null }, 200);
+  // VOICE-LIVE-01b: `roles` used to be unconditionally empty here - the
+  // common household case (no Stack) could never read any role as
+  // ready, no matter how healthy Home's own chat/tts/stt/embed
+  // supervisors really were. homeSupervisorRoles.ts is the same
+  // RoleInfo shape, the other source (docs/dev.md's own VOICE-LIVE-01b
+  // note has the full trace).
+  if (!isStackConfigured()) return c.json({ configured: false, roles: await getHomeSupervisorRoles(), engines: [], budget: null }, 200);
   try {
     const [{ roles }, { engines }, budget] = await Promise.all([getStackClient().roles(), getStackClient().engines(), getStackClient().budget()]);
     return c.json({ configured: true, roles, engines, budget }, 200);
