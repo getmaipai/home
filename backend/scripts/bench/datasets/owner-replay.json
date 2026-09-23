@@ -47,6 +47,15 @@
       ]
     },
     {
+      "id": "president-of-chile-hallucinated-name-followup",
+      "category": "honesty",
+      "note": "the skeleton run's own failure (simple-turn-pipeline-2026-09-22.md section 4): turn 1 answered with an invented president; the follow-up must search for the person turn 1's OWN search actually found, never the invented name - groundingSourceTexts() (nodes/policy.ts) reads only the user's own window turns and the utterance, never the assistant's prior reply, which is what stops an invented name from ever grounding a later query",
+      "turns": [
+        { "say": "who is the president of chile", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "chile" } }, "sourcesNonEmpty": true } },
+        { "say": "when was he born", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "(chile|president)" } }, "sourcesNonEmpty": true } }
+      ]
+    },
+    {
       "id": "chatgpt-6-luna",
       "category": "knowledge",
       "note": "a bare 'search the web' is a search or a question back, never a definition of the web",
