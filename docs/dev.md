@@ -22584,3 +22584,86 @@ not reproduced here at length.
 
 Not diagnosed further per the coordinator's own stop-here instruction -
 Fable's own to rule on.
+
+## BISECT-02 ruling: two collapses, two fixes, one table (2026-09-23)
+
+PARITY-BISECT-02's table (above, 2c13909a) settles the written-reply
+collapse. A system message as such does not collapse the 8B (the
+one-line control 697 tokens, 0.95x of the 736 floor, structured; plus
+the identity line 753, 1.02x). STABLE_SYSTEM_SUFFIX alone takes it to
+101 tokens, 0.14x, no headings, no lists. FORMALITY_FRAGMENT_WRITTEN's
+"writes a relaxed message" alone produces the all-lowercase reply (3
+of 3 with it, 0 of 3 once removed). And with the suffix removed from
+the full prefix the reply is still 121 tokens, so one more fragment
+among the complexity dial, the written engagement, the filler line, the
+information policy and WRITTEN_POLICY itself is sufficient on its own,
+not yet isolated.
+
+### (1) The suffix, and the fix in the design's terms
+
+The suffix is six sentences joined in `turnEngine.ts`, outside the
+persona file B's six fixes touched. The second sentence the model
+reads on every register says "concise", and the block casts a spoken
+friend ("respond to it the way a friend would"). The fix is not a
+better suffix string: it is the one table the reply-floor record
+asked for. Every sentence of the stable prefix is declared once, in
+`persona.ts`, as spoken, written, or class-neutral, and
+`buildStablePrefix(persona, surfaceClass)` composes from that table;
+`STABLE_SYSTEM_SUFFIX` retires into it sentence by sentence: "Be warm
+and honest. Nothing you say leaves this house." (neutral; "concise"
+goes, because length is the engagement dial's job and only on the
+spoken class), the safety sentence (neutral), the two knowledge
+sentences (neutral: answer from what you know, use the lookup when
+unsure), the "can't watch, taste or visit" sentence (neutral), the
+friend sentence (spoken only), the household-facts sentence (neutral).
+Because BISECT-02 added the suffix whole, BISECT-03 runs its six
+sentences one at a time on the control-plus-identity base, so the
+written suffix is evidence rather than this guess.
+
+### (2) The formality wording
+
+Confirmed as the lowercase: the "relaxed message" reads as a text
+message. The written variants keep the dial's tone words only and
+never name a message: casual "Write in a relaxed, friendly tone, with
+contractions (it's, you're, don't)"; neutral "Write in a natural,
+unforced tone, with contractions, neither stiff nor overly casual";
+formal "Write in complete, well-formed sentences without contractions,
+polite and precise, never stiff or robotic".
+
+### (3) The second sufficient fragment: BISECT-03
+
+Control plus identity plus each of the remaining six alone, three reps
+each, predicted tokens and structure per rep: COMPLEXITY_FRAGMENT
+(standard: "no unnecessarily complex sentence structure"),
+ENGAGEMENT_FRAGMENT_WRITTEN (brief: "then stop"), FILLER_FRAGMENT
+(none: "clean and direct"), INFORMATION_HANDLING_POLICY ("Skip detail
+nobody asked for ... round the way people round in conversation"),
+WRITTEN_POLICY; plus the six suffix sentences from (1). My order of
+suspicion, for the record and not for the ruling: the information
+policy's opening sentence (a direct instruction against completeness),
+the written engagement's "then stop", the complexity dial's
+"sentence structure". Whichever the table names gets its written
+variant in the table; two sufficient fragments both do; a fragment
+that collapses only in combination is reported as such.
+
+### (4) The row
+
+`PREFIX-CLASS-01` (M, Sonnet), landed before PHRASE-01 because the
+phrasing round continues this prompt: the per-class table, the suffix
+and formality variants from (1) and (2), BISECT-03's fragment, and the
+acceptance that closes the collapse: on the written set (WRITTEN-
+PARITY-01's rows plus the prompt-cache question) every conceptual adult
+row's predicted tokens are at least 0.8 times the bare thinking-off
+floor with headings or lists present, lowercase 0 of 3, the parity
+judge column read by a person on every failure; and no spoken row of
+the replay set regresses, since the spoken variants do not change.
+
+### The reply-floor layer list, updated
+
+Two layers B's three-way run added and the two BISECT-02 measured, for
+the list in "The reply floor: the layers that remove substance today":
+`FORMALITY_FRAGMENT` on every register ("not like a written page being
+read aloud", now with a written variant per level), the few-shot
+examples block (spoken one-liners, omitted on the written class,
+WRITTEN-EXAMPLES-01 later), `STABLE_SYSTEM_SUFFIX` (measured: 0.14x on
+its own) and, pending BISECT-03, one of the five fragments above.
