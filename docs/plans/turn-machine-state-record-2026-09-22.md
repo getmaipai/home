@@ -46,6 +46,7 @@ interface TurnBudget {            // one record per model, in the catalog
   always_search: boolean;         // the interim rule
   answer_from_context_tool: boolean;
   model_transitions: boolean;     // false on the robot's Pi
+  query_writer: "model" | "builder"; // who writes a search: the model's argument, or the engine's builder (also the fallback when the model's argument fails grounding)
   context_tokens: number;
   thinking_budget_tokens: number;
   thinking_for_minors: boolean;   // false by default: a minor's turn runs with thinking off
