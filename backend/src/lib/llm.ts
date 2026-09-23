@@ -286,7 +286,14 @@ function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
       tools: offering ? tools!.map(toToolDefinition) : undefined,
       tool_choice: offering ? (tool_choice ?? "auto") : undefined,
       chat_template_kwargs: { enable_thinking: !!thinking },
-      cache_prompt: true,
+      // ENGINE-CONTRACT-01 (dev.md 2026-09-23): GROUND-01's own live
+      // rerun may need one pass with the prompt cache off, to read the
+      // grounding bar on the forced rows without llama-server b10797's
+      // own cache-hit defect (tool_choice: "required" going advisory on
+      // a warm KV cache) in the way - never set as a standing default,
+      // the operator sets it per invocation for exactly that rerun. The
+      // product fix is ENGINE-CONTRACT-02, never this flag.
+      cache_prompt: process.env.MAIPAI_BENCH_CACHE_PROMPT_FALSE === "1" ? false : true,
       id_slot: 0,
     },
   };

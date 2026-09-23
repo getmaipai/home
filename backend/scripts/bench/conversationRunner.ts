@@ -708,6 +708,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     // The turn's own completions: the interrupted one is the first
     // (a summary refresh may follow it on the same proxy).
     const own = requests[0];
+    const requiredCall = requests.find((r) => r.toolChoice === "required");
     const currentMediaUrls = (driven.value?.media_items ?? (driven.value?.media ? [driven.value.media] : [])).map((item) => item.url);
     const previousUrls = previousMediaUrls[conversationId] ?? [];
     const mediaDisjointFromPrevious = previousUrls.length > 0 && currentMediaUrls.length > 0 && currentMediaUrls.every((url) => !previousUrls.includes(url));
@@ -783,6 +784,12 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
         .where(and(eq(episodesTable.personId, actor.id), eq(episodesTable.speaker, "assistant"), ne(episodesTable.conversationId, conversationId)))
         .all()
         .map((r) => r.text),
+      // ENGINE-CONTRACT-01 (dev.md 2026-09-23): the first completion
+      // this turn actually forced, read straight off the recording
+      // proxy - null when none was.
+      requiredHonored: requiredCall?.hasToolCalls ?? null,
+      requiredCachedTokens: requiredCall?.cachedTokens ?? null,
+      requiredPromptTokens: requiredCall?.promptTokens ?? null,
     };
     previousReplies[conversationId] = observed.reply;
     previousMediaUrls[conversationId] = currentMediaUrls;

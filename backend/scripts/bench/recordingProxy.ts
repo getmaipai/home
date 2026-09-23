@@ -24,6 +24,25 @@ export interface RecordedRequest {
   completed: boolean;
   /** The client aborted the request before the upstream reply ended. */
   aborted: boolean;
+  /** GROUND-01's live rerun (ENGINE-CONTRACT-01's ruling, dev.md
+   * 2026-09-23): the request's own `tool_choice`, `undefined` when the
+   * request didn't send one - read here, not reconstructed later, so
+   * "was this call forced" is never guessed from context. */
+  toolChoice?: string;
+  /** Whether the reply carried at least one tool call, streamed or not -
+   * `required_honored` for a request whose `toolChoice` was `"required"`
+   * is exactly this flag; false on a `tool_choice: "required"` reply
+   * that answered in plain text instead is ENGINE-CONTRACT-01's own
+   * defect, caught here at the wire, never inferred from the trace. */
+  hasToolCalls: boolean;
+  /** llama-server's own OpenAI-shaped extension,
+   * `usage.prompt_tokens_details.cached_tokens` - `undefined` when the
+   * engine's response carried no `usage` at all (the test stub, an
+   * older engine). */
+  cachedTokens?: number;
+  /** `usage.prompt_tokens` - `undefined` on the same terms as
+   * `cachedTokens`. */
+  promptTokens?: number;
 }
 
 export interface RecordingProxy {
@@ -69,6 +88,50 @@ export function extractModelText(raw: string): string {
   return text;
 }
 
+export interface ModelMeta {
+  hasToolCalls: boolean;
+  cachedTokens?: number;
+  promptTokens?: number;
+}
+
+/** ENGINE-CONTRACT-01's own rerun harness (dev.md 2026-09-23): whether
+ * a reply carried a tool call (streamed as `delta.tool_calls` fragments,
+ * or `message.tool_calls` whole on a non-streamed reply) and the
+ * engine's own cache telemetry, read the same line-by-line way
+ * extractModelText() already does - never a second SSE parser, just a
+ * second thing read off the same lines. `usage` typically arrives only
+ * on the final chunk/object, so the last one seen wins. */
+export function extractModelMeta(raw: string): ModelMeta {
+  const trimmed = raw.trim();
+  type Usage = { prompt_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
+  let hasToolCalls = false;
+  let usage: Usage | undefined;
+  const consider = (parsed: { choices?: { delta?: { tool_calls?: unknown[] }; message?: { tool_calls?: unknown[] } }[]; usage?: Usage }) => {
+    const choice = parsed.choices?.[0];
+    if ((choice?.delta?.tool_calls?.length ?? 0) > 0 || (choice?.message?.tool_calls?.length ?? 0) > 0) hasToolCalls = true;
+    if (parsed.usage) usage = parsed.usage;
+  };
+  if (trimmed.startsWith("{")) {
+    try {
+      consider(JSON.parse(trimmed));
+    } catch {
+      // not JSON - nothing to read
+    }
+  } else {
+    for (const line of raw.split("\n")) {
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        consider(JSON.parse(payload));
+      } catch {
+        // a keepalive or a partial line
+      }
+    }
+  }
+  return { hasToolCalls, cachedTokens: usage?.prompt_tokens_details?.cached_tokens, promptTokens: usage?.prompt_tokens };
+}
+
 /** A Bun.serve() that forwards every request to the real chat engine
  * and keeps, per completion request, the system messages the model saw
  * and the tool names offered. The response streams through untouched. */
@@ -104,6 +167,8 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
                 : (parsed.messages ?? []).filter((m) => typeof m.content === "string").flatMap((m) => m.content.match(/https?:\/\/[^\s"'<>)\]]+/g) ?? []),
             completed: false,
             aborted: false,
+            toolChoice: parsed.tool_choice,
+            hasToolCalls: false,
           };
           requests.push(recorded);
         } catch {
@@ -170,15 +235,25 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
             tail += piece;
             const lines = tail.split("\n");
             tail = lines.pop() ?? "";
-            text += extractModelText(lines.join("\n"));
+            const joined = lines.join("\n");
+            text += extractModelText(joined);
             record.responseText = text;
+            const meta = extractModelMeta(joined);
+            if (meta.hasToolCalls) record.hasToolCalls = true;
+            if (meta.cachedTokens !== undefined) record.cachedTokens = meta.cachedTokens;
+            if (meta.promptTokens !== undefined) record.promptTokens = meta.promptTokens;
           } else {
             nonStream += piece;
           }
           controller.enqueue(chunk);
         },
         flush() {
+          const finalRaw = streamed ? tail : nonStream;
           record.responseText = streamed ? text + extractModelText(tail) : extractModelText(nonStream);
+          const meta = extractModelMeta(finalRaw);
+          if (meta.hasToolCalls) record.hasToolCalls = true;
+          if (meta.cachedTokens !== undefined) record.cachedTokens = meta.cachedTokens;
+          if (meta.promptTokens !== undefined) record.promptTokens = meta.promptTokens;
           record.completed = true;
           finish();
         },

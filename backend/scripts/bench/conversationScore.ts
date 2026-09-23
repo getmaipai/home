@@ -134,6 +134,20 @@ export interface TurnObserved {
    * bodies delivered to the person since the turn started, after the
    * wait (paired with `deliveries`' own type list). */
   notificationBodies?: readonly { type: string; body: string }[];
+  /** ENGINE-CONTRACT-01 (dev.md 2026-09-23): whether this turn's first
+   * `tool_choice: "required"` completion actually carried a tool call -
+   * `null` when no completion this turn was forced (an ordinary `auto`
+   * turn, or no model call at all), read straight off the recording
+   * proxy, never inferred from whether a search ran (a grounding
+   * refusal after a real call is a different thing from the engine
+   * never returning a call at all). */
+  requiredHonored?: boolean | null;
+  /** The same forced completion's own `usage.prompt_tokens_details.
+   * cached_tokens` and `usage.prompt_tokens` - `null` on the same terms
+   * as `requiredHonored` (no forced completion, or the engine returned
+   * no `usage`). */
+  requiredCachedTokens?: number | null;
+  requiredPromptTokens?: number | null;
 }
 
 export interface Check {
@@ -615,7 +629,7 @@ const cell = (t: string) => t.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
  * and a blank verdict column; a scored row prints the checks that
  * failed (or "ok"). */
 export function renderTable(scores: readonly TurnScore[]): string {
-  const lines = ["| conversation | turn | said | expected | observed | pass | verdict | first delta ms | first sentence ms | total ms |", "|---|---|---|---|---|---|---|---|---|---|"];
+  const lines = ["| conversation | turn | said | expected | observed | pass | verdict | first delta ms | first sentence ms | total ms | required honoured | cached tokens |", "|---|---|---|---|---|---|---|---|---|---|---|---|"];
   for (const s of scores) {
     const failed = s.checks.filter((c) => !c.pass);
     // A failing scored row carries the reply too: the reader ranks what
@@ -632,7 +646,9 @@ export function renderTable(scores: readonly TurnScore[]): string {
             ? `ok; "${cell(s.observed.reply)}"`
             : "ok";
     const pass = s.pass === null ? "" : s.pass ? "yes" : s.hard ? "NO (hard)" : "no";
-    lines.push(`| ${s.conversationId} | ${s.turnIndex + 1} | ${cell(s.say)} | ${cell(s.expected)} | ${cell(observed)} | ${pass} | ${s.humanVerdict ? "" : "n/a"} | ${ms(s.observed.firstDeltaMs)} | ${ms(s.observed.firstSentenceMs)} | ${ms(s.observed.totalMs)} |`);
+    const requiredHonoured = s.observed.requiredHonored === null || s.observed.requiredHonored === undefined ? "" : s.observed.requiredHonored ? "yes" : "NO (ENGINE-CONTRACT-01)";
+    const cachedTokens = s.observed.requiredCachedTokens ?? "";
+    lines.push(`| ${s.conversationId} | ${s.turnIndex + 1} | ${cell(s.say)} | ${cell(s.expected)} | ${cell(observed)} | ${pass} | ${s.humanVerdict ? "" : "n/a"} | ${ms(s.observed.firstDeltaMs)} | ${ms(s.observed.firstSentenceMs)} | ${ms(s.observed.totalMs)} | ${requiredHonoured} | ${cachedTokens} |`);
   }
   return lines.join("\n");
 }

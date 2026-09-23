@@ -42,8 +42,15 @@ async function main(): Promise<void> {
   const upstream = process.env.MAIPAI_LLAMA_SERVER_URL ?? "http://127.0.0.1:8788";
   const ownDataDir = mkdtempSync(join(tmpdir(), "interim-rule-measure-"));
   process.env.MAIPAI_DATA_DIR = ownDataDir;
-  process.env.MAIPAI_LLAMA_SERVER_URL = upstream;
   if (!process.env.MAIPAI_EMBED_URL) process.env.MAIPAI_EMBED_URL = "http://127.0.0.1:8794";
+  // ENGINE-CONTRACT-01 (dev.md 2026-09-23): the recording proxy in
+  // front of the real engine, the same one replay.ts's --hub-live uses,
+  // so this script's own rows carry cached_tokens/prompt_tokens/
+  // required_honored per request too - reset before each turn (the
+  // same per-turn scoping conversationRunner.ts already relies on).
+  const { startRecordingProxy } = await import("./recordingProxy");
+  const proxy = startRecordingProxy(upstream);
+  process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
 
   const setup = await import("./setup");
   await setup.startBench();
@@ -78,6 +85,11 @@ async function main(): Promise<void> {
     replyText: string;
     pass: boolean;
     note: string;
+    /** ENGINE-CONTRACT-01: null when this turn made no `tool_choice:
+     * "required"` call at all. */
+    requiredHonored: boolean | null;
+    requiredCachedTokens: number | null;
+    requiredPromptTokens: number | null;
   }
   const rows: Row[] = [];
 
@@ -88,11 +100,24 @@ async function main(): Promise<void> {
     try {
       for (let i = 0; i < turns.length; i++) {
         await waitForQuiet();
+        proxy.reset();
         const t0 = performance.now();
         const result = await runTurnNext(people.owner, "chat", turns[i]!, { conversationId });
         const ttftMs = performance.now() - t0;
+        // A review caught this reading proxy.requests immediately: the
+        // teed reply's own flush() (which sets hasToolCalls/cachedTokens/
+        // promptTokens from the last SSE chunk) lands a tick after the
+        // client's own read finishes (conversationRunner.ts's identical
+        // await, same reason) - reading before this settles could see
+        // the pre-flush defaults and report a real honoured call as a
+        // miss with no usage.
+        await proxy.settled();
+        const requiredCall = proxy.requests.find((r) => r.toolChoice === "required");
+        const requiredHonored = requiredCall?.hasToolCalls ?? null;
+        const requiredCachedTokens = requiredCall?.cachedTokens ?? null;
+        const requiredPromptTokens = requiredCall?.promptTokens ?? null;
         if (!result.ok) {
-          rows.push({ conversationId: conversationId ?? "", label, alwaysSearch, repeat, turnIndex: i, say: turns[i]!, ttftMs: null, searched: false, answeredFromContext: false, sourced: false, replyText: "", pass: false, note: `error: ${result.error}` });
+          rows.push({ conversationId: conversationId ?? "", label, alwaysSearch, repeat, turnIndex: i, say: turns[i]!, ttftMs: null, searched: false, answeredFromContext: false, sourced: false, replyText: "", pass: false, note: `error: ${result.error}`, requiredHonored, requiredCachedTokens, requiredPromptTokens });
           continue;
         }
         if (result.kind !== "immediate") continue;
@@ -120,6 +145,9 @@ async function main(): Promise<void> {
           replyText: result.value.reply.text.slice(0, 200),
           pass: result.value.safety.action !== "refuse" && result.value.reply.text.length > 0,
           note: (result.value as { source: string }).source,
+          requiredHonored,
+          requiredCachedTokens,
+          requiredPromptTokens,
         });
       }
     } finally {
@@ -159,9 +187,15 @@ async function main(): Promise<void> {
       const contextRate = subset.length ? subset.filter((r) => r.answeredFromContext).length / subset.length : 0;
       const ttfts = subset.map((r) => r.ttftMs).filter((v): v is number => v !== null);
       const medianTtft = ttfts.length ? ttfts.sort((a, b) => a - b)[Math.floor(ttfts.length / 2)] : null;
-      console.log(`${label} always_search=${alwaysSearch}: pass ${(passRate * 100).toFixed(0)}%, searched ${(searchedRate * 100).toFixed(0)}%, answer_from_context ${(contextRate * 100).toFixed(0)}%, median TTFT ${medianTtft}ms, n=${subset.length}`);
+      // ENGINE-CONTRACT-01: only over turns that actually made a forced
+      // call - most turns in this script never do (only the interim
+      // rule's own first call per conversation does).
+      const forced = subset.filter((r) => r.requiredHonored !== null);
+      const missShare = forced.length ? forced.filter((r) => r.requiredHonored === false).length / forced.length : null;
+      console.log(`${label} always_search=${alwaysSearch}: pass ${(passRate * 100).toFixed(0)}%, searched ${(searchedRate * 100).toFixed(0)}%, answer_from_context ${(contextRate * 100).toFixed(0)}%, median TTFT ${medianTtft}ms, n=${subset.length}, required_miss ${missShare === null ? "n/a" : `${(missShare * 100).toFixed(0)}%`} (${forced.length} forced calls)`);
     }
   }
+  proxy.stop();
 }
 
 if (import.meta.main) {

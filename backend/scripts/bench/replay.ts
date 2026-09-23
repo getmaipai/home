@@ -130,6 +130,19 @@ interface RowVerdict {
   id: string;
   category: "failed" | "control";
   passRepeats: number;
+  /** ENGINE-CONTRACT-01 (dev.md 2026-09-23): repeats whose only bad
+   * checks are on a turn the engine itself never honoured
+   * (`requiredHonored === false` on a `tool_choice: "required"` call) -
+   * counted, but excluded from `passRepeats`/the grounding pass bar,
+   * because the row measures whether the grounding check passes the
+   * searches the model does make, not whether the engine makes one. */
+  engineRepeats: number;
+  /** How many of this row's own repeats made at least one
+   * `tool_choice: "required"` call at all (`observed.requiredHonored`
+   * is `true` or `false`, never `null`, on some turn) - the real
+   * denominator for "engine miss share," never `repeats` itself (most
+   * rows, and most turns within a forced row, never force a call). */
+  forcedRepeats: number;
   failures: string[];
 }
 
@@ -137,12 +150,15 @@ interface RowVerdict {
  * times) back into one verdict per fixture row: a row counts as
  * passing a repeat only when every one of its turns passed that
  * repeat (the plan's own bar, "on all three repeats"). */
-export function summarizeRepeats(rows: readonly { id: string; category: "failed" | "control" }[], scoresByConversationId: ReadonlyMap<string, readonly { pass: boolean | null; turnIndex: number; checks: readonly { name: string; pass: boolean; detail: string }[] }[]>, repeats: number): RowVerdict[] {
+export function summarizeRepeats(rows: readonly { id: string; category: "failed" | "control" }[], scoresByConversationId: ReadonlyMap<string, readonly { pass: boolean | null; turnIndex: number; checks: readonly { name: string; pass: boolean; detail: string }[]; observed: { requiredHonored?: boolean | null } }[]>, repeats: number): RowVerdict[] {
   return rows.map((row) => {
     let passRepeats = 0;
+    let engineRepeats = 0;
+    let forcedRepeats = 0;
     const failures: string[] = [];
     for (let r = 1; r <= repeats; r++) {
       const scores = scoresByConversationId.get(`${row.id}#${r}`) ?? [];
+      if (scores.some((s) => s.observed.requiredHonored === true || s.observed.requiredHonored === false)) forcedRepeats++;
       const bad = scores.filter((s) => s.pass === false);
       if (bad.length === 0 && scores.length > 0) {
         passRepeats++;
@@ -152,11 +168,14 @@ export function summarizeRepeats(rows: readonly { id: string; category: "failed"
         // a silent zero-score repeat read as a mysterious non-pass
         // without this line naming why.
         failures.push(`repeat ${r}: no scores (the conversation run threw - see the console log above)`);
+      } else if (bad.every((b) => b.observed.requiredHonored === false)) {
+        engineRepeats++;
+        failures.push(`repeat ${r}: engine (ENGINE-CONTRACT-01) - tool_choice required not honoured on turn(s) ${bad.map((b) => b.turnIndex + 1).join(", ")}`);
       } else {
         for (const b of bad) failures.push(`repeat ${r} turn ${b.turnIndex + 1}: ${b.checks.filter((c) => !c.pass).map((c) => `${c.name} (${c.detail})`).join("; ")}`);
       }
     }
-    return { id: row.id, category: row.category, passRepeats, failures };
+    return { id: row.id, category: row.category, passRepeats, engineRepeats, forcedRepeats, failures };
   });
 }
 
@@ -289,16 +308,31 @@ async function runMain(): Promise<void> {
     searxng.stop();
   }
 
+  let totalEngineRepeats = 0;
+  let totalForcedRepeats = 0;
   for (const label of ["failed", "control"] as const) {
     const labelRows = rows.filter((r) => r.category === label);
     const verdicts = summarizeRepeats(labelRows, scoresByConversationId, REPEATS);
     console.log(`\n## ${label === "failed" ? "Failed rows (must pass)" : "Control rows (must not regress)"}\n`);
     for (const v of verdicts) {
-      console.log(`${v.passRepeats === REPEATS ? "ok  " : "FAIL"} ${v.id} (${v.passRepeats}/${REPEATS} repeats clean)`);
+      // ENGINE-CONTRACT-01: a row clean on the grounding bar is
+      // passRepeats + engineRepeats === REPEATS (no REAL grounding
+      // failure), reported separately from a row with zero engine
+      // misses at all.
+      const groundingClean = v.passRepeats + v.engineRepeats === REPEATS;
+      const label2 = groundingClean && v.engineRepeats === 0 ? "ok  " : groundingClean ? "ok* " : "FAIL";
+      console.log(`${label2} ${v.id} (${v.passRepeats}/${REPEATS} clean, ${v.engineRepeats}/${REPEATS} engine misses)`);
       for (const f of v.failures.slice(0, REPEATS)) console.log(`       ${f}`);
+      totalEngineRepeats += v.engineRepeats;
+      totalForcedRepeats += v.forcedRepeats;
     }
-    const cleanRows = verdicts.filter((v) => v.passRepeats === REPEATS).length;
-    console.log(`\n${cleanRows}/${verdicts.length} ${label} rows clean on every repeat`);
+    const cleanRows = verdicts.filter((v) => v.passRepeats + v.engineRepeats === REPEATS).length;
+    const trueCleanRows = verdicts.filter((v) => v.passRepeats === REPEATS).length;
+    console.log(`\n${cleanRows}/${verdicts.length} ${label} rows clean on every repeat's grounding bar (${trueCleanRows}/${verdicts.length} with zero engine misses); ok* marks a row with at least one engine miss`);
+  }
+  if (totalForcedRepeats > 0) {
+    console.log(`\n## ENGINE-CONTRACT-01 miss share\n`);
+    console.log(`${totalEngineRepeats}/${totalForcedRepeats} repeats classified engine (tool_choice required not honoured)`);
   }
 
   console.log("\n## Full table\n");

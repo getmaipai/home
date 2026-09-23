@@ -103,17 +103,39 @@ describe("owner-replay.json", () => {
   test("summarizeRepeats: a row counts as clean only when every repeat's every turn passed", () => {
     const rows = [{ id: "a", category: "failed" as const }, { id: "b", category: "control" as const }];
     const scoresByConversationId = new Map([
-      ["a#1", [{ pass: true, turnIndex: 0, checks: [] }]],
-      ["a#2", [{ pass: false, turnIndex: 0, checks: [{ name: "tool", pass: false, detail: "ran none" }] }]],
-      ["a#3", [{ pass: true, turnIndex: 0, checks: [] }]],
-      ["b#1", [{ pass: true, turnIndex: 0, checks: [] }]],
-      ["b#2", [{ pass: true, turnIndex: 0, checks: [] }]],
-      ["b#3", [{ pass: true, turnIndex: 0, checks: [] }]],
+      ["a#1", [{ pass: true, turnIndex: 0, checks: [], observed: {} }]],
+      ["a#2", [{ pass: false, turnIndex: 0, checks: [{ name: "tool", pass: false, detail: "ran none" }], observed: {} }]],
+      ["a#3", [{ pass: true, turnIndex: 0, checks: [], observed: {} }]],
+      ["b#1", [{ pass: true, turnIndex: 0, checks: [], observed: {} }]],
+      ["b#2", [{ pass: true, turnIndex: 0, checks: [], observed: {} }]],
+      ["b#3", [{ pass: true, turnIndex: 0, checks: [], observed: {} }]],
     ]);
     const verdicts = summarizeRepeats(rows, scoresByConversationId, 3);
     expect(verdicts.find((v) => v.id === "a")?.passRepeats).toBe(2);
     expect(verdicts.find((v) => v.id === "a")?.failures.length).toBeGreaterThan(0);
     expect(verdicts.find((v) => v.id === "b")?.passRepeats).toBe(3);
     expect(verdicts.find((v) => v.id === "b")?.failures.length).toBe(0);
+  });
+
+  // ENGINE-CONTRACT-01 (dev.md 2026-09-23): a repeat whose only bad
+  // check is on a turn the engine itself never honoured a forced call
+  // on is counted separately, never as an ordinary grounding failure.
+  test("summarizeRepeats: a repeat failing only on requiredHonored:false is classed engine, not a real failure", () => {
+    const rows = [{ id: "a", category: "failed" as const }];
+    const scoresByConversationId = new Map([
+      ["a#1", [{ pass: true, turnIndex: 0, checks: [], observed: {} }]],
+      ["a#2", [{ pass: false, turnIndex: 0, checks: [{ name: "toolRan", pass: false, detail: "no tool ran" }], observed: { requiredHonored: false } }]],
+      ["a#3", [{ pass: true, turnIndex: 0, checks: [], observed: {} }]],
+    ]);
+    const verdicts = summarizeRepeats(rows, scoresByConversationId, 3);
+    const a = verdicts.find((v) => v.id === "a")!;
+    expect(a.passRepeats).toBe(2);
+    expect(a.engineRepeats).toBe(1);
+    // Only repeat 2 made a tool_choice:"required" call at all -
+    // forcedRepeats is the real denominator for "engine miss share",
+    // never REPEATS itself (a review caught the first cut computing
+    // this as a no-op that always equalled REPEATS).
+    expect(a.forcedRepeats).toBe(1);
+    expect(a.failures.some((f) => f.includes("engine (ENGINE-CONTRACT-01)"))).toBe(true);
   });
 });
