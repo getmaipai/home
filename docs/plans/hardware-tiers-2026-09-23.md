@@ -37,7 +37,9 @@ budget records and deployment limits, nothing more.
 1. **Voice conversation needs no new model, on any tier.** The hub already listens
    (dictation) and speaks (read aloud). The live session is those two
    pieces joined into one loop, on the chat library's own voice screen.
-   Three small steps; the first is a one-line slot in the chat kit.
+   Three small steps; the first is a one-line slot in the chat kit. The
+backlog rows are under "Hardware tiers (2026-09-23)" in home and in
+the Stack's backlog.
 2. **Photos: a small vision model on the Mac, loaded only when a photo
    arrives.** It fits beside the chat model with room to spare, answers
    from the photo, and hands its reading to the chat model so every rule
@@ -80,20 +82,25 @@ reply takes the spoken register; RESP-02's `reply.speech`; the spec's
 sentence chunker for per-sentence speech as the reply streams; the
 read-aloud Element's own stop control.
 
-**Items, in order:** (1) `VOICE-01` (S, kit, upstream-bound): the
+**Items, in order:** (1) `VOICE-LIVE-01` (S, kit, upstream-bound): the
 right-side composer slot (`ComposerExtraEnd`, the same recipe as the
 left slot, onto assistant-ui/assistant-ui#8003 or its successor) so the
-waveform mounts. (2) `VOICE-02` (M, Sonnet): the live session: press the
+waveform mounts. (2) `VOICE-LIVE-02` (M, Sonnet): the live session: press the
 waveform, the Element shows listening, the voice detector ends the
 utterance, the stt role transcribes, the turn runs with `spoken: true`,
 `reply.speech` is spoken sentence by sentence as it streams, the Element
 shows speaking, the transcript lands in the thread as text; stop from the
 Element at any point; a child's turn keeps the child rules and no
-reasoning. (3) `VOICE-03` (S): the chevron carries voice selection from
+reasoning. (3) `VOICE-LIVE-03` (S): the chevron carries voice selection from
 the tts role's voice catalog and, only when a wakeword package is
 installed, the shortcut to that device's wake-word setting (the one
 declared key, HANDSFREE-01 c's invariants). Out of scope: barge-in
-(needs the robot's echo cancellation) and the wake word itself.
+and the wake word itself. Barge-in is the existing backlog row `VOICE-01`
+(interruption as a chat gate: filler while a lookup runs, cancelling
+inference mid-reply, the end-of-turn detector); it follows `VOICE-LIVE-02`
+as its own item and depends on it: the live session's stop control and
+the abort signal it uses are what barge-in cancels through, so
+`VOICE-LIVE-02` must leave both in place and never preclude it.
 
 **Needs from ENGINE-CONTRACT-01:** cancellation reaching the engine
 (stop mid-reply stops the decode). **Acceptance on the 24 GB Mac:** a
@@ -181,7 +188,7 @@ anywhere in copy.
 
 | Order | Item | Size | Needs from ENGINE-CONTRACT-01 | Needs from the acceptance workload |
 |---|---|---|---|---|
-| 1 | Voice: VOICE-01, VOICE-02, VOICE-03 | S, M, S | cancellation reaching the engine | a voice turn beside a typed one on the 24 GB Mac: first spoken word, peak memory, stop |
+| 1 | Voice: VOICE-LIVE-01, VOICE-LIVE-02, VOICE-LIVE-03 | S, M, S | cancellation reaching the engine | a voice turn beside a typed one on the 24 GB Mac: first spoken word, peak memory, stop |
 | 2 | Photos: VISION-01 | M | the vision engine's checks (image input, timing, cancellation, the pinned set) | a photo turn while a typed conversation runs: first useful answer, peak memory with the vision model loaded |
 | 3 | Pictures: IMAGE-01, IMAGE-02 | M, S | none on the Mac (the engine is remote); the URL-tier health check | a picture job while a conversation runs: chat unaffected with the laptop, chat paused and resumed cleanly without it |
 | with 1 | STACK-SIZE-01: the sizer honours a per-role step-down | M | none | the workload rerun under a stepped-down proposal inherits the smaller reference point's limits |
