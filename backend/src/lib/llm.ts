@@ -166,6 +166,45 @@ function toolCallFromWire(wire: ToolCallWire): ToolCall {
   return { tool: wire.function.name, args, ...(wire.id ? { id: wire.id } : {}), rawArgs: wire.function.arguments };
 }
 
+// ENGINE-CONTRACT-03 (dev.md "U6 rerun ruling" (a)): a reply whose
+// WHOLE visible text is one tool-call envelope - the model writing the
+// wire's own {name, arguments} shape as prose instead of using the
+// engine's real tool-call field, in whatever tag wraps it (or none).
+// Found live: Qwen3's chat template wraps a call in <function_call>,
+// which llama-server's own parser does not recognize, so it arrives as
+// ordinary content and nothing anywhere used to notice. Prose anywhere
+// around the envelope - a lead-in sentence, a trailing aside - means
+// this is a reply that happens to mention a call, not a bare one; only
+// the ENTIRE trimmed text, once at most one wrapping tag is stripped,
+// parsing as exactly one object with a `name` and an `arguments` field
+// counts. Reuses toolCallFromWire()'s own args-parsing so a hand-typed
+// envelope call is normalized identically to a real wire one.
+const ENVELOPE_TAG_RE = /^<([a-zA-Z_][\w-]*)>([\s\S]*)<\/\1>$/;
+
+export function envelopeToolCall(text: string): ToolCall | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  const tagged = trimmed.match(ENVELOPE_TAG_RE);
+  const candidate = tagged ? tagged[2]!.trim() : trimmed;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj.name !== "string" || obj.name.trim().length === 0) return undefined;
+  if (!("arguments" in obj)) return undefined;
+  const args = obj.arguments;
+  const rawArgs = typeof args === "string" ? args : JSON.stringify(args);
+  // No real wire id for a call the model wrote as prose instead of
+  // through the wire's own tool-call field; toolCallFromWire() only
+  // keeps a truthy one, so "" comes through as ToolCall.id: undefined,
+  // same as any other synthetic call (builderFallbackOutput's own).
+  return toolCallFromWire({ id: "", type: "function", function: { name: obj.name, arguments: rawArgs } });
+}
+
 export interface LlmCompleteValue {
   text: string;
   model: string;

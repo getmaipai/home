@@ -122,6 +122,14 @@ export interface TurnGeneration {
    * beside the parsed call so a parse failure (`args: undefined`) and a
    * literal `{}` are told apart on the record. */
   tool_call_raw_args?: string | null;
+  /** ENGINE-CONTRACT-03 (home/docs/dev.md 2026-09-23, "U6 rerun ruling"
+   * (a)): true when this generation's own tool call came from the model
+   * writing the wire's {name, arguments} shape as plain text instead of
+   * through the engine's real tool-call field - kept on the trace so a
+   * rerun's own row shows whether a call only landed because of this
+   * catch. Absent/false on every generation that made a real wire call
+   * or none at all. */
+  envelope_parsed?: boolean;
 }
 
 /** U2's own per-node trace entry, TurnGeneration's structural twin -

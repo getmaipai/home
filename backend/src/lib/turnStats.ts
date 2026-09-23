@@ -26,6 +26,12 @@ export interface GenerationInput {
    * are told apart on the record - `null` when no such call was made
    * this generation. */
   toolCallRawArgs?: string | null;
+  /** ENGINE-CONTRACT-03 (dev.md "U6 rerun ruling" (a)): true when this
+   * generation's own tool call came from the model writing the wire's
+   * {name, arguments} shape as plain text (llm.ts's envelopeToolCall())
+   * rather than through the engine's real tool-call field - a wire
+   * normalization the trace counts, not a language rule. */
+  envelopeParsed?: boolean;
 }
 
 function projectGeneration(gen: GenerationInput): TurnGeneration {
@@ -52,6 +58,7 @@ function projectGeneration(gen: GenerationInput): TurnGeneration {
     request_sent_ms: gen.requestSentMs,
     first_delta_ms: gen.firstDeltaMs,
     tool_call_raw_args: gen.toolCallRawArgs ?? null,
+    envelope_parsed: gen.envelopeParsed ?? false,
   };
 }
 

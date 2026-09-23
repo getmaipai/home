@@ -91,4 +91,20 @@ describe("STATS-01 turn stats", () => {
     expect(stats.predicted_tokens).toBe(12);
     expect(stats.stop_reason).toBe("stop");
   });
+
+  test("ENGINE-CONTRACT-03: envelopeParsed projects to envelope_parsed, defaulting to false when absent", () => {
+    const stats = buildTurnStats(
+      [
+        { reason: "model", thinking: false, maxTokens: null, requestSentMs: 0, firstDeltaMs: 10, stats: { usage: null, timings: null, stopReason: null }, envelopeParsed: true },
+        { reason: "model", thinking: false, maxTokens: null, requestSentMs: 0, firstDeltaMs: 10, stats: { usage: null, timings: null, stopReason: null } },
+      ],
+      emptyTimings(),
+      0,
+      50,
+      null,
+      undefined,
+    );
+    expect(stats.generations[0]?.envelope_parsed).toBe(true);
+    expect(stats.generations[1]?.envelope_parsed).toBe(false);
+  });
 });

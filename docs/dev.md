@@ -21006,6 +21006,100 @@ re-review of the fix hunks after two real findings on the first pass
 (the required_miss corruption above, and the hardcoded fixed line
 where `COMPOSE_FAILURE_LINE` already existed).
 
+## ENGINE-CONTRACT-03: a tool-call envelope delivered as text is a call, never a reply (2026-09-23)
+
+The third diagnosed cause from "U6 rerun ruling" (a): `chatgpt-6-luna`
+repeat 3 turn 3 delivered `<function_call> {"name": "websearch",
+"arguments": {"expression": "when will chatgpt 6 luna be released"}}
+</function_call>.` verbatim - the model wrote its call in a tag the
+engine's parser does not recognize (Qwen3's own template uses
+`<tool_call>`), so it arrived as ordinary content on an offered (not
+forced) turn, and nothing anywhere checked a reply's own text for that
+shape.
+
+**The fix: a shared wire-normalization helper, `envelopeToolCall()` in
+`llm.ts`, beside `toolCallFromWire()`.** Given a reply's whole trimmed
+text, at most one wrapping tag stripped (or none - "whatever tag wraps
+it" per the row), it parses the remainder as JSON, requires exactly a
+`name` and an `arguments` field, and builds a `ToolCall` through
+`toolCallFromWire()` itself (a synthetic `id: ""`, the same "no real
+wire id" shape `builderFallbackOutput()`'s own call already uses).
+Prose anywhere around the tag (a lead-in sentence, a trailing aside)
+fails the whole-text match on purpose, so a reply that only *mentions*
+a call stays untouched.
+
+**Wired into the one real production call site: `nodes/model.ts`'s
+`runOneGeneration()`.** The architecture question this item actually
+turned on: `modelNode` calls `startCompleteStream()`, the streaming
+variant, not either non-streaming `complete()` - but `runOneGeneration()`
+already drains that generator manually (`for (;;) { const step = await
+started.tokens.next(); ... }`) and only returns to its caller once the
+whole reply is known, before anything downstream ever sees a token. So
+the envelope check runs right there, after the drain, before
+`attempt.toolCalls`/`attempt.text` ever leave the function: when the
+wire carried no real call, `envelopeToolCall(visibleText(raw))` is
+tried, and a hit becomes `attempt.toolCalls` exactly as if the wire had
+carried it - the same required/offered verification a few lines up in
+`modelNode`, the same builder-row fallback, all of it, rather than a
+second, parallel envelope-only path. `envelopeParsed: true` rides on
+the generation record (`GenerationInput.envelopeParsed` in
+`turnStats.ts`, projected to `TurnGeneration.envelope_parsed` in
+`wire.ts`, hand-declared per that file's own "alias-free" rule, no
+`@maipai/spec` change needed), the counter the row asked for.
+
+**The output gate's own floor: checked on the ORIGINAL text, not the
+repaired one.** `outputGateNode` (`nodes/outputGate.ts`) runs the same
+`envelopeToolCall()` on `input.reply.text` before `repairReply()` ever
+touches it - a real bug caught while wiring this in: `repairReply()`
+assumes prose (a sentence terminator, balanced quotes) and reshapes
+anything that doesn't look like one, which silently mangled a raw
+`{name, arguments}` envelope (no terminator) into something that no
+longer matched the exact-text check, so the first cut's catch never
+fired. Checked first, before any repair, it fires correctly. On a hit,
+this never delivers `REFUSAL_FIRST` (a wire-shape miss is not a safety
+refusal): it returns `refused: false` with `COMPOSE_FAILURE_LINE`, the
+identical honest, still-delivered line DEADLINE-01's own `model_failed`
+case already uses one node up, never routed through the "refused"
+branch `machine.ts` reserves for a real safety decision.
+
+**Verified:** `llm.test.ts` tests `envelopeToolCall()` directly in the
+row's own words - the Luna string becomes a websearch call with that
+expression; a reply with prose around a call (leading or trailing) is
+untouched; plus edge cases (untagged, a different tag, malformed JSON,
+a missing `name`/`arguments`, empty text). `turnMachine/outputGate.test.ts`
+(new) calls `outputGateNode` directly with a bare envelope as
+`reply.text` and confirms it never reaches the household verbatim,
+delivered instead as `COMPOSE_FAILURE_LINE`, `refused: false` - direct
+unit tests of the node, the same way `policy.test.ts` already tests
+`argsGrounded()` directly, since no currently-real turn can drive that
+specific defense-in-depth branch end to end (`runOneGeneration()`'s own
+catch, tested above, already stops the one live miss before any real
+turn reaches `output_gate` with one). Full backend suite (3927/3927)
+and `tsc --noEmit` green. Review: medium (a wire shape, the
+coordinator's own call), no findings on the implementation.
+
+**A found-live test-infrastructure race, filed not fixed here
+(getmaipai/home#140).** An end-to-end integration test was tried first
+(`runTurnNext()` scripted to answer a forced call with the raw Luna
+envelope), and it worked - until it was run alongside the rest of
+`turnNext.test.ts`, where it made the unrelated DEADLINE-01 tests fail
+deterministically. Isolated with repeated reruns (this item's own
+production code alone, no new tests: three clean full-suite runs;
+the new integration test alone, or the DEADLINE-01 tests alone: both
+green every time): the cause is `deadEngineUrl()`'s own helper (and
+`startFakeSearxng()`'s identical pattern) trusting a stub server's
+`stop()` before the OS has actually released the port - `@maipai/spec`'s
+`stubServer.ts` calls `server.stop(true)` without ever returning or
+awaiting its own promise, so a "dead" URL can still answer for a moment
+after `stop()` returns. Enough extra stub/proxy churn nearby exposes it
+deterministically; DEADLINE-01's own test passes every time alone, and
+so does this item's dropped integration test. Fixing it means touching
+shared test infrastructure (`@maipai/spec` or `conversationRunner.ts`),
+outside this item's own scope, so it is filed instead
+(getmaipai/home#140) and this item ships without the extra end-to-end
+test - the pure-function and node-level tests above already cover the
+row's own three required cases without opening a real network port.
+
 ## VOICE-LIVE-05: the orb reads the primary token, gains flair, and its own measured frame cost (2026-09-23)
 
 Landed `0241b703` (commons `ui-v0.5.42`, this repo's own pin bump and the gear). Full story of the restyle and the false-positive review finding in commons's own history (`4190c40`); this section is the verification: the captures, the recording, and the per-frame measurement.

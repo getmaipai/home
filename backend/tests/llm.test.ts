@@ -5,7 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { complete, startCompleteStream, embed, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall, CHAT_SAMPLING } from "@/lib/llm";
+import { complete, startCompleteStream, embed, envelopeToolCall, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall, CHAT_SAMPLING } from "@/lib/llm";
 import { clampMaxTokens } from "@/routes/llm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -267,6 +267,54 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     } finally {
       stub.stop();
     }
+  });
+});
+
+// ENGINE-CONTRACT-03 (dev.md "U6 rerun ruling" (a)): the live miss this
+// catches - `chatgpt-6-luna` repeat 3, Qwen3's own <function_call> tag,
+// unrecognized by llama-server's parser - delivered as the raw string
+// below verbatim before this existed.
+const LUNA_ENVELOPE = '<function_call> {"name": "websearch", "arguments": {"expression": "when will chatgpt 6 luna be released"}} </function_call>';
+
+describe("lib/llm.ts envelopeToolCall() (ENGINE-CONTRACT-03)", () => {
+  test("the Luna string becomes a websearch call with that expression", () => {
+    const call = envelopeToolCall(LUNA_ENVELOPE);
+    expect(call).toBeDefined();
+    expect(call!.tool).toBe("websearch");
+    expect(call!.args).toEqual({ expression: "when will chatgpt 6 luna be released" });
+  });
+
+  test("a reply with prose around a call is untouched", () => {
+    expect(envelopeToolCall(`Sure, let me check that.\n${LUNA_ENVELOPE}`)).toBeUndefined();
+    expect(envelopeToolCall(`${LUNA_ENVELOPE}\nLet me know if that's what you meant.`)).toBeUndefined();
+  });
+
+  test("a real, prose-only reply is untouched", () => {
+    expect(envelopeToolCall("The capital of Chile is Santiago.")).toBeUndefined();
+  });
+
+  test("an untagged bare envelope still counts (whatever tag wraps it, or none)", () => {
+    const call = envelopeToolCall('{"name": "websearch", "arguments": {"expression": "chatgpt 6 luna"}}');
+    expect(call?.tool).toBe("websearch");
+  });
+
+  test("a different wrapping tag still counts", () => {
+    const call = envelopeToolCall('<tool_call>{"name": "websearch", "arguments": {"expression": "chatgpt 6 luna"}}</tool_call>');
+    expect(call?.tool).toBe("websearch");
+  });
+
+  test("malformed JSON inside the tag is not an envelope", () => {
+    expect(envelopeToolCall("<function_call> not json </function_call>")).toBeUndefined();
+  });
+
+  test("an object missing name or arguments is not an envelope", () => {
+    expect(envelopeToolCall('{"arguments": {"expression": "x"}}')).toBeUndefined();
+    expect(envelopeToolCall('{"name": "websearch"}')).toBeUndefined();
+  });
+
+  test("empty text is not an envelope", () => {
+    expect(envelopeToolCall("")).toBeUndefined();
+    expect(envelopeToolCall("   ")).toBeUndefined();
   });
 });
 

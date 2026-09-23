@@ -26,6 +26,8 @@ import { assessReply, repairReply } from "@/lib/wellFormed";
 import { evaluateReply } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
+import { envelopeToolCall } from "@/lib/llm";
+import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 import type { Node, TurnState } from "../contract";
 import type { AnswerOutput } from "./answer";
 
@@ -46,6 +48,32 @@ export type OutputGateOutput =
   | { refused: false; text: string; speech?: string; sources: AnswerOutput["sources"]; reasoningOut?: string; reasoning: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] } };
 
 export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (state, input) => {
+  // ENGINE-CONTRACT-03 (dev.md "U6 rerun ruling" (a)): checked on the
+  // ORIGINAL text, before repairReply() below ever runs - that repair
+  // assumes prose (a sentence terminator, balanced quotes) and reshapes
+  // anything that doesn't look like one, which would mangle a raw
+  // {name, arguments} envelope (found live: repairReply() appending a
+  // terminator broke the exact-match this check needs) before this ever
+  // got a chance to recognize it. The model node's own runOneGeneration()
+  // already turns a whole-reply envelope into a real call before it ever
+  // reaches `answer` - this is the floor for whatever text still arrives
+  // here as one anyway (a second model round's own text, a package
+  // reply). A wire-shape miss, not a safety call, so this never delivers
+  // as REFUSAL_FIRST does: the same honest, still-"refused: false" line
+  // DEADLINE-01's own model_failed already uses one node up (answer.ts's
+  // COMPOSE_FAILURE_LINE), not the "refused" branch machine.ts reserves
+  // for a real safety decision.
+  if (envelopeToolCall(input.reply.text) !== undefined) {
+    // A review caught the first cut hardcoding `withheld_for: null` here,
+    // exactly the bug the safety-refusal branch below is already careful
+    // to avoid (its own comment: a benign span's real reason must never
+    // read back as "nothing to withhold"). This branch never evaluates
+    // reasoning at all, so `input.reasoningWithheldFor` - context's own
+    // decision (`"minor"`, `"surface"`, `"presence"`, or null) - passes
+    // through unchanged, never overwritten by this unrelated catch.
+    return { outcome: { ok: true }, output: { refused: false, text: COMPOSE_FAILURE_LINE, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
+  }
+
   const repaired = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const band = speakerAgeBand(state.actor, new Date());
   const evaluation = evaluateReply({ text: repaired, speech: input.reply.speech }, band);

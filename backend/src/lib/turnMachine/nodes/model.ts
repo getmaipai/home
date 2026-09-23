@@ -18,7 +18,7 @@
 // turn's context carries - here, simply, whether the utterance itself
 // contains a roster name, the same literal check subjects.ts's own
 // speakerNamedAny() already makes for this exact purpose elsewhere.
-import { startCompleteStream } from "@/lib/llm";
+import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
@@ -153,14 +153,33 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
     return { ok: false, code: "generation_failed" };
   }
 
+  const visible = visibleText(raw);
+  // ENGINE-CONTRACT-03 (dev.md "U6 rerun ruling" (a)): a generation the
+  // wire carried no real tool call for might still have written one as
+  // plain text (Qwen3's own <function_call> tag, unrecognized by
+  // llama-server's parser, was the live miss). Checked here, before
+  // this attempt's text/toolCalls ever leave this function, so the rest
+  // of the model node treats it exactly like a real wire call - the
+  // required/offered verification a few lines up in modelNode, the
+  // builder-row fallback, all of it - rather than a second, parallel
+  // envelope-only path.
+  let envelopeParsed = false;
+  if (!toolCalls || toolCalls.length === 0) {
+    const envelope = envelopeToolCall(visible);
+    if (envelope) {
+      toolCalls = [envelope];
+      envelopeParsed = true;
+    }
+  }
+
   // ENGINE-CONTRACT-02 ("U6: the flip verdict" regression A): the raw
   // wire string for a websearch call this generation made, forced or
   // offered - kept on the record regardless of whether it turns out to
   // verify, since a parse failure or a literal "{}" is exactly what a
   // later read of the trace needs to tell apart from a real query.
   const websearchRawArgs = toolCalls?.find((c) => c.tool === "websearch")?.rawArgs ?? null;
-  state.generations.push({ reason, thinking, maxTokens: maxTokensFor(state.plan) ?? null, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: websearchRawArgs });
-  return { ok: true, text: visibleText(raw), reasoning: extractReasoningText(raw), toolCalls, thinking };
+  state.generations.push({ reason, thinking, maxTokens: maxTokensFor(state.plan) ?? null, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
+  return { ok: true, text: visible, reasoning: extractReasoningText(raw), toolCalls, thinking };
 }
 
 /** ENGINE-CONTRACT-02's builder row, shared by every path that reaches
