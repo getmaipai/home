@@ -34,11 +34,11 @@ record gains, spec first (`STORE-SPEC-01` carries it):
 |---|---|
 | `kind` | `person`, `household`, or `link` |
 | `token` | for `link` only: an unguessable value (at least 256 bits from the platform's random source, encoded for a URL), stored hashed with the secret pepper like a device token, never logged, never returned after creation except once to the person who made it |
-| `expires_at` | optional; the default is question 1 |
+| `expires_at` | 30 days from creation by default, "no expiry" as a choice at creation (decision 1) |
 | `download_limit`, `download_count` | optional limit; the count is the owner's view log's total |
 | `revoked_at` | set by revoke; a revoked link answers not found, indistinguishable from a link that never existed |
 
-One link points at one file (question 3 asks about folders). Every view
+One link points at one file; an album is a later row on the same pointer shape (decision 3). Every view
 is logged for the owner as a view record (time, the file, the link's id,
 the viewer's rough origin as the proxy reports it, never a fingerprint),
 shown on the Storage page beside the link, and nowhere else.
@@ -53,8 +53,9 @@ anything shared with a person be re-shared within the household and an
 adult acting for a child's file is the "until an adult acts" of ruling
 2; the child sees the link on their own Storage page with the adult's
 name, and the adult's action is logged as a parental action. A file
-shared with the household: any adult may link it; the owner sees who
-did. Creating a link is a consequential action in the pipeline's terms:
+shared with the household or with a person is not linked by the
+recipient: only the owner makes a link, and an adult for a child's file
+shared with them (decision 2). Creating a link is a consequential action in the pipeline's terms:
 the executor asks once ("Share this picture with anyone who has the
 link?") and the answer is a real confirmation, never inferred.
 
@@ -127,14 +128,12 @@ after a restore if the person wants.
   Storage page's link controls (create with expiry and limit, copy once,
   revoke, the view log), the privacy page's row.
 
-## Questions for Jesse
+## Decisions (owner, 2026-09-23)
 
-1. The default expiry for a link: none (a link lives until revoked), or
-   a default such as 30 days with "no expiry" as a choice.
-2. Whether a recipient inside the household may make a link from a file
-   shared with them (ruling 6 allows re-sharing within the household; a
-   link is outside it), or whether only the owner and, for a child's
-   file, an adult may.
-3. Whether a link may point at a folder (an album of pictures) or only
-   at one file; one file is the design above, and a folder would be a
-   list of file ids on one pointer with the same token rules.
+1. A link expires after 30 days by default, with "no expiry" as a choice
+   at creation.
+2. Only the owner makes a link from a file, and an adult for a child's
+   file shared with them; a recipient inside the household does not make
+   a link from a file shared with them.
+3. A link points at one file; an album is a later row on the same
+   pointer shape (a list of file ids on one pointer, the same token rules).
