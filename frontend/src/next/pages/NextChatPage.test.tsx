@@ -2078,6 +2078,11 @@ describe("NextChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger
       if (url.includes("/api/voice/stt/status")) return Promise.resolve(Response.json({ installed: true, sileroInstalled: true, moonshineInstalled: true, recognizerLoaded: false }));
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-voicelive1", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/voice/catalog")) return Promise.resolve(Response.json({ entries: [] }));
+      // VoiceChevron's currentQuery (api.settingsValues()) expects a
+      // real ResolvedSetting[] - it calls .find() on the resolved data,
+      // which throws on the generic {} fallback below.
+      if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     return () => {
@@ -2103,6 +2108,18 @@ describe("NextChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger
 
   test("renders the waveform and voice chevron once stt and tts are both ready", async () => {
     const restore = stubDictationFetch(true);
+    // MicrophoneGroup (VOICE-LIVE-03, mounted inside the chevron's menu
+    // whenever ComposerVoiceControls renders) calls enumerateDevices()
+    // and a devicechange listener on mount - the same
+    // Object.defineProperty(navigator, "mediaDevices", ...) pattern
+    // useWakeWord.test.ts/sttDictationAdapter.test.ts/
+    // composerVoiceControls.test.tsx already use, since bun's test
+    // environment has no real navigator.mediaDevices to answer them.
+    const originalMediaDevices = navigator.mediaDevices;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { enumerateDevices: () => Promise.resolve([]), addEventListener: () => {}, removeEventListener: () => {} },
+    });
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -2120,7 +2137,13 @@ describe("NextChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger
       const waveform = view.getByLabelText("Start a voice conversation");
       const send = view.getByRole("button", { name: "Send message" });
       expect(waveform.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      view.unmount();
+      // MicrophoneGroup's unmount effect (navigator.mediaDevices.removeEventListener)
+      // runs as a passive effect, a tick after unmount() returns - wait
+      // for it before restoring navigator.mediaDevices below.
+      await new Promise((r) => setTimeout(r, 0));
     } finally {
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
       restore();
     }
   });

@@ -3,6 +3,7 @@ import type { DictationAdapter } from "@assistant-ui/react";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import type { SttSocket, SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { readMicDevicePreference, writeMicDevicePreference } from "@/lib/voice/micDevicePreference";
 
 // The same minimal Web Audio fake useWakeWord.test.ts already uses
 // (mic-capture.ts's real startMicCapture() is exercised here too, since
@@ -113,6 +114,56 @@ describe("createSttDictationAdapter", () => {
       expect(session.status).toEqual({ type: "ended", reason: "error" });
     } finally {
       Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
+    }
+  });
+
+  // A code review (2026-09-23): a chosen microphone that gets unplugged
+  // later left every future session broken forever, silently, with no
+  // UI left to fix it (MicrophoneGroup stops rendering below two
+  // devices). This proves the self-heal: the stale preference is
+  // cleared on exactly this failure, so the NEXT session's own
+  // getUserMedia call is made with no deviceId at all.
+  test("a stale preferred microphone (OverconstrainedError) clears the preference so the next session falls back to the default device", async () => {
+    writeMicDevicePreference("unplugged-device-id");
+    const originalMediaDevices = navigator.mediaDevices;
+    const originalAudioContext = (globalThis as unknown as { AudioContext?: unknown }).AudioContext;
+    const originalWorkletNode = (globalThis as unknown as { AudioWorkletNode?: unknown }).AudioWorkletNode;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    (globalThis as unknown as { AudioWorkletNode: unknown }).AudioWorkletNode = FakeAudioWorkletNode;
+    const calls: (string | undefined)[] = [];
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: (constraints: MediaStreamConstraints) => {
+          const audio = constraints.audio as { deviceId?: { exact?: string } } | undefined;
+          calls.push(audio?.deviceId?.exact);
+          return calls.length === 1 ? Promise.reject(new DOMException("Overconstrained", "OverconstrainedError")) : Promise.resolve({ getTracks: () => [] } as unknown as MediaStream);
+        },
+      },
+    });
+    try {
+      const fake1 = fakeSocketFactory();
+      const adapter = createSttDictationAdapter({ createSocket: fake1.createSocket, turnSchedulerRef: { current: null }, onFinalReady: () => {} });
+      const session1 = adapter.listen();
+      fake1.emit({ t: "ready" });
+      await waitFor(10);
+      expect(session1.status).toEqual({ type: "ended", reason: "error" });
+      expect(readMicDevicePreference()).toBeNull();
+
+      // Same fake1 - the adapter's own `deps.createSocket` is fixed at
+      // creation (fake1.createSocket), so a second listen() call
+      // re-captures fake1's own handlers for session2, the same as the
+      // real runtime creating one adapter and listening on it repeatedly.
+      const session2 = adapter.listen();
+      fake1.emit({ t: "ready" });
+      await waitFor(10);
+      expect(session2.status).toEqual({ type: "running" });
+      expect(calls).toEqual(["unplugged-device-id", undefined]);
+    } finally {
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });
+      (globalThis as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;
+      (globalThis as unknown as { AudioWorkletNode: unknown }).AudioWorkletNode = originalWorkletNode;
+      localStorage.removeItem("maipai.chat.mic-device-id");
     }
   });
 

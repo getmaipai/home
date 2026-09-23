@@ -3,6 +3,7 @@ import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture"
 import type { SttSocket, SttSocketHandlers } from "@/lib/voice/sttSocket";
 import type { SttServerMessage } from "@/lib/voice/sttContract";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { readMicDevicePreference, clearMicDevicePreference } from "@/lib/voice/micDevicePreference";
 
 type SpeechResult = { transcript: string; isFinal?: boolean };
 
@@ -135,15 +136,33 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
             // already doomed to fail, undercutting "fails fast and
             // honestly" - the point of using the real socket instead of
             // a fixture in the first place).
-            startMicCapture({ onFrame: (frame) => socket?.sendAudio(frame) })
-              .then((handle) => {
-                if (ended) {
-                  handle.stop();
-                  return;
-                }
-                micHandle = handle;
-              })
-              .catch(() => finish("error"));
+            {
+              const preferredDeviceId = readMicDevicePreference() ?? undefined;
+              startMicCapture({ onFrame: (frame) => socket?.sendAudio(frame), deviceId: preferredDeviceId })
+                .then((handle) => {
+                  if (ended) {
+                    handle.stop();
+                    return;
+                  }
+                  micHandle = handle;
+                })
+                .catch((error: unknown) => {
+                  // A review (2026-09-23): the `{ exact: deviceId }`
+                  // constraint's "fail loudly" design meant a chosen
+                  // device that later gets unplugged breaks dictation
+                  // forever, silently, with no UI left to fix it
+                  // (MicrophoneGroup stops rendering below two devices).
+                  // OverconstrainedError/NotFoundError specifically mean
+                  // the preferred device no longer exists - clear it so
+                  // the NEXT attempt falls back to the browser's default
+                  // input instead of repeating the same failure. This
+                  // attempt still ends honestly as an error.
+                  if (preferredDeviceId && error instanceof DOMException && (error.name === "OverconstrainedError" || error.name === "NotFoundError")) {
+                    clearMicDevicePreference();
+                  }
+                  finish("error");
+                });
+            }
             break;
           case "vad":
             // Barge-in: the household member started talking while an

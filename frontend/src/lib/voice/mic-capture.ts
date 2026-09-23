@@ -40,6 +40,15 @@ export interface MicCaptureHandle {
 export interface MicCaptureOptions {
   onFrame: (samples: Float32Array) => void;
   getStream?: () => Promise<MediaStream>;
+  /** VOICE-LIVE-03: the household member's remembered device (a per-
+   * browser preference, `micDevicePreference.ts`), never required -
+   * omitted, this stays the browser's own default input, same as
+   * before this option existed. `{ exact: deviceId }` rather than an
+   * `ideal` constraint: a stale id (the device was unplugged since the
+   * preference was written) should fail loudly as a real getUserMedia
+   * error, never silently fall back to a different microphone than the
+   * one the household member actually chose. */
+  deviceId?: string;
 }
 
 export async function startMicCapture(options: MicCaptureOptions): Promise<MicCaptureHandle> {
@@ -63,6 +72,7 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
           // safely on browsers that don't support it - same posture the
           // three constraints above it already have.
           voiceIsolation: true,
+          ...(options.deviceId ? { deviceId: { exact: options.deviceId } } : {}),
         } as MediaTrackConstraints,
       }));
   const stream = await getStream();

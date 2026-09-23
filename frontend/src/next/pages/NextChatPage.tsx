@@ -1315,6 +1315,14 @@ export function NextChatPage({ person }: { person: Roster }) {
   // shell header's own slot (ui-v0.5.35) mounts and unmounts it, never
   // re-created per render.
   useHeaderExtra(ChatHeaderBar);
+  // VOICE-LIVE-03: ComposerVoiceControls now needs personId (the voice
+  // chevron reads/writes the person's own tts.voice_id setting) - a
+  // stable component reference, not a fresh inline arrow every render,
+  // for the same reason `dictationAdapter` (useNextChatRuntime) needed
+  // the frozen-memo fix: a new function identity on every NextChatPage
+  // render would remount this subtree (losing the chevron's own open/
+  // close state) every time, not just when person.id actually changes.
+  const BoundComposerVoiceControls = useMemo(() => () => <ComposerVoiceControls personId={person.id} />, [person.id]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
   // ADMIN-COMPARE-01: the identical desktop-pane/mobile-sheet split
@@ -1955,7 +1963,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   // own render on stt+tts both being ready
                   // (composerVoiceControls.tsx's own header), so this is
                   // unconditional here the same way ComposerAddMenu is.
-                  ComposerExtraEnd: ComposerVoiceControls,
+                  ComposerExtraEnd: BoundComposerVoiceControls,
                   ReasoningGroup: NextReasoningGroup,
                 }}
               />
