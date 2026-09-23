@@ -31,17 +31,18 @@ stage() { now=$(date +%s); [ -n "${STAGE_T:-}" ] && echo "   (${STAGE_NAME}: $((
 # --- Scope computation (before anything else can print, so it is
 # genuinely the gate's first line) -----------------------------------
 #
-# The diff is the working tree against the merge base with
+# The diff is the tracked working tree against the merge base with
 # origin/main, not literally "the staged diff": this workflow stages
 # and commits in one step, so at the moment check.sh actually runs
 # there is usually nothing staged at all, and a staged-only read would
-# fall back to "full" on every single run. Comparing the working tree
-# (committed + staged + unstaged + untracked) against the merge base
-# covers everything the run's own tests will actually see, and is
-# never narrower than "the staged diff" or "main...HEAD" would have
-# been - a stale local base only ever widens the scope, never narrows
-# it, so origin/main is preferred when it exists but main is a safe
-# fallback in a checkout with no remote configured.
+# fall back to "full" on every single run. Comparing the tracked
+# working tree (committed + staged + unstaged, never untracked - see
+# compute_scope()'s own note below) against the merge base covers
+# everything the run's own tests will actually see, and is never
+# narrower than "the staged diff" or "main...HEAD" would have been - a
+# stale local base only ever widens the scope, never narrows it, so
+# origin/main is preferred when it exists but main is a safe fallback
+# in a checkout with no remote configured.
 gate_diff_base() {
   if git rev-parse --verify origin/main >/dev/null 2>&1; then
     git merge-base HEAD origin/main
@@ -68,12 +69,53 @@ compute_scope() {
   local base files=() f
   base="$(gate_diff_base)"
 
+  # Tracked, changed files first - an untracked file never WIDENS this
+  # (found live: another session's own stray output sitting in this
+  # shared working tree, backend/scripts/bench/query-rewrite.ts,
+  # widened a --docs run to backend and cost it the full four-minute
+  # suite - only tracked files decide the scope when any exist). This
+  # also means --docs is honoured whenever every tracked, changed file
+  # is a doc, exactly as the flag's own caller intends - no separate
+  # code path needed for that; it falls out of using tracked files
+  # alone whenever the tracked set is non-empty.
+  #
+  # But an untracked file is exactly how a brand-new file looks before
+  # its first `git add` - the ordinary, common case of creating a file
+  # and running check.sh before staging anything at all (this comment
+  # block's own sibling above: "at the moment check.sh actually runs
+  # there is usually nothing staged"). If NO tracked file changed at
+  # all, there is no "another session's stray file" ambiguity to
+  # protect against - untracked files are the only signal of what this
+  # run is actually for, so they're included then (a review caught an
+  # earlier version of this fix dropping them unconditionally, which
+  # would have forced `full` on every single new-file-only change,
+  # exactly the cost this whole item exists to eliminate).
+  #
+  # Residual, accepted gap (a second review round, empirically checked
+  # rather than reopened a third time): a tracked change in one area
+  # plus a brand-new untracked file in a DIFFERENT, unscoped area, both
+  # meant for the same not-yet-staged commit, scopes to only the
+  # tracked area - the untracked one is silently dropped here, same as
+  # the "another session's stray file" case, since this function can't
+  # tell the two apart. This is safe, not just tolerated: it can never
+  # let an under-scoped commit actually land, because require-gate-
+  # before-commit.sh (GATE-HOOK-01, getmaipai/.github) recomputes the
+  # required scope from the real staged diff at commit time, not from
+  # this run's own guess - confirmed live, staging both files and
+  # attempting the commit denies with "needs 'frontend'" against a
+  # stale 'docs' stamp, every time. What this function computes is a
+  # fast, best-effort convenience for the common case, never the actual
+  # safety boundary; a session that hits this gap sees an honest commit
+  # denial naming the real scope needed, not a silent gap in what
+  # shipped.
   if [ -n "$base" ]; then
     while IFS= read -r -d '' f; do files+=("$f"); done \
       < <(git diff -z --name-only --no-renames "$base" -- .)
   fi
-  while IFS= read -r -d '' f; do files+=("$f"); done \
-    < <(git ls-files -z --others --exclude-standard)
+  if [ "${#files[@]}" -eq 0 ]; then
+    while IFS= read -r -d '' f; do files+=("$f"); done \
+      < <(git ls-files -z --others --exclude-standard)
+  fi
 
   local changed_file imported_file
   changed_file="$(mktemp)"
@@ -104,8 +146,16 @@ compute_scope() {
   # grep, not a hand-kept list that can silently go stale as new
   # imports are added; classifyScope() (scripts/gateScope.ts) compares
   # a changed backend/ path's own extension-stripped form against this
-  # list to decide the direct-import full-gate escalation.
-  git grep -hoE '@maipai/home-backend/src/[A-Za-z0-9_./-]+' -- frontend/ 2>/dev/null \
+  # list to decide the direct-import full-gate escalation. `git grep`
+  # exits 1 (not an error) when it finds nothing - real in any repo (or
+  # this repo, someday) whose frontend/ doesn't import backend code at
+  # all, and under this function's own `set -o pipefail` that would
+  # otherwise kill the whole gate run via the pipeline's own exit
+  # status (getmaipai/home#144 - dormant on the real frontend/, which
+  # always has a real match today, but scripts/checkScope.test.ts's
+  # own minimal fixture repo hit it immediately, so it's fixed here
+  # rather than left filed).
+  { git grep -hoE '@maipai/home-backend/src/[A-Za-z0-9_./-]+' -- frontend/ 2>/dev/null || true; } \
     | sed 's#@maipai/home-backend/#backend/#' \
     | sort -u > "$imported_file"
 

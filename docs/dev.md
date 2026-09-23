@@ -23627,12 +23627,14 @@ each item waited twenty to sixty minutes from done to live behind a
 suite no frontend file could touch.
 
 **The scope rule, exactly.** `check.sh` reads the changed-file list
-(working tree against `git merge-base HEAD origin/main`, tracked and
-untracked, never literally "the staged diff" - the org's own
-git-workflow rule stages and commits in one step, so at the moment
-`check.sh` actually runs there is normally nothing staged at all, and a
-staged-only read would fall back to `full` on every run; the org
-CLAUDE.md wording is being corrected to say "the working tree against
+(working tree against `git merge-base HEAD origin/main`, tracked files
+first, falling back to untracked ones only when nothing tracked
+changed at all - see "GATE-SCOPE-01 follow-up" below for why - never
+literally "the staged diff": the org's own git-workflow rule stages
+and commits in one step, so at the moment `check.sh` actually runs
+there is normally nothing staged at all, and a staged-only read would
+fall back to `full` on every run; the org CLAUDE.md wording is being
+corrected to say "the working tree against
 the merge base" instead) and buckets every path:
 
 - A root/workspace `package.json` or lockfile, `.gitignore`,
@@ -23701,9 +23703,14 @@ across packages (fed as two plain paths, proving the classifier's own
 side of `check.sh`'s `--no-renames` diff flag), the direct-import
 escalation both ways (hits and stays-scoped) and across a `.js`/`.ts`
 extension mismatch on either side, an empty diff (runs full,
-"verifying the full state"), an untracked file (classified the same as
-a tracked one), and an unclassified path (forces full rather than
-silently narrowing). Bash string matching over dozens of path
+"verifying the full state"), and an unclassified path (forces full
+rather than silently narrowing) - 19 cases in `scripts/gateScope.test.ts`.
+A separate `scripts/checkScope.test.ts` (3 cases) proves the real
+bash, not `classifyScope()` in isolation: it extracts `check.sh`'s own
+`gate_diff_base()`/`compute_scope()` live from the file itself (never a
+hand-kept copy that can drift) and runs them against a real scratch git
+repo - see "GATE-SCOPE-01 follow-up" below for what it covers and why
+it exists as its own file. Bash string matching over dozens of path
 shapes is exactly the kind of thing that silently drifts wrong with no
 test suite proving it, and `check.sh`'s own exit code only ever proves
 "did it exit 0 today," never "did it pick the right scope for this
@@ -23959,3 +23966,120 @@ Verification: `bash scripts/check.sh` (backend scope - only
 --noEmit` clean; the interleaved rerun above, kept at
 `/var/folders/qr/d9yr4nz52fbf1gvkq4hjc07w0000gn/T/owner-replay-interleaved-D8tYAU`
 for tracing.
+
+## GATE-SCOPE-01 follow-up: an untracked file must not widen a run (2026-09-23)
+
+Found live by the coordinator: `bash scripts/check.sh --docs` on the
+home checkout at 19:00 scoped itself to `backend` and ran four
+minutes, because an untracked file another session left in the same
+shared working tree (`backend/scripts/bench/query-rewrite.ts`) was
+still being gathered via `git ls-files --others --exclude-standard`
+and fed into `gateScope.ts`'s classifier alongside the real, tracked
+diff. Two rules, the coordinator's own words: `--docs` is honoured
+whenever every tracked, changed file is a doc (the flag's own caller
+is stating the commit's real contents); an untracked file never widens
+the scope (it cannot be in the commit unless someone runs `git add` on
+it).
+
+**The naive fix regressed a common case, caught by review.** Dropping
+untracked files from `compute_scope()`'s own gathering entirely (no
+`git ls-files --others` at all) fixes the coordinator's exact bug, but
+breaks something else: creating a brand-new file and running
+`check.sh` before the first `git add` on it - the ordinary case this
+file's own header comment already names ("at the moment check.sh
+actually runs there is usually nothing staged") - now finds zero
+tracked-changed files, which `classifyScope([])` correctly reads as
+"nothing to scope, verify the full state" and forces `full`, exactly
+the cost GATE-SCOPE-01 exists to eliminate, for one of the single most
+common real editing patterns there is.
+
+The actual fix keeps tracked files as the only signal whenever any
+exist (closing the coordinator's own bug: a real tracked doc edit plus
+a stray untracked backend file from another session scopes to `docs`,
+full stop), and falls back to untracked files only when the tracked
+set is completely empty - the one case where an untracked file
+genuinely is the only signal of what this run is for, since nothing
+else changed. This isn't a compromise between the two goals; it
+resolves both exactly, because the two failure modes never happen in
+the same run: "another session's stray file distorts my real change"
+needs a real tracked change to distort in the first place, and "I just
+created a file with nothing else touched" has no tracked change for an
+untracked one to compete with.
+
+**A permanent, real-bash regression test, not just classifyScope()
+cases.** The bug lived entirely in `check.sh`'s own gathering step
+(bash), upstream of `classifyScope()` - a suite that only exercises
+`classifyScope()` given a pre-filtered list would stay green forever
+even if the gathering step regressed again (a review named this
+directly: "if a future edit to check.sh's compute_scope() reintroduces
+untracked-file gathering... none of gateScope.test.ts's tests touch
+check.sh's shell code at all"). New `scripts/checkScope.test.ts`
+extracts `gate_diff_base()`/`compute_scope()` live from the real
+`scripts/check.sh` (a regex over the file's own text at test-run time,
+never a hand-kept copy that can drift out of sync with it) and runs
+them against a real scratch git repo (a bare origin, an init'd working
+repo, a real `git diff`/`git ls-files`), asserting on the real stdout.
+Three cases: the coordinator's own bug scenario (tracked doc change
+plus untracked stray file - `docs`), the regression the second review
+pass caught (untracked-only new file, nothing tracked changed -
+narrows correctly, not `full`), and a clean tree (`full`, verifying
+the full state).
+
+**Found writing that test: `getmaipai/home#144`, fixed, not left
+filed.** `check.sh`'s own `git grep -hoE '@maipai/home-backend/src/...'`
+line (the frontend-imports-backend escalation) exits 1 - not an error,
+just "no matches" - whenever `frontend/` has no such import, and under
+this function's own `set -o pipefail` that kills the whole
+`compute_scope()` run. Dormant in the real repo (home's `frontend/`
+always imports `wire.ts`/`homeCardQuestions.ts` today), the exact
+reason the bug was filed rather than fixed when `require-gate-before-
+commit.sh` (GATE-HOOK-01, `getmaipai/.github`) hit and fixed its own
+copy of the identical line live - but `checkScope.test.ts`'s own
+minimal fixture repo (a `frontend/` with no backend imports at all,
+the realistic shape of a test fixture, not a production repo) hit it
+immediately, on the very first run. Fixed the same way here: wrap the
+`git grep` in `{ ... || true; }` so a real "no matches" result doesn't
+propagate as a pipeline failure.
+
+**Two smaller findings from the same review, also fixed.** A comment
+overclaiming `require-gate-before-commit.sh` (GATE-HOOK-01) as a
+blanket safety net for whatever `check.sh` itself might miss was
+removed along with the naive fix it belonged to (the rewritten
+tracked-first design doesn't need that argument at all - it's simply
+correct on its own). `scripts/gateScope.test.ts`'s own two new tests
+from the first attempt (`an untracked file never widens...`,
+`--docs is honoured...`) turned out to duplicate existing docs-only
+coverage once `classifyScope()` itself was confirmed unchanged by this
+fix (only `check.sh`'s own gathering step needed to change) - removed
+in favour of `checkScope.test.ts`'s own real coverage, with one
+remaining `gateScope.test.ts` test's comment pointing there.
+
+**A second review round caught one more real gap, resolved without a
+third automated pass.** The tracked-first design can't tell "another
+session's unrelated stray file" apart from "my own new file for this
+same commit, just not staged yet" - so a tracked change in one area
+plus a co-occurring brand-new untracked file in a *different*,
+unscoped area narrows to the tracked area alone, silently dropping the
+untracked one from that run's own scope. Checked directly rather than
+reopened a third time: this can delay a commit, never let one land
+unverified. `require-gate-before-commit.sh` (GATE-HOOK-01,
+`getmaipai/.github`) recomputes the required scope from the *real*
+staged diff at commit time, independent of whatever check.sh's own
+run guessed - staging both files and attempting the commit against a
+stale `docs` stamp was confirmed live to deny with "needs 'frontend'",
+every time. `compute_scope()`'s own comment now names this trade-off
+directly, and `checkScope.test.ts` has a fourth case asserting the
+narrower (accepted) scope explicitly, so a future reader sees this is
+deliberate, not an oversight.
+
+Verification: `scripts/gateScope.test.ts` (19 cases) and the new
+`scripts/checkScope.test.ts` (4 cases) both pass; the full gate reran
+green (39 scripts + 4064 backend + 721 frontend, 0 fail, no flakes).
+The coordinator's own bug scenario, the first review's regression, and
+the second review's residual-gap scenario were all reproduced by hand
+first (the old code producing the wrong scope in each case) before
+each fix, then reconfirmed producing the right scope after it, using
+the same live-extracted-function technique `checkScope.test.ts` now
+runs permanently; the residual gap's own safety argument (GATE-HOOK-01
+catching it at commit time) was separately confirmed live in a scratch
+repo with both hooks involved, not just asserted.

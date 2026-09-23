@@ -102,11 +102,14 @@ describe("classifyScope", () => {
     expect(result.scope).toBe("full");
   });
 
-  test("an untracked file is classified the same as a tracked one of the same path", () => {
-    // classifyScope itself doesn't know tracked vs untracked - this
-    // proves the classifier treats a new frontend/ file the same as an
-    // edited one, which is what matters since check.sh feeds both
-    // tracked and untracked paths into the same list.
+  test("classifyScope has no concept of tracked vs untracked - it classifies whatever list it's given", () => {
+    // Which files land in that list - a stray untracked file from
+    // another session in a shared checkout must never widen a run,
+    // but a brand-new file with nothing else tracked-changed must
+    // still classify narrowly, not fall back to full - is check.sh's
+    // own compute_scope() job, not this function's, and is proven
+    // against real git and real bash in scripts/checkScope.test.ts
+    // (getmaipai/home#144's own fix included), not here.
     const result = classifyScope(["frontend/src/apps/chat/newPanel.tsx"]);
     expect(result.scope).toBe("frontend");
   });
