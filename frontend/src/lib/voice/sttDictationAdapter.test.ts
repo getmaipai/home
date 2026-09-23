@@ -63,6 +63,33 @@ function fakeSocketFactory(): { createSocket: (handlers: SttSocketHandlers) => S
 }
 
 describe("createSttDictationAdapter", () => {
+  // DICT-01 acceptance, coordinator's own words: "with STT assets
+  // missing, clicking the mic shows the not-installed message and the
+  // composer still sends text." The composer-still-sends half is
+  // NextChatPage.test.tsx's job (nothing here touches the composer at
+  // all); this is the adapter's own half - no socket, no mic prompt, a
+  // session that's already over the instant `listen()` returns.
+  test("STT not installed: no socket opens, no mic prompt, onNotInstalled fires, session ends immediately", () => {
+    const fake = fakeSocketFactory();
+    let notInstalledCalls = 0;
+    let createSocketCalls = 0;
+    const trackedCreateSocket: typeof fake.createSocket = (handlers) => {
+      createSocketCalls++;
+      return fake.createSocket(handlers);
+    };
+    const adapter = createSttDictationAdapter({
+      createSocket: trackedCreateSocket,
+      turnSchedulerRef: { current: null },
+      onFinalReady: () => {},
+      sttInstalled: () => false,
+      onNotInstalled: () => notInstalledCalls++,
+    });
+    const session = adapter.listen();
+    expect(createSocketCalls).toBe(0);
+    expect(notInstalledCalls).toBe(1);
+    expect(session.status).toEqual({ type: "ended", reason: "error" });
+  });
+
   test("a denied microphone ends the session with reason error, no crash", async () => {
     const originalMediaDevices = navigator.mediaDevices;
     Object.defineProperty(navigator, "mediaDevices", {
@@ -81,7 +108,7 @@ describe("createSttDictationAdapter", () => {
       // review, 2026-09-06: not in parallel with the socket connecting) -
       // this test's own "denied permission" outcome needs that signal
       // first, the same as a real session would get it.
-      fake.emit({ type: "ready" });
+      fake.emit({ t: "ready" });
       await waitFor(10);
       expect(session.status).toEqual({ type: "ended", reason: "error" });
     } finally {
@@ -100,7 +127,7 @@ describe("createSttDictationAdapter", () => {
       const session = adapter.listen();
       const started = mock(() => {});
       session.onSpeechStart(started);
-      fake.emit({ type: "ready" });
+      fake.emit({ t: "ready" });
       expect(session.status).toEqual({ type: "running" });
       expect(started).toHaveBeenCalledTimes(1);
     });
@@ -115,10 +142,10 @@ describe("createSttDictationAdapter", () => {
       const results: Array<{ transcript: string; isFinal?: boolean }> = [];
       session.onSpeech((r) => results.push(r));
 
-      fake.emit({ type: "partial", text: "turn the" });
+      fake.emit({ t: "partial", v: "turn the" });
       expect(results).toEqual([{ transcript: "turn the", isFinal: false }]);
 
-      fake.emit({ type: "final", text: "turn the lights on" });
+      fake.emit({ t: "final", v: "turn the lights on" });
       expect(results).toEqual([
         { transcript: "turn the", isFinal: false },
         { transcript: "turn the lights on", isFinal: true },
@@ -148,8 +175,20 @@ describe("createSttDictationAdapter", () => {
         onFinalReady: () => sessionRef.current?.cancel(), // mimics aui.composer.send()'s own reentrant cancel()
       });
       sessionRef.current = adapter.listen();
-      fake.emit({ type: "final", text: "turn the lights on" });
+      fake.emit({ t: "final", v: "turn the lights on" });
       expect(sessionRef.current.status).toEqual({ type: "ended", reason: "stopped" });
+    });
+  });
+
+  test("a server-side error ends the session with reason error, no crash", async () => {
+    await withFakeAudioEnv(async () => {
+      const fake = fakeSocketFactory();
+      const onFinalReady = mock(() => {});
+      const adapter = createSttDictationAdapter({ createSocket: fake.createSocket, turnSchedulerRef: { current: null }, onFinalReady });
+      const session = adapter.listen();
+      fake.emit({ t: "error", v: "transcription unavailable" });
+      expect(session.status).toEqual({ type: "ended", reason: "error" });
+      expect(onFinalReady).not.toHaveBeenCalled();
     });
   });
 
@@ -159,7 +198,7 @@ describe("createSttDictationAdapter", () => {
       const onFinalReady = mock(() => {});
       const adapter = createSttDictationAdapter({ createSocket: fake.createSocket, turnSchedulerRef: { current: null }, onFinalReady });
       const session = adapter.listen();
-      fake.emit({ type: "no_speech" });
+      fake.emit({ t: "no_speech" });
       expect(session.status).toEqual({ type: "ended", reason: "stopped" });
       expect(onFinalReady).not.toHaveBeenCalled();
     });
@@ -177,7 +216,7 @@ describe("createSttDictationAdapter", () => {
         onFinalReady: () => {},
       });
       adapter.listen();
-      fake.emit({ type: "vad", speaking: true });
+      fake.emit({ t: "vad", speaking: true, rms: 0.05 });
       expect(stopSpy).toHaveBeenCalledTimes(1);
     });
   });
@@ -194,7 +233,7 @@ describe("createSttDictationAdapter", () => {
         onFinalReady: () => {},
       });
       adapter.listen();
-      fake.emit({ type: "vad", speaking: false });
+      fake.emit({ t: "vad", speaking: false, rms: 0 });
       expect(stopSpy).not.toHaveBeenCalled();
     });
   });

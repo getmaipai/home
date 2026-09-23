@@ -10,6 +10,7 @@ import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import type { Artifact } from "@maipai/spec/gen/ts/artifact.js";
+import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import type {
   Roster,
   TurnValue,
@@ -88,6 +89,7 @@ export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, Convers
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
+export type { SttStatusResponse };
 export type { Relationship };
 export type { PackageManifest };
 export type { Issue };
@@ -549,6 +551,11 @@ export const api = {
   // (no Stack set up), never an error - routes/engines.ts's own header.
   engines: () => request<EnginesOverview>("/api/engines"),
   enginesHealth: () => request<EnginesHealth>("/api/engines/health"),
+  // GET /api/voice/stt/status (DICT-01): whether the STT assets (Silero
+  // VAD, Moonshine) are installed and the recognizer is loaded - the
+  // composer's mic button checks this before opening a session, never
+  // after a silently dead click.
+  sttStatus: () => request<SttStatusResponse>("/api/voice/stt/status"),
   // GET /api/performance (ADMIN-PERF-01): owner/admin only, one
   // aggregate read of turn stats, queues, the label harvest, engine
   // health and hardware. `days` defaults to 30 on the backend when

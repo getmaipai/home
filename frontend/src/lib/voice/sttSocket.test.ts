@@ -54,16 +54,16 @@ function installFakeWebSocket(): void {
 }
 
 describe("createSttSocket", () => {
-  test("sends a typed hello once open, then parses server messages", () => {
+  test("sends nothing on open (no hello in the real contract), parses server messages", () => {
     installFakeWebSocket();
     const received: SttServerMessage[] = [];
     createSttSocket({ onMessage: (m) => received.push(m) });
     lastSocket!.readyState = FakeWebSocket.OPEN;
     lastSocket!.fire("open", {});
-    expect(lastSocket!.sent).toEqual([JSON.stringify({ type: "hello", sample_rate: 16_000 })]);
+    expect(lastSocket!.sent).toEqual([]);
 
-    lastSocket!.fire("message", { data: JSON.stringify({ type: "vad", speaking: true }) });
-    expect(received).toEqual([{ type: "vad", speaking: true }]);
+    lastSocket!.fire("message", { data: JSON.stringify({ t: "vad", speaking: true, rms: 0.05 }) });
+    expect(received).toEqual([{ t: "vad", speaking: true, rms: 0.05 }]);
   });
 
   test("sendAudio ships only the frame's own byteOffset/byteLength range, not the whole underlying buffer", () => {
@@ -102,30 +102,30 @@ describe("createMockSttSocket", () => {
   test("replays each fixture step's message after its own delay, in order", async () => {
     const received: SttServerMessage[] = [];
     const fixture: SttFixtureStep[] = [
-      { delayMs: 1, message: { type: "ready" } },
-      { delayMs: 1, message: { type: "partial", text: "turn the" } },
-      { delayMs: 1, message: { type: "final", text: "turn the lights on" } },
+      { delayMs: 1, message: { t: "ready" } },
+      { delayMs: 1, message: { t: "partial", v: "turn the" } },
+      { delayMs: 1, message: { t: "final", v: "turn the lights on" } },
     ];
     createMockSttSocket(fixture, { onMessage: (m) => received.push(m) });
     await waitFor(20);
     expect(received).toEqual([
-      { type: "ready" },
-      { type: "partial", text: "turn the" },
-      { type: "final", text: "turn the lights on" },
+      { t: "ready" },
+      { t: "partial", v: "turn the" },
+      { t: "final", v: "turn the lights on" },
     ]);
   });
 
   test("close() cancels every not-yet-delivered step", async () => {
     const received: SttServerMessage[] = [];
     const fixture: SttFixtureStep[] = [
-      { delayMs: 1, message: { type: "ready" } },
-      { delayMs: 50, message: { type: "final", text: "should never arrive" } },
+      { delayMs: 1, message: { t: "ready" } },
+      { delayMs: 50, message: { t: "final", v: "should never arrive" } },
     ];
     const socket = createMockSttSocket(fixture, { onMessage: (m) => received.push(m) });
     await waitFor(10);
     socket.close();
     await waitFor(60);
-    expect(received).toEqual([{ type: "ready" }]);
+    expect(received).toEqual([{ t: "ready" }]);
   });
 
   test("sendAudio is a no-op - the mock stands in for the network, not for real STT", () => {

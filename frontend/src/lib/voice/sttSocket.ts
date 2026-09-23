@@ -1,4 +1,4 @@
-import type { SttHelloMessage, SttServerMessage } from "@/lib/voice/sttContract";
+import type { SttServerMessage } from "@/lib/voice/sttContract";
 
 export interface SttSocketHandlers {
   onMessage: (message: SttServerMessage) => void;
@@ -31,10 +31,10 @@ export function createSttSocket(handlers: SttSocketHandlers): SttSocket {
   // shutdown apart from the server hanging up on its own.
   let closedByUs = false;
 
-  socket.addEventListener("open", () => {
-    const hello: SttHelloMessage = { type: "hello", sample_rate: 16_000 };
-    socket.send(JSON.stringify(hello));
-  });
+  // DICT-01: no client-to-server "hello" - the real contract
+  // (SttWireEvent, sttContract.ts's own header) names no such message,
+  // and the server starts a session and sends "ready" the moment the
+  // socket opens (routes/stt.ts's onOpen), never waiting on one.
   socket.addEventListener("message", (event) => {
     if (typeof event.data !== "string") return; // audio never flows server -> client
     try {

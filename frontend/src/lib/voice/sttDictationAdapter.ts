@@ -46,6 +46,19 @@ export interface SttDictationDeps {
    * before this session has finished lets `aui.composer.send()`
    * reentrantly cancel this same still-active session first. */
   onFinalReady: () => void;
+  /** DICT-01 (Jesse: "the mic button must show the hub's own not-
+   * installed state... never a dead button", the same rule
+   * localImageAttachmentAdapter.ts's own capability check already
+   * follows for vision). Read fresh on every `listen()` call, not
+   * cached at adapter-creation time, since an install can finish while
+   * the composer is already mounted. Defaults to `true` so a caller
+   * that never wires this (every existing test) keeps today's
+   * behavior. */
+  sttInstalled?: () => boolean;
+  /** Called instead of opening a socket at all when `sttInstalled()` is
+   * false - the page owns how to show it (a toast, today), the adapter
+   * only knows the socket has no assets to talk to. */
+  onNotInstalled?: () => void;
 }
 
 // The composer's push-to-talk mic button (session-e-ui-and-docs.md step
@@ -81,6 +94,18 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
         onSpeech: speech.subscribe,
       };
 
+      // DICT-01: assets missing is checked BEFORE any socket opens - a
+      // household mic-permission prompt for a session already doomed to
+      // fail would undercut "fails fast and honestly" the same way the
+      // "wait for ready before starting the mic" rule above already
+      // protects against, and the STT route itself never checks this
+      // (routes/stt.ts's onOpen creates a session unconditionally).
+      if (deps.sttInstalled?.() === false) {
+        deps.onNotInstalled?.();
+        session.status = { type: "ended", reason: "error" };
+        return session;
+      }
+
       function finish(reason: "stopped" | "cancelled" | "error", result?: SpeechResult): void {
         if (ended) return;
         ended = true;
@@ -90,8 +115,15 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
         speechEnd.notify(result ?? { transcript: "" });
       }
 
+      // DICT-01: the real wire shape (SttWireEvent, sttContract.ts) uses
+      // `t`/`v`, not `type`/`text` - this switch used to read a field no
+      // server message ever carries, so it silently matched nothing and
+      // mic capture never started (found via a headless-Chromium repro
+      // with a fake mic device: the socket opened, "ready" arrived, and
+      // nothing else ever happened - zero audio frames, empty composer,
+      // no error, because nothing here ever ran).
       function onMessage(message: SttServerMessage): void {
-        switch (message.type) {
+        switch (message.t) {
           case "ready":
             session.status = { type: "running" };
             speechStart.notify();
@@ -122,10 +154,10 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
             if (message.speaking) deps.turnSchedulerRef.current?.stop();
             break;
           case "partial":
-            speech.notify({ transcript: message.text, isFinal: false });
+            speech.notify({ transcript: message.v, isFinal: false });
             break;
           case "final": {
-            speech.notify({ transcript: message.text, isFinal: true });
+            speech.notify({ transcript: message.v, isFinal: true });
             // finish() BEFORE onFinalReady(), not after - reentrancy,
             // not just tidiness. Verified against @assistant-ui/core's
             // own composer-runtime-core.js: aui.composer.send() (which
@@ -138,13 +170,22 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
             // reported the session's end reason as "cancelled" instead
             // of "stopped" (a code review, 2026-09-06, verified this
             // live against the library source, not just in theory).
-            const result = { transcript: message.text, isFinal: true };
+            const result = { transcript: message.v, isFinal: true };
             finish("stopped", result);
             deps.onFinalReady();
             break;
           }
           case "no_speech":
             finish("stopped");
+            break;
+          // The real spec has a case this file's old, hand-guessed
+          // contract never declared: a structured server-side error
+          // (a transcription failure, say). It used to fall through
+          // this switch unhandled, the identical silent-no-op shape the
+          // "ready" bug had - the session would just sit open forever
+          // showing "listening" with nothing happening.
+          case "error":
+            finish("error");
             break;
         }
       }

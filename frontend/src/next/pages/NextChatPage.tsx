@@ -1040,11 +1040,24 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   // slice's UI-composition scope.
   const imageAttachmentAdapter = useMemo(() => createLocalImageAttachmentAdapter({ capability: () => CURRENT_LOCAL_VISION_CAPABILITY }), []);
   const attachmentsAdapter = useMemo(() => new CompositeAttachmentAdapter([imageAttachmentAdapter, new SimpleTextAttachmentAdapter()]), [imageAttachmentAdapter]);
+  // DICT-01: read fresh (not cached at mount) since an install can finish
+  // while this page is already open - `sttInstalled` below reads
+  // `sttStatusQuery.data` live on every mic click, not this render's
+  // snapshot. Defaults to installed while the query is still loading
+  // (a one-time, near-instant fs check) rather than flashing the
+  // not-installed message on a page that hasn't heard back yet.
+  const sttStatusQuery = useQuery({ queryKey: ["stt-status"], queryFn: api.sttStatus });
   const dictationAdapter = useMemo(
     () =>
       createSttDictationAdapter({
         createSocket: createSttSocket,
         turnSchedulerRef,
+        sttInstalled: () => sttStatusQuery.data?.installed ?? true,
+        // A stable id (a review finding): repeated mic clicks while
+        // still uninstalled re-fire this every time, and without an id
+        // sonner stacks a new toast per click instead of replacing the
+        // one already showing.
+        onNotInstalled: () => toast.error("Voice input needs a one-time download that hasn't finished on this hub yet.", { id: "stt-not-installed" }),
         // Unlike ChatPage.tsx's own dictation, no auto-send here yet -
         // the brief for this slice is "speech into the text box", not
         // the old page's own send-on-final behavior; a household member
@@ -1053,7 +1066,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
         // `onSpeech`, independent of this callback.
         onFinalReady: () => {},
       }),
-    [],
+    [sttStatusQuery.data],
   );
 
   // A named, `use`-prefixed function, not an inline arrow - ChatPage.tsx's
@@ -1113,12 +1126,19 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     // the speech adapter is new (chatSpeechAdapter.ts), the identical
     // POST /api/tts pieces chatListenStore.ts's own "Listen" replay
     // already uses, wired through the runtime instead of a second store.
-    // A review caught this: an empty deps array here is harmless today
-    // only because both adapters are themselves already stably
-    // memoized - but it defeats exhaustive-deps' own future
-    // protection for no reason, since listing them doesn't actually
-    // trigger the "outer-scope value" warning either.
-    const adapters = useMemo(() => ({ feedback: createChatFeedbackAdapter(), speech: createChatSpeechAdapter(), attachments: attachmentsAdapter, dictation: dictationAdapter }), []);
+    // DICT-01: an empty deps array here used to be harmless only because
+    // every adapter was itself already stably memoized forever - true of
+    // `attachmentsAdapter`, no longer true of `dictationAdapter` once it
+    // started reacting to `sttStatusQuery.data` (a query that has not
+    // resolved yet on the render this whole tree first mounts on). A
+    // real bug caught building this row's own test: with `[]` here, the
+    // runtime keeps the FIRST `dictationAdapter` forever - the one built
+    // before the STT status query ever answered - so `sttInstalled()`'s
+    // permissive "assume installed while loading" default became
+    // permanent for the rest of the page's life, not just the loading
+    // window it was meant to cover.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the rule's own static analysis can't see that dictationAdapter's *own* useMemo deps (sttStatusQuery.data) genuinely change across renders, and calls both deps "unnecessary" on that mistaken belief; removing them is exactly the bug named above, verified live by NextChatPage.test.tsx's DICT-01 describe block.
+    const adapters = useMemo(() => ({ feedback: createChatFeedbackAdapter(), speech: createChatSpeechAdapter(), attachments: attachmentsAdapter, dictation: dictationAdapter }), [attachmentsAdapter, dictationAdapter]);
     return useLocalRuntime(chatModelAdapter, { adapters });
   }
 

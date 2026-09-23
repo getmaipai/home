@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "rea
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, useAssistantToolUI, useAui, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
+import { toast } from "sonner";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
@@ -374,11 +375,22 @@ export function ChatPage({ person }: ChatPageProps) {
   // Set by `SttAutoSend` once it mounts inside `AssistantRuntimeProvider`
   // (below); `onFinalReady` below just calls whatever's there.
   const sttAutoSendRef = useRef<(() => void) | null>(null);
+  // DICT-01 (a review finding): this page is still live-routed (not
+  // retired behind ui.shell.next), so the not-installed check needs the
+  // identical wiring NextChatPage.tsx got - without it, this mic button
+  // would keep the same class of silent-dead-feature bug DICT-01 exists
+  // to fix, just triggered by missing assets instead of the wire-shape
+  // mismatch. No frozen-memo risk here the way NextChatPage.tsx had:
+  // `useLocalRuntime`'s own `adapters` object below is inline, rebuilt
+  // fresh every render, never a separately memoized value of its own.
+  const sttStatusQuery = useQuery({ queryKey: ["stt-status"], queryFn: api.sttStatus });
   const dictationAdapter = useMemo(
     () =>
       createSttDictationAdapter({
         createSocket: createSttSocket,
         turnSchedulerRef,
+        sttInstalled: () => sttStatusQuery.data?.installed ?? true,
+        onNotInstalled: () => toast.error("Voice input needs a one-time download that hasn't finished on this hub yet.", { id: "stt-not-installed" }),
         // The transcript itself already landed in the composer
         // (speech.notify() above, in sttDictationAdapter.ts) - skipping
         // the send here just leaves it sitting there, same as typed text,
@@ -387,7 +399,7 @@ export function ChatPage({ person }: ChatPageProps) {
           if (composerDisabledRef.current === undefined) sttAutoSendRef.current?.();
         },
       }),
-    [],
+    [sttStatusQuery.data],
   );
   // Multi-select, clear-all, and server-side search - the rest of
   // ConversationsPage's own admin-oversight restoration (design doc's

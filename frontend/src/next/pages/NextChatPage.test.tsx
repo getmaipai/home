@@ -1964,3 +1964,92 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
     }
   });
 });
+
+// DICT-01 (2026-09-23): a live Jesse report ("I don't think dictation
+// works in the browser yet") traced to a wire-shape mismatch - the
+// server's real messages use {t, v}, the client read {type, text},
+// which never matched a single one, so the mic button silently did
+// nothing at all in every browser (sttDictationAdapter.ts's own header
+// comment has the full trace). Fixed there; this describe covers the
+// coordinator's own acceptance line for the half that belongs to this
+// page: "clicking the mic shows the not-installed message and the
+// composer still sends text." The complementary half ("a fake 2-second
+// utterance produces a transcript") is proven two ways that both outrank
+// a jsdom mock here: sttDictationAdapter.test.ts's own message-handling
+// tests (t/v now matches what the server really sends), and a live,
+// real headless-Chromium repro with a fake mic device through the real
+// /api/stt/stream socket (docs/dev.md's DICT-01 note) - jsdom has no
+// AudioWorklet to run a real worklet thread in, so a mocked "transcript
+// appears" test here would only prove the mock, not the pipeline.
+describe("NextChatPage (DICT-01: the mic button's not-installed state)", () => {
+  const ORIGINAL_MEDIA_DEVICES = navigator.mediaDevices;
+
+  function stubDictationFetch(sttInstalled: boolean): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    // happy-dom has no MediaDevices at all - assistant-ui's own runtime
+    // reads `navigator.mediaDevices` to decide `thread.capabilities.
+    // dictation` in the first place (mic-capture.ts's real code path is
+    // never reached in this test either way, since the not-installed
+    // branch returns before it - sttDictationAdapter.test.ts's own
+    // `withFakeAudioEnv` is the file that actually exercises capture).
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: () => Promise.reject(new Error("not reached in this test")) },
+    });
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/voice/stt/status")) return Promise.resolve(Response.json({ installed: sttInstalled, sileroInstalled: sttInstalled, moonshineInstalled: sttInstalled, recognizerLoaded: false }));
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-dict1", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) {
+        return Promise.resolve(
+          new Response(
+            ndjsonStream([
+              { type: "delta", text: "Typed while STT is uninstalled." },
+              { type: "done", value: { turn_id: "turn-dict1", reply: { text: "Typed while STT is uninstalled." }, source: "model", safety: SAFETY } },
+            ]),
+            { status: 200, headers: { "content-type": "application/x-ndjson" } },
+          ),
+        );
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: ORIGINAL_MEDIA_DEVICES });
+    };
+  }
+
+  test("STT not installed: clicking the mic never opens a session, and typing plus Send still works", async () => {
+    const restore = stubDictationFetch(false);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      // `sttInstalled` falls back to "installed" while the status query
+      // is still loading (the not-installed message must never flash
+      // false before a real answer exists) - this waits past that
+      // window so the click below hits the real, resolved "false", not
+      // the loading-state fallback. The button's accessible name
+      // ("Start voice input") is its own sr-only span text
+      // (TooltipIconButton's shape, ui-v0.5.35), not an aria-label
+      // attribute.
+      const micButton = await view.findByRole("button", { name: "Start voice input" });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      fireEvent.click(micButton);
+      // No crash, and the ordinary text path still works right after -
+      // the coordinator's own "the composer still sends text."
+      fireEvent.change(await view.findByLabelText("Message input"), { target: { value: "typed instead" } });
+      const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+      await waitFor(() => expect(send.disabled).toBe(false));
+      fireEvent.click(send);
+      expect(await view.findByText("Typed while STT is uninstalled.")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+});
