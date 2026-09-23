@@ -21028,3 +21028,81 @@ Negative and reproducible - the animation's own cost is indistinguishable from m
 **The gear:** composerVoiceControls.tsx's own trailing waveform pill is the only way in; `liveVoiceSession.tsx` now has the only way back out, to Settings > Voice (VOICE-LIVE-03b's own note that voice/microphone choice lives there and nothing else outside Settings should reach it). The Element has no slot for an extra control, so it's composed just outside the card (`TooltipIconButton asChild` wrapping a `Link`), never forked into the shipped Element. A review flagged this as a likely Radix Slot crash (two children reaching `Slot.Root`); traced through `@radix-ui/react-slot`'s real source and confirmed it's exactly what `Slot.Slottable` exists for (the sr-only tooltip span merges into the Link's own children via `cloneElement`, never counted against the "one child" rule) - corroborated by this session's own test rendering the link for real and finding it by role and name.
 
 Verified: `bunx tsc --noEmit` clean, full frontend suite (717/717) green, `bash scripts/check.sh` green in both commons and this repo. Review: low each pass (commons: one comment-accuracy finding fixed; this repo: one finding checked against source and not applied, see above).
+
+## NEXT-CACHE-01: no prefix reuse, ever, fixed with U1's own old-path order (2026-09-23)
+
+The third design fact from "U6 rerun ruling" (b) 2: `messages.ts`'s
+`contextToMessages()` put every non-window context item - memory
+matches, the profile, the clock, the roster, all utterance- or
+time-dependent - into the FIRST system message, the same one Qwen3's
+template fills with the tools block, ahead of the whole conversation
+window. Every prompt therefore differed from its first token, and
+llama-server's prompt cache (a longest-common-prefix match) never
+reused anything: about 4,000 context tokens re-prefilled at roughly
+375 tokens a second, the floor under every world-question row in the
+U6 rerun.
+
+**The fix is U1's own order, carried over, not invented.** The old path
+(`turnEngine.ts`'s `runTurn()`/`runTurnStream()`) already builds its
+message list as `[stablePrefix, ...window.messages, context, user]` -
+`buildStablePrefix()` (identity, persona, information policy, standing
+skills: the same every turn for a given persona) ahead of the window,
+and the volatile `context` string (household, memory, the conversation
+summary, local time) as its own system message after it, right before
+the question. `messages.ts` had never carried that split to the new
+path at all - one system message, everything in it, every time.
+`contextToMessages()` now does the same split with what it actually
+has: a new `isStableContext()` (checked one at a time, never an array -
+the rule-budget lint's own word-list check) puts `profile` and
+`roster` - both derived from the actor and the household roster alone,
+never the utterance or the clock - into the first message, and
+`memory`, `clock`, and every other source into a second system message
+placed after the window. The shape (`system, ...window, system, user`)
+is byte-for-byte the pattern already proven safe in production on the
+old path; this item did not invent a new one.
+
+**Verified:** a new `tests/turnMachine/messages.test.ts` unit-tests
+`contextToMessages()` directly against synthetic `ContextItem[]` rows -
+faster and more precise than a full turn for exactly what this
+function decides. Seven tests: profile/roster land in the first
+message; memory/clock land in the second, after the window; both
+halves together read in the exact stable-window-volatile-utterance
+order; **the stable message is proven byte-identical across two turns
+whose only difference is volatile context** - the actual claim the
+prompt cache depends on, checked directly rather than only inferred
+from the code; no stable items means no first message at all, not an
+empty one (and the mirror for volatile items); the utterance never
+appears in either context message, only as the final user message.
+Full backend suite (3923/3923) and `tsc --noEmit` green. Medium review
+(a prompt shape): confirmed `getProfileParagraph()` and
+`subjectRosterFor()` are both genuinely deterministic per actor/
+household (DB-backed, not utterance- or time-dependent, so the
+"stable" classification is factual, not aspirational), confirmed the
+old path's own identical message shape in production, checked every
+caller and the recording proxy's own system-message reader (already a
+`.filter().join()`, unaffected by a second system message) - no
+findings.
+
+**The acceptance line, measured live, once, in the same quiet window as
+the gate.** A three-turn conversation ("hi" / "what's the weather like
+where you are" / "what's your favorite color", the new path on,
+`turn.pipeline.next: true`) against the household's real engine
+(llama-server b10797-832fd6f17, `qwen3-8b-instruct-q4-k-m.gguf`, port
+8788), through the same recording proxy `replay.ts`'s `--hub-live`
+already uses (USAGE-01's `stream_options.include_usage` is what makes
+`cached_tokens` readable at all):
+
+| turn | said | cached_tokens | prompt_tokens |
+|---|---|---|---|
+| 1 | hi | 3 | 493 |
+| 2 | what's the weather like where you are | 51 | 526 |
+| 3 | what's your favorite color | 480 | 593 |
+
+Rising every turn, as designed: turn 1 is cold (nothing to reuse yet);
+turn 2 reuses a small, real slice; turn 3 reuses 480 of 593 prompt
+tokens (81 percent) - the stable message and the accumulated window
+staying a real cache hit, with only the new volatile message and the
+new utterance costing a fresh prefill. No gate ran beside this
+measurement (checked immediately before starting); the throwaway
+script that ran it mirrored `interimRuleMeasure.ts`'s own setup
+exactly and was deleted after this one measurement, never committed.

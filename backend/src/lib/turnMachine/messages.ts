@@ -48,22 +48,56 @@ function windowRoleFromId(id: string): "system" | "user" | "assistant" | "tool" 
   return "user";
 }
 
+/** NEXT-CACHE-01 (dev.md "U6 rerun ruling" (b) 2): stable per actor and
+ * household, not per utterance or per minute - checked one at a time,
+ * never an array (the rule-budget lint's own word-list check, the same
+ * reason SOURCE_LABEL above is a Record and windowRoleFromId() reads
+ * its four roles one at a time). Everything else (`memory`, `clock`,
+ * and any tool-round or utterance-matched source) changes every turn
+ * by design and belongs in the volatile half instead. */
+function isStableContext(source: ContextItem["source"]): boolean {
+  if (source === "profile") return true;
+  if (source === "roster") return true;
+  return false;
+}
+
+/** U1's own cache-stable order (turnEngine.ts's buildStablePrefix()
+ * ahead of the window, its own volatile `context` string after it -
+ * `runTurn()`'s literal `[stablePrefix, ...window.messages, context,
+ * utterance]` message list), carried to this path for the first time.
+ * The old single system-message-first shape put memory matches, the
+ * profile, the clock and the roster - all of it utterance- or
+ * time-dependent - INTO the one message the Qwen3 template also fills
+ * with the tools block, ahead of the whole window: every prompt
+ * differed from its first token, and llama-server's prompt cache
+ * (a longest-common-PREFIX match) never reused anything. Splitting
+ * `other` by isStableContext() and moving the volatile half behind the
+ * window means the prefix every turn in a conversation actually shares
+ * (this stable message, unchanged for the same actor/household, plus
+ * the window, unchanged once written) stays a real prefix match; only
+ * the trailing volatile message and the new utterance differ, the
+ * smallest part of the prompt a cache miss can cost. */
 export function contextToMessages(context: readonly ContextItem[], utterance: string): LlmMessage[] {
   const windowItems = context.filter((item) => item.source === "window");
   // "utterance" is excluded too: it rides the "utterance" argument
   // below as the final user message, the one place it belongs in the
-  // prompt - not a second time in the system context block.
+  // prompt - not a second time in either context message.
   const other = context.filter((item) => item.source !== "window" && item.source !== "utterance");
+  const stable = other.filter((item) => isStableContext(item.source));
+  const volatile = other.filter((item) => !isStableContext(item.source));
 
   const messages: LlmMessage[] = [];
-  if (other.length > 0) {
-    messages.push({ role: "system", content: other.map(renderContextLine).join("\n") });
+  if (stable.length > 0) {
+    messages.push({ role: "system", content: stable.map(renderContextLine).join("\n") });
   }
   // The window already alternates user/assistant/tool roles correctly
   // (buildConversationWindow()'s own job); this machine never rebuilds
   // that ordering, only replays the window's own roles verbatim.
   for (const item of windowItems) {
     messages.push({ role: windowRoleFromId(item.id), content: item.text });
+  }
+  if (volatile.length > 0) {
+    messages.push({ role: "system", content: volatile.map(renderContextLine).join("\n") });
   }
   messages.push({ role: "user", content: utterance });
   return messages;
