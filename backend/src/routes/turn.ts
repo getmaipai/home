@@ -2,18 +2,36 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
-import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
+import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnEngine";
 import { runBareTurnStream, BareModeForbidden } from "@/lib/turnBareStream";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId } from "@/lib/conversationHistory";
+
+// U6a (docs/plans/simple-turn-pipeline-2026-09-22.md; the coordinator's
+// ruling, 2026-09-23): one boundary, no second one. This is the only
+// place either route decides old path or new path - conversationRunner.ts's
+// bench harness reads the identical setting the identical way, so a
+// bench run and a real household turn are never on different paths for
+// the same setting value. `runTurnNext`'s own opts surface is narrower
+// than `runTurn`/`runTurnStream`'s (no thinking, supersedes,
+// continuation, ephemeral or robot evidence yet - U2's own scope, not
+// this item's to widen): those fields are silently unavailable on the
+// new path until their own units land, exactly as `bare` mode stays on
+// the frozen path regardless of the setting (a debug bypass, not a
+// household turn).
+function newPathOn(): boolean {
+  return getHouseholdSettingValue("turn.pipeline.next") === true;
+}
 
 export const turnRoutes = apiRouter();
 const RESUME_TTL_MS = 60_000;
@@ -114,6 +132,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     speaker_evidence?: unknown;
     present?: unknown;
     temporary?: boolean;
+    spoken?: boolean;
   };
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn evidence", code: "invalid_input" }, 400);
@@ -139,13 +158,20 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   // anyway.
   const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
   const dropReasoning = isMinor || surface !== "chat";
-  const result = await runTurn(actor, surface, body.text ?? "", {
-    thinking: dropReasoning ? false : body.thinking,
-    conversationId: body.conversation_id,
-    supersedes: body.supersedes,
-    temporary: body.temporary,
-    ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
-  });
+  const result: TurnOpResult = newPathOn()
+    ? await (async () => {
+        // runTurnNext() always resolves "immediate" (its own header note);
+        // the explicit kind check is TypeScript's, not a real branch.
+        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true });
+        return next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the new path returned a stream result unexpectedly" } : next;
+      })()
+    : await runTurn(actor, surface, body.text ?? "", {
+        thinking: dropReasoning ? false : body.thinking,
+        conversationId: body.conversation_id,
+        supersedes: body.supersedes,
+        temporary: body.temporary,
+        ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
+      });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
@@ -513,6 +539,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     present?: unknown;
     bare?: boolean;
     temporary?: boolean;
+    spoken?: boolean;
   };
   if (body.resume_token !== undefined) {
     const session = typeof body.resume_token === "string" ? resumeSessions.get(body.resume_token) : undefined;
@@ -579,9 +606,18 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   const dropReasoning = isMinor || surface !== "chat";
   let result: TurnStreamResult;
   try {
-    result =
-      body.bare === true
-        ? await runBareTurnStream(actor, body.text ?? "", body.conversation_id, abortController.signal)
+    // A code review caught this: `bare` must be checked BEFORE
+    // newPathOn(), not after - bare mode is a debug bypass of the whole
+    // pipeline (ADMIN-COMPARE-01: the raw model, no persona, no
+    // routing, no packages), and the header comment above already
+    // promises it "stays on the frozen path regardless of the
+    // setting"; checking newPathOn() first would silently route a
+    // bare:true request through the full new-path pipeline instead,
+    // defeating the comparison with no error at all.
+    result = body.bare === true
+      ? await runBareTurnStream(actor, body.text ?? "", body.conversation_id, abortController.signal)
+      : newPathOn()
+        ? await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, signal: abortController.signal })
         : await runTurnStream(actor, surface, body.text ?? "", {
             thinking: dropReasoning ? false : body.thinking,
             conversationId: body.conversation_id,
@@ -617,8 +653,15 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   if (result.kind === "immediate") {
     // A safety refusal or a plugin reply is already complete, deterministic
     // text - one "done" event, no artificial trickle for something with
-    // nothing left to stream.
-    const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "signal", signal: result.signal }), ndjsonLine({ type: "done", value: result.value })]);
+    // nothing left to stream. U6a: this is also every new-path (runTurnNext)
+    // result, always "immediate" by its own design (its own header note) -
+    // its `reasoning.emit` gate already runs inside the machine (the state
+    // record's "decided once, in context, before the model runs"), so
+    // `result.value.reasoning` is already undefined for a minor by
+    // construction; stripped here too anyway, the same belt-and-braces
+    // every other reasoning site in this route already keeps.
+    const value = dropReasoning && result.value.reasoning !== undefined ? { ...result.value, reasoning: undefined } : result.value;
+    const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "signal", signal: result.signal }), ndjsonLine({ type: "done", value })]);
     return new Response(body, {
       headers: { "content-type": "application/x-ndjson" },
     });
