@@ -130,6 +130,16 @@ export interface TurnGeneration {
    * catch. Absent/false on every generation that made a real wire call
    * or none at all. */
   envelope_parsed?: boolean;
+  /** GENFAIL-01 (home/docs/dev.md 2026-09-23, "generation_failed is
+   * never blind again"): the real cause when this generation's own
+   * stream threw - the engine's status and, where the client captured
+   * one, its response body (spec-v0.1.29's own client.ts fix), a
+   * timeout, or an abort reason. `null`/absent on a generation that
+   * produced a real reply; the failed generation's OWN row still
+   * carries every other field it managed to fill in before the throw
+   * (`request_sent_ms`, `first_delta_ms`), this is only the reason it
+   * stopped there. */
+  error?: string | null;
 }
 
 /** U2's own per-node trace entry, TurnGeneration's structural twin -
@@ -141,7 +151,14 @@ export interface TurnNodeExecution {
   version: string;
   startMs: number;
   endMs: number;
-  outcome: { ok: true } | { ok: false; code: string } | { skipped: true; reason: string };
+  // GENFAIL-01: `message` mirrors contract.ts's own NodeOutcome exactly
+  // (a code review caught the two drifting - a TS type cast elsewhere
+  // in this same path already suppresses excess-property checking, so
+  // an undeclared field would ride the wire unchecked instead of
+  // failing to compile). The engine's own diagnostic text only (a
+  // status, a response body), never a household member's words - see
+  // contract.ts's own NodeOutcome doc for the identical note.
+  outcome: { ok: true } | { ok: false; code: string; message?: string } | { skipped: true; reason: string };
   /** "Reasoning is a second output" (turn-machine-state-record's owner
    * ruling): set only on the `model` node's own entry, mirroring
    * turnMachine/contract.ts's NodeExecution.reasoning structurally

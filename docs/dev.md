@@ -22230,3 +22230,81 @@ port), `backend/src/wire.ts` (`EngineHealthKind`), `backend/src/app.ts`
 HealthSection.tsx`, `backend/tests/sidecars.test.ts`,
 `backend/tests/preload.ts`, `backend/tests/isolation.ts`,
 `backend/tests/isolation.test.ts`.
+
+## GENFAIL-01: landed (2026-09-23)
+
+`runOneGeneration` (`nodes/model.ts`) caught every thrown stream error
+as `{ ok: false, code: "generation_failed" }` and never pushed a
+generation record at all on failure - the outage above read as a bare
+code with nothing behind it, in the persisted `stats.generations[]`,
+the model node's own trace entry, or the running hub's own log.
+
+**The record.** Both failure sites (the pre-stream `!started.ok`
+branch, the mid-stream `catch`) now push a `GenerationInput` even on
+failure - carrying whatever the attempt actually managed
+(`requestSentMs`, `firstDeltaMs`, `stats` when the stream got that
+far) plus `error`, the engine's own caught message
+(`llmSupervisor`'s "chat model unavailable: ..." for a pre-stream
+rejection, `spec-v0.1.29`'s own `client.ts` fix carrying the status
+and, where the client captured one, the response body, inside that
+same message for a mid-stream one). `TurnGeneration.error` (`wire.ts`)
+and `GenerationInput.error` (`turnStats.ts`) mirror it. Bounded to
+2000 characters before it is ever persisted or pushed
+(`boundedGenerationError`, `model.ts`) - a code review's own caution,
+GROUND-01's already-drawn line applied again here: the engine's error
+text is trusted to be about the wire shape, never a household
+member's words, but a third-party OpenAI-compatible server's own
+validation message is not this codebase's to fully control, and this
+field reaches both the household's DB and the wire.
+
+**The trace.** `NodeOutcome`'s `ok: false` variant (`contract.ts`)
+and its wire mirror `TurnNodeExecution.outcome` (`wire.ts`) both gain
+the identical optional `message` - a code review caught the two
+drifting in a first cut (the field reached the wire type undeclared,
+since a cast elsewhere in `turnNext.ts`'s `buildTurnValue()`
+suppresses excess-property checking, so an unreviewed field would
+have ridden along silently rather than failing to compile).
+`runOneGeneration`'s two failure returns, `builderFallbackOutput`'s
+own `failureMessage` parameter, and `modelNode`'s two
+`model_failed`/builder-row call sites all thread it through, so
+`stats.nodes[]`'s own `model` entry carries the same reason the
+generation record does - a reader never has to cross-reference two
+arrays.
+
+**The hub's own log.** A code review's own second pass caught this
+missing from the first cut entirely: the design's own words ("the
+hub log's `[sidecars]` lines beside the turn's time are the only
+evidence, and they were enough here") name the running log as real
+evidence, not only the persisted DB column read after the fact.
+`console.error` on both failure sites now prints `[model] generation
+"<reason>" failed before streaming started: <code> - <message>` or
+`... failed mid-stream: <message>`, beside the `[sidecars]`/`[engine]`
+lines the same incident already reads.
+
+**The person-facing line is unchanged** (DEADLINE-01's own
+`COMPOSE_FAILURE_LINE`) - this is trace and log only, never a new
+sentence anyone hears.
+
+**Verified**: `bun test tests/turnMachine/turnNext.test.ts` green
+(the DEADLINE-01 test extended to assert `stats.generations[0].error`
+and `stats.nodes[]`'s own `model` entry's `message` both carry the
+real reason and agree with each other; the GENFAIL-01 turn added
+above proves a fresh conversation with real, matched memory rows
+still answers from the model, never the failure line, against the
+scripted stub engine). `bunx tsc --noEmit` clean. `bash
+scripts/lint/rule-budget.ts` unaffected (no new regex or word-list
+literal; `model.ts` and `contract.ts` are both turn-path files at
+their own zero baseline, and this diff adds neither kind of literal
+to either). The FORCED-CALL-01 `required_miss` test failed once in a
+full-suite run (`searxng.queries.length` 0) and passed clean alone -
+the shared machine's own load, per the org's own standing note on
+this class of flake, not a regression this diff caused; unrelated to
+any file this item touches.
+
+Files: `backend/src/lib/turnMachine/nodes/model.ts`
+(`runOneGeneration`, `builderFallbackOutput`, `boundedGenerationError`,
+`modelNode`'s two failure call sites), `backend/src/lib/turnMachine/
+contract.ts` (`NodeOutcome`), `backend/src/lib/turnStats.ts`
+(`GenerationInput`, `projectGeneration`), `backend/src/wire.ts`
+(`TurnGeneration`, `TurnNodeExecution`), `backend/tests/turnMachine/
+turnNext.test.ts`.

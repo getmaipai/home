@@ -32,6 +32,12 @@ export interface GenerationInput {
    * rather than through the engine's real tool-call field - a wire
    * normalization the trace counts, not a language rule. */
   envelopeParsed?: boolean;
+  /** GENFAIL-01: the real cause of a failed generation (llm.ts's own
+   * caught error message, carrying the engine's status and, once
+   * spec-v0.1.29's client.ts fix is pinned, its response body) - see
+   * wire.ts's TurnGeneration.error for the full contract. `undefined`
+   * on a generation that produced a real reply. */
+  error?: string | null;
 }
 
 function projectGeneration(gen: GenerationInput): TurnGeneration {
@@ -59,6 +65,7 @@ function projectGeneration(gen: GenerationInput): TurnGeneration {
     first_delta_ms: gen.firstDeltaMs,
     tool_call_raw_args: gen.toolCallRawArgs ?? null,
     envelope_parsed: gen.envelopeParsed ?? false,
+    error: gen.error ?? null,
   };
 }
 

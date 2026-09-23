@@ -129,7 +129,30 @@ interface GenerationAttempt {
   toolCalls: ToolCall[] | undefined;
   thinking: boolean;
 }
-type GenerationResult = GenerationAttempt | { ok: false; code: string };
+// GENFAIL-01: `message` is the engine's own diagnostic text (llm.ts's
+// caught error, or startCompleteStream()'s own `started.error`) -
+// carried back to modelNode so it lands on both the generation record
+// (already pushed inside runOneGeneration, below) AND the model node's
+// own NodeOutcome (contract.ts), the same reason a caller shouldn't
+// need to cross-reference two different records to read why a turn
+// failed.
+type GenerationResult = GenerationAttempt | { ok: false; code: string; message?: string };
+
+// GENFAIL-01 (a code review, 2026-09-23): the same GROUND-01 caution
+// `arg` already carries (contract.ts's own NodeOutcome doc) - the
+// engine's own error text is trusted to be about the WIRE (a status, a
+// generic "two system messages" or "invalid request" shape), never a
+// household member's own words, but a rejected request's body is not
+// this codebase's to control, and some OpenAI-compatible servers do
+// echo a bad field's value back in a validation message. Bounded
+// rather than trusted blindly: the same 2000-character cap
+// spec-v0.1.29's own client.ts already applies before it ever reads a
+// response body, applied again here since this field is also
+// persisted to the household's own DB and served over the wire.
+const MAX_GENERATION_ERROR_CHARS = 2000;
+function boundedGenerationError(message: string | undefined): string | undefined {
+  return message === undefined ? undefined : message.slice(0, MAX_GENERATION_ERROR_CHARS);
+}
 
 /** One real model call: builds the tools block for this attempt, runs
  * it through the streaming client (COR-7's own signal support), and
@@ -147,7 +170,24 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
     else signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
   }
   const started = await startCompleteStream("chat", messages, { tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens }, controller?.signal ?? signal);
-  if (!started.ok) return { ok: false, code: started.code };
+  if (!started.ok) {
+    // GENFAIL-01 (dev.md "generation_failed is never blind again"): a
+    // failed attempt used to leave no generation record at all (the
+    // push below was the ONLY one, reached only on a real reply) - the
+    // model node's own outcome told a caller THAT this generation
+    // failed, never why. `started.error` is already the real message
+    // (llmSupervisor's "chat model unavailable: ..." or an invalid
+    // request), captured here rather than discarded.
+    const boundedError = boundedGenerationError(started.error);
+    // GENFAIL-01: the running hub's own log stream, not only the
+    // persisted stats column - a live outage (Fable's own diagnosis,
+    // dev.md) is read from `[sidecars]`/`[engine]` lines beside the
+    // turn's own time before anyone queries a DB row, and this failure
+    // class had no line here at all.
+    console.error(`[model] generation "${reason}" failed before streaming started: ${started.code}${boundedError ? ` - ${boundedError}` : ""}`);
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: Date.now() - state.startedAt, firstDeltaMs: null, stats: null, error: boundedError });
+    return { ok: false, code: started.code, message: boundedError };
+  }
 
   const requestSentMs = Date.now();
   let firstDeltaMs: number | null = null;
@@ -177,8 +217,17 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
       }
       raw += step.value;
     }
-  } catch {
-    return { ok: false, code: "generation_failed" };
+  } catch (err) {
+    // GENFAIL-01: the same gap as the pre-stream branch above, mid-
+    // stream - llm.ts's own tokens() generator already wraps whatever
+    // broke into a real Error ("chat model unavailable: <cause>"),
+    // spec-v0.1.29's client.ts carrying the engine's status and
+    // response body inside that cause for a rejected request; this is
+    // the one place that used to throw the message away.
+    const message = boundedGenerationError(err instanceof Error ? err.message : String(err));
+    console.error(`[model] generation "${reason}" failed mid-stream: ${message ?? "(no message)"}`);
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message });
+    return { ok: false, code: "generation_failed", message };
   }
 
   const visible = visibleText(raw);
@@ -231,9 +280,9 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
  * reports) while still returning the builder's `tool_calls` output -
  * the machine's own routing (`modelIsToolCalls`) reads `output.kind`
  * only, never `outcome.ok`, so the search still runs either way. */
-function builderFallbackOutput(utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, failureCode?: string): { outcome: NodeOutcome; output: ModelOutput } {
+function builderFallbackOutput(utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, failureCode?: string, failureMessage?: string): { outcome: NodeOutcome; output: ModelOutput } {
   const builderCall: ToolCall = { tool: "websearch", args: { expression: utterance }, id: "builder" };
-  const outcome: NodeOutcome = failureCode !== undefined ? { ok: false, code: failureCode } : { ok: true, required_miss: true };
+  const outcome: NodeOutcome = failureCode !== undefined ? { ok: false, code: failureCode, message: failureMessage } : { ok: true, required_miss: true };
   return { outcome, output: { kind: "tool_calls", calls: [...otherCalls, builderCall], reasoning } };
 }
 
@@ -291,7 +340,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // below; otherwise the turn gets a real, fixed model_failed line,
   // never the empty string this used to deliver silently through
   // `answer` as if the model had genuinely said nothing.
-  if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code) : { outcome: { ok: false, code: attempt.code }, output: { kind: "model_failed" } };
+  if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
 
   // State table, `model`'s own exits: "no visible text: one
   // regeneration with thinking off, then answer." A tool call always
@@ -301,7 +350,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // this retry is only ever an ordinary/offered call's own.
   if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && thinkingOn) {
     attempt = await runOneGeneration(state, messages, tools, tool_choice, false, visibleReplyMaxTokens(state.plan.max_words, false), "model_retry_no_thinking", signal);
-    if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code) : { outcome: { ok: false, code: attempt.code }, output: { kind: "model_failed" } };
+    if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
   }
 
   // "Reasoning is a second output" (the owner's ruling): `context`

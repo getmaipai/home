@@ -188,8 +188,17 @@ export interface TurnState {
  * `required` as advisory once the slot's KV cache holds the prefix
  * (ENGINE-CONTRACT-01), so `interimRuleMeasure` and the replay bench
  * can count this by cache state without re-deriving it from the
- * generation record. */
-export type NodeOutcome = { ok: true; required_miss?: boolean } | { ok: false; code: string; arg?: string } | { skipped: true; reason: string };
+ * generation record. GENFAIL-01 (dev.md 2026-09-23, "generation_failed
+ * is never blind again"): `message`, on the `ok: false` variant only,
+ * is the ENGINE's own diagnostic text (a status, llama-server's own
+ * generic JSON error body, "could not reach ...") - the same GROUND-01
+ * limit above applies to it the way it applies to `arg`: this is never
+ * a household member's own words, and `nodes/model.ts` bounds its
+ * length before it ever reaches this field, the same caution a
+ * response body earns anywhere it might echo request content back.
+ * Optional: every other node's own failure still reports with `code`
+ * alone when it has nothing more to say. */
+export type NodeOutcome = { ok: true; required_miss?: boolean } | { ok: false; code: string; arg?: string; message?: string } | { skipped: true; reason: string };
 
 export type NodeName = "safety" | "commands" | "context" | "model" | "policy" | "tool" | "answer" | "output_gate";
 
