@@ -361,21 +361,20 @@ is a second output with the same rules as the first, and one more.
   the withholding decision holds on reload and in every client. Old rows
   with inline think text are stripped on read. (U2e on the new path; the
   old path's fix, 141eaf86, is part of the safety exception.)
-- **Stored reasoning is gated on read, by the reading actor.** Ruling,
-  2026-09-22, reconciling this record with the old path's tested
-  contract: a minor's turn generates no reasoning by default (the budget
-  record's `thinking_for_minors` is false, so thinking is forced off
-  server-side for a minor's turn and for every non-chat surface, and
-  there is nothing to store); when a budget turns it on, the stored
-  field is readable only by an owner or admin in the parental view of
-  the child's chat, never by the minor, on the wire and on reload, the
-  same rule the memory store's parental view already keeps. Parents'
-  oversight of what the hub thought about their child's question is a
-  feature, and stored reasoning inherits the stored answer's own
-  protections (the encrypted backup, the person's own export); the
-  disclosure filter still runs on the parent's read. The list() test that
-  proves an owner may read a child's stored reasoning and the child
-  cannot stays as the contract.
+- **A child's reasoning is never persisted (owner's ruling, 2026-09-22,
+  a privacy invariant, not a setting).** Not in the turn row, not in the
+  trace, not in history, exports or backups, on any budget setting: if a
+  budget ever turns thinking on for a minor, the spans are consumed in
+  the model node and nothing of them is written anywhere; the trace
+  records only `withheld_for`. Parental audit of a child's turn uses the
+  question, the answer, the consulted sources, the executed tools and the
+  policy decisions, which are all stored. Adult reasoning retention stays
+  as ruled the same day: stored in REASONING-02's field and gated on read
+  by the reading actor, explicit and limited to that. This supersedes the
+  earlier "an owner may read a child's stored reasoning" reading, and
+  the old path's `list()` contract that proves it is retired with this
+  reason when GROUND-01's session next touches that file (REASONING-03,
+  S, in the backlog).
 
 The decision is made once, in `context`, before the model runs, and is
 never recomputed by a later node. For an adult on a typed screen the
