@@ -169,6 +169,15 @@ judgment about phrasing.
 - Malformed-reply repair (an empty or cut-off reply is regenerated once).
 - The one ReplyPlan: the surface's length budget and the child band
   (`register.ts`, as ARCH-LAYERS-01 accepted it). Length lives there only.
+- The reply floor (owner's rule, 2026-09-23; the state record's "The
+  reply floor"): the bare model's answer to the same words is the floor
+  for content, structure and usefulness. The register, the persona, the
+  plan line, the guards and safety change tone, length within the
+  register's bounds and what a child is not shown, and never remove a
+  point, a list, a heading or a step the bare reply had. A typed adult
+  question gets the bare reply's completeness in the companion's voice.
+  Measured by the written set's bare-parity column, a judge trend line
+  beside the human verdict; U4b and PHRASE-01 accept on it.
 
 ### 2. What gets deleted
 

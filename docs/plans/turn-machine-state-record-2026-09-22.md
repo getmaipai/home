@@ -395,6 +395,57 @@ second log. A behaviour that seems to need one of those is a bench row
 on the replay set first, then either a node's own change or a budget
 field, never a rule added in front of the model.
 
+## The reply floor (owner's rule, 2026-09-23)
+
+Jesse compared the hub's reply with the bare model's on a typed adult
+question ("what is technical benchmarking and why do you need it"):
+the bare model gave a complete, useful, well-structured answer (the
+what, the why, headings); the hub gave two sentences and an analogy.
+His rule, in substance: whatever we do with personality, guards and
+the rest, it still has to do that.
+
+**The bare model's answer to the same words is the floor.** For a
+typed question from an adult, the reply keeps every point, the
+structure (lists, headings, steps) and the usefulness the bare reply
+had, with the companion's voice on it. Personality, the register, the
+plan line, guards and safety may change tone, may change length within
+the register's bounds, and may withhold what a child must not see; none
+of them may remove substance, structure or usefulness. A layer that
+does is a defect in that layer, found by the parity column below,
+never a reason to loosen the floor.
+
+What follows from it, stated once:
+
+- On the written class the plan's length numbers are room, not a
+  ceiling on substance: `planLine` already says "as long as it needs,
+  structured where it helps", and `max_tokens` on a written adult turn
+  comes from the budget's reply ceiling, never from `max_words` times a
+  constant. The spoken class keeps its caps: a voice reply is short by
+  design, and the floor there is the bare reply's substance said in
+  fewer words, never its structure read aloud.
+- The spoken naturalness policy ("never bullet points", "the way a
+  person talking out loud would") is a spoken-class fragment. The
+  written class gets its own policy, which permits and expects the
+  structure the bare reply had.
+- The persona's engagement fragment bounds the spoken reply; on the
+  written class "brief" means no padding, never "a sentence or two".
+- The composition instruction's "in one to three sentences" is the
+  spoken form; the written form asks for the complete answer from the
+  results, structured where it helps.
+- The child band's clamp (forty words, concrete, no pointing) applies
+  to a child's turn only; the unknown-speaker default to child is the
+  robot's, never a typed chat's (`turnContext.ts`, `effectiveBand`).
+
+**The measurement.** The written-set bench gains a bare-parity column:
+for each row the bare reply (the same words to the same engine, no
+system message, thinking off) beside the path's reply, judged
+"carries every point of the bare reply and its structure" by a
+structured-output judge call, printed per row as a trend line beside
+the human verdict (RULES-AND-LEARNED-COMPONENTS.md: a model judge is a
+trend line, never a gate). Every failure is read by a person. U4b and
+PHRASE-01 accept only when every adult typed row keeps the bare
+reply's points and structure on that column.
+
 ## The setting
 
 `turn.pipeline.next`: scope household, selector switch, default `false`,
@@ -449,6 +500,9 @@ the flip.
   forced search and answers the same both times (the escape is off).
 - First visible token on "hi" on the 8B under the skeleton's live
   baseline (2.5 s median), with the cache-stable prompt in place.
+- The reply floor: on the written set, every adult typed row's reply
+  keeps the bare reply's points and structure on the bare-parity
+  column, each failure read by a person.
 
 ## Left to measurement
 

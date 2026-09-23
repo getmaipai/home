@@ -21735,3 +21735,23 @@ state), versioned `-v2` in the same Desktop delivery folder as round 1
 so Jesse finds both. Jesse's own judgment is still the acceptance bar
 this row waits on, round 2 same as round 1 - not something this
 session can self-certify.
+
+## The reply floor: the layers that remove substance today (2026-09-23)
+
+The owner's rule is in the state record ("The reply floor") and the
+build plan (section 1). This names, with lines, what removes substance
+from a typed adult reply today, so the rows point at the right code.
+
+| Layer | Where | What it does to a typed adult question |
+|---|---|---|
+| The spoken plan on a typed chat (old path) | `turnEngine.ts` calls `planFor` with no `surfaceClass` (about line 3345), so `register.ts` defaults to "spoken": a question gets 2 sentences and 60 words | the two-sentence reply Jesse saw; the old path is frozen except for safety defects, so this is recorded, not fixed |
+| The written caps read as ceilings (new path) | `register.ts` `writtenBudgetFor`: a question 220 words, 360 with evidence; `nodes/model.ts` turns `max_words` into `max_tokens` | a bare reply longer than the table is cut; the floor makes the written numbers room, with `max_tokens` from the budget's reply ceiling |
+| The spoken naturalness policy on every register | `persona.ts` `NATURALNESS_POLICY` (line 190: "never bullet points", "the way a person talking out loud would"), inside `buildStablePrefix`, now on the new path through U4b (c3982311) beside a written plan line that says "structured where it helps" | the structure the bare reply had is forbidden by one line and asked for by the next; a written policy does not exist yet |
+| The persona's engagement | `persona.ts` `ENGAGEMENT_FRAGMENT.brief` (line 221: "a sentence or two"), `DEFAULT_PERSONA` is brief, `composePersonaPrompt` (line 264) reads no surface class | the reply is told to stop after two sentences whatever the register |
+| The composition instruction | `composer.ts` `compositionInstruction` (line 820: "in one to three sentences") | a searched answer is one to three sentences on every register; PHRASE-01 carries it to the new path as written |
+| The child band | `register.ts`: band child forbids `point` and clamps to 40 words, vocabulary simple, explanation concrete | a child's turn only; the unknown-speaker default to child is robot-only (`turnContext.ts` `effectiveBand`, line 46), so no child rule reaches a typed adult today: named so no row chases it |
+
+Rows: `WRITTEN-PARITY-01` builds the measurement; U4b (the written
+policy, the surface-aware engagement fragment, the written cap as
+room) and PHRASE-01 (the written composition instruction) carry the
+fixes and accept on the column.
