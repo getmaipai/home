@@ -23,6 +23,9 @@ capabilities.
 | Picture creation (`image` role) | on demand on a second in-house machine when one exists (a URL-tier engine); otherwise on this machine's MPS with the chat engine paused for about a minute per picture | on demand on the second card (FLUX.2 Klein 4B at fp8 or 4-bit, the text encoder in RAM), chat unaffected; when both cards are needed, the judge yields first | on the Studio itself, admitted by the governor beside a resident chat model |
 | Deployment limits | one conversation with speech plus one photo or picture job at a time | the same, with the image job on its own card | two conversations with speech, a photo and a picture job at once (STUDIO-ACCEPT-01's original workload) |
 
+The table is the default proposal at each reference point, never what a
+machine is locked to (see "The configuration is proposed, never fixed").
+
 What the tiers share: the roles (`chat`, `judge`, `embed`, `stt`, `tts`,
 `vision`, `image`), the on-demand admission and eviction, the machine
 and its budget, the chat Elements and the composer. What they never
@@ -181,6 +184,8 @@ anywhere in copy.
 | 1 | Voice: VOICE-01, VOICE-02, VOICE-03 | S, M, S | cancellation reaching the engine | a voice turn beside a typed one on the 24 GB Mac: first spoken word, peak memory, stop |
 | 2 | Photos: VISION-01 | M | the vision engine's checks (image input, timing, cancellation, the pinned set) | a photo turn while a typed conversation runs: first useful answer, peak memory with the vision model loaded |
 | 3 | Pictures: IMAGE-01, IMAGE-02 | M, S | none on the Mac (the engine is remote); the URL-tier health check | a picture job while a conversation runs: chat unaffected with the laptop, chat paused and resumed cleanly without it |
+| with 1 | STACK-SIZE-01: the sizer honours a per-role step-down | M | none | the workload rerun under a stepped-down proposal inherits the smaller reference point's limits |
+| with 1 | SETUP-SIZE-01: the wizard's sizing page with impact per role | M | none | a stepped-down chat role visible in the next start's resident set |
 
 STUDIO-ACCEPT-01 becomes **the tier acceptance workload, run on tier 1
 first**:
@@ -197,3 +202,58 @@ Elements and the composer slot. **What a bigger tier changes:** the vision
 model stays resident, pictures draw on the hub itself and a second
 machine's URL-tier address retires, and the chat role's budget is that
 tier's model's own measured record.
+
+### The configuration is proposed, never fixed (owner's rule, 2026-09-23)
+
+Jesse's rule: the system has no fixed configurations; it chooses its
+configuration from the hardware it detects, and lets a person step
+specific things down when they want the room, with the wizard up front
+about the impact. The three tiers above are measured reference points
+and the default proposal, nothing more.
+
+1. **The Stack's probe proposes, per role.** `proposeProfile`
+   (`stack/backend/src/profiles.ts`, described in stack dev.md "Sizing
+   and profiles") already picks the highest profile the detected
+   hardware clears; the supervisor sets the governor's tier from it at
+   start (`setMachineTierFromHardware`, `stack/backend/src/lib/supervisor.ts`)
+   and the hardware route returns the proposal. That is the mechanism;
+   no new sizer.
+2. **The wizard shows the proposal with its impact, and lets a person
+   step any role down.** In the first-run wizard's hardware step (plan
+   12's "hardware detection and the model set that fits") and on the
+   same page later under Settings, each role shows the proposed choice
+   and its impact in a parent's words: the memory it keeps back from
+   the rest of the computer, the expected speed, and what a smaller
+   choice loses ("photos take longer", "no pictures", "shorter
+   answers"). The person may set any role to a smaller pinned
+   candidate, to on demand instead of resident, or off. The page is the
+   template's form layout, no hand-built control.
+3. **One Setting record per role.** The choice is a declared settings
+   key per role (`engines.<role>.choice`: `proposed`, a smaller pinned
+   candidate's id, `on_demand`, `off`; scope household, level basic),
+   declared once in the registry and rendered by the generic renderer
+   (SETTINGS.md); the Stack reads it and honours it in its residency
+   budget. Never a second config file, never a hub-side override.
+4. **Measured once.** The acceptance workload records limits per
+   proposal; a stepped-down proposal inherits the smaller reference
+   point's measured limits (a chat role stepped from the tier 3 model
+   to the 8B runs under the 8B's measured budget record), so nothing
+   is measured twice.
+
+**The gap, checked in the Stack:** today it only proposes. There is no
+input that accepts a per-role choice below the proposal: the governor's
+`pinned` flag is per-process eviction, not a profile choice, and no
+route or setting carries a step-down. Two rows, in the order table:
+`STACK-SIZE-01` (M, Sonnet; `stack/backend/src/profiles.ts`,
+`lib/supervisor.ts`, `lib/governor.ts`, the hardware and models routes):
+the sizer takes the per-role choice from the settings record, applies it
+at or below the proposal (a larger choice than the proposal is refused
+with the reason), and the residency budget honours it; test: a p64
+machine with `chat` stepped to the 8B and `image` set to `off` runs the
+8B and never admits an image job. `SETUP-SIZE-01` (M, Sonnet; the
+hardware step of "The first-run wizard, end to end" and the same page
+under Settings, a shadcndashboard form layout, the settings key spec
+first): the proposal with impact per role and the step-down controls;
+acceptance: stepping `chat` down on the dev Mac changes the Stack's
+resident set on the next start and the page says what changed.
+
