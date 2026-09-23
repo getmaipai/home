@@ -23387,3 +23387,165 @@ motivating examples) never showed the signature in any of the three
 concurrent attempts - whatever Jesse saw there earlier was very likely
 this same staleness class, already closed by the fixes above, not a
 defect of their own.
+
+## GATE-SCOPE-01: `scripts/check.sh` runs only the stages a diff can touch (2026-09-23)
+
+Landed the same night as FLAKE-PORT-01 above, for a related but
+different reason: FLAKE-PORT-01 fixed the backend suite's own
+stub-server flakiness under concurrent gate runs, but even a perfectly
+reliable backend suite is still four minutes of dead weight in front of
+a frontend-only commit that can't possibly break it. On 2026-09-22 to
+23 four sessions landed about thirty mostly frontend-only commits
+through one shared full gate, one at a time, with flaky reruns, and
+each item waited twenty to sixty minutes from done to live behind a
+suite no frontend file could touch.
+
+**The scope rule, exactly.** `check.sh` reads the changed-file list
+(working tree against `git merge-base HEAD origin/main`, tracked and
+untracked, never literally "the staged diff" - the org's own
+git-workflow rule stages and commits in one step, so at the moment
+`check.sh` actually runs there is normally nothing staged at all, and a
+staged-only read would fall back to `full` on every run; the org
+CLAUDE.md wording is being corrected to say "the working tree against
+the merge base" instead) and buckets every path:
+
+- A root/workspace `package.json` or lockfile, `.gitignore`,
+  `.gitleaks.toml`, anything under the root `scripts/` (it holds the
+  pin tags every workspace resolves from), a `spec/` workspace path
+  (home has none today - dead code here as of this landing, kept and
+  tested for the day one exists again), or a path matching no known
+  bucket at all - `full`, no exceptions, since a change there can touch
+  anything.
+- `frontend/**` (except `frontend/package.json`, itself a full-bucket
+  trigger above) - `frontend`.
+- `backend/**` (except `backend/package.json`) and `docs/api/**` (the
+  generated API docs, whose drift check is a backend concern) -
+  `backend`.
+- Root `README.md`/`CHANGELOG.md`/`AGENTS.md`/`CLAUDE.md`/`LICENSE`/`NOTICE`,
+  `docs/**` (except `docs/api/`), `.claude/**` - `docs`. A bundled
+  package's own `README.md` (`backend/packages/*/README.md`) is a
+  backend file, not a doc - `hashPackageDir()` hashes every file in a
+  bundled package including its README, and `package-bronze.test.ts`
+  checks for it, so a docs-scoped gate would never run that check.
+- Both `frontend/` and `backend/` changed together - `full` (crosses
+  packages, the two suites' own scopes can't cover a change that spans
+  both).
+- A `backend/` change touching a path `frontend/` imports directly -
+  `full` too, found live at gate time with `git grep -hoE
+  '@maipai/home-backend/src/[A-Za-z0-9_./-]+' -- frontend/` (today:
+  `wire.ts`, `homeCardQuestions.ts`), never a hand-kept list that
+  silently goes stale as a new cross-import is added.
+
+`frontend: typecheck` runs under both `frontend` and `backend` scope -
+the frontend imports typed backend code (the two files above), so a
+backend-only change can still break the frontend's own type surface
+even when it doesn't touch one of those files directly enough to force
+`full`. `frontend: a11y` stays `frontend`-only: it drives a real
+Chromium against the built frontend and never runs the backend's own
+test suite, so it isn't the stage this rule exists to route around, and
+keeping it in scope preserves the exact real-pixel coverage the
+CHAT-FIND-0923 findings earlier the same night depended on. The secrets
+scan and PII wordlist (the standards core) run in every scope,
+unchanged - never skippable.
+
+`check.sh` prints the scope and its reason as its own first line
+(`== scope: frontend (only frontend/ changed)`, `== scope: full
+(scripts/ changed (scripts/check.sh) - it holds the pin tags every
+workspace resolves from)`), before `ensure-tag.sh` or anything else can
+print. `--full` always forces everything (widening is always safe).
+`--docs` is kept only so the existing "docs commit" habit
+(`AGENTS.md`'s own documented `bash scripts/check.sh --docs`) still
+works - the real scope is always computed regardless, and if it comes
+out wider than `docs`, the wider scope runs and says `--docs` was
+ignored, rather than silently under-checking a diff that reaches beyond
+docs.
+
+**Why unit tests, not just the bash script.** The actual
+classification logic (which bucket a path falls into, the
+crosses-packages rule, the direct-import escalation) moved out of
+`check.sh`'s own bash into a new `scripts/gateScope.ts`, a pure
+`classifyScope(files, frontendImportedBackendPaths)` function with 19
+`bun:test` cases covering every rule: frontend-only, backend-only,
+docs-only, root docs files by exact name, a bundled package's own
+README as backend not docs, `docs/api/` as backend, `.claude/` as
+docs, crosses-packages, a root package.json/bun.lock/scripts/spec/
+change forcing full, a root `scripts/` change versus `backend/scripts/`
+(stays backend) and `frontend/scripts/` (stays frontend), a rename
+across packages (fed as two plain paths, proving the classifier's own
+side of `check.sh`'s `--no-renames` diff flag), the direct-import
+escalation both ways (hits and stays-scoped) and across a `.js`/`.ts`
+extension mismatch on either side, an empty diff (runs full,
+"verifying the full state"), an untracked file (classified the same as
+a tracked one), and an unclassified path (forces full rather than
+silently narrowing). Bash string matching over dozens of path
+shapes is exactly the kind of thing that silently drifts wrong with no
+test suite proving it, and `check.sh`'s own exit code only ever proves
+"did it exit 0 today," never "did it pick the right scope for this
+diff." `check.sh` itself stays a thin shell wrapper: gathering the two
+file lists `gateScope.ts` needs (git is naturally a shell job) into
+temp files, calling `bun scripts/gateScope.ts <changed> <imported>`,
+and reading its two-line stdout result with two plain `read -r` calls
+rather than ever eval-ing anything a file path could inject into.
+
+**What this landing found along the way, not fixed here.** Two other
+lanes were mid-edit on `scripts/check.sh` at the same time tonight
+(GATE-SPEED-01, already landed by the time this item started; GATE-SPEED-02
+(a), a separate session's own uncommitted draft) - resolved by rebasing
+onto `origin/main` cleanly (no textual conflict, since the edits landed
+in different regions of the file) rather than by any coordination
+beyond the normal rebase-before-push discipline. `frontend: a11y`
+rebuilds the frontend a second time on top of `frontend: build`'s own
+build (`scripts/screenshot.ts`'s own `bun run build` call) - a real,
+separate speed gap, GATE-SPEED-02 (c)'s own scope, not this item's.
+
+**Five real gaps a medium review found, all fixed before landing** (this
+item changes the gate's own guard logic, so it got a medium pass, not
+low): (1) `printf '%s\n' "${files[@]}"` on a genuinely empty `files`
+array throws "unbound variable" under `set -euo pipefail` on this
+machine's own bash (3.2.57, macOS's last GPLv2 build - a known
+pre-4.4 quirk in empty-array expansion under `set -u`), confirmed live
+by extracting and running `compute_scope()` verbatim against a clean
+tree - exactly the "nothing to scope, verify the full state" case the
+empty-diff rule exists for, and it crashed the whole gate before
+`gateScope.ts` ever got to say so. Fixed with a length check before the
+`printf`. (2) The two `mktemp` temp files leaked on any failure inside
+`compute_scope()` - a `RETURN` trap doesn't fire when `set -e` aborts
+the whole script from inside the function (confirmed live: it fires on
+a normal return, not on a `set -e`-triggered exit), so it silently
+never ran on exactly the failure paths that matter. Fixed with an
+`EXIT` trap instead, its command string expanded with double quotes at
+registration time (the function's own `local` variables won't exist by
+the time a later `EXIT` actually fires). (3) A comment in both files
+named a `frontend_imported_backend_paths()` function that the
+refactor into `gateScope.ts` never actually created under that name
+(the git grep is inlined directly in `compute_scope()`) - reworded to
+point at the real location. (4) The direct-import escalation stripped
+only a `.ts`/`.tsx` extension from the changed backend path before
+comparing against the grepped import specifiers; today every import
+specifier this regex can capture is extension-free, but a future
+Node16/nodenext-style import could write the compiled `.js` extension
+against a `.ts` source, silently breaking the match - fixed by
+stripping a known extension (`.ts`/`.tsx`/`.js`/`.jsx`) from both
+sides via one shared `stripKnownExtension()` helper. (5) The `spec/`
+full-forcing rule had no test and wasn't named in either doc's own
+rule list, contradicting the "cover every rule" claim - added a test
+and named it above (home has no `spec/` workspace today, so this was,
+and remains, dead code, just now honestly documented as such rather
+than silently uncovered).
+
+Verification: `bash scripts/check.sh` on this item's own diff prints
+`== scope: full` (it touches `scripts/check.sh` and adds `scripts/
+gateScope.ts`, both root-`scripts/` paths, the correct and only honest
+answer for a change to the gate's own scoping logic) and passes every
+stage (4046 backend + 721 frontend + 33 scripts tests, 0 fail, no
+flakes - FLAKE-PORT-01 landed the same night); the 19 `gateScope.test.ts`
+cases pass. `gateScope.ts`'s CLI
+called directly (bypassing git, with a crafted changed-file list) on
+one frontend-only path, one backend-only path, one docs-only path, and
+one frontend-plus-backend pair confirmed it prints exactly `frontend`,
+`backend`, `docs` and `full` respectively - and `check.sh`'s own
+stage-gating conditions (`grep` confirms each: backend stages gated on
+`backend`/`full`, `frontend: typecheck` on `frontend`/`backend`/`full`,
+the rest of the frontend stages on `frontend`/`full` only) match this
+design exactly, so a real diff of each shape runs the stage set this
+record claims it does.
