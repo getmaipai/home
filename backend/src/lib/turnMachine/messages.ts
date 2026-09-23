@@ -54,6 +54,14 @@ function renderContextLine(item: ContextItem): string {
   return `[${label}${dated}] ${item.text}`;
 }
 
+/** The one place that renders a real memory match's own header, bullets
+ * and trust line - shared by both classes below, so a future edit to
+ * this shape (the header wording, a bullet's own format, the trust
+ * line) can never land in one class and not the other by hand. */
+function renderMemoryMatches(memoryItems: readonly ContextItem[]): string {
+  return `${MEMORY_SECTION_HEADER}\n${memoryItems.map(renderContextLine).join("\n")}\n${MEMORY_TRUST_REMINDER}`;
+}
+
 /** CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)): the
  * same header, trust line and "nothing matched" line the old path's
  * own memorySection used (turnEngine.ts), shared via memoryFraming.ts -
@@ -64,10 +72,25 @@ function renderContextLine(item: ContextItem): string {
  * there are none (NOTHING_STORED_LINE says so plainly, #93's own
  * reasoning: an empty recall is said, not left blank, so the model
  * answers a general question from what it knows instead of reaching
- * for the recall tool to check what context already checked). */
+ * for the recall tool to check what context already checked). Spoken
+ * class only, unchanged - the written class's own twin is below. */
 function renderMemoryBlock(memoryItems: readonly ContextItem[]): string {
-  const bullets = memoryItems.length > 0 ? memoryItems.map(renderContextLine).join("\n") : NOTHING_STORED_LINE;
-  return `${MEMORY_SECTION_HEADER}\n${bullets}\n${MEMORY_TRUST_REMINDER}`;
+  if (memoryItems.length === 0) return `${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}`;
+  return renderMemoryMatches(memoryItems);
+}
+
+/** The written-adult class's own twin (dev.md "The written prompt on
+ * tier 1, decided"): NOTHING_STORED_LINE and its framing are the
+ * "still answer, don't decline" INSTRUCTION half of the shared block -
+ * real on the spoken class (every measured shape with an instruction
+ * sentence in the written prompt cost length), but a written-adult
+ * turn with no memory match gets no memory section at all rather than
+ * a sentence-shaped framing of an absence. A real match is content
+ * (the header, the bullet, the trust line, unchanged - renderMemoryMatches()
+ * above, never a second copy of that template), so it still renders in
+ * full. */
+function renderMemoryBlockWritten(memoryItems: readonly ContextItem[]): string | null {
+  return memoryItems.length > 0 ? renderMemoryMatches(memoryItems) : null;
 }
 
 /** Reads the role nodes/context.ts encoded into a "window" item's id
@@ -147,6 +170,14 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
 
   const messages: LlmMessage[] = [];
   const stableContextLines = stable.length > 0 ? `\n\n${stable.map(renderContextLine).join("\n")}` : "";
+  // PREFIX-ROLE-01 (dev.md "PREFIX-ROLE-01: moving the stable message's
+  // role alone does not clear the bar either"): tried and reverted -
+  // moving this message's role to "user" for a written-adult turn
+  // measured no effect (0.15x/0.16x, no better than the system-role
+  // shape it replaced, worse on one question). The stable message stays
+  // role "system" on every surface class; the coordinator's own
+  // follow-up ruling named the volatile message's own plan line as the
+  // real suspect instead - see below.
   messages.push({ role: "system", content: `${buildStablePrefix(persona, promptSurfaceClass)}${stableContextLines}` });
   // The window already alternates user/assistant/tool roles correctly
   // (buildConversationWindow()'s own job); this machine never rebuilds
@@ -154,6 +185,26 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   for (const item of windowItems) {
     messages.push({ role: windowRoleFromId(item.id), content: item.text });
   }
+  if (promptSurfaceClass === "written") {
+    // The written prompt on tier 1, decided (dev.md, the coordinator's
+    // own design record): no reanchor line, no plan line - arm 1 (the
+    // plan line dropped) measured 0 of 5 "you" misreads on the
+    // benchmarking question where arm 2 (the reanchor folded ahead of
+    // the question) reproduced it, and both are instruction, never
+    // content. The memory block itself only renders on a real match -
+    // NOTHING_STORED_LINE's own framing is the instruction half of that
+    // shared block (renderMemoryBlockWritten's own comment). Content-only
+    // otherwise (clock, a tool round's result), and when nothing
+    // remains at all, no second system message - never an empty or
+    // instruction-only one.
+    const writtenVolatileParts = [renderMemoryBlockWritten(memoryItems), restVolatile.length > 0 ? restVolatile.map(renderContextLine).join("\n") : null].filter((part): part is string => part !== null);
+    if (writtenVolatileParts.length > 0) {
+      messages.push({ role: "system", content: writtenVolatileParts.join("\n\n") });
+    }
+    messages.push({ role: "user", content: utterance });
+    return messages;
+  }
+
   // CONTEXT-RECALL-01: the memory block (renderMemoryBlock, always
   // present - the header and trust line wrap even a "nothing matched"
   // line) leads the volatile message; every other volatile source
@@ -166,7 +217,8 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // specifically because legacy measured real persona-voice drift after
   // about eight turns with nothing repeating who's speaking. Reused
   // verbatim here too, every turn, the same volatile-zone role it
-  // already has in the old path.
+  // already has in the old path. Spoken only, unchanged: the written
+  // class dropped both above.
   const reanchor = companionReanchorLine(persona).trim();
   messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}${reanchor}\n\nHow to answer this one: ${planLine(plan, signal, promptSurfaceClass)}` });
   messages.push({ role: "user", content: utterance });

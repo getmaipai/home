@@ -18,6 +18,9 @@ import {
   StreamSafetyRefusal,
   buildSystemPrompt,
   buildStablePrefix,
+  stableSuffixFor,
+  STABLE_SYSTEM_SUFFIX_SENTENCES,
+  STABLE_SYSTEM_SUFFIX,
   selectPageLinkFor,
   matchPattern,
   capSection,
@@ -48,7 +51,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { createEntity } from "@/lib/entities";
 import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
-import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, PERSONA_IDS } from "@/lib/persona";
+import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, PERSONA_IDS, DEFAULT_PERSONA } from "@/lib/persona";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords, episodes } from "@/db/schema";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
@@ -2312,6 +2315,65 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
     const stable = buildStablePrefix(persona);
     const full = buildSystemPrompt(fakeActor(), "hi there", [], undefined, persona);
     expect(full.startsWith(stable)).toBe(true);
+  });
+
+  // PREFIX-CLASS-01 (dev.md "PARITY-BISECT-04: arms e and f, and the
+  // ruling"): the acceptance test named in the row itself - the spoken
+  // prefix stays exactly what it was before this item, the written
+  // prefix contains none of the three phrases the row calls out by name.
+  describe("buildStablePrefix() written class (PREFIX-CLASS-01)", () => {
+    test("the spoken prefix for the default persona still carries every phrase it had before this item - unchanged", () => {
+      const spoken = buildStablePrefix(DEFAULT_PERSONA);
+      expect(spoken).toContain("Be warm, concise and honest");
+      expect(spoken).toContain("the way a friend would");
+      expect(spoken).toContain("Talk the way a person actually talks in a relaxed conversation");
+      expect(spoken).toContain("Keep replies to a sentence or two");
+      expect(spoken).toContain(STABLE_SYSTEM_SUFFIX);
+    });
+
+    test('the written prefix contains no "concise", no "relaxed message", no "the way a friend would"', () => {
+      const written = buildStablePrefix(DEFAULT_PERSONA, "written").toLowerCase();
+      expect(written).not.toContain("concise");
+      expect(written).not.toContain("relaxed message");
+      expect(written).not.toContain("the way a friend would");
+    });
+
+    test("the written prefix carries only the three surviving suffix sentences, not the other three", () => {
+      const written = buildStablePrefix(DEFAULT_PERSONA, "written");
+      expect(written).toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[1]!);
+      expect(written).toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[2]!);
+      expect(written).toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[3]!);
+      expect(written).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[0]!);
+      expect(written).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[4]!);
+      expect(written).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[5]!);
+    });
+
+    test("carries the real identityLine(), not a rewritten one, and no floor sentence", () => {
+      const persona = resolvePersona("tutor");
+      const written = buildStablePrefix(persona, "written");
+      expect(written.startsWith(`You are ${persona.display_name}, a private, self-hosted AI assistant for this household.`)).toBe(true);
+      expect(written).not.toContain("Answer as completely and as well structured as you would with no instructions at all");
+    });
+  });
+
+  describe("stableSuffixFor() (PREFIX-CLASS-01)", () => {
+    test('"spoken" returns STABLE_SYSTEM_SUFFIX itself, byte-identical - never a rebuilt copy', () => {
+      expect(stableSuffixFor("spoken")).toBe(STABLE_SYSTEM_SUFFIX);
+    });
+
+    test('"written" returns exactly the three surviving sentences, in order, joined the same way STABLE_SYSTEM_SUFFIX is', () => {
+      expect(stableSuffixFor("written")).toBe([STABLE_SYSTEM_SUFFIX_SENTENCES[1], STABLE_SYSTEM_SUFFIX_SENTENCES[2], STABLE_SYSTEM_SUFFIX_SENTENCES[3]].join(" "));
+    });
+
+    test("every suffix sentence is reachable on spoken; only sentences 1, 2 and 3 are also reachable on written - none of the six is reachable on neither", () => {
+      const spoken = stableSuffixFor("spoken");
+      const written = stableSuffixFor("written");
+      STABLE_SYSTEM_SUFFIX_SENTENCES.forEach((sentence, i) => {
+        expect(spoken).toContain(sentence); // every sentence: spoken
+        const alsoWritten = written.includes(sentence);
+        expect(alsoWritten).toBe([1, 2, 3].includes(i)); // exactly indices 1,2,3: both
+      });
+    });
   });
 
   test("the companion re-anchor names the active persona, unconditionally (even with no memory matches)", () => {

@@ -66,23 +66,28 @@ describe("parity-bisect-stages: buildStages()", () => {
     expect(stage2.opts.tool_choice).toBe("auto");
   });
 
-  test("stage 3 carries the volatile context message too (three messages: stable, volatile, user)", () => {
+  // The written prompt on tier 1, decided (dev.md, the coordinator's own
+  // design record, 2026-09-23): contextToMessages() now omits the
+  // volatile system message entirely on a written-adult turn when there
+  // is nothing to put in it (no memory match, no other volatile items) -
+  // stage 3's own fixture (empty context) is exactly that case, so it
+  // gets two messages now, not three. buildStages()'s own merge logic
+  // (`stage3Messages.filter(m => m.role === "system")`) is robust to
+  // this by construction - it was never counting on a fixed length -
+  // only this test's own hard-coded number was.
+  test("stage 3, with nothing in the volatile zone, is the stable message plus the question - two messages, not three", () => {
     const stages = buildStages(DEFAULT_PERSONA, plan, signal, TOOLS);
     const stage3 = stages.find((s) => s.name === "3-plus-volatile")!;
-    expect(stage3.messages.length).toBe(3);
+    expect(stage3.messages.length).toBe(2);
     expect(stage3.messages[0]!.role).toBe("system");
-    expect(stage3.messages[1]!.role).toBe("system");
-    expect(stage3.messages[2]!).toEqual({ role: "user", content: QUESTION });
+    expect(stage3.messages[1]!).toEqual({ role: "user", content: QUESTION });
   });
 
-  test("stage 4 merges stage 3's two system messages into one, same total content", () => {
+  test("stage 4's merge is a no-op here (stage 3 already has one system message) - same content either way", () => {
     const stages = buildStages(DEFAULT_PERSONA, plan, signal, TOOLS);
     const stage3 = stages.find((s) => s.name === "3-plus-volatile")!;
     const stage4 = stages.find((s) => s.name === "4-merged-system")!;
-    expect(stage4.messages.length).toBe(2);
-    expect(stage4.messages[0]!.role).toBe("system");
-    expect(stage4.messages[0]!.content).toBe(`${stage3.messages[0]!.content}\n\n${stage3.messages[1]!.content}`);
-    expect(stage4.messages[1]).toEqual({ role: "user", content: QUESTION });
+    expect(stage4.messages).toEqual(stage3.messages);
   });
 
   test("stage 5 drops the explicit temperature (lets CHAT_SAMPLING apply), stage 3 keeps it", () => {

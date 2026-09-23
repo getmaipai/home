@@ -173,13 +173,18 @@ describe("contextToMessages(): U4b, the persona prefix, the reanchor and the pla
     expect(volatileMessage?.content).toContain("a statement about themselves");
   });
 
-  test("a different surfaceClass changes the plan line's own length clause", () => {
+  // The written prompt on tier 1, decided (dev.md, the coordinator's
+  // own design record): a written-adult turn carries no plan line at
+  // all (arm 1 measured 0 of 5 "you" misreads with it gone, arm 2
+  // reproduced the misread with the reanchor folded in instead - both
+  // are instruction, never content). The spoken class is unaffected.
+  test("a written adult turn carries no plan line at all; a spoken turn keeps it", () => {
     const spoken = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "spoken");
     const written = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "written");
-    const spokenLine = spoken.find((m) => m.content.includes("How to answer this one:"))?.content;
-    const writtenLine = written.find((m) => m.content.includes("How to answer this one:"))?.content;
-    expect(spokenLine).not.toBe(writtenLine);
-    expect(writtenLine).toContain("as complete as you would answer with no persona at all");
+    const spokenLine = spoken.find((m) => m.content.includes("How to answer this one:"));
+    const writtenLine = written.find((m) => m.content.includes("How to answer this one:"));
+    expect(spokenLine).toBeDefined();
+    expect(writtenLine).toBeUndefined();
   });
 
   // The reply floor is a written-class, ADULT-only backstop
@@ -201,5 +206,81 @@ describe("contextToMessages(): U4b, the persona prefix, the reanchor and the pla
     expect(stableMessage.content).toContain("Say things the way a person talking out loud would");
     expect(stableMessage.content).not.toContain("use whatever structure");
     expect(volatileMessage?.content).not.toContain("as complete as you would answer with no persona at all");
+  });
+
+  // PREFIX-ROLE-01 (dev.md "PREFIX-ROLE-01: moving the stable message's
+  // role alone does not clear the bar either"): tried and reverted -
+  // moving the stable message to role "user" for a written-adult turn
+  // measured no effect live (0.15x/0.16x, no better than the system-role
+  // shape it replaced). The stable message stays role "system" on every
+  // surface class, unconditionally.
+  test("the stable message is always role \"system\", on every surface class - PREFIX-ROLE-01's role move was reverted", () => {
+    const written = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "written");
+    const spoken = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "spoken");
+    expect(written[0]!.role).toBe("system");
+    expect(spoken[0]!.role).toBe("system");
+  });
+
+  // The written prompt on tier 1, decided (dev.md, the coordinator's
+  // own design record, 2026-09-23): the ceiling's shape, in the item's
+  // own words. Every test below is named directly from the ruling's own
+  // acceptance list.
+  describe("the written prompt on tier 1, decided", () => {
+    test("the written prefix contains no dial or policy fragment", () => {
+      const written = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "written");
+      const stableMessage = written[0]!;
+      // Every spoken-class dial fragment's own instructive marker text -
+      // none of it belongs in the written stable message while
+      // WRITTEN_VOICE_PROSE is off.
+      expect(stableMessage.content).not.toContain("relaxed, friendly tone");
+      expect(stableMessage.content).not.toContain("plain, everyday language");
+      expect(stableMessage.content).not.toContain("answers the exact question completely");
+      expect(stableMessage.content).not.toContain("clean and direct");
+      expect(stableMessage.content).not.toContain("Detail nobody asked for");
+      expect(stableMessage.content).not.toContain("Numbers and dates are said exactly");
+      expect(stableMessage.content).toBe(buildStablePrefix(DEFAULT_PERSONA, "written"));
+    });
+
+    test("a written adult turn with no memory match emits no volatile system message at all", () => {
+      const out = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "written");
+      // Exactly two messages: the stable message and the utterance -
+      // nothing in between when there is nothing to say.
+      expect(out).toHaveLength(2);
+      expect(out[0]!.role).toBe("system");
+      expect(out[1]!).toEqual({ role: "user", content: "hi" });
+    });
+
+    test("a written adult turn with a memory match emits the header, the bullet and the trust line, and no reanchor, no plan line", () => {
+      const context: ContextItem[] = [item("memory", "the household calendar rule about pizza night")];
+      const out = contextToMessages(context, "hi", DEFAULT_PERSONA, plan, signal, "written");
+      const volatileMessage = out.find((m) => m.role === "system" && m !== out[0]);
+      expect(volatileMessage).toBeDefined();
+      expect(volatileMessage!.content).toContain(MEMORY_SECTION_HEADER);
+      expect(volatileMessage!.content).toContain("the household calendar rule about pizza night");
+      expect(volatileMessage!.content).toContain(MEMORY_TRUST_REMINDER);
+      expect(volatileMessage!.content).not.toContain(NOTHING_STORED_LINE);
+      expect(volatileMessage!.content).not.toContain(REANCHOR);
+      expect(volatileMessage!.content).not.toContain("How to answer this one:");
+      expect(out[out.length - 1]).toEqual({ role: "user", content: "hi" });
+    });
+
+    test("a written adult turn's other volatile content (clock, a tool result) still renders, with no memory match and no plan line", () => {
+      const context: ContextItem[] = [item("clock", "it's 3:45 PM")];
+      const out = contextToMessages(context, "hi", DEFAULT_PERSONA, plan, signal, "written");
+      const volatileMessage = out.find((m) => m.role === "system" && m !== out[0]);
+      expect(volatileMessage).toBeDefined();
+      expect(volatileMessage!.content).toContain("it's 3:45 PM");
+      expect(volatileMessage!.content).not.toContain(MEMORY_SECTION_HEADER);
+      expect(volatileMessage!.content).not.toContain("How to answer this one:");
+    });
+
+    test("the spoken stable message and volatile message are byte-identical to today's - only the written class changed", () => {
+      const context: ContextItem[] = [item("profile", "Sage's profile: likes hiking."), item("roster", "Sage", "roster-0")];
+      const out = contextToMessages(context, "hi", DEFAULT_PERSONA, plan, signal, "spoken");
+      expect(out[0]).toEqual({ role: "system", content: `${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage` });
+      const volatileMessage = out.find((m) => m.content.includes("How to answer this one:"));
+      expect(volatileMessage?.role).toBe("system");
+      expect(volatileMessage?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\n${REANCHOR}`)).toBe(true);
+    });
   });
 });

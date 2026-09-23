@@ -40,12 +40,14 @@ and its budget, the chat Elements and the composer. What they never
 share: a code path chosen by the tier. A tier is a set of measured
 budget records and deployment limits, nothing more.
 
-**The written reply's own length parity is per tier too** (PARITY-
-BISECT-04's ruling, `home/docs/dev.md` "PARITY-BISECT-04: arms e and
-f, and the ruling"): a smaller chat model reads a multi-sentence
-system message as a cue to answer briefly, measured and stable on
-tier 1's own 8B, so PREFIX-CLASS-01 and WRITTEN-PARITY-01 accept 0.35x
-the bare floor there, not the 0.8x a bigger model reaches; the full
+**The written reply's own length parity is per tier too** (the
+coordinator's own design record, `home/docs/dev.md` "The written prompt
+on tier 1, decided"): a smaller chat model reads ANY instruction
+sentence in the prompt - a persona dial, a policy, a plan line - as a
+cue to answer briefly, dose-dependent, measured and stable on tier 1's
+own 8B; the written-adult prompt there carries no persona-voice prose
+at all as a result, and PREFIX-CLASS-01/WRITTEN-PARITY-01 accept 0.4x
+the bare floor, not the 0.8x a bigger model reaches; the full
 0.8x bar is the Studio's (tier 3) number, once that tier's own model
 is measured. Not yet measured on tier 2.
 

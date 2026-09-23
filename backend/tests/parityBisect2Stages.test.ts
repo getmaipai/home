@@ -12,7 +12,7 @@ import {
   INFORMATION_HANDLING_POLICY,
   WRITTEN_POLICY,
 } from "@/lib/persona";
-import { identityLine, STABLE_SYSTEM_SUFFIX, buildStablePrefix } from "@/lib/turnEngine";
+import { identityLine, STABLE_SYSTEM_SUFFIX } from "@/lib/turnEngine";
 import { buildStages2, QUESTION } from "../scripts/bench/parity-bisect2-stages";
 
 describe("parity-bisect2-stages: buildStages2()", () => {
@@ -56,11 +56,19 @@ describe("parity-bisect2-stages: buildStages2()", () => {
     expect(byName["i-plus-written-policy-full-prefix"]).toBe(`${byName["h-plus-info-policy"]} ${WRITTEN_POLICY}`);
   });
 
-  test("stage i is byte-identical to the real buildStablePrefix() output", () => {
-    const stages = buildStages2(DEFAULT_PERSONA);
-    const stageI = stages.find((s) => s.name === "i-plus-written-policy-full-prefix")!;
-    expect(stageI.messages[0]!.content).toBe(buildStablePrefix(DEFAULT_PERSONA, "written"));
-  });
+  // This assertion used to check stage i against the real, live
+  // buildStablePrefix(persona, "written") output - true when BISECT-02
+  // ran (the real function still stacked every fragment in this exact
+  // order), which is what let BISECT-02's own findings (dev.md) stand as
+  // real production evidence. PREFIX-CLASS-01 (dev.md "PARITY-BISECT-04:
+  // arms e and f, and the ruling") deliberately changed the real
+  // function's written shape (fewer suffix sentences, folded policies,
+  // descriptive dial fragments) - stage i's own hand-built composition
+  // stays frozen on purpose, a pinned historical reconstruction BISECT-02
+  // measured against, not a live mirror of today's production shape.
+  // Retired rather than chased: nothing depends on this file continuing
+  // to match production, and BISECT-02's own dev.md findings are
+  // unaffected either way.
 
   test("the no-formality swap drops the formality fragment but keeps everything else from the real prefix", () => {
     const stages = buildStages2(DEFAULT_PERSONA);
@@ -70,12 +78,21 @@ describe("parity-bisect2-stages: buildStages2()", () => {
     expect(swap.messages[0]!.content).toContain(WRITTEN_POLICY);
   });
 
-  test("the no-description swap drops STABLE_SYSTEM_SUFFIX but keeps the identity line and the persona dials", () => {
+  // The written prompt on tier 1, decided (dev.md, the coordinator's
+  // own design record, 2026-09-23): this stage calls the real
+  // composePersonaPrompt(persona, "written") directly, same as
+  // PARITY-BISECT-02 did when it ran - that function now returns ""
+  // while WRITTEN_VOICE_PROSE is off (persona.ts), so the dial fragment
+  // this test used to find is gone from the stage's own content, same
+  // as it is from the real prompt. The identity-line assertion stays;
+  // the dial-fragment one is retired, the same "frozen historical
+  // bench, no longer a live mirror" reasoning the "stage i is byte-
+  // identical" test above already carries.
+  test("the no-description swap drops STABLE_SYSTEM_SUFFIX but keeps the identity line", () => {
     const stages = buildStages2(DEFAULT_PERSONA);
     const swap = stages.find((s) => s.name === "swap-no-description")!;
     expect(swap.messages[0]!.content).not.toContain(STABLE_SYSTEM_SUFFIX);
     expect(swap.messages[0]!.content).toContain(identityLine(DEFAULT_PERSONA));
-    expect(swap.messages[0]!.content).toContain(FORMALITY_FRAGMENT_WRITTEN[DEFAULT_PERSONA.formality]);
   });
 
   test("every stage runs at the reply floor's own conditions: engine-default temperature, thinking off", () => {

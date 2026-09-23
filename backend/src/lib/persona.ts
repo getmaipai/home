@@ -199,8 +199,36 @@ export const NATURALNESS_POLICY =
 // fragment's written twin: the same "say it exactly, don't pad it"
 // spirit, permitting and expecting the structure the spoken policy
 // forbids.
+//
+// Not reachable from production's own buildStablePrefix() any more
+// (dev.md "The written prompt on tier 1, decided", 2026-09-23): the
+// written-adult prompt carries no policy prose at all while
+// WRITTEN_VOICE_PROSE (below) is off. Kept exported and defined - a
+// code review flagged it as a possible orphan - because PARITY-BISECT-
+// 02/03/04's own frozen bench scripts and tests still import and
+// compose with it directly, as real historical measurement fixtures,
+// not because anything live still reads it.
 export const WRITTEN_POLICY =
   "This is a typed reply on a screen, not read aloud: use whatever structure makes it clearest - headings, a numbered list, short paragraphs - the same way a well-written answer to this would be structured anywhere else. Say a time, a fact or a list exactly, the way it reads written down; never pad it into spoken phrasing to avoid structure.";
+
+// PREFIX-CLASS-01 (dev.md "PARITY-BISECT-04: arms e and f, and the
+// ruling"): INFORMATION_HANDLING_POLICY and WRITTEN_POLICY above are
+// both instructions ("Skip...", "use whatever structure..."); on the
+// written class they fold into buildStablePrefix()'s own descriptive-
+// voice section as their third-person twins below instead of appending
+// as separate instructive sections - the composition PARITY-BISECT-04's
+// arm e measured (0.48x/0.37x the bare floor, tier 1's own 0.35x
+// acceptance bar). The spoken class keeps INFORMATION_HANDLING_POLICY
+// itself untouched, exactly as today.
+export const INFORMATION_HANDLING_POLICY_WRITTEN = [
+  "Detail nobody asked for (exact decimals, timezones, a full date when only the day matters) is left out, rounded the way people round in conversation (\"about thirty\", \"low seventies\") unless the exact number genuinely matters, like money or an appointment time.",
+  "Anything uncertain or secondhand is talked about as uncertain, never as flat fact: forecasts, predictions and guesses get hedged (\"it's supposed to\", \"I think\", \"probably\"), not asserted outright.",
+].join(" ");
+
+// WRITTEN_POLICY's own descriptive twin, folded into the written class's
+// voice section the same way INFORMATION_HANDLING_POLICY_WRITTEN is.
+export const WRITTEN_VOICE_POLICY =
+  "Numbers and dates are said exactly as they read written down. Replies on a screen use headings and lists where they make an answer clearest.";
 
 const FORMALITY_FRAGMENT: Record<Persona["formality"], string> = {
   casual:
@@ -211,22 +239,31 @@ const FORMALITY_FRAGMENT: Record<Persona["formality"], string> = {
     "Speak in complete, well-formed sentences without contractions, the way a careful professional would in conversation: polite and precise, never stiff or robotic.",
 };
 
-// The reply floor (owner's rule, 2026-09-23): FORMALITY_FRAGMENT above
-// is written for the ear ("not like a written page being read aloud"),
-// the opposite instruction on a typed reply - a code review of U4b-2's
-// live measurement caught this fragment fighting WRITTEN_POLICY in the
-// same message. This is that fragment's written twin: how this
-// companion writes, not how it talks, nothing about pages or being
-// read aloud.
-// Exported alongside COMPLEXITY_FRAGMENT/ENGAGEMENT_FRAGMENT_WRITTEN/
-// FILLER_FRAGMENT below (PARITY-BISECT-02): scripts/bench/parity-
-// bisect2.ts isolates each stable-prefix fragment's own marginal effect
-// on a written reply's length, one at a time - it needs the exact real
-// fragment text, never a re-typed copy that can drift.
+// PREFIX-CLASS-01 (dev.md "PARITY-BISECT-04: arms e and f, and the
+// ruling", the coordinator's own ruling, 2026-09-23): FORMALITY_FRAGMENT
+// above is written for the ear, its own written twin below WAS an
+// instruction to write "a relaxed message" - PARITY-BISECT-02 measured
+// that "relaxed message" framing alone makes an 8B answer in all
+// lowercase (the register bug), independent of PARITY-BISECT-03/04's
+// separate finding that nearly any second-person instruction in the
+// stable prefix collapses this model's reply length. The fix for both
+// findings at once, on this fragment and on COMPLEXITY_FRAGMENT_WRITTEN/
+// ENGAGEMENT_FRAGMENT_WRITTEN/FILLER_FRAGMENT_WRITTEN below: describe the
+// reply's own voice in the third person ("The reply reads in...") rather
+// than instruct the model to produce it ("Write in..."), naming a tone
+// rather than a message. This is PARITY-BISECT-04's own arm e
+// composition (measured 0.48x/0.37x the bare floor, 0/5 lowercase on
+// both questions, tier 1's own 0.35x acceptance bar), promoted from the
+// bench script to real production text, not new untested copy.
+// Exported alongside COMPLEXITY_FRAGMENT_WRITTEN/ENGAGEMENT_FRAGMENT_
+// WRITTEN/FILLER_FRAGMENT_WRITTEN below (PARITY-BISECT-02): scripts/
+// bench/parity-bisect2.ts isolates each stable-prefix fragment's own
+// marginal effect on a written reply's length, one at a time - it needs
+// the exact real fragment text, never a re-typed copy that can drift.
 export const FORMALITY_FRAGMENT_WRITTEN: Record<Persona["formality"], string> = {
-  casual: "Write the way a person actually writes a relaxed message: use contractions (it's, you're, don't) and keep your phrasing easygoing.",
-  neutral: "Write the way a person actually writes, using contractions (it's, you're, don't), in a natural, unforced tone - neither stiff nor overly casual.",
-  formal: "Write in complete, well-formed sentences without contractions, the way a careful professional would in a written note: polite and precise, never stiff or robotic.",
+  casual: "The reply reads in a relaxed, friendly tone, with contractions (it's, doesn't, isn't).",
+  neutral: "The reply reads in a natural, unforced tone, with contractions, neither stiff nor overly casual.",
+  formal: "The reply reads in complete, well-formed sentences without contractions, polite and precise, never stiff or robotic.",
 };
 
 export const COMPLEXITY_FRAGMENT: Record<Persona["complexity"], string> = {
@@ -235,6 +272,18 @@ export const COMPLEXITY_FRAGMENT: Record<Persona["complexity"], string> = {
   standard: "Use plain, everyday language: no unexplained jargon, no unnecessarily complex sentence structure.",
   advanced:
     "You may use precise, subject-specific vocabulary and more nuanced sentence structure when it genuinely helps explain something well.",
+};
+
+// PREFIX-CLASS-01's own written twin of COMPLEXITY_FRAGMENT above -
+// COMPLEXITY_FRAGMENT itself had no written variant before this; the
+// spoken one is instructive ("Use..."), this one describes the reply's
+// own vocabulary the same descriptive way FORMALITY_FRAGMENT_WRITTEN
+// does, for the same reason (PARITY-BISECT-03/04: an instruction in the
+// stable prefix collapses this model's reply length on its own).
+export const COMPLEXITY_FRAGMENT_WRITTEN: Record<Persona["complexity"], string> = {
+  simple: "The reply uses short sentences and everyday words a young child would understand, explaining anything unfamiliar in the simplest possible terms.",
+  standard: "The reply uses plain, everyday language: no unexplained jargon, no unnecessarily complex sentence structure.",
+  advanced: "The reply may use precise, subject-specific vocabulary and more nuanced sentence structure when it genuinely helps explain something well.",
 };
 
 // A code review (2026-09-05) found the old NATURAL_REGISTER_POLICY's
@@ -255,22 +304,25 @@ const ENGAGEMENT_FRAGMENT: Record<Persona["engagement"], string> = {
     "Keep it natural and not too long: when they share something personal or emotional, show you noticed - ask a brief, genuine follow-up or say something caring before moving on, the way someone who cares about them would.",
 };
 
-// The reply floor (owner's rule, 2026-09-23): the sentence-count
-// language above is a spoken-class assumption ("a sentence or two"
-// measures a voice reply, not a typed one) - on the written class,
-// "brief" means no padding and no habit-follow-up, never a cap on how
-// complete the answer is allowed to be. Same three characters (brief
-// stays the most economical, curious still asks a follow-up), the
-// length constraint dropped for all three since a written answer's own
-// length already comes from the plan (register.ts's writtenBudgetFor),
-// never from this fragment.
+// The reply floor (owner's rule, 2026-09-23) plus PREFIX-CLASS-01
+// (dev.md "PARITY-BISECT-04: arms e and f, and the ruling"): the
+// sentence-count language above is a spoken-class assumption ("a
+// sentence or two" measures a voice reply, not a typed one) - on the
+// written class, "brief" means no padding and no habit-follow-up, never
+// a cap on how complete the answer is allowed to be. Same three
+// characters (brief stays the most economical, curious still asks a
+// follow-up), the length constraint dropped for all three since a
+// written answer's own length already comes from the plan (register.ts's
+// writtenBudgetFor), never from this fragment - and, per the ruling,
+// described in the third person rather than instructed, the same fix
+// FORMALITY_FRAGMENT_WRITTEN above got.
 export const ENGAGEMENT_FRAGMENT_WRITTEN: Record<Persona["engagement"], string> = {
   brief:
-    'Answer the exact question completely, then stop: no restating it back, no "let me know if you need anything else," no follow-up question tacked on - but never cut a genuinely complete answer short for the sake of being brief. Brief means no padding, not less substance.',
+    "The reply answers the exact question completely, then stops - it never cuts a genuinely complete answer short for the sake of being brief; brief means no padding, not less substance.",
   balanced:
-    "Answer the question directly and completely, and offer one natural follow-up only if it would genuinely help, never as a matter of habit.",
+    "The reply answers the question directly and completely, and offers one natural follow-up only if it would genuinely help, never as a matter of habit.",
   curious:
-    "Answer completely; when they share something personal or emotional, show you noticed - ask a brief, genuine follow-up or say something caring before moving on, the way someone who cares about them would.",
+    "The reply answers completely; when someone shares something personal or emotional, it shows that was noticed - a brief, genuine follow-up or something caring before moving on, the way someone who cares would.",
 };
 
 export const FILLER_FRAGMENT: Record<Persona["filler_density"], string> = {
@@ -278,6 +330,15 @@ export const FILLER_FRAGMENT: Record<Persona["filler_density"], string> = {
   light: 'A little casual phrasing here and there ("honestly," "I mean") is fine, used naturally, never forced.',
   frequent:
     'Talk casually, the way a teenager texting a friend would: casual asides like "honestly," "I mean," and "like" are natural here, used the way a person actually talks, not sprinkled in at random.',
+};
+
+// PREFIX-CLASS-01's own written twin of FILLER_FRAGMENT above - no
+// written variant existed before this; described in the third person
+// for the same reason every other written fragment here now is.
+export const FILLER_FRAGMENT_WRITTEN: Record<Persona["filler_density"], string> = {
+  none: "The reply's wording is clean and direct, without casual filler phrases.",
+  light: 'A little casual phrasing here and there ("honestly," "I mean") reads naturally, never forced.',
+  frequent: 'The reply talks casually, the way a text between friends would: casual asides like "honestly," "I mean," and "like" come naturally, not sprinkled in at random.',
 };
 
 /** The one persona-composition function (2026-09-05): renders a
@@ -289,8 +350,10 @@ export const FILLER_FRAGMENT: Record<Persona["filler_density"], string> = {
  * to vary register without a live rewriting pass or a risk of drifting
  * meaning (docs/dev.md's persona research: PERSONAGE, ACL 2007/2008,
  * did exactly this - deterministic, parametrized realization, zero
- * runtime cost). Never touches INFORMATION_HANDLING_POLICY, which every
- * persona gets identically. */
+ * runtime cost). On the spoken class, still never touches
+ * INFORMATION_HANDLING_POLICY, which every persona gets identically
+ * there; PREFIX-CLASS-01 (below) folds that policy's own written twin
+ * in on the written class only, still identical across personas. */
 // Step 8's own addition: a short few-shot block of the companion's
 // examples, in its own voice - legacy's review named this "the single
 // biggest lever for small-model voice fidelity," a stronger signal than
@@ -313,6 +376,7 @@ function examplesBlock(examples: readonly string[] | undefined): string {
  * sites (turnEngine.ts, personaJudge.ts) pass nothing and get today's
  * exact wording, frozen; only the new path (messages.ts, via
  * buildStablePrefix's own new parameter) passes "written" explicitly.
+ * The spoken branch is byte-identical to before PREFIX-CLASS-01.
  *
  * The reply floor (owner's rule, 2026-09-23): the few-shot voice
  * examples are the spoken voice lever (`examplesBlock`'s own comment:
@@ -323,11 +387,37 @@ function examplesBlock(examples: readonly string[] | undefined): string {
  * short and casual despite it. On the written class the voice carries
  * through the formality and engagement fragments alone; a written
  * examples field is a later, spec-first item (WRITTEN-EXAMPLES-01),
- * not this one. */
+ * not this one.
+ *
+ * PREFIX-CLASS-01, decided (dev.md "The written prompt on tier 1,
+ * decided", the coordinator's own design record, 2026-09-23): every
+ * shape tried this whole chain that added ANY persona or policy prose
+ * to the written-adult prompt measured 0.12x to 0.48x the bare floor;
+ * the two shapes that ever cleared close to it (the ceiling, arm e's
+ * own no-prose variant) both lacked it entirely. The reading: this 8B
+ * treats a written system message with instruction sentences in it -
+ * any of them, worded any way, in any role, with or without a plan
+ * line - as a cue to answer briefly, dose-dependent on how many
+ * sentences it holds. So the written-adult prompt carries no persona
+ * voice prose on this tier, full stop, until a prebuilt mechanism
+ * exists to vary voice without spending prompt sentences on it
+ * (PERSONA-STEER-01, org principle 6: activation steering over
+ * prompt prose). WRITTEN_VOICE_PROSE below is that off switch - the
+ * written twins above (FORMALITY_FRAGMENT_WRITTEN and the rest) stay
+ * declared and exported (WRITTEN-VOICE-TIER-01 turns this on once a
+ * bigger tier measures them clearing the bar), but composePersonaPrompt
+ * never reaches them while it's false. */
+export const WRITTEN_VOICE_PROSE = false;
+
 export function composePersonaPrompt(persona: Persona, surfaceClass: SurfaceClass = "spoken"): string {
   const written = surfaceClass === "written";
+  if (written && !WRITTEN_VOICE_PROSE) return "";
   const formality = written ? FORMALITY_FRAGMENT_WRITTEN[persona.formality] : FORMALITY_FRAGMENT[persona.formality];
+  const complexity = written ? COMPLEXITY_FRAGMENT_WRITTEN[persona.complexity] : COMPLEXITY_FRAGMENT[persona.complexity];
   const engagement = written ? ENGAGEMENT_FRAGMENT_WRITTEN[persona.engagement] : ENGAGEMENT_FRAGMENT[persona.engagement];
+  const filler = written ? FILLER_FRAGMENT_WRITTEN[persona.filler_density] : FILLER_FRAGMENT[persona.filler_density];
   const examples = written ? "" : examplesBlock(persona.examples);
-  return [formality, COMPLEXITY_FRAGMENT[persona.complexity], engagement, FILLER_FRAGMENT[persona.filler_density]].join(" ") + examples;
+  const voice = [formality, complexity, engagement, filler].join(" ") + examples;
+  if (!written) return voice;
+  return [voice, INFORMATION_HANDLING_POLICY_WRITTEN, WRITTEN_VOICE_POLICY].join(" ");
 }

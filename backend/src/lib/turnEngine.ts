@@ -90,7 +90,7 @@ import { NOTHING_RECALLED } from "@maipai/spec/interpreters/ts/recipe-interprete
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { listActivePeople } from "@/lib/access";
-import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, WRITTEN_POLICY, type Persona } from "@/lib/persona";
+import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, type Persona } from "@/lib/persona";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -628,6 +628,22 @@ export const STABLE_SYSTEM_SUFFIX_SENTENCES = [
 ];
 export const STABLE_SYSTEM_SUFFIX = STABLE_SYSTEM_SUFFIX_SENTENCES.join(" ");
 
+// PREFIX-CLASS-01 (dev.md "PARITY-BISECT-04: arms e and f, and the
+// ruling"): on the written class, only the three suffix sentences
+// PARITY-BISECT-03/04 measured surviving alone (indices 1, 2, 3 - the
+// safety-blocked-requests line, the world-knowledge/lookup line, the
+// can't-watch-taste-visit line) appear; the other three (0, 4, 5) each
+// collapse a written reply's length on their own when measured in
+// isolation, sentence 5 (household facts) once as an outright refusal
+// of an unrelated question. The spoken class keeps all six, unchanged -
+// stableSuffixFor("spoken") returns STABLE_SYSTEM_SUFFIX itself,
+// byte-identical, never a rebuilt copy that could drift from it.
+const WRITTEN_SUFFIX_INDICES = [1, 2, 3] as const;
+export function stableSuffixFor(surfaceClass: SurfaceClass): string {
+  if (surfaceClass === "spoken") return STABLE_SYSTEM_SUFFIX;
+  return WRITTEN_SUFFIX_INDICES.map((i) => STABLE_SYSTEM_SUFFIX_SENTENCES[i]!).join(" ");
+}
+
 // The speech register is now the selected Persona (lib/persona.ts,
 // 2026-09-05): what used to be a single fixed NATURAL_REGISTER_POLICY
 // constant is the "default" entry in `PERSONAS`, composed through the
@@ -764,6 +780,32 @@ const MAX_NATURALNESS_SECTION_CHARS = 500;
 // MAX_SKILLS_SECTION_CHARS's own budget for the section most likely to
 // grow with real content.
 const MAX_COMPANION_SECTION_CHARS = 1200;
+
+// PREFIX-CLASS-01: the written class's own composePersonaPrompt() output
+// now folds what used to be three separate capped sections (companion,
+// rules, naturalness) into one - capped at their combined budget rather
+// than inventing a new one, so the written branch's worst case is no
+// larger than the spoken branch's already-accepted worst case above.
+// A code review (2026-09-23) flagged a single combined cap as riskier
+// than three independent ones: if the joined string ever ran long,
+// capSection's own slice-and-append-"..." would land inside whichever
+// fragment happens to be last (today, WRITTEN_VOICE_POLICY), silently
+// dropping the structure-permission policy rather than truncating
+// persona-specific text the way the old three-cap version could only
+// ever do to the companion section. On the written class specifically
+// this is unreachable by construction, not just unreached today:
+// composePersonaPrompt(persona, "written") never includes the few-shot
+// examples block (spoken-only, examplesBlock() is skipped entirely on
+// written) or any other free-text, household-varying content - every
+// component is one of a small number of fixed strings selected from a
+// Record by dial value, so the output's maximum possible length is a
+// fixed, computable bound (measured under 1200 chars across every
+// bundled persona), nowhere near this cap. The cap stays as defensive
+// headroom, not a guard against real growth; a future written-class
+// addition that DOES add free text would need its own reasoning about
+// truncation order, the same way this comment now flags for the next
+// reader.
+const MAX_WRITTEN_VOICE_SECTION_CHARS = MAX_COMPANION_SECTION_CHARS + MAX_RULES_SECTION_CHARS + MAX_NATURALNESS_SECTION_CHARS;
 
 /** Shared by every capped section below (a code review pass on this
  * step found the same "slice then append '...'" logic repeated inline
@@ -976,15 +1018,30 @@ export function companionReanchorLine(persona: Persona): string {
 /** `surfaceClass` defaults "spoken" - the old path's own call site
  * (buildPromptParts below) passes nothing and keeps today's exact
  * wording, frozen; only the new path (turnMachine/messages.ts) passes
- * "written" explicitly. The reply floor (owner's rule, 2026-09-23):
- * NATURALNESS_POLICY's "never bullet points" is a spoken-class
- * assumption - the written class reads WRITTEN_POLICY instead, which
- * permits and expects the structure a bare reply had. */
+ * "written" explicitly. The spoken branch is byte-identical to before
+ * PREFIX-CLASS-01.
+ *
+ * PREFIX-CLASS-01, decided (dev.md "The written prompt on tier 1,
+ * decided", the coordinator's own design record, 2026-09-23): the
+ * written branch is the ceiling's own shape - identity plus
+ * stableSuffixFor("written")'s three surviving sentences, nothing else
+ * - the one composition, alongside arm e, that ever measured close to
+ * the bare floor across this whole chain; every shape that added
+ * persona or policy prose measured 0.12x to 0.48x regardless of role,
+ * wording, or the plan line's presence. composePersonaPrompt's own
+ * written voice section returns "" while WRITTEN_VOICE_PROSE (persona.ts)
+ * is false, so voiceSection below is empty by default - kept as a real
+ * conditional, not assumed empty, so PERSONA-STEER-01/WRITTEN-VOICE-
+ * TIER-01 can flip the switch later without touching this function. */
 export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, surfaceClass: SurfaceClass = "spoken"): string {
+  if (surfaceClass === "written") {
+    const base = `${identityLine(persona)} ${stableSuffixFor("written")}`;
+    const voiceSection = capSection(composePersonaPrompt(persona, "written"), MAX_WRITTEN_VOICE_SECTION_CHARS);
+    return voiceSection.length > 0 ? `${base} ${voiceSection}` : base;
+  }
   const companionSection = capSection(composePersonaPrompt(persona, surfaceClass), MAX_COMPANION_SECTION_CHARS);
   const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
-  const registerSection = surfaceClass === "written" ? WRITTEN_POLICY : NATURALNESS_POLICY;
-  const naturalnessSection = capSection(registerSection, MAX_NATURALNESS_SECTION_CHARS);
+  const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
   return `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection} ${naturalnessSection}`;
 }
 

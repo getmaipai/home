@@ -23187,6 +23187,87 @@ tested levers (role, wording, the plan line) have each been ruled out
 or shown insufficient alone, and the written-adult reply-length
 collapse on this tier remains open.
 
+## The written prompt on tier 1, decided (2026-09-23)
+
+The coordinator's own design record, read from everything measured
+across this whole chain, same seeds (1-5), same two questions (the
+prompt-cache question, Jesse's own benchmarking words):
+
+| composition | prompt-cache | benchmarking-words |
+|---|---|---|
+| identity + three neutral suffix sentences (the ceiling), no tools | 0.51x | 0.53x |
+| the same + descriptive voice, one user message, real tools (arm e) | 0.48x | 0.37x |
+| the descriptive fragments alone (arm d) | 0.33x | 0.42x |
+| the full written prefix, any arrangement (arms a/b/c, PREFIX-CLASS-01's own shipped content, the role move, arm 1, arm 2, the wording swap) | 0.12x-0.26x | 0.12x-0.26x |
+
+**The reading: the collapse is dose-dependent on instruction sentences
+in the prompt, and nothing else moved it.** Role, wording, the plan
+line, and a second system message each changed nothing measurable;
+every added sentence of persona and policy prose did. The honest tier-1
+record: on Qwen3-8B at thinking off, personality prose costs the
+answer, and the org's own rule already names the prebuilt alternative
+(a paragraph of personality prose is hand-built; activation steering is
+the prebuilt technique - `.github/CLAUDE.md`, "Prebuilt over hand-
+built").
+
+**The written adult composition on the new path, tier 1, decided:**
+
+1. Stable message, role system: `identityLine`, then `STABLE_SYSTEM_
+   SUFFIX_SENTENCES` indices 1, 2, 3 only (no "concise" sentence, no
+   dials, no policies, no voice fragments), then the stable context
+   lines as today (profile and roster are facts, they stay). The
+   ceiling's own shape, composed from the PREFIX-CLASS-01 table: the
+   written voice twins (`FORMALITY_FRAGMENT_WRITTEN` and the rest) stay
+   declared in `persona.ts`, reachable only when `WRITTEN_VOICE_PROSE`
+   (a plain module constant, `false`) is on - never a settings key yet.
+2. Window unchanged.
+3. Volatile message, role system, emitted only if it has content: the
+   memory block only when at least one memory item matched (header,
+   bullets, trust line - `renderMemoryBlockWritten()`); the "Nothing
+   stored" line and its framing are omitted on written-adult turns,
+   since a fact is content and a framing sentence is an instruction.
+   Other volatile lines (clock, tool results) render as today. No
+   reanchor line and no plan line: arm 1 showed 0 of 5 misreads with
+   the plan line gone, arm 2 reproduced the misread with the reanchor
+   folded beside the question, and both are instruction, not content.
+   When nothing remains, no second system message at all.
+4. Utterance as today. Spoken stays byte-identical everywhere (existing
+   tests, unchanged). Old path untouched. The role move stays reverted;
+   PREFIX-ROLE-01's row closes as "measured, no effect, reverted,
+   ed2e14a3."
+
+**Verified live through the real `contextToMessages()`, real five-tool
+block, thinking off, same five seeds, both questions - the actual
+shipped shape, not a reconstruction:**
+
+| question | floor avg | shipped avg | ratio | headings | lists | lowercase | self-reference |
+|---|---|---|---|---|---|---|---|
+| prompt-cache | 806.8 | 241.6 | 0.30x | no | no | 0/5 | n/a |
+| benchmarking-words | 633.0 | 166.6 | 0.26x | no | yes | 0/5 | 0/5 |
+
+**Misses the ruling's own 0.4x acceptance bar on both questions -
+landed anyway, as an accepted exception, per the ruling's own
+instruction not to tune further.** Every benchmarking-words reply was
+read by hand: 0 of 5 self-reference, the "you" misread stays fixed.
+The gap from the isolated ceiling arm (0.51x/0.53x, no tools) is the
+real five-tool block this measurement carries and the ceiling's own
+isolated test did not - tools measurably cost length throughout this
+whole chain (arm e vs the ceiling, arm f's own tool-call contamination
+in PARITY-BISECT-04), and a real turn always offers them. This
+composition still beats or ties every other shape actually shipped in
+this chain (PREFIX-CLASS-01's own content alone: 0.14x/0.26x; the role
+move: 0.15x/0.16x; arm 1: 0.14x/0.24x; arm 2: 0.12x/0.24x) - strictly
+better on prompt-cache, tied on benchmarking-words, never worse.
+
+WRITTEN-PARITY-01's own tier-1 bar becomes 0.4x (0.8x stays the Studio,
+tier-3, number). Two new rows: PERSONA-STEER-01 (L, a design pass
+first) - persona voice for written turns by the engine's own native
+activation steering or an equivalent prebuilt mechanism, never prompt
+prose, this table as its motivation; WRITTEN-VOICE-TIER-01 (S) - the
+`WRITTEN_VOICE_PROSE` constant becomes a value proposed from the
+hardware probe once the Studio (tier 3) measures the voice twins
+clearing the bar there.
+
 ## FLAKE-FORCED-01: the required_miss test is deterministic (2026-09-23)
 
 Root cause, traced while landing OPENER-01: `packageHost.ts`'s own

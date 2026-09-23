@@ -13,7 +13,7 @@ import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import { finishBench } from "../scripts/bench/finish";
 
 const BACKEND = join(import.meta.dir, "..");
-const ENTRY_POINTS = ["routing.ts", "tool-calling.ts", "naturalness.ts", "persona-eval.ts", "memory-eval.ts", "memory/run.ts", "judge-eval.ts", "parity-bisect.ts", "parity-bisect2.ts", "parity-bisect3.ts", "parity-bisect4.ts"];
+const ENTRY_POINTS = ["routing.ts", "tool-calling.ts", "naturalness.ts", "persona-eval.ts", "memory-eval.ts", "memory/run.ts", "judge-eval.ts", "parity-bisect.ts", "parity-bisect2.ts", "parity-bisect3.ts", "parity-bisect4.ts", "prefix-class-01-verify.ts"];
 
 let stub: { url: string; stop: () => void };
 beforeAll(() => {
