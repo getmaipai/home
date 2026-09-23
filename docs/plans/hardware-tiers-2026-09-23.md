@@ -196,7 +196,8 @@ anywhere in copy.
 | with 1 | SETUP-SIZE-01: the wizard's sizing page with impact per role | M | none | a stepped-down chat role visible in the next start's resident set |
 | with 1 | STACK-FLOOR-01: the `p8` profile with the robot's pins, the lowest step-down | S | none | proposed on an 8 GB probe, runnable as a step-down on the dev Mac |
 | with 1 | CAP-VOCAB-01: the capability vocabulary gains the engine roles (commons, spec first) | S | none | the fixtures and the Python package regenerate, the spec tag bumped |
-| with 1 | PKG-UNINSTALL-01: the normal package uninstall path (route, hook, the data rule) | S | none | an installed package is uninstalled through the route, its hook runs, its data directory is kept and the reply says so |
+| with 1 | MEDIA-RECORD-01: the spec's media record for a person's generated output (commons, spec first) | S | none | a picture from the image job is written as a media record with package, turn and job provenance |
+| with 1 | PKG-UNINSTALL-01: the normal package uninstall path to PACKAGES.md's rule | S | none | an installed package is uninstalled through the route, its hook runs, its settings and state stay, the person's records stay in Library, the reply says so |
 | with 1 | CAP-GATE-01: the node capability set derived from the allocation, packages filtered on `requires`, reconcile uninstalls what lost a required capability | M | none | with image off, a package requiring it is absent from the packages route, the offered tools and the apps page; present with it on; turning image off with it installed lists it in the confirmation and uninstalls it after |
 | after 1 | FLOOR-ACCEPT-01: the floor run of the acceptance workload | S | none | voice plus typed on this Mac with the robot's model as the stand-in, marked so, rerun on an 8 GB machine when one is on the bench |
 
@@ -297,15 +298,21 @@ path, and the confirmation names them before the change is applied
 optional capability only degrades a package, never removes it; (4)
 reconcile runs in one place at every start and after every allocation
 change, so a role that failed to load is caught the same way as one
-turned off. What happens to a package's data at uninstall is not
-invented here: PACKAGES.md has no uninstall rule today (a gap, named
-as `PACKAGES-UNINSTALL-01` in `.github`), and the nearest standard is
-SERVICES.md's daemon rule, "uninstall removes the service and the binary
-and never the data directory, and says so"; until PACKAGES.md rules,
-the package's own data directory is kept and the confirmation says so.
-The hub's package host also has no uninstall path today
+turned off. What happens to a person's files is the standard's rule, PACKAGES.md
+"Uninstall, and a person's files" (owner's rule, 2026-09-23): anything a
+person made through a package is a household media record with
+provenance, owned by the person, never package data; uninstall removes
+the code and hides the surfaces, keeps the package's own settings and
+state for a reinstall, and never touches the records, which stay in the
+household's library and files pages; the confirmation reads "the
+following will be uninstalled and users will lose access", then "your
+pictures stay in Library"; a package that stores output elsewhere fails
+the manifest lint. The spec has no media record for a person's generated
+output yet (the attachment record is a file a person sent, the artifact
+record a generated document), so commons `MEDIA-RECORD-01` (S, spec
+first) adds it. The hub's package host has no uninstall path today
 (`packageHost.ts`, the packages routes), so `PKG-UNINSTALL-01` (S)
-builds it first and the reconcile calls it. Rows: `CAP-VOCAB-01` (S,
+builds it to that rule and the reconcile calls it. Rows: `CAP-VOCAB-01` (S,
 spec first in commons), `PKG-UNINSTALL-01` (S, home) and `CAP-GATE-01`
 (M, home), in the order table.
 
