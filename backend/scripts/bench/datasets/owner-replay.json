@@ -83,6 +83,14 @@
       "turns": [
         { "say": "this is the new reply engine", "expect": { "toolRan": null, "mustNotContain": "search|didn't find|birth|try a different" } }
       ]
+    },
+    {
+      "id": "benchmarking-typed-adult",
+      "category": "knowledge",
+      "note": "OPENER-01/COMMAND-FAIL-01 (dev.md 'The knowledge hijack'): knowledge's own 'what is *' bound the whole question to `topic` and ran it as a Wikipedia page title; the lookup failed with a 502 and the raw MCP error string, carrying a Wikipedia URL, reached Jesse verbatim. commandsNode now refuses a question-word wildcard opener on anything but a directive turn (OPENER-01) - the manifest still lists the pattern (removing it broke the old, frozen path's own routing-corpus fixture, found live building this item; flagged for the coordinator, not fixed here), but the runtime gate never fires it on this question - and a failed pattern outcome now continues the turn to the model instead of answering with the error text (COMMAND-FAIL-01). No via: pattern outcome on this turn either way, a reply from source: model (a search may run under the interim rule; toolRan is not asserted), judged by WRITTEN-PARITY-01's own bare-parity column.",
+      "turns": [
+        { "say": "what is technical benchmarking and why do you need it", "expect": { "mustNotContain": "MCP error|404|wikipedia\\.org" } }
+      ]
     }
   ],
 

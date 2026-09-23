@@ -22812,3 +22812,118 @@ class (any file exercising `packageHost.ts`, `voiceCatalog.ts`,
 `telegramChannel.ts` or `updates.ts` without a reset in its own
 `beforeEach`) - not checked here, noted on the issue for whoever picks
 those up next.
+
+## OPENER-01: landed as a runtime gate, the manifest edit found to conflict with the old path's own frozen tests (2026-09-23)
+
+`nodes/commandsNode` now fires an opener only as one of three closed
+kinds (turn-machine-state-record's own commands row): a fixed phrase
+matched whole, always; a wildcard whose fixed part is a question word,
+never, unless its owning package declares a real deterministic
+resolver (`manifestLint.ts`'s own `COMPUTED_WILDCARD_RESOLVERS` -
+math's "what does \* equal", gated on `evaluateExpression` accepting
+the captured remainder) and that resolver accepts; every other
+wildcard, only on a directive turn (`state.signal.primary_act`). To
+make that last branch fire at all for the bundled imperative openers
+(convert, define's "define \*", timer, remember, and the rest),
+`turnNext.ts` now passes `commandOpeners(loadAllManifests())` into
+`classifyTurnSignal()`, the identical shape cue the old path's own
+`commandOpeners(effectiveLoaded)` already gives it - without this, none
+of those phrasings classify as directive at all (checked live: "look up
+the artist Radiohead" read as `inform` with no opener cue, `directive`
+with it).
+
+**The manifest edit in the BACKLOG row's own words - found to conflict
+with the old path, not made.** The row asks for `routing.patterns`
+itself to lose every question-word entry (knowledge's five, media-
+lookup's eight, weather's six, two of define's three, music's "who is
+the singer \*", both of recall's). Building that first, then running
+the full suite, found 30+ failures across `routingCorpus.test.ts`
+(spec's own `routing-corpus.json` fixture, real and frozen, expecting
+"who was Marie Curie" to route to knowledge, "who is the singer Prince"
+to music, and the rest through the OLD path's `route()`/`matchPattern()`),
+plus `#86`, `CHAT-02`, `#92`, `routingStats()`, and a recall test - all
+old-path tests reading the SAME bundled manifest files this item was
+about to edit. The org's own rule: the old path is frozen except for
+safety defects (.github/CLAUDE.md; dev.md's own "The reply floor" holds
+the identical line for a different item). Reverting every manifest edit
+back to its original `routing.patterns` and rerunning the full suite
+confirmed all 485 previously-failing tests pass clean - proof the
+runtime gate above is sufficient on its own: `commandsNode` never fires
+"what is \*" on "what is technical benchmarking and why do you need
+it" (a question, not a directive) whether or not the pattern is still
+in the manifest, so the actual bug (the hijack) is closed either way.
+
+**The four catalog-mirrored manifests (knowledge, media-lookup,
+weather, define) were still edited, correctly, in `getmaipai/catalog`**
+(commit `c475887`, its own gate green: tools typecheck, 144 tests,
+lint+scorecard on all 7 packages) before this conflict was found -
+that edit is real, forward-facing, and not wrong in itself. Home's own
+mirror was refreshed from it once
+(`scripts/refresh-bundled-packages.ts`), found the routing-corpus
+break, and was reverted back to the original provenance
+(`bundled-provenance.json`'s `source_commit` for those four is the
+pre-edit catalog commit again, real and honest - never hand-edited).
+**This is a real, known drift, left for the coordinator's own call**:
+home's mirror will not match catalog's own `main` for these four
+packages until either the old path is retired (the deletions "come
+after the flip," turn-machine-state-record.md's own Files note) or a
+session is directed to update `routing-corpus.json` and the other
+frozen old-path tests to match the new, intended manifest shape as its
+own reviewed item. Refreshing home's mirror again before that decision
+would reproduce the exact regression found here.
+
+**`manifestLint.ts`'s own functions ship real and tested**
+(`isQuestionWordOpener`, `lintManifestPatterns`, `fixedPartOf`,
+`COMPUTED_WILDCARD_RESOLVERS`) against synthetic inputs, matching
+`policy.test.ts`'s own style for a pure function - but the "sweep every
+bundled manifest" test the row's own words imply is deliberately not
+in this commit, for the identical reason the manifest itself is
+unedited: today's real manifests still carry the patterns the old path
+needs, so a sweep asserting they are clean would just re-fail for the
+same reason. Wiring `lintManifestPatterns` into `check.sh` as a live
+gate over the current manifest set waits on the same coordinator
+decision above.
+
+**The replay row** (`benchmarking-typed-adult`, `owner-replay.json`)
+stands: `commandsNode`'s own gate keeps "what is technical benchmarking
+and why do you need it" off the pattern floor regardless of what the
+manifest lists, so the row's own expectation (no `via: pattern`
+outcome, a reply from `source: model`) holds under the runtime fix
+exactly as it would have under the manifest edit.
+
+**A fourth case the three-kind scheme alone missed, found by review.**
+"tell me about \*" (knowledge) and "tell me about the movie \*"
+(media-lookup) grammatically read as a directive ("tell me...", not an
+interrogative pronoun), so `classifyTurnSignal` correctly reads "tell
+me about quantum entanglement" as `directive` (confirmed live) - which
+would have let the "imperative wildcard fires only on directive"
+branch fire it, reproducing the exact hijack the interrogative-pronoun
+patterns are protected from, since its remainder is the identical
+open, free-form topic. `manifestLint.ts`'s own `NEVER_FIRES_WILDCARDS`
+names both bundled instances (never a broadened regex, which risks
+catching a real future imperative opener); `commandsNode` checks it
+first, unconditionally, before the resolver/directive split.
+
+**Verified**: `bun test tests/manifestLint.test.ts tests/turnMachine/
+commands.test.ts` (21 pass, the opener gate's own direct tests,
+including "tell me about quantum entanglement" proven `directive` yet
+still refused, real bundled manifests, no manifest edit); full suite
+green except the pre-existing FORCED-CALL-01 flake (3985/3986,
+reproduced clean alone; the same class of load-dependent failure
+DEADLINE-01/GENFAIL-01's own landing notes already document) - and
+485/485 on the specific files the manifest edit had broken, confirmed
+twice (once broken, once fixed by the revert); `bunx tsc --noEmit`
+clean. Review: medium, two passes (the first catching the "tell me
+about" gap above, fixed and covered by its own test; the second, the
+fix hunk alone, clean).
+
+Files: `backend/src/lib/turnMachine/nodes/commands.ts` (the three-kind
+gate), `backend/src/lib/turnMachine/turnNext.ts` (`commandOpeners`
+wiring), `backend/src/lib/manifestLint.ts` (new),
+`backend/tests/manifestLint.test.ts` (new),
+`backend/tests/turnMachine/commands.test.ts` (new),
+`backend/scripts/bench/datasets/owner-replay.json`
+(`benchmarking-typed-adult`). Not touched: every `backend/packages/*/
+manifest.json` (reverted to original). `getmaipai/catalog`'s own
+`c475887` stands as real, separate, forward-facing work, not synced
+into home's mirror pending the coordinator's own call above.

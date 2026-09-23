@@ -20,7 +20,7 @@
 // named here rather than silently worked around.
 import { createActor, waitFor } from "xstate";
 import type { Surface, TurnValue, TurnStreamResult } from "@/lib/turnEngine";
-import { validateTurnInput } from "@/lib/turnEngine";
+import { validateTurnInput, loadAllManifests, commandOpeners } from "@/lib/turnEngine";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
@@ -117,7 +117,16 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
 
   const band = speakerAgeBand(actor, new Date());
-  const signal = classifyTurnSignal({ text, ageBand: band });
+  // OPENER-01: the same shape opener commandOpenersFrom() reads for the
+  // old path (turnEngine.ts's own commandOpeners(effectiveLoaded)) - a
+  // clause opening with a bundled package's own command verb ("look",
+  // "convert", "define") reads as a directive by shape, the cue the
+  // commands node's imperative wildcards (below) depend on to fire at
+  // all. Every loaded manifest, not narrowed for temporary mode: this
+  // is a shape cue for the signal only, never a routing decision -
+  // the commands node's own temporary-mode guard still keeps a
+  // memory:write package from actually firing in a temporary chat.
+  const signal = classifyTurnSignal({ text, ageBand: band, commandOpeners: commandOpeners(loadAllManifests()) });
   const persona = resolvePersona(getHouseholdSettingValue("persona.active_id"));
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape

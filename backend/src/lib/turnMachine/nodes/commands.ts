@@ -18,6 +18,7 @@ import { matchPattern, loadAllManifests } from "@/lib/turnEngine";
 import { runPlugin, meetsMinRole } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
 import { usableReply } from "@/lib/composer";
+import { COMPUTED_WILDCARD_RESOLVERS, NEVER_FIRES_WILDCARDS } from "@/lib/manifestLint";
 import type { Node, NodeOutcome } from "../contract";
 
 export interface CommandsInput {
@@ -75,6 +76,37 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
     for (const pattern of manifest.routing?.patterns ?? []) {
       const captured = matchPattern(input.utterance, pattern);
       if (captured === null) continue;
+      // OPENER-01 (state record "The machine," commands row; dev.md
+      // "The knowledge hijack" (a)): an opener fires only as one of
+      // three closed things. A fixed phrase (no `*`) always fires - it
+      // is one exact meaning, matchPattern's own whole-string branch.
+      // A wildcard fires only when its owning package declares a real
+      // resolver for it (manifestLint.ts's own, single list: a
+      // computed wildcard on a compute or clock package, gated on the
+      // resolver accepting the captured remainder, never the pattern
+      // text) or, failing that, only on a directive turn (an
+      // imperative wildcard: the fixed part instructs the hub, the
+      // remainder is the argument by definition). A wildcard that is
+      // neither yields to the model, never fires blind.
+      //
+      // A code review caught a fourth case this scheme alone misses:
+      // "tell me about *" grammatically IS a directive ("tell me...",
+      // not an interrogative), so it would otherwise fire as an
+      // "imperative" opener on exactly the directive-classified turns
+      // it needs to be refused on - its remainder is the same open,
+      // free-form topic "what is *"'s is, never a narrow
+      // argument-by-definition. manifestLint.ts's own
+      // NEVER_FIRES_WILDCARDS names the two bundled instances; checked
+      // first, unconditionally, before the directive/resolver split.
+      if (pattern.includes("*")) {
+        if (NEVER_FIRES_WILDCARDS.has(`${id}:${pattern}`)) continue;
+        const computedResolver = COMPUTED_WILDCARD_RESOLVERS[`${id}:${pattern}`];
+        if (computedResolver) {
+          if (!computedResolver(captured)) continue;
+        } else if (state.signal.primary_act !== "directive") {
+          continue;
+        }
+      }
       const args = captured ? { [firstRequiredArg(manifest)]: captured } : {};
       const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId });
       const outcome = outcomeOf({
