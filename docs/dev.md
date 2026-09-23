@@ -23119,6 +23119,74 @@ same self-referential "you" misread PARITY-BISECT-04 found and could
 not reproduce in isolation. It reproduced here, in the real message
 shape. Worth its own trace once the length question is settled.
 
+## The plan line: named, tested, ruled out as the length cause - but it is the "you" misread's own cause (2026-09-23, blocked)
+
+The coordinator's second follow-up ruling, read straight from the code
+(`messages.ts` line 179, `register.ts`'s `planLine()` line 219): the
+volatile system message's own closing line, "How to answer this one:
+${planLine(...)}", is a terse constraint spec in the system role
+immediately before the question - the one thing every real turn on
+this tier carries that arm e (the only composition that ever cleared
+close to 0.5x) never did. `planLine()` also hardcodes `"${act} about
+themselves"` regardless of `signal.target`, named as the likely cause
+of the "you" misread. Reverted the role move first (PREFIX-ROLE-01's
+own stable-message role change measured no effect; `messages.ts`'s
+stable message is role `"system"` again, unconditionally).
+
+Two arms, built by transforming the real `contextToMessages()` output
+(split on the plan line's own literal marker string, never a rebuilt
+copy), real five-tool block, thinking off, same five seeds, both
+questions:
+
+- **Arm 1**: the real three messages, with "How to answer this one:
+  ..." removed from the volatile system message (memory block and
+  reanchor stay, role system stays).
+- **Arm 2**: the real messages, with the volatile message's remainder
+  (memory block plus reanchor, no plan line) folded into the
+  utterance's user message, the second system message gone entirely -
+  arm e's own shape, stable prefix still in the system role.
+
+| arm | question | floor avg | avg | ratio | headings | lists | lowercase |
+|---|---|---|---|---|---|---|---|
+| 1 (plan line dropped) | prompt-cache | 806.8 | 113.4 | 0.14x | no | no | 0/5 |
+| 1 (plan line dropped) | benchmarking-words | 633.0 | 149.8 | 0.24x | no | no | 0/5 |
+| 2 (arm e's shape) | prompt-cache | 806.8 | 98.8 | 0.12x | no | no | 0/5 |
+| 2 (arm e's shape) | benchmarking-words | 633.0 | 151.0 | 0.24x | no | no | 0/5 |
+
+**Neither arm clears 0.35x on either question.** Per the ruling's own
+decision tree, this is the stop condition: no third arm. The plan
+line's presence is not, on its own or removed, what separates a 0.5x
+composition from a 0.15x one - the collapse this whole chain has been
+chasing since PARITY-BISECT-01 is not fully explained by the stable
+message's role (PREFIX-ROLE-01), the plan line's presence (this round),
+or the dial/policy wording (PREFIX-ROLE-01's own wording-swap). What
+every near-0.5x composition (the ceiling, arm e) shares and every
+sub-0.25x one lacks has not been isolated yet.
+
+**The plan line IS, cleanly, the "you" misread's own cause - read
+manually, all 5 of arm 1's benchmarking-words replies, per the org's
+own rule on reading eval failures by hand:** zero of five read "you"
+as MaiPai. Every reply answers about a general system or process,
+third person, no self-reference at all. Arm 2's own sample reply (the
+one that still folds the reanchor - "Remember: you are MaiPai" -
+directly ahead of the question) reproduces the misread outright: "As
+MaiPai, I need technical benchmarking to ensure that my performance and
+capabilities are consistently measured..." One data point, not five,
+but a stark contrast against arm 1's clean 0/5. Filed as
+[getmaipai/home#145](https://github.com/getmaipai/home/issues/145):
+`planLine()` hardcodes "about themselves" regardless of
+`signal.target`, both paths, benchmarking utterance as the repro, the
+old path's own fix deferred to the platform flip per the ruling.
+
+**Not landed - stopped per the ruling's own third branch.** The tables
+above are docs-only; `messages.ts`/`persona.ts`/`turnEngine.ts`/the
+tests/`scripts/bench/prefix-class-01-verify.ts` (now testing both
+arms) stay uncommitted in `home-b-prefix-class-01`. This goes to a
+design record, not a fourth live round: three separate, independently-
+tested levers (role, wording, the plan line) have each been ruled out
+or shown insufficient alone, and the written-adult reply-length
+collapse on this tier remains open.
+
 ## FLAKE-FORCED-01: the required_miss test is deterministic (2026-09-23)
 
 Root cause, traced while landing OPENER-01: `packageHost.ts`'s own
