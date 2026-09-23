@@ -22752,6 +22752,109 @@ wording, which is exactly PREFIX-CLASS-01's own scope already. Not
 diagnosing further per the coordinator's own stop-here instruction;
 Fable's own to rule on.
 
+## PARITY-BISECT-04: no candidate composition clears the floor, and the "you" misread does not reproduce in isolation (2026-09-23)
+
+Fable's own extended protocol: five reps per arm, a fixed seed per rep
+(1-5, `benchSampling.ts`'s own `__setSamplingSeedForBench`) shared
+across every arm and a freshly re-measured floor, since BISECT-03's own
+unseeded floor moved 736 to 574 between rounds - too wide to read an
+0.8x bar through. Four candidate PREFIX-CLASS-01 composition shapes
+plus a ceiling, each against two questions: the running prompt-cache
+question, and, now that OPENER-01 has landed and unblocked it, Jesse's
+own benchmarking words ("what is technical benchmarking and why do you
+need it", the `benchmarking-typed-adult` replay row), which carries its
+own live failure - the new path read "why do you need it" as about
+MaiPai itself, not the person asking ("I don't actually use a
+computer").
+
+- **arm a**: the floor sentence ("answer as completely and as well
+  structured as you would with no instructions at all") ahead of the
+  full, unreduced `buildStablePrefix()` output.
+- **arm b**: the system message reduced to identity, the floor
+  sentence, and the three suffix sentences BISECT-03 found survive
+  (indices 1, 2, 3: safety-blocked-requests, world-knowledge/lookup,
+  can't-watch-taste-visit); the dials and the two policies moved to a
+  "How to sound:" preamble on the user message.
+- **arm c** ("(a)+(b) both", Fable's own phrase - genuinely ambiguous,
+  resolved and flagged in the code's own comments): the floor sentence
+  and the full, unreduced suffix stay in the system message (arm a's
+  shape), while the dials and policies move to the user-message
+  preamble (arm b's relocation).
+- **arm d**: every written-class fragment rewritten as third-person
+  description, never instruction, same content and order, no floor
+  sentence; the household-facts sentence and the identity sentence are
+  both Fable's own verbatim text (the identity sentence names who
+  "you" refers to, aimed straight at the benchmarking question's own
+  failure, and is deliberately not persona-varied - see the code
+  comment).
+- **ceiling**: identity plus the three surviving suffix sentences only
+  - nothing else, no floor sentence, no dials, no policies.
+
+**Table: prompt-cache question**
+
+| stage | predicted tokens (seed 1-5) | avg | vs floor | headings | lists | lowercase |
+|---|---|---|---|---|---|---|
+| floor (bare, thinking off) | 798, 848, 845, 758, 785 | 806.8 | 1.00x | yes | yes | 0/5 |
+| arm a (floor sentence + full prefix) | 104, 118, 143, 138, 132 | 127.0 | 0.16x | no | no | 1/5 |
+| arm b (reduced system, preamble user) | 129, 149, 178, 103, 124 | 136.6 | 0.17x | no | no | 0/5 |
+| arm c (floor sentence + full suffix, preamble user) | 81, 107, 141, 145, 134 | 121.6 | 0.15x | no | no | 0/5 |
+| arm d (descriptive, never instructive) | 162, 217, 325, 345, 291 | 268.0 | 0.33x | no | no | 0/5 |
+| ceiling (identity + surviving suffix only) | 397, 476, 534, 190, 457 | 410.8 | 0.51x | yes | yes | 0/5 |
+
+**Table: benchmarking-words question**
+
+| stage | predicted tokens (seed 1-5) | avg | vs floor | headings | lists | lowercase |
+|---|---|---|---|---|---|---|
+| floor (bare, thinking off) | 659, 692, 680, 562, 572 | 633.0 | 1.00x | yes | yes | 0/5 |
+| arm a (floor sentence + full prefix) | 98, 120, 119, 98, 127 | 112.4 | 0.18x | no | no | 0/5 |
+| arm b (reduced system, preamble user) | 105, 127, 96, 126, 138 | 118.4 | 0.19x | no | no | 0/5 |
+| arm c (floor sentence + full suffix, preamble user) | 69, 77, 87, 96, 100 | 85.8 | 0.14x | no | no | 0/5 |
+| arm d (descriptive, never instructive) | 192, 264, 276, 296, 302 | 266.0 | 0.42x | no | yes | 0/5 |
+| ceiling (identity + surviving suffix only) | 373, 293, 307, 339, 376 | 337.6 | 0.53x | yes | yes | 0/5 |
+
+**No candidate clears the floor, and neither does the ceiling.** The
+best of the four true arms, arm d, still lands at a third to two-fifths
+of the floor on both questions - well under the 0.8x bar - and the
+other three arms (a, b, c) all cluster at 0.14x-0.19x regardless of
+question or which of the two relocations (arm a's unreduced suffix,
+arm b's preamble move, arm c's combination) is used. Even the ceiling,
+identity plus only the three suffix sentences BISECT-03 found do not
+collapse the reply alone, comes in at half the floor - meaning the
+collapse is not fully explained by the twelve fragments BISECT-03
+tested one at a time either; something about a multi-sentence system
+message itself, even a minimal, all-surviving one, still halves this
+model's reply on this 8B engine. This confirms BISECT-03's own reading
+(nine of twelve fragments collapse the reply alone, not one villain)
+rather than overturning it: composition shape alone, at least among
+these four candidates, is not PREFIX-CLASS-01's fix.
+
+**The "you" misread does not reproduce in this isolated bench.** All
+30 non-floor, non-ceiling replies to the benchmarking-words question
+(arms a-d, 5 seeds each) were read manually, plus the 5 ceiling replies
+- every one of the 35 reads "you"/"your" as the person asking ("your
+system's performance", "your car", "your setup"), the same reading the
+bare floor gives, never as MaiPai talking about itself. Fable's own
+`IDENTITY_DESCRIPTIVE` sentence in arm d ("MaiPai... answers 'you' as
+the person it is talking to...") was never actually put to the test by
+this result, since nothing else in the bench reproduced the failure it
+was meant to fix. The live "I don't actually use a computer" reading
+Fable saw is therefore not reproduced by any of these four single-turn,
+isolated stable-prefix compositions - it depends on something this
+bench does not include: conversation history, a different node's own
+contribution to the live prompt, or run-to-run sampling variance at an
+unseeded live call. Not re-chased further here per the same stop-here
+discipline as BISECT-03; worth a stated open question rather than a
+guessed cause.
+
+Full replies for every rep of both questions are in the live run's own
+log (not committed; the bench's own console output), kept for this
+write-up's own quotes above and available again with `bun run
+scripts/bench/parity-bisect4.ts` against the resident engine.
+
+Reported to Fable in full (both tables, the "no arm clears the floor"
+reading, and the "you" misread's non-reproduction) for the
+PREFIX-CLASS-01 composition ruling; not started pending that ruling.
+
 ## FLAKE-FORCED-01: the required_miss test is deterministic (2026-09-23)
 
 Root cause, traced while landing OPENER-01: `packageHost.ts`'s own
