@@ -102,6 +102,50 @@ function stubFetch(): () => void {
   };
 }
 
+// Shared by any test that needs a real multi-turn conversation (not just
+// the thread list's own smoke tests above) - a POST creates the
+// conversation, GET lists it empty, and each /api/turn/stream call
+// replies once and increments, so a test can send more than one message
+// and tell the replies apart. Originally local to the CHAT-HEADER-01
+// describe block below; hoisted here once CHAT-LIST-01's own temporary-
+// chat button needed the identical shape, rather than a second copy.
+function stubMultiTurnFetch(): () => void {
+  const original = globalThis.fetch;
+  (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  let turnCount = 0;
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-temp789", status: "open", surface: "chat" }));
+    if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    if (url.includes("/api/turn/stream")) {
+      turnCount++;
+      const text = `Reply ${turnCount}.`;
+      const body = ndjsonStream([
+        { type: "delta", text },
+        { type: "done", value: { turn_id: `turn-temp${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
+      ]);
+      return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+    }
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as unknown as typeof fetch;
+  return () => {
+    globalThis.fetch = original;
+  };
+}
+
+function turnRequestBodies(): Array<Record<string, unknown>> {
+  return (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
+    .filter((c: unknown[]) => (typeof c[0] === "string" ? c[0] : (c[0] as URL | Request).toString()).includes("/api/turn/stream"))
+    .map((c: unknown[]) => JSON.parse((c[1] as RequestInit).body as string));
+}
+
+async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+  fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+  const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+  await waitFor(() => expect(send.disabled).toBe(false));
+  fireEvent.click(send);
+}
+
 describe("NextChatPage (SHELL-02's first slice)", () => {
   // findByLabelText (not getByLabelText): AuiProvider's own mount does an
   // async state update (the same "assistant-ui async init" ChatPage.test.tsx
@@ -1483,43 +1527,6 @@ describe("NextChatPage (CHAT-HEADER-01: the header's own temporary-chat entry)",
     );
   }
 
-  function stubMultiTurnFetch(): () => void {
-    const original = globalThis.fetch;
-    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
-    let turnCount = 0;
-    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-temp789", status: "open", surface: "chat" }));
-      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes("/api/turn/stream")) {
-        turnCount++;
-        const text = `Reply ${turnCount}.`;
-        const body = ndjsonStream([
-          { type: "delta", text },
-          { type: "done", value: { turn_id: `turn-temp${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
-        ]);
-        return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
-      }
-      return Promise.resolve(new Response("{}", { status: 200 }));
-    }) as unknown as typeof fetch;
-    return () => {
-      globalThis.fetch = original;
-    };
-  }
-
-  function turnRequestBodies(): Array<Record<string, unknown>> {
-    return (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
-      .filter((c: unknown[]) => (typeof c[0] === "string" ? c[0] : (c[0] as URL | Request).toString()).includes("/api/turn/stream"))
-      .map((c: unknown[]) => JSON.parse((c[1] as RequestInit).body as string));
-  }
-
-  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
-    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
-    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
-    await waitFor(() => expect(send.disabled).toBe(false));
-    fireEvent.click(send);
-  }
-
   test("marks the very next send as temporary - the switch it performs itself must not clear its own flag", async () => {
     const restore = stubMultiTurnFetch();
     try {
@@ -1539,6 +1546,69 @@ describe("NextChatPage (CHAT-HEADER-01: the header's own temporary-chat entry)",
       await view.findByText("Reply 1.");
 
       fireEvent.click(view.getByText("header-start-temporary"));
+      await view.findByLabelText("Message input");
+      await sendMessage(view, "a private question");
+      await view.findByText("Reply 2.");
+
+      const bodies = turnRequestBodies();
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0]!.temporary).toBeUndefined();
+      expect(bodies[1]!.temporary).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("NextChatPage (CHAT-LIST-01: the thread list's own temporary-chat button)", () => {
+  test("appears beside New Thread for a role that can have a temporary chat", async () => {
+    const restore = stubFetch();
+    try {
+      const { findByRole } = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await findByRole("button", { name: "Start a temporary chat" })).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  // RESP-04 (f): a control a child profile can't use renders nothing,
+  // never a disabled one - the same rule the header's own "Start
+  // temporary chat" entry follows (canHaveTemporaryChatRole gates both).
+  test("renders nothing for a child", async () => {
+    const restore = stubFetch();
+    try {
+      const { findByLabelText, queryByRole } = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson({ role: "child" })} />
+        </MemoryRouter>,
+      );
+      await findByLabelText("Message input");
+      expect(queryByRole("button", { name: "Start a temporary chat" })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  // Same real assertion as CHAT-HEADER-01's own test above (the next
+  // send's `temporary: true`) - this button reuses `armTemporaryChat`,
+  // just reached from the thread list's toolbar instead of the header's
+  // dropdown, so it must mark a chat the same way.
+  test("starts a temporary chat, marked as such, the same as the header's own entry", async () => {
+    const restore = stubMultiTurnFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "hi");
+      await view.findByText("Reply 1.");
+
+      fireEvent.click(view.getByRole("button", { name: "Start a temporary chat" }));
       await view.findByLabelText("Message input");
       await sendMessage(view, "a private question");
       await view.findByText("Reply 2.");

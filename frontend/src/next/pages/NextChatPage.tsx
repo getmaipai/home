@@ -71,6 +71,9 @@ const RailToggleIcon = getIcon("message-square");
 // one kit tag it already needed for the action bars themselves.
 const CompareIcon = getIcon("grid-2x2");
 const DetailsIcon = getIcon("gauge");
+// CHAT-LIST-01: the thread list's temporary-chat button, beside New
+// Thread - the kit's own icon for anonymous/private identity.
+const IncognitoIcon = getIcon("incognito");
 
 // SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
 // almanac-date's own structured result (chatModelAdapter.ts's own
@@ -953,7 +956,17 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
 // nothing left in flow to place it inline with. The mobile Sheet's own
 // instance passes no `collapseToggle` (it has no collapse of its own),
 // so nothing renders there.
-function NextThreadList({ onNewThread, collapseToggle }: { onNewThread: () => void; collapseToggle?: ReactNode }) {
+function NextThreadList({
+  onNewThread,
+  onStartTemporary,
+  temporaryAllowed,
+  collapseToggle,
+}: {
+  onNewThread: () => void;
+  onStartTemporary: () => void;
+  temporaryAllowed: boolean;
+  collapseToggle?: ReactNode;
+}) {
   const [search, setSearch] = useState("");
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
   return (
@@ -964,6 +977,41 @@ function NextThreadList({ onNewThread, collapseToggle }: { onNewThread: () => vo
       <div className="flex items-center gap-1">
         {collapseToggle}
         <ThreadListNew onClick={onNewThread} />
+        {/* CHAT-LIST-01: Jesse's own ruling (2026-09-23) - character/
+            voice-style controls live in Settings, not out on a prompt
+            bar; the thread list's own toolbar is the one place this
+            reaches the surface, as a plain icon button beside New
+            Thread rather than a second labeled row. Same shipped parts
+            as New Thread: `ThreadListNew` itself (its own
+            `ThreadListPrimitive.New` wrap already composes the click
+            handler passed here with the runtime's real thread switch,
+            the same way `onNewThread` above does), just with the kit's
+            incognito icon and a screen-reader label in place of the
+            default Plus/"New Thread" children. `onStartTemporary` only
+            arms the flag the new thread's first turn reads
+            (armTemporaryChat, NextChatPage.tsx) - it never needs to
+            call `switchToNewThread` itself, unlike ChatHeaderBar's own
+            "Start temporary chat" entry, which has no AuiProvider
+            ancestor and has to. Gated on `temporaryAllowed` the same
+            way ChatHeaderBar's own entry is (RESP-04(f): a control a
+            child profile can't use renders nothing, never a disabled
+            one). */}
+        {temporaryAllowed && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ThreadListNew
+                onClick={onStartTemporary}
+                className="w-8 shrink-0 justify-center px-0"
+              >
+                <IncognitoIcon data-slot="aui_thread-list-new-icon" className="size-4 shrink-0" />
+                <span data-slot="aui_thread-list-new-label" className="sr-only">
+                  Start a temporary chat
+                </span>
+              </ThreadListNew>
+            </TooltipTrigger>
+            <TooltipContent>Start a temporary chat</TooltipContent>
+          </Tooltip>
+        )}
       </div>
       {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />
@@ -1600,7 +1648,13 @@ export function NextChatPage({ person }: { person: Roster }) {
   // exactly this (a code review caught two call sites drifting once one
   // grew props the other didn't). The persistent desktop rail gets its
   // own instance below, since it alone carries the collapse toggle.
-  const threadList = <NextThreadList onNewThread={() => setSheetOpen(false)} />;
+  const threadList = (
+    <NextThreadList
+      onNewThread={() => setSheetOpen(false)}
+      onStartTemporary={armTemporaryChat}
+      temporaryAllowed={canHaveTemporaryChatRole(person.role)}
+    />
+  );
   const closeArtifact = () => setOpenArtifactId(null);
   const closeCompare = () => setCompareTarget(null);
   // The toggle (see the CHAT-UI-02 comment above the state
@@ -1977,7 +2031,23 @@ export function NextChatPage({ person }: { person: Roster }) {
                 if (e.target === e.currentTarget && e.propertyName === "width") stopRailWidthAnimation();
               }}
             >
-              <NextThreadList onNewThread={() => { setSheetOpen(false); setRailPeeked(false); }} collapseToggle={inlineToggle} />
+              <NextThreadList
+                onNewThread={() => { setSheetOpen(false); setRailPeeked(false); }}
+                // A code review caught this: `switchToNewThread`'s own
+                // `onThreadIdChange` effect closes the Sheet/artifact/
+                // compare panels on any thread-id change (including this
+                // one), but never touches `railPeeked` - only
+                // `onNewThread`'s own wrapper above does that, and a
+                // click inside `#next-chat-rail` never fires the pointer/
+                // blur-based `closeRailPeek` (its `relatedTarget` stays
+                // inside the rail). Without this, starting a temporary
+                // chat from a peeked-open collapsed rail would leave it
+                // expanded over the content instead of collapsing back
+                // the same way New Thread already does.
+                onStartTemporary={() => { armTemporaryChat(); setRailPeeked(false); }}
+                temporaryAllowed={canHaveTemporaryChatRole(person.role)}
+                collapseToggle={inlineToggle}
+              />
             </div>
             {railCollapsed && !railPeeked ? collapsedToggle : null}
             {/* Jesse found this: the row's own `gap-4` (removed above)

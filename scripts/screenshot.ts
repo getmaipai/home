@@ -35,7 +35,7 @@
 // `--chat-stats-review` runs one dedicated adult-only chat capture with the
 // advanced reply-details popover open, plus the normal chat accessibility
 // checks; it is intentionally separate from the ordinary matrix shots.
-import { chromium, firefox, webkit, type Browser, type BrowserContext } from "playwright";
+import { chromium, firefox, webkit, type Browser, type BrowserContext, type Locator, type Page } from "playwright";
 import { findOverflowingPanels } from "./panelOverflow";
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
@@ -256,6 +256,7 @@ const chatResearchReview = process.argv.includes("--chat-research-review");
 const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
+const chatListReview = process.argv.includes("--chat-list-review");
 const chatHeaderTitleReview = process.argv.includes("--chat-header-title-review");
 const nextPageHeaderIconReview = process.argv.includes("--next-page-header-icon-review");
 const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
@@ -1790,6 +1791,64 @@ async function captureChatThreadActionsReview(browser: Browser, sessionValue: st
       console.log(`Wrote ${join(outDir, file)}`);
     } finally {
       await context.close();
+    }
+  }
+}
+
+/** CHAT-LIST-01's own acceptance ("captured at 1440 and 390") - the
+ * `/next/chat` thread list's own toolbar row with the new temporary-
+ * chat button beside New Thread, both visible together. Seeded with
+ * one real conversation (seedTitledConversation, the same helper
+ * captureChatThreadActionsReview uses for the legacy `/chat` list) so
+ * the list isn't the empty state. On phone the rail is a Sheet, opened
+ * the same way a person would ("Show threads" - NextChatPage.test.tsx's
+ * own "New Thread closes the phone/tablet Sheet" test uses the same
+ * button). Light and dark, matching the coordinator's own instruction
+ * for this batch of four header/list rows. */
+async function captureChatListReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureChatListReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  await seedTitledConversation("captureChatListReview", cookie, "Weekend garden plans");
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/next/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        // On phone the rail column is still in the DOM (hidden, not
+        // unmounted) once the Sheet's own copy of the same list opens
+        // beside it - scoped to the open dialog the same way
+        // NextChatPage.test.tsx's "New Thread closes the phone/tablet
+        // Sheet" test disambiguates the two.
+        let scope: Page | Locator = page;
+        if (slug === "phone") {
+          await page.getByRole("button", { name: "Show threads" }).click();
+          scope = page.getByRole("dialog");
+        }
+        await scope.getByText("Weekend garden plans", { exact: true }).waitFor();
+        await scope.getByRole("button", { name: "New Thread", exact: true }).waitFor();
+        await scope.getByRole("button", { name: "Start a temporary chat", exact: true }).waitFor();
+        await settleAnimations(page);
+        const file = `chat-list-temporary-button-${viewport.width}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
+        console.log(`Wrote ${join(outDir, file)}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
     }
   }
 }
@@ -3624,6 +3683,10 @@ async function main() {
       await captureChatThreadActionsReview(browser, sessionValue);
     }
 
+    if (!a11yOnly && chatListReview) {
+      await captureChatListReview(browser, sessionValue);
+    }
+
     if (!a11yOnly && chatHeaderTitleReview) {
       await captureChatHeaderTitleReview(browser, sessionValue);
     }
@@ -3636,7 +3699,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
