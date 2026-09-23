@@ -6,6 +6,18 @@
 // @/apps/chat below is real Home business logic (citations, memory,
 // turn stats, day dividers, continuation/edit-supersedes state) that
 // stays here, the actual generic-vs-product split that move made.
+//
+// OLD PAGE ONLY (VOICE-LIVE-04, 2026-09-23): this file backs ChatPage.tsx,
+// not /next/chat. NextChatPage.tsx renders `Thread` imported from
+// "@maipai/ui/src/elements/thread.aui" - the VENDORED kit's own file, same
+// basename as this one, a different file entirely. A change made here has
+// no effect on /next/chat; a feature meant for the current page belongs in
+// the vendored file (a new ThreadComponents slot, cut there, the same
+// recipe VOICE-LIVE-01/04b both used) or in NextChatPage.tsx's own
+// composition, never here. Found live: VOICE-LIVE-04's own first attempt
+// wired a dictation waveform into this file's Composer and shipped as dead
+// code that never rendered anywhere real, because nothing on /next/chat
+// reads it.
 
 import {
   ComposerAttachments,

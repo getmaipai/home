@@ -46,7 +46,7 @@ import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
-import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
+import { ComposerDictationWaveform, DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
@@ -2019,6 +2019,18 @@ export function NextChatPage({ person }: { person: Roster }) {
                   // (composerVoiceControls.tsx's own header), so this is
                   // unconditional here the same way ComposerAddMenu is.
                   ComposerExtraEnd: ComposerVoiceControls,
+                  // VOICE-LIVE-04b: ComposerInputOverride (ui-v0.5.40)
+                  // fully owns the composer's text-field region -
+                  // composerDictationWaveform.tsx's own component reads
+                  // `s.composer.dictation` itself and renders either the
+                  // waveform or a real ComposerPrimitive.Input, so this
+                  // is unconditional here too. A first attempt wired the
+                  // identical feature into apps/chat/thread.aui.tsx (the
+                  // OLD page's own composition, same basename as this
+                  // kit file, never rendered on /next/chat) and shipped
+                  // as dead code - this is the file that's actually live
+                  // here, `@maipai/ui/src/elements/thread.aui`.
+                  ComposerInputOverride: ComposerDictationWaveform,
                   ReasoningGroup: NextReasoningGroup,
                 }}
               />
