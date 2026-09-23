@@ -23042,6 +23042,83 @@ cache-stable ordering (U1) and every other `buildStablePrefix` consumer
 (the old path's `buildSystemPrompt`, `personaJudge.ts`), not a content
 edit. Reported to the coordinator as blocked rather than decided here.
 
+## PREFIX-ROLE-01: moving the stable message's role alone does not clear the bar either (2026-09-23, blocked)
+
+The coordinator's own follow-up ruling, read from the code
+(`turnMachine/messages.ts` line 150 as the one new-path producer):
+for a written-adult turn, `contextToMessages()`'s stable message
+(`buildStablePrefix()`'s output plus `stableContextLines`) becomes role
+`"user"` instead of `"system"` - still the first message, still
+unchanged content turn to turn, only the role differs. Built exactly
+as specified (`messages.ts`'s own `stableRole` branch), tested (5 new
+tests in `messages.test.ts`, all passing, spoken byte-identical to
+before), comments corrected to stop overclaiming byte-identity with
+arm e's own measured numbers.
+
+**Verified live through the real `contextToMessages()` itself (not a
+hand-built message array), real five-tool block, thinking off, same
+five seeds:**
+
+| question | floor avg | shipped avg | ratio | headings | lists | lowercase |
+|---|---|---|---|---|---|---|
+| prompt-cache | 806.8 | 119.2 | 0.15x | no | no | 0/5 |
+| benchmarking-words | 633.0 | 99.2 | 0.16x | no | no | 0/5 |
+
+**Still under 0.35x on both questions - and prompt-cache barely moved
+while benchmarking-words got WORSE** than PREFIX-CLASS-01's own
+system-role numbers (0.14x/0.26x before this item, 0.15x/0.16x after).
+The role move did not help.
+
+**The ruling's own wording-swap comparison (point 2), run because both
+questions missed the bar: no difference either.** The real message
+shape, with only the stable message's content swapped for arm e's own
+exact text (`parity-bisect4-stages.ts`'s `voiceDescriptive()`, copied
+verbatim - "MaiPai writes/uses/answers", third person, not the shipped
+"The reply reads/uses/answers"):
+
+| question | floor avg | arm-e-wording avg | ratio | headings | lists | lowercase |
+|---|---|---|---|---|---|---|
+| prompt-cache | 806.8 | 110.2 | 0.14x | no | no | 0/5 |
+| benchmarking-words | 633.0 | 115.0 | 0.18x | no | no | 0/5 |
+
+Within noise of the shipped wording's own numbers. **Wording is ruled
+out as the cause, conclusively**: two different, independently-written
+texts, same message shape, nearly identical (bad) results.
+
+**What's left, and what arm e never had: the volatile message.**
+`contextToMessages()`'s real output for a written-adult turn is three
+messages - `[user: stable prefix, system: memory block + reanchor +
+"How to answer this one:" planLine, user: the question]` - not the
+two-message `[user: everything, implicit]` shape PARITY-BISECT-04's
+arm e actually tested (one message, no system role anywhere in the
+request, no volatile section at all). The one thing every version
+tried on this tier has in common with a real turn and NOT with arm e
+is that middle system-role message. This converges, again, with
+PARITY-BISECT-01's own first and most literal finding restated more
+precisely than either PREFIX-CLASS-01 or PREFIX-ROLE-01 restated it:
+maybe it is not "the first message's role" that matters, but "any
+system-role message anywhere in the request" - a hypothesis this
+item's own scope did not test (moving the volatile message too is a
+bigger, further change, not ruled on).
+
+**Not landed.** `messages.ts`'s `stableRole` change, `persona.ts`/
+`turnEngine.ts`'s content changes, the new tests, and
+`scripts/bench/prefix-class-01-verify.ts` (now also running the
+wording-swap comparison) stay uncommitted in `home-b-prefix-class-01`.
+Reported blocked to the coordinator with this full table and the
+volatile-message hypothesis named plainly, asking whether to test
+removing every system-role message from a written-adult turn next (a
+bigger surface change than either ruling scoped) or take a different
+direction.
+
+**Also still present, unresolved, and separate from length:** the
+benchmarking-words sample reply (seed 1, shipped wording) reads "I
+need it to ensure that my responses are accurate... It helps me
+provide the most effective and up-to-date assistance to you" - the
+same self-referential "you" misread PARITY-BISECT-04 found and could
+not reproduce in isolation. It reproduced here, in the real message
+shape. Worth its own trace once the length question is settled.
+
 ## FLAKE-FORCED-01: the required_miss test is deterministic (2026-09-23)
 
 Root cause, traced while landing OPENER-01: `packageHost.ts`'s own
