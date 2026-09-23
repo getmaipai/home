@@ -20270,3 +20270,121 @@ Landed `906d740b`, `docs/BACKLOG.md`'s own row. Built: `frontend/src/apps/chat/l
 **VOICE-LIVE-03 landed concurrently** (a peer session, the composer chevron's real voice/microphone picker) touching the same three files (`composerVoiceControls.tsx`, `mic-capture.ts`, `NextChatPage.tsx`); the rebase conflicts were additive in every case (VOICE-LIVE-03's `deviceId` field beside this item's `onSource` field on `MicCaptureOptions`, `VoiceChevron`'s new `personId` prop beside the waveform's `onClick` wiring, `BoundComposerVoiceControls` beside `voiceOpen` state) and a low-effort review of the merged hunks specifically (not either feature's own logic, already reviewed separately) found nothing wrong.
 
 **The measurement is the one acceptance line not met.** The row asks for the first spoken word under 3 seconds after the utterance ends, beside the resident 8B, measured on this Mac with `turn.pipeline.next` both on and off. This session has no real engine and no real microphone to produce that number - the same class of gap `docs/dev.md`'s "Firefox not verified" line names for a different check (2026-09-22: a check that needs real hardware this sandbox doesn't have is named honestly rather than skipped silently or fabricated). Code review, typecheck, eslint and the full test suite (`bash scripts/check.sh`, green) all pass; the row stays unticked until someone with this Mac's own hardware runs the two timed calls and records them here.
+
+## U6: the flip verdict after the live rerun (2026-09-23)
+
+The verdict on the tables above ("GROUND-01: the live acceptance
+rerun"): **not yet.** The new path beats the old on the rows that were
+broken (5 of 8 clean against 3 of 8, the diagnosed chile turn grounding
+and searching on both paths, no row refusing on `category` or
+`read_page` anywhere) and loses three controls the old path holds, and
+the controls are the household's everyday turns. The three are not
+grounding defects and not new-path design faults: read from the code
+they are two integration gaps, each with a one-place fix, and the flip
+waits for those two fixes and one rerun against the bar at the end of
+this section.
+
+### Regression A: a real websearch outcome with empty arguments
+
+`control-search-mariners-explicit` repeat 3 and the hallucinated-name
+follow-up's repeat 1 turn 2 both show `websearch/tool_call {}` and a
+knowledge answer ("I cannot directly search the web for real-time
+information ..." and "Gabriel Boric Font was born on July 24, 1989").
+The chain, node by node: the engine returned a `websearch` call whose
+`arguments` string did not parse (or was empty); `toolCallFromWire` in
+`backend/src/lib/llm.ts` turns a parse failure into `args: undefined`;
+`nodes/policy.ts` normalizes `call.args ?? {}` and `checkGrounding`
+over zero entries passes, since there is nothing to refuse; `nodes/
+tool.ts` runs it and `runPlugin`'s schema validation fails on the
+missing required `expression`, recording the outcome as failed, via
+`tool_call`, args `{}`; the machine then takes the failed outcome back
+to `model` (the `moreRoundsAvailable` transition in `machine.ts`),
+where round two has no tools left and answers from knowledge. So the
+search "ran", produced nothing, and the person got the model's own
+answer with no refusal and no source: the same near-tie as
+ENGINE-CONTRACT-01, one level down (the model half-commits to a call
+and never writes the query). The layer is the model node's
+verification, which ENGINE-CONTRACT-02 already owns: its check becomes
+"a `websearch` call whose `expression` is a non-empty string", forced
+or offered (the bench judge's own definition of a pass), and a call
+that fails it is a miss that takes the builder row, never runs, and is
+never fed back as a failed outcome for a second round. The trace does
+not keep the engine's raw `arguments` string (the generation record
+holds the parsed `ToolCall` only), so ENGINE-CONTRACT-02 records it
+beside `cached_tokens`; whether these two were a parse failure or a
+literal `{}` is read from that field on the next run, and the fix is
+the same either way.
+
+### Regression B: `recall` instead of nothing on a negative control
+
+`control-negative-spiderman` repeat 3 and `control-negative-feeling-down`
+repeat 1 show `ran recall (source plugin)` and a fine reply, at twice
+the time (10,873 ms against 5,283 and 5,176 for the clean repeats;
+8,694 against 4,307 and 4,484). The layer is the offered set, not the
+model and not a rule: the 8B budget in `modelCatalog.ts` offers six
+tools (`recall`, `remember`, `remind`, `timer`, `weather`, `websearch`),
+and the context node (`nodes/context.ts`) already calls `recall(actor,
+utterance)` on every turn and places up to eight matches in the context
+as `source: "memory"`. The `recall` tool is a second implementation of
+a retrieval the model already holds in its context (one definition,
+one implementation), so at temperature 0.7 the model reaches for it one
+time in three on small talk and pays a whole round for nothing new.
+The fix is `TOOLSET-01`: `recall` leaves every budget's `tools_offered`
+on the new path; memory reaches the model through context only. The
+old path is untouched. Not a prompt sentence, not a word rule.
+
+### The France 60 percent, and ENGINE-CONTRACT-02's design
+
+`interimRuleMeasure`'s France conversation (the identical question
+asked twice) misses the forced call 60 percent of the time against
+chile's 30. In a conversation the second identical question is not a
+full-prefix cache hit (the first question and its answer now sit in the
+window before it), so this is the partial-reuse case of A3 plus the
+strongest possible pull toward answering: the answer is in the window,
+and the answer-from-this-conversation escape is off by design. It
+changes nothing in ENGINE-CONTRACT-02: the counter by cache state stays
+the number, and the builder row is not preferred outright on an
+identical repeat, because "identical repeat" is a word rule by another
+name (RULES-AND-LEARNED-COMPONENTS.md) and the verify-and-fallback
+reaches the builder on the same turn anyway at the cost of one wasted
+generation. When the escape turns on, that case becomes an allowed
+answer from context and the miss stops being one. Two consequences the
+number does carry: `interimRuleMeasure`'s `answer_from_context` line is
+renamed `required_miss` (the tool is never offered, so the heuristic was
+counting misses), and the counter sits beside time-to-first-token per
+outcome, so the fallback's extra generation is measured on the France
+shape (15,478 ms median already), never assumed.
+
+### The bar for the next rerun (the flip's own acceptance)
+
+Run after ENGINE-CONTRACT-02 and TOOLSET-01 land, same fixture, three
+repeats, both paths, live on the 8B:
+
+1. Every failed row that was clean on this rerun stays clean
+   (`president-of-france-repeat`, `apple-announce-this-week`,
+   `search-mariners-game`, `chatgpt-6-luna`,
+   `corey-feldman-michael-jackson-friendship`), and no row is classed
+   engine: with ENGINE-CONTRACT-02 landed a miss takes the builder row,
+   so a forced turn produces a search or a real failure, never an
+   engine exclusion.
+2. The three controls back to clean on every repeat
+   (`control-search-mariners-explicit`, `control-negative-spiderman`,
+   `control-negative-feeling-down`), and every control row's median
+   time-to-first-token within 1.25 times the old path's on the same
+   run, because regression B showed as latency and a "no tool" bar
+   alone would not catch the next one.
+3. `control-negative-stephen-king`'s expectation flips: "what's the
+   latest Stephen King novel" is a world question with a fresh fact
+   under the adopted interim rule, so the row expects a `websearch` with
+   `expression` matching `stephen king`; both paths "over-searched"
+   against a bar the legacy corpus wrote, not the design (`REPLAY-BAR-01`).
+4. `president-of-chile-when-born` turn 3 ("yes") is its own row,
+   `CONFIRM-01`, outside the flip's bar: a "yes" to the hub's own offer
+   to look something up must run the search the offer named, and both
+   paths fail it today (parity, not regression).
+   `primetime-trailer-correction` and turns 1 and 2 of the chile row are
+   parity failures too (the model answering from memory with no call, a
+   signal question), outside the bar and named in `SIGNAL-01`.
+
+The flip happens when 1 to 3 hold on one rerun; rows 4's items are
+the next block's, not the flip's.
