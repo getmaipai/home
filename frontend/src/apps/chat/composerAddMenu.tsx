@@ -74,15 +74,23 @@ const FileTextIcon = getIcon("file-text");
 const SearchIcon = getIcon("search");
 const SparklesIcon = getIcon("sparkles");
 
+// Live finding 2026-09-22 (Jesse): the previous, stacked name/description
+// layout ran oversized and still truncated ("Add photos and files" over
+// "Images, text, and Markdown f..." in a wide-padded row) - `w-72`
+// (composer.tsx's own ComposerMenu width) has no room for two full-width
+// lines per item at readable size. `elements/composer.tsx`'s own
+// ComposerCommandItem is the shipped one-line form (name, then a short
+// grey description sharing the SAME row) - used as shipped here instead
+// of inventing a second stacked layout.
 function ComposerAddMenuItem({ icon, name, description, ...props }: { icon: ComponentType<{ className?: string }>; name: string; description: string } & Omit<ComponentProps<typeof ComposerMenuItem>, "children">) {
   const Icon = icon;
   return (
     <ComposerMenuItem {...props}>
       <Icon className="text-foreground/35 size-4 shrink-0" />
-      <span className="flex min-w-0 flex-1 flex-col text-start">
-        <span className="font-medium">{name}</span>
-        <span className="text-foreground/45 truncate text-base">{description}</span>
-      </span>
+      <span className="font-medium shrink-0">{name}</span>
+      {/* Deliberate type-floor exception: text-xs, same compact size
+          variant the shipped ComposerCommandItem's own description uses. */}
+      <span className="text-foreground/45 min-w-0 flex-1 truncate text-start text-xs">{description}</span>
     </ComposerMenuItem>
   );
 }
@@ -99,7 +107,7 @@ function GroupLabel({ children }: { children: string }) {
 function AddPhotosAndFilesItem({ onSelect }: { onSelect: () => void }) {
   return (
     <ComposerPrimitive.AddAttachment asChild>
-      <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, and Markdown files" onClick={onSelect} />
+      <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, Markdown" onClick={onSelect} />
     </ComposerPrimitive.AddAttachment>
   );
 }
@@ -146,7 +154,7 @@ function TakeAPhotoItem({ onSelect }: { onSelect: () => void }) {
     <ComposerAddMenuItem
       icon={CameraIcon}
       name="Take a photo"
-      description="Use this device's camera"
+      description="This device's camera"
       className="sm:hidden"
       disabled={disabled}
       onClick={() => {
@@ -160,12 +168,12 @@ function TakeAPhotoItem({ onSelect }: { onSelect: () => void }) {
 function CreateImageItem({ overview, onSelect }: { overview: EnginesOverview | undefined; onSelect: () => void }) {
   if (!unwiredControlsAreEnabled()) return null;
   if (!readyRole(overview, "image")) return null;
-  return <ComposerAddMenuItem icon={SparklesIcon} name="Create image" description="Generate a picture for this reply" onClick={onSelect} />;
+  return <ComposerAddMenuItem icon={SparklesIcon} name="Create image" description="Generate a picture" onClick={onSelect} />;
 }
 
 function WebSearchItem({ onSelect }: { onSelect: () => void }) {
   if (!unwiredControlsAreEnabled()) return null;
-  return <ComposerAddMenuItem icon={SearchIcon} name="Web search" description="Search the web for this reply" onClick={onSelect} />;
+  return <ComposerAddMenuItem icon={SearchIcon} name="Web search" description="Search the web" onClick={onSelect} />;
 }
 
 function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) {
@@ -195,13 +203,13 @@ function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) 
       <GroupLabel>Apps</GroupLabel>
       {apps.map((pkg) => {
         const style = kindStyle(pkg.kind);
+        // Deliberate type-floor exception: same compact-row shape as
+        // ComposerAddMenuItem above, `text-xs` on the description only.
         return (
           <ComposerMenuItem key={pkg.id} onClick={() => onSelect(pkg)}>
             <IconTile icon={style.icon} hue={style.hue} size="sm" glow={false} />
-            <span className="flex min-w-0 flex-1 flex-col text-start">
-              <span className="font-medium">{pkg.display}</span>
-              <span className="text-foreground/45 truncate text-base">{pkg.description}</span>
-            </span>
+            <span className="font-medium shrink-0">{pkg.display}</span>
+            <span className="text-foreground/45 min-w-0 flex-1 truncate text-start text-xs">{pkg.description}</span>
           </ComposerMenuItem>
         );
       })}
