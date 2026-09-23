@@ -22417,3 +22417,79 @@ framing); full suite reconfirmed green after. Spec pin at
 spec-v0.1.29. The commit sits on the `b-u4b2` branch, unpushed,
 pending the coordinator's own call on whether the four assigned fixes
 land on their own merits or wait for WRITTEN-PARITY-01's own verdict.
+
+**U4b-2 landed on its own merits (2026-09-23, `4380798a`/`b5812398`):**
+the seven fixes are each individually verified, reviewed and gated; the
+holistic bar is WRITTEN-PARITY-01's own question to answer. Row stays
+open in `docs/BACKLOG.md`.
+
+## PARITY-BISECT-01: the mere presence of a system message collapses the reply, not its content (2026-09-23)
+
+`backend/scripts/bench/parity-bisect.ts`, isolated the same way U4b-2's
+own measurement was (a scratch `MAIPAI_DATA_DIR`, the resident chat and
+embed engines by URL only, no supervisor spawn). Same question as
+U4b-2's own second round: "how does a prompt cache make a language
+model faster and why does that matter."
+
+| stage | predicted tokens (3 reps) | avg | vs floor | headings | lists |
+|---|---|---|---|---|---|
+| 0a, bare, thinking on | 2386, 1693, 1430 | 1836.3 | 2.49x | yes | yes |
+| 0b, bare, thinking off (the floor) | 818, 729, 662 | 736.3 | 1.00x | yes | yes |
+| 1, + stable system prefix alone | 100, 122, 111 | 111.0 | 0.15x | no | no |
+| 2, + tools block | 92, 97, 99 | 96.0 | 0.13x | no | no |
+| 3, + volatile context message | 109, 91, 92 | 97.3 | 0.13x | no | no |
+| 4, two-system-message split merged into one | 87, 95, 105 | 95.7 | 0.13x | no | no |
+| 5, + CHAT_SAMPLING (vs engine defaults) | 89, 68, 94 | 83.7 | 0.11x | no | no |
+| 6, thinking off, completion check | 93, 93, 132 | 106.0 | 0.14x | no | no |
+
+The collapse happens entirely at stage 1. A bare call with no system
+message at all - even at the path's own thinking-off setting - writes
+a full structured answer (818/729/662 predicted tokens, headings, a
+table, an example, a summary, a conclusion). Adding *only* the stable
+system prefix (`buildStablePrefix`'s own identity, policy, and register
+text - the same prose already found correct on the reconstructed
+prompt) collapses the reply to about 100 tokens, two short paragraphs,
+no structure, before the tools block, the volatile context message, the
+message split, or CHAT_SAMPLING are ever added. Every later stage stays
+in the same collapsed range (84-111 tokens); none of them makes it
+meaningfully worse or better once stage 1 has already collapsed it.
+
+One more observation from the actual text, not counted in the table:
+stage 1's reply is also all-lowercase throughout ("a prompt cache makes
+a language model faster...", "think of it like...") - a register shift
+beyond just length, appearing the moment any system message exists.
+
+Sample replies:
+
+> **0b (no system message):** A **prompt cache** is a feature in some
+> large language models (LLMs), such as **Qwen**, that allows the model
+> to **remember and reuse previous interactions** to **speed up
+> subsequent responses**... [continues with "What is a Prompt Cache?",
+> "How Does a Prompt Cache Make a Language Model Faster?" with three
+> numbered sub-points, "Why Does That Matter?" with four numbered
+> sub-points, an example use case, limitations, a summary table, and a
+> conclusion - 818 predicted tokens on this rep]
+
+> **1 (+ stable system prefix alone):** a prompt cache makes a language
+> model faster by storing previously used input prompts so the model
+> doesn't have to process them every time. think of it like remembering
+> a conversation - if you've already asked a question, the model can
+> recall the context instead of starting fresh each time.
+>
+> this matters because it saves time and makes interactions smoother,
+> especially when the same or similar prompts come up again. it's like
+> having a memory bank for common questions, so the model can respond
+> quicker and with more consistency.
+
+Verdict: not a wiring defect in any of U4b-2's seven layers, and not
+the tools block, the volatile context message, the message split, or
+sampling - the collapse is triggered by this 8B model receiving *any*
+system message at all on this question, independent of that message's
+own content. The stable prefix's own prose (identity, `WRITTEN_POLICY`,
+the written engagement fragment) was already proven correct on its own
+terms in U4b-2's own reconstructed-prompt check; this bench shows that
+correctness alone cannot fix the collapse, since even a stripped-down
+system message with none of the written-mode prose would presumably
+still trigger it (untested here - the next question, if this needs
+narrowing further). Reported to Fable for the fix; not diagnosed
+further here per the coordinator's own stop-here instruction.
