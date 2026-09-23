@@ -417,6 +417,38 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
   });
 });
 
+describe("turnNext.ts: GROUND-01, thinking_for_minors", () => {
+  test("a minor's turn sends thinking:false by default", async () => {
+    let sawThinking: unknown;
+    const result = await withStub(
+      {
+        reply: (request) => {
+          sawThinking = request.chat_template_kwargs?.enable_thinking;
+          return "Hi there!";
+        },
+      },
+      () => runTurnNext(people.child, "chat", "hi"),
+    );
+    expect(result.ok).toBe(true);
+    expect(sawThinking).toBe(false);
+  });
+
+  test("an adult's turn on the same budget still sends thinking:true (the 8B's thinking_budget_tokens is 512)", async () => {
+    let sawThinking: unknown;
+    const result = await withStub(
+      {
+        reply: (request) => {
+          sawThinking = request.chat_template_kwargs?.enable_thinking;
+          return "Hi there!";
+        },
+      },
+      () => runTurnNext(people.owner, "chat", "hi"),
+    );
+    expect(result.ok).toBe(true);
+    expect(sawThinking).toBe(true);
+  });
+});
+
 describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-text fields", () => {
   async function policyNodeOutcome(turnId: string): Promise<{ ok?: boolean; code?: string; arg?: string } | undefined> {
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();

@@ -176,7 +176,14 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
       .filter((t): t is ToolSpec => t !== null);
   }
 
-  const thinkingOn = state.budget.thinking_budget_tokens > 0;
+  // GROUND-01: `context`'s own decideReasoning() already decided
+  // `reasoning.withheld_for === "minor"` from the age band, reused here
+  // rather than a second age check - a minor's turn sends `thinking:
+  // false` to the engine by default (budget.thinking_for_minors), a
+  // cost control since the reasoning span would be consumed and
+  // dropped below regardless (see `reasoning` a few lines down).
+  const minorThinkingOff = state.reasoning.withheld_for === "minor" && !state.budget.thinking_for_minors;
+  const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, interimRuleApplies ? "interim_rule" : "model", signal);
   if (!attempt.ok) return { outcome: { ok: false, code: attempt.code }, output: { kind: "text", text: "", thinking: false } };
 

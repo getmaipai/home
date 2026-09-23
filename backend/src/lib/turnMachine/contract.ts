@@ -80,6 +80,13 @@ export interface TurnBudget {
   model_transitions: boolean;
   context_tokens: number;
   thinking_budget_tokens: number;
+  /** GROUND-01 ("Reasoning is a second output"): whether the model node
+   * even asks the engine to think on a minor's turn - false by default.
+   * A cost control only, never the safety gate: `context.ts`'s
+   * decideReasoning() already forces `reasoning.emit` false for a minor
+   * from the age band alone, so a minor's turn never emits or persists
+   * reasoning whichever way this is set. */
+  thinking_for_minors: boolean;
   deadlines_ms: { model: number; tool: number; total: number };
   measured: { false_call_rate: number; inverse_miss_rate: number; rewrite_pass_rate: number; on: string };
 }

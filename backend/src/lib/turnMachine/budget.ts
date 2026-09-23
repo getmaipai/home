@@ -19,6 +19,7 @@ export const NO_RECORD_BUDGET: TurnBudget = {
   model_transitions: false,
   context_tokens: 2000,
   thinking_budget_tokens: 0,
+  thinking_for_minors: false,
   deadlines_ms: { model: 20000, tool: 10000, total: 45000 },
   measured: { false_call_rate: 0, inverse_miss_rate: 0, rewrite_pass_rate: 0, on: "no measured record" },
 };

@@ -468,16 +468,22 @@ function buildTurnRow(
     sources: value.sources ? JSON.stringify(value.sources) : null,
     media: value.media ? JSON.stringify(value.media_items?.length ? { ...value.media, media_items: value.media_items } : value.media) : null,
     stats: value.stats ? JSON.stringify(value.stats) : null,
-    // REASONING-02 (tool-call reasoning) and REASONING-04 (a prose
-    // reply's own think block, extracted above): the row itself always
-    // keeps it, same as REASONING-02's own tested contract - the drop is
-    // presentation-only, gated at READ time by the READING actor's own
-    // band (listConversationTurns() below), never by this row's own
-    // minorSpeaker. A minor never sees their own reasoning back; an
-    // owner/admin still does, the same parental-oversight floor this
-    // file's "owner/admin see a child's turns in full" rule already
-    // holds everywhere else.
-    reasoning: value.reasoning ?? proseReasoning ?? null,
+    // REASONING-03 (owner's ruling, 2026-09-22, a privacy invariant, not
+    // a setting): a child's reasoning is never persisted, full stop -
+    // not in this row, not in the trace, not in history, exports or
+    // backups, on any budget setting. This supersedes the old path's
+    // own tested contract (REASONING-02/04) that this row always kept
+    // it and dropped it only at READ time, gated on the READING actor's
+    // band rather than this row's own minorSpeaker - that reading let
+    // an owner read a child's stored reasoning, which the state record
+    // (turn-machine-state-record-2026-09-22.md, "A child's reasoning is
+    // never persisted") explicitly retires. Parental oversight of a
+    // child's turn keeps the question, the answer, the sources, the
+    // executed tools and the policy decisions - all still stored below,
+    // none of them this field. Adult reasoning is unaffected: still
+    // stored, still gated on read by the reading actor
+    // (listConversationTurns()/list() below).
+    reasoning: minorSpeaker ? null : (value.reasoning ?? proseReasoning ?? null),
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
     // row (CHAT-03) they are approximate, and a `policy` turn is skipped
@@ -1443,6 +1449,37 @@ function memoryIdsByTurn(turnIds: readonly string[]): Map<string, string[]> {
   return byTurn;
 }
 
+/** REASONING-02/03/04, the one place "should this row's reasoning reach
+ * this reader" is decided - a review caught the same five lines
+ * duplicated between listConversationTurns() and list() below, exactly
+ * the shape that let the two drift ("a second place this could be
+ * decided differently"). `undefined` means omit the `reasoning` field
+ * entirely (both callers' own established contract: no key, not
+ * `null`). `dropReasoningForActor` is passed in rather than
+ * recomputed per row - it depends only on the reading actor, not the
+ * row, so each caller computes it once for its whole result set. */
+function effectiveReasoningFor(r: ConversationTurnRow, dropReasoningForActor: boolean): string | undefined {
+  // REASONING-04: a row written before the same item split a prose
+  // reply's own think block into this column still carries it inline
+  // in reply_text - reconstructed here, on every read, so an old row
+  // heals itself with no migration (the coordinator's own "strip on
+  // read").
+  const legacyReasoning = r.reasoning === null ? extractReasoningText(r.replyText) : undefined;
+  const effectiveReasoning = r.reasoning ?? legacyReasoning ?? null;
+  // Reasoning is a disclosure surface built for typed chat's own
+  // Reasoning Element, never sent for a row from any other surface,
+  // adult reader or not - checked per row (a row is what it was spoken
+  // on, not what the reader happens to be viewing from). A minor never
+  // sees their own reasoning back either (dropReasoningForActor).
+  // REASONING-03 (owner's ruling, 2026-09-22): `r.minorSpeaker` is
+  // checked too, defense in depth for a row written by a minor before
+  // buildTurnRow()'s write-side gate landed (or reconstructed from an
+  // old think-tagged reply_text) - the write side is what actually
+  // stops a minor's reasoning existing to read in the first place.
+  const dropReasoningForRow = dropReasoningForActor || r.surface !== "chat" || r.minorSpeaker;
+  return effectiveReasoning !== null && !dropReasoningForRow ? effectiveReasoning : undefined;
+}
+
 /** GET /api/conversations/:id/turns?since=<turn_id> (step 3's contract):
  * oldest first, each with `memory_ids` - every memory record whose
  * provenance (step 2's `source` field) names this exact turn, batched in
@@ -1489,24 +1526,9 @@ export function listConversationTurns(
   }
 
   const byTurn = memoryIdsByTurn(rows.map((r) => r.id));
-  // REASONING-02: the same minor-projection POST /api/turn and the
-  // streaming `done` event already apply, applied here too - a review
-  // caught the write-side gate having no read-side twin, so a child's
-  // own turn history (this route, the chat history adapter's real
-  // source) leaked the reasoning right back in. Gated on the READING
-  // actor's own band, not the row's `minorSpeaker`: canAccessPerson()
-  // only ever lets a non-adult see their OWN turns (never another
-  // person's, per this file's own access tests), while an owner/admin
-  // reading a child's turns keeps seeing everything, matching this
-  // file's established "owner/admin see a child's turns in full" rule -
-  // the point is never showing a minor's own reasoning back to THEM,
-  // not withholding it from a parent's oversight. A review caught this
-  // missing the surface half of the same rule routes/turn.ts's own
-  // dropReasoning just gained - reasoning is a disclosure surface built
-  // for typed chat's own Reasoning Element, never sent for a row from
-  // any other surface, adult reader or not (checked per row below,
-  // never the reading actor's own current surface, since a row is what
-  // it was spoken on, not what the reader happens to be viewing from).
+  // See effectiveReasoningFor()'s own doc comment above for the full
+  // rule; computed once here since it depends only on the reading
+  // actor, never the row.
   const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
   // artifacts.ts's own visibleArtifactRow() access check, inlined
   // rather than called per row (it would re-fetch the same turn row
@@ -1516,21 +1538,10 @@ export function listConversationTurns(
   const artifactByTurn = artifactsByTurn(rows.map((r) => r.id));
 
   return { ok: true, value: rows.map((r) => {
-    const { media: rawMedia, reasoning, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, ...row } = r;
     const artifact = actor.role === "child" && r.safetyAction === "refuse" ? undefined : artifactByTurn.get(r.id);
-    // REASONING-04: a row written before the same item split a prose
-    // reply's own think block into this column still carries it inline
-    // in reply_text - stripped here, on every read, so an old row heals
-    // itself with no migration (the coordinator's own "strip on read").
-    // Reconstructed as a real `reasoning` value too, the row itself
-    // always keeping it (REASONING-02's own tested contract, extended
-    // here to an old row) - dropReasoningForActor/dropReasoningForRow
-    // below is what stops a minor seeing their own back, or any row
-    // from a non-chat surface reaching anyone.
-    const legacyReasoning = reasoning === null ? extractReasoningText(r.replyText) : undefined;
-    const effectiveReasoning = reasoning ?? legacyReasoning ?? null;
-    const dropReasoningForRow = dropReasoningForActor || r.surface !== "chat";
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(effectiveReasoning !== null && !dropReasoningForRow ? { reasoning: effectiveReasoning } : {}), ...(artifact ? { artifact } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2019,18 +2030,15 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const capped = rows.slice(0, LIST_CAP);
   const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
-  // REASONING-02/04: the same reader-gated minor projection as
-  // listConversationTurns() above, for the identical reason (see its
-  // own comment) - including the surface half a review caught missing
-  // here too, and the same legacy-row healing (a prose think block
-  // stripped/reconstructed on read, no migration).
+  // effectiveReasoningFor()'s own doc comment above has the full rule -
+  // this is the `list()` the state record names directly: the test
+  // that used to prove "an owner may read a child's stored reasoning"
+  // is retired with this fix (conversationHistory.test.ts).
   const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
   return capped.map((r) => {
-    const { media: rawMedia, reasoning, ...row } = r;
-    const legacyReasoning = reasoning === null ? extractReasoningText(r.replyText) : undefined;
-    const effectiveReasoning = reasoning ?? legacyReasoning ?? null;
-    const dropReasoningForRow = dropReasoningForActor || r.surface !== "chat";
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(effectiveReasoning !== null && !dropReasoningForRow ? { reasoning: effectiveReasoning } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    const { media: rawMedia, reasoning: _reasoning, ...row } = r;
+    const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

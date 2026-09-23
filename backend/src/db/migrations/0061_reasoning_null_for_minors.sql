@@ -1,0 +1,13 @@
+-- REASONING-03 (owner's ruling, 2026-09-22, a privacy invariant, not a
+-- setting): a child's reasoning is never persisted, "not in the row,
+-- not in the trace, not in history, exports or backups, on any budget
+-- setting." conversationHistory.ts's buildTurnRow() now refuses to
+-- write a minor's reasoning going forward (gated on the row's own
+-- minor_speaker), but a row written by a minor between 141eaf86
+-- (2026-09-22, the fix that started storing reasoning for every turn)
+-- and this fix still carries it at rest - the read-side gate hides it
+-- from list()/listConversationTurns(), but a backup (backup.ts's
+-- VACUUM INTO), a raw sqlite read, or a future export that selects the
+-- table directly would not. One-time scrub, no read-time healing
+-- needed after this runs once.
+UPDATE `conversation_turns` SET `reasoning` = NULL WHERE `minor_speaker` = 1 AND `reasoning` IS NOT NULL;

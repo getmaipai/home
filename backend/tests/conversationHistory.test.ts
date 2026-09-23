@@ -412,16 +412,27 @@ describe("list()", () => {
     expect(rows.length).toBe(1);
   });
 
-  // REASONING-02, a review finding: the write-side minor-gate on
-  // TurnValue.reasoning (POST /api/turn, the streaming `done` event) had
-  // no read-side twin, so a child's own tool-call reasoning, hidden live,
-  // reappeared unfiltered the moment this same route (getmaipai/home#64's
-  // own "the chat history adapter's real source") loaded it back.
-  test("a child never sees their own stored reasoning through their history, but an owner/admin still does", async () => {
+  // REASONING-03 (owner's ruling, 2026-09-22, a privacy invariant, not
+  // a setting): retires this test's own old contract ("an owner may
+  // read a child's stored reasoning") - the write side
+  // (conversationHistory.ts's buildTurnRow()) never stores a child's
+  // reasoning at all now, so there is nothing left for even an
+  // owner/admin's read to surface. Parental oversight keeps the
+  // question, the answer, the sources, the executed tools and the
+  // policy decisions (unaffected here). Adult reasoning is unchanged:
+  // still stored, still readable by the speaker, and still invisible
+  // to a second adult (canAccessPerson()'s existing "owner/admin see
+  // nothing of an adult's turns" rule, the test right below this one).
+  test("a child's turn with thinking forced on by a test budget writes an empty reasoning column and no reasoning in stats; an adult's turn still stores it and a second adult cannot read it", async () => {
     const { client, actor: ownerActor } = await owner();
     const child = await addPerson(client, "Bramble", "child");
     const conv = resolveOrCreateConversation(child, "chat");
     if (!conv.ok) throw new Error(conv.error);
+    // "Thinking forced on by a test budget" stands in for here: a
+    // reasoning string reaching logTurn() at all for a minor's turn,
+    // whatever budget or path put it there - buildTurnRow()'s own
+    // `minorSpeaker` gate (computed from the actor, not a client claim)
+    // is what must refuse to store it regardless.
     logTurn(child, "chat", "remember Friday is pizza night", {
       reply: { text: "Got it, I'll remember that." },
       source: "plugin",
@@ -438,11 +449,37 @@ describe("list()", () => {
 
     const asOwner = list(ownerActor, child.id);
     expect(asOwner).toHaveLength(1);
-    expect(asOwner[0]!.reasoning).toBe("the household wants this remembered, so I should call remember");
+    expect(asOwner[0]!.reasoning).toBeUndefined();
 
-    // Presentation-only: the row itself always keeps it.
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-reasoning-1")).get();
-    expect(row?.reasoning).toBe("the household wants this remembered, so I should call remember");
+    expect(row?.reasoning).toBeNull();
+    // No reasoning in stats either: NodeExecution/GenerationInput carry
+    // no raw reasoning text field at all (contract.ts's own shape) -
+    // this row wrote no stats at all, so the check is that nothing
+    // reintroduces the household's words there either.
+    expect(row?.stats ? String(row.stats) : "").not.toContain("household wants this remembered");
+
+    // An adult's own turn still stores its reasoning...
+    const conv2 = resolveOrCreateConversation(ownerActor, "chat");
+    if (!conv2.ok) throw new Error(conv2.error);
+    logTurn(ownerActor, "chat", "remember trash day is Tuesday", {
+      reply: { text: "Got it, I'll remember that." },
+      source: "plugin",
+      plugin_id: "remember",
+      safety: SAFE,
+      conversation_id: conv2.value.id,
+      turn_id: "turn-reasoning-adult",
+      reasoning: "the household wants this remembered, so I should call remember",
+    });
+    const row2 = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-reasoning-adult")).get();
+    expect(row2?.reasoning).toBe("the household wants this remembered, so I should call remember");
+    const asSelf = list(ownerActor, ownerActor.id).find((t) => t.id === "turn-reasoning-adult");
+    expect(asSelf?.reasoning).toBe("the household wants this remembered, so I should call remember");
+
+    // ...but a second adult cannot read it at all (canAccessPerson()'s
+    // own "owner/admin see nothing of an adult's turns" rule).
+    const secondAdult = await addPerson(client, "Marlow", "adult");
+    expect(list(secondAdult, ownerActor.id)).toHaveLength(0);
   });
 
   // 4.14 asks for "a summary and safety flags for a teen's"; no
@@ -1824,9 +1861,9 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     expect(result.value.map((t) => t.id)).toEqual(["turn-tie-2", "turn-tie-3"]);
   });
 
-  // REASONING-02: listConversationTurns()'s own twin of list()'s reader-
-  // gated reasoning test above.
-  test("a child never sees their own stored reasoning here either, but an owner/admin still does", async () => {
+  // REASONING-03: listConversationTurns()'s own twin of list()'s
+  // retired reasoning test above - same reason, same fix.
+  test("a child's turn with thinking forced on by a test budget writes an empty reasoning column and no reasoning in stats; an adult's turn still stores it and a second adult cannot read it", async () => {
     const { client, actor: ownerActor } = await owner();
     const child = await addPerson(client, "Bramble", "child");
     const conv = resolveOrCreateConversation(child, "chat");
@@ -1847,7 +1884,33 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
 
     const asOwner = listConversationTurns(ownerActor, conv.value.id);
     expect(asOwner.ok).toBe(true);
-    if (asOwner.ok) expect(asOwner.value[0]?.reasoning).toBe("the household wants this remembered, so I should call remember");
+    if (asOwner.ok) expect(asOwner.value[0]?.reasoning).toBeUndefined();
+
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-reasoning-2")).get();
+    expect(row?.reasoning).toBeNull();
+    expect(row?.stats ? String(row.stats) : "").not.toContain("household wants this remembered");
+
+    // An adult's own turn still stores its reasoning, readable through
+    // this same function by the speaker...
+    const conv2 = resolveOrCreateConversation(ownerActor, "chat");
+    if (!conv2.ok) throw new Error(conv2.error);
+    logTurn(ownerActor, "chat", "remember trash day is Tuesday", {
+      reply: { text: "Got it, I'll remember that." },
+      source: "plugin",
+      plugin_id: "remember",
+      safety: SAFE,
+      conversation_id: conv2.value.id,
+      turn_id: "turn-reasoning-adult-2",
+      reasoning: "the household wants this remembered, so I should call remember",
+    });
+    const asSelf = listConversationTurns(ownerActor, conv2.value.id);
+    expect(asSelf.ok).toBe(true);
+    if (asSelf.ok) expect(asSelf.value[0]?.reasoning).toBe("the household wants this remembered, so I should call remember");
+
+    // ...but a second adult cannot read the conversation at all.
+    const secondAdult = await addPerson(client, "Marlow", "adult");
+    const asSecondAdult = listConversationTurns(secondAdult, conv2.value.id);
+    expect(asSecondAdult.ok).toBe(false);
   });
 
   // SHELL-02 slice 4: canvas-split's own acceptance ("this slice must

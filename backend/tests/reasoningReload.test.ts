@@ -111,12 +111,19 @@ describe("GET /api/conversations/:id/turns - a fresh turn's own think block neve
     });
   });
 
-  // REASONING-02's own tested contract, extended here: the row itself
-  // always keeps the reasoning it was given, prose or tool-call - the
-  // drop is presentation-only, gated on the READING actor's own band,
-  // never on the row's own minorSpeaker. A parent's oversight of a
-  // child's turn is unaffected by this item.
-  test("an owner/admin still sees a child's own prose reasoning, unlike the child", async () => {
+  // REASONING-03 (owner's ruling, 2026-09-22, a privacy invariant, not
+  // a setting): retires this test's own old contract ("the row itself
+  // always keeps it, the drop is presentation-only, gated on the
+  // READING actor") - conversationHistory.ts's buildTurnRow() now
+  // never stores a child's reasoning at all (`minorSpeaker` checked at
+  // WRITE time), so an owner/admin's read has nothing left to surface
+  // either, even though the stub still "thought" for this turn (a
+  // scripted reply, standing in for the engine ignoring the
+  // server-side thinking-off instruction, or a model that thinks
+  // unprompted). A parent's oversight of a child's turn keeps the
+  // question, the answer, the sources, the executed tools and the
+  // policy decisions - all still stored, none of them this field.
+  test("an owner/admin does not see a child's own prose reasoning either - it was never stored", async () => {
     const { client: ownerClient } = await owner();
     const { client: childClient } = await childMember(ownerClient);
     await withStubReply(THINK_BLOCK_REPLY, async () => {
@@ -126,7 +133,9 @@ describe("GET /api/conversations/:id/turns - a fresh turn's own think block neve
       const asChild = (await (await childClient.get(`/api/conversations/${id}/turns`)).json()) as ReloadedTurn[];
       expect(asChild[0]!.reasoning).toBeUndefined();
       const asOwner = (await (await ownerClient.get(`/api/conversations/${id}/turns`)).json()) as ReloadedTurn[];
-      expect(asOwner[0]!.reasoning).toBe("carry the two");
+      expect(asOwner[0]!.reasoning).toBeUndefined();
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, id)).get();
+      expect(row?.reasoning).toBeNull();
     });
   });
 });

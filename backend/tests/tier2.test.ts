@@ -584,16 +584,21 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     expect(row?.reasoning).toBe("the household wants this remembered, so I should call remember");
   });
 
-  // REASONING-02: the minor/child projection (ageBand.ts's shared band,
-  // the same one dropReasoning already gates the live `reasoning` stream
-  // event on) hides TurnValue.reasoning from the wire, whichever route
-  // returns it - POST /api/turn serializes the whole TurnValue directly
-  // (routes/turn.ts), unlike /stream's own hand-built events, so this is
-  // the one boundary that needs its own HTTP-level test rather than a
-  // streamTurnEvents() unit test. The row keeps it regardless: the drop
-  // is presentation-only, the same posture the `reasoning` event itself
-  // takes for the stored combined text.
-  test("POST /api/turn drops a child's own stored reasoning from the response, but the row still has it", async () => {
+  // REASONING-03 (owner's ruling, 2026-09-22, a privacy invariant, not
+  // a setting): a child's reasoning is never persisted at all, on the
+  // old path too - not just dropped from the response. Supersedes this
+  // test's own old assertion ("the row still has it, the drop is
+  // presentation-only"), which REASONING-02's write-side gate on
+  // conversationHistory.ts's buildTurnRow() now makes untrue on
+  // purpose: `thinking: true` here stands in for "a test budget forces
+  // thinking on" (POST /api/turn's own client field, the belt-and-
+  // braces route gate this same describe block's earlier tests already
+  // prove forces `enable_thinking: false` server-side regardless - this
+  // test is about what gets WRITTEN when a reasoning string somehow
+  // reaches the write path anyway, via the scripted tool-call
+  // reasoning below, never about whether the engine was asked to
+  // think).
+  test("POST /api/turn: a child's turn with thinking forced on writes an empty reasoning column, not just a hidden response field", async () => {
     const client = new TestClient();
     await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const created = await client.post("/api/people", { displayName: "Bramble", role: "child" });
@@ -609,7 +614,13 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     const body = (await res.json()) as { turn_id: string; reasoning?: string };
     expect(body.reasoning).toBeUndefined();
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, body.turn_id)).get();
-    expect(row?.reasoning).toBe("the household wants this remembered, so I should call remember");
+    expect(row?.reasoning).toBeNull();
+    // No reasoning in stats either - NodeExecution/GenerationInput carry
+    // no raw reasoning text field at all (contract.ts's own shape), so
+    // this is a structural guarantee, not a per-row scrub; the stored
+    // stats blob is asserted here not to contain the household's words.
+    const storedStats = row?.stats ? String(row.stats) : "";
+    expect(storedStats).not.toContain("household wants this remembered");
   });
 
   test("runTurn(): every proposed call failing falls back to a second, plain completion - never a fabricated success", async () => {

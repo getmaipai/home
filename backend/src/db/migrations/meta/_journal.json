@@ -428,6 +428,13 @@
       "when": 1790092362475,
       "tag": "0060_conversation_turns_bare",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "6",
+      "when": 1790141628488,
+      "tag": "0061_reasoning_null_for_minors",
+      "breakpoints": true
     }
   ]
 }

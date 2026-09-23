@@ -77,6 +77,12 @@ export const CATALOG: ModelCapabilities[] = [
       model_transitions: true,
       context_tokens: 4000,
       thinking_budget_tokens: 512,
+      // GROUND-01 ("Reasoning is a second output"): a cost control, not
+      // the safety gate - context.ts's decideReasoning() already forces
+      // reasoning off for a minor from the age band alone, so this
+      // false default only saves the tokens a minor's turn would never
+      // see or keep anyway.
+      thinking_for_minors: false,
       deadlines_ms: { model: 20000, tool: 10000, total: 45000 },
       measured: {
         false_call_rate: 0,
