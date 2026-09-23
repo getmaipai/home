@@ -32,7 +32,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/toolt
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
-import { api, ApiError, isOwnerOrAdminRole, readBareCompareStream, type BareCompareTrace, type InstalledPackage, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type InstalledPackage, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
@@ -960,6 +960,22 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   const [thinking, setThinking] = useState(false);
   const thinkingRef = useRef(false);
   thinkingRef.current = thinking;
+  // Safety ruling, 2026-09-22: the same non-minor floor temporary chat
+  // already uses (owner/admin/adult) - a minor's turn request never
+  // carries `thinking` at all, belt and braces alongside the composer
+  // control being hidden below (a client can be edited). A code review
+  // found this is ROLE alone, while the backend's own real gate
+  // (routes/turn.ts's isMinor, ageBand.ts's speakerAgeBand) takes the
+  // STRICTER of role and birthdate - `Roster` never carries birthdate to
+  // the frontend at all (wire.ts's own omission, a deliberate privacy
+  // choice), so an account whose role says non-minor but whose
+  // birthdate makes the real band stricter shows this control with no
+  // effect (the backend still force-sets thinking:false and strips
+  // reasoning regardless - no disclosure risk, just a confusing no-op
+  // toggle). Fixing it for real needs the backend to expose a computed
+  // age_band on the signed-in person's own profile, a wire addition out
+  // of scope here - flagged, not silently accepted as correct.
+  const thinkingAllowed = canHaveTemporaryChatRole(person.role);
   // ADMIN-COMPARE-01 (b): bare mode. Deliberately session-local, never
   // consumed/reset per turn the way `thinking` is - it stays on for
   // every send until the admin turns it off, or the conversation
@@ -1031,7 +1047,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
           // a send. Persisting across a reload still waits on
           // PERSIST-CONV-01 (no backend field yet); this is the
           // session-local half.
-          consumeThinking: () => thinkingRef.current,
+          consumeThinking: () => (thinkingAllowed ? thinkingRef.current : undefined),
           consumeSupersedes: () => undefined,
           consumePackageScope: () => {
             const value = packageScopeRef.current?.id;
@@ -1120,7 +1136,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     },
   });
 
-  return { runtime, banner, thinking, setThinking, bareMode, setBareMode, packageScope, setPackageScope };
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1367,7 +1383,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, bareMode, setBareMode, packageScope, setPackageScope } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1777,7 +1793,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   AssistantActionBarExtra: SourcesActionBarTrigger,
                   AssistantMessageFooterExtra: MessageFooterExtra,
                   Indicator: ChatThinkingIndicator,
-                  ComposerExtra: ComposerThinkingControl,
+                  ComposerExtra: thinkingAllowed ? ComposerThinkingControl : undefined,
                   ComposerAddAttachmentOverride: ComposerAddMenu,
                   ReasoningGroup: NextReasoningGroup,
                 }}

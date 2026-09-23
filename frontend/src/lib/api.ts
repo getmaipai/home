@@ -52,7 +52,7 @@ import type {
   BareCompareTrace,
   TurnStats,
 } from "@maipai/home-backend/src/wire";
-import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
+import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 
 // GET /api/people (routes/people.ts) returns toRoster()'s output directly
@@ -82,7 +82,7 @@ export type { Relationship };
 export type { PackageManifest };
 export type { Issue };
 export type { Conversation };
-export { isOwnerOrAdminRole };
+export { isOwnerOrAdminRole, canHaveTemporaryChatRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
 // imported directly rather than through @/wire.
 export type { SettingsKey };

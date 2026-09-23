@@ -126,8 +126,21 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   if (body.temporary === true && !canHaveTemporaryChat(actor)) {
     return c.json({ error: "temporary chat is not available for minors" }, 403);
   }
+  // REASONING-03 (safety ruling, 2026-09-22): a minor's turn never even
+  // asks the model to think, belt and braces alongside the composer's
+  // own control being hidden for a minor (NextChatPage.tsx) - a client
+  // can be edited, so `body.thinking` is never trusted for a minor
+  // regardless of what it claims. Reasoning is a disclosure surface
+  // built for typed chat's own Reasoning Element - never sent on a
+  // surface that has no such affordance (voice/robot/tv/phone), adult
+  // actor or not; a review caught the first draft only skipping the
+  // MODEL for a minor and leaving a non-chat surface to spend the
+  // tokens and latency on a think block this same gate discards below
+  // anyway.
+  const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
+  const dropReasoning = isMinor || surface !== "chat";
   const result = await runTurn(actor, surface, body.text ?? "", {
-    thinking: body.thinking,
+    thinking: dropReasoning ? false : body.thinking,
     conversationId: body.conversation_id,
     supersedes: body.supersedes,
     temporary: body.temporary,
@@ -139,8 +152,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   // REASONING-02: this blocking route serializes the whole TurnValue
   // (unlike /stream's own hand-built events), so a minor's reasoning
   // field is stripped here rather than at a shared boundary - the same
-  // speakerAgeBand() gate the streaming route's own dropReasoning uses.
-  const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
+  // dropReasoning gate the streaming route's own version uses.
   return c.json(dropReasoning && result.value.reasoning !== undefined ? { ...result.value, reasoning: undefined } : result.value);
 });
 
@@ -555,13 +567,23 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   if (body.temporary === true && !canHaveTemporaryChat(actor)) {
     return c.json({ error: "temporary chat is not available for minors" }, 403);
   }
+  // REASONING-03 (safety ruling, 2026-09-22): same belt-and-braces as
+  // the non-stream route above - a minor's turn never asks the model to
+  // think, regardless of what `body.thinking` claims, and neither does
+  // any turn on a surface with no Reasoning Element to disclose it in
+  // (voice/robot/tv/phone) - a review caught the first draft only
+  // skipping the model for a minor, leaving a non-chat surface to spend
+  // the tokens and latency on a think block dropReasoning discards
+  // below anyway.
+  const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
+  const dropReasoning = isMinor || surface !== "chat";
   let result: TurnStreamResult;
   try {
     result =
       body.bare === true
         ? await runBareTurnStream(actor, body.text ?? "", body.conversation_id, abortController.signal)
         : await runTurnStream(actor, surface, body.text ?? "", {
-            thinking: body.thinking,
+            thinking: dropReasoning ? false : body.thinking,
             conversationId: body.conversation_id,
             supersedes: body.supersedes,
             continuation: body.continuation_text === undefined ? undefined : { fromTurnId: body.continuation_of, assistantText: body.continuation_text },
@@ -611,7 +633,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     // excluded teen and could disagree with every other minor-gated
     // decision on this same turn (host.ts's chat-models gate, turnEngine.ts's
     // withholdSensitive/mayDefer, composer.ts's child-only projection).
-    dropReasoning: speakerAgeBand(actor, new Date()) !== "adult",
+    dropReasoning,
     conversationId: result.conversationId,
     turnId: result.turnId,
     controller: abortController,

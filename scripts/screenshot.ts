@@ -314,6 +314,7 @@ const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
+const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
 
 interface RouteSpec {
   slug: string;
@@ -2388,6 +2389,56 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
   }
 }
 
+/** Safety ruling, 2026-09-22: the composer's thinking-mode control
+ * (RESP-04) is hidden entirely for a minor, never just disabled - the
+ * model trigger (`[data-slot="composer-model-trigger"]`) must be absent
+ * from the DOM. Signs in as Nova, `seedHousehold()`'s own seeded child,
+ * the same auth/select pattern `flagTurnsAsMarlow()` already uses for
+ * a different household member - both viewports (desktop 1440, phone
+ * 390) the coordinator's own finding asked for, since this is a layout
+ * claim (nothing shifts into the trigger's place oddly), not just a
+ * presence check. */
+async function captureNextChatChildComposerReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextChatChildComposerReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const nova = people.find((p) => p.display_name === "Nova");
+  if (!nova) throw new Error("captureNextChatChildComposerReview: seedHousehold() didn't create Nova");
+  const novaSelect = await fetch(`${BASE_URL}/api/auth/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: nova.id }),
+  });
+  if (!novaSelect.ok) throw new Error(`captureNextChatChildComposerReview: signing in as Nova failed: ${novaSelect.status}`);
+  const novaSession = novaSelect.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!novaSession) throw new Error("captureNextChatChildComposerReview: Nova's own sign-in carried no session cookie");
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const context = await newContext(browser, viewport, "dark", novaSession);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      await settleAnimations(page);
+      const path = join(outDir, `next-chat-child-composer-${viewport.width}-dark.png`);
+      await page.screenshot({ path, fullPage: slug === "phone" });
+      console.log(`Wrote ${path}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 /** SHELL-02 slice 4's own stated acceptance ("a real 'write me a short
  * note about X' turn... the deterministic capture"): "pizza night" is
  * the stub model's own scripted `scriptedToolCalls` branch (main()'s
@@ -3373,8 +3424,12 @@ async function main() {
       await captureNextSignInReview(browser, sessionValue);
     }
 
-    if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview) {
+    if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatChildComposerReview) {
       await captureNextChatComposerReview(browser, sessionValue);
+    }
+
+    if (nextChatChildComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview) {
+      await captureNextChatChildComposerReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

@@ -49,7 +49,10 @@ export interface ChatModelAdapterDeps {
   // to hang that reset off.
   onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
   onSpeechError?(): void;
-  consumeThinking(): boolean;
+  // undefined for a minor (safety ruling, 2026-09-22): the turn request
+  // omits `thinking` entirely rather than sending `false`, so a minor's
+  // request looks identical to a surface that never offers the control.
+  consumeThinking(): boolean | undefined;
   // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - unlike
   // `consumeThinking()`, bare mode is meant to stay on across every send
   // in the conversation until the admin turns it off themselves

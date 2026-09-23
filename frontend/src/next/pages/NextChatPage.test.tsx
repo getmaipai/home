@@ -64,7 +64,7 @@ function renderPage(ui: ReactElement) {
   );
 }
 
-function makePerson(): Roster {
+function makePerson(overrides: Partial<Roster> = {}): Roster {
   return {
     id: "person-abc123",
     display_name: "Nova",
@@ -81,6 +81,7 @@ function makePerson(): Roster {
     memorialized_at: null,
     hlc: "1788000000000:0:test",
     hasSecret: true,
+    ...overrides,
   };
 }
 
@@ -1416,6 +1417,48 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     }
   });
 
+  // Safety ruling, 2026-09-22: reasoning is a disclosure surface, so a
+  // minor never even sees the control that asks for it - belt and
+  // braces alongside the backend's own REASONING-03 gate
+  // (routes/turn.ts: thinking forced off for a minor regardless of what
+  // the request claims).
+  test("a child's chat renders no thinking control, and its turn request has no thinking field", async () => {
+    const restore = stubMultiTurnFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson({ role: "child" })} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      expect(trigger()).toBeNull();
+      fireEvent.change(await view.findByLabelText("Message input"), { target: { value: "hi" } });
+      const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+      await waitFor(() => expect(send.disabled).toBe(false));
+      fireEvent.click(send);
+      await view.findByText("Reply 1.");
+      const bodies = turnRequestBodies();
+      expect(bodies).toHaveLength(1);
+      expect("thinking" in bodies[0]!).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test("an adult's chat renders it", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      expect(trigger()).not.toBeNull();
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
