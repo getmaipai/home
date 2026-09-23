@@ -401,12 +401,15 @@ function examplesBlock(examples: readonly string[] | undefined): string {
  * sentences it holds. So the written-adult prompt carries no persona
  * voice prose on this tier, full stop, until a prebuilt mechanism
  * exists to vary voice without spending prompt sentences on it
- * (PERSONA-STEER-01, org principle 6: activation steering over
- * prompt prose). WRITTEN_VOICE_PROSE below is that off switch - the
- * written twins above (FORMALITY_FRAGMENT_WRITTEN and the rest) stay
- * declared and exported (WRITTEN-VOICE-TIER-01 turns this on once a
- * bigger tier measures them clearing the bar), but composePersonaPrompt
- * never reaches them while it's false. */
+ * (EVAL-03, org principle 6: activation steering over prompt prose -
+ * merged from PERSONA-STEER-01, TRUEUP-01, 2026-09-23).
+ * WRITTEN_VOICE_PROSE below is that off switch - the written twins
+ * above (FORMALITY_FRAGMENT_WRITTEN and the rest) stay declared and
+ * exported, kept as the designed fallback (owner, 2026-09-23 evening:
+ * offered per tier once the primary, EVAL-03's control vector, has
+ * been tested - never a second pass ahead of it). WRITTEN-VOICE-TIER-01
+ * turns this on once a bigger tier measures them clearing the bar, but
+ * composePersonaPrompt never reaches them while it's false. */
 export const WRITTEN_VOICE_PROSE = false;
 
 export function composePersonaPrompt(persona: Persona, surfaceClass: SurfaceClass = "spoken"): string {

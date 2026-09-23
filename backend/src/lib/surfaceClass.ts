@@ -34,3 +34,18 @@ export function surfaceClassOf(surface: Surface, spoken = false): SurfaceClass {
 export function isWrittenAdultTurn(surfaceClass: SurfaceClass | undefined, ageBand: TurnSignal["age_band"]): boolean {
   return (surfaceClass ?? "spoken") === "written" && ageBand === "adult";
 }
+
+/** TRUEUP-01 (a code review, 2026-09-23): the one place `contextToMessages()`
+ * (messages.ts) and the phrasing round (nodes/model.ts) both resolve a
+ * turn's own prompt-facing surface class - "written" only for the reply
+ * floor's own written-adult turn, "spoken" otherwise (a minor's or a
+ * teen's chat turn included) - so the prompt never promises a length or
+ * a written-class instruction the token budget or the age band can't
+ * back. Both call sites re-derived this identical ternary inline before
+ * this helper existed, each with its own comment claiming "one
+ * definition" while the code itself had two - a review caught the gap
+ * between the claim and the code, not a live bug (both copies agreed),
+ * but exactly the class of drift this item exists to prevent. */
+export function promptSurfaceClassFor(surfaceClass: SurfaceClass | undefined, ageBand: TurnSignal["age_band"]): SurfaceClass {
+  return isWrittenAdultTurn(surfaceClass, ageBand) ? "written" : "spoken";
+}

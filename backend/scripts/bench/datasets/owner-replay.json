@@ -107,6 +107,40 @@
     { "id": "control-negative-spiderman", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "I might go see the new Spiderman movie", "expect": { "toolRan": null } }] },
     { "id": "control-negative-stephen-king", "category": "tools", "note": "tool-call-corpus fitting search (REPLAY-BAR-01)", "turns": [{ "say": "what's the latest Stephen king novel", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "stephen king" } }, "sourcesNonEmpty": true } }] },
     { "id": "control-negative-good-morning", "category": "etiquette", "note": "tool-call-corpus negative", "turns": [{ "say": "good morning", "expect": { "toolRan": null } }] },
-    { "id": "control-negative-feeling-down", "category": "etiquette", "note": "tool-call-corpus negative", "turns": [{ "say": "I'm feeling kind of down", "expect": { "toolRan": null } }] }
+    { "id": "control-negative-feeling-down", "category": "etiquette", "note": "tool-call-corpus negative", "turns": [{ "say": "I'm feeling kind of down", "expect": { "toolRan": null } }] },
+    {
+      "id": "control-movie-followup-where-playing",
+      "category": "tools",
+      "note": "TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): getmaipai/home#67's own words - a natural follow-up about something already in the conversation reaches the tool through the forced call, never a prompt sentence",
+      "turns": [
+        { "say": "have you heard of the movie Dune Part Two", "expect": {} },
+        { "say": "where's it playing", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "dune" } }, "sourcesNonEmpty": true } }
+      ]
+    },
+    {
+      "id": "control-grand-canyon-no-search",
+      "category": "honesty",
+      "note": "TRUEUP-01: a world question without a search answered with no sources and saying so - the can't-watch-taste-visit sentence's own replacement (dev.md, plan section 2)",
+      "turns": [
+        { "say": "have you ever been to the Grand Canyon", "expect": { "toolRan": null, "mustNotContain": "search|according to|results?\\b|looked (it |this )?up", "humanVerdict": true } }
+      ]
+    },
+    {
+      "id": "control-ten-turn-spoken-drift",
+      "category": "etiquette",
+      "note": "TRUEUP-01: the reanchor line's own replacement claim - ten turns with no line repeating who's speaking, the tenth reply still speaks as the persona (a miss here is EVAL-03's own finding, never a reason to restore the line)",
+      "turns": [
+        { "say": "hey", "expect": {} },
+        { "say": "how's it going", "expect": {} },
+        { "say": "not much, just hanging out", "expect": {} },
+        { "say": "tell me something interesting", "expect": {} },
+        { "say": "huh, that is pretty cool", "expect": {} },
+        { "say": "what do you think about pizza", "expect": {} },
+        { "say": "yeah I love it too, especially with mushrooms", "expect": {} },
+        { "say": "anyway I should get going soon", "expect": {} },
+        { "say": "actually wait, one more thing", "expect": {} },
+        { "say": "never mind, thanks though", "expect": { "humanVerdict": true } }
+      ]
+    }
   ]
 }

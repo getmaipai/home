@@ -6,7 +6,7 @@ import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/lib/llmSupervisor";
-import { buildStablePrefix, ordinaryToolSpecs } from "@/lib/turnEngine";
+import { buildOldPathStablePrefix, ordinaryToolSpecs } from "@/lib/turnEngine";
 import { toToolDefinition } from "@/lib/llm";
 import { getEmbedClient, getEmbedLivePid } from "@/lib/embedSupervisor";
 import { getTtsClient, getTtsLivePid } from "@/lib/ttsSupervisor";
@@ -52,7 +52,11 @@ try {
 // FAST-01: set up the warmup prompt provider for cache priming after engine
 // spawn. ROUTE-02: with the ordinary tool block, the same one every
 // conversation-shaped turn sends, so the primed prefix is the one reused.
-setWarmupPrompt(() => ({ system: buildStablePrefix(), tools: ordinaryToolSpecs().map(toToolDefinition) }));
+// TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): this primes the OLD
+// path's own cache (ordinaryToolSpecs() is that path's own fixed tool
+// list), so it needs buildOldPathStablePrefix() specifically -
+// buildStablePrefix() itself now serves the new path's shrunk suffix.
+setWarmupPrompt(() => ({ system: buildOldPathStablePrefix(), tools: ordinaryToolSpecs().map(toToolDefinition) }));
 
 // COR-6 (code review, 2026-09-06): before anything below this line can
 // possibly write a fresh hlc, recover monotonicity from every table that

@@ -222,7 +222,16 @@ export function startFakeSearxng(): FakeSearxng {
                   ? [
                       { title: "Lantern Bay (cartoon)", url: `https://example.com/${slug}`, content: "The old Lantern Bay cartoon's horse is called Copper; the show ran for six seasons." },
                     ]
-                  : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
+                  : // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md, the
+                    // coordinator's own ruling): "mariners" fell into the
+                    // generic catch-all below, a placeholder with no real
+                    // content - a fixture gap named directly (fix the
+                    // fixture, not the code), since search-mariners-game's
+                    // own row needs real content to answer a forced-search
+                    // turn from.
+                    /mariners/i.test(q)
+                    ? [{ title: "Mariners win 6-3", url: `https://example.com/${slug}`, content: "The Seattle Mariners won last night's game 6-3, extending their winning streak to four games." }]
+                    : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
       return Response.json({ query: q, results });
     },
   });

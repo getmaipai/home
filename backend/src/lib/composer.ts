@@ -825,13 +825,21 @@ export function questionOf(outcomes: readonly ToolExecutionOutcome[]): string | 
  * written plan line already asks for. PHRASE-01 (dev.md "U6 rerun 2
  * ruling") is what actually calls this with "written" on the new
  * path's own phrasing round - this function only carries the split. */
+// A quoted question or utterance gets embedded verbatim in a double-
+// quoted prompt sentence; this is the one escape both call sites need
+// (double quotes to single) - a rule-budget review (2026-09-23) caught
+// compositionInstruction's own written/spoken split duplicating it
+// into both branches, and TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md)
+// adding phrasingInstruction's own copy pushed the file over its
+// unmarked-regex-literal baseline a second time - one string
+// operation, shared, never a second copy of the same escape.
+function quoteForPrompt(text: string): string {
+  return text.replace(/"/g, "'");
+}
+
 export function compositionInstruction(input: Pick<ComposerInput, "constraints" | "moves" | "ageBand">, hints: readonly string[], question: string | null = null, surfaceClass: SurfaceClass = "spoken"): string {
-  // Computed once, used by whichever branch below quotes it back - a
-  // rule-budget review (2026-09-23) caught the written/spoken split
-  // duplicating this same escape into both branches, pushing composer.ts
-  // over its unmarked-regex-literal baseline for no reason: one string
-  // operation, not two copies of it.
-  const quotedQuestion = question ? question.replace(/"/g, "'") : null;
+  // Computed once, used by whichever branch below quotes it back.
+  const quotedQuestion = question ? quoteForPrompt(question) : null;
   const answerLine =
     surfaceClass === "written"
       ? quotedQuestion
@@ -899,10 +907,20 @@ export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[]): L
  * embellishments `compositionInstruction` carries - out of this
  * substance's own stated scope, not silently dropped: a real gap to
  * revisit if it turns out to matter, not assumed away here. */
-export function phrasingInstruction(surfaceClass: SurfaceClass): string {
+// TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md, the coordinator's own
+// ruling after the #67 sentence was found masking this defect): the
+// phrasing round's question sits several messages up, behind an
+// assistant tool call and the tool results, so an instruction that
+// never names what to answer binds to the nearest content the model
+// can talk about instead - the identity line, producing a self-
+// description. compositionInstruction() above always carried its own
+// referent ("Answer this question of mine ... : '<question>'");
+// phrasingInstruction's own first cut dropped it. This one doesn't.
+export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: string): string {
   const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences";
+  const quotedUtterance = quoteForPrompt(utterance);
   return [
-    `Answer completely from what you know, ${lengthClause}; use the results above as support.`,
+    `Answer this question of mine completely from what you know, ${lengthClause}; use the results above as support: "${quotedUtterance}".`,
     "Any specific current fact - who holds an office, a date, a number, a price, a score, what is latest - comes from the results or is left out.",
     "Where the results contradict what you know, the results win.",
     "Where the results do not bear on the question, answer from what you know and say nothing about searching.",

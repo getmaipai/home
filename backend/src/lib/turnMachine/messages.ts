@@ -26,8 +26,8 @@ import type { Persona } from "@/lib/persona";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SurfaceClass } from "@/lib/surfaceClass";
-import { isWrittenAdultTurn } from "@/lib/surfaceClass";
-import { buildStablePrefix, companionReanchorLine } from "@/lib/turnEngine";
+import { promptSurfaceClassFor } from "@/lib/surfaceClass";
+import { buildStablePrefix } from "@/lib/turnEngine";
 import { planLine } from "@/lib/register";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
@@ -166,7 +166,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // still fell through to the small, age-clamped word budget. Collapsed
   // to "spoken" for any turn that isn't a written, adult one, so the
   // prompt never promises a length the token budget can't back.
-  const promptSurfaceClass: SurfaceClass = isWrittenAdultTurn(surfaceClass, plan.age_band) ? "written" : "spoken";
+  const promptSurfaceClass: SurfaceClass = promptSurfaceClassFor(surfaceClass, plan.age_band);
 
   const messages: LlmMessage[] = [];
   const stableContextLines = stable.length > 0 ? `\n\n${stable.map(renderContextLine).join("\n")}` : "";
@@ -211,16 +211,18 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // (clock, a tool round's own result) follows as a plain labeled
   // line, unchanged from before this item.
   const otherVolatileLines = restVolatile.length > 0 ? `${restVolatile.map(renderContextLine).join("\n")}\n\n` : "";
-  // A review caught this file's first cut carrying the identity line
-  // once (the stable prefix) but never again - the old path's own
-  // reanchorSection (companionReanchorLine(), turnEngine.ts) exists
-  // specifically because legacy measured real persona-voice drift after
-  // about eight turns with nothing repeating who's speaking. Reused
-  // verbatim here too, every turn, the same volatile-zone role it
-  // already has in the old path. Spoken only, unchanged: the written
-  // class dropped both above.
-  const reanchor = companionReanchorLine(persona).trim();
-  messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}${reanchor}\n\nHow to answer this one: ${planLine(plan, signal, promptSurfaceClass)}` });
+  // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): the reanchor line
+  // (companionReanchorLine(), "Remember: you are X.") leaves the spoken
+  // class too - no design ever put it here (the old path's own
+  // reanchorSection is a Session C plan step, not a design, per the
+  // verdict table), and it is the confirmed cause of the "you" misread
+  // (dev.md, PREFIX-ROLE-01's arm 2: arm 1, the plan line alone dropped,
+  // measured 0 of 5 misreads where arm 2, the reanchor folded ahead of
+  // the question, reproduced it). The written class dropped it earlier
+  // in this function, before this record; drift over ten spoken turns
+  // becomes a replay row (TRUEUP-01's own tests), never a line back in
+  // the prompt.
+  messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}How to answer this one: ${planLine(plan, signal, promptSurfaceClass)}` });
   messages.push({ role: "user", content: utterance });
   return messages;
 }

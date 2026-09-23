@@ -18,7 +18,9 @@ import {
   StreamSafetyRefusal,
   buildSystemPrompt,
   buildStablePrefix,
+  buildOldPathStablePrefix,
   stableSuffixFor,
+  PRIVACY_SENTENCE,
   STABLE_SYSTEM_SUFFIX_SENTENCES,
   STABLE_SYSTEM_SUFFIX,
   selectPageLinkFor,
@@ -2301,34 +2303,60 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
   });
 
   // Issue #15 (session-f-platform-and-trust.md step 3): llmSupervisor.ts's
-  // engine warm-up primes a freshly-spawned chat backend's prefix cache
-  // with buildStablePrefix()'s own output - the chat-latency win only
-  // exists if that's byte-for-byte identical to what buildSystemPrompt()
-  // actually sends on a real turn. Since buildSystemPrompt() calls
-  // buildStablePrefix() itself (never a second, hand-copied
-  // implementation), this can never drift by construction - but the
-  // point of a test here is to fail loudly if a future edit changes that
-  // and reintroduces the drift, not to prove something already
-  // structurally guaranteed.
-  test("buildStablePrefix() is a literal prefix of buildSystemPrompt()'s own output, for the same inputs", () => {
+  // engine warm-up primes a freshly-spawned chat backend's prefix cache -
+  // the chat-latency win only exists if that's byte-for-byte identical
+  // to what buildSystemPrompt() actually sends on a real turn.
+  // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): buildStablePrefix()
+  // now serves the new path only, so buildOldPathStablePrefix() is the
+  // function this invariant is about - buildSystemPrompt() calls it via
+  // buildPromptParts() (never a second, hand-copied implementation), so
+  // this can never drift by construction, but the point of a test here
+  // is to fail loudly if a future edit changes that and reintroduces the
+  // drift, not to prove something already structurally guaranteed.
+  test("buildOldPathStablePrefix() is a literal prefix of buildSystemPrompt()'s own output, for the same inputs", () => {
     const persona = resolvePersona("tutor");
-    const stable = buildStablePrefix(persona);
+    const stable = buildOldPathStablePrefix(persona);
     const full = buildSystemPrompt(fakeActor(), "hi there", [], undefined, persona);
     expect(full.startsWith(stable)).toBe(true);
   });
 
-  // PREFIX-CLASS-01 (dev.md "PARITY-BISECT-04: arms e and f, and the
-  // ruling"): the acceptance test named in the row itself - the spoken
-  // prefix stays exactly what it was before this item, the written
-  // prefix contains none of the three phrases the row calls out by name.
-  describe("buildStablePrefix() written class (PREFIX-CLASS-01)", () => {
-    test("the spoken prefix for the default persona still carries every phrase it had before this item - unchanged", () => {
+  // TRUEUP-01: the old path's own spoken stable prefix is frozen, byte-
+  // identical to before this item - captured live from buildStablePrefix()
+  // (its own pre-TRUEUP-01 spoken branch) before the edit, now asserted
+  // against buildOldPathStablePrefix() instead, the function that carries
+  // that frozen text forward.
+  describe("buildOldPathStablePrefix() stays byte-identical to before TRUEUP-01", () => {
+    test("the tutor persona's spoken prefix is unchanged", () => {
+      expect(buildOldPathStablePrefix(resolvePersona("tutor"))).toBe(
+        `You are The Tutor, a private, self-hosted AI assistant for this household. ${STABLE_SYSTEM_SUFFIX} Speak in complete, well-formed sentences without contractions, the way a careful professional would in conversation: polite and precise, never stiff or robotic. You may use precise, subject-specific vocabulary and more nuanced sentence structure when it genuinely helps explain something well. Keep replies short, usually just a few sentences: answer the question directly, and offer one natural follow-up only if it would genuinely help, never as a matter of habit. Keep your wording clean and direct, without casual filler phrases. Some examples of how you talk:\n- That is a fair question. The short answer is yes, though the reasoning behind it is worth walking through.\n- Let me put that a bit more precisely: the two aren't quite the same thing, and the difference matters here.\n- You're on the right track. One small correction would make this exactly right.\n- That's a well-formed question. Here is the clearest way to think about it. Skip detail nobody asked for (exact decimals, timezones, a full date when only the day matters) and round the way people round in conversation ("about thirty", "low seventies") unless they asked for the exact number or it genuinely matters, like money or an appointment time. Talk about anything uncertain or secondhand as uncertain, never as flat fact: forecasts, predictions, and guesses get hedged ("it's supposed to", "I think", "probably"), not asserted outright. Say things the way a person talking out loud would, not the way a screen would print them: a time is "it's three forty-five," never "the current time is 3:45 PM"; a yes/no question gets "yep" or "nope," never "the answer to your question is yes"; a short list gets said as a sentence ("you've got milk, eggs, and bread"), never read back with "the following items:" or bullet points.`,
+      );
+    });
+
+    test("the default persona's spoken prefix is unchanged", () => {
+      expect(buildOldPathStablePrefix(DEFAULT_PERSONA)).toBe(
+        `You are MaiPai, a private, self-hosted AI assistant for this household. ${STABLE_SYSTEM_SUFFIX} Talk the way a person actually talks in a relaxed conversation, not like a written page being read aloud: use contractions (it's, you're, don't) and keep your phrasing easygoing. Use plain, everyday language: no unexplained jargon, no unnecessarily complex sentence structure. Keep replies to a sentence or two, and answer the exact question then stop: no restating it back, no "let me know if you need anything else," no follow-up question tacked on. Keep your wording clean and direct, without casual filler phrases. Some examples of how you talk:\n- Yep, that works, see you at six then.\n- Sounds like a long day, put your feet up.\n- Fair point, I'd go with the second one and keep it simple.\n- Nice, tell me how it goes on Saturday. Skip detail nobody asked for (exact decimals, timezones, a full date when only the day matters) and round the way people round in conversation ("about thirty", "low seventies") unless they asked for the exact number or it genuinely matters, like money or an appointment time. Talk about anything uncertain or secondhand as uncertain, never as flat fact: forecasts, predictions, and guesses get hedged ("it's supposed to", "I think", "probably"), not asserted outright. Say things the way a person talking out loud would, not the way a screen would print them: a time is "it's three forty-five," never "the current time is 3:45 PM"; a yes/no question gets "yep" or "nope," never "the answer to your question is yes"; a short list gets said as a sentence ("you've got milk, eggs, and bread"), never read back with "the following items:" or bullet points.`,
+      );
+    });
+  });
+
+  // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md, the verdict table):
+  // buildStablePrefix() itself now serves the new path only, both
+  // classes - the spoken class's own suffix shrinks from
+  // STABLE_SYSTEM_SUFFIX's six sentences to stableSuffixFor("spoken")'s
+  // one, superseding PREFIX-CLASS-01's own written-only carve-out.
+  describe("buildStablePrefix() (new path, TRUEUP-01)", () => {
+    test("the spoken prefix carries only the privacy sentence, not the other five, but keeps the spoken persona composition", () => {
       const spoken = buildStablePrefix(DEFAULT_PERSONA);
-      expect(spoken).toContain("Be warm, concise and honest");
-      expect(spoken).toContain("the way a friend would");
+      expect(spoken).toContain(PRIVACY_SENTENCE);
+      expect(spoken).not.toContain("Be warm, concise and honest");
+      expect(spoken).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[1]!);
+      expect(spoken).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[2]!);
+      expect(spoken).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[3]!);
+      expect(spoken).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[4]!);
+      expect(spoken).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[5]!);
+      // the designed fallback stays reachable on spoken until EVAL-03:
       expect(spoken).toContain("Talk the way a person actually talks in a relaxed conversation");
       expect(spoken).toContain("Keep replies to a sentence or two");
-      expect(spoken).toContain(STABLE_SYSTEM_SUFFIX);
     });
 
     test('the written prefix contains no "concise", no "relaxed message", no "the way a friend would"', () => {
@@ -2338,14 +2366,10 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
       expect(written).not.toContain("the way a friend would");
     });
 
-    test("the written prefix carries only the three surviving suffix sentences, not the other three", () => {
+    test("the written prefix carries only the privacy sentence, none of the other five", () => {
       const written = buildStablePrefix(DEFAULT_PERSONA, "written");
-      expect(written).toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[1]!);
-      expect(written).toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[2]!);
-      expect(written).toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[3]!);
-      expect(written).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[0]!);
-      expect(written).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[4]!);
-      expect(written).not.toContain(STABLE_SYSTEM_SUFFIX_SENTENCES[5]!);
+      expect(written).toContain(PRIVACY_SENTENCE);
+      STABLE_SYSTEM_SUFFIX_SENTENCES.forEach((sentence) => expect(written).not.toContain(sentence));
     });
 
     test("carries the real identityLine(), not a rewritten one, and no floor sentence", () => {
@@ -2356,23 +2380,15 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
     });
   });
 
-  describe("stableSuffixFor() (PREFIX-CLASS-01)", () => {
-    test('"spoken" returns STABLE_SYSTEM_SUFFIX itself, byte-identical - never a rebuilt copy', () => {
-      expect(stableSuffixFor("spoken")).toBe(STABLE_SYSTEM_SUFFIX);
+  describe("stableSuffixFor() (TRUEUP-01)", () => {
+    test("both classes return the privacy sentence alone, byte-identical", () => {
+      expect(stableSuffixFor("spoken")).toBe(PRIVACY_SENTENCE);
+      expect(stableSuffixFor("written")).toBe(PRIVACY_SENTENCE);
     });
 
-    test('"written" returns exactly the three surviving sentences, in order, joined the same way STABLE_SYSTEM_SUFFIX is', () => {
-      expect(stableSuffixFor("written")).toBe([STABLE_SYSTEM_SUFFIX_SENTENCES[1], STABLE_SYSTEM_SUFFIX_SENTENCES[2], STABLE_SYSTEM_SUFFIX_SENTENCES[3]].join(" "));
-    });
-
-    test("every suffix sentence is reachable on spoken; only sentences 1, 2 and 3 are also reachable on written - none of the six is reachable on neither", () => {
-      const spoken = stableSuffixFor("spoken");
-      const written = stableSuffixFor("written");
-      STABLE_SYSTEM_SUFFIX_SENTENCES.forEach((sentence, i) => {
-        expect(spoken).toContain(sentence); // every sentence: spoken
-        const alsoWritten = written.includes(sentence);
-        expect(alsoWritten).toBe([1, 2, 3].includes(i)); // exactly indices 1,2,3: both
-      });
+    test("the privacy sentence is exactly the surviving clause of STABLE_SYSTEM_SUFFIX_SENTENCES[0], never the whole sentence", () => {
+      expect(STABLE_SYSTEM_SUFFIX_SENTENCES[0]).toContain(PRIVACY_SENTENCE);
+      expect(STABLE_SYSTEM_SUFFIX_SENTENCES[0]).not.toBe(PRIVACY_SENTENCE);
     });
   });
 

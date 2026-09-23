@@ -11,20 +11,26 @@
 // plan, signal and surfaceClass are real inputs now, not "context
 // alone" - buildStablePrefix(persona) always opens the stable message
 // (identity, composePersonaPrompt, the two policies) and the volatile
-// one always closes with companionReanchorLine() then planLine(), so
-// there is no longer a "no stable message"/"no volatile message" case
-// at all. The reanchor line was a review's own finding on the first
-// cut: the old path resends it every turn specifically because legacy
-// measured real persona-voice drift after about eight turns with
-// nothing repeating who's speaking - carrying the identity line once,
-// in the cached stable prefix, doesn't fight that on its own.
+// one always closes with planLine(), so there is no longer a "no
+// stable message"/"no volatile message" case at all.
+//
+// TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): a review's own
+// finding on U4b's first cut added companionReanchorLine() ("Remember:
+// you are X.") to the volatile message every turn, reasoning that the
+// old path resends it specifically because legacy measured real
+// persona-voice drift after about eight turns - but no design ever put
+// it here (a Session C plan step, never a design, per TRUEUP-01's own
+// verdict table), and it turned out to be the confirmed cause of the
+// "you" misread (dev.md, PREFIX-ROLE-01's arm 2). It leaves both
+// classes; a ten-turn drift row in the replay set watches for the real
+// drift it used to guard against.
 import { describe, expect, test } from "bun:test";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ContextItem } from "@/lib/turnMachine/contract";
 import { fallbackSignal } from "@/lib/turnSignal";
 import { planFor, type PlanInput } from "@/lib/register";
-import { buildStablePrefix, companionReanchorLine } from "@/lib/turnEngine";
+import { buildStablePrefix, companionReanchorLine, identityLine, PRIVACY_SENTENCE } from "@/lib/turnEngine";
 import { DEFAULT_PERSONA } from "@/lib/persona";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
@@ -65,7 +71,7 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
     const context: ContextItem[] = [item("memory", "Sage likes tea.", "memory-1"), item("clock", "Monday 9:00 AM")];
     const out = messages(context);
     expect(out[0]).toEqual({ role: "system", content: STABLE_PREFIX });
-    expect(out[1]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n[remembered] Sage likes tea.\n${MEMORY_TRUST_REMINDER}\n\n[clock] Monday 9:00 AM\n\n${REANCHOR}\n\nHow to answer this one:`)).toBe(true);
+    expect(out[1]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n[remembered] Sage likes tea.\n${MEMORY_TRUST_REMINDER}\n\n[clock] Monday 9:00 AM\n\nHow to answer this one:`)).toBe(true);
     expect(out[2]).toEqual({ role: "user", content: "what's the weather" });
   });
 
@@ -94,7 +100,7 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
     const out = messages(context);
     expect(out.map((m) => m.role)).toEqual(["system", "user", "assistant", "system", "user"]);
     expect(out[0]?.content).toBe(`${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage`);
-    expect(out[3]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n[remembered] Sage likes tea.\n${MEMORY_TRUST_REMINDER}\n\n[clock] Monday 9:00 AM\n\n${REANCHOR}\n\nHow to answer this one:`)).toBe(true);
+    expect(out[3]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n[remembered] Sage likes tea.\n${MEMORY_TRUST_REMINDER}\n\n[clock] Monday 9:00 AM\n\nHow to answer this one:`)).toBe(true);
     expect(out[4]).toEqual({ role: "user", content: "what's the weather" });
   });
 
@@ -123,14 +129,14 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
 
   // CONTEXT-RECALL-01: no memory (or clock, or any other) item at all
   // still gets the framed "nothing matched" block - the memory block
-  // always leads the volatile message, ahead of the reanchor and plan
-  // lines U4b added.
-  test("no volatile context items: the volatile message is still the reanchor line and the plan line, never empty or skipped", () => {
+  // always leads the volatile message, ahead of the plan line U4b
+  // added (TRUEUP-01 dropped the reanchor line that used to follow it).
+  test("no volatile context items: the volatile message is still the plan line, never empty or skipped", () => {
     const context: ContextItem[] = [item("profile", "Sage's profile: likes hiking.")];
     const out = messages(context, "hi");
     expect(out[0]).toEqual({ role: "system", content: `${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.` });
     expect(out[1]).toEqual({ role: "system", content: expect.stringContaining("How to answer this one:") });
-    expect(out[1]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\n${REANCHOR}`)).toBe(true);
+    expect(out[1]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\nHow to answer this one:`)).toBe(true);
     expect(out[2]).toEqual({ role: "user", content: "hi" });
   });
 
@@ -151,19 +157,20 @@ describe("contextToMessages(): U4b, the persona prefix, the reanchor and the pla
     expect(STABLE_PREFIX.length).toBeGreaterThan(0);
   });
 
-  // A review caught the first cut of this item dropping the old path's
-  // own companionReanchorLine() entirely - identity sent once, in the
-  // cached prefix, is not the same guarantee as the old path's own
-  // every-turn repeat, the thing that actually fights persona-voice
-  // drift on a long conversation.
-  test("the volatile message repeats the persona's identity every turn (companionReanchorLine)", () => {
+  // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): the reanchor line
+  // this test used to require leaves the spoken class too - no design
+  // ever put it here (a Session C plan step, never a design, per the
+  // verdict table), and it is the confirmed cause of the "you" misread
+  // (dev.md, PREFIX-ROLE-01's arm 2). A ten-turn drift row in the
+  // replay set (owner-replay.json, "control-ten-turn-spoken-drift")
+  // watches for the real persona-voice drift this line used to guard
+  // against; a failure there is a finding for EVAL-03, never a reason
+  // to restore this line.
+  test("the volatile message never repeats the persona's identity (companionReanchorLine left both classes, TRUEUP-01)", () => {
     const out = messages([], "what's the weather");
     const volatileMessage = out.find((m) => m.role === "system" && m.content.includes("How to answer this one:"));
-    // CONTEXT-RECALL-01: the memory block (here, "nothing matched" -
-    // an empty context recalls nothing) leads the volatile message,
-    // ahead of the reanchor line.
-    expect(volatileMessage?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\n${REANCHOR}`)).toBe(true);
-    expect(REANCHOR).toContain(DEFAULT_PERSONA.display_name);
+    expect(volatileMessage?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\nHow to answer this one:`)).toBe(true);
+    expect(volatileMessage?.content).not.toContain("Remember: you are");
   });
 
   test("the volatile message ends with planLine()'s own words for this signal", () => {
@@ -274,13 +281,44 @@ describe("contextToMessages(): U4b, the persona prefix, the reanchor and the pla
       expect(volatileMessage!.content).not.toContain("How to answer this one:");
     });
 
-    test("the spoken stable message and volatile message are byte-identical to today's - only the written class changed", () => {
+    // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): this test's own
+    // title used to claim the spoken class stayed byte-identical while
+    // only the written class changed - no longer true (both classes'
+    // stable suffix shrinks, both drop the reanchor line), so it now
+    // asserts the actual current shape instead of a stale claim.
+    test("the spoken stable message uses buildStablePrefix()'s own live output, and the volatile message carries no reanchor line", () => {
       const context: ContextItem[] = [item("profile", "Sage's profile: likes hiking."), item("roster", "Sage", "roster-0")];
       const out = contextToMessages(context, "hi", DEFAULT_PERSONA, plan, signal, "spoken");
       expect(out[0]).toEqual({ role: "system", content: `${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage` });
       const volatileMessage = out.find((m) => m.content.includes("How to answer this one:"));
       expect(volatileMessage?.role).toBe("system");
-      expect(volatileMessage?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\n${REANCHOR}`)).toBe(true);
+      expect(volatileMessage?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\nHow to answer this one:`)).toBe(true);
+      expect(volatileMessage?.content).not.toContain("Remember: you are");
     });
+  });
+});
+
+// TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): the item's own
+// acceptance tests, in its own words.
+describe("TRUEUP-01: the new path sends the model only designed prose", () => {
+  test("the written adult prompt's stable message is exactly identity, the privacy sentence, and the stable facts - nothing else", () => {
+    const context: ContextItem[] = [item("profile", "Sage's profile: likes hiking."), item("roster", "Sage", "roster-0")];
+    const out = contextToMessages(context, "hi", DEFAULT_PERSONA, plan, signal, "written");
+    expect(out[0]).toEqual({ role: "system", content: `${identityLine(DEFAULT_PERSONA)} ${PRIVACY_SENTENCE}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage` });
+  });
+
+  test('no prompt on the new path contains "Remember: you are", on either surface class', () => {
+    const written = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "written");
+    const spoken = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "spoken");
+    for (const m of [...written, ...spoken]) expect(m.content).not.toContain("Remember: you are");
+  });
+
+  test("the spoken prefix is identity plus the privacy sentence plus the spoken persona composition - none of the removed five sentences", () => {
+    const spoken = buildStablePrefix(DEFAULT_PERSONA, "spoken");
+    expect(spoken.startsWith(`${identityLine(DEFAULT_PERSONA)} ${PRIVACY_SENTENCE}`)).toBe(true);
+    // the spoken persona composition (companionSection/rulesSection/
+    // naturalnessSection) survives - the designed fallback until EVAL-03.
+    expect(spoken).toContain("Talk the way a person actually talks in a relaxed conversation");
+    expect(spoken).toContain("Keep replies to a sentence or two");
   });
 });

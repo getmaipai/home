@@ -24083,3 +24083,154 @@ the same live-extracted-function technique `checkScope.test.ts` now
 runs permanently; the residual gap's own safety argument (GATE-HOOK-01
 catching it at commit time) was separately confirmed live in a scratch
 repo with both hooks involved, not just asserted.
+
+## TRUEUP-01: the new path sends the model only designed prose (2026-09-23)
+
+The work order is `docs/plans/chat-trueup-2026-09-23.md`, the ARCH-BUILD-01
+verdict table the coordinator owed: anything the new path sends the
+model without a design behind it comes out, a mis-designed piece is
+rebuilt, never patched. Five changes landed.
+
+**1. `stableSuffixFor(class)` returns the privacy sentence alone, both
+classes.** `PRIVACY_SENTENCE = "Nothing you say leaves this house."`
+(the surviving clause of `STABLE_SYSTEM_SUFFIX_SENTENCES[0]` -
+"concise" contradicts the reply floor and goes with it); the other
+five sentences (the safety-blocked announcement, the #67 lookup
+sentence, the can't-watch sentence, the friend sentence, the household-
+facts sentence) go, per the verdict table's own read of each. The old
+path must keep sending `STABLE_SYSTEM_SUFFIX`'s six sentences verbatim
+until its own deletion (plan section 2), and `buildStablePrefix()` -
+now the new path's own builder for both classes - was the ONE function
+both paths shared for the spoken class's own construction (its default
+argument, never an explicit call). Split apart: `buildOldPathStablePrefix()`
+carries the frozen composition forward, used by `buildPromptParts()`
+(the real old-path construction) and by `index.ts`'s own engine warm-up
+(FAST-01) - a warm-up priming the wrong prefix is worse than none at
+all, a cold miss on every real turn behind a decoy "primed" state.
+Golden-string tests (the tutor and default persona's own spoken prefix,
+captured before the edit) prove the old path byte-identical.
+
+**2. `contextToMessages` drops `companionReanchorLine` on the spoken
+class too** (already gone on written, PREFIX-ROLE-01). No design ever
+put it here - a Session C plan step, never a design - and it is the
+confirmed cause of the "you" misread (PREFIX-ROLE-01's arm 2).
+
+**3. The written persona twins and `WRITTEN_VOICE_PROSE` stay exactly
+as they are**, the designed fallback, off on tier 1; the flag's own
+comment now cites this record and `EVAL-03` (merged from
+`PERSONA-STEER-01` this same commit) as the primary, tested first.
+
+**4. Three replay rows added to `owner-replay.json`**:
+`control-movie-followup-where-playing` (#67's own words - a natural
+follow-up reaches the tool through the forced call, never a prompt
+sentence), `control-grand-canyon-no-search` (a world question without
+a search answered with no sources and saying so - the can't-watch
+sentence's own replacement), `control-ten-turn-spoken-drift` (ten
+turns with no line repeating who's speaking; the tenth reply still
+speaks as the persona - a failure here is EVAL-03's own finding, never
+a reason to restore the reanchor line).
+
+**5. Tests in the item's own words**, all in `turnEngine.test.ts` and
+`messages.test.ts`: the written adult prompt's stable message is
+exactly identity, the privacy sentence and the stable facts, nothing
+else; no prompt on the new path contains "Remember: you are", on
+either class; the spoken prefix is identity plus the privacy sentence
+plus the spoken persona composition; `buildOldPathStablePrefix()` is a
+literal prefix of `buildSystemPrompt()`'s own output and byte-identical
+to the captured golden strings.
+
+**A severe regression, found live, not by the mechanical checks.**
+Spot-checking the new #67 row (`turn.pipeline.next` on, the real
+engine) turn 2 ("where's it playing", after the forced search) came
+back "I am MaiPai, a private, self-hosted AI assistant for this
+household. Nothing I say leaves this house. I exist to assist with
+tasks..." - the model reciting its own system prompt instead of
+answering from the search results. Every mechanical check passed
+(`toolRan`, `outcomeArgsMatch`, `sourcesNonEmpty`), because none of
+them read the reply's own substance - only reading it by hand caught
+this, exactly why the record calls for a human read on the drift row.
+Re-running two rows PHRASE-01's own interleaved rerun had verified
+clean (`president-of-france-repeat`, `search-mariners-game`) showed
+the identical garbled self-description on their own first forced-
+search turn: a real regression from before this item, not fixture
+noise.
+
+**The A/B that isolated it.** Restoring exactly one sentence
+(`STABLE_SYSTEM_SUFFIX_SENTENCES[2]`, the #67 lookup sentence) fully
+fixed `president-of-france-repeat` - both turns, clean correct
+answers, same code otherwise. `search-mariners-game` stayed off-topic
+even with it restored, but that row's own fake-searxng result was a
+generic placeholder (real content exists only for the fixture's own
+named subjects) - a separate confound, not counter-evidence.
+
+**The cause, and why restoring the sentence isn't the fix (the
+coordinator's own ruling).** `composer.ts`'s old `compositionInstruction`
+always carried its own referent ("Answer this question of mine ... :
+'<question>'"); `phrasingInstruction`'s first cut (PHRASE-01) dropped
+it. The phrasing round's question sits several messages up, behind an
+assistant tool call and the tool results, so an instruction that never
+names what to answer binds to the nearest content the model can talk
+about instead - now the identity line, once the stable suffix shrank
+to one sentence and nothing else in the whole prompt named a subject.
+The #67 sentence, read as "answer world questions from what you know
+or the tool", supplied the missing referent by accident - which is
+exactly why restoring it fixed the row, and why the verdict table's
+own read of that sentence ("none stated" as a design) was incomplete:
+live, it was also carrying real weight the design record didn't
+credit it for. `docs/plans/chat-trueup-2026-09-23.md`'s own verdict
+table row for that sentence now carries this finding.
+
+**The fix, in PHRASE-01's own design, never by restoring the
+sentence.** `phrasingInstruction(surfaceClass, utterance)` gains the
+referent as its own first sentence, both classes: `Answer this
+question of mine completely from what you know, <length clause>; use
+the results above as support: "<utterance>"` (double quotes escaped to
+single, the same convention `compositionInstruction` already uses);
+the three sentences after it are unchanged. `nodes/model.ts` passes
+`input.utterance`. Separately, the phrasing round's own instruction
+message now drops the plan line on a written adult turn (mirroring
+`contextToMessages`'s own `isWrittenAdultTurn` rule, one definition of
+when the plan line appears, not a second one re-derived in
+`model.ts`) - the plan line's own "a question about themselves" label
+was re-injecting exactly the reanchor-adjacent content the written
+class had already dropped, pushing the same way. `search-mariners-game`'s
+own fake-searxng result was fixed too (`conversationRunner.ts`): it
+fell into the generic "no further details" placeholder, a fixture gap,
+not a code defect - it now gets a real score result the way the
+fixture's other named subjects already do. `conversationScore.ts`
+gained one automatic check on every forced-search turn (any turn
+`observed.requiredHonored` is set on, forced miss or not): the reply
+never contains "self-hosted AI assistant" - a regression test on the
+reply's own substance, not a runtime rule.
+
+**Re-verified live after the fix**, all five rows, one repeat each:
+`president-of-france-repeat` and `search-mariners-game` both answer
+correctly with zero self-description; the #67 row's own follow-up
+turn answers on-topic (about the film, not itself); the Grand Canyon
+row stays clean; the ten-turn drift row shows no drift by turn ten and
+no self-description on any turn, including one whose own search still
+mis-fires on a casual "how's it going" (a separate, pre-existing
+interim-rule routing gap, out of this item's own scope - the phrasing
+round now handles even that mis-routed case gracefully instead of
+reciting its own identity).
+
+**Step 6, the acceptance measurement**, rerun once after the fix since
+the coordinator asked for a fresh number: identical to the pre-fix
+run, 0.24x prompt-cache / 0.33x benchmarking-words (seeds 1-5 pinned,
+so an identical result is the expected, correct outcome - the fix
+lives entirely in the phrasing round, a code path this measurement's
+own single, non-tool `contextToMessages` call never reaches). Both
+stay under WRITTEN-PARITY-01's 0.4x tier-1 bar, the same accepted-
+exception status as PREFIX-CLASS-01's own 0.30x/0.26x - recorded here,
+never tuned. 0/5 self-reference on both questions' own replies, read
+by hand. Kind (docs/DECISIONS.md, "Gate per push, and a narrow hold",
+2026-09-23): a token-ratio measurement, not a time one - a gate may run
+beside it.
+
+Verification: `bash scripts/check.sh` (backend scope), 4076/4076
+backend tests, 0 fail, `bunx tsc --noEmit` clean; medium review (wire
+shape) - one finding, `isWrittenAdultTurn`'s own written-adult
+resolution duplicated between `messages.ts` and `model.ts` despite
+both files' own comments claiming one definition, fixed by extracting
+`promptSurfaceClassFor()` (`surfaceClass.ts`) as the one real shared
+call both sites use now; live-verified as above.

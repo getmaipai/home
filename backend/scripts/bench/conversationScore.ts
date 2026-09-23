@@ -284,6 +284,19 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   if (!observed.interrupted && (!observed.answered || reply.startsWith("[error:"))) {
     checks.push({ name: "answered", pass: false, detail: reply.startsWith("[error:") ? reply : "no reply arrived" });
   }
+  // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md, the coordinator's
+  // own ruling): a forced-search turn's own phrasing round binding
+  // "answer completely from what you know" to the nearest content
+  // instead of the question it never named produced a self-description
+  // instead of an answer - caught live by hand, never by this scorer,
+  // since none of its own checks before this one read the reply's
+  // substance. Automatic on every turn a required call happened
+  // (`observed.requiredHonored` is set at all, forced miss or not),
+  // never opt-in per row.
+  if (observed.requiredHonored !== null && observed.requiredHonored !== undefined) {
+    const selfDescribed = /self-hosted AI assistant/i.test(reply);
+    checks.push({ name: "no self-description", pass: !selfDescribed, detail: selfDescribed ? `reply recites its own identity instead of answering: "${reply.slice(0, 120)}"` : "reply doesn't recite the identity line" });
+  }
   if (e.memoryWritten) {
     for (const keywords of e.memoryWritten) {
       const hit = observed.memoryRows.find((row) => keywords.every((k) => has(row, k)));

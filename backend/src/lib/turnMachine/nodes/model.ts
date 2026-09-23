@@ -24,7 +24,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnEngine";
-import { isWrittenAdultTurn } from "@/lib/surfaceClass";
+import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
 import { planLine } from "@/lib/register";
 import { contextToMessages } from "../messages";
@@ -344,17 +344,30 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // never hit the prompt cache), then the assistant's own tool_calls
     // message and the tool result messages (composer.ts's own builders,
     // the identical shape the old path's composition call already
-    // sends), then one user-role instruction: the plan line
-    // (register.ts's planLine, re-derived from state.plan/state.signal,
-    // which machine.ts's own derivePlanFromEvidence already refreshed
-    // from this round's real evidence before this node ran) plus
-    // composer.ts's own phrasingInstruction for this turn's surface
-    // class - never compositionInstruction, which is the old path's own
-    // frozen text, pinned by its own tests.
+    // sends), then one user-role instruction: composer.ts's own
+    // phrasingInstruction (never compositionInstruction, which is the
+    // old path's own frozen text, pinned by its own tests), with the
+    // plan line ahead of it on the spoken class only.
+    //
+    // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md, the coordinator's
+    // own ruling; a review's own follow-up moved the resolution itself
+    // into surfaceClass.ts's promptSurfaceClassFor(), the one definition
+    // contextToMessages() and this node both call now, not two copies
+    // of the same ternary): a written adult turn drops the plan line
+    // entirely (messages.ts's own rule: the plan line's "a question
+    // about themselves" label re-injects exactly the reanchor-adjacent
+    // content the written class already dropped); spoken keeps it.
+    // phrasingInstruction() itself now carries the question's own
+    // referent as its first sentence - its first cut didn't, so "answer
+    // completely from what you know" bound to the nearest content the
+    // model could talk about (the identity line, a few messages up),
+    // producing a self-description instead of an answer.
     const surfaceClass = state.planBasis.surfaceClass ?? "spoken";
+    const promptSurfaceClass: SurfaceClass = promptSurfaceClassFor(surfaceClass, state.plan.age_band);
     const assistantMessage = toolCallAssistantMessage(state.outcomes);
     const resultMessages = toolResultMessages(state.outcomes);
-    const instruction: LlmMessage = { role: "user", content: `${planLine(state.plan, state.signal, surfaceClass)} ${phrasingInstruction(surfaceClass)}` };
+    const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance);
+    const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? phrasing : `${planLine(state.plan, state.signal, promptSurfaceClass)} ${phrasing}` };
     messages = [...state.messages, assistantMessage, ...resultMessages, instruction];
     // The same tools block the forced/offered round itself sent -
     // reused verbatim (see contract.ts's own `lastTools` doc comment:

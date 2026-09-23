@@ -628,20 +628,27 @@ export const STABLE_SYSTEM_SUFFIX_SENTENCES = [
 ];
 export const STABLE_SYSTEM_SUFFIX = STABLE_SYSTEM_SUFFIX_SENTENCES.join(" ");
 
-// PREFIX-CLASS-01 (dev.md "PARITY-BISECT-04: arms e and f, and the
-// ruling"): on the written class, only the three suffix sentences
-// PARITY-BISECT-03/04 measured surviving alone (indices 1, 2, 3 - the
-// safety-blocked-requests line, the world-knowledge/lookup line, the
-// can't-watch-taste-visit line) appear; the other three (0, 4, 5) each
-// collapse a written reply's length on their own when measured in
-// isolation, sentence 5 (household facts) once as an outright refusal
-// of an unrelated question. The spoken class keeps all six, unchanged -
-// stableSuffixFor("spoken") returns STABLE_SYSTEM_SUFFIX itself,
-// byte-identical, never a rebuilt copy that could drift from it.
-const WRITTEN_SUFFIX_INDICES = [1, 2, 3] as const;
-export function stableSuffixFor(surfaceClass: SurfaceClass): string {
-  if (surfaceClass === "spoken") return STABLE_SYSTEM_SUFFIX;
-  return WRITTEN_SUFFIX_INDICES.map((i) => STABLE_SYSTEM_SUFFIX_SENTENCES[i]!).join(" ");
+// TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md, the owner's rule of
+// 2026-09-23 evening: anything the new path sends without a design
+// behind it comes out): the verdict table on STABLE_SYSTEM_SUFFIX_
+// SENTENCES found a design behind exactly one clause of one sentence -
+// the privacy promise ("Nothing you say leaves this house.") is the
+// product; "concise" contradicts the reply floor; the safety-blocked
+// sentence announces code that already runs and needs no announcement;
+// the #67 lookup sentence and the can't-watch sentence were live
+// patches for gaps the forced call (state record, the interim rule)
+// and the reply floor now close by design; the remaining sentence has
+// no design cited for it at all. So stableSuffixFor() now returns the
+// privacy sentence alone, for both classes - PREFIX-CLASS-01's own
+// written-class carve-out (indices 1, 2, 3) is superseded, not
+// extended. STABLE_SYSTEM_SUFFIX and STABLE_SYSTEM_SUFFIX_SENTENCES
+// above stay exactly as they are for the old path's buildSystemPrompt()
+// (buildPromptParts() below no longer calls this function at all,
+// inlining STABLE_SYSTEM_SUFFIX directly instead), frozen until the old
+// path's own deletion (plan section 2).
+export const PRIVACY_SENTENCE = "Nothing you say leaves this house.";
+export function stableSuffixFor(_surfaceClass: SurfaceClass): string {
+  return PRIVACY_SENTENCE;
 }
 
 // The speech register is now the selected Persona (lib/persona.ts,
@@ -1015,24 +1022,35 @@ export function companionReanchorLine(persona: Persona): string {
  * reintroduce a cold prefix on every real turn. Called by
  * buildSystemPrompt() itself below, never reimplemented, so the two can
  * never drift apart by construction whenever that warm-up does land. */
-/** `surfaceClass` defaults "spoken" - the old path's own call site
- * (buildPromptParts below) passes nothing and keeps today's exact
- * wording, frozen; only the new path (turnMachine/messages.ts) passes
- * "written" explicitly. The spoken branch is byte-identical to before
- * PREFIX-CLASS-01.
+/** `surfaceClass` defaults "spoken" - this is the NEW path's own
+ * builder for both classes (`turnMachine/messages.ts`'s only caller);
+ * the old path's own construction (`buildPromptParts` below) no longer
+ * calls this function at all, since TRUEUP-01 (docs/plans/chat-
+ * trueup-2026-09-23.md) needed the two to diverge on exactly the
+ * suffix piece - it inlines its own frozen composition directly
+ * instead, so the two paths can never silently drift onto the same
+ * suffix again.
  *
  * PREFIX-CLASS-01, decided (dev.md "The written prompt on tier 1,
  * decided", the coordinator's own design record, 2026-09-23): the
  * written branch is the ceiling's own shape - identity plus
- * stableSuffixFor("written")'s three surviving sentences, nothing else
- * - the one composition, alongside arm e, that ever measured close to
- * the bare floor across this whole chain; every shape that added
- * persona or policy prose measured 0.12x to 0.48x regardless of role,
- * wording, or the plan line's presence. composePersonaPrompt's own
- * written voice section returns "" while WRITTEN_VOICE_PROSE (persona.ts)
- * is false, so voiceSection below is empty by default - kept as a real
- * conditional, not assumed empty, so PERSONA-STEER-01/WRITTEN-VOICE-
- * TIER-01 can flip the switch later without touching this function. */
+ * stableSuffixFor("written")'s own sentence, nothing else - the one
+ * composition, alongside arm e, that ever measured close to the bare
+ * floor across this whole chain; every shape that added persona or
+ * policy prose measured 0.12x to 0.48x regardless of role, wording, or
+ * the plan line's presence. composePersonaPrompt's own written voice
+ * section returns "" while WRITTEN_VOICE_PROSE (persona.ts) is false,
+ * so voiceSection below is empty by default - kept as a real
+ * conditional, not assumed empty, so EVAL-03/WRITTEN-VOICE-TIER-01 can
+ * flip the switch later without touching this function.
+ *
+ * TRUEUP-01: the spoken branch's own suffix shrinks from
+ * STABLE_SYSTEM_SUFFIX's six sentences to stableSuffixFor("spoken")'s
+ * one - the verdict table's own account (dev.md, the same record) - so
+ * this branch is no longer byte-identical to before that item; the
+ * companion/rules/naturalness sections it composes with are unchanged
+ * (the spoken persona fragments stay, as the designed fallback until
+ * EVAL-03). */
 export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, surfaceClass: SurfaceClass = "spoken"): string {
   if (surfaceClass === "written") {
     const base = `${identityLine(persona)} ${stableSuffixFor("written")}`;
@@ -1040,6 +1058,26 @@ export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, surfaceCla
     return voiceSection.length > 0 ? `${base} ${voiceSection}` : base;
   }
   const companionSection = capSection(composePersonaPrompt(persona, surfaceClass), MAX_COMPANION_SECTION_CHARS);
+  const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
+  const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
+  return `${identityLine(persona)} ${stableSuffixFor(surfaceClass)} ${companionSection} ${rulesSection} ${naturalnessSection}`;
+}
+
+/** TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): the old path's own
+ * spoken stable prefix, frozen until the old path's own deletion (plan
+ * section 2) - this is exactly the composition buildStablePrefix()'s
+ * own spoken branch built before this record (STABLE_SYSTEM_SUFFIX's
+ * six sentences, never stableSuffixFor()'s new, shrunk one), factored
+ * into its own function rather than inlined twice: buildPromptParts()
+ * below (the old path's real construction) and index.ts's own engine
+ * warm-up (FAST-01 - it primes the cache with whatever the old path
+ * actually sends, and drifted the moment buildStablePrefix() itself
+ * started serving the new path's shrunk suffix) both need the identical
+ * string, and a warm-up that primes the wrong prefix is worse than no
+ * warm-up at all - a cold miss on every real turn instead of the
+ * decoy's own false "primed" state. */
+export function buildOldPathStablePrefix(persona: Persona = DEFAULT_PERSONA): string {
+  const companionSection = capSection(composePersonaPrompt(persona, "spoken"), MAX_COMPANION_SECTION_CHARS);
   const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
   const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
   return `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection} ${naturalnessSection}`;
@@ -1082,7 +1120,7 @@ export function buildPromptParts(
   plan?: ReplyPlan,
   signal?: TurnSignal,
 ): { stablePrefix: string; context: string } {
-  const stablePrefix = buildStablePrefix(persona);
+  const stablePrefix = buildOldPathStablePrefix(persona);
 
   const { now, locale } = frozen;
 
