@@ -21667,3 +21667,71 @@ typing "peo" narrows the list to exactly the People result under
 BACKLOG row are the record; `scripts/check.sh` green before landing,
 rerun clean again after two rebases onto a busy `main` (RERUN-PROTOCOL-01's
 own landing window).
+
+## VOICE-LIVE-05 round 2: the orb's own token, ChatGPT's own scale, the phone call look (2026-09-23)
+
+Jesse opened round 1's own recording and captures before handing them
+on: too small, and in light theme a small dark-grey disc, not a blue
+glow. Three real fixes, all verified before landing, none touching
+`--voice-accent` (kept exactly as round 1 built it - see TOKENS-PRIMARY-01
+for the general cascade fix that made a dedicated token necessary in
+the first place).
+
+**Size.** The orb's own largest ring was 96px; now 160px on the phone,
+192px on desktop (`size-40`/`sm:size-48`, Tailwind's own scale landing
+exactly in "roughly 160-200px on desktop"), every inner ring and the
+ripple rescaled to the component's own original ratios (ring2 70.8%,
+the core and ripple 41.7%).
+
+**"The phone call look instead of the visualizer."** The transcript
+list and its "you"/"ai" labels are gone from `VoiceConversation`
+outright - the `transcript` prop and `VoiceTurn` type deleted, not
+hidden (nothing else in either repo referenced them, confirmed before
+removing). The orb now centers in the space above the controls
+(`justify-between` on the root plus the orb group's own `flex-1`,
+below `sm`), the state line under it unchanged, mute and end pinned to
+the bottom as `TooltipIconButton` (the kit's own enhanced copy in
+`assistant-ui/`, a real touch target regardless of the visual size
+override - End reads `variant="destructive"` instead of a hard-coded
+`bg-red-500`). Below `sm` the whole surface grows to fill the overlay
+(`h-full w-full`, no border, no rounding - edge to edge, a real call
+screen); at `sm` and up it's back to the original small floating card.
+`liveVoiceSession.tsx`'s own local transcript-mirroring state (built
+purely for the now-gone prop - the thread itself was always the real
+record) is deleted with it, not left dangling; the gear repositions
+inset from the corner on the phone since there's no card edge to sit
+just outside of at that width anymore.
+
+**The composer pill's own size.** "The orb button is too large" -
+`composerVoiceControls.tsx`'s own waveform trigger was the kit's
+`Button size="icon"` (48px), noticeably bigger than the Dictate/Send
+buttons beside it in the same row (`thread.aui.tsx`'s `ComposerAction`,
+both `size-7 rounded-full`). Matches them exactly now, via
+`TooltipIconButton` - not the same `TooltipIconButton` Dictate/Send
+themselves use (`elements/tooltip-icon-button.tsx`, the vendored copy
+with no touch-target floor at all, confirmed reading its own source),
+but the enhanced `assistant-ui/` one, the same file this component's
+own sibling `liveVoiceSession.tsx` already uses for its gear - a real
+48px+ touch target on a 28px visual box regardless, since this button
+is Home's own composition (injected through `ComposerExtraEnd`), never
+inside the vendored Element itself.
+
+**Landing this collided with a busy `main`.** Two other sessions'
+own commons landings happened between this item's own commits and its
+gate - `package.json`'s version field conflicted twice on rebase
+(commons and home both), resolved to the next real, unclaimed tag
+(`ui-v0.5.46`, after a local, unpushed `0.5.44` collided with a peer's
+already-pushed `0.5.45`) rather than reusing a number below `origin`'s
+own newest.
+
+**Verified.** `bun test`/`tsc` clean on both repos before landing (the
+dialog-close animation's own hang under `happy-dom`, the same class of
+environment fragility this session already hit once, meant the
+"closes again" half of the mute/end behavior is proven live, not
+asserted in the suite - see the commit's own comment). Commons
+`a790400`, home `e25a836a`. Restarted 8787, re-recorded and
+re-captured the same four (light/dark × desktop/phone, the speaking
+state), versioned `-v2` in the same Desktop delivery folder as round 1
+so Jesse finds both. Jesse's own judgment is still the acceptance bar
+this row waits on, round 2 same as round 1 - not something this
+session can self-certify.
