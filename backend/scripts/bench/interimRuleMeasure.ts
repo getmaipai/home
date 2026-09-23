@@ -84,14 +84,21 @@ async function main(): Promise<void> {
         }
         if (result.kind !== "immediate") continue;
         conversationId = result.value.conversation_id;
-        const nodesTrace = (result.value.stats as { nodes?: { node: string; impl: string }[] } | null)?.nodes ?? [];
+        const nodesTrace = (result.value.stats as { nodes?: { node: string; impl: string; outcome: { ok?: boolean; skipped?: boolean } }[] } | null)?.nodes ?? [];
         const generations = result.value.stats?.generations ?? [];
         // answer_from_context taken: the model's own second-round choice
         // (nodes/model.ts's ANSWER_FROM_CONTEXT_TOOL_ID) - visible only
         // via the trace's own node presence today (no dedicated wire
         // field yet); approximated here as "an interim_rule generation
         // ran but no websearch outcome exists on the turn."
-        const hasWebsearchOutcome = nodesTrace.some((n) => n.node === "tool");
+        // The coordinator caught this reading mere presence: U2e's own
+        // trace-completeness fix (TraceRecorder.skip()) means a "tool"
+        // entry now ALWAYS exists in stats.nodes, skipped or not, so
+        // `.some(n => n.node === "tool")` was true on every single row
+        // regardless of whether a tool actually ran - reading `.outcome`
+        // (`ok` present means it ran, with or without an error; `skipped`
+        // means it never did) is the real signal.
+        const hasWebsearchOutcome = nodesTrace.some((n) => n.node === "tool" && n.outcome?.ok !== undefined);
         const answeredFromContext = generations.some((g) => g.reason === "interim_rule") && !hasWebsearchOutcome;
         const sourced = (result.value.reply as { sources?: unknown[] }).sources !== undefined || false;
         rows.push({
