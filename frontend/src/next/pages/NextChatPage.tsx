@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DismissableLayer } from "radix-ui/internal";
+import { toast } from "sonner";
 import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
 import { ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "@maipai/ui/src/elements/reasoning.aui";
@@ -40,7 +41,10 @@ import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
-import { ComposerAddMenu, PackageScopeContext } from "@/apps/chat/composerAddMenu";
+import { ComposerAddMenu, PackageScopeContext, unwiredControlsAreEnabled } from "@/apps/chat/composerAddMenu";
+import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
+import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
@@ -1006,6 +1010,23 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   const [packageScope, setPackageScope] = useState<InstalledPackage | null>(null);
   const packageScopeRef = useRef<InstalledPackage | null>(null);
   packageScopeRef.current = packageScope;
+  // CHAT-HEADER-01: "Start temporary chat" from the header menu - single-
+  // shot like packageScope above, consumed by the very next send (the
+  // one that starts the new conversation this was chosen for). Reset by
+  // the same conversation-change effect that ends bareMode, so switching
+  // away without ever sending never leaves it armed for an unrelated
+  // later new-thread click.
+  const [temporaryNext, setTemporaryNext] = useState(false);
+  const temporaryNextRef = useRef(false);
+  temporaryNextRef.current = temporaryNext;
+  // A code review caught this: "Start temporary chat" itself performs
+  // the deliberate switch below (it calls switchToNewThread right after
+  // arming the flag), so without this marker the reset meant for an
+  // UNRELATED switch away would fire on this one too and clear the flag
+  // before the new thread's first send ever reads it. Set true in
+  // armTemporaryChat, read and cleared the one time onThreadIdChange's
+  // own deliberate-switch branch actually runs for it.
+  const startingTemporaryRef = useRef(false);
 
   const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
   // SHELL-02 slice 6: the same real adapters ChatPage.tsx's composer
@@ -1067,6 +1088,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
             const value = packageScopeRef.current?.id;
             packageScopeRef.current = null;
             setPackageScope(null);
+            return value;
+          },
+          consumeTemporary: () => {
+            const value = temporaryNextRef.current || undefined;
+            temporaryNextRef.current = false;
+            setTemporaryNext(false);
             return value;
           },
           isBareMode: () => bareModeRef.current,
@@ -1146,11 +1173,36 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
       if (isDeliberateSwitch) {
         thinkingRef.current = false;
         setThinking(false);
+        // Same reasoning as thinkingRef above: "Start temporary chat"
+        // is chosen for the NEW conversation about to start, and that
+        // conversation's own first send resolving its placeholder id
+        // must not read as a switch away from it. A real deliberate
+        // switch (New Thread, picking a past conversation) still clears
+        // it, so it never survives to arm an unrelated later send -
+        // UNLESS this very switch is the one armTemporaryChat caused,
+        // in which case the flag is for the thread this switch is
+        // landing ON, not the one it's leaving, and clearing it here
+        // would silently defeat the feature on every use.
+        if (startingTemporaryRef.current) {
+          startingTemporaryRef.current = false;
+        } else {
+          temporaryNextRef.current = false;
+          setTemporaryNext(false);
+        }
       }
     },
   });
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope };
+  // The only place that arms temporaryNext - bundles the flag and the
+  // marker above into one atomic call so a caller can never set one
+  // without the other.
+  function armTemporaryChat() {
+    startingTemporaryRef.current = true;
+    temporaryNextRef.current = true;
+    setTemporaryNext(true);
+  }
+
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, armTemporaryChat };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1182,7 +1234,66 @@ function ChatDocumentTitle() {
   return null;
 }
 
+/** CHAT-HEADER-01: the bridge chatHeaderData.tsx's own header comment
+ * describes - reads the real runtime state ChatHeaderBar (rendered as
+ * Header's own child, outside this provider) can't reach directly, and
+ * pushes it into the data context. Same side-effect-mount shape as
+ * ArtifactCacheInvalidator/ChatDocumentTitle above, just carrying data
+ * instead of a DOM/browser-API side effect. */
+function ChatHeaderDataBridge({ temporaryAllowed, onStartTemporary, shareAllowed }: { temporaryAllowed: boolean; onStartTemporary: () => void; shareAllowed: boolean }) {
+  const aui = useAui();
+  const title = useAuiState((s) => s.threadListItem.title) ?? "";
+  useSetChatHeaderData({
+    title,
+    // A code review caught this: the vendored thread-list.aui.tsx's own
+    // rename/delete already toast on failure (`toast.error("Could not
+    // rename/delete this chat. Try again.")`) - this header's own
+    // actions are the same operations on the same runtime and need the
+    // same feedback, not a silent no-op the person has no way to notice.
+    onRename: async (next) => {
+      try {
+        await aui.threadListItem.rename(next);
+      } catch (error) {
+        toast.error("Could not rename this chat. Try again.");
+        throw error;
+      }
+    },
+    onDelete: async () => {
+      try {
+        await aui.threadListItem.delete();
+      } catch {
+        toast.error("Could not delete this chat. Try again.");
+        return;
+      }
+      // The deleted conversation was the one open in this very header -
+      // the thread list's own row delete never needs this (a person
+      // deletes a DIFFERENT row than the one they're reading), but here
+      // the active conversation just stopped existing, so this moves
+      // off it deliberately rather than leaving whatever the runtime
+      // happens to fall back to.
+      await aui.threads.switchToNewThread();
+    },
+    // ChatHeaderBar (chatHeaderBar.tsx) renders as Header's own child,
+    // outside this provider - it has no runtime to call
+    // ThreadListPrimitive.New itself (that primitive needs an AuiProvider
+    // ancestor, which doesn't exist there), so the actual thread switch
+    // happens here, where aui is real, alongside setting the flag the new
+    // thread's own first turn reads.
+    onStartTemporary: () => {
+      onStartTemporary();
+      void aui.threads.switchToNewThread();
+    },
+    temporaryAllowed,
+    shareAllowed,
+  });
+  return null;
+}
+
 export function NextChatPage({ person }: { person: Roster }) {
+  // CHAT-HEADER-01: ChatHeaderBar is a stable, zero-prop reference - the
+  // shell header's own slot (ui-v0.5.35) mounts and unmounts it, never
+  // re-created per render.
+  useHeaderExtra(ChatHeaderBar);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
   // ADMIN-COMPARE-01: the identical desktop-pane/mobile-sheet split
@@ -1397,7 +1508,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, armTemporaryChat } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1657,6 +1768,11 @@ export function NextChatPage({ person }: { person: Roster }) {
         <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />
         <ChatDocumentTitle />
+        <ChatHeaderDataBridge
+          temporaryAllowed={canHaveTemporaryChatRole(person.role)}
+          onStartTemporary={armTemporaryChat}
+          shareAllowed={unwiredControlsAreEnabled()}
+        />
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
             height a hard ceiling, not a floor a growing composer or a
             streaming reply could push past - FullLayout.tsx's own

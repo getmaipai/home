@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { NextChatPage } from "@/next/pages/NextChatPage";
+import { ChatHeaderDataProvider, useChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
 import type { Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
@@ -1455,6 +1456,97 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       );
       await view.findByLabelText("Message input");
       expect(trigger()).not.toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("NextChatPage (CHAT-HEADER-01: the header's own temporary-chat entry)", () => {
+  // A code review caught this: armTemporaryChat's own switchToNewThread
+  // call is itself a deliberate switch (onThreadIdChange's own
+  // definition: the id changes and the PREVIOUS one was real), so
+  // without the startingTemporaryRef marker this file's own
+  // Thinking-reset code right beside it would reset temporaryNext too,
+  // clearing the very flag "Start temporary chat" just set before the
+  // new conversation's first send ever reads it. ChatHeaderBar itself
+  // isn't mounted in these tests (no HeaderExtraProvider/Header - see
+  // this file's other describe blocks), so this reaches the same
+  // bridge callback chatHeaderData.tsx exposes, the way a real header
+  // click would.
+  function HeaderTemporaryButton() {
+    const data = useChatHeaderData();
+    return (
+      <button type="button" onClick={() => data?.onStartTemporary()}>
+        header-start-temporary
+      </button>
+    );
+  }
+
+  function stubMultiTurnFetch(): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let turnCount = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-temp789", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) {
+        turnCount++;
+        const text = `Reply ${turnCount}.`;
+        const body = ndjsonStream([
+          { type: "delta", text },
+          { type: "done", value: { turn_id: `turn-temp${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
+        ]);
+        return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  function turnRequestBodies(): Array<Record<string, unknown>> {
+    return (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
+      .filter((c: unknown[]) => (typeof c[0] === "string" ? c[0] : (c[0] as URL | Request).toString()).includes("/api/turn/stream"))
+      .map((c: unknown[]) => JSON.parse((c[1] as RequestInit).body as string));
+  }
+
+  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+  }
+
+  test("marks the very next send as temporary - the switch it performs itself must not clear its own flag", async () => {
+    const restore = stubMultiTurnFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <ChatHeaderDataProvider>
+            <HeaderTemporaryButton />
+            <NextChatPage person={makePerson()} />
+          </ChatHeaderDataProvider>
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      // A real conversation first - the bug only reproduces switching
+      // AWAY from a real (non-undefined) thread id, which is exactly
+      // what "Start temporary chat" itself triggers.
+      await sendMessage(view, "hi");
+      await view.findByText("Reply 1.");
+
+      fireEvent.click(view.getByText("header-start-temporary"));
+      await view.findByLabelText("Message input");
+      await sendMessage(view, "a private question");
+      await view.findByText("Reply 2.");
+
+      const bodies = turnRequestBodies();
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0]!.temporary).toBeUndefined();
+      expect(bodies[1]!.temporary).toBe(true);
     } finally {
       restore();
     }

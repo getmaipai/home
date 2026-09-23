@@ -18,6 +18,7 @@ import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
+import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import type { Roster } from "@/lib/api";
 
 /** The `/next/*` route tree (docs/plans/shell-on-shadcndashboard-
@@ -63,24 +64,30 @@ function NextRoutesInner({ person }: { person: Roster }) {
   useNextLook(person.id);
 
   return (
-    <Routes>
-      {/* Reachable only while signed out (NextSignedOutRoutes below) -
-          an already-authenticated visit to this URL has nothing to do
-          here, so it bounces to the dashboard instead of a blank
-          no-match. */}
-      <Route path="sign-in" element={<Navigate to="/next" replace />} />
-      <Route element={<FullLayout />}>
-        <Route index element={<NextDashboardPage person={person} />} />
-        <Route path="chat" element={<NextChatPage person={person} />} />
-        <Route path="apps" element={<NextAppsPage />} />
-        <Route path="people" element={<NextPeoplePage person={person} />} />
-        <Route path="settings" element={<NextSettingsPage person={person} />} />
-        <Route path="engines" element={<NextEnginesPage />} />
-        <Route path="updates" element={<NextUpdatesPage person={person} />} />
-        <Route path="repairs" element={<NextRepairsPage person={person} />} />
-        <Route path="backups" element={<NextBackupsPage person={person} />} />
-      </Route>
-    </Routes>
+    // CHAT-HEADER-01: wraps every /next page (a Route element, never a
+    // per-page one) since FullLayout's own Header - where ChatHeaderBar
+    // actually renders (a sibling of this Outlet, not a descendant) -
+    // needs the SAME provider instance NextChatPage writes into.
+    <ChatHeaderDataProvider>
+      <Routes>
+        {/* Reachable only while signed out (NextSignedOutRoutes below) -
+            an already-authenticated visit to this URL has nothing to do
+            here, so it bounces to the dashboard instead of a blank
+            no-match. */}
+        <Route path="sign-in" element={<Navigate to="/next" replace />} />
+        <Route element={<FullLayout />}>
+          <Route index element={<NextDashboardPage person={person} />} />
+          <Route path="chat" element={<NextChatPage person={person} />} />
+          <Route path="apps" element={<NextAppsPage />} />
+          <Route path="people" element={<NextPeoplePage person={person} />} />
+          <Route path="settings" element={<NextSettingsPage person={person} />} />
+          <Route path="engines" element={<NextEnginesPage />} />
+          <Route path="updates" element={<NextUpdatesPage person={person} />} />
+          <Route path="repairs" element={<NextRepairsPage person={person} />} />
+          <Route path="backups" element={<NextBackupsPage person={person} />} />
+        </Route>
+      </Routes>
+    </ChatHeaderDataProvider>
   );
 }
 

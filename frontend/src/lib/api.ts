@@ -789,7 +789,7 @@ export const api = {
   streamTurn: (
     text: string,
     signal?: AbortSignal,
-    opts: { thinking?: boolean; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string } = {},
+    opts: { thinking?: boolean; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean } = {},
   ) =>
     rawStreamPost(
       "/api/turn/stream",
@@ -798,7 +798,12 @@ export const api = {
       // not read by routes/turn.ts yet (the old turn path is frozen),
       // carried behind NEXT_CHAT_UNWIRED_CONTROLS_ENABLED so it has no
       // real effect until U2's turn-request fields land.
-      { surface: "chat", text, thinking: opts.thinking, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom, bare: opts.bare, package_scope: opts.packageScope },
+      // `temporary`: CHAT-HEADER-01's own "start temporary chat" entry -
+      // only meaningful on the first turn of a brand new conversation
+      // (`opts.conversationId` unset); routes/turn.ts's own 403 for a
+      // minor already covers the same floor `canHaveTemporaryChatRole`
+      // gates the menu entry on client-side.
+      { surface: "chat", text, thinking: opts.thinking, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom, bare: opts.bare, package_scope: opts.packageScope, temporary: opts.temporary },
       0,
       undefined,
       signal,

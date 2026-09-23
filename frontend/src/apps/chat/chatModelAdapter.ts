@@ -95,6 +95,13 @@ export interface ChatModelAdapterDeps {
   // test can assert the outgoing payload without the flag it's gated
   // behind changing how a real send behaves today.
   consumePackageScope?(): string | undefined;
+  // CHAT-HEADER-01: reads AND resets the "start temporary chat" choice
+  // made from the header menu, the same single-shot shape as
+  // `consumeSupersedes()`/`consumePackageScope()` - only meaningful on
+  // the very next send (which starts the new conversation this was
+  // chosen for), never a mode a later message inherits. Undefined for
+  // any surface with no temporary-chat entry.
+  consumeTemporary?(): boolean | undefined;
   getConversationId?(): Promise<string>;
   // 4.3: "offer, never block" - a crisis-resources banner rides alongside
   // the reply, not as part of the message content assistant-ui renders.
@@ -368,6 +375,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             turnId: resumeTurnId,
             resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
             packageScope: reconnectAttempts === 0 ? deps.consumePackageScope?.() : undefined,
+            temporary: reconnectAttempts === 0 ? deps.consumeTemporary?.() : undefined,
           });
           for await (const event of readTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
