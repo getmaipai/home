@@ -22671,3 +22671,75 @@ read aloud", now with a written variant per level), the few-shot
 examples block (spoken one-liners, omitted on the written class,
 WRITTEN-EXAMPLES-01 later), `STABLE_SYSTEM_SUFFIX` (measured: 0.14x on
 its own) and, pending BISECT-03, one of the five fragments above.
+
+## PARITY-BISECT-03: almost every fragment collapses the reply alone, not one villain (2026-09-23)
+
+Fable's own protocol: on the identity line alone (BISECT-02's own
+floor-holding base), each of the remaining six stable-prefix fragments
+added ALONE, three reps each - never stacked - plus each of
+`STABLE_SYSTEM_SUFFIX`'s own six sentences, same treatment. Same
+isolation and question as before.
+
+| stage | predicted tokens (3 reps) | avg | vs BISECT-01 floor | headings | lists |
+|---|---|---|---|---|---|
+| baseline, identity alone | 605, 586, 531 | 574.0 | 0.78x | yes | yes |
+| + COMPLEXITY_FRAGMENT (standard) | 149, 197, 178 | 174.7 | 0.24x | no | no |
+| + ENGAGEMENT_FRAGMENT_WRITTEN (brief) | 121, 79, 115 | 105.0 | 0.14x | no | no |
+| + FILLER_FRAGMENT (none) | 105, 91, 141 | 112.3 | 0.15x | no | no |
+| + INFORMATION_HANDLING_POLICY | 127, 134, 177 | 146.0 | 0.20x | no | no |
+| + WRITTEN_POLICY | 248, 243, 309 | 266.7 | 0.36x | yes | yes |
+| + FORMALITY_FRAGMENT_WRITTEN (length check only) | 316, 302, 262 | 293.3 | 0.40x | no | no |
+| + suffix sentence 1 ("Be warm, concise and honest...") | 91, 95, 44 | 76.7 | 0.10x | no | no |
+| + suffix sentence 2 (the safety-blocked-requests line) | 513, 486, 583 | 527.3 | 0.72x | yes | yes |
+| + suffix sentence 3 (the world-knowledge/lookup lines) | 400, 454, 565 | 473.0 | 0.64x | yes | yes |
+| + suffix sentence 4 ("can't watch, taste or visit") | 561, 487, 595 | 547.7 | 0.74x | yes | yes |
+| + suffix sentence 5 (the "respond like a friend" line) | 163, 144, 192 | 166.3 | 0.23x | no | no |
+| + suffix sentence 6 (the household-facts-only line) | 89, 439, 418 | 315.3 | 0.43x | no | no |
+
+Reference floor (PARITY-BISECT-01, bare call, thinking off, no system
+message): 736.3. This run's own baseline (identity alone, re-measured
+live) came in at 574.0, noticeably below BISECT-02's own measurement
+of the identical condition (753.0) - no seed is pinned at this
+temperature, so run-to-run sampling variance on a bare or near-bare
+prompt is real; the reference floor stays the fixed BISECT-01 number
+throughout so every bisect round is judged against the same yardstick,
+but this variance is itself worth carrying forward.
+
+**Almost everything collapses it alone - this is not one villain
+fragment.** Nine of the twelve additions drop below half the BISECT-01
+floor by themselves: every one of the four persona dials, the
+information policy, `WRITTEN_POLICY`, `FORMALITY_FRAGMENT_WRITTEN`
+(length as well as the already-known lowercase effect), and two of
+the six suffix sentences. This 8B reads almost any single meta-
+instruction line, on top of a bare identity, as a cue to answer
+briefly - not a property of one fragment's own wording, but the
+model's own reaction to being told how to behave at all, on most of
+the ways this prefix tells it.
+
+**Three suffix sentences are the exception**, and read as clean
+counter-evidence: sentence 2 (the safety-blocked-requests line, "already
+blocked... answer anything else helpfully"), sentence 3 (the world-
+knowledge and lookup-tool lines), and sentence 4 ("can't watch, taste
+or visit... still tell them what you know") all stay at 0.64-0.74x the
+floor, with headings and lists intact. These three, alone among the
+twelve, do not collapse the reply.
+
+**Suffix sentence 6 (household facts only) is unstable and, once, an
+outright refusal to answer at all** - 89, 439, 418 tokens across three
+reps of the identical request, the widest spread in the table. The
+89-token rep is not a short structured answer, it reads as a decline:
+"I don't have information about a 'prompt cache'... I don't have
+knowledge about specific technical implementations." One rep in three,
+this sentence alone made the model treat a general technical question
+as if it were bound by the household-facts-only rule the sentence
+actually states for facts about the household - a real, if
+intermittent, overreach worth naming on its own, independent of the
+length-collapse question this bench was built to answer.
+
+Given the breadth of the effect (nine of twelve, on their own), and
+that even the three exceptions still come in under the floor, PREFIX-
+CLASS-01's own written variants (BACKLOG.md) are not a one-line fix
+for a single named fragment - every piece needs its own written
+wording, which is exactly PREFIX-CLASS-01's own scope already. Not
+diagnosing further per the coordinator's own stop-here instruction;
+Fable's own to rule on.
