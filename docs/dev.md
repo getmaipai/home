@@ -20791,3 +20791,20 @@ Verified: `bunx tsc --noEmit` clean; the two new tests and the full
 `turnNext.test.ts` suite (28/28) green; the full backend suite
 (3904/3904) green; `bash scripts/check.sh` green. Review: low (one
 call site, tests), no findings.
+
+## VOICE-LIVE-02: the measured line (2026-09-23)
+
+The row's own owed measurement, taken once the coordinator confirmed the grounding session's live rerun was clear and 8787 was live on `9c5da178`: first spoken word timed from the end of the utterance, on this Mac, beside the resident 8B (`qwen3-8b-instruct-q4-k-m`, llama-server b10797, port 8788), five reps per `turn.pipeline.next` state, the engine warmed with one plain turn before the first timed rep of each batch.
+
+**Method.** DICT-01's own repro pattern: headless Chromium (`--use-fake-device-for-media-stream --use-file-for-fake-audio-capture`) plays a real WAV (the vendored Moonshine test set's `0.wav`, "After early nightfall the yellow lamps would light up here and there the squalid quarter of the brothels", 6.6s) into the live voice session's own real mic pipeline - never the browser's own speech recognition, never a fake transcript. T0 (utterance end) and T1 (first spoken word) both come from an in-page `MutationObserver` on the Element's own caption span (`data-slot="voice-conversation"`), reading `performance.now()` in the SAME clock for both edges - no cross-process clock sync. Two real bugs found building the harness, both live, both worth naming: (1) a bare page-wide `getByText("Thinking")` matches the COMPOSER'S OWN unrelated Thinking-mode toggle (RESP-04) within milliseconds of the overlay opening, nowhere near the real transition - fixed by scoping every query to the overlay locator; (2) even scoped, a plain Playwright `waitFor` missed the real "Thinking" state on more than one run (the observer never did) - the state genuinely exists but is brief enough that external polling can miss it, where a DOM-mutation-driven observer never does. Each rep ran as its own OS process (`voiceLive02OneRep.ts`, driven by five separate `bun run` invocations per batch), not a loop inside one process: looping `chromium.launch()`/`close()` inside a single Bun process hung the whole event loop, reproducibly, on exactly the 5th launch (no `headless_shell` process ever spawned, no timer fired, including the script's own 120s safety-net `setTimeout` - a real in-process resource issue, never diagnosed further since per-process isolation sidesteps it entirely, and suits a benchmark that must never let one stuck rep block the rest better anyway).
+
+**Result.**
+
+| `turn.pipeline.next` | reps (ms) | median | min |
+|---|---|---|---|
+| off (today's engine, the household's real default) | 1398.5, 1489.8, 1073.9, 1079.2, 1751.1 | **1398.5ms** | 1073.9ms |
+| on (the rebuilt engine) | 6363.6, 4902.7, 6214.8, 4751.0, 6265.7 | **6214.8ms** | 4751.0ms |
+
+The row's own bar (first spoken word under 3s) is cleared with room to spare on the engine the household actually runs today - every one of 5 reps landed under 1.8s. The rebuilt engine is a different story: every one of its 5 reps landed OVER the bar, by a wide and consistent margin (4.75s to 6.36s, no outlier pulling the median around - this is the rebuilt pipeline's real, repeatable voice-turn latency on this hardware, not noise). VOICE-LIVE-02's own acceptance is met for the shipping default, so the row is ticked; the rebuilt engine's own latency is named here as a separate, real finding for whoever owns that pipeline's speed next (GATE-SPEED-02) - not something this item's own scope fixes, and not swept under "it's measured" when half the measurement fails a 3-second bar by double or more.
+
+`turn.pipeline.next` was restored to its default (off) afterward - this measurement never left the household on the slower path.
