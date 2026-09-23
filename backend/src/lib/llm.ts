@@ -303,6 +303,13 @@ function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
       // product fix is ENGINE-CONTRACT-02, never this flag.
       cache_prompt: process.env.MAIPAI_BENCH_CACHE_PROMPT_FALSE === "1" ? false : true,
       id_slot: 0,
+      // USAGE-01 (dev.md "U6 rerun ruling," 2026-09-23): without this,
+      // a streamed completion never carries a final usage chunk at
+      // all, so cached_tokens stayed blank on every streamed row even
+      // though ChatCompletionUsage already had the field to carry it.
+      // Harmless on the non-streaming call sites too (stream_options
+      // only applies alongside stream: true; spec-v0.1.26).
+      stream_options: { include_usage: true },
     },
   };
 }

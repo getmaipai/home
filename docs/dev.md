@@ -20826,3 +20826,57 @@ The header's left slot showed a page's own title (chat) or the shipped `Search` 
 **The CHAT-HEADER-03 shrink-0 gap, re-checked as promised.** That item's own comment named the app icon as the next fixed-width sibling to watch for the title `Button`'s latent `shrink-0`/`flex-1` conflict (kit's shared `buttonVariants` base class always carries `shrink-0`, which `tailwind-merge` doesn't dedupe against `flex-1`, and wins the cascade). Re-checked at both captured widths with a real 60-character title: still no real bug, confirmed by opening the actual captures - the icon and chevron's combined fixed width stays well under either viewport's available space even with the icon added, so the row never reaches the "shrink" branch. The gap itself is unchanged, not re-fixed here.
 
 **Verified:** `NextRoutes.test.tsx`'s own sign-in-redirect test asserted the shipped `Search....` placeholder as proof the dashboard shell mounted - now gone from that page by design, so the assertion moved to the header's own new `Home` label instead (scoped to the header's unnamed `<nav>`, since the sidebar's own "Home" group heading is a second, unrelated match otherwise). Full frontend suite green (707 tests, up from 696 - the new `nextPageHeaderTitle.test.tsx`'s own 11, no other regressions from the route restructuring). Two new captures opened and judged: `--chat-header-title-review` (unchanged from CHAT-HEADER-03, now also showing the chat icon) and the new `--next-page-header-icon-review` (the dashboard page, both viewports, both themes) - the sidebar's own House icon before "Home," the Search field gone, nothing overlapping or wrapping at 390px.
+
+## USAGE-01: streamed completions never carried usage, so cached_tokens was always blank (2026-09-23)
+
+The second measurement fact from "U6 rerun ruling" (b): `chatRequestBody()`
+(`backend/src/lib/llm.ts`) never set `stream_options: { include_usage:
+true }`, so llama-server never appended a final usage-only chunk to a
+streamed completion - `cached_tokens` had the field to carry it since
+spec-v0.1.24, and the recording proxy already read the right path
+(`usage.prompt_tokens_details.cached_tokens`), but nothing ever arrived
+to read.
+
+**One line, on every call.** `ChatCompletionRequest` gained
+`stream_options?: { include_usage?: boolean }` in `@maipai/spec`
+(spec-v0.1.26; `client.ts` already spreads the whole request into its
+fetch body, so no client code changes were needed once the type carried
+it). `chatRequestBody()` sets it unconditionally - the one shared
+builder every call site (`complete()`, `completeViaStack()`,
+`startCompleteStream()`, `startCompleteStreamViaStack()`) already reads
+from, so this reaches every call, streamed or not, direct or through a
+Stack, with no second copy to drift. It is a no-op on the two
+non-streaming call sites (`stream_options` only takes effect alongside
+`stream: true`); both streaming consumers (`stackChatDeltas` here,
+`client.ts`'s own stream parser) already read `chunk.choices?.[0]`
+through optional chaining, so the extra usage-only final chunk this
+now triggers (an empty `choices: []`, a populated `usage`) was already
+safe to receive, confirmed by a low review that checked both parsers
+directly rather than assuming it.
+
+**The pin bump's own fallout, fixed narrowly.** Bumping home's spec pin
+past spec-v0.1.25 (SIGNAL-02's `target` gaining `computed`, landed in
+commons but not yet consumed by home - see BACKLOG.md, still an open
+item) surfaced one real `tsc` error: `guards.ts`'s own `GuardContext.target`
+union didn't include `"computed"`, since spec's linear history means any
+pin bump past 0.1.24 inherits SIGNAL-02's type change whether or not
+this item touches it. Widened the union to add `"computed"` - a
+type-only fix, verified nothing in home's own code produces that value
+today (`classifyTurnSignal`/`targetOf` never return it, confirmed by
+search), so this is not SIGNAL-02's own classifier or interim-rule
+work, which stays a separate, unpicked-up item.
+
+**The live proof stays owed, on purpose.** "cached_tokens rising across
+a conversation" needs a real streamed turn against the pinned engine;
+the coordinator's own instruction for this block of items was "no
+rerun until I say," so this item stops at the wiring and its scripted
+proof (below), not a live measurement.
+
+Verified: two existing `llm.test.ts` tests (`FAST-01`'s own "cache_prompt
+... on every chat request" and its streamed twin) extended to also
+assert `capturedRequest.stream_options` equals `{ include_usage: true
+}`, rather than a new, narrower test - the same claim ("every call"),
+proven the same way FAST-01 already proves its own. `bunx tsc --noEmit`
+clean in both `backend/` and `frontend/`; full backend suite (3910/3910)
+green; `bash scripts/check.sh` green. Review: low, one finding-free pass
+(checked both streaming parsers directly for the empty-choices chunk).

@@ -242,7 +242,7 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     expect(result.value.tool_calls).toBeUndefined();
   });
 
-  test("sends cache_prompt: true and id_slot: 0 on every chat request (FAST-01)", async () => {
+  test("sends cache_prompt: true, id_slot: 0 and stream_options.include_usage on every chat request (FAST-01, USAGE-01)", async () => {
     let capturedRequest: ChatCompletionRequest | null = null;
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
@@ -259,6 +259,11 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
       expect(capturedRequest).not.toBeNull();
       expect(capturedRequest!.cache_prompt).toBe(true);
       expect(capturedRequest!.id_slot).toBe(0);
+      // USAGE-01: harmless on a non-streaming call (stream_options only
+      // takes effect alongside stream: true), sent here too because
+      // chatRequestBody() is the one shared builder every call site
+      // reads from - never a second copy that could drift.
+      expect(capturedRequest!.stream_options).toEqual({ include_usage: true });
     } finally {
       stub.stop();
     }
@@ -425,7 +430,7 @@ describe("lib/llm.ts startCompleteStream()", () => {
     if (!started.ok) expect(started.code).toBe("invalid_input");
   });
 
-  test("sends cache_prompt: true and id_slot: 0 on every streamed chat request (FAST-01)", async () => {
+  test("sends cache_prompt: true, id_slot: 0 and stream_options.include_usage on every streamed chat request (FAST-01, USAGE-01)", async () => {
     let capturedRequest: ChatCompletionRequest | null = null;
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
@@ -447,6 +452,10 @@ describe("lib/llm.ts startCompleteStream()", () => {
       expect(capturedRequest).not.toBeNull();
       expect(capturedRequest!.cache_prompt).toBe(true);
       expect(capturedRequest!.id_slot).toBe(0);
+      // USAGE-01 (dev.md "U6 rerun ruling"): without this, a streamed
+      // completion never carries a final usage chunk at all, so
+      // cached_tokens stayed blank on every streamed row.
+      expect(capturedRequest!.stream_options).toEqual({ include_usage: true });
     } finally {
       stub.stop();
     }
