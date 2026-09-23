@@ -20034,22 +20034,48 @@ assumed `required` holds on this build; it does not. The reply the
 engine returns instead is the model's own knowledge answer, which the
 interim rule forbids showing.
 
-**What was not determined, and the five-minute check that would.**
-Whether the engine enforces `required` with a grammar at all on this
-build and template, or only hints it in the prompt: a grammar-enforced
-`required` cannot produce plain content whatever the cache state, so the
-partial-reuse split in A3 (two of four pass on the same reuse) reads
-more like a near-tie at temperature 0 flipped by the numerics of a
-one-token or eleven-token batch than like a cache path that skips a
-constraint. Re-check C: the A1 request with `cache_prompt: false`,
-temperature 0.7 and a different `seed` per rep, ten reps; any rep that
-answers with content proves `required` is advisory on this build, and the
-cache merely decides which side of the tie the deterministic run lands
-on. Either answer leaves the hub-side fix below unchanged; it changes
-only the upstream issue's title. The draft issue for llama.cpp, with the
-minimal repro and the four sets, is at
+**Re-check C settles the mechanism: `required` is advisory on this
+build.** A grammar-enforced `required` cannot produce plain content
+whatever the cache state, so the A3 split (two of four pass on the same
+partial reuse) read like a near-tie flipped by numerics rather than a
+cache path skipping a constraint. Re-check C tested that directly: A1's
+request with `cache_prompt: false` (so `cached_tokens` 0 on every rep,
+no cache anywhere in the set), temperature 0.7 and a distinct `seed` per
+rep, ten reps (`results.md` "Re-check C", `logs/recheck-c.jsonl`).
+
+| rep | seed | cached_tokens | tool call | reply |
+|---|---|---|---|---|
+| 0 to 6 | 1000 to 1006 | 0 | yes | `expression: "president of chile"` |
+| 7 | 1007 | 0 | no | "The current president of Chile is ..." |
+| 8 | 1008 | 0 | no | the same knowledge answer |
+| 9 | 1009 | 0 | yes | `expression: "president of chile"` |
+
+8/10. Two reps answered from knowledge with no cache in play, which a
+grammar would have made impossible. So on llama-server b10797 with the
+Qwen3 template under `--jinja`, `tool_choice: "required"` is not
+enforced by a grammar; the prompt only asks for a call, and the model
+is near a tie between calling and answering. At temperature 0 the
+deterministic path lands on the call from a cold cache and on the
+answer once the slot's KV reuse shifts the logits (A2, A3, A4); at
+temperature 0.7 sampling alone flips it on about one rep in five. The
+cache-hit failures are one instance of the same near-tie, not a second
+bug. The upstream draft at
 `data-scratch/omlx-vs-llama/upstream-issue-llama-server-required.md`
-(scratch, roster-safe, for the coordinator to file).
+(scratch, roster-safe) is retitled accordingly, for the coordinator to
+file.
+
+**The hub runs this request at temperature 0.7, so the miss is the
+common case.** The model node passes no temperature
+(`backend/src/lib/turnMachine/nodes/model.ts`, the `startCompleteStream`
+call), so `chatRequestBody` in `backend/src/lib/llm.ts` applies
+`CHAT_SAMPLING` (FAST-06: temperature 0.7, `min_p` 0.05, XTC and DRY
+on) to every tool-calling completion, forced or offered. Re-check C's
+one-in-five was measured at 0.7 without the hub's `min_p`, XTC and
+DRY, so the hub's own miss rate is the nearest measurement, not a
+record; ENGINE-CONTRACT-02's `required_miss` counter is that record.
+FAST-06's note that the tool-calling bench "holds every positive and
+every negative" with the set on was measured under `auto`; it says
+nothing about `required`, which this finding now does.
 
 **The ruling, four parts (2026-09-23).**
 
