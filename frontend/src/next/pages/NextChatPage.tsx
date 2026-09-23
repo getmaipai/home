@@ -42,6 +42,7 @@ import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { ComposerAddMenu, PackageScopeContext, unwiredControlsAreEnabled } from "@/apps/chat/composerAddMenu";
+import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
@@ -1948,6 +1949,13 @@ export function NextChatPage({ person }: { person: Roster }) {
                   Indicator: ChatThinkingIndicator,
                   ComposerExtra: thinkingAllowed ? ComposerThinkingControl : undefined,
                   ComposerAddAttachmentOverride: ComposerAddMenu,
+                  // VOICE-LIVE-01: ComposerExtraEnd is the trailing-side
+                  // append point (ui-v0.5.36, beside Send/dictate, not
+                  // Attach) - ComposerVoiceControls already gates its
+                  // own render on stt+tts both being ready
+                  // (composerVoiceControls.tsx's own header), so this is
+                  // unconditional here the same way ComposerAddMenu is.
+                  ComposerExtraEnd: ComposerVoiceControls,
                   ReasoningGroup: NextReasoningGroup,
                 }}
               />

@@ -27,7 +27,7 @@ function stubEngines(roles: { id: string; state: string }[]): () => void {
   };
 }
 
-describe("ComposerVoiceControls (HANDSFREE-01 (b), built and tested ahead of its own composer slot)", () => {
+describe("ComposerVoiceControls (HANDSFREE-01 (b); mounted via ComposerExtraEnd, VOICE-LIVE-01)", () => {
   test("absent with no Stack configured - the common household today", async () => {
     const restore = stubEngines([]);
     try {

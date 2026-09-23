@@ -6,19 +6,15 @@
 // its chevron carrying voice selection. Built and unit-tested
 // (composerVoiceControls.test.tsx) - it renders whenever stt+tts are
 // both ready regardless of composerAddMenu.tsx's own unwired-controls
-// flag, since it isn't gated by that flag at all: it isn't mounted in
-// the real composer today, so there's no default view for the flag to
-// hide it from. `ComposerAction`'s right
-// group (the dictate mic, Send) has no append point the way its left
-// group does (`ComposerAddAttachmentOverride`, commons ui-v0.5.34;
-// `ComposerExtra`, ui-v0.5.31) - a `ComposerExtraEnd`-shaped slot is
-// HANDSFREE-01's own gap to cut, alongside the real live voice session
-// this control has nothing to drive yet (the vendored kit only carries
-// the presentational `elements/voice.tsx`/`voice-conversation.tsx`,
-// not upstream's runtime-wired `voice.aui.tsx`/`voice-conversation.aui.tsx`
-// and `createVoiceSession()` - worth a look when that session gets
-// built, not this slice's call). So this file's only consumer today is
-// its own test.
+// flag, since it isn't gated by that flag at all. VOICE-LIVE-01
+// (commons ui-v0.5.36) cut the `ComposerExtraEnd` slot `ComposerAction`'s
+// right group (the dictate mic, Send) was missing - `NextChatPage.tsx`
+// mounts this component there now. The real live voice session this
+// control has nothing to drive yet (the vendored kit only carries the
+// presentational `elements/voice.tsx`/`voice-conversation.tsx`, not
+// upstream's runtime-wired `voice.aui.tsx`/`voice-conversation.aui.tsx`
+// and `createVoiceSession()`) is VOICE-LIVE-02's own scope, not this
+// file's.
 import { useState } from "react";
 import { DismissableLayer } from "radix-ui/internal";
 import { useQuery } from "@tanstack/react-query";

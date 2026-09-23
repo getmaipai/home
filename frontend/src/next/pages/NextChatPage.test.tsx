@@ -2053,3 +2053,75 @@ describe("NextChatPage (DICT-01: the mic button's not-installed state)", () => {
     }
   });
 });
+
+// VOICE-LIVE-01 (2026-09-23): the composer's trailing-side append point
+// (`ComposerExtraEnd`, commons ui-v0.5.36) mounts `ComposerVoiceControls`
+// (composerVoiceControls.tsx, already built and unit-tested on its own)
+// - this describe covers the item's own acceptance line: "the waveform
+// renders in the composer on /next/chat when stt and tts are both ready
+// and is absent otherwise."
+describe("NextChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger)", () => {
+  function stubDictationFetch(sttTtsReady: boolean): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) {
+        const roles = sttTtsReady
+          ? [
+              { id: "stt", label: "stt", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-09-23T00:00:00.000Z" }, reason: null, model: null, check: { state: "not checked", at: null, reason: null, stale: false } },
+              { id: "tts", label: "tts", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-09-23T00:00:00.000Z" }, reason: null, model: null, check: { state: "not checked", at: null, reason: null, stale: false } },
+            ]
+          : [];
+        return Promise.resolve(Response.json({ configured: sttTtsReady, roles, engines: [], budget: null }));
+      }
+      if (url.includes("/api/voice/stt/status")) return Promise.resolve(Response.json({ installed: true, sileroInstalled: true, moonshineInstalled: true, recognizerLoaded: false }));
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-voicelive1", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  test("absent when stt/tts aren't both ready - the common household today", async () => {
+    const restore = stubDictationFetch(false);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+      expect(view.queryByLabelText("Start a voice conversation")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("renders the waveform and voice chevron once stt and tts are both ready", async () => {
+    const restore = stubDictationFetch(true);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      await view.findByLabelText("Start a voice conversation");
+      expect(view.getByLabelText("Choose a voice")).toBeTruthy();
+      // On the trailing side, before Send - not a second copy of the
+      // leading-side ComposerExtra slot. ComposerVoiceControls renders
+      // its own wrapper div (the waveform button plus the chevron), so
+      // this checks document order within the composer's action row
+      // rather than a shared immediate parent with Send.
+      const waveform = view.getByLabelText("Start a voice conversation");
+      const send = view.getByRole("button", { name: "Send message" });
+      expect(waveform.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+});
