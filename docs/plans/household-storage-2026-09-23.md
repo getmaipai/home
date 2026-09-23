@@ -43,7 +43,21 @@ this.
 | `media_type`, `size`, `sha256`, `storage_path` | the bytes below the household data directory, as today |
 | `retention` | as today; a person's own files default to "kept until deleted", a chat attachment keeps the conversation's retention |
 | `provenance` | the package id, the turn id and the job id that made it, or the conversation and turn it was sent in |
-| `shared_with` | `[]` (private), a list of person ids, or `"household"`; set only by the owner (see the bounds below) |
+| (sharing) | not a field on the file: a share is its own pointer record, below |
+
+**No duplicates, at any level (owner's rule, 2026-09-23).** The bytes are
+stored once, content-addressed: the blob store keys on `sha256`, so one
+blob exists per hash. One file record exists per blob, with one owner.
+When a second person adds the same bytes (two people send the same
+photo), no second blob and no second file record is written: the first
+arrival owns the file, and the second person receives a share pointer
+to it (the natural rule, stated: first in, owner). A share is a pointer
+record, `spec/schemas/share.schema.json`: `id`, `file_id`, `from_person_id`,
+`to` (a person id or `"household"`), `created_at`, `hlc`, `provenance`
+(the turn or the page that made it); never a second file record, never
+a copy of the bytes. Re-sharing (bramble shares a picture with lucia,
+lucia shares it with the family) is another pointer on the same file;
+what a person may re-share is question 6.
 
 The attachment fixture becomes a `file` fixture with `origin: sent`; the
 Python package regenerates; the tag is bumped and `home` and `bot` pin
@@ -64,7 +78,7 @@ memorialization) act on them; nothing here invents a new rule for that.
 
 ## Sharing, and its bounds
 
-The owner sets `shared_with`: nobody, named people, or the household. A
+The owner creates share pointers: to named people or to the household. A
 shared file appears in the recipients' Library under the owner's name
 and counts against the owner's usage only, never the recipient's. Bounds
 that already exist apply: a child's sharing is limited by the consent
@@ -73,8 +87,9 @@ adults; sharing with a named sibling is a household share in practice;
 sharing outside the household does not exist for anyone today, see
 question 2), a package reads a shared file only if its `min_role` and
 permissions allow, and the disclosure filter in the turn pipeline treats
-a shared file as context with the owner's disclosure. Unsharing is the
-owner's one action and takes effect at once.
+a shared file as context with the owner's disclosure. Unsharing deletes the
+pointer, the owner's one action, and takes effect at once; a re-share
+made from a pointer dies with the pointer it came from.
 
 ## The two caps, declared once
 
@@ -103,9 +118,12 @@ question 3.
 
 ## Usage, computed from the records
 
-Usage per person is the sum of `size` over the person's records; the
-household's is the sum over everyone; a shared file counts once, against
-its owner. Never a disk walk: the records are the truth, and a
+Usage per person is the sum of `size` over the files the person owns,
+each file once, never against the people it is shared with; the
+household's is the sum over everyone plus the household-owned files
+(below). Because bytes are stored once and a file record exists once,
+the numbers a person sees are the bytes on disk, with no double count
+to explain. Never a disk walk: the records are the truth, and a
 reconcile that finds bytes with no record or a record with no bytes
 reports it as a health item (the one health list), not as usage.
 
@@ -116,6 +134,22 @@ UI): each person's usage against their cap, the household total against
 its cap, the largest kinds per person, and the cap controls for an
 admin. The Admin performance page's storage panel (053b1422) reads the
 same numbers from the same function, so there is one source.
+
+## When a person is deleted
+
+The existing person-deletion path (`backend/src/lib/personLifecycle.ts`)
+gains one step, in one place: the person's files with no live share
+pointer are purged with the person, records and blobs (a blob is purged
+only when no file record points at it); a file with any live share
+remains. Decision, with the reasoning: the surviving file's ownership
+passes to the household, it counts against the household cap and
+against nobody's personal cap, and the deleted person's name stays in
+`provenance` as history. Why the household and not the recipient: a
+file shared with three people has no one recipient to inherit it, a
+recipient who did not ask for the bytes should not lose their own room
+to them, and a parent's page then shows the inherited files under one
+row, "shared by people no longer here", which is what a family would
+expect to find. This is not close enough to be a question.
 
 ## Backups, uninstall, and the robot
 
@@ -128,8 +162,9 @@ say: a transfer, never a translation.
 
 ## Rows
 
-- `STORE-SPEC-01` (commons, S, spec first): the `file` record above,
-  the attachment fixture migrated, `MEDIA-RECORD-01` folded in, the tag
+- `STORE-SPEC-01` (commons, S, spec first): the `file` record and the
+  `share` pointer record above, the blob store keyed on `sha256`, the
+  attachment fixture migrated, `MEDIA-RECORD-01` folded in, the tag
   bumped.
 - `STORE-CAP-01` (home, M): the three keys, enforcement at the record
   API with the two messages, usage from records, the reconcile health
@@ -138,9 +173,13 @@ say: a transfer, never a translation.
   more room", an adult gets the version with "or raise the limit under
   Settings", a shared file counts once against its owner, no job ever
   deletes a file.
-- `STORE-SHARE-01` (home, M): `shared_with` set and cleared by the owner,
-  the recipients' Library view, the consent bounds for a child, the
-  disclosure filter reading a shared file with the owner's disclosure.
+- `STORE-SHARE-01` (home, M): share pointers created and deleted by the
+  owner, re-sharing as a further pointer, the recipients' Library view,
+  the consent bounds for a child, the disclosure filter reading a shared
+  file with the owner's disclosure, and a second person's identical bytes
+  becoming a pointer to the first person's file.
+- `STORE-DELETE-01` (home, S): the person-deletion step: unshared files
+  and their orphaned blobs purged, shared files passed to the household.
 - `STORE-PAGE-01` (home, S): the Storage page and the performance panel
   on one function.
 - The robot's side rides on the portability rows in `bot`, not a new row
@@ -160,4 +199,8 @@ say: a transfer, never a translation.
 4. Whether a shared file counts against the owner only (my
    recommendation), or against every recipient.
 5. What happens to a person's files when that person is removed or
-   memorialized: kept under the household, or offered for export first.
+   memorialized: the deletion rule above purges the unshared ones; is an
+   export offered first, and does memorialization keep everything.
+6. What a person may re-share: anything shared with them (the natural
+   rule for a household), or only what the owner marked re-shareable,
+   and whether a child may re-share at all.
