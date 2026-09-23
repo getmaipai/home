@@ -22057,3 +22057,85 @@ texts that exist to carry are the client's own: "could not reach
 broke", and an HTTP error's status and body. Until GENFAIL-01 lands,
 the hub log's `[sidecars]` lines beside the turn's time are the only
 evidence, and they were enough here.
+
+## U4b-2's live measurement hit the failure class above, and wrote real conversations into the household DB (2026-09-23)
+
+The U4b-2 acceptance measurement (a three-way comparison script,
+`runTurn`/`runTurnNext`/the bare model, against Jesse's own morning
+question) was run twice without the port and data-directory isolation
+this same section's own finding calls for: `MAIPAI_DATA_DIR` pointed
+at the household's real data directory both times, and neither run set
+`MAIPAI_LLAMA_SERVER_PORT`/`MAIPAI_BACKGROUND_PORT`/`MAIPAI_EMBED_PORT`
+to non-production ports. `ps` afterward showed all three engine
+processes (8788, 8789, 8794) with a start time matching the second
+run's own window, confirming the exact kill-and-respawn this section
+already names: a second process starting the hub's supervisors with
+production defaults SIGKILLs the household's engines by port match and
+starts its own. Health was fine by the time this was caught (all four
+ports answering), but any in-flight household request during that
+window would have failed the way this section's outage did.
+
+**The real-data half is separate and worse.** `runTurn`/`runTurnNext`
+called with no explicit conversation id resolve to the actor's own
+most-recently-open conversation for chat (`resolveOrCreateConversation`
+with `opts.conversationId` unset), the same path a real chat message
+takes - so the measurement's calls did not write into an isolated
+thread of their own; they landed inside, and alongside, the actor's
+real conversation history. `hub.db` read-only, checked directly:
+`memory_records` had nothing from today (2026-09-23) at all, so
+nothing propagated to memory. `episodes` (what `recall`'s embedding
+search reads) did carry entries for the affected conversations.
+
+**Cleanup used `batchDeleteConversations` called directly against the
+live database from a script, not the batch-delete route itself** - the
+same function the route calls, but invoked without going through it is
+not the real path, and is not repeated; verified after by re-reading
+`hub.db` that `conversation_turns` and `episodes` were both zero for
+every deleted id:
+- 36 single/few-turn conversations from repeated dictation-testing runs
+  (a fake-audio input transcribed to a public-domain literary line),
+  spanning several hours - content unambiguous, no realistic reading of
+  them as a real household turn.
+- One conversation of garbled real-time dictation fragments, same class.
+
+**Five conversations were held back, not deleted**, because they mix
+what looks like the household's own real testing turns with the
+measurement script's own repeated retries of the same question landing
+in the same thread (the `resolveOrCreateConversation` behavior below) -
+the delete path only works at conversation granularity, so removing
+any of these would also remove the real turns inside them. They stay
+as they are; Jesse deletes what he wants from his own list, no further
+deletion of any kind by a lane.
+
+**One further conversation was deleted, then confirmed to be Jesse's
+own live test** and could not be recovered (no backup predated it; the
+delete path hard-removes `conversation_turns`, not a soft delete): a
+single turn whose exact question text and MCP-error reply matched both
+the measurement script's own fixed question and this file's own "The
+knowledge hijack" section. The loss is small (one question and the
+error string), and the two are not distinguishable by content alone -
+the one held back this time should have been the safer default.
+
+**Why the runs wrote into the household at all**: `runTurn`/
+`runTurnNext` called with no explicit conversation id resolve to the
+actor's own most-recently-open conversation for that surface
+(`resolveOrCreateConversation`), the same path a real chat message
+takes. A bench or measurement script must always create its own
+conversation, in its own scratch data directory, never resolve against
+the household's open one - isolation is not just the engine ports and
+`MAIPAI_DATA_DIR`, it is the conversation too.
+
+**The chat engine on 8788 was also found gone entirely** (not just
+unresponsive) partway through the cleanup work, with the background
+and embed engines from the same earlier restart still up; the cleanup
+script itself made no completion or supervisor calls, so the cause is
+unconfirmed. Fable restarted the hub; it is back.
+
+**The standing rule from here**: every measurement, repro, or bench run
+outside the test suite sets `MAIPAI_DATA_DIR` to a scratch directory and
+the three port variables to free, non-production ports; a measurement
+that must exercise the household's resident engine sends requests to
+its URL directly (`MAIPAI_LLAMA_SERVER_URL`) and starts no supervisor of
+its own. `ENGINE-PORT-01` (above) is the structural fix for the engine
+half; nothing here changes it, it is one more confirmed occurrence
+naming the same root cause with a live household on the other end of it.
