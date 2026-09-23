@@ -21412,3 +21412,107 @@ land: a 17-second "what time is it" is worse in a kitchen than a wrong
 1.4-second one, and turn 3 ("hello, how are you", 1.4 s against 1.7 s)
 shows the new path is already fine where nothing above applies. The
 registry default was never on; nothing to change there.
+
+## U6 rerun 2: interleaved (2026-09-23)
+
+RERUN-PROTOCOL-01's own first live use, from the shared checkout at
+`7db9756d` (Fable's `895075f1` landed after this run started and is
+not reflected here), against the household's real engine on 8788:
+`bun run backend/scripts/bench/replay.ts --interleaved --hub-live`,
+the full 21-row fixture, three repeats, old/new/old/new per row,
+`--keep-data` implied. The window ran 08:14:06 to 08:29:41 UTC (15m
+35s); Jesse was chatting on the new path on 8787 against the same
+engine for part of it, per the coordinator's own note before starting -
+the household-quiet wait stretched rather than skipped, and this run
+never touched `turn.pipeline.next` for the household's own setting
+(the bench flips it in its own isolated data directory only).
+
+### The bar, verbatim
+
+```
+PASS the five named failed rows stay clean, no engine-classed row, no empty reply
+     president-of-france-repeat: 3/3 clean, 0 engine; apple-announce-this-week: 3/3 clean, 0 engine; search-mariners-game: 3/3 clean, 0 engine; chatgpt-6-luna: 3/3 clean, 0 engine; corey-feldman-michael-jackson-friendship: 3/3 clean, 0 engine
+PASS the three named controls are 3/3 clean
+     control-search-mariners-explicit: 3/3; control-negative-spiderman: 3/3; control-negative-feeling-down: 3/3
+FAIL every plain turn's total is within 1.25x the old path's total
+     worst ratio 42.22x across 42 plain turns
+PASS every forced-search turn's total is under 10s median
+     median 5391ms across 42 forced turns
+FAIL cached_tokens rises across every multi-turn row
+     8/15 rows rising; failed: president-of-france-repeat#2, primetime-trailer-correction#1, primetime-trailer-correction#2, primetime-trailer-correction#3, president-of-chile-when-born#2, president-of-chile-hallucinated-name-followup#1, president-of-chile-hallucinated-name-followup#3
+```
+
+**Three of five pass.** The correctness bar (1, 2) and the forced-
+search median (4) hold. Speed (3) and cache reuse (5) do not - both
+already-named, already-queued gaps (THINK-DEFAULT-01/NEXT-CACHE-01/
+USAGE-01 landed only just ahead of this run; FORCED-CALL-01/CONTEXT-
+RECALL-01 land after it, per the coordinator's own queue), not new
+findings this run adds - this run is the first real measurement of
+where they stand together, live.
+
+### Per-row table (median total across 3 repeats, both paths)
+
+| row | old median total (ms) | new median total (ms) | ratio | new cache_n by turn (repeat 1 / 2 / 3) |
+|---|---|---|---|---|
+| president-of-france-repeat | 5274 | 25937 | 4.92x | 3/51; 225/3; 3/207 |
+| apple-announce-this-week | 3424 | 5741 | 1.68x | 211; 3; 225 |
+| search-mariners-game | 494 | 5446 | 11.02x | 74; 499; 3 |
+| primetime-trailer-correction | 1160 | 4421 | 3.81x | 483/3; 498/478; 498/478 |
+| president-of-chile-when-born | 9341 | 8667 | 0.93x | 3/193/460; 226/208/480; 3/208/484 |
+| president-of-chile-hallucinated-name-followup | 7067 | 6635 | 0.94x | 226/209; 3/209; 226/208 |
+| chatgpt-6-luna | 8245 | 16833 | 2.04x | 3/460/653; 229/460/645; 3/491/611 |
+| corey-feldman-michael-jackson-friendship | 2869 | 15372 | 5.36x | 3; 232; 232 |
+| control-dune-3 | 3475 | 7402 | 2.13x | 3; 226; 226 |
+| control-carrie-series | 1406 | 5429 | 3.86x | 213; 3; 226 |
+| control-search-mariners-explicit | 464 | 3805 | 8.20x | 74; 501; 501 |
+| control-hi | 494 | 404 | 0.82x | 483; 492; 3 |
+| control-say-hi | 190 | 358 | 1.88x | 483; 493; 493 |
+| control-twelve-plus-thirty | 667 | 11391 | 17.08x | 3; 228; 228 |
+| control-time-in-tokyo | 744 | 2417 | 3.25x | 23; 227; 227 |
+| control-remember-pizza-night | ~0 | ~10 | n/a | command-matched, no model call either path |
+| control-negative-dye-hair | 917 | 6136 | 6.69x | 74; 497; 3 |
+| control-negative-spiderman | 783 | 935 | 1.19x | 483; 500; 500 |
+| control-negative-stephen-king | 4171 | 8412 | 2.02x | 3; 226; 226 |
+| control-negative-good-morning | 247 | 362 | 1.47x | 3; 493; 493 |
+| control-negative-feeling-down | 766 | 1050 | 1.37x | 483; 497; 497 |
+
+Totals: old path's own `[turn]` log's `total_time_ms`, summed per
+conversation, median of the three repeats; new path's own
+`stats.nodes[]` wall-time sum (context through `output_gate`), summed
+per conversation, median of the three repeats - the same "total
+against total" the bar itself reads, not first-delta. `control-twelve-
+plus-thirty` and `control-time-in-tokyo`'s own bad ratios are
+`SIGNAL-02`'s own named gap (computed questions still force a search on
+the new path); most of the rest read as `NEXT-CACHE-01`/`USAGE-01`
+being real but not sufficient alone - several rows show a real cache
+hit on repeat 2 or 3 (`apple-announce-this-week` 211→3→225,
+`president-of-chile-when-born`'s turn 1 3→3→3 stays cold every repeat
+since each repeat is its own fresh conversation) while STILL running
+far slower in absolute terms than the old path, which this run cannot
+tell apart from the load spike below without a quieter rerun.
+
+### Load line summary
+
+126 load-average lines (one per interleaved step), 9 logged-in user
+lines throughout (unchanged - the same physical machine, the same
+logged-in sessions, all 15m 35s). The 1-minute load average started at
+6.83, climbed to a peak of **28.50** roughly two-thirds through the
+run, then came back down to 6.39-6.51 by the last few steps - a real,
+observed load spike mid-run, not a steady climb to the end and not
+present at either edge. This machine runs many concurrent Claude
+sessions per the org's own standing note; the spike's own cause (Jesse
+himself, another session's own work, or ordinary machine variance)
+isn't something this run's own data can tell apart. Read against it:
+condition 3's 42.22x worst ratio and several of the table's own
+double-digit ratios above may be inflated by this window's own
+contention, not purely the architecture; condition 4 (forced-search
+turns under 10s median, 5391ms) held even through the spike, which is
+real signal that the forced-search path itself isn't the slow part.
+
+### Kept data dir
+
+`/var/folders/qr/d9yr4nz52fbf1gvkq4hjc07w0000gn/T/owner-replay-interleaved-eDgw5C`
+(this Mac's own temp root; not committed, not portable - read directly
+on this machine if a specific turn's own trace is needed next). Full
+raw log: `data-scratch/u6-rerun-2-interleaved.log` (git-ignored, kept
+for reference; 1,596 lines, 168 cases executed).
