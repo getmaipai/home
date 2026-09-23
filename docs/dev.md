@@ -20711,3 +20711,83 @@ That fix introduced a second defect, only visible once `chatHeaderBar.tsx`'s own
 **Both fixes verified twice over:** the commons re-review's real-browser reproduction for the Search-overflow fix (37 widths, zero overlaps), and this item's own real captures opened and judged for the wrap fix - the full title reading whole at 1440, truncating with no wrap at 390, in both themes, plus a throwaway regression check (not committed - a temporary capture of the Settings page's own Search fallback at 800px, removed before landing) confirming the wrap-below-390 fix didn't reopen the Search-overflow case it was built on top of. `HeaderExtraContext.tsx`'s own `useHeaderExtra()` doc comment gained a paragraph naming the implicit contract: a consumer must itself add `flex-1 min-w-0` (and `truncate` on whatever should actually clip) to benefit from the growing left group - `chatHeaderBar.tsx` is the one example today.
 
 **A low-effort review of the home-side diff found four more real issues, all fixed, plus one named gap deferred to CHAT-HEADER-02.** (1) `ChatHeaderRename`'s `Input` kept the old fixed `max-w-64` while the display-mode title now grows via `flex-1` - entering rename on a wide header with a long title would visibly snap the header's own width down to 256px and back on commit/cancel/blur; fixed (`min-w-0 flex-1`, matching the title), with a new test asserting the rename input's own classes. (2) The doc comment above claimed Header.tsx used `flex-1`, when the landed fix is `flex-auto` (plus the `flex-nowrap`/`sm:flex-wrap` follow-up) - reworded to match what's actually in `ui-v0.5.39`, so a future reader doesn't "fix" Header.tsx back to the version the same-day review already found broken. (3) The 60-character fixture title named real people ("Corey Feldman," "Michael Jackson") - a real violation of the persona-roster rule even though the wording originated as the owner's own live example, not this session's invention; replaced with a roster-compliant title of the same length. (4) `seedConversation` in `captureChatThreadActionsReview` duplicated the exact recipe this item's own new capture needed - factored into the shared `seedTitledConversation()` helper above, both callers now use it. **Named, deferred gap:** the title `Button`'s own `flex-1` sets `flex-shrink:1` via the `flex` shorthand, but the kit's shared `buttonVariants` base class also carries an unconditional `shrink-0` that `tailwind-merge` does not dedupe against `flex-1` (different utility groups) and that wins the cascade (confirmed with a real computed-style check) - today this never triggers a real bug, since the title's `flex-basis: 0%` keeps this nested row permanently in the "grow" branch rather than the "shrink" branch, but CHAT-HEADER-02's planned app icon in this same slot could make the row's own available space genuinely tight enough to reach the shrink branch, where this would leave the chevron nowhere to go; documented in `chatHeaderBar.tsx`'s own comment for that item to re-check, not silently assumed fixed here. (Also noted, not fixed: several sibling `--x-review` flags, including the new one, don't fully isolate themselves from the default full capture matrix when run standalone - a pre-existing gap this item inherited rather than introduced, out of scope to fix here.)
+
+## U4c: the plan recomputes from real tool-round evidence (2026-09-23)
+
+`turnNext.ts` computed its one `planFor()` call up front, before
+`context` or any tool round ran, with `evidence` hardcoded to `{
+choices: 0, sources: 0, deliverable: false }` - correct at that point
+(nothing had run yet), but never revisited once a tool round actually
+returned something, so a written question's evidence-boosted row (360
+words / 24 sentences, `register.ts`'s own `writtenQuestionHasRoom`) was
+unreachable on the new path, named and left open in U4's own done
+report.
+
+**The fix, one `planFor()` call site, reused, not duplicated.**
+`turnNext.ts`'s original inputs (signal, surface, surfaceClass,
+companion, band, brevity, deferred, disclosureWithheld - everything
+`planFor()` takes except `evidence`) are now kept on `TurnState.planBasis`
+(`contract.ts`), so a second computation never re-resolves persona or
+signal a second time. `machine.ts` gained one new action,
+`derivePlanFromEvidence`, wired into both of the `tool` state's
+`onDone` transitions (the loop back to `model` for a phrasing round,
+and the fall-through to `answer`) immediately after `recordOutcomes`,
+so `turnState.outcomes` already holds the round's real results when it
+runs. It derives `sources` (the total `Source` count across every
+succeeded outcome so far) and `deliverable` (whether any succeeded
+outcome's result carried a non-empty `actions` array - something the
+plugin actually did, not only looked up) from that real evidence, and
+calls the exact same `planFor()` with `{ ...planBasis, evidence: {
+choices: 0, sources, deliverable } }`.
+
+**Recomputed once after the tool round, for today's budget - by
+design, not by an accident of the fixture.** The action is wired to
+run every time the `tool` state completes, so a budget allowing more
+than one round would recompute again each time, always from the fully
+accumulated real evidence (never additive drift, since `sources`/
+`deliverable` are re-derived from the whole `outcomes` array each
+call, not incremented). The 8B budget in `modelCatalog.ts` sets
+`rounds: 1`, so `moreRoundsAvailable` (`roundsUsed < budget.rounds`)
+allows exactly one loop back to `model` after the first tool round and
+none after that - `tool` therefore completes at most once per turn
+under today's budget, so the recompute runs at most once, always
+before both the phrasing generation (if the model proposed a tool
+call) and `answer`.
+
+**`choices` stays 0 - not guessed.** The objective names `sources`,
+`deliverable`, and "a `pick` choice count" as the real evidence to
+derive from, but no field on `ToolExecutionOutcome` or `PluginResult`
+today reports "more than one candidate the household must pick
+between" - `data` is an untyped `Record<string, unknown>` a recipe's
+`format` step fills however that recipe defines it, with nothing
+structurally naming a candidate count. Inventing a heuristic here (a
+result with N items in some `data` array, say) would be exactly the
+kind of hacky rule RULES-AND-LEARNED-COMPONENTS.md rules out - a real
+`choices` signal needs its own named field on the shape, a separate
+item, not a guess folded into this one.
+
+**Acceptance, in the row's exact words:** "a written question whose
+tool round returns one source gets the 360/24 row and `planLine`'s own
+text changes with it; a written question with no tool round, or one
+that returns nothing, keeps the base 220/14 row." Two new integration
+tests in `tests/turnMachine/turnNext.test.ts` ("turnNext.ts: U4c, the
+plan recomputes from real tool-round evidence") prove the wiring
+end to end against the real machine and a fake SearXNG: a chile
+world-question whose scripted websearch call returns a real result
+gets `max_tokens` 720 (360 words * `model.ts`'s own `maxTokensFor`
+ceiling, `max_words * 2`) on its last generation - the phrasing round,
+the only one that runs after the recompute - against the base row's
+440; the same question with its tool call's expression pointed at the
+fake SearXNG's own "no results fixture" query (a real, succeeded
+outcome with no sources) keeps 440 despite a tool round actually
+running. `planLine`'s own text changing with evidence is already
+proven directly, at the unit level, in `tests/register.test.ts`
+("planLine on the written class names no sentence count" and its
+neighbors) - what these two new tests prove is that a real tool round's
+real evidence actually reaches that recompute, the gap U4 named and
+this item closes.
+
+Verified: `bunx tsc --noEmit` clean; the two new tests and the full
+`turnNext.test.ts` suite (28/28) green; the full backend suite
+(3904/3904) green; `bash scripts/check.sh` green. Review: low (one
+call site, tests), no findings.

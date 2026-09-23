@@ -18,6 +18,7 @@ import type { LlmMessage, ToolCall } from "@/lib/llm";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { GenerationInput } from "@/lib/turnStats";
 import type { PendingAsk } from "@/lib/conversationHistory";
+import type { PlanInput } from "@/lib/register";
 
 /** ARCH-POLICY-01's ingress unit: what the model actually sees, filtered
  * before the prompt (disclosure, band, temporary mode) and typed by
@@ -105,6 +106,14 @@ export interface TurnState {
   signal: TurnSignal;
   budget: TurnBudget;
   plan: ReplyPlan;
+  /** U4c: the exact non-evidence `planFor()` inputs `turnNext.ts`
+   * resolved once, up front (signal, surface, surfaceClass, companion,
+   * band, brevity, deferred, disclosureWithheld) - kept so the
+   * machine's own post-tool-round recompute (`derivePlanFromEvidence`
+   * in `machine.ts`) reuses the identical inputs and only `evidence`
+   * changes: the same `planFor()` shape, never a second, divergent
+   * one. */
+  planBasis: Omit<PlanInput, "evidence">;
   safety: SafetyResult;
   crisis: boolean;
   /** The filtered list; the only prompt input. */

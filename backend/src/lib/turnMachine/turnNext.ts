@@ -113,19 +113,23 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
   const persona = resolvePersona(getHouseholdSettingValue("persona.active_id"));
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
-  // `reasoning.emit` already follows in `context`.
+  // `reasoning.emit` already follows in `context`. U4c: everything
+  // here except `evidence` is the turn's fixed plan basis, kept on
+  // `state.planBasis` so the machine's own post-tool-round recompute
+  // reuses these exact inputs rather than re-resolving persona/signal
+  // a second time.
   const surfaceClass = surfaceClassOf(surface, opts.spoken === true);
-  const plan = planFor({
+  const planBasis = {
     signal,
     surface,
     surfaceClass,
     brevity: false,
-    evidence: { choices: 0, sources: 0, deliverable: false },
-    companion: { directness: "direct", engagement: persona.engagement, complexity: persona.complexity },
+    companion: { directness: "direct" as const, engagement: persona.engagement, complexity: persona.complexity },
     band,
     deferred: false,
     disclosureWithheld: false,
-  });
+  };
+  const plan = planFor({ ...planBasis, evidence: { choices: 0, sources: 0, deliverable: false } });
 
   const state: TurnState = {
     turnId: newConversationTurnId(),
@@ -136,6 +140,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     signal,
     budget: resolveTurnBudget(),
     plan,
+    planBasis,
     safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
     crisis: false,
     context: [],

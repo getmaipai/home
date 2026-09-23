@@ -19,6 +19,7 @@ import { policyNode, type PolicyOutput, type PolicyEntry } from "./nodes/policy"
 import { toolNode, type ToolOutput } from "./nodes/tool";
 import { answerNode, type AnswerInput, type AnswerOutput, type PolicyRefusedReason } from "./nodes/answer";
 import { outputGateNode, type OutputGateOutput } from "./nodes/outputGate";
+import { planFor } from "@/lib/register";
 
 const IMPL_VERSION = "1";
 
@@ -173,6 +174,32 @@ export const turnMachine = setup({
     recordOutcomes: ({ context }) => {
       context.turnState.outcomes.push(...(context.step as ToolOutput).outcomes);
     },
+    // U4c (docs/BACKLOG.md): the plan `turnNext.ts` computed up front
+    // used a static `evidence: { choices: 0, sources: 0, deliverable:
+    // false }` because nothing had run yet - correct at that point, but
+    // never revisited once a tool round actually returns something,
+    // so a written question with a real source never reached the
+    // evidence-sized (360 words / 24 sentences) row. Runs immediately
+    // after `recordOutcomes` so `turnState.outcomes` already holds this
+    // round's real results; re-derives `sources` (the total Source
+    // count across every succeeded outcome so far) and `deliverable`
+    // (whether any succeeded outcome's result carried a real `actions`
+    // entry - a plugin that did something, not only looked something
+    // up) from that real evidence, through the exact same `planFor()`
+    // call turnNext.ts made, via `turnState.planBasis` - never a
+    // second, divergent plan computation. `choices` stays 0: no
+    // `ToolExecutionOutcome`/`PluginResult` field today reports "more
+    // than one candidate the household must pick between," so there is
+    // no real evidence to derive it from yet (named, not guessed).
+    // Runs on every tool-round completion, so a budget allowing more
+    // than one round keeps the plan current each time; today's 8B
+    // budget (`rounds: 1`) means this runs at most once per turn.
+    derivePlanFromEvidence: ({ context }) => {
+      const succeeded = context.turnState.outcomes.filter((o) => o.status === "succeeded");
+      const sources = succeeded.reduce((n, o) => n + (o.sources?.length ?? 0), 0);
+      const deliverable = succeeded.some((o) => (o.result?.actions?.length ?? 0) > 0);
+      context.turnState.plan = planFor({ ...context.turnState.planBasis, evidence: { choices: 0, sources, deliverable } });
+    },
     recordCommandOutcome: ({ context }) => {
       const step = context.step as CommandsOutput;
       if (step.matched) context.turnState.outcomes.push(step.outcome);
@@ -310,10 +337,10 @@ export const turnMachine = setup({
         onDone: [
           {
             guard: "moreRoundsAvailable",
-            actions: [assign(({ event }) => ({ step: event.output })), assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), "recordOutcomes"],
+            actions: [assign(({ event }) => ({ step: event.output })), assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), "recordOutcomes", "derivePlanFromEvidence"],
             target: "model",
           },
-          { actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes"], target: "answer" },
+          { actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes", "derivePlanFromEvidence"], target: "answer" },
         ],
       },
     },

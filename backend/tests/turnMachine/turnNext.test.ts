@@ -412,11 +412,13 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
     const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.owner, "chat", "how do I make a paper airplane"));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    // Written, no evidence (turnNext.ts's own plan is computed once,
-    // upfront, with evidence hardcoded to zero - the 360/24 evidence-
-    // boosted row is unreachable on this path today, a separate gap
-    // named in the done report, not this test's job to close): 220
-    // words * model.ts's own maxTokensFor ceiling (max_words * 2) = 440.
+    // Written, no evidence: this row never runs a tool at all (a
+    // self-target question, never the world), so U4c's post-tool-round
+    // recompute never fires and the plan stays exactly what
+    // turnNext.ts computed up front - 220 words * model.ts's own
+    // maxTokensFor ceiling (max_words * 2) = 440. The evidence-boosted
+    // row is covered by the "U4c" describe block below, on a row whose
+    // tool round actually returns something.
     expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(440);
   });
 
@@ -426,6 +428,81 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     // Spoken keeps the act table exactly: a question is 60 words * 2 = 120.
     expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(120);
+  });
+});
+
+// U4c (docs/BACKLOG.md): the plan turnNext.ts computes up front always
+// has evidence hardcoded to zero, since nothing has run yet at that
+// point - correct for the first (forced-call) generation, but the
+// machine's own `derivePlanFromEvidence` action (machine.ts, wired
+// into the `tool` state's `onDone`) re-derives it from the tool
+// round's real outcomes before the phrasing generation and before
+// `answer`. The phrasing round is always the last entry in
+// `state.generations` for these two-round tool-call turns (the forced
+// call, then the phrase-from-result call), so reading the last
+// generation's own max_tokens - not the first's - is what proves the
+// recompute actually reached the request that matters.
+describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", () => {
+  async function lastGenerationMaxTokens(turnId: string): Promise<number | null | undefined> {
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { max_tokens: number | null }[] };
+    const generations = stats.generations ?? [];
+    return generations[generations.length - 1]?.max_tokens;
+  }
+
+  test("a written question whose tool round returns one source gets the evidence-boosted plan row", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.sources?.length).toBeGreaterThan(0);
+      // Written, evidence.sources >= 1: 360 words * maxTokensFor's
+      // ceiling (max_words * 2) = 720, not the base row's 440.
+      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(720);
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("a written question whose tool round returns nothing keeps the base plan row", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          // The fake SearXNG's own "no results fixture" query (used
+          // elsewhere for the empty_rows composer row) returns zero
+          // results regardless of the real utterance - a succeeded
+          // outcome with no sources, so evidence.sources stays 0 and
+          // the base row should hold even though a tool round ran.
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "no results fixture" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "I couldn't find anything on that." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.sources?.length ?? 0).toBe(0);
+      // Written, no real evidence despite the tool round running: the
+      // base row, 220 words * 2 = 440, exactly like no tool round at all.
+      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(440);
+    } finally {
+      searxng.stop();
+    }
   });
 });
 
