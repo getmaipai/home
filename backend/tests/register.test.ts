@@ -113,7 +113,7 @@ describe("planFor", () => {
       const signal = base("inform");
       const line = planLine(planFor(input(signal, { surfaceClass: "written" })), signal, "written");
       expect(line).not.toContain("sentence");
-      expect(line).toContain("as long as it needs, structured where it helps");
+      expect(line).toContain("as complete as you would answer with no persona at all, then in the companion's voice");
     });
   });
 

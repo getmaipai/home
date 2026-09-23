@@ -52,6 +52,7 @@
 // invariants section, and needs its own explicit reconciliation rule,
 // not a value dropped in beside three harmless ones).
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
+import type { SurfaceClass } from "@/lib/surfaceClass";
 
 export interface Persona {
   id: string;
@@ -190,6 +191,17 @@ export const INFORMATION_HANDLING_POLICY = [
 export const NATURALNESS_POLICY =
   'Say things the way a person talking out loud would, not the way a screen would print them: a time is "it\'s three forty-five," never "the current time is 3:45 PM"; a yes/no question gets "yep" or "nope," never "the answer to your question is yes"; a short list gets said as a sentence ("you\'ve got milk, eggs, and bread"), never read back with "the following items:" or bullet points.';
 
+// The reply floor (owner's rule, 2026-09-23, the state record "The
+// reply floor"): NATURALNESS_POLICY above is a spoken-class fragment -
+// "never bullet points" is right for a voice reply and wrong for a
+// typed one, where the bare model's own structure (headings, numbered
+// steps, a list) is exactly what a written answer keeps. This is that
+// fragment's written twin: the same "say it exactly, don't pad it"
+// spirit, permitting and expecting the structure the spoken policy
+// forbids.
+export const WRITTEN_POLICY =
+  "This is a typed reply on a screen, not read aloud: use whatever structure makes it clearest - headings, a numbered list, short paragraphs - the same way a well-written answer to this would be structured anywhere else. Say a time, a fact or a list exactly, the way it reads written down; never pad it into spoken phrasing to avoid structure.";
+
 const FORMALITY_FRAGMENT: Record<Persona["formality"], string> = {
   casual:
     "Talk the way a person actually talks in a relaxed conversation, not like a written page being read aloud: use contractions (it's, you're, don't) and keep your phrasing easygoing.",
@@ -197,6 +209,19 @@ const FORMALITY_FRAGMENT: Record<Persona["formality"], string> = {
     "Talk the way a person actually talks, using contractions (it's, you're, don't), in a natural, unforced tone - neither stiff nor overly casual.",
   formal:
     "Speak in complete, well-formed sentences without contractions, the way a careful professional would in conversation: polite and precise, never stiff or robotic.",
+};
+
+// The reply floor (owner's rule, 2026-09-23): FORMALITY_FRAGMENT above
+// is written for the ear ("not like a written page being read aloud"),
+// the opposite instruction on a typed reply - a code review of U4b-2's
+// live measurement caught this fragment fighting WRITTEN_POLICY in the
+// same message. This is that fragment's written twin: how this
+// companion writes, not how it talks, nothing about pages or being
+// read aloud.
+const FORMALITY_FRAGMENT_WRITTEN: Record<Persona["formality"], string> = {
+  casual: "Write the way a person actually writes a relaxed message: use contractions (it's, you're, don't) and keep your phrasing easygoing.",
+  neutral: "Write the way a person actually writes, using contractions (it's, you're, don't), in a natural, unforced tone - neither stiff nor overly casual.",
+  formal: "Write in complete, well-formed sentences without contractions, the way a careful professional would in a written note: polite and precise, never stiff or robotic.",
 };
 
 const COMPLEXITY_FRAGMENT: Record<Persona["complexity"], string> = {
@@ -223,6 +248,24 @@ const ENGAGEMENT_FRAGMENT: Record<Persona["engagement"], string> = {
     "Keep replies short, usually just a few sentences: answer the question directly, and offer one natural follow-up only if it would genuinely help, never as a matter of habit.",
   curious:
     "Keep it natural and not too long: when they share something personal or emotional, show you noticed - ask a brief, genuine follow-up or say something caring before moving on, the way someone who cares about them would.",
+};
+
+// The reply floor (owner's rule, 2026-09-23): the sentence-count
+// language above is a spoken-class assumption ("a sentence or two"
+// measures a voice reply, not a typed one) - on the written class,
+// "brief" means no padding and no habit-follow-up, never a cap on how
+// complete the answer is allowed to be. Same three characters (brief
+// stays the most economical, curious still asks a follow-up), the
+// length constraint dropped for all three since a written answer's own
+// length already comes from the plan (register.ts's writtenBudgetFor),
+// never from this fragment.
+const ENGAGEMENT_FRAGMENT_WRITTEN: Record<Persona["engagement"], string> = {
+  brief:
+    'Answer the exact question completely, then stop: no restating it back, no "let me know if you need anything else," no follow-up question tacked on - but never cut a genuinely complete answer short for the sake of being brief. Brief means no padding, not less substance.',
+  balanced:
+    "Answer the question directly and completely, and offer one natural follow-up only if it would genuinely help, never as a matter of habit.",
+  curious:
+    "Answer completely; when they share something personal or emotional, show you noticed - ask a brief, genuine follow-up or say something caring before moving on, the way someone who cares about them would.",
 };
 
 const FILLER_FRAGMENT: Record<Persona["filler_density"], string> = {
@@ -261,13 +304,25 @@ function examplesBlock(examples: readonly string[] | undefined): string {
   return ` Some examples of how you talk:\n${lines}`;
 }
 
-export function composePersonaPrompt(persona: Persona): string {
-  return (
-    [
-      FORMALITY_FRAGMENT[persona.formality],
-      COMPLEXITY_FRAGMENT[persona.complexity],
-      ENGAGEMENT_FRAGMENT[persona.engagement],
-      FILLER_FRAGMENT[persona.filler_density],
-    ].join(" ") + examplesBlock(persona.examples)
-  );
+/** `surfaceClass` defaults "spoken" - the old path's own four call
+ * sites (turnEngine.ts, personaJudge.ts) pass nothing and get today's
+ * exact wording, frozen; only the new path (messages.ts, via
+ * buildStablePrefix's own new parameter) passes "written" explicitly.
+ *
+ * The reply floor (owner's rule, 2026-09-23): the few-shot voice
+ * examples are the spoken voice lever (`examplesBlock`'s own comment:
+ * "the single biggest lever for small-model voice fidelity") and are
+ * spoken-only - a code review of U4b-2's live measurement found an 8B
+ * model handed four short, casual, spoken one-liners alongside the
+ * written-mode prose reading them as the stronger signal and writing
+ * short and casual despite it. On the written class the voice carries
+ * through the formality and engagement fragments alone; a written
+ * examples field is a later, spec-first item (WRITTEN-EXAMPLES-01),
+ * not this one. */
+export function composePersonaPrompt(persona: Persona, surfaceClass: SurfaceClass = "spoken"): string {
+  const written = surfaceClass === "written";
+  const formality = written ? FORMALITY_FRAGMENT_WRITTEN[persona.formality] : FORMALITY_FRAGMENT[persona.formality];
+  const engagement = written ? ENGAGEMENT_FRAGMENT_WRITTEN[persona.engagement] : ENGAGEMENT_FRAGMENT[persona.engagement];
+  const examples = written ? "" : examplesBlock(persona.examples);
+  return [formality, COMPLEXITY_FRAGMENT[persona.complexity], engagement, FILLER_FRAGMENT[persona.filler_density]].join(" ") + examples;
 }

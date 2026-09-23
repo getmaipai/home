@@ -24,6 +24,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnEngine";
+import { isWrittenAdultTurn } from "@/lib/surfaceClass";
 import { contextToMessages } from "../messages";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 
@@ -106,11 +107,35 @@ function toolSpecFor(id: string): ToolSpec | null {
 // text - a websearch call is 30 to 45 tokens (the name, `expression`,
 // `category`, `read_page` and the wrapper), so 96 leaves real room for
 // a long expression and can never pay for a 440-token knowledge answer
-// the way `maxTokensFor`'s own doubled-max_words formula did. The cap
-// is the backstop for the non-streaming Stack twin and for a runaway
-// call; the early-abort below (the first text delta on a forced call)
-// is what actually keeps a miss cheap in the common, streaming case.
+// the way the ordinary/phrasing call's own cap did. The cap is the
+// backstop for the non-streaming Stack twin and for a runaway call;
+// the early-abort below (the first text delta on a forced call) is
+// what actually keeps a miss cheap in the common, streaming case.
 const FORCED_CALL_MAX_TOKENS = 96;
+
+/** The reply floor (spec-v0.1.28, U4b-2, turn-machine-state-record-
+ * 2026-09-22.md "The reply floor"): a written, non-brevity, adult
+ * turn uses the budget's own reply_ceiling_tokens instead of LAT-01's
+ * shared visibleReplyMaxTokens formula (turnEngine.ts) - a runaway
+ * backstop sized per model, not a max_words-derived number built for
+ * the spoken register's short-form defaults, which would clip a long
+ * written answer well before it ever ran away. Every other turn
+ * (spoken, glance, a child's or teen's turn, a brevity turn) keeps
+ * LAT-01's own formula unchanged, the same one the old path uses -
+ * one formula outside the written-adult case, not two that can drift.
+ * `thinking` adds the toggled-on budget on top so a written turn with
+ * thinking on gets room for both the reasoning span and the visible
+ * reply that follows it. isWrittenAdultTurn (surfaceClass.ts) is the
+ * one shared gate for "written and adult" - a review caught this
+ * file's own inline version of the same check (surfaceClass +
+ * age_band, no shared helper) drifting from messages.ts's own gate on
+ * the persona/plan-line side, which is exactly the kind of duplicated-
+ * predicate risk a second, independent copy invites. */
+function replyMaxTokensFor(state: TurnState, thinking: boolean): number {
+  const isWrittenAdult = isWrittenAdultTurn(state.planBasis.surfaceClass, state.plan.age_band) && !state.planBasis.brevity;
+  if (isWrittenAdult) return state.budget.reply_ceiling_tokens + (thinking ? state.budget.thinking_budget_tokens_toggled : 0);
+  return visibleReplyMaxTokens(state.plan.max_words, thinking);
+}
 
 interface GenerationAttempt {
   ok: true;
@@ -327,11 +352,11 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // household's own toggle (THINK-DEFAULT-01) unchanged.
   const thinkingOn = tool_choice !== "required" && state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
   // FORCED-CALL-01: the forced call's own cap is fixed (FORCED_CALL_
-  // MAX_TOKENS); the phrasing/ordinary call's own cap is LAT-01's one
-  // formula (visibleReplyMaxTokens), never a second one - thinkingOn
-  // is already forced false above for a required call, so this reads
-  // truthfully for both.
-  const maxTokens = tool_choice === "required" ? FORCED_CALL_MAX_TOKENS : visibleReplyMaxTokens(state.plan.max_words, thinkingOn);
+  // MAX_TOKENS); the phrasing/ordinary call's own cap is replyMaxTokensFor's
+  // (LAT-01's formula, or the reply floor's ceiling on a written adult
+  // turn) - thinkingOn is already forced false above for a required
+  // call, so this reads truthfully for both.
+  const maxTokens = tool_choice === "required" ? FORCED_CALL_MAX_TOKENS : replyMaxTokensFor(state, thinkingOn);
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, interimRuleApplies ? "interim_rule" : "model", signal);
   // DEADLINE-01: a generation that never finished (the model node's
   // own deadline, a dead engine) is one more way "the model produced
@@ -349,7 +374,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // calls never reach here with thinkingOn true (forced above), so
   // this retry is only ever an ordinary/offered call's own.
   if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && thinkingOn) {
-    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, visibleReplyMaxTokens(state.plan.max_words, false), "model_retry_no_thinking", signal);
+    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false), "model_retry_no_thinking", signal);
     if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
   }
 

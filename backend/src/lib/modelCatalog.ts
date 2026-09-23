@@ -98,6 +98,12 @@ export const CATALOG: ModelCapabilities[] = [
       // false default only saves the tokens a minor's turn would never
       // see or keep anyway.
       thinking_for_minors: false,
+      // The reply floor (spec-v0.1.28, turn-machine-state-record-2026-09-22.md
+      // "The reply floor", owner's rule 2026-09-23): a runaway-guard
+      // backstop for the most visible tokens one written adult reply may
+      // take, never a length target - the written plan's own length
+      // numbers (register.ts's writtenBudgetFor) stay room, not a ceiling.
+      reply_ceiling_tokens: 1536,
       deadlines_ms: { model: 20000, tool: 10000, total: 45000 },
       measured: {
         false_call_rate: 0,

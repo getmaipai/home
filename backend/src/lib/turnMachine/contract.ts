@@ -102,6 +102,15 @@ export interface TurnBudget {
    * from the age band alone, so a minor's turn never emits or persists
    * reasoning whichever way this is set. */
   thinking_for_minors: boolean;
+  /** The reply floor (spec-v0.1.28, turn-machine-state-record-2026-09-22.md
+   * "The reply floor", owner's rule 2026-09-23): the most visible tokens
+   * one written adult reply may take - a runaway-guard backstop, never a
+   * length target (the written plan's own length numbers, register.ts's
+   * writtenBudgetFor, stay room the model's own end-of-reply decides
+   * inside). nodes/model.ts's max_tokens derivation uses this only for a
+   * written, non-brevity, adult turn; every other turn keeps its existing
+   * max_words-derived cap. */
+  reply_ceiling_tokens: number;
   deadlines_ms: { model: number; tool: number; total: number };
   measured: { false_call_rate: number; inverse_miss_rate: number; rewrite_pass_rate: number; on: string };
 }

@@ -179,6 +179,27 @@ describe("contextToMessages(): U4b, the persona prefix, the reanchor and the pla
     const spokenLine = spoken.find((m) => m.content.includes("How to answer this one:"))?.content;
     const writtenLine = written.find((m) => m.content.includes("How to answer this one:"))?.content;
     expect(spokenLine).not.toBe(writtenLine);
-    expect(writtenLine).toContain("as long as it needs");
+    expect(writtenLine).toContain("as complete as you would answer with no persona at all");
+  });
+
+  // The reply floor is a written-class, ADULT-only backstop
+  // (isWrittenAdultTurn, surfaceClass.ts). A code review (U4b-2) caught
+  // this file's first cut passing a "written" surfaceClass straight
+  // through regardless of band: a child's chat turn got the written
+  // persona's "use whatever structure" wording and planLine's "as long
+  // as it needs" length clause, while nodes/model.ts's max_tokens still
+  // fell through to the small, age-clamped word budget - the model was
+  // told to answer completely and use structure while capped to a
+  // fraction of the tokens that would take.
+  test("a minor's written turn still reads spoken: the reply floor is adult-only", () => {
+    const childSignal: TurnSignal = fallbackSignal("how do I make a paper airplane", "child");
+    const childPlanInput: PlanInput = { signal: childSignal, surface: "chat", surfaceClass: "written", brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", vocabulary: "simple" }, band: "child", deferred: false, disclosureWithheld: false };
+    const childPlan = planFor(childPlanInput);
+    const out = contextToMessages([], "how do I make a paper airplane", DEFAULT_PERSONA, childPlan, childSignal, "written");
+    const stableMessage = out[0]!;
+    const volatileMessage = out.find((m) => m.role === "system" && m.content.includes("How to answer this one:"));
+    expect(stableMessage.content).toContain("Say things the way a person talking out loud would");
+    expect(stableMessage.content).not.toContain("use whatever structure");
+    expect(volatileMessage?.content).not.toContain("as complete as you would answer with no persona at all");
   });
 });

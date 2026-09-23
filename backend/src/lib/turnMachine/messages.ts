@@ -26,6 +26,7 @@ import type { Persona } from "@/lib/persona";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SurfaceClass } from "@/lib/surfaceClass";
+import { isWrittenAdultTurn } from "@/lib/surfaceClass";
 import { buildStablePrefix, companionReanchorLine } from "@/lib/turnEngine";
 import { planLine } from "@/lib/register";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
@@ -133,9 +134,20 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   const memoryItems = volatile.filter((item) => item.source === "memory");
   const restVolatile = volatile.filter((item) => item.source !== "memory");
 
+  // The reply floor is a written-class, adult-only backstop
+  // (isWrittenAdultTurn, surfaceClass.ts): a review caught this file's
+  // first cut passing the raw surfaceClass straight to buildStablePrefix
+  // and planLine, so a child's chat turn got the written persona's "never
+  // cut a genuinely complete answer short" wording and planLine's "as
+  // long as it needs" length clause while nodes/model.ts's max_tokens
+  // still fell through to the small, age-clamped word budget. Collapsed
+  // to "spoken" for any turn that isn't a written, adult one, so the
+  // prompt never promises a length the token budget can't back.
+  const promptSurfaceClass: SurfaceClass = isWrittenAdultTurn(surfaceClass, plan.age_band) ? "written" : "spoken";
+
   const messages: LlmMessage[] = [];
   const stableContextLines = stable.length > 0 ? `\n\n${stable.map(renderContextLine).join("\n")}` : "";
-  messages.push({ role: "system", content: `${buildStablePrefix(persona)}${stableContextLines}` });
+  messages.push({ role: "system", content: `${buildStablePrefix(persona, promptSurfaceClass)}${stableContextLines}` });
   // The window already alternates user/assistant/tool roles correctly
   // (buildConversationWindow()'s own job); this machine never rebuilds
   // that ordering, only replays the window's own roles verbatim.
@@ -156,7 +168,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // verbatim here too, every turn, the same volatile-zone role it
   // already has in the old path.
   const reanchor = companionReanchorLine(persona).trim();
-  messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}${reanchor}\n\nHow to answer this one: ${planLine(plan, signal, surfaceClass)}` });
+  messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}${reanchor}\n\nHow to answer this one: ${planLine(plan, signal, promptSurfaceClass)}` });
   messages.push({ role: "user", content: utterance });
   return messages;
 }

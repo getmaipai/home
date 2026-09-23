@@ -410,21 +410,19 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
   // pattern claims it either - the plain one-call path on both
   // surfaces, isolating the register's own effect on max_tokens from
   // the tool-calling machinery.
-  test("a typed chat question's completion runs with the written plan's max_tokens, not today's 120", async () => {
+  test("a typed chat question's completion runs with the reply floor's ceiling, not today's 120", async () => {
     const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.owner, "chat", "how do I make a paper airplane"));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    // Written, no evidence: this row never runs a tool at all (a
-    // self-target question, never the world), so U4c's post-tool-round
-    // recompute never fires and the plan stays exactly what
-    // turnNext.ts computed up front - 220 words, thinking off (no
-    // toggle). FORCED-CALL-01 (dev.md "The owner's three live turns",
-    // (1)) retired model.ts's own maxTokensFor (max_words * 2 = 440);
-    // every ordinary generation now uses LAT-01's one shared formula,
-    // visibleReplyMaxTokens: ceil(220 * 1.6) + 32 = 384. The
-    // evidence-boosted row is covered by the "U4c" describe block
-    // below, on a row whose tool round actually returns something.
-    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(384);
+    // The reply floor (U4b-2): a written, non-brevity, adult turn's
+    // max_tokens comes from the budget's own reply_ceiling_tokens
+    // (1536 on the test catalog's qwen3-8b entry), not FORCED-CALL-01's
+    // shared visibleReplyMaxTokens formula (which every OTHER turn
+    // still uses, replyMaxTokensFor's own fallback) - the plan's own
+    // length numbers (max_words: 220 here) stay room the model's own
+    // end-of-reply decides inside, never a ceiling read out in full
+    // every time.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(1536);
   });
 
   test("a robot question's completion keeps today's spoken plan, unchanged", async () => {
@@ -435,6 +433,40 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
     // thinking off. FORCED-CALL-01: visibleReplyMaxTokens's formula,
     // not the retired max_words * 2 (120) - ceil(60 * 1.6) + 32 = 128.
     expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(128);
+  });
+
+  test("a minor's typed chat question keeps the max_words-derived cap, not the reply ceiling", async () => {
+    const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.child, "chat", "how do I make a paper airplane"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    // The reply floor is a written-class, adult-only backstop
+    // (turn-machine-state-record-2026-09-22.md, "The reply floor"): a
+    // minor's plan.age_band is never "adult", so replyMaxTokensFor
+    // falls through to LAT-01's shared visibleReplyMaxTokens formula
+    // even though the surface is still written - the written question
+    // budget (220 words) clamped to the child band's own 40-word
+    // ceiling, then ceil(40 * 1.6) + 32 = 96.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(96);
+  });
+
+  test("an adult's typed chat question with thinking on adds the toggled budget on top of the reply ceiling", async () => {
+    let sawThinking: unknown;
+    const result = await withStub(
+      {
+        reply: (request) => {
+          sawThinking = request.chat_template_kwargs?.enable_thinking;
+          return "Fold it in half, then fold the corners in.";
+        },
+      },
+      () => runTurnNext(people.owner, "chat", "how do I make a paper airplane", { thinking: true }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(sawThinking).toBe(true);
+    // 1536 (reply_ceiling_tokens) + 512 (thinking_budget_tokens_toggled,
+    // the 8B's toggled-on value) = 2048: room for the reasoning span
+    // ahead of the visible reply, not just the reply alone.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(2048);
   });
 });
 
@@ -474,11 +506,15 @@ describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", 
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.sources?.length).toBeGreaterThan(0);
-      // Written, evidence.sources >= 1: 360 words, thinking off.
-      // FORCED-CALL-01: visibleReplyMaxTokens, not the retired
-      // maxTokensFor ceiling (max_words * 2 = 720) - ceil(360 * 1.6) +
-      // 32 = 608, still above the base row's 384.
-      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(608);
+      // The reply floor (U4b-2): the plan's own max_words still moves
+      // with the evidence recompute (220 -> 360 words here), but
+      // max_tokens for a written adult turn no longer derives from it -
+      // reply_ceiling_tokens is a flat per-model backstop, the same
+      // 1536 whichever plan row the evidence recompute lands on. This
+      // row's own tool result is real (a source found), so the ordinary
+      // phrasing generation actually runs and reads it, unlike the
+      // empty-rows row below.
+      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(1536);
     } finally {
       searxng.stop();
     }
@@ -510,12 +546,10 @@ describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", 
       // all: composer.ts's own "empty_rows" mode (model_calls: 0)
       // writes the canned no-results line directly, so the forced
       // call is the ONLY (and so also the last) generation this turn
-      // ever runs. FORCED-CALL-01: a required call's own cap is fixed
-      // at 96 regardless of plan or evidence - not the base plan row
-      // this test proved before that item (220 * 2 = 440, then LAT-01's
-      // visibleReplyMaxTokens(220, false) = 384 after it), since there
-      // is no ordinary/phrasing generation here for that formula to
-      // ever apply to.
+      // ever runs. FORCED_CALL_MAX_TOKENS (96) applies regardless of
+      // plan, evidence, or the reply floor's own ceiling, since there
+      // is no ordinary/phrasing generation here for either to ever
+      // apply to.
       expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(96);
     } finally {
       searxng.stop();

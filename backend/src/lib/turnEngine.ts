@@ -90,7 +90,8 @@ import { NOTHING_RECALLED } from "@maipai/spec/interpreters/ts/recipe-interprete
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { listActivePeople } from "@/lib/access";
-import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, type Persona } from "@/lib/persona";
+import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, WRITTEN_POLICY, type Persona } from "@/lib/persona";
+import type { SurfaceClass } from "@/lib/surfaceClass";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
@@ -961,10 +962,18 @@ export function companionReanchorLine(persona: Persona): string {
  * reintroduce a cold prefix on every real turn. Called by
  * buildSystemPrompt() itself below, never reimplemented, so the two can
  * never drift apart by construction whenever that warm-up does land. */
-export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA): string {
-  const companionSection = capSection(composePersonaPrompt(persona), MAX_COMPANION_SECTION_CHARS);
+/** `surfaceClass` defaults "spoken" - the old path's own call site
+ * (buildPromptParts below) passes nothing and keeps today's exact
+ * wording, frozen; only the new path (turnMachine/messages.ts) passes
+ * "written" explicitly. The reply floor (owner's rule, 2026-09-23):
+ * NATURALNESS_POLICY's "never bullet points" is a spoken-class
+ * assumption - the written class reads WRITTEN_POLICY instead, which
+ * permits and expects the structure a bare reply had. */
+export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, surfaceClass: SurfaceClass = "spoken"): string {
+  const companionSection = capSection(composePersonaPrompt(persona, surfaceClass), MAX_COMPANION_SECTION_CHARS);
   const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
-  const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
+  const registerSection = surfaceClass === "written" ? WRITTEN_POLICY : NATURALNESS_POLICY;
+  const naturalnessSection = capSection(registerSection, MAX_NATURALNESS_SECTION_CHARS);
   return `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection} ${naturalnessSection}`;
 }
 

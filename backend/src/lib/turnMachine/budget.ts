@@ -23,6 +23,10 @@ export const NO_RECORD_BUDGET: TurnBudget = {
   // an unmeasured model gets no reasoning either way.
   thinking_budget_tokens_toggled: 0,
   thinking_for_minors: false,
+  // The reply floor: 1024, the design record's own NO_RECORD_BUDGET
+  // figure - smaller than a measured model's ceiling, matching this
+  // budget's already-smaller context_tokens.
+  reply_ceiling_tokens: 1024,
   deadlines_ms: { model: 20000, tool: 10000, total: 45000 },
   measured: { false_call_rate: 0, inverse_miss_rate: 0, rewrite_pass_rate: 0, on: "no measured record" },
 };

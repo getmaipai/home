@@ -194,17 +194,25 @@ export function planFor(input: PlanInput): ReplyPlan {
 /** `surfaceClass` optional, defaulting to "spoken" - the same default
  * `PlanInput.surfaceClass` uses, so turnEngine.ts's one call site (the
  * frozen path) needs no edit and reads exactly today's wording. On the
- * written class the length clause names no sentence count ("as long as
- * it needs, structured where it helps"): a written turn's budget is
- * evidence-sized, not act-capped, so a fixed "one or two sentences"
- * would be a written-register lie the moment it applied to an inform
- * or a directive. */
+ * written class the length clause names no sentence count: a written
+ * turn's budget is evidence-sized, not act-capped, so a fixed "one or
+ * two sentences" would be a written-register lie the moment it applied
+ * to an inform or a directive.
+ *
+ * The reply floor (owner's rule, 2026-09-23): "as long as it needs,
+ * structured where it helps" measured short and flat on a live U4b-2
+ * question even with the persona and engagement fixes in place (the
+ * model stopped on its own, well under the token ceiling) - "as long
+ * as it needs" reads as permission, not an instruction, and an 8B
+ * model given permission to be short took it. Restated as the floor
+ * itself, in instruction form: as complete as the bare model's own
+ * answer, then in the companion's voice. */
 export function planLine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass = "spoken"): string {
   const act = signal.primary_act === "inform" ? "a statement" : `a ${signal.primary_act}`;
   const emotion = signal.expressed_emotion === "neutral" ? "neutral" : signal.expressed_emotion;
   const required = Object.entries(plan.moves).filter(([, value]) => value === "required").map(([move]) => move.replace("_", " "));
   const forbidden = Object.entries(plan.moves).filter(([, value]) => value === "forbidden").map(([move]) => move);
-  const length = surfaceClass === "written" ? "as long as it needs, structured where it helps" : `${plan.max_sentences === 1 ? "one" : "one or two"} sentence${plan.max_sentences === 1 ? "" : "s"}`;
+  const length = surfaceClass === "written" ? "as complete as you would answer with no persona at all, then in the companion's voice" : `${plan.max_sentences === 1 ? "one" : "one or two"} sentence${plan.max_sentences === 1 ? "" : "s"}`;
   const requirements = required.length ? required.join(", ") : "no required move";
   const bans = [forbidden.includes("ask_back") || required.includes("care") ? "no question" : "", forbidden.includes("point") ? "no tasks" : "", plan.playfulness === "forbidden" ? "no playfulness" : ""].filter(Boolean).join(", ");
   const lead = required.includes("care") ? "acknowledge the feeling first" : requirements;
