@@ -24234,3 +24234,50 @@ resolution duplicated between `messages.ts` and `model.ts` despite
 both files' own comments claiming one definition, fixed by extracting
 `promptSurfaceClassFor()` (`surfaceClass.ts`) as the one real shared
 call both sites use now; live-verified as above.
+
+## GATE-SPEED-02 (a): the backend and frontend legs run concurrently under `full` scope (2026-09-23)
+
+GATE-SCOPE-01 already narrows a backend-only or frontend-only change to
+one suite; the one case left paying both costs serially is `full`
+scope, where nothing narrows it. `run_backend_suite()` and the
+frontend suite's stages now run in their own subshells, launched after
+the one shared `bun install`, each leg's stdout/stderr buffered to a
+temp file and printed whole (`== backend leg ==` / `== frontend leg
+==`) once it finishes rather than interleaved line by line; the worse
+of the two exit codes is the script's own exit. `stage_end()` prints a
+leg's last stage's own elapsed time explicitly, since nothing after it
+in that subshell calls `stage()` again to do it the normal way.
+
+**Measured, live, this Mac (24 GB), before landing:**
+
+| | serial (today's baseline, summed from this run's own per-stage numbers) | concurrent (measured) |
+|---|---|---|
+| backend leg total | 230s (1+1+6+0+0+1+221) | 230s (unchanged, same stages) |
+| frontend leg total | 93s (5+32+3+2+51) | 93s (unchanged, same stages) |
+| **wall time for `full` scope** | **323s** (sum) | **232s** (measured wall clock, both legs to completion) |
+
+28% faster wall-clock on a `--full` run (3830 backend + 653 frontend
+tests that day, 0 fail). Peak system memory, sampled every 5s via
+`vm_stat` (active + wired + compressor pages) for the run's duration:
+21.3 GB at 19:03:44, during the ~93s window both legs' heaviest stages
+(`backend: bun test`, `frontend: bun test`) actually overlap; falls to
+15-17 GB once the frontend leg finishes and only backend's own `bun
+test` remains running alone. 21.3 GB of 24 GB leaves about 2.7 GB of
+headroom with the rest of this Mac's own load (this session, the
+editor, the OS) already counted in that number, not layered on top of
+it; no swap thrashing, no port collision, no flaky test, 0 fail on
+either leg. Decision: land it - the measured peak is real pressure but
+stays under the ceiling with room, the two-full-gates-at-once incident
+this item's own row cites (2026-09-21) was two separate sessions each
+running a full backend suite AND a full frontend suite concurrently
+(roughly double this change's own worst-case overlap), and the
+one-full-gate-at-a-time rule (only one `check.sh` invocation on the
+machine) is unchanged by this - it still applies at the session level,
+this item only reshapes what a single invocation does internally.
+
+Verification: the rebased `scripts/check.sh` ran green twice - once
+under `--full` on a scratch worktree (39 scripts + 3830 backend + 653
+frontend, 0 fail, the memory sample above), once on the real diff
+about to land (39 scripts + 4081 backend + 721 frontend, 0 fail, scope
+auto-escalated to `full` by GATE-SCOPE-01's own rule since
+`scripts/check.sh` itself changed).

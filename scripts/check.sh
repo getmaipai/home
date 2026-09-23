@@ -6,6 +6,15 @@
 # docs/dev.md. @maipai/spec's own checks (lint, tests, codegen drift)
 # run in commons's own check.sh, not here - this repo just pins a tag.
 #
+# GATE-SPEED-02 (a) (2026-09-22): under `full` scope, both suites' cost
+# is already unavoidable - no narrower scope applies, unlike the
+# backend-only or frontend-only cases, where the other suite's absence
+# already does the narrowing GATE-SCOPE-01 exists for. That's the one
+# case this runs the backend and frontend suites concurrently in their
+# own subshells instead of serially, each leg's output buffered and
+# printed whole once it finishes (never interleaved line by line), the
+# worse of the two exit codes wins.
+#
 # Scoped gates (GATE-SCOPE-01, org CLAUDE.md "Verification" > "Scoped
 # gates", owner's rule 2026-09-23): the gate decides which stages a
 # change can possibly touch from the diff itself, not from a flag or a
@@ -251,7 +260,16 @@ if [ "$SCOPE" != "docs" ]; then
   bun install --silent
 fi
 
-if { [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; } && [ -d backend/src ]; then
+# stage_end() closes out whichever stage a leg's own subshell last
+# opened: each leg below runs in its own process, so it gets its own
+# STAGE_T/STAGE_NAME instead of racing the other leg's, but nothing
+# after a leg's last real stage ever calls stage() again in that same
+# subshell to print that stage's own elapsed time - printed here
+# explicitly instead, since the per-stage numbers are what this item's
+# own measurement reads.
+stage_end() { local now; now=$(date +%s); [ -n "${STAGE_T:-}" ] && echo "   (${STAGE_NAME}: $((now-STAGE_T))s)" >&2; }
+
+run_backend_suite() {
   stage "backend: settings registry, regenerate and check for drift"
   # $SPEC_DIR is a per-tag worktree shared by every consumer pinning
   # spec-v0.1.2 (home, bot, and any other session's check.sh run) - a
@@ -294,42 +312,105 @@ if { [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; } && [ -d backend/src ];
 
   stage "backend: bun test"
   (cd backend && bun test)
-fi
+}
 
-if { [ "$SCOPE" = "frontend" ] || [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; } && [ -d frontend/src ]; then
-  # Runs under backend scope too: the frontend imports typed backend
-  # code (currently wire.ts and homeCardQuestions.ts - see the git grep
-  # for @maipai/home-backend/src/... in compute_scope() above, which
-  # feeds classifyScope() in scripts/gateScope.ts), so a backend-only
-  # change can still break the frontend's own type surface even when it
-  # doesn't touch one of those files directly enough to force a full
-  # gate on its own. Cheap with tsc's incremental cache.
-  stage "frontend: typecheck"
-  (cd frontend && bunx tsc --noEmit)
-fi
+if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
+  # `bun install` above stays the one serial step before either leg
+  # starts - it writes into the one shared node_modules both workspaces
+  # resolve from, so two concurrent installs would race the same files.
+  BACKEND_LOG="$(mktemp)"
+  FRONTEND_LOG="$(mktemp)"
 
-if { [ "$SCOPE" = "frontend" ] || [ "$SCOPE" = "full" ]; } && [ -d frontend/src ]; then
-  stage "frontend: bun test"
-  (cd frontend && bun test)
+  ( run_backend_suite; stage_end ) > "$BACKEND_LOG" 2>&1 &
+  BACKEND_PID=$!
+  ( stage "frontend: typecheck"
+    (cd frontend && bunx tsc --noEmit)
 
-  stage "frontend: eslint"
-  (cd frontend && bunx eslint . --cache --cache-location .eslintcache)
+    stage "frontend: bun test"
+    (cd frontend && bun test)
 
-  stage "frontend: build"
-  (cd frontend && bunx vite build >/dev/null)
+    stage "frontend: eslint"
+    (cd frontend && bunx eslint . --cache --cache-location .eslintcache)
 
-  # Left out while #43 (the chat contrast failure) was open; #43 closed
-  # 2026-09-06 and the timestamp finding it left behind was resolved
-  # 2026-09-12 (11e8afd) - back in the gate now that it passes clean
-  # (getmaipai/home#55). `a11y` is a repo-root script (package.json),
-  # not frontend/'s own - it drives scripts/screenshot.ts directly. It
-  # only checks frontend/ - the pages it captures, their accessibility
-  # tree and overflow - and never runs the backend's own test suite, so
-  # it stays in frontend scope rather than forcing a full gate: it is
-  # not the stage GATE-SCOPE-01 exists to route around (that is the
-  # backend suite's own stub-engine flakiness and runtime).
-  stage "frontend: a11y"
-  bun run a11y >/dev/null
+    stage "frontend: build"
+    (cd frontend && bunx vite build >/dev/null)
+
+    stage "frontend: a11y"
+    bun run a11y >/dev/null
+    stage_end
+  ) > "$FRONTEND_LOG" 2>&1 &
+  FRONTEND_PID=$!
+
+  BACKEND_RC=0
+  wait "$BACKEND_PID" || BACKEND_RC=$?
+  FRONTEND_RC=0
+  wait "$FRONTEND_PID" || FRONTEND_RC=$?
+
+  echo "== backend leg =="
+  cat "$BACKEND_LOG"
+  echo "== frontend leg =="
+  cat "$FRONTEND_LOG"
+  rm -f "$BACKEND_LOG" "$FRONTEND_LOG"
+
+  # stage()'s own STAGE_T/STAGE_NAME were last set for "install" in this
+  # (parent) process, right before both legs forked - every stage() call
+  # since then happened inside a subshell, whose STAGE_T/STAGE_NAME never
+  # propagate back here. Left alone, the next stage() call in this
+  # process (docs: reading-level lint) would print the whole concurrent
+  # block's wall time mislabeled as "(install: Ns)" - reproduced live
+  # during this item's own measurement. Print the real number under its
+  # own name instead, then clear STAGE_T so the next stage() call starts
+  # a fresh clock silently rather than also printing a second, redundant
+  # "(both legs: 0s)" line for the same reset point.
+  now=$(date +%s)
+  echo "   (both legs: $((now-STAGE_T))s)" >&2
+  unset STAGE_T STAGE_NAME
+
+  if [ "$BACKEND_RC" -ne 0 ] || [ "$FRONTEND_RC" -ne 0 ]; then
+    WORSE_RC=$BACKEND_RC
+    [ "$FRONTEND_RC" -gt "$WORSE_RC" ] && WORSE_RC=$FRONTEND_RC
+    exit "$WORSE_RC"
+  fi
+else
+  if { [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; } && [ -d backend/src ]; then
+    run_backend_suite
+  fi
+
+  if { [ "$SCOPE" = "frontend" ] || [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; } && [ -d frontend/src ]; then
+    # Runs under backend scope too: the frontend imports typed backend
+    # code (currently wire.ts and homeCardQuestions.ts - see the git grep
+    # for @maipai/home-backend/src/... in compute_scope() above, which
+    # feeds classifyScope() in scripts/gateScope.ts), so a backend-only
+    # change can still break the frontend's own type surface even when it
+    # doesn't touch one of those files directly enough to force a full
+    # gate on its own. Cheap with tsc's incremental cache.
+    stage "frontend: typecheck"
+    (cd frontend && bunx tsc --noEmit)
+  fi
+
+  if { [ "$SCOPE" = "frontend" ] || [ "$SCOPE" = "full" ]; } && [ -d frontend/src ]; then
+    stage "frontend: bun test"
+    (cd frontend && bun test)
+
+    stage "frontend: eslint"
+    (cd frontend && bunx eslint . --cache --cache-location .eslintcache)
+
+    stage "frontend: build"
+    (cd frontend && bunx vite build >/dev/null)
+
+    # Left out while #43 (the chat contrast failure) was open; #43 closed
+    # 2026-09-06 and the timestamp finding it left behind was resolved
+    # 2026-09-12 (11e8afd) - back in the gate now that it passes clean
+    # (getmaipai/home#55). `a11y` is a repo-root script (package.json),
+    # not frontend/'s own - it drives scripts/screenshot.ts directly. It
+    # only checks frontend/ - the pages it captures, their accessibility
+    # tree and overflow - and never runs the backend's own test suite, so
+    # it stays in frontend scope rather than forcing a full gate: it is
+    # not the stage GATE-SCOPE-01 exists to route around (that is the
+    # backend suite's own stub-engine flakiness and runtime).
+    stage "frontend: a11y"
+    bun run a11y >/dev/null
+  fi
 fi
 
 stage "docs: reading-level lint"
