@@ -22511,3 +22511,76 @@ Five live findings from Jesse on 8787 (`fa85640b`), the same night as CHAT-LIST-
 **Finding 5's own same-day follow-up: the logo itself, not just the alignment.** Jesse looked at 8787 again after the alignment fix and found the root cause of what made the mismatch invisible until now - the sidebar's own brand mark (`AppShell.tsx`'s `Brand`) was tiny relative to the free space its own row already reserved. His exact words, with a reference image: "the upper left logo is tiny - look at all the free space - all we need is the logo here." This supersedes a 2026-09-20 owner ruling on the SAME component, cited in the code as "the reference's own exact figure" (48px tile, 19px wordmark, an 11px tagline) - kept in the file's own history as a real prior decision, not silently erased, since the fresher instruction is from the same owner. Tagline removed (absent from the reference), tile 48px to 64px, wordmark 19px to 28px, expanded state only.
 
 **Two real findings from review, both fixed, one genuine dead end.** (1) The bigger 64px tile only fit the expanded row Jesse looked at - collapsed to icon-only, the fixed 72px `--sidebar-width-icon` has no room for a 64px tile plus its own 8px collapsed padding. Fixed with the component's own existing `group-data-[collapsible=icon]` pattern (already used one row down for the wordmark's own visibility): the collapsed state keeps the original 48px/6px pair. (2) Two stale comments still said "tile-plus-tagline" after the tagline was removed - fixed to "tile-plus-wordmark." A third attempt, verifying (1) with a dedicated headless assertion in `captureShellRail`, is the genuine dead end worth recording: a first version measured the inner tile `<span>` alone (missed the regression outright - the span always reports its own CSS size regardless of fit); a second measured the anchor's own `getBoundingClientRect()` against the sidebar container's edge (still missed it - the collapsed anchor has `overflow-hidden` and no max-width, so it CLIPS an oversized child rather than bleeding past its container, meaning its own measured box never shows the problem). A third version, `scrollWidth - clientWidth` on the anchor (the general, correct JS test for "content doesn't fit its own box," confirmed live: 4px with the clamp removed, matching this page's own a11y/overflow sweep's independent detection of the identical regression at a narrower breakpoint) - **still threw on the clamp-restored, correct code**, at the same 4px. Isolated against a pristine `origin/main` checkout of the unmodified file (before any of tonight's changes) to rule out a mistake in the fix itself: same 4px, confirmed genuinely pre-existing and unrelated to logo size at all. The assertion was reverted out of `captureShellRail` entirely rather than landed broken or landed with a magic-number tolerance papering over an unexplained pre-existing defect; the real defect is filed as [getmaipai/home#142](https://github.com/getmaipai/home/issues/142), not fixed here. Verification for this follow-up rests on what actually holds up: full test suite green, the real `--a11y-only` gate path (the one `scripts/check.sh` actually runs) green at 0 overflow, and both expanded and collapsed states captured at both themes, opened and judged directly (zoomed crops of the mark itself, not just a full-page thumbnail).
+
+## PARITY-BISECT-02: STABLE_SYSTEM_SUFFIX collapses the reply, FORMALITY_FRAGMENT_WRITTEN collapses the register - two separate effects, not one (2026-09-23)
+
+PARITY-BISECT-01 found the collapse happens somewhere inside the
+stable system prefix. This isolates the prefix's own fragments one at
+a time, in `buildStablePrefix`'s own real order, same isolation and
+same question as before.
+
+| stage | predicted tokens (3 reps) | avg | vs floor | headings | lists | lowercase reps |
+|---|---|---|---|---|---|---|
+| a, control ("You are a helpful assistant.") | 723, 653, 715 | 697.0 | 0.95x | yes | yes | 0/3 |
+| b, + identity line alone | 803, 712, 744 | 753.0 | 1.02x | yes | yes | 0/3 |
+| c, + STABLE_SYSTEM_SUFFIX | 112, 98, 93 | 101.0 | 0.14x | no | no | 0/3 |
+| d, + FORMALITY_FRAGMENT_WRITTEN | 237, 238, 116 | 197.0 | 0.27x | no | no | 3/3 |
+| e, + COMPLEXITY_FRAGMENT | 241, 111, 241 | 197.7 | 0.27x | no | no | 3/3 |
+| f, + ENGAGEMENT_FRAGMENT_WRITTEN | 115, 115, 148 | 126.0 | 0.17x | no | no | 1/3 |
+| g, + FILLER_FRAGMENT | 127, 126, 90 | 114.3 | 0.16x | no | no | 2/3 |
+| h, + INFORMATION_HANDLING_POLICY | 114, 117, 102 | 111.0 | 0.15x | no | no | 3/3 |
+| i, + WRITTEN_POLICY (the complete real prefix) | 102, 136, 130 | 122.7 | 0.17x | no | no | 3/3 |
+| swap, full prefix minus FORMALITY_FRAGMENT_WRITTEN | 106, 116, 116 | 112.7 | 0.15x | no | no | 0/3 |
+| swap, full prefix minus STABLE_SYSTEM_SUFFIX | 118, 136, 109 | 121.0 | 0.16x | no | no | 1/3 |
+
+Reference floor (PARITY-BISECT-01, bare call, thinking off, no system
+message): 736.3 predicted tokens.
+
+**Two separate findings, not one.**
+
+Length and structure collapse at stage c, not before it and not later.
+A one-line, content-free control system message (stage a) and the real
+identity line alone (stage b) both write a full structured answer -
+headings, lists, at or above the floor. The moment `STABLE_SYSTEM_SUFFIX`
+is added (stage c: "You know a lot about the world... Facts about this
+household... are the one thing you answer only from what you were told
+here; never guess one.") the reply drops to about a seventh of the
+floor with no structure at all, and every stage after it (the four
+persona dials, the information policy, `WRITTEN_POLICY`, the complete
+real prefix) stays in that same collapsed range - none of them
+recovers it and none of them makes it meaningfully worse. **Fable's own
+suspicion was not confirmed**: `FORMALITY_FRAGMENT_WRITTEN` (stage d)
+is not where the length collapses - that already happened one stage
+earlier, at c.
+
+Register (all-lowercase writing) collapses at stage d, one stage after
+the length already collapsed. Every stage before d writes normally
+capitalized; the moment `FORMALITY_FRAGMENT_WRITTEN` is added, every
+rep in every later regular stage (d, e, h, i - f and g partially)
+writes all-lowercase throughout ("a prompt cache makes...", "this
+matters because..."). This part of Fable's suspicion holds: the
+swap that removes only `FORMALITY_FRAGMENT_WRITTEN` from the complete
+real prefix is the one row in the whole table that reads normally
+capitalized (0/3 lowercase) - length still collapsed (0.15x), but the
+register returns. `FORMALITY_FRAGMENT_WRITTEN`'s own wording ("how this
+companion writes a message or a note") is the register's own cause,
+confirmed by removing it and nothing else.
+
+The swap that removes only `STABLE_SYSTEM_SUFFIX` from the complete
+real prefix does **not** undo the length collapse (0.16x, still no
+structure) - once the persona dials, the information policy and
+`WRITTEN_POLICY` are all present together, removing the suffix alone is
+not enough to restore the floor's own length. The incremental story (c
+alone collapses it) and the full-prefix-minus-one-fragment story (c's
+own removal, alone, does not un-collapse it) are both true and in
+tension: something in the dials/info-policy/written-policy set is
+independently sufficient to keep the reply short once enough of the
+prefix is present, even without the specific fragment that first
+triggered the drop when building up from nothing.
+
+Sample replies (stage a, c, d, and both swaps) are read alongside the
+table above; the full text of every stage is in the bench's own log,
+not reproduced here at length.
+
+Not diagnosed further per the coordinator's own stop-here instruction -
+Fable's own to rule on.
