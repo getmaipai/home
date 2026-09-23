@@ -85,7 +85,13 @@ export const CATALOG: ModelCapabilities[] = [
       answer_from_context_tool: false,
       model_transitions: true,
       context_tokens: 4000,
-      thinking_budget_tokens: 512,
+      // THINK-DEFAULT-01 (dev.md "U6 rerun ruling" (b) 1, spec-v0.1.27):
+      // 0 by default - thinking is the person's per-turn toggle
+      // (RunTurnNextOpts.thinking, RESP-04's composer toggle), never
+      // the budget's own default. 512 moves to thinking_budget_tokens_
+      // toggled below, unchanged as the value a toggled-on turn uses.
+      thinking_budget_tokens: 0,
+      thinking_budget_tokens_toggled: 512,
       // GROUND-01 ("Reasoning is a second output"): a cost control, not
       // the safety gate - context.ts's decideReasoning() already forces
       // reasoning off for a minor from the age band alone, so this

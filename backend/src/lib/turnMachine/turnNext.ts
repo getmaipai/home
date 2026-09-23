@@ -37,7 +37,7 @@ import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { resolveTurnBudget } from "./budget";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
-import type { TurnState, ActionProposal } from "./contract";
+import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 
 export interface RunTurnNextOpts {
@@ -48,6 +48,14 @@ export interface RunTurnNextOpts {
   // dictated chat turn - unwired to any client today (no dictation
   // marker exists yet), plumbed and tested ahead of a real caller.
   spoken?: boolean;
+  // THINK-DEFAULT-01 (dev.md "U6 rerun ruling" (b) 1): mirrors the old
+  // path's own RunTurnOpts.thinking exactly - the person's per-turn
+  // toggle (routes/turn.ts's `dropReasoning ? false : body.thinking`,
+  // the same REASONING-03 belt-and-braces for a minor or a non-chat
+  // surface). Absent or false keeps the budget's own default
+  // (thinking_budget_tokens, 0 on every real budget); true substitutes
+  // thinking_budget_tokens_toggled for this turn only.
+  thinking?: boolean;
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
@@ -131,6 +139,19 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
   };
   const plan = planFor({ ...planBasis, evidence: { choices: 0, sources: 0, deliverable: false } });
 
+  // THINK-DEFAULT-01: the catalog's own turn_budget object is shared
+  // (resolveTurnBudget() returns CATALOG's entry by reference, never a
+  // copy - the same object every other household's turn reads), so the
+  // per-turn toggle builds a new object rather than mutating it in
+  // place. `opts.thinking` is trusted as already the caller's own
+  // final decision (routes/turn.ts's `dropReasoning ? false : body.
+  // thinking`, the identical gate the old path's RunTurnOpts.thinking
+  // already trusts) - the minor gate is still enforced independently,
+  // belt and braces, by model.ts's own minorThinkingOff regardless of
+  // what this resolves to.
+  const resolvedBudget = resolveTurnBudget();
+  const budget: TurnBudget = opts.thinking === true ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
+
   const state: TurnState = {
     turnId: newConversationTurnId(),
     conversationId: conversation.id,
@@ -138,7 +159,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     surface,
     utterance: text,
     signal,
-    budget: resolveTurnBudget(),
+    budget,
     plan,
     planBasis,
     safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },

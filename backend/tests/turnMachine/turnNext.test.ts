@@ -522,7 +522,7 @@ describe("turnNext.ts: GROUND-01, thinking_for_minors", () => {
     expect(sawThinking).toBe(false);
   });
 
-  test("an adult's turn on the same budget still sends thinking:true (the 8B's thinking_budget_tokens is 512)", async () => {
+  test("an adult's turn with no toggle sends thinking:false too (THINK-DEFAULT-01: 0 is the default for everyone, not just a minor)", async () => {
     let sawThinking: unknown;
     const result = await withStub(
       {
@@ -534,7 +534,39 @@ describe("turnNext.ts: GROUND-01, thinking_for_minors", () => {
       () => runTurnNext(people.owner, "chat", "hi"),
     );
     expect(result.ok).toBe(true);
+    expect(sawThinking).toBe(false);
+  });
+});
+
+describe("turnNext.ts: THINK-DEFAULT-01, thinking is the person's per-turn toggle", () => {
+  test("an adult's turn with thinking: true sends thinking:true (the 8B's thinking_budget_tokens_toggled is 512)", async () => {
+    let sawThinking: unknown;
+    const result = await withStub(
+      {
+        reply: (request) => {
+          sawThinking = request.chat_template_kwargs?.enable_thinking;
+          return "Hi there!";
+        },
+      },
+      () => runTurnNext(people.owner, "chat", "hi", { thinking: true }),
+    );
+    expect(result.ok).toBe(true);
     expect(sawThinking).toBe(true);
+  });
+
+  test("a minor's turn with thinking: true still sends thinking:false (the minor gate wins regardless of the toggle)", async () => {
+    let sawThinking: unknown;
+    const result = await withStub(
+      {
+        reply: (request) => {
+          sawThinking = request.chat_template_kwargs?.enable_thinking;
+          return "Hi there!";
+        },
+      },
+      () => runTurnNext(people.child, "chat", "hi", { thinking: true }),
+    );
+    expect(result.ok).toBe(true);
+    expect(sawThinking).toBe(false);
   });
 });
 

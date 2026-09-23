@@ -153,4 +153,31 @@ describe("POST /api/turn - U6a's non-stream twin", () => {
       expect(storedNodeNames(value.turn_id)).toBeDefined();
     });
   });
+
+  // THINK-DEFAULT-01 (dev.md "U6 rerun ruling" (b) 1): the new path's
+  // default is 0 (thinking off) just like the old path's own
+  // RunTurnOpts.thinking, absent unless the request's own body.thinking
+  // asks for it - proven here at the route, the same boundary this
+  // file's own header names.
+  test("with turn.pipeline.next on and no body.thinking, the new path sends thinking:false", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", true);
+    setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
+    const { client } = await owner();
+    await withStubReply("Hello! How can I help?", async (seen) => {
+      const res = await client.post("/api/turn", { surface: "chat", text: "hi" });
+      expect(res.status).toBe(200);
+      expect(seen.requests[0]?.chat_template_kwargs?.enable_thinking).toBe(false);
+    });
+  });
+
+  test("with turn.pipeline.next on and body.thinking: true, the new path sends thinking:true", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", true);
+    setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
+    const { client } = await owner();
+    await withStubReply("Hello! How can I help?", async (seen) => {
+      const res = await client.post("/api/turn", { surface: "chat", text: "hi", thinking: true });
+      expect(res.status).toBe(200);
+      expect(seen.requests[0]?.chat_template_kwargs?.enable_thinking).toBe(true);
+    });
+  });
 });

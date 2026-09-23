@@ -80,7 +80,20 @@ export interface TurnBudget {
   answer_from_context_tool: boolean;
   model_transitions: boolean;
   context_tokens: number;
+  /** THINK-DEFAULT-01 (spec-v0.1.27): the turn's default when the
+   * person hasn't toggled thinking on - 0 on every real budget, since
+   * reasoning is a second output the person chooses, never the
+   * budget's own default. turnNext.ts resolves the effective per-turn
+   * value once, up front, from this and thinking_budget_tokens_toggled
+   * together (RunTurnNextOpts.thinking); every later read of this
+   * field (model.ts's thinkingOn, buildTurnStats) sees that resolved
+   * value, never the raw catalog default. */
   thinking_budget_tokens: number;
+  /** THINK-DEFAULT-01: the value turnNext.ts substitutes in for a turn
+   * where the person explicitly toggled thinking on. Per model, not a
+   * single hardcoded constant, since a different chat model may reason
+   * usefully at a different token count. */
+  thinking_budget_tokens_toggled: number;
   /** GROUND-01 ("Reasoning is a second output"): whether the model node
    * even asks the engine to think on a minor's turn - false by default.
    * A cost control only, never the safety gate: `context.ts`'s

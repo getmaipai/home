@@ -162,7 +162,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     ? await (async () => {
         // runTurnNext() always resolves "immediate" (its own header note);
         // the explicit kind check is TypeScript's, not a real branch.
-        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true });
+        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking });
         return next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the new path returned a stream result unexpectedly" } : next;
       })()
     : await runTurn(actor, surface, body.text ?? "", {
@@ -617,7 +617,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     result = body.bare === true
       ? await runBareTurnStream(actor, body.text ?? "", body.conversation_id, abortController.signal)
       : newPathOn()
-        ? await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, signal: abortController.signal })
+        ? await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, signal: abortController.signal })
         : await runTurnStream(actor, surface, body.text ?? "", {
             thinking: dropReasoning ? false : body.thinking,
             conversationId: body.conversation_id,

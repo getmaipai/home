@@ -20897,3 +20897,53 @@ green; `bash scripts/check.sh` green. Review: low, one finding-free pass
 2. **`frontend/src/apps/chat/thread.aui.tsx` is the OLD page's composition only.** It has its own header comment now saying so directly. `/next/chat`'s real composer is `@maipai/ui/src/elements/thread.aui.tsx`, the vendored kit - a new composer feature for the current page is either a new `ThreadComponents` slot cut there (`ComposerExtra`/`ComposerExtraEnd`/`ComposerAddAttachmentOverride`/`ComposerInputOverride` are the shapes so far) or lives in `NextChatPage.tsx`'s own composition, never in `apps/chat/thread.aui.tsx`.
 
 **Verified for real, this time, before the push:** `git status --short` first every time in the shared checkout (the coordinator's own rule after a separate incident this same session: a lane in the shared checkout runs only `git fetch`, `git merge --ff-only`, `bun install --force` after a pin move, and `git status` - never `git checkout --`, `git stash`, `git reset` or `git clean` there, and never any command that discards working-tree changes anywhere without `git status --short` in the same breath and the paths named from it; every other git command lives in the item's own worktree). With that: local ff-merge, `bun install --force` in both workspaces, `bun restart`, then a real headless-Chromium session against `/next/chat` with the fake media device - `ui.appearance` set explicitly via `PUT /api/settings` before each theme (`colorScheme` alone does not flip the shell once a person has a real appearance setting, `scripts/screenshot.ts`'s own established pattern, restored to its original value afterward) - captured at 1440 and 390, light and dark: real bars, real varying heights, mid-recording; the real transcript sitting in the composer's own text field once dictation stops; zero requests whose content-type carried audio or a multipart/binary payload across all eight captures. Every screenshot opened and read before calling this done, per the org's own screenshot standard. `bash scripts/check.sh` green throughout. Review: low each pass (a mechanical fallback swap, then the layout fix), no findings surviving to this state.
+
+## THINK-DEFAULT-01: thinking is the person's toggle, not the budget's default (2026-09-23)
+
+The first design fact from "U6 rerun ruling" (b) 1: the 8B budget's
+`thinking_budget_tokens: 512` meant every new-path turn sent
+`thinking: true` to the engine, adult or child, toggled or not -
+control-negative-spiderman at 4.9-5.3s against the old path's 0.7-0.9s,
+up to 512 reasoning tokens on small talk nobody asked for. Reasoning is
+a second output (GROUND-01's own ruling); it should never be a budget's
+default, only the person's per-turn choice.
+
+**The fix, three layers, the same shape spec-v0.1.22's
+`thinking_for_minors` bump already established.** `@maipai/spec`
+(spec-v0.1.27): `turn_budget` gains `thinking_budget_tokens_toggled`,
+required alongside `thinking_budget_tokens`; the 8B catalog entry's
+`thinking_budget_tokens` moves from 512 to 0 (the default) with
+`thinking_budget_tokens_toggled: 512` alongside it - the number is
+kept, not dropped, just repurposed. `RunTurnNextOpts` gains
+`thinking?: boolean`, mirroring the old path's own `RunTurnOpts.
+thinking` field exactly. `turnNext.ts` builds the turn's effective
+budget once, up front: `opts.thinking === true` substitutes
+`thinking_budget_tokens_toggled` for `thinking_budget_tokens` in a new
+object (never mutating the catalog's own shared `turn_budget`, which
+every other household's turn reads by reference) - every later reader
+(`model.ts`'s `thinkingOn`, `buildTurnStats`) sees the resolved value
+without change. `routes/turn.ts`'s two `runTurnNext()` call sites now
+pass `thinking: dropReasoning ? false : body.thinking` - the identical
+gate already computed there for the old path, so a minor or a
+non-chat surface is protected the same way on both paths, belt and
+braces: even if a caller passed `thinking: true` for what turns out to
+be a minor's turn, `model.ts`'s own `minorThinkingOff` (driven by
+`context.ts`'s age-band decision, never the caller's opts) still wins.
+
+**Verified:** `turnNext.test.ts`'s own thinking test flipped from
+asserting the old always-on default to the new always-off one, plus a
+new "THINK-DEFAULT-01" describe block: an adult's turn with `thinking:
+true` sends `enable_thinking: true`; a minor's turn with `thinking:
+true` still sends `enable_thinking: false`. `turnRouteU6a.test.ts`
+gained the same proof at the real route: `POST /api/turn` with no
+`body.thinking` sends `thinking:false` on the new path; with
+`body.thinking: true` it sends `thinking:true`. Full backend suite
+(3914/3914) and frontend `tsc --noEmit` both green; `bash scripts/
+check.sh` green.
+
+**Not done here:** wiring the composer's own RESP-04 "Thinking mode"
+toggle to actually send `body.thinking` when `turn.pipeline.next` is
+on - `chatModelAdapter.ts`'s `consumeThinking()` already sends it on
+the OLD path unconditionally, so once the new path is the household's
+real default this needs no frontend change at all; named here only
+because it was checked, not assumed.
