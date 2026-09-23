@@ -173,6 +173,12 @@ async function main(): Promise<void> {
   } finally {
     entry.turn_budget = baseBudget;
     rmSync(ownDataDir, { recursive: true, force: true });
+    // A review caught this listening server left running on a throw
+    // (only this function's own last statement stopped it, past
+    // wherever an exception propagated to) - the same "a throw is a
+    // real risk here" reason the budget/tempdir restores above already
+    // moved into this block for.
+    proxy.stop();
   }
 
   console.log("\n## interim-rule-measure rows\n");
@@ -195,7 +201,6 @@ async function main(): Promise<void> {
       console.log(`${label} always_search=${alwaysSearch}: pass ${(passRate * 100).toFixed(0)}%, searched ${(searchedRate * 100).toFixed(0)}%, answer_from_context ${(contextRate * 100).toFixed(0)}%, median TTFT ${medianTtft}ms, n=${subset.length}, required_miss ${missShare === null ? "n/a" : `${(missShare * 100).toFixed(0)}%`} (${forced.length} forced calls)`);
     }
   }
-  proxy.stop();
 }
 
 if (import.meta.main) {
