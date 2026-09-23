@@ -43,6 +43,7 @@ import { ChatTurnStats } from "@/apps/chat/chatTurnStats";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
 import { ChatBrainBadContext } from "@/apps/chat/useEngineHealth";
+import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
 import { api } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -382,6 +383,10 @@ const ThreadSuggestionItem: FC = () => {
 };
 
 const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode; disabled?: boolean; disabledReason?: string }> = ({ autoFocus, toolbar, disabled, disabledReason }) => {
+  // VOICE-LIVE-04: the same condition that already swaps the mic button
+  // to Stop (below) also swaps the text field itself for a live waveform
+  // - ChatGPT's own dictation look.
+  const dictating = useAuiState((s) => s.composer.dictation != null);
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
       <ComposerPrimitive.AttachmentDropzone asChild>
@@ -391,19 +396,23 @@ const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode; disabled?: boolean
         >
           <ComposerAttachments />
           {toolbar ? <div className="flex shrink-0 items-center gap-1">{toolbar}</div> : null}
-          <ComposerPrimitive.Input
-            placeholder={disabled ? (disabledReason ?? "MaiPai's AI isn't ready yet.") : "Send a message..."}
-            disabled={disabled}
-            // min-h-12 (48px), not min-h-9: the touch-target floor
-            // (docs/UI.md, BACKLOG.md lane 8 item 1, 2026-09-13) - the
-            // composer's own text field, a real tap target every message
-            // starts with, measured under 48px tall by the live check.
-            className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-1 py-3 text-base leading-6 outline-none disabled:cursor-not-allowed"
-            rows={1}
-            autoFocus={autoFocus}
-            enterKeyHint="send"
-            aria-label="Message input"
-          />
+          {dictating ? (
+            <ComposerDictationWaveform />
+          ) : (
+            <ComposerPrimitive.Input
+              placeholder={disabled ? (disabledReason ?? "MaiPai's AI isn't ready yet.") : "Send a message..."}
+              disabled={disabled}
+              // min-h-12 (48px), not min-h-9: the touch-target floor
+              // (docs/UI.md, BACKLOG.md lane 8 item 1, 2026-09-13) - the
+              // composer's own text field, a real tap target every message
+              // starts with, measured under 48px tall by the live check.
+              className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-1 py-3 text-base leading-6 outline-none disabled:cursor-not-allowed"
+              rows={1}
+              autoFocus={autoFocus}
+              enterKeyHint="send"
+              aria-label="Message input"
+            />
+          )}
           <ComposerAction disabled={disabled} disabledReason={disabledReason} />
         </div>
       </ComposerPrimitive.AttachmentDropzone>

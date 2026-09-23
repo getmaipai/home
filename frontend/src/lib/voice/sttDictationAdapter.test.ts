@@ -4,6 +4,7 @@ import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import type { SttSocket, SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { readMicDevicePreference, writeMicDevicePreference } from "@/lib/voice/micDevicePreference";
+import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 
 // The same minimal Web Audio fake useWakeWord.test.ts already uses
 // (mic-capture.ts's real startMicCapture() is exercised here too, since
@@ -20,11 +21,13 @@ class FakeAudioContext {
   createMediaStreamSource() {
     return { connect() {}, disconnect() {} };
   }
-  // VOICE-LIVE-02: this same global fake also stands in for the
-  // AudioContext a real SentenceSpeechScheduler constructs (the barge-in
-  // tests below build one to exercise its own stop() call) - its own
-  // playback bus and level meter, unused by anything these tests assert
-  // on, only present so the constructor doesn't throw.
+  // VOICE-LIVE-02/VOICE-LIVE-04: this same global fake also stands in
+  // for the AudioContext a real SentenceSpeechScheduler constructs (the
+  // barge-in tests below build one to exercise its own stop() call) and
+  // for `audioLevelMeter.ts`'s own `createLevelMeter()` (VOICE-LIVE-04's
+  // dictation waveform) - its own playback bus and level meter, unused
+  // by anything these tests assert on, only present so the constructor
+  // doesn't throw.
   createGain() {
     return { connect: () => {} };
   }
@@ -308,6 +311,75 @@ describe("createSttDictationAdapter", () => {
       await session.stop();
       expect(session.status).toEqual({ type: "ended", reason: "stopped" });
       expect(fake.closed).toBe(true);
+    });
+  });
+
+  // VOICE-LIVE-04: composerDictationWaveform.tsx's own gate on rendering
+  // any bars at all - a live `LevelMeter` (audioLevelMeter.ts, the
+  // identical AnalyserNode mechanism VOICE-LIVE-02 already proved), over
+  // the identical stream mic-capture.ts's real audio pipeline already
+  // opened (no second getUserMedia call).
+  test("ready hands onLevelMeter a live meter over the mic's own stream", async () => {
+    await withFakeAudioEnv(async () => {
+      const fake = fakeSocketFactory();
+      const meters: Array<LevelMeter | null> = [];
+      const adapter = createSttDictationAdapter({
+        createSocket: fake.createSocket,
+        turnSchedulerRef: { current: null },
+        onFinalReady: () => {},
+        onLevelMeter: (meter) => meters.push(meter),
+      });
+      adapter.listen();
+      fake.emit({ t: "ready" });
+      await waitFor(10);
+      expect(meters).toHaveLength(1);
+      expect(typeof meters[0]?.read).toBe("function");
+    });
+  });
+
+  test("ending the session stops the meter and clears it via onLevelMeter(null)", async () => {
+    await withFakeAudioEnv(async () => {
+      const fake = fakeSocketFactory();
+      const meters: Array<LevelMeter | null> = [];
+      const adapter = createSttDictationAdapter({
+        createSocket: fake.createSocket,
+        turnSchedulerRef: { current: null },
+        onFinalReady: () => {},
+        onLevelMeter: (meter) => meters.push(meter),
+      });
+      const session = adapter.listen();
+      fake.emit({ t: "ready" });
+      await waitFor(10);
+      const live = meters[0];
+      await session.stop();
+      expect(meters.at(-1)).toBeNull();
+      // stop() makes every later read() return 0 - audioLevelMeter.ts's
+      // own contract, proven here rather than assumed.
+      expect(live?.read()).toBe(0);
+    });
+  });
+
+  test("a session cancelled before mic capture resolves never hands a live meter to onLevelMeter", async () => {
+    await withFakeAudioEnv(async () => {
+      const fake = fakeSocketFactory();
+      const meters: Array<LevelMeter | null> = [];
+      const adapter = createSttDictationAdapter({
+        createSocket: fake.createSocket,
+        turnSchedulerRef: { current: null },
+        onFinalReady: () => {},
+        onLevelMeter: (meter) => meters.push(meter),
+      });
+      const session = adapter.listen();
+      // Synchronous, no await between "ready" and cancel(): the exact
+      // race `.then()`'s own `if (cancelled) { handle.stop(); return; }`
+      // already guards for the mic handle - unguarded for the meter, it
+      // would be created and handed out AFTER finish() already ran its
+      // own cleanup, leaking a live AnalyserNode nothing would ever stop
+      // (the mirror image of the mic-handle race above).
+      fake.emit({ t: "ready" });
+      session.cancel();
+      await waitFor(10);
+      expect(meters.every((m) => m === null)).toBe(true);
     });
   });
 });

@@ -46,11 +46,13 @@ import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
+import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
+import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { CURRENT_LOCAL_VISION_CAPABILITY } from "@/apps/chat/visionCapability";
 import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assistant-ui/core";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -1070,6 +1072,10 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   // (a one-time, near-instant fs check) rather than flashing the
   // not-installed message on a page that hasn't heard back yet.
   const sttStatusQuery = useQuery({ queryKey: ["stt-status"], queryFn: api.sttStatus });
+  // VOICE-LIVE-04: a live AnalyserNode-backed meter, present only while
+  // dictation is actually recording - composerDictationWaveform.tsx's own
+  // gate on rendering any bars at all.
+  const [dictationLevelMeter, setDictationLevelMeter] = useState<LevelMeter | null>(null);
   const dictationAdapter = useMemo(
     () =>
       createSttDictationAdapter({
@@ -1088,6 +1094,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
         // transcript lands in the composer through the adapter's own
         // `onSpeech`, independent of this callback.
         onFinalReady: () => {},
+        onLevelMeter: setDictationLevelMeter,
       }),
     [sttStatusQuery.data],
   );
@@ -1262,7 +1269,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     setTemporaryNext(true);
   }
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, armTemporaryChat, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt };
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, armTemporaryChat, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1574,7 +1581,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, armTemporaryChat, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, armTemporaryChat, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1829,6 +1836,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <BareModeContext.Provider value={bareModeValue}>
       <PackageScopeContext.Provider value={packageScopeValue}>
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
+      <DictationLevelMeterProvider value={dictationLevelMeter}>
         <StructuredResultTools />
         <ArtifactTool />
         <ToolTimelineTool />
@@ -2063,6 +2071,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
           </SheetContent>
         </Sheet>
+      </DictationLevelMeterProvider>
       </VoiceSessionProvider>
       </PackageScopeContext.Provider>
       </BareModeContext.Provider>

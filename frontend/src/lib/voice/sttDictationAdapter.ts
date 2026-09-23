@@ -4,6 +4,7 @@ import type { SttSocket, SttSocketHandlers } from "@/lib/voice/sttSocket";
 import type { SttServerMessage } from "@/lib/voice/sttContract";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { readMicDevicePreference, clearMicDevicePreference } from "@/lib/voice/micDevicePreference";
+import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 
 type SpeechResult = { transcript: string; isFinal?: boolean };
 
@@ -60,6 +61,22 @@ export interface SttDictationDeps {
    * false - the page owns how to show it (a toast, today), the adapter
    * only knows the socket has no assets to talk to. */
   onNotInstalled?: () => void;
+  /** VOICE-LIVE-04: called with a live `LevelMeter` (`audioLevelMeter.ts`,
+   * the identical AnalyserNode-over-the-mic mechanism VOICE-LIVE-02's own
+   * live voice session already uses) the moment real capture begins,
+   * `null` once this session ends - `composerDictationWaveform.tsx`
+   * polls its `read()` to animate the composer's bars, without a second
+   * `getUserMedia` call. **Not** `react-audio-visualize`'s own
+   * `LiveAudioVisualizer`, as the row first named: verified broken (a
+   * bare import crashes) against this stack's React 19 - the package's
+   * bundled dev-mode `react-jsx-runtime` shim reads an internals shape
+   * React 19 removed, and it has had no release since 2024-09. Named as
+   * a gap, the fallback the platform standard itself names for exactly
+   * this case: the smallest composition of already-shipped parts (the
+   * native `AnalyserNode`, `audioLevelMeter.ts` already proven by
+   * VOICE-LIVE-02) rather than a broken dependency or hand-rolled FFT
+   * drawing. */
+  onLevelMeter?: (meter: LevelMeter | null) => void;
 }
 
 // The composer's push-to-talk mic button (session-e-ui-and-docs.md step
@@ -80,6 +97,7 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
       const speech = createCallbackSet<SpeechResult>();
       let micHandle: MicCaptureHandle | null = null;
       let socket: SttSocket | null = null;
+      let levelMeter: LevelMeter | null = null;
       let ended = false;
 
       const session: DictationAdapter.Session = {
@@ -113,6 +131,9 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
         session.status = { type: "ended", reason };
         micHandle?.stop();
         socket?.close();
+        levelMeter?.stop();
+        levelMeter = null;
+        deps.onLevelMeter?.(null);
         speechEnd.notify(result ?? { transcript: "" });
       }
 
@@ -138,7 +159,21 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
             // a fixture in the first place).
             {
               const preferredDeviceId = readMicDevicePreference() ?? undefined;
-              startMicCapture({ onFrame: (frame) => socket?.sendAudio(frame), deviceId: preferredDeviceId })
+              startMicCapture({
+                onFrame: (frame) => socket?.sendAudio(frame),
+                deviceId: preferredDeviceId,
+                onSource: (context, source) => {
+                  // The same cancel-before-connect race `.then()` below
+                  // already guards against (session ended before mic
+                  // capture resolved) - unguarded, a level meter could be
+                  // created and handed to the composer AFTER finish()
+                  // already ran its own cleanup, leaking a live
+                  // AnalyserNode nothing would ever stop.
+                  if (ended) return;
+                  levelMeter = createLevelMeter(context, source);
+                  deps.onLevelMeter?.(levelMeter);
+                },
+              })
                 .then((handle) => {
                   if (ended) {
                     handle.stop();
