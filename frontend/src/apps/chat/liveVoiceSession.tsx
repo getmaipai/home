@@ -131,7 +131,12 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
     const socket = createSocket({
       onMessage(message) {
         if (cancelled) return;
-        switch (message.type) {
+        // DICT-01 (found live, 2026-09-23): the real wire contract uses
+        // short keys, `t` and `v`, never `type`/`text` - this file's own
+        // first draft was written against the same wrong guessed shape
+        // dictation's own bug was, caught here before ever shipping
+        // rather than live.
+        switch (message.t) {
           case "ready":
             setMode("listening");
             void startCapture({
@@ -164,7 +169,7 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
             // already the "it's hearing you" signal while this is live.
             break;
           case "final": {
-            const text = message.text.trim();
+            const text = message.v.trim();
             micHandle?.stop();
             micHandle = null;
             levelMeter?.stop();
@@ -194,6 +199,18 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
             clearInterval(levelTimer);
             setAmplitude(0);
             setListenGeneration((g) => g + 1);
+            break;
+          // A real server-side STT failure (the spec's own `{ t: "error",
+          // v: string }`) - distinct from a dropped socket (onError
+          // below): the session is still connected, but nothing further
+          // will transcribe correctly, so this ends the call the same
+          // way a connection-level failure does rather than looping on a
+          // broken session.
+          case "error":
+            micHandle?.stop();
+            levelMeter?.stop();
+            clearInterval(levelTimer);
+            onOpenChange(false);
             break;
         }
       },

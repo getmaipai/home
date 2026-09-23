@@ -68,8 +68,8 @@ describe("LiveVoiceSession", () => {
       view.rerender(<Harness open={true} onOpenChange={() => {}} isSpeaking={isSpeaking} speakingEndedAt={speakingEndedAt} fixture={fixture} sentTexts={sentTexts} />);
     };
     const fixture: SttFixtureStep[] = [
-      { delayMs: 0, message: { type: "ready" } },
-      { delayMs: 150, message: { type: "final", text: "what's the weather" } },
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 150, message: { t: "final", v: "what's the weather" } },
     ];
     const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} />);
 
@@ -100,8 +100,8 @@ describe("LiveVoiceSession", () => {
   test("a reply that never speaks (isSpeaking stays false throughout) still resumes listening once speakingEndedAt bumps", async () => {
     const sentTexts: string[] = [];
     const fixture: SttFixtureStep[] = [
-      { delayMs: 0, message: { type: "ready" } },
-      { delayMs: 150, message: { type: "final", text: "hi" } },
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 150, message: { t: "final", v: "hi" } },
     ];
     const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
@@ -119,8 +119,8 @@ describe("LiveVoiceSession", () => {
   test("no_speech re-listens instead of sending an empty turn", async () => {
     const sentTexts: string[] = [];
     const fixture: SttFixtureStep[] = [
-      { delayMs: 0, message: { type: "ready" } },
-      { delayMs: 150, message: { type: "no_speech" } },
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 150, message: { t: "no_speech" } },
     ];
     const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
@@ -132,7 +132,7 @@ describe("LiveVoiceSession", () => {
   });
 
   test("onEnd closes the overlay", async () => {
-    const fixture: SttFixtureStep[] = [{ delayMs: 0, message: { type: "ready" } }];
+    const fixture: SttFixtureStep[] = [{ delayMs: 0, message: { t: "ready" } }];
     let open = true;
     const onOpenChange = (value: boolean) => {
       open = value;
