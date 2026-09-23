@@ -72,6 +72,17 @@
       "turns": [
         { "say": "why did corey feldmans friendship end with michael jackson", "expect": { "toolRan": "websearch", "sourcesNonEmpty": true, "mustNotContain": "i think|i'm not sure|not sure of all the exact reasons" } }
       ]
+    },
+    {
+      "id": "new-engine-small-talk",
+      "category": "memory",
+      "note": "CONTEXT-RECALL-01 (dev.md 'The owner's three live turns', (2)): a fresh conversation's small talk was answered as if a remembered lookup were the question - nodes/context.ts called recall(actor, utterance) bare (keyword overlap, no tier floor), so an unrelated seeded memory surfaced anyway. The seeded row is a remembered lookup that came back empty, the exact shape that leaked.",
+      "seedRecords": [
+        { "text": "Searched for when the president of Chile was born; the search found nothing.", "category": "fact", "scope": "household" }
+      ],
+      "turns": [
+        { "say": "this is the new reply engine", "expect": { "toolRan": null, "mustNotContain": "search|didn't find|birth|try a different" } }
+      ]
     }
   ],
 

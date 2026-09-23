@@ -26,6 +26,7 @@ import { fallbackSignal } from "@/lib/turnSignal";
 import { planFor, type PlanInput } from "@/lib/register";
 import { buildStablePrefix, companionReanchorLine } from "@/lib/turnEngine";
 import { DEFAULT_PERSONA } from "@/lib/persona";
+import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
 function item(source: ContextItem["source"], text: string, id = `${source}-1`): ContextItem {
   return { id, text, source, subjects: [], disclosure: "child_ok" };
@@ -55,12 +56,30 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
     expect(out[2]).toEqual({ role: "assistant", content: "Hello!" });
   });
 
+  // CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)): the
+  // memory item leads the volatile message wrapped in the shared
+  // header/trust-line framing (memoryFraming.ts), never a bare
+  // "[remembered] ..." line - the clock (and any other volatile
+  // source) still renders as a plain labeled line, after it.
   test("memory and clock land in a second system message, after the window and before the utterance", () => {
     const context: ContextItem[] = [item("memory", "Sage likes tea.", "memory-1"), item("clock", "Monday 9:00 AM")];
     const out = messages(context);
     expect(out[0]).toEqual({ role: "system", content: STABLE_PREFIX });
-    expect(out[1]?.content.startsWith(`[remembered] Sage likes tea.\n[clock] Monday 9:00 AM\n\n${REANCHOR}\n\nHow to answer this one:`)).toBe(true);
+    expect(out[1]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n[remembered] Sage likes tea.\n${MEMORY_TRUST_REMINDER}\n\n[clock] Monday 9:00 AM\n\n${REANCHOR}\n\nHow to answer this one:`)).toBe(true);
     expect(out[2]).toEqual({ role: "user", content: "what's the weather" });
+  });
+
+  // CONTEXT-RECALL-01's own test, in the row's exact words.
+  test("the volatile message begins with the header line", () => {
+    const context: ContextItem[] = [item("clock", "Monday 9:00 AM")];
+    const out = messages(context, "hi");
+    expect(out[1]?.content.startsWith(MEMORY_SECTION_HEADER)).toBe(true);
+  });
+
+  test("no memory items at all: the volatile message still says nothing was found, framed the same way", () => {
+    const context: ContextItem[] = [item("clock", "Monday 9:00 AM")];
+    const out = messages(context, "hi");
+    expect(out[1]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\n[clock] Monday 9:00 AM\n\n`)).toBe(true);
   });
 
   test("both halves together: stable, window, volatile, utterance, in that exact order", () => {
@@ -75,7 +94,7 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
     const out = messages(context);
     expect(out.map((m) => m.role)).toEqual(["system", "user", "assistant", "system", "user"]);
     expect(out[0]?.content).toBe(`${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage`);
-    expect(out[3]?.content.startsWith(`[remembered] Sage likes tea.\n[clock] Monday 9:00 AM\n\n${REANCHOR}\n\nHow to answer this one:`)).toBe(true);
+    expect(out[3]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n[remembered] Sage likes tea.\n${MEMORY_TRUST_REMINDER}\n\n[clock] Monday 9:00 AM\n\n${REANCHOR}\n\nHow to answer this one:`)).toBe(true);
     expect(out[4]).toEqual({ role: "user", content: "what's the weather" });
   });
 
@@ -97,16 +116,21 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
 
   test("no stable context items: the stable message is still buildStablePrefix() alone, never empty or skipped", () => {
     const context: ContextItem[] = [item("memory", "Sage likes tea.", "memory-1")];
-    const out = messages(context);
+    const out = messages(context, "hi");
     expect(out[0]).toEqual({ role: "system", content: STABLE_PREFIX });
+    expect(out[1]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n[remembered] Sage likes tea.\n${MEMORY_TRUST_REMINDER}\n\n`)).toBe(true);
   });
 
+  // CONTEXT-RECALL-01: no memory (or clock, or any other) item at all
+  // still gets the framed "nothing matched" block - the memory block
+  // always leads the volatile message, ahead of the reanchor and plan
+  // lines U4b added.
   test("no volatile context items: the volatile message is still the reanchor line and the plan line, never empty or skipped", () => {
     const context: ContextItem[] = [item("profile", "Sage's profile: likes hiking.")];
     const out = messages(context, "hi");
     expect(out[0]).toEqual({ role: "system", content: `${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.` });
     expect(out[1]).toEqual({ role: "system", content: expect.stringContaining("How to answer this one:") });
-    expect(out[1]?.content.startsWith(REANCHOR)).toBe(true);
+    expect(out[1]?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\n${REANCHOR}`)).toBe(true);
     expect(out[2]).toEqual({ role: "user", content: "hi" });
   });
 
@@ -135,7 +159,10 @@ describe("contextToMessages(): U4b, the persona prefix, the reanchor and the pla
   test("the volatile message repeats the persona's identity every turn (companionReanchorLine)", () => {
     const out = messages([], "what's the weather");
     const volatileMessage = out.find((m) => m.role === "system" && m.content.includes("How to answer this one:"));
-    expect(volatileMessage?.content.startsWith(REANCHOR)).toBe(true);
+    // CONTEXT-RECALL-01: the memory block (here, "nothing matched" -
+    // an empty context recalls nothing) leads the volatile message,
+    // ahead of the reanchor line.
+    expect(volatileMessage?.content.startsWith(`${MEMORY_SECTION_HEADER}\n${NOTHING_STORED_LINE}\n${MEMORY_TRUST_REMINDER}\n\n${REANCHOR}`)).toBe(true);
     expect(REANCHOR).toContain(DEFAULT_PERSONA.display_name);
   });
 

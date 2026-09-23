@@ -23,6 +23,7 @@ import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
+import { visibleReplyMaxTokens } from "@/lib/turnEngine";
 import { contextToMessages } from "../messages";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 
@@ -100,13 +101,16 @@ function toolSpecFor(id: string): ToolSpec | null {
   return { id, description: loaded.value.description, args: loaded.value.args };
 }
 
-/** ReplyPlan bounds length in words (max_words), never tokens; llm.ts's
- * max_tokens wants a token ceiling. English averages under 1.5 tokens
- * per word, so doubling max_words is a deliberately generous ceiling -
- * a plan meant to stop a rambling reply, not clip a normal one short. */
-function maxTokensFor(plan: TurnState["plan"]): number | undefined {
-  return typeof plan?.max_words === "number" ? Math.ceil(plan.max_words * 2) : undefined;
-}
+// FORCED-CALL-01 (dev.md "The owner's three live turns", (1)): a
+// required call's own reply IS a tool_calls fragment stream, never
+// text - a websearch call is 30 to 45 tokens (the name, `expression`,
+// `category`, `read_page` and the wrapper), so 96 leaves real room for
+// a long expression and can never pay for a 440-token knowledge answer
+// the way `maxTokensFor`'s own doubled-max_words formula did. The cap
+// is the backstop for the non-streaming Stack twin and for a runaway
+// call; the early-abort below (the first text delta on a forced call)
+// is what actually keeps a miss cheap in the common, streaming case.
+const FORCED_CALL_MAX_TOKENS = 96;
 
 interface GenerationAttempt {
   ok: true;
@@ -131,8 +135,18 @@ type GenerationResult = GenerationAttempt | { ok: false; code: string };
  * it through the streaming client (COR-7's own signal support), and
  * drains it manually so the generator's return value (the tool calls)
  * survives - `for await...of` would discard it. */
-async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "required" | undefined, thinking: boolean, reason: string, signal: AbortSignal): Promise<GenerationResult> {
-  const started = await startCompleteStream("chat", messages, { tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokensFor(state.plan) }, signal);
+async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "required" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal): Promise<GenerationResult> {
+  const forced = tool_choice === "required";
+  // FORCED-CALL-01: a child AbortController chained off the node's own
+  // signal (deadline.ts's nodeSignal shape, without its timer half -
+  // this one fires on content, not a clock), so a forced call's own
+  // early-abort never reaches past THIS generation's own request.
+  const controller = forced ? new AbortController() : null;
+  if (controller) {
+    if (signal.aborted) controller.abort(signal.reason);
+    else signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  }
+  const started = await startCompleteStream("chat", messages, { tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens }, controller?.signal ?? signal);
   if (!started.ok) return { ok: false, code: started.code };
 
   const requestSentMs = Date.now();
@@ -147,6 +161,20 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
         break;
       }
       if (firstDeltaMs === null) firstDeltaMs = Date.now() - requestSentMs;
+      // FORCED-CALL-01: llm.ts streams a tool call as tool_calls
+      // fragments, never as text, and a forced call always runs
+      // thinking off (modelNode, below), so ANY text delta at all here
+      // already means the model wrote prose instead of a call - the
+      // miss itself. Abort now rather than pay for the rest of a
+      // doomed generation; breaking (not throwing) lets this fall
+      // through below exactly like an ordinary "no tool call" attempt,
+      // which the existing requiredButMissing/builder-row logic in
+      // modelNode already handles correctly.
+      if (forced && controller && step.value.length > 0) {
+        controller.abort(new DOMException("forced call wrote text, not a tool call", "AbortError"));
+        await started.tokens.return?.(undefined as never).catch(() => {});
+        break;
+      }
       raw += step.value;
     }
   } catch {
@@ -178,7 +206,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   // verify, since a parse failure or a literal "{}" is exactly what a
   // later read of the trace needs to tell apart from a real query.
   const websearchRawArgs = toolCalls?.find((c) => c.tool === "websearch")?.rawArgs ?? null;
-  state.generations.push({ reason, thinking, maxTokens: maxTokensFor(state.plan) ?? null, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
+  state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
   return { ok: true, text: visible, reasoning: extractReasoningText(raw), toolCalls, thinking };
 }
 
@@ -242,8 +270,20 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // cost control since the reasoning span would be consumed and
   // dropped below regardless (see `reasoning` a few lines down).
   const minorThinkingOff = state.reasoning.withheld_for === "minor" && !state.budget.thinking_for_minors;
-  const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
-  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, interimRuleApplies ? "interim_rule" : "model", signal);
+  // FORCED-CALL-01 (dev.md "The owner's three live turns", (1)):
+  // thinking off on every required call, whatever the person's own
+  // toggle - a call is not a reply, and re-check C's own miss-rate
+  // measurement was taken with thinking off. Only a `required` call is
+  // forced this way; an ordinary/offered call still follows the
+  // household's own toggle (THINK-DEFAULT-01) unchanged.
+  const thinkingOn = tool_choice !== "required" && state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
+  // FORCED-CALL-01: the forced call's own cap is fixed (FORCED_CALL_
+  // MAX_TOKENS); the phrasing/ordinary call's own cap is LAT-01's one
+  // formula (visibleReplyMaxTokens), never a second one - thinkingOn
+  // is already forced false above for a required call, so this reads
+  // truthfully for both.
+  const maxTokens = tool_choice === "required" ? FORCED_CALL_MAX_TOKENS : visibleReplyMaxTokens(state.plan.max_words, thinkingOn);
+  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, interimRuleApplies ? "interim_rule" : "model", signal);
   // DEADLINE-01: a generation that never finished (the model node's
   // own deadline, a dead engine) is one more way "the model produced
   // no query" happens - on a forced turn (tool_choice required), the
@@ -256,9 +296,11 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // State table, `model`'s own exits: "no visible text: one
   // regeneration with thinking off, then answer." A tool call always
   // counts as "visible" (it is the turn's real output); only a call
-  // that came back with neither text nor a tool call retries.
+  // that came back with neither text nor a tool call retries. Forced
+  // calls never reach here with thinkingOn true (forced above), so
+  // this retry is only ever an ordinary/offered call's own.
   if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && thinkingOn) {
-    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, "model_retry_no_thinking", signal);
+    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, visibleReplyMaxTokens(state.plan.max_words, false), "model_retry_no_thinking", signal);
     if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code) : { outcome: { ok: false, code: attempt.code }, output: { kind: "model_failed" } };
   }
 

@@ -11,10 +11,11 @@
 // "household privacy and disclosure ... filtered before the prompt,
 // never left to the model").
 import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation } from "@/lib/conversationHistory";
-import { recall, getProfileParagraph } from "@/lib/memory";
+import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/lib/memory";
 import { subjectRosterFor } from "@/lib/subjects";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { MAX_MEMORY_SNIPPETS } from "@/lib/turnEngine";
 import type { Node, ContextItem, TurnState } from "../contract";
 
 /** "Reasoning is a second output" (the owner's ruling): decided once,
@@ -111,7 +112,55 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // own rule - and nothing here should ground a temporary answer in a
   // durable record that outlives it).
   if (!temporary) {
-    const matches = recall(state.actor, input.utterance).slice(0, 8);
+    // CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)):
+    // carries the old path's own recall call whole (turnEngine.ts
+    // around line 3290, hard-won logic), never a bare recall(actor,
+    // utterance) - that fell to the lenient keyword-overlap path with
+    // no tier floor at all, which is why a fresh conversation's small
+    // talk got answered as if a remembered lookup were the question.
+    // "No rule, no signal switch" (the owner's own words): nothing
+    // here branches on question-vs-inform - the tier floor this query
+    // vector enables, plus messages.ts's own framing of the result, do
+    // the whole job.
+    const now = new Date();
+    const ageBand = speakerAgeBand(state.actor, now);
+    // withholdSensitive's robot half mirrors turnContext.ts's own
+    // sensitiveAllowed(): missing presence data withholds rather than
+    // guesses, and no presence signal exists on the new path yet
+    // (this file's own header note) - so every robot-surface turn
+    // withholds sensitive records until a real speaker-evidence/
+    // presence system lands here too. anonymous stays false for the
+    // same reason: no unknown-speaker-default path exists on the new
+    // engine yet either.
+    const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen";
+    const anonymous = false;
+    const queryVector = await embedQueryForRecall(input.utterance);
+    const matches = recall(state.actor, input.utterance, {
+      selfOnly: true,
+      asOf: now,
+      queryVector,
+      withholdSensitive,
+      anonymous,
+      // #88's own excludeSource (an edited turn's own resend): no
+      // supersede concept exists on the new path yet, so nothing to
+      // exclude - the option rides along so a later edit-and-resend
+      // build only has to supply a value here, never re-wire the call.
+      excludeSource: undefined,
+      // A code review caught this call bumping uses/last_used_at on
+      // every one of recall()'s top-20 scored candidates (the default)
+      // instead of only the up to MAX_MEMORY_SNIPPETS that actually
+      // reach the prompt below - RecallOptions.bumpUsage's own comment
+      // names exactly this ("the turn engine... bumps only the subset
+      // that actually reached the model's prompt"), which turnEngine.ts
+      // already honors this same way (its own bumpUsage() call after
+      // its own prompt-inclusion filter).
+      bumpUsage: false,
+    }).slice(0, MAX_MEMORY_SNIPPETS);
+    // Every sliced match becomes a context item below, unconditionally
+    // (no further filtering happens after this point) - so the matches
+    // array itself is exactly "what reached the prompt," the same
+    // bump the old path's own subset-only call makes.
+    bumpUsage(matches);
     for (const match of matches) {
       const r = match.record;
       items.push({

@@ -21918,3 +21918,60 @@ a turn needs a lookup, replaces "question plus world" when it clears
 its bar; until then `always_search` stays true on every surface class,
 written included, because the stale-fact failure is the same typed or
 spoken.
+
+## FORCED-CALL-01 and CONTEXT-RECALL-01: landed (2026-09-23)
+
+The ruling's own (1) and (2), both landed. Files: `nodes/model.ts`,
+`turnEngine.ts` (`visibleReplyMaxTokens` exported, `MAX_MEMORY_SNIPPETS`
+exported, the memory-framing strings moved to the new
+`lib/memoryFraming.ts`), `nodes/context.ts`, `messages.ts`,
+`tests/turnMachine/turnNext.test.ts`, `tests/turnMachine/context.test.ts`
+(new), `tests/turnMachine/messages.test.ts`,
+`scripts/bench/datasets/owner-replay.json` (`new-engine-small-talk`).
+
+### FORCED-CALL-01: the trace line
+
+Live, real 8B, `turn.pipeline.next` on, "what time is it in Tokyo"
+(SIGNAL-02 not yet landed, so this still runs the interim rule's forced
+call): six real attempts, one cold-cache (the bench's own first request
+of the session, `cache_n: 3` out of `prompt_n: 254`) and five with a
+warm-to-full cache. The forced generation (`nodeTrace`'s first `model`
+entry) landed at 1361ms, 1363ms, 1346ms and 897ms on the four warm
+repeats (under the row's own 2,000 ms line every time), and 3439ms on
+the one cold-cache attempt (`prompt_ms` alone was 2599ms of that - a
+cache-warmth cost NEXT-CACHE-01 already addresses for an ongoing
+conversation, not something a turn's own first-ever request in a
+process can avoid, and not a required-call miss: every one of the six
+attempts made a real websearch call on the first try, `required_miss`
+never set). Total turn time: 3944ms (the cold one), then 2146ms,
+2086ms, 2716ms, 1297ms - every attempt well under the row's 8s line,
+against the original incident's 17s. The scripted regression test
+(`turnNext.test.ts`, "a scripted engine that answers a required call
+with text is aborted after its first delta...") is what actually proves
+the miss case cheap - a real miss never reproduced live in six
+attempts, matching re-check C's own low false-call rate, so the abort
+path's own cost is proven by the stub (a spy on
+`AbortController.prototype.abort`, since the stub's synchronous stream
+completes before a real network abort could race it) rather than a
+live trace.
+
+One unrelated finding from the same live run, filed as
+[getmaipai/home#141](https://github.com/getmaipai/home/issues/141): the
+phrasing round's reply named the wrong YEAR three times out of six
+("...2032", "...2226", "...2126"), while the day and time of day were
+right every time and the tool call itself never missed. Not this
+item's own defect (the phrasing round's own hallucination, not the
+forced call this item changed) - noted, not fixed here.
+
+### CONTEXT-RECALL-01: the rerun table
+
+`new-engine-small-talk` ("this is the new reply engine", a seeded
+household memory reading "Searched for when the president of Chile was
+born; the search found nothing."): clean 3/3 live, `toolRan: null`
+every time, no `search`/`didn't find`/`birth`/`try a different` in any
+reply ("I'm the new reply engine. How can I assist you today?", "I'm
+here to assist you with any tasks or questions you may have...",
+"Hello! I'm the new reply engine, here to help you with any tasks or
+questions you may have..."). `control-negative-feeling-down` and
+`control-remember-pizza-night` both unchanged (pass, same shape as
+before this item: no tool for the first, `remember` for the second).

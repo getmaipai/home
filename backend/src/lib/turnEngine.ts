@@ -103,6 +103,13 @@ import type { Media, TurnValue } from "@/wire";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 export type { TurnReply, TurnValue } from "@/wire";
+// CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)): these
+// three lines moved to memoryFraming.ts so nodes/messages.ts can render
+// the identical wording; re-exported here unchanged so this file's own
+// memorySection and every existing caller of NOTHING_STORED_LINE (this
+// file's own export before this item) keep working untouched.
+import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
+export { NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
 // 4.5 names six surfaces (chat, overlay, pod, robot, tv, phone), each
 // changing memory sensitivity, discretion and presentation. Only `chat`
@@ -686,15 +693,19 @@ const THINKING_ALLOWANCE = 512;
 
 /** LAT-01: the one formula for a visible reply's own max_tokens, shared
  * by the streaming and the blocking model-call sites so they can't drift
- * into two different answers for "how much room does thinking need". */
-function visibleReplyMaxTokens(maxWords: number, thinking: boolean | undefined): number {
+ * into two different answers for "how much room does thinking need".
+ * FORCED-CALL-01 (dev.md "The owner's three live turns", (1)): exported
+ * so the new path's own phrasing round reads this exact formula too,
+ * retiring `nodes/model.ts`'s own `maxTokensFor` - one formula, not two
+ * that can quietly drift apart. */
+export function visibleReplyMaxTokens(maxWords: number, thinking: boolean | undefined): number {
   return Math.ceil(maxWords * 1.6) + 32 + (thinking ? THINKING_ALLOWANCE : 0);
 }
 
-const MAX_MEMORY_SNIPPETS = 5;
-/** #93: the memory block's own line when recall found nothing relevant
- * (exported for the tests and the bench). */
-export const NOTHING_STORED_LINE = "Nothing stored here bears on this message.";
+// FORCED-CALL-01/CONTEXT-RECALL-01 style: exported so nodes/context.ts
+// caps its own recall the same way, one constant, not two that can
+// drift (the row: "five rows (MAX_MEMORY_SNIPPETS)").
+export const MAX_MEMORY_SNIPPETS = 5;
 const MAX_MEMORY_SECTION_CHARS = 800;
 const MAX_SKILLS_SECTION_CHARS = 1200;
 // Step 3: one line, so a generous cap is plenty; guards the same way
@@ -908,8 +919,6 @@ function subjectLabelsFor(actor: PersonRow, matches: RecallMatch[]): Map<string,
   return labels;
 }
 
-const MEMORY_TRUST_REMINDER = "Prefer these facts over guessing when they're relevant.";
-
 // Step 4: "re-anchor the companion's one-line identity after the memory
 // block" - legacy measured real drift (losing the persona's voice)
 // after about eight turns with no repeat of who's speaking. Companions-
@@ -1010,7 +1019,7 @@ export function buildPromptParts(
     // a general question from what it knows instead of reaching for the
     // recall tool to check what the context already checked.
     const bulletsBlock = lines.length > 0 ? `${lines.join("\n")}\n` : `${NOTHING_STORED_LINE}\n`;
-    memorySection = `\n\nWhat you already know about this household:\n${profileLine}${bulletsBlock}${MEMORY_TRUST_REMINDER}`;
+    memorySection = `\n\n${MEMORY_SECTION_HEADER}\n${profileLine}${bulletsBlock}${MEMORY_TRUST_REMINDER}`;
     memorySection = capSection(memorySection, MAX_MEMORY_SECTION_CHARS);
   } else {
     memorySection = `\n\n${NOTHING_STORED_LINE}`;

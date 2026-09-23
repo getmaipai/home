@@ -416,19 +416,24 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
     // Written, no evidence: this row never runs a tool at all (a
     // self-target question, never the world), so U4c's post-tool-round
     // recompute never fires and the plan stays exactly what
-    // turnNext.ts computed up front - 220 words * model.ts's own
-    // maxTokensFor ceiling (max_words * 2) = 440. The evidence-boosted
-    // row is covered by the "U4c" describe block below, on a row whose
-    // tool round actually returns something.
-    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(440);
+    // turnNext.ts computed up front - 220 words, thinking off (no
+    // toggle). FORCED-CALL-01 (dev.md "The owner's three live turns",
+    // (1)) retired model.ts's own maxTokensFor (max_words * 2 = 440);
+    // every ordinary generation now uses LAT-01's one shared formula,
+    // visibleReplyMaxTokens: ceil(220 * 1.6) + 32 = 384. The
+    // evidence-boosted row is covered by the "U4c" describe block
+    // below, on a row whose tool round actually returns something.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(384);
   });
 
   test("a robot question's completion keeps today's spoken plan, unchanged", async () => {
     const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane"));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    // Spoken keeps the act table exactly: a question is 60 words * 2 = 120.
-    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(120);
+    // Spoken keeps the act table exactly: a question is 60 words,
+    // thinking off. FORCED-CALL-01: visibleReplyMaxTokens's formula,
+    // not the retired max_words * 2 (120) - ceil(60 * 1.6) + 32 = 128.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(128);
   });
 });
 
@@ -468,9 +473,11 @@ describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", 
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.sources?.length).toBeGreaterThan(0);
-      // Written, evidence.sources >= 1: 360 words * maxTokensFor's
-      // ceiling (max_words * 2) = 720, not the base row's 440.
-      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(720);
+      // Written, evidence.sources >= 1: 360 words, thinking off.
+      // FORCED-CALL-01: visibleReplyMaxTokens, not the retired
+      // maxTokensFor ceiling (max_words * 2 = 720) - ceil(360 * 1.6) +
+      // 32 = 608, still above the base row's 384.
+      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(608);
     } finally {
       searxng.stop();
     }
@@ -498,9 +505,17 @@ describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", 
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.sources?.length ?? 0).toBe(0);
-      // Written, no real evidence despite the tool round running: the
-      // base row, 220 words * 2 = 440, exactly like no tool round at all.
-      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(440);
+      // A zero-result tool round never reaches a second LLM call at
+      // all: composer.ts's own "empty_rows" mode (model_calls: 0)
+      // writes the canned no-results line directly, so the forced
+      // call is the ONLY (and so also the last) generation this turn
+      // ever runs. FORCED-CALL-01: a required call's own cap is fixed
+      // at 96 regardless of plan or evidence - not the base plan row
+      // this test proved before that item (220 * 2 = 440, then LAT-01's
+      // visibleReplyMaxTokens(220, false) = 384 after it), since there
+      // is no ordinary/phrasing generation here for that formula to
+      // ever apply to.
+      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(96);
     } finally {
       searxng.stop();
     }
@@ -882,6 +897,141 @@ describe("turnNext.ts: DEADLINE-01, a failed generation never delivers an empty 
       expect(modelOutcomes[0]?.ok).toBe(false);
       expect(modelOutcomes[0]?.code).toBeDefined();
     } finally {
+      searxng.stop();
+    }
+  });
+});
+
+// FORCED-CALL-01 (dev.md "The owner's three live turns on the new
+// path", (1)): the interim rule's `required` generation once ran a
+// full 440-token knowledge answer to completion (live, "what time is
+// it in Tokyo", 11.6 s) before the builder fallback ever started -
+// llm.ts streams a tool call as `tool_calls` fragments, never text, so
+// with thinking off any text delta on a forced call already IS the
+// miss. model.ts now aborts the generation right there (a child
+// AbortController chained off the node's own signal, mirroring
+// deadline.ts's nodeSignal shape) instead of paying for the rest of
+// a doomed reply, and the phrasing/ordinary round's own cap comes from
+// LAT-01's one shared formula (visibleReplyMaxTokens), retiring
+// maxTokensFor's second, max_words * 2 formula (proven above, U4/U4c).
+describe("turnNext.ts: FORCED-CALL-01, a forced call that misses costs under a second", () => {
+  // The stub streams every word of a scripted reply synchronously in
+  // one tick (stubServer.ts's own `start(controller)`), so on
+  // localhost the whole HTTP response is already sitting in the fetch
+  // layer's own buffer before this test's JS ever gets to read a
+  // second delta - a real network race the abort would win against a
+  // slow engine, but not something a deterministic unit test can prove
+  // by racing the recording proxy's own `aborted` flag. What IS
+  // deterministic, and what "abort on it" (dev.md "The owner's three
+  // live turns", (1)) actually means in code, is that model.ts's own
+  // controller.abort() call fires with its own documented reason - so
+  // this test spies on AbortController.prototype.abort itself, the
+  // real side effect model.ts's abort produces, rather than a race.
+  function spyOnAbort(): { reasons: unknown[]; restore(): void } {
+    const reasons: unknown[] = [];
+    const original = AbortController.prototype.abort;
+    AbortController.prototype.abort = function abort(this: AbortController, reason?: unknown): void {
+      reasons.push(reason);
+      original.call(this, reason);
+    };
+    return { reasons, restore: () => { AbortController.prototype.abort = original; } };
+  }
+
+  test("a scripted engine that answers a required call with text is aborted after its first delta and the turn searches through the builder with required_miss: true", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const spy = spyOnAbort();
+    try {
+      const result = await withStub(
+        {
+          // The forced call never scripts a tool call at all (`calls`
+          // returns undefined), so it falls to `reply` and answers in
+          // plain text - the miss. The phrasing round (the second
+          // request, carrying a tool-role message) answers for real.
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question, sourced." : "The current president of Chile is a made-up name the model should never get to finish saying."),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(result.value.plugin_id).toBe("websearch");
+      expect(result.value.sources?.length).toBeGreaterThan(0);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; required_miss?: boolean } }[] };
+      const modelOutcomes = (stats.nodes ?? []).filter((n) => n.node === "model").map((n) => n.outcome ?? {});
+      expect(modelOutcomes[0]?.required_miss).toBe(true);
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
+      expect(outcomes.some((o) => o.callId === "builder" && o.args?.expression === "who is the president of chile")).toBe(true);
+      // The proof this item is actually about: model.ts's own
+      // early-abort branch really fired, with its own documented
+      // reason, not just that the reply got discarded after arriving
+      // whole (ENGINE-CONTRACT-02's own, unmodified test above already
+      // covers "discarded eventually"; this proves "aborted, not read
+      // to the end").
+      expect(spy.reasons.some((r) => r instanceof DOMException && r.message === "forced call wrote text, not a tool call")).toBe(true);
+    } finally {
+      spy.restore();
+      searxng.stop();
+    }
+  });
+
+  test("a required request carries thinking: false and max_tokens: 96 whatever the budget's thinking", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let forcedRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            forcedRequest ??= request;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        // The household's own thinking toggled ON for this turn (the
+        // 8B's thinking_budget_tokens_toggled is 512, THINK-DEFAULT-01) -
+        // the exact case the row names: a required call's thinking:false
+        // and max_tokens:96 hold regardless of the budget's own thinking.
+        () => runTurnNext(people.owner, "chat", "who is the president of chile", { thinking: true }),
+      );
+      expect(result.ok).toBe(true);
+      expect(forcedRequest?.tool_choice).toBe("required");
+      expect(forcedRequest?.chat_template_kwargs?.enable_thinking).toBe(false);
+      expect(forcedRequest?.max_tokens).toBe(96);
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("a scripted call reply is untouched", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const spy = spyOnAbort();
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile 2026" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.plugin_id).toBe("websearch");
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; required_miss?: boolean } }[] };
+      const modelOutcomes = (stats.nodes ?? []).filter((n) => n.node === "model").map((n) => n.outcome ?? {});
+      expect(modelOutcomes[0]?.required_miss).toBeUndefined();
+      // The new abort logic only fires on a text delta; a tool-calls
+      // stream never trips it, so it never runs at all here.
+      expect(spy.reasons.some((r) => r instanceof DOMException && r.message === "forced call wrote text, not a tool call")).toBe(false);
+    } finally {
+      spy.restore();
       searxng.stop();
     }
   });

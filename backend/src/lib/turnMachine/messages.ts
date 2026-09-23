@@ -28,6 +28,7 @@ import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import { buildStablePrefix, companionReanchorLine } from "@/lib/turnEngine";
 import { planLine } from "@/lib/register";
+import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
 // GROUND-01: "utterance" is excluded here too, same as "window" - it is
 // already the final "user" message contextToMessages() appends below,
@@ -50,6 +51,22 @@ function renderContextLine(item: ContextItem): string {
   const label = SOURCE_LABEL[item.source as Exclude<ContextItem["source"], "window" | "utterance">];
   const dated = item.at ? ` (${item.at.slice(0, 10)})` : "";
   return `[${label}${dated}] ${item.text}`;
+}
+
+/** CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)): the
+ * same header, trust line and "nothing matched" line the old path's
+ * own memorySection used (turnEngine.ts), shared via memoryFraming.ts -
+ * a recalled row reads as background evidence under this header, never
+ * as the turn's own subject, which is what let a fresh conversation's
+ * small talk get answered as if a remembered lookup were the question.
+ * The header and trust line always wrap the memory items, even when
+ * there are none (NOTHING_STORED_LINE says so plainly, #93's own
+ * reasoning: an empty recall is said, not left blank, so the model
+ * answers a general question from what it knows instead of reaching
+ * for the recall tool to check what context already checked). */
+function renderMemoryBlock(memoryItems: readonly ContextItem[]): string {
+  const bullets = memoryItems.length > 0 ? memoryItems.map(renderContextLine).join("\n") : NOTHING_STORED_LINE;
+  return `${MEMORY_SECTION_HEADER}\n${bullets}\n${MEMORY_TRUST_REMINDER}`;
 }
 
 /** Reads the role nodes/context.ts encoded into a "window" item's id
@@ -111,6 +128,10 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   const other = context.filter((item) => item.source !== "window" && item.source !== "utterance");
   const stable = other.filter((item) => isStableContext(item.source));
   const volatile = other.filter((item) => !isStableContext(item.source));
+  // CONTEXT-RECALL-01: memory splits out from the rest of the volatile
+  // items so it can be framed separately, below.
+  const memoryItems = volatile.filter((item) => item.source === "memory");
+  const restVolatile = volatile.filter((item) => item.source !== "memory");
 
   const messages: LlmMessage[] = [];
   const stableContextLines = stable.length > 0 ? `\n\n${stable.map(renderContextLine).join("\n")}` : "";
@@ -121,7 +142,12 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   for (const item of windowItems) {
     messages.push({ role: windowRoleFromId(item.id), content: item.text });
   }
-  const volatileContextLines = volatile.length > 0 ? `${volatile.map(renderContextLine).join("\n")}\n\n` : "";
+  // CONTEXT-RECALL-01: the memory block (renderMemoryBlock, always
+  // present - the header and trust line wrap even a "nothing matched"
+  // line) leads the volatile message; every other volatile source
+  // (clock, a tool round's own result) follows as a plain labeled
+  // line, unchanged from before this item.
+  const otherVolatileLines = restVolatile.length > 0 ? `${restVolatile.map(renderContextLine).join("\n")}\n\n` : "";
   // A review caught this file's first cut carrying the identity line
   // once (the stable prefix) but never again - the old path's own
   // reanchorSection (companionReanchorLine(), turnEngine.ts) exists
@@ -130,7 +156,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // verbatim here too, every turn, the same volatile-zone role it
   // already has in the old path.
   const reanchor = companionReanchorLine(persona).trim();
-  messages.push({ role: "system", content: `${volatileContextLines}${reanchor}\n\nHow to answer this one: ${planLine(plan, signal, surfaceClass)}` });
+  messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}${reanchor}\n\nHow to answer this one: ${planLine(plan, signal, surfaceClass)}` });
   messages.push({ role: "user", content: utterance });
   return messages;
 }
