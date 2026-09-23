@@ -20656,3 +20656,42 @@ times the old path's total, every forced-search turn's total is under
 10 s median (a forced call with thinking off on a cached prefix, a
 search, a phrasing round: about 2, 3 and 3 s on this Mac), and
 `cached_tokens` rises across every multi-turn row.
+
+## SIGNAL-02: the computed target, spec half written (2026-09-23)
+
+The spec half of SIGNAL-02 is written into the commons working tree
+(uncommitted; commons `SIGNAL-SPEC-01` and the brief at
+`data-scratch/signal-02-spec-brief.md` carry the mechanical cut to
+spec-v0.1.25: regenerate, two fixture-test lines, the gate, the tag).
+What it says, and why it is shaped this way:
+
+- **`target` gains `computed`**, and the clause `subject` gains `{ kind:
+  "computed" }`, because home's `targetOf` derives the turn's target
+  from the primary clause's subject and falls through to `world` for
+  anything unnamed. The schema's old description said `target` was
+  "whom the emotion is about"; the interim rule and `targetOf` have read
+  it as the question's referent since SPEC-01, so the description now
+  says both, rather than adding a second field the code would then
+  have to keep in step.
+- **`computed` means "no lookup"**: arithmetic, a percentage, a unit or
+  currency conversion, the time or date in a place, a date difference.
+  The interim rule forces search on `world` only. The hub's compute and
+  clock packages (`math`, `convert`, `almanac-time`, `almanac-date`)
+  answer these through the commands node's own openers or the model's
+  `auto` choice; the spec's compute interpreter
+  (`interpreters/ts/compute.ts`, `evaluateExpression`) is the evaluator
+  both packages already run, which is why the home half may use its
+  accept as the deterministic signal for arithmetic without adding a
+  word rule.
+- **The labelled rows live in the tool-call corpus**
+  (`spec/llm/tool-call-corpus.json`), with an optional `target` label,
+  because that corpus is already the shared measure of "which tool, or
+  none" and the computed rows are exactly "this tool, not a search";
+  the first two are the replay controls the rerun forced to search.
+  There is no signal-classifier head yet (`classifyTurnSignal` is
+  protocol, rule and fallback), so these rows are its first labels
+  under RULES-AND-LEARNED-COMPONENTS.md, not training data for
+  anything today.
+- **What is not decided here:** the clock's place resolver library (the
+  home session picks a maintained, offline, pinned one and records the
+  license), and the classifier head itself.
