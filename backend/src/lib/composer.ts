@@ -826,13 +826,19 @@ export function questionOf(outcomes: readonly ToolExecutionOutcome[]): string | 
  * ruling") is what actually calls this with "written" on the new
  * path's own phrasing round - this function only carries the split. */
 export function compositionInstruction(input: Pick<ComposerInput, "constraints" | "moves" | "ageBand">, hints: readonly string[], question: string | null = null, surfaceClass: SurfaceClass = "spoken"): string {
+  // Computed once, used by whichever branch below quotes it back - a
+  // rule-budget review (2026-09-23) caught the written/spoken split
+  // duplicating this same escape into both branches, pushing composer.ts
+  // over its unmarked-regex-literal baseline for no reason: one string
+  // operation, not two copies of it.
+  const quotedQuestion = question ? question.replace(/"/g, "'") : null;
   const answerLine =
     surfaceClass === "written"
-      ? question
-        ? `Answer this question of mine completely from the tool results above, in your own voice, structured however makes it clearest (headings, a list, steps) whenever that helps: "${question.replace(/"/g, "'")}".`
+      ? quotedQuestion
+        ? `Answer this question of mine completely from the tool results above, in your own voice, structured however makes it clearest (headings, a list, steps) whenever that helps: "${quotedQuestion}".`
         : "Answer what I just asked completely from the tool results above, in your own voice, structured however makes it clearest (headings, a list, steps) whenever that helps."
-      : question
-        ? `Answer this question of mine from the tool results above, in one to three sentences, in your own voice: "${question.replace(/"/g, "'")}".`
+      : quotedQuestion
+        ? `Answer this question of mine from the tool results above, in one to three sentences, in your own voice: "${quotedQuestion}".`
         : "Answer what I just asked from the tool results above, in one to three sentences, in your own voice.";
   const lines = [
     answerLine,
