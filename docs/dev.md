@@ -20519,3 +20519,140 @@ Jesse's live read of 7d3f83d7 on 8787, the same day VOICE-LIVE-03 landed: the co
 **Verified:** `composerVoiceControls.test.tsx` cut to three tests (absent with no roles, absent with only one ready, present as the pill alone with no "Choose a voice" chevron); `NextChatPage.test.tsx`'s own VOICE-LIVE-01 describe simplified the same way, dropping the now-unneeded `navigator.mediaDevices`/`/api/voice/catalog`/`/api/settings` stubbing the chevron used to need. `VoiceCatalogSection.test.tsx` gained tests: the donated-hash file reads as `zerocool enhanced` in the list and in the "currently using" line (never the raw name or the hash), the microphone group is absent below two devices, and two devices list both with the second write proven through `readMicDevicePreference()` - the same assertion VOICE-LIVE-03's own now-deleted chevron test made, moved to where the control now lives. `voiceDisplayName.test.ts` (new) unit-tests the stripping rules directly against the donation example, a plain underscored name, a hyphenated name and a bare file name with no directory. Full frontend suite green.
 
 **A low-effort review found two real issues, both fixed.** (1) `HASH_SUFFIX` first matched any trailing run of 6+ hex-valid letters, so a real word that happens to use only a-f (`facade`, `decade`, `deface`) would have been silently deleted as if it were a content hash - fixed by requiring at least one digit in the match (a genuine random hash is all but certain to contain one; a real word rarely does), with `voiceDisplayName.test.ts` gaining the `facade`/`decade` case directly. (2) `MicrophoneSection` was nested inside the catalog's own "loaded" branch, so a household with no internet, or a Hugging Face outage, could never reach the (purely local, offline) microphone picker at all - fixed by rendering it as a sibling of the catalog's own conditional block, reachable regardless of whether the catalog ever loads; `VoiceCatalogSection.test.tsx` gained a regression test that never clicks "Browse" and fails the catalog fetch outright, proving the microphone list still renders. One re-review pass of the fix hunks confirmed both, no new findings.
+
+## U6 rerun ruling: the misses and the slowdown, read from the code (2026-09-23)
+
+The ruling on "U6 rerun: the flip did not hold" above, from the raw
+logs (`data-scratch/ground01-flip-rerun-{old,new}.log`) and the code on
+`main` at 4aafab1d. **U6 stays not yet.** The France miss is not the
+builder fallback's branch, and the slowdown is not the shared machine:
+both are design costs sitting in named places, each with a one-place
+fix below, and the flip waits for them and one rerun under the protocol
+at the end.
+
+### (a) The France miss: the model node's deadline, before the fallback exists
+
+`president-of-france-repeat` repeat 3 turn 1 delivered an empty reply
+(`""`, `ran none (source model)`) in exactly 20,015 ms. The 8B budget's
+`deadlines_ms.model` is 20,000 (`modelCatalog.ts`). The branch, with
+lines: the forced generation (thinking on, an uncached prompt, see (b))
+ran past the model node's deadline; `runOneGeneration` returned `{ ok:
+false, code }` (`nodes/model.ts`, the `GenerationResult` failure arm);
+`modelNode`'s early return right after the first attempt (`if
+(!attempt.ok) return { outcome: { ok: false, code }, output: { kind:
+"text", text: "" } }`) sent an empty text to `answer`, which has no
+input kind for a failed generation (`nodes/answer.ts`'s `AnswerInput`:
+immediate, model_text, context_quote, from_outcomes, policy_refused) and
+delivered the empty string. ENGINE-CONTRACT-02's `requiredButMissing`
+check (lines 237 to 252) sits after that return and never ran. The
+harness then labelled the turn engine-classed because no forced call
+came back, which is true and misleading: the engine never finished. The
+old path's repeat 3 turn 1 failed the same row differently (a knowledge
+answer, no search), so the row is flaky on both paths for two different
+reasons.
+
+`chatgpt-6-luna` repeat 3 turn 3 is a third thing, not SIGNAL-01: the
+delivered reply is literally `<function_call> {"name": "websearch",
+"arguments": {"expression": "when will chatgpt 6 luna be released"}}
+</function_call>.` The model wrote its call in a tag the engine's parser
+does not recognize (Qwen3's template uses `<tool_call>`), so it arrived
+as content; the turn was offered, not forced, so the model node's check
+saw no websearch call and returned the text, and the person received a
+raw function-call string. No envelope parser exists anywhere (`llm.ts`,
+`turnEngine.ts`, the machine).
+
+Rows: `DEADLINE-01` (a failed generation never delivers `""`: a
+`model_failed` answer input with its fixed line, and on an interim-rule
+turn the builder row runs first, since the design's builder exists for
+exactly "the model produced no query") and `ENGINE-CONTRACT-03` (a reply
+whose whole visible text is a tool-call envelope is parsed as the call
+in `llm.ts` beside `toolCallFromWire`, counted; and the output gate
+never delivers an envelope as text). Both S.
+
+### (b) The slowdown is the new path's design, in three places, not the box
+
+The machine confound does not survive the rows. `control-hi` is 1.1 to
+2.1 s on the new path against 1.3 s on the old; `control-remember-pizza-
+night` (a command) is 5 to 28 ms on both. A load average that slowed
+every node equally would have slowed those too. What is slow is every
+turn that reaches the model with a real prompt, and three design facts
+account for it, ranked by what the numbers say:
+
+1. **Thinking is on for every generation.** The 8B budget sets
+   `thinking_budget_tokens: 512`, so `modelNode` sends `thinking: true`
+   on every call (`thinkingOn` in `nodes/model.ts`); the old path runs
+   these turns with thinking off. That is up to 512 reasoning tokens
+   before the first content token on small talk: `control-negative-
+   spiderman` 4.9 to 5.3 s against 0.7 to 0.9, `control-negative-feeling-
+   down` 5.1 to 6.2 against 0.8, `control-say-hi` 2.4 to 4.3 against
+   0.9. Ruling: the chat budget's default is `thinking_budget_tokens: 0`
+   on tier 1; thinking is the person's per-turn choice under "reasoning
+   is a second output", never the budget's default (`THINK-DEFAULT-01`).
+2. **No prefix reuse, ever.** `turnMachine/messages.ts`'s
+   `contextToMessages` puts every non-window context item (the memory
+   matches for this utterance, the profile, the clock at minute
+   resolution, the roster) into the FIRST system message, the same
+   message the Qwen3 template fills with the tools block. Every turn's
+   prompt therefore differs from its first token, and the slot
+   re-prefills the whole prompt every turn (about 4,000 context tokens
+   at roughly 375 tokens a second is about 10 s, which is the floor
+   under every world-question row here). U1's cache-stable order (the
+   stable system message first, the window, then the per-turn context
+   message) was built on the old path and never carried to the new one.
+   Ruling: `NEXT-CACHE-01`, the same order in `messages.ts`, proven by
+   `cached_tokens` growing across a conversation.
+3. **The forced search fires on computed questions.** `control-twelve-
+   plus-thirty` (8.9 to 21.6 s, forced on two of three) and `control-
+   time-in-tokyo` (22.6 to 23.7 s, forced and missed on all three,
+   builder search, answer) are arithmetic and the clock, which the
+   context node already answers (`clock` is in every prompt). The
+   signal's `target` is `world` for both, so `isWorldQuestion` forces
+   the search. Ruling: `SIGNAL-02`, spec first: the signal vocabulary
+   gains a `computed` target (arithmetic, clock, conversion) decided by
+   the classifier, and the interim rule forces search on `world` only.
+   Not a regex on "plus" or "time".
+
+Two measurement facts sit under all three. First, the harness drives
+the new path through `runTurnNext` non-streaming
+(`conversationRunner.ts:353`: `firstDeltaMs: total, firstSentenceMs:
+total, totalMs: total`), so the new path's "first delta" is its total
+turn time while the old path's is its stream's first delta; the old
+path's totals are within a few ms of its first delta on every row, so
+the totals do compare, and the new path is slower in total. The bar
+compares total to total from now on. Second, `cached_tokens` is blank
+on every row: `chatRequestBody` in `llm.ts` streams without
+`stream_options: {include_usage: true}`, so no `usage` arrives on the
+final chunk; the recording proxy reads the right path
+(`usage.prompt_tokens_details.cached_tokens`, confirmed against
+llama-server's raw reply), and gets nothing. ENGINE-CONTRACT-02's
+counter by cache state therefore counts nothing today; `USAGE-01` fixes
+the one line and records usage on every call, forced or not.
+
+### (c) The protocol that settles it
+
+1. Traces kept (`--keep-data`), and `stats.nodes[]` printed per turn:
+   context, each model generation with its thinking flag, prompt tokens,
+   cached tokens and wall time, the tool call with the package and its
+   wall time, answer.
+2. The two paths interleaved row by row (old repeat 1, new repeat 1,
+   old repeat 2, ...) so load cancels; a load-average and logged-user
+   line per row; the run starts only when the box shows one user's work
+   and the coordinator has cleared the window.
+3. Both paths on the same runner shape: first delta and total for each,
+   and the bar reads total against total.
+4. Every generation's cached tokens on the row (USAGE-01 first), so the
+   NEXT-CACHE-01 claim is proven by the number rising across a
+   conversation, not by the speed.
+
+### (d) U6 as it stands
+
+Not yet. What flips it: THINK-DEFAULT-01, NEXT-CACHE-01, USAGE-01,
+DEADLINE-01 and ENGINE-CONTRACT-03 landed (SIGNAL-02 may follow; the
+computed rows are excluded from the total-time bar until it lands and
+counted separately), then one rerun under (c) where the five clean
+failed rows stay clean with no engine-classed row and no empty reply,
+the three controls stay 3/3, every plain turn's total is within 1.25
+times the old path's total, every forced-search turn's total is under
+10 s median (a forced call with thinking off on a cached prefix, a
+search, a phrasing round: about 2, 3 and 3 s on this Mac), and
+`cached_tokens` rises across every multi-turn row.
