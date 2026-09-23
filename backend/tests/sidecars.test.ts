@@ -12,6 +12,7 @@ import {
   probeAlive,
   cancelEngineRespawn,
   engineRespawnState,
+  engineHealthKind,
   registerGracefulExit,
   __resetSidecarsForTests,
   __setSidecarTimingForTestsOnly,
@@ -810,6 +811,10 @@ describe("engineHealthKind: a blocked port reports \"blocked\"", () => {
     const port = 39178;
     const child = await spawnRealListener(port, "blocked for this test");
     try {
+      // A mismatched record, the same shape the real incident's steady
+      // state has (ownership already established) - the bootstrap
+      // fallback above would otherwise just kill this and never block.
+      __recordOwnedPortForTests(port, child.pid + 1);
       await expect(freePort(port)).rejects.toThrow(ForeignPortHolderError);
       expect(engineHealthKind("chat", "spawned", port)).toBe("blocked");
     } finally {

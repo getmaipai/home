@@ -22139,3 +22139,94 @@ its URL directly (`MAIPAI_LLAMA_SERVER_URL`) and starts no supervisor of
 its own. `ENGINE-PORT-01` (above) is the structural fix for the engine
 half; nothing here changes it, it is one more confirmed occurrence
 naming the same root cause with a live household on the other end of it.
+
+## ENGINE-PORT-01: landed (2026-09-23)
+
+This session's own repro of the "generation_failed" outage above
+(`contextToMessages()` output posted straight to the live engine on
+8788, real seeded memory rows) never reproduced a rejection - both a
+matched and an empty memory block came back 200, so the message-shape
+theory is disproved for that specific shape; the fix below stands
+regardless, since Fable's own hub-log read (`sidecars.ts` line 207,
+above) is the confirmed cause. This session's own start line for that
+repro: `MAIPAI_DATA_DIR` set to a scratch directory (`resetDb()`'s own
+guard refuses anything else), the three port variables NOT set - the
+same gap this item closes, caught on itself before landing.
+
+**The ownership record.** `sidecars.ts` writes `data/local-app/
+engine-pids.json` (beside `data/local-app/pid`, `scripts/app.sh`'s own
+hub pid file) the moment a spawn passes its health check
+(`spawnAndWaitHealthy`, once per port): `{ port: { pid, command,
+startedAt } }`. `freePort(port)` reads it back before touching
+anything: a pid it names is a real orphan (this exact install's own
+previous instance of that port, left over from a crash or a reload)
+and is killed, logged with its pid and the reason; a pid it does NOT
+name, while the record holds a DIFFERENT pid for that port, is a live
+foreign holder - never killed, logged ("port 8788 is held by pid N,
+not ours: set MAIPAI_LLAMA_SERVER_PORT, MAIPAI_BACKGROUND_PORT and
+MAIPAI_EMBED_PORT"), and the spawn fails with `ForeignPortHolderError`
+instead of racing a bind against a process still alive.
+
+**The bootstrap gap, found by review, closed.** A record only exists
+once a spawn has succeeded through this code; an install upgrading to
+this fix (or a port's very first spawn ever) has none yet, and a first
+cut refused to touch ANYTHING found there, including a genuine crash
+orphan the old code would have cleaned up - a real regression for
+exactly the one class of process this design exists to let through.
+Fixed: no record at all for a port reads as "unknown, not
+established" and falls back to the old kill-everything-found behavior,
+logged as a legacy orphan rather than an install's own tracked one;
+only a record that actively names a DIFFERENT pid than what is
+currently there is ever treated as foreign. The very next successful
+spawn on that port establishes real ownership, closing the window for
+good.
+
+**The health list.** `EngineHealthKind` gains `"blocked"`
+(`wire.ts`); `engineHealthKind(role, kind, port)` takes the port now
+and reads it back from the in-memory `blockedPorts` map `freePort` set
+alongside its own log line, ahead of the existing restarting/failed
+healing states. All four spawned engines (chat, embed, background,
+voice/tts) pass their own fixed default port through at their
+`probe*Engine()` call site; a code review caught `ttsSupervisor.ts` as
+the one left out of this wiring in the first cut, since it was added
+one file at a time by hand rather than generically. `GET /api/health`'s
+own `ok` computation treats `blocked` as unhealthy, matching
+`failed`/`restarting`; the Health page (`HealthSection.tsx`) reads it
+as "Blocked by another program," checked ahead of the ordinary
+alive/not-answering read since a blocked engine was never given the
+chance to answer at all.
+
+**The test suite's own second gap, found while building this.**
+`tests/preload.ts` isolated the chat port (`MAIPAI_LLAMA_SERVER_PORT`,
+the 2026-09-07 incident) but never the other two fixed-port roles -
+`MAIPAI_BACKGROUND_PORT`/`MAIPAI_EMBED_PORT` were unset in every test
+run on this machine, so a test exercising `getBackgroundClient()`/
+`getEmbedClient()` could still have freed the household's real
+background or embed port the identical way, just never caught because
+nothing had. Both now get their own `reserveFreePort()` call in
+`tests/preload.ts`, and `tests/isolation.ts`'s own guard (a single
+port key before this) generalizes to all three, restored by name if a
+test's own `afterEach` breaks one.
+
+**Verified**: `bun test tests/sidecars.test.ts tests/isolation.test.ts`
+green (43 and, after a code review's own two findings, 39 and updated
+isolation tests); real child processes bound to real ports throughout,
+never a mocked `ps` or a mocked kill. `bash scripts/lint/rule-budget.ts`
+unaffected (`sidecars.ts` is not a turn-path file). Not verified live
+against the household's own hub restarting twice from two data
+directories (the acceptance line in the BACKLOG row) - the unit tests
+above exercise the identical mechanism with real, separate OS
+processes standing in for two hub instances, which is what a live
+two-hub repro would also be, minus the two real supervisors around it;
+doing that against the household's own resident engines was judged not
+worth repeating the exact mistake this item fixes to prove it.
+
+Files: `backend/src/lib/sidecars.ts` (`freePort`, `findPidsMatching`,
+the ownership record, `blockedPorts`, `ForeignPortHolderError`),
+`backend/src/lib/llmSupervisor.ts`/`embedSupervisor.ts`/
+`backgroundSupervisor.ts`/`ttsSupervisor.ts` (`probe*Engine()`'s own
+port), `backend/src/wire.ts` (`EngineHealthKind`), `backend/src/app.ts`
+(the health route's own enum and `ok`), `frontend/src/apps/settings/
+HealthSection.tsx`, `backend/tests/sidecars.test.ts`,
+`backend/tests/preload.ts`, `backend/tests/isolation.ts`,
+`backend/tests/isolation.test.ts`.

@@ -20,6 +20,7 @@ import { eq } from "drizzle-orm";
 import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { remember, embedMemoryRecordSafely } from "@/lib/memory";
 
 let people: BenchPeople;
 
@@ -864,6 +865,27 @@ describe("turnNext.ts: DEADLINE-01, a failed generation never delivers an empty 
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toBe(COMPOSE_FAILURE_LINE);
     expect(result.value.reply.text.length).toBeGreaterThan(0);
+    // GENFAIL-01 (dev.md "generation_failed is never blind again"): the
+    // failed attempt now leaves its own row in stats.generations[],
+    // carrying the real reason (llm.ts's own caught message) rather
+    // than being absent from the trace entirely - previously the only
+    // record of this failure was the model node's own bare outcome
+    // code, with nothing saying whether the engine refused the request
+    // or was simply unreachable.
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as {
+      generations?: { error?: string | null }[];
+      nodes?: { node: string; outcome?: { ok?: boolean; code?: string; message?: string } }[];
+    };
+    expect(stats.generations?.length).toBeGreaterThan(0);
+    expect(stats.generations?.[0]?.error).toBeTruthy();
+    // The row's own second ask: not just the generation record, but
+    // stats.nodes[]'s own `model` entry too, so a reader doesn't have
+    // to cross-reference two different arrays to see why the turn
+    // failed.
+    const modelNodeEntry = (stats.nodes ?? []).find((n) => n.node === "model");
+    expect(modelNodeEntry?.outcome?.message).toBeTruthy();
+    expect(modelNodeEntry?.outcome?.message).toBe(stats.generations?.[0]?.error ?? undefined);
   });
 
   test("an interim-rule turn whose forced generation fails still runs the builder row's real search", async () => {
@@ -899,6 +921,45 @@ describe("turnNext.ts: DEADLINE-01, a failed generation never delivers an empty 
     } finally {
       searxng.stop();
     }
+  });
+});
+
+// GENFAIL-01 (dev.md, the coordinator's own live regression report,
+// 2026-09-23): the household saw every generation in a fresh
+// conversation fail once its own recall matched real memory rows (the
+// household's first conversation, extracted), while an identical fresh
+// conversation with nothing to recall worked. Jesse's own words for the
+// acceptance test: this turn, on a fresh conversation with two
+// remembered rows, answers from the model, never the failure line.
+// Direct message-shape reproduction (this session's own side requests
+// straight to the live engine on 8788, contextToMessages() output with
+// real seeded, matched memory rows, bypassing the hub) got a clean 200
+// both with and without the memory block present - never reproduced a
+// rejection this way, so this test proves the shape is fine against a
+// scripted engine; it cannot rule out a transient cause (engine load,
+// a timeout) this suite has no way to simulate. GENFAIL-01's own
+// generations[].error field (added above) is what turns the NEXT live
+// occurrence from a blind code into a real cause.
+describe("turnNext.ts: GENFAIL-01, a fresh conversation with real matched memory still answers", () => {
+  test('"this is the new reply engine" with two seeded, matched memory rows answers from the model, never the failure line', async () => {
+    // Worded to share real vocabulary with the utterance so
+    // CONTEXT-RECALL-01's own tier floor actually surfaces them (an
+    // unrelated seed, tried first while diagnosing this live, correctly
+    // recalls nothing - not what reached the engine in the household's
+    // own incident, where the first conversation's own turns, on this
+    // exact subject, had already become memories).
+    for (const text of ["the household said this is the new reply engine and it seemed to work", "asked what time it is in Tokyo and got an answer"]) {
+      const seeded = remember(people.owner, { text, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5 });
+      if (!seeded.ok) throw new Error("setup failed");
+      await embedMemoryRecordSafely(seeded.value.id, text);
+    }
+
+    const result = await withStub({ reply: () => "Cool, let me know how it goes." }, () => runTurnNext(people.owner, "chat", "this is the new reply engine"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.source).toBe("model");
+    expect(result.value.reply.text).not.toBe(COMPOSE_FAILURE_LINE);
+    expect(result.value.reply.text.length).toBeGreaterThan(0);
   });
 });
 

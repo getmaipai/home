@@ -122,4 +122,20 @@ describe("HealthSection", () => {
       restore();
     }
   });
+
+  // ENGINE-PORT-01 (dev.md 2026-09-23): a live process this install did
+  // not spawn already holds the engine's own port - MaiPai refuses to
+  // touch it rather than kill it, so this reads as a named, actionable
+  // state, never a generic "not answering."
+  test("a blocked engine names what happened, not just that it's down", async () => {
+    const restore = stubHealth(
+      health({ ok: false, engines: { ...health().engines, chat: { kind: "blocked", pid: null, alive: null } } }),
+    );
+    try {
+      const { findByText } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
+      expect(await findByText("Blocked by another program")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
 });
