@@ -15,17 +15,32 @@
 // them.
 import { afterEach } from "bun:test";
 
-/** The one production default a test spawn must never resolve to -
- * llmSupervisor.ts's own `MAIPAI_LLAMA_SERVER_PORT ?? 8788`. */
+/** The production defaults a test spawn must never resolve to -
+ * llmSupervisor.ts's own `MAIPAI_LLAMA_SERVER_PORT ?? 8788`, and
+ * ENGINE-PORT-01's own two siblings (backgroundSupervisor.ts's
+ * `MAIPAI_BACKGROUND_PORT ?? 8789`, embedSupervisor.ts's
+ * `MAIPAI_EMBED_PORT ?? 8794`) - the identical gap for both, found live
+ * only once Fable traced a real household outage to it (dev.md
+ * 2026-09-23), because nothing had exercised getBackgroundClient()/
+ * getEmbedClient() in a test that also happened to be missing the
+ * override. `PRODUCTION_CHAT_PORT` stays its own export (existing
+ * tests read it by name); the other two are exported the same way for
+ * the same reason. */
 export const PRODUCTION_CHAT_PORT = "8788";
+export const PRODUCTION_BACKGROUND_PORT = "8789";
+export const PRODUCTION_EMBED_PORT = "8794";
 
 /** Environment variables tests/preload.ts owns. `exact` ones must keep
  * the exact value preload set (a different data dir is a different
- * household's data); the chat port only has to stay isolated - a test
- * may pick its own throwaway port (resourceGovernor.test.ts does), it
- * just can't unset it or point it at the production default. */
+ * household's data); a port key only has to stay isolated - a test may
+ * pick its own throwaway port (resourceGovernor.test.ts does), it just
+ * can't unset it or point it at the production default. */
 const EXACT_KEYS = ["MAIPAI_DATA_DIR", "MAIPAI_BACKUP_DIR", "MAIPAI_KEYSTORE_BACKEND", "MAIPAI_TTS_DISABLE_SPAWN"] as const;
-const CHAT_PORT_KEY = "MAIPAI_LLAMA_SERVER_PORT";
+const PORT_KEYS: readonly { key: string; productionDefault: string }[] = [
+  { key: "MAIPAI_LLAMA_SERVER_PORT", productionDefault: PRODUCTION_CHAT_PORT },
+  { key: "MAIPAI_BACKGROUND_PORT", productionDefault: PRODUCTION_BACKGROUND_PORT },
+  { key: "MAIPAI_EMBED_PORT", productionDefault: PRODUCTION_EMBED_PORT },
+];
 
 export type IsolationSnapshot = Record<string, string | undefined>;
 
@@ -37,7 +52,7 @@ export interface IsolationViolation {
 
 export function snapshotTestIsolation(env: IsolationSnapshot = process.env): IsolationSnapshot {
   const snapshot: IsolationSnapshot = {};
-  for (const key of [...EXACT_KEYS, CHAT_PORT_KEY]) snapshot[key] = env[key];
+  for (const key of [...EXACT_KEYS, ...PORT_KEYS.map((p) => p.key)]) snapshot[key] = env[key];
   return snapshot;
 }
 
@@ -57,11 +72,13 @@ export function checkTestIsolation(env: IsolationSnapshot, expected: IsolationSn
       env[key] = want;
     }
   }
-  const wantPort = expected[CHAT_PORT_KEY];
-  const port = env[CHAT_PORT_KEY];
-  if (wantPort !== undefined && (port === undefined || port === PRODUCTION_CHAT_PORT)) {
-    violations.push({ name: CHAT_PORT_KEY, found: port, restoredTo: wantPort });
-    env[CHAT_PORT_KEY] = wantPort;
+  for (const { key, productionDefault } of PORT_KEYS) {
+    const wantPort = expected[key];
+    const port = env[key];
+    if (wantPort !== undefined && (port === undefined || port === productionDefault)) {
+      violations.push({ name: key, found: port, restoredTo: wantPort });
+      env[key] = wantPort;
+    }
   }
   return violations;
 }
@@ -79,7 +96,7 @@ export function installTestIsolationGuard(): void {
     throw new Error(
       `this test broke the suite's isolation from real state: ${list}. ` +
         `Restore tests/preload.ts's value in your own afterEach instead of deleting it - ` +
-        `with the chat port unset, a later test's spawn calls freePort(${PRODUCTION_CHAT_PORT}) and SIGKILLs the real hub's chat engine.`,
+        `with a port unset or pointed at its production default (chat ${PRODUCTION_CHAT_PORT}, background ${PRODUCTION_BACKGROUND_PORT}, embed ${PRODUCTION_EMBED_PORT}), a later test's spawn calls freePort() against the real hub's own engine.`,
     );
   });
 }

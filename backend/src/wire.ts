@@ -443,7 +443,12 @@ export type EngineKind = "url" | "override" | "selection" | "stub" | "stopped" |
  * predates them). Declared once here (2026-09-07) so app.ts's schema,
  * sidecars.ts's engineHealthKind(), and HealthSection.tsx's badge all
  * draw from the same three literals instead of hand-repeating them. */
-export type EngineHealthKind = EngineKind | "spawned" | "restarting" | "failed";
+/** "blocked" (ENGINE-PORT-01, dev.md 2026-09-23): a live process this
+ * install never spawned already holds the role's own port, so the
+ * spawn was refused rather than killing it - distinct from "failed"
+ * (this install's own spawn attempts gave up) because the fix is never
+ * a retry, only dealing with whatever else is on that port. */
+export type EngineHealthKind = EngineKind | "spawned" | "restarting" | "failed" | "blocked";
 
 export interface EngineStatus {
   kind: EngineKind;

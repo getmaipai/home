@@ -124,7 +124,8 @@ export async function restartEmbedBackend(): Promise<void> {
 
 /** For GET /api/health: the kind plus a real probe of the process. */
 export async function probeEmbedEngine(): Promise<EngineHealth> {
-  return { kind: engineHealthKind("embed", getEmbedBackendKind()), pid: state.embedBackend?.pid ?? null, alive: await probeAlive(state.embedBackend?.client) };
+  const port = Number(process.env.MAIPAI_EMBED_PORT ?? 8794);
+  return { kind: engineHealthKind("embed", getEmbedBackendKind(), port), pid: state.embedBackend?.pid ?? null, alive: await probeAlive(state.embedBackend?.client) };
 }
 
 async function startEmbedBackend(): Promise<EmbedBackend> {

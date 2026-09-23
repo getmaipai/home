@@ -147,7 +147,14 @@ export async function spawnPocketTts(): Promise<TtsBackend> {
 
 /** For GET /api/health: the kind plus a real probe of the process. */
 export async function probeTtsEngine(): Promise<EngineHealth> {
-  return { kind: engineHealthKind("tts", getTtsBackendKind()), pid: state.ttsBackend?.pid ?? null, alive: await probeAlive(state.ttsBackend?.client) };
+  // ENGINE-PORT-01: this role spawns through the identical
+  // spawnAndWaitHealthy()/freePort() mechanism the other three engines
+  // do (Issue #44's own comment above, on the spawn path) - a code
+  // review caught this probe as the one left out of the port-aware
+  // engineHealthKind() wiring the other three got, so a blocked voice
+  // engine could never actually read "blocked" here.
+  const port = Number(process.env.MAIPAI_TTS_PORT ?? 8793);
+  return { kind: engineHealthKind("tts", getTtsBackendKind(), port), pid: state.ttsBackend?.pid ?? null, alive: await probeAlive(state.ttsBackend?.client) };
 }
 
 async function startTtsBackend(): Promise<TtsBackend> {

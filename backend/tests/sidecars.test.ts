@@ -15,6 +15,10 @@ import {
   registerGracefulExit,
   __resetSidecarsForTests,
   __setSidecarTimingForTestsOnly,
+  blockedPortReason,
+  ForeignPortHolderError,
+  __recordOwnedPortForTests,
+  __resetPortOwnershipForTests,
 } from "@/lib/sidecars";
 import { listIssues, fixIssue, __resetFixHandlersForTests } from "@/lib/issues";
 import { resetDb } from "./reset-db";
@@ -649,39 +653,51 @@ describe("watchEngine (the engines' auto-heal)", () => {
   }, 15_000);
 });
 
+// A real, separate child process (not Bun.serve() in this test process
+// itself - freePort kills by pid, and killing the test runner's own pid
+// would kill the whole suite) proves the actual mechanism this guards
+// against the live incident lib/sidecars.ts's own header documents: an
+// orphaned process left bound to a fixed port after a `--hot` reload
+// wiped a supervisor's tracking - now gated on ENGINE-PORT-01's own
+// ownership record (dev.md 2026-09-23, "The generation_failed outage
+// on the new path was a killed engine, not a prompt shape"). Module
+// scope: both the freePort and engineHealthKind describe blocks below
+// use it.
+async function spawnRealListener(port: number, replyText: string): Promise<Bun.Subprocess> {
+  const child = Bun.spawn(
+    ["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("${replyText}") });`, "--port", String(port)],
+    { stdout: "ignore", stderr: "ignore" },
+  );
+  const deadline = Date.now() + 5_000;
+  let up = false;
+  while (Date.now() < deadline && !up) {
+    up = await fetch(`http://127.0.0.1:${port}`)
+      .then(() => true)
+      .catch(() => false);
+    if (!up) await new Promise((r) => setTimeout(r, 50));
+  }
+  expect(up).toBe(true);
+  return child;
+}
+
 describe("freePort", () => {
-  // A real, separate child process (not Bun.serve() in this test process
-  // itself - freePort kills by pid, and killing the test runner's own pid
-  // would kill the whole suite) proves the actual mechanism this guards
-  // against the live incident lib/sidecars.ts's own header documents: an
-  // orphaned process left bound to a fixed port after a `--hot` reload
-  // wiped a supervisor's tracking.
-  test("kills a real process bound to the port and frees it for a new listener", async () => {
+  beforeEach(() => {
+    __resetPortOwnershipForTests();
+  });
+
+  test("kills a pid this install's own record names as its previous instance, and frees the port", async () => {
     const port = 39172; // arbitrary, unlikely to collide with anything else in CI
-    // Trailing "--port <N>" args (unused by the script itself) are still
-    // part of the OS-level argv the SEC-9 user-scoped `ps -u <uid> -o
-    // pid=,command=` shows - freePort matches on exactly that substring,
-    // the same shape a real sidecar spawn always has, so this exercises
-    // the real matching logic rather than a differently-shaped stand-in
-    // for it.
-    const child = Bun.spawn(
-      ["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("ok") });`, "--port", String(port)],
-      { stdout: "ignore", stderr: "ignore" },
-    );
+    const child = await spawnRealListener(port, "ok");
     try {
-      const deadline = Date.now() + 5_000;
-      let up = false;
-      while (Date.now() < deadline && !up) {
-        up = await fetch(`http://127.0.0.1:${port}`)
-          .then(() => true)
-          .catch(() => false);
-        if (!up) await new Promise((r) => setTimeout(r, 50));
-      }
-      expect(up).toBe(true);
+      // Simulates a real prior spawn: spawnAndWaitHealthy() would have
+      // called this itself once the health check passed. child.pid is
+      // the exact pid `ps` will find bound to the port.
+      __recordOwnedPortForTests(port, child.pid);
 
       await freePort(port);
 
       await expect(fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(1000) })).rejects.toThrow();
+      expect(blockedPortReason(port)).toBeUndefined();
 
       const server = Bun.serve({ port, fetch: () => new Response("new") });
       try {
@@ -690,6 +706,55 @@ describe("freePort", () => {
       } finally {
         server.stop(true);
       }
+    } finally {
+      child.kill();
+    }
+  }, 10_000);
+
+  // A code review caught the bootstrap gap this test proves is closed: an
+  // install upgrading to this fix has no record yet for a port it has
+  // spawned onto for months, so a genuine crash orphan sitting there the
+  // moment this ships must still be recoverable - the old (unsafe, but
+  // self-healing) behavior for exactly this one case, until the next
+  // successful spawn records real ownership.
+  test("a port with no ownership record at all is treated as a legacy orphan and killed (the bootstrap fallback)", async () => {
+    const port = 39177;
+    const child = await spawnRealListener(port, "legacy orphan, never recorded");
+    try {
+      await freePort(port);
+
+      await expect(fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(1000) })).rejects.toThrow();
+      expect(blockedPortReason(port)).toBeUndefined();
+    } finally {
+      child.kill();
+    }
+  }, 10_000);
+
+  // ENGINE-PORT-01's own real fix, once ownership IS established (every
+  // successful spawn records it - the actual live incident's own
+  // steady state, an install that has spawned onto this port many
+  // times already): a live process on the port whose pid the record
+  // does NOT name - Fable's live diagnosis, dev.md 2026-09-23, was
+  // exactly this shape, a perfectly healthy process on its own
+  // production port a second, unrelated process's freePort() call
+  // killed anyway - must survive. A record naming a pid that is NOT
+  // the one currently there (the previously-owned pid already exited
+  // on its own, something else now holds the port) is exactly as
+  // foreign as no record at all being wrong would be; only an EXACT
+  // pid match is ever killed.
+  test("refuses to kill a live process a recorded (but non-matching) owner names, and reports it as blocked", async () => {
+    const port = 39176;
+    const child = await spawnRealListener(port, "not the recorded pid");
+    try {
+      __recordOwnedPortForTests(port, child.pid + 1);
+
+      await expect(freePort(port)).rejects.toThrow(ForeignPortHolderError);
+
+      const res = await fetch(`http://127.0.0.1:${port}`);
+      expect(await res.text()).toBe("not the recorded pid");
+
+      const blocked = blockedPortReason(port);
+      expect(blocked?.pid).toBe(child.pid);
     } finally {
       child.kill();
     }
@@ -728,6 +793,37 @@ describe("freePort", () => {
       decoy.kill();
     }
   }, 10_000);
+});
+
+// ENGINE-PORT-01's own BACKLOG row: "the health list carries the
+// condition" - engineHealthKind() is what every probe*Engine() function
+// (llmSupervisor.ts, embedSupervisor.ts, backgroundSupervisor.ts,
+// ttsSupervisor.ts) calls to build GET /api/health's own per-engine
+// `kind`, so this is the one place that check is provable without a
+// live spawn.
+describe("engineHealthKind: a blocked port reports \"blocked\"", () => {
+  beforeEach(() => {
+    __resetPortOwnershipForTests();
+  });
+
+  test("a port freePort() refused to touch reads back as blocked", async () => {
+    const port = 39178;
+    const child = await spawnRealListener(port, "blocked for this test");
+    try {
+      await expect(freePort(port)).rejects.toThrow(ForeignPortHolderError);
+      expect(engineHealthKind("chat", "spawned", port)).toBe("blocked");
+    } finally {
+      child.kill();
+    }
+  }, 10_000);
+
+  test("a port with no blocked reading falls through to the ordinary kind", () => {
+    expect(engineHealthKind("chat", "spawned", 39179)).toBe("spawned");
+  });
+
+  test("with no port given at all (a role with no fixed port), behaves exactly as before ENGINE-PORT-01", () => {
+    expect(engineHealthKind("chat", "spawned")).toBe("spawned");
+  });
 });
 
 describe("sweepOrphanProcesses", () => {

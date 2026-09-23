@@ -125,8 +125,9 @@ export async function restartBackgroundBackend(): Promise<void> {
 }
 
 export async function probeBackgroundEngine(): Promise<EngineHealth> {
+  const port = Number(process.env.MAIPAI_BACKGROUND_PORT ?? 8789);
   return {
-    kind: engineHealthKind("background", getBackgroundBackendKind()),
+    kind: engineHealthKind("background", getBackgroundBackendKind(), port),
     pid: state.backgroundBackend?.pid ?? null,
     alive: await probeAlive(state.backgroundBackend?.client),
   };

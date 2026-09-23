@@ -27,6 +27,21 @@ process.env.MAIPAI_KEYSTORE_BACKEND = "file";
 // spawns from the real app's port entirely, the same "tests never touch
 // real state" guarantee MAIPAI_DATA_DIR/MAIPAI_BACKUP_DIR already give.
 process.env.MAIPAI_LLAMA_SERVER_PORT = String(reserveFreePort());
+// ENGINE-PORT-01 (dev.md 2026-09-23, "The generation_failed outage...
+// was a killed engine, not a prompt shape"): the identical gap for the
+// OTHER two roles with a fixed production default - background (8789)
+// and embed (8794) never got this override at all, so a test exercising
+// getBackgroundClient()/getEmbedClient() on this shared machine could
+// still freePort() the household's real background or embed engine
+// exactly the way the 2026-09-07 incident above describes for chat,
+// just unnoticed until Fable's own live diagnosis traced a real outage
+// to it. ENGINE-PORT-01's own ownership record (sidecars.ts) means a
+// live foreign holder is refused rather than killed now regardless, but
+// a test should never even attempt to touch the real ports to begin
+// with - belt and braces, the same posture MAIPAI_LLAMA_SERVER_PORT
+// already takes.
+process.env.MAIPAI_BACKGROUND_PORT = String(reserveFreePort());
+process.env.MAIPAI_EMBED_PORT = String(reserveFreePort());
 // Same guarantee for the `tts` role: without this, ttsSupervisor.ts's
 // real-spawn tier would shell out to `uvx pocket-tts serve` on any
 // machine that has `uv` installed (Jesse's dev Mac included) the moment a

@@ -20,14 +20,127 @@
 // from the day it ships, not a mechanism waiting for a first caller.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { createLogger } from "@maipai/core/src/log";
-import { logsDir } from "@/lib/paths";
+import { logsDir, dataDir } from "@/lib/paths";
 import type { EngineHealthEntry, EngineHealthKind } from "@/wire";
 
 const execFileAsync = promisify(execFile);
+
+// ENGINE-PORT-01 (dev.md "The generation_failed outage on the new path
+// was a killed engine, not a prompt shape," 2026-09-23): freePort()
+// used to kill whatever held the target port unconditionally - fine
+// for a genuine orphan (this exact install's own previous instance,
+// left over from a crash or a dev reload), a real bug for a live
+// foreign process (the household's own currently-running hub, killed
+// by a second, unrelated process - a headless repro, a bench, a
+// sibling worktree - that called spawnAndWaitHealthy() with the same
+// production-default port and had no way to know one was already
+// there). The fix is ownership, not politeness: this install persists
+// which pid it last spawned on each port to a small on-disk record (a
+// plain file, not a lock - MAIPAI_DATA_DIR-scoped, so a test's own
+// scratch data dir gets its own empty record and never reads or writes
+// the real household's), and freePort() only ever kills a pid that
+// record names. A pid on the port that record does NOT name is a live
+// foreign holder: never killed, the spawn is refused instead, and the
+// condition is both logged (pid and reason, every time) and left for
+// the caller to report on the health list, exactly like any other
+// engine failure.
+interface OwnedPortRecord {
+  pid: number;
+  command: string;
+  startedAt: string;
+}
+
+// BACKLOG.md's own ENGINE-PORT-01 row: "beside data/local-app/pid" -
+// scripts/app.sh already writes this install's own hub pid to
+// data/local-app/pid (tests/localApp.test.ts), so the engines' own pid
+// record lives right next to it, the same directory standing for "this
+// exact install's own process identity," rather than a second,
+// unrelated directory this file would otherwise invent.
+function ownedPortsFile(): string {
+  return join(dataDir, "local-app", "engine-pids.json");
+}
+
+function readOwnedPorts(): Record<string, OwnedPortRecord> {
+  try {
+    return JSON.parse(readFileSync(ownedPortsFile(), "utf-8")) as Record<string, OwnedPortRecord>;
+  } catch {
+    return {};
+  }
+}
+
+function writeOwnedPorts(record: Record<string, OwnedPortRecord>): void {
+  const file = ownedPortsFile();
+  mkdirSync(join(dataDir, "local-app"), { recursive: true });
+  writeFileSync(file, JSON.stringify(record, null, 2));
+}
+
+/** Called once a spawn on `port` has actually passed its health check
+ * (spawnAndWaitHealthy(), below) - this install's own record of "the
+ * last pid I put on this port," read back by the next freePort() call
+ * against the same port, whether that's later this run or a fresh
+ * process after a restart. */
+function recordOwnedPort(port: number, pid: number, command: string): void {
+  const record = readOwnedPorts();
+  record[String(port)] = { pid, command, startedAt: new Date().toISOString() };
+  writeOwnedPorts(record);
+}
+
+function ownedPid(port: number): number | null {
+  return readOwnedPorts()[String(port)]?.pid ?? null;
+}
+
+/** In-memory, this-process-only: the last port freePort() refused to
+ * touch because a live foreign process held it, so a caller (the
+ * health status functions) can report the condition without freePort()
+ * itself knowing anything about engine roles or the wire shape. Reset
+ * the moment that same port is later freed or spawned onto
+ * successfully - a stale "blocked" reading a caller couldn't reproduce
+ * would be its own bug. */
+const blockedPorts = new Map<number, { pid: number; command: string; at: string }>();
+
+export function blockedPortReason(port: number): { pid: number; command: string; at: string } | undefined {
+  return blockedPorts.get(port);
+}
+
+/** Test-only: lets a test simulate "this install already spawned
+ * something on this port" without going through a real spawn +
+ * health-check round trip - sidecars.test.ts's own freePort() tests
+ * are the real caller. MAIPAI_DATA_DIR is a fresh scratch directory per
+ * suite run (tests/preload.ts), so this never touches a real
+ * household's own data/local-app/engine-pids.json. */
+export function __recordOwnedPortForTests(port: number, pid: number, command = "test"): void {
+  recordOwnedPort(port, pid, command);
+}
+
+/** Test-only: clears both the on-disk ownership record and the
+ * in-memory blocked-ports map, so one test's port numbers (often
+ * reused across files) never leak an owned/blocked reading into the
+ * next. */
+export function __resetPortOwnershipForTests(): void {
+  writeOwnedPorts({});
+  blockedPorts.clear();
+}
+
+/** A live process is holding `port` and this install's own record does
+ * not name its pid as ours - freePort() refuses to kill it and throws
+ * this instead of proceeding, so spawnAndWaitHealthy() fails the spawn
+ * cleanly rather than racing a bind against a process still very much
+ * alive. */
+export class ForeignPortHolderError extends Error {
+  constructor(
+    public readonly port: number,
+    public readonly pid: number,
+  ) {
+    super(`port ${port} is held by pid ${pid}, a process this install did not spawn - refusing to kill it`);
+    this.name = "ForeignPortHolderError";
+  }
+}
 
 export type SidecarBackupMode = "exclude" | "include";
 
@@ -186,7 +299,12 @@ export function getSidecarLogs(id: string): string[] {
  * itself doesn't either, so this returns no matches there rather than
  * guessing a uid (0 would mean root, which is not a safe fallback to
  * silently substitute). */
-async function findPidsMatching(pattern: RegExp): Promise<number[]> {
+interface PsMatch {
+  pid: number;
+  command: string;
+}
+
+async function findPidsMatching(pattern: RegExp): Promise<PsMatch[]> {
   if (typeof process.getuid !== "function") return [];
   try {
     const { stdout } = await execFileAsync(
@@ -197,28 +315,75 @@ async function findPidsMatching(pattern: RegExp): Promise<number[]> {
     return stdout
       .split("\n")
       .filter((line) => pattern.test(line))
-      .map((line) => Number(line.trim().split(/\s+/)[0]))
-      .filter((n) => Number.isFinite(n) && n > 0);
+      .map((line) => {
+        const trimmed = line.trim();
+        const pid = Number(trimmed.split(/\s+/)[0]);
+        const command = trimmed.slice(String(pid).length).trim();
+        return { pid, command };
+      })
+      .filter((m) => Number.isFinite(m.pid) && m.pid > 0);
   } catch {
     return [];
   }
 }
 
+/** ENGINE-PORT-01: only ever kills a pid THIS install's own on-disk
+ * record (recordOwnedPort(), above) names for `port` - a real orphan,
+ * left over from this exact install's previous instance (a crash, a
+ * dev reload, a restart that never got to clean up after itself). A
+ * live pid on the port the record does NOT name is a foreign holder:
+ * never killed, logged with its pid and reason, and left on
+ * `blockedPorts` for spawnAndWaitHealthy() to refuse the spawn over
+ * and a caller's own health status to report - the household's own
+ * hub, running as a completely separate OS process from whatever else
+ * asked for this port, must never be a casualty of someone else
+ * wanting the same default port free. */
 export async function freePort(port: number): Promise<void> {
   // Anchored to a word boundary after the number: a plain substring test
   // ("--port 8788".includes(...)) would also match "--port 87889" and
   // kill an unrelated process whose port has this one as a numeric
   // prefix (a real bug a code review caught in the original version).
   const portPattern = new RegExp(`--port[= ]${port}\\b`);
-  const pids = await findPidsMatching(portPattern);
-  for (const pid of pids) {
+  const matches = await findPidsMatching(portPattern);
+  if (matches.length === 0) {
+    blockedPorts.delete(port);
+    return;
+  }
+
+  // A code review caught the bootstrap gap: an install that upgrades to
+  // this fix has no record yet for a port it has spawned onto for
+  // months, so a genuine crash orphan sitting there the moment this
+  // ships would read as "foreign" and stay stuck forever, a real
+  // regression from the old (unsafe, but self-healing) behavior. `null`
+  // ("no record was ever written for this port") and "a record names a
+  // DIFFERENT pid than what's there now" are different states: only the
+  // second is real evidence of a foreign holder. The first successful
+  // spawn after this ships records ownership (spawnAndWaitHealthy,
+  // below), so this fallback is a one-time bootstrap window per port,
+  // never the steady state the live incident actually happened in.
+  const owned = ownedPid(port);
+  const toKill = owned === null ? matches : matches.filter((m) => m.pid === owned);
+  const foreign = owned === null ? [] : matches.filter((m) => m.pid !== owned);
+
+  for (const match of toKill) {
+    const reason = owned === null ? "no ownership record exists yet for this port (a pre-ENGINE-PORT-01 install, or the very first spawn) - treated as a legacy orphan" : "an orphan this install spawned previously";
+    console.error(`[sidecars] freePort(${port}): killing pid ${match.pid} (${reason}: ${match.command})`);
     try {
-      process.kill(pid, "SIGKILL");
+      process.kill(match.pid, "SIGKILL");
     } catch {
       // already gone
     }
   }
-  if (pids.length === 0) return;
+
+  if (foreign.length > 0) {
+    const first = foreign[0]!;
+    console.error(`[sidecars] port ${port} is held by pid ${first.pid}, not ours: set MAIPAI_LLAMA_SERVER_PORT, MAIPAI_BACKGROUND_PORT and MAIPAI_EMBED_PORT (command: ${first.command})`);
+    blockedPorts.set(port, { pid: first.pid, command: first.command, at: new Date().toISOString() });
+    throw new ForeignPortHolderError(port, first.pid);
+  }
+  blockedPorts.delete(port);
+
+  if (toKill.length === 0) return;
 
   // Give the OS a moment to actually release the socket before the
   // caller tries to bind it again - SIGKILL is immediate but the kernel's
@@ -271,9 +436,9 @@ export async function sweepOrphanProcesses(
   const pattern = new RegExp(
     matchSubstring.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
   );
-  const pids = (await findPidsMatching(pattern)).filter(
-    (pid) => pid !== process.pid && !exclude.has(pid),
-  );
+  const pids = (await findPidsMatching(pattern))
+    .map((m) => m.pid)
+    .filter((pid) => pid !== process.pid && !exclude.has(pid));
   for (const pid of pids) {
     try {
       process.kill(pid, "SIGKILL");
@@ -364,6 +529,13 @@ async function pipeAndLog(stream: ReadableStream<Uint8Array>, terminal: NodeJS.W
 export async function spawnAndWaitHealthy(
   opts: SpawnAndWaitOptions,
 ): Promise<Bun.Subprocess> {
+  // ENGINE-PORT-01: a ForeignPortHolderError propagates straight out of
+  // this call (never caught here) - a live process this install did not
+  // spawn already answers on `opts.port`, so the spawn below never
+  // happens at all. Every caller (llmSupervisor.ts, embedSupervisor.ts,
+  // ttsSupervisor.ts) already turns a thrown spawn failure into its own
+  // "unavailable"/health-list reporting; this is one more real reason
+  // for that same path, not a new one to build.
   if (opts.port) await freePort(opts.port);
   const proc = Bun.spawn(opts.command, {
     cwd: opts.cwd,
@@ -387,6 +559,13 @@ export async function spawnAndWaitHealthy(
       );
     }
     if (Date.now() - spawnedAt >= minUptimeMs && (await opts.healthCheck())) {
+      // ENGINE-PORT-01: this install's own record of "the pid I put on
+      // this port," so the NEXT freePort() call against it - later this
+      // run, or a fresh process after a restart - recognizes this pid
+      // as a real orphan if it's still there, rather than a foreign
+      // one. Only recorded once healthy, never at spawn time: a process
+      // that never came up is nothing to remember owning.
+      if (opts.port && proc.pid) recordOwnedPort(opts.port, proc.pid, opts.command.join(" "));
       return proc;
     }
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -748,7 +927,15 @@ export type EngineHealth = EngineHealthEntry;
  * GET /api/health, so the page never says "starts when needed" about an
  * engine that just died, and says "failed" (not merely "not started")
  * once the cap tripped. */
-export function engineHealthKind(role: string, kind: EngineHealthKind): EngineHealthKind {
+/** ENGINE-PORT-01: `port`, when given, is checked against
+ * `blockedPorts` first - a live foreign holder refusing this role's own
+ * spawn is a more specific, more actionable condition than the generic
+ * "restarting"/"failed" the healing state below already reports, and a
+ * caller (the Health page, Repairs) needs to be able to tell "trying
+ * again" apart from "won't work until whatever else is on that port is
+ * dealt with." */
+export function engineHealthKind(role: string, kind: EngineHealthKind, port?: number): EngineHealthKind {
+  if (port !== undefined && blockedPorts.has(port)) return "blocked";
   const healing = engineRespawnState(role);
   if (healing === "gave_up") return "failed";
   if (healing === "pending" && (kind === "none" || kind === "starting"))

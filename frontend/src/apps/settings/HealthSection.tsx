@@ -32,6 +32,10 @@ function engineState(engine: EngineHealthEntry): { label: string; variant: "seco
   // this page must not call it "Running" - the chat dock's own pill
   // already calls it demo mode.
   if (engine.kind === "stub") return { label: "Demo mode", variant: "outline" };
+  // ENGINE-PORT-01: checked before the alive probe below - a blocked
+  // engine never got the chance to be "not answering," something else
+  // already holds its port and MaiPai refused to touch it, on purpose.
+  if (engine.kind === "blocked") return { label: "Blocked by another program", variant: "destructive" };
   if (engine.alive === true) return { label: "Running", variant: "secondary" };
   if (engine.alive === false) return { label: "Not answering", variant: "destructive" };
   if (engine.kind === "restarting") return { label: "Restarting", variant: "destructive" };

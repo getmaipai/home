@@ -305,7 +305,8 @@ export function reportChatBackendUnreachable(message: string): void {
  * kind label. */
 export async function probeChatEngine(): Promise<EngineHealth> {
   const status = getEngineStatus();
-  return { kind: engineHealthKind("chat", status.kind), pid: status.pid, alive: await probeAlive(state.chatBackend?.client) };
+  const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
+  return { kind: engineHealthKind("chat", status.kind, port), pid: status.pid, alive: await probeAlive(state.chatBackend?.client) };
 }
 
 /** Null unless the engine is genuinely fully installed - both the binary
