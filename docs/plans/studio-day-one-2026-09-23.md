@@ -81,8 +81,9 @@ studio-bench.sh`, STACK-74: load time, first token, tokens per second,
 footprint per pinned model); ENGINE-CONTRACT-01's suite per engine
 (llama-server at b10797, Splash at its formula revision); ENGINE-SPLASH-01's
 comparison on the two candidates; MEASURE-02's rows for each candidate
-(tool-calling at ten repeats, the inverse miss, query rewrite, latency,
-the end-to-end search success centrepiece); STUDIO-ACCEPT-01's workload
+(tool-calling at ten repeats, the inverse miss, query rewrite, latency
+cold and warm at 32K with the effective rate, the end-to-end search
+success centrepiece), llama-server run with the model's MTP head on; STUDIO-ACCEPT-01's workload
 (two conversations with speech, a photo turn, a picture job). Each
 bench already writes a report; the script runs them in order on a
 scratch data directory, collects the summary rows into one
@@ -92,6 +93,45 @@ engine is then a reading of tables: the candidate that passes the
 contract suite, clears the tool-calling bars, and gives the best first
 useful answer under the workload, with its budget record filled from the
 numbers. Row: `STUDIO-EVAL-01` (M).
+
+**What the hands-on review adds (the owner's saved transcript,
+`data-scratch/splash/transcript-qwen38-27b-2x-faster-on-mac.txt`, a
+hands-on video review read 2026-09-23; every number in it is a claim to
+measure, never our record).** Four things change the evaluation and one
+changes the staging. (1) The reviewer's reading of Inco's own
+methodology: Splash's headline "2x" is speculative decoding (its DFlash 2
+draft, about 1.2 GB, proposing about seven tokens a step with three to
+four surviving) measured against oMLX without a draft model on a
+draft-friendly coding workload with reasoning on; the memory-bandwidth
+ceiling (about 20 tokens per second for a 15 GB model on 307 GB per
+second) is what a draft beats. So the baseline we compare Splash against
+is llama-server at our pin with Qwen3.8-27B's own multi-token-prediction
+head turned on (the model ships it; the laptop's lane already runs MTP
+on; the review cites community gains of 23 to 30 percent), at draft
+depth two and three, never plain autoregressive decoding, or we repeat
+the comparison the review takes apart. (2) Prefill dominates: the
+reviewer cites Inco's own 96 seconds to first token on a cold 32,000-token
+prompt (oMLX 317 s) against 282 milliseconds warm, and an effective rate
+across the whole response of about 9 tokens per second cold against 53
+warm. The evaluation therefore measures every candidate cold and warm at
+32K, reports the effective rate from send to last token, and the
+acceptance workload's "first useful answer" is recorded cold and warm;
+this is the same finding as LAT-00 to LAT-03 on the 8B, and it is why
+the stable tool set and the prefix cache matter more than decode. (3)
+A concurrency claim to test, 16 concurrent 32K requests on 48 GB where
+general policies held nine, against the workload's two conversations
+with speech. (4) A failure mode to test: Splash prints a memory report
+and refuses to boot when the model will not fit, which is a second
+admission beside the Stack's governor; the evaluation records what each
+says on the same machine and the design keeps one authority (the
+governor admits, Splash's report is logged as the engine's reason). And
+for staging: the reviewer confirms the package is proprietary (4-bit
+weights, the vision encoder and the draft in one 17.4 GB file that only
+Splash loads), so the GGUF cannot be reused and both forms are staged on
+purpose; and the reviewer's "one config line" for Claude Code, Codex and
+OpenCode is a claim `splash claude` proves on day one, as above. The
+pinned execution configuration gains the speculative-decoding settings
+(draft model or MTP head, draft depth) beside the thinking settings.
 
 ## 4. The Studio as a coding lane
 
