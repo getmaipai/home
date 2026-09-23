@@ -197,7 +197,9 @@ the name resolver.
 
 Three answers, in the order they arrive.
 
-- **Today (the interim rule).** The turn signal already computes two
+- **Today (the interim rule).** (The answer-from-context escape is off
+  initially; the rule is plain forced search until reuse of earlier
+  evidence with freshness is built.) The turn signal already computes two
   fields on every turn: the act (question, inform, directive, greeting)
   and the target (world, self, hub, household). The rule is one line: a
   question whose target is the world runs the model call with the search
@@ -240,7 +242,11 @@ search runs with the game in the query); "new trailer for primetime just
 dropped" then "no, I was talking about the trailer" (a search with
 "trailer" in the query, a video source in the reply); "who is the president
 of chile", "when was he born", "yes" (a search with the president's name
-or "president of chile" in the query, a sourced birth date); "did chatgpt 6
+or "president of chile" in the query, a sourced birth date); the
+skeleton run's hallucinated-name follow-up as a permanent row ("who is
+the president of chile" answered with an invented name, then "when was
+he born": the follow-up must not search or answer for the invented
+person); "did chatgpt 6
 luna come out", "search the web" (a search, or a question back, never a
 definition of the web), "search the web for when chatgpt 6 luna releases".
 

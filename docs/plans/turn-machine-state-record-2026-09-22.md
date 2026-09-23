@@ -108,8 +108,16 @@ the robot's Pi: one machine, one file, a budget field.
 
 The interim rule, in `model`'s actor: when `signal.primary_act` is
 `question`, `signal.target` is `world`, and `budget.always_search` is
-true, the call runs with `tool_choice: "required"` over two tools, the
-search and `answer_from_this_conversation` (one argument: the quoted line
+true, the call runs with `tool_choice: "required"` over the search tool.
+**The `answer_from_this_conversation` escape is off initially (Astra's
+review, 2026-09-22): a quote check proves a line exists in the
+conversation, not that it is true, and the Chile follow-up in the
+skeleton run recycled a hallucinated name that way.** Reuse of an
+earlier answer returns only around previously retrieved evidence (a
+succeeded outcome on this conversation) with a freshness window, which
+is a later item; until then the interim rule is plain forced search, and
+`budget.answer_from_context_tool` is false everywhere. When the escape
+returns it is the second tool of the same forced call (one argument: the quoted line
 of the context list it answers from). `policy` verifies the quote is in
 the list (a set check); a quote that is not there is an ungrounded
 argument and the search runs instead. A household subject in the
@@ -192,7 +200,11 @@ stop list that contains none of the query words in the failing rows,
 and `groundingSourceTexts()` does include the utterance.
 
 **Work order, GROUND-01 (S, Sonnet: a live verification loop; after the
-weekly reset).** Files: `backend/src/lib/turnMachine/nodes/policy.ts`,
+weekly reset).** Step 0, before any change: capture on a real failing
+call the refusal branch, the loaded manifest and the rejected argument
+(name and shape), so the cause below is confirmed rather than assumed;
+the regression test then uses the real manifest and the full argument
+object the model produced. Files: `backend/src/lib/turnMachine/nodes/policy.ts`,
 `contract.ts`, `machine.ts`, `nodes/answer.ts`, `trace.ts`,
 `backend/scripts/bench/interimRuleMeasure.ts`,
 `backend/tests/turnMachine/policy.test.ts`.
@@ -203,19 +215,20 @@ weekly reset).** Files: `backend/src/lib/turnMachine/nodes/policy.ts`,
    never the raw values). The refusal line stays one sentence; the trace
    is what changes.
 2. Ground the query, not every field: `argsGrounded()` checks only the
-   arguments the manifest schema types as free strings (`type: "string"`
-   without `enum`), skips enum-typed and boolean fields, and a call with
-   no free-string argument passes. Tests in these exact words:
+   manifest's declared search-text fields (a `search_text: true` mark on
+   the argument schema, `expression` on websearch), never "any free
+   string"; identifiers, recipients, quantities and durations keep the
+   executor's exact-match validation; enum and boolean fields pass by
+   schema. Tests in these exact words:
    `argsGrounded({ expression: "president of Chile 2026", category:
    "images" }, ["who is the president of chile"])` is true;
    `argsGrounded({ expression: "he born" }, [...])` stays false;
    `argsGrounded({ expression: "how to pick a lock" }, ["when is dune 3
    releasing"])` stays false; the schema passed in comes from the loaded
    manifest, so the test loads `websearch`'s real manifest.
-3. The quote check reads the utterance too: `contextQuoteGrounded`
-   compares against `state.utterance` and the context list; a test where
-   the model quotes the question verbatim answers from context without
-   the forced retry.
+3. The utterance joins the typed context list as its own item (source
+   `utterance`), never as answer evidence: it grounds a search and is
+   never a quotable line for an answer.
 4. The bench counts a search by outcome: `interimRuleMeasure.ts` marks a
    row searched only when the `tool` node's trace entry has `outcome.ok`
    and a websearch proposal ran, never by the node's presence in the
@@ -225,6 +238,48 @@ Acceptance: the live replay rerun on the 8B, each refusal (if any) carrying
 the refusing argument's terms in its trace; the Dune and Chile rows pass;
 the control rows match or beat the old path; then U6's recommendation is
 re-read from that run. Exit: `scripts/check.sh`.
+
+**Grounding is a diagnostic, not a guarantee (Astra's review,
+2026-09-22).** Term overlap catches an invented topic; it does not make a
+query right. Arguments are validated by purpose: search text (the
+manifest's declared search-text fields) by term overlap as above;
+identifiers, recipients, quantities and durations by exact match against
+what was said, the executor's own check; enum and boolean fields by the
+schema alone. Action tools stay strict, and no search-wording exemption
+ever authorizes an invented action parameter. A refusal's trace records
+the branch and the argument NAME, never the terms (terms are the
+person's data).
+
+## The transition table, once
+
+| `model_transitions` | `always_search` and a world question | What runs |
+|---|---|---|
+| on | yes | the forced search call, the model writes the query, `policy`, `tool`, one more `model` round to phrase, `answer` |
+| on | no | one model call with the fixed tool set on `auto`; a tool call goes through `policy` and `tool`; text goes to `answer` |
+| off | yes | the engine builds the query (`query_writer: builder`) and proposes the search itself; `policy`, `tool`; the model runs with `tool_choice: "none"` to phrase from the result; `answer` |
+| off | no | the model runs with `tool_choice: "none"`; `answer` |
+
+This table is the one authority; "transitions off goes straight to
+answer" above is read as the last row only, and the verdict's "what off
+means" is the third row.
+
+## Deployment limits narrow the budget
+
+The budget record is what the model measured; a turn runs under the
+budget narrowed by the machine's state at that moment, `DeploymentLimits`
+computed by `context`: `connected` (no network: the search tool is
+absent and a world question gets the inability reply), `tools_available`
+(installed and reachable now), `memory_pressure` ("high" drops
+`thinking_budget_tokens` to zero and `rounds` to the minimum),
+`deadline_ms` (the caller's, capped by the budget's). The effective
+budget is the intersection, and the trace records both. The robot's
+degraded behaviour, stated: the exact commands; the permitted local
+context (its own memories and window, the disclosure filter unchanged);
+bounded generation (the small model phrases, `tool_choice: "none"`, the
+plan's budget); and an explicit inability reply for a world question it
+cannot serve ("I can't look that up from here"), never an invented
+answer; the hub-reachable path hands the turn to the hub. The Pi itself
+is not measured; every robot number is on paper until a Pi is reachable.
 
 ## What every turn writes
 
@@ -250,7 +305,10 @@ row, which is how a slow layer and a wrong layer are both named.
 
 - **A confirmation or a consent** parks the machine in `asked`, stores
   the pending ask on the conversation as today, and ends the turn with
-  the ask's line. The next turn's `safety` state runs first, then the
+  the ask's line. The confirmation is bound to the actor and the exact
+  proposal (tool, arguments, callId); at execution the permissions are
+  rechecked against the current state, and a retry is idempotent on the
+  callId. The next turn's `safety` state runs first, then the
   pending ask is consumed before `commands`: an affirmative re-enters at
   `policy` with the stored proposal marked confirmed; a negative or a
   new statement clears it. A plan with two confirmations asks them one
@@ -384,9 +442,8 @@ the flip.
   end with no tool call and no branch on surface or device.
 - The interim rule's row: "who is the president of chile" runs the search
   under `tool_choice: "required"` and answers with sources; "who is the
-  president of France" asked twice answers the second time from the
-  conversation through the `answer_from_this_conversation` choice with no
-  search.
+  president of France" asked twice searches both times under the plain
+  forced search and answers the same both times (the escape is off).
 - First visible token on "hi" on the 8B under the skeleton's live
   baseline (2.5 s median), with the cache-stable prompt in place.
 
