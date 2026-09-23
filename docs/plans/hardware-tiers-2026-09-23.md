@@ -14,14 +14,14 @@ capabilities.
 
 ## The tiers at a glance
 
-| Capability | Tier 1: 24 GB Apple silicon laptop | Tier 2: 16 GB CUDA laptop (two 8 GB cards) | Tier 3: 128 GB Studio and up |
-|---|---|---|---|
-| Chat model | the 8B at Q4 on Metal, resident (about 7.7 GB measured with its cache); its budget record as measured | the 8B at Q4 on one card (about 6 GB with a smaller cache), the CUDA llama-server build; the same budget record once ENGINE-CONTRACT-01 runs on that build | the Studio's model, resident, its own budget record (MEASURE-02's candidates) |
-| Judge, embeddings | the CPU 4B and the embedder, resident | the 4B on the second card or the CPU, the embedder on the CPU | resident |
-| Voice (stt, tts) | sherpa-onnx in process, resident, under 1 GB | the same, on the CPU | the same |
-| Photo understanding (`vision` role) | a small vision model on demand (Qwen3-VL-4B at Q4, about 3.5 GB while a photo turn runs), evicted when idle | the same model on demand on the second card | resident |
-| Picture creation (`image` role) | on demand on a second in-house machine when one exists (a URL-tier engine); otherwise on this machine's MPS with the chat engine paused for about a minute per picture | on demand on the second card (FLUX.2 Klein 4B at fp8 or 4-bit, the text encoder in RAM), chat unaffected; when both cards are needed, the judge yields first | on the Studio itself, admitted by the governor beside a resident chat model |
-| Deployment limits | one conversation with speech plus one photo or picture job at a time | the same, with the image job on its own card | two conversations with speech, a photo and a picture job at once (STUDIO-ACCEPT-01's original workload) |
+| Capability | Floor: an 8 GB laptop or a CPU-only desktop (the robot's configuration) | Tier 1: 24 GB Apple silicon laptop | Tier 2: 16 GB CUDA laptop (two 8 GB cards) | Tier 3: 128 GB Studio and up |
+|---|---|---|---|---|
+| Chat model | the robot's chat model (the 1.7B at Q8 today, the 2B candidate MEASURE-02 names), `always_search` on, the engine's builder as the query writer, model-driven moves off (the ARCH-MEASURE-01 verdict) | the 8B at Q4 on Metal, resident (about 7.7 GB measured with its cache); its budget record as measured | the 8B at Q4 on one card (about 6 GB with a smaller cache), the CUDA llama-server build; the same budget record once ENGINE-CONTRACT-01 runs on that build | the Studio's model, resident, its own budget record (MEASURE-02's candidates) |
+| Judge, embeddings | the embedder on the CPU; the judge a rules-plus-template pass, no 4B (ARCH-MEM-01's floor class) | the CPU 4B and the embedder, resident | the 4B on the second card or the CPU, the embedder on the CPU | resident |
+| Voice (stt, tts) | sherpa-onnx on the CPU, resident | sherpa-onnx in process, resident, under 1 GB | the same, on the CPU | the same |
+| Photo understanding (`vision` role) | not available | a small vision model on demand (Qwen3-VL-4B at Q4, about 3.5 GB while a photo turn runs), evicted when idle | the same model on demand on the second card | resident |
+| Picture creation (`image` role) | not available | on demand on a second in-house machine when one exists (a URL-tier engine); otherwise on this machine's MPS with the chat engine paused for about a minute per picture | on demand on the second card (FLUX.2 Klein 4B at fp8 or 4-bit, the text encoder in RAM), chat unaffected; when both cards are needed, the judge yields first | on the Studio itself, admitted by the governor beside a resident chat model |
+| Deployment limits | one conversation, typed or spoken, at a time | one conversation with speech plus one photo or picture job at a time | the same, with the image job on its own card | two conversations with speech, a photo and a picture job at once (STUDIO-ACCEPT-01's original workload) |
 
 The table is the default proposal at each reference point, never what a
 machine is locked to (see "The configuration is proposed, never fixed").
@@ -186,6 +186,8 @@ anywhere in copy.
 | 3 | Pictures: IMAGE-01, IMAGE-02 | M, S | none on the Mac (the engine is remote); the URL-tier health check | a picture job while a conversation runs: chat unaffected with the laptop, chat paused and resumed cleanly without it |
 | with 1 | STACK-SIZE-01: the sizer honours a per-role step-down | M | none | the workload rerun under a stepped-down proposal inherits the smaller reference point's limits |
 | with 1 | SETUP-SIZE-01: the wizard's sizing page with impact per role | M | none | a stepped-down chat role visible in the next start's resident set |
+| with 1 | STACK-FLOOR-01: the `p8` profile with the robot's pins, the lowest step-down | S | none | proposed on an 8 GB probe, runnable as a step-down on the dev Mac |
+| after 1 | FLOOR-ACCEPT-01: the floor run of the acceptance workload | S | none | voice plus typed on this Mac with the robot's model as the stand-in, marked so, rerun on an 8 GB machine when one is on the bench |
 
 STUDIO-ACCEPT-01 becomes **the tier acceptance workload, run on tier 1
 first**:
@@ -240,6 +242,17 @@ and the default proposal, nothing more.
    to the 8B runs under the 8B's measured budget record), so nothing
    is measured twice.
 
+**The floor tier, on any machine (owner's question, 2026-09-23: "can a
+user go as low as the Pi's configuration on their own desktop or
+laptop?").** Yes. The floor column is the robot's configuration on an
+8 GB laptop or a CPU-only desktop, and it is also the lowest step the
+wizard offers on every bigger machine. In the wizard's words: "The
+robot's brain on your computer: chat and voice only, no photos or
+pictures, slower and plainer answers. Uses the least memory." It runs
+the same pipeline with the floor budget record (the ARCH-MEASURE-01
+verdict's 1.7B column, or the 2B candidate once measured) and the
+floor's deployment limits.
+
 **The gap, checked in the Stack:** today it only proposes. There is no
 input that accepts a per-role choice below the proposal: the governor's
 `pinned` flag is per-process eviction, not a profile choice, and no
@@ -255,5 +268,20 @@ hardware step of "The first-run wizard, end to end" and the same page
 under Settings, a shadcndashboard form layout, the settings key spec
 first): the proposal with impact per role and the step-down controls;
 acceptance: stepping `chat` down on the dev Mac changes the Stack's
-resident set on the next start and the page says what changed.
+resident set on the next start and the page says what changed. And
+for the floor: the Stack's lowest profile today is `p16`
+(`stack/backend/src/profiles.ts`: `p16`, `p32`, `p64`, `p128`), so
+`STACK-FLOOR-01` (S, Sonnet; `profiles.ts`, the pins in
+`modelCatalog.ts`, `lib/governor.ts`'s margin table): a `p8` profile
+below it carrying the robot's pins (the floor chat model, stt and tts on
+the CPU, the embedder, no judge model, no generators) with its own
+working margin, proposed on an 8 GB machine and offered as the lowest
+step-down everywhere; test: an 8 GB probe proposes `p8`, a p64 machine
+stepped to `p8` runs only the floor set. And `FLOOR-ACCEPT-01` (S,
+Sonnet; Home, the acceptance workload's floor run): a voice conversation
+plus a typed one, no photo, no picture, first useful answer, first spoken
+word, peak memory and cancellation, run on this Mac with the robot's
+model as a stand-in for an 8 GB machine, recorded honestly as a stand-in
+until an 8 GB machine is on the bench, when it is rerun there and the
+floor's limits are set from that run.
 
