@@ -107,6 +107,13 @@ describe("turnNext.ts: the interim rule", () => {
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(searxng.queries.length).toBeGreaterThan(0);
       expect(result.value.reply.text.length).toBeGreaterThan(0);
+      // A live acceptance run (U2d) caught buildTurnValue() (turnNext.ts)
+      // never carrying plugin_id or sources onto TurnValue at all - every
+      // scripted test here only checked reply.text, so this real gap
+      // reached the live run undetected. conversationRunner.ts's own
+      // scorer reads exactly these two top-level fields.
+      expect(result.value.plugin_id).toBe("websearch");
+      expect(result.value.sources?.length).toBeGreaterThan(0);
     } finally {
       searxng.stop();
     }
@@ -148,6 +155,38 @@ describe("turnNext.ts: the household-subject rule", () => {
     } finally {
       searxng.stop();
     }
+  });
+});
+
+describe("turnNext.ts: a custom household command reports its bare id", () => {
+  test("command_id is the bare command id, never \"command:<id>\"", async () => {
+    // A review caught commands.ts tagging this outcome's packageId as
+    // "command:<id>" (an internal prefix meant for callId, copied
+    // here too by mistake) - turnEngine.ts's own reference builder
+    // reports the bare id (matchedCommand.id) on the wire.
+    const { createCommand } = await import("@/lib/commands");
+    const created = createCommand(people.owner, "movie night", "child", { kind: "reply", text: "Starting movie night mode." });
+    if (!created.ok) throw new Error(created.error);
+    const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "movie night"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.source).toBe("command");
+    expect(result.value.command_id).toBe(created.value.id);
+  });
+});
+
+describe("turnNext.ts: a matched command carries its own package id", () => {
+  test('"remember that ..." reports source "command" with command_id set, not lost', async () => {
+    // The same gap the interim-rule test above closes, on the commands
+    // node's own path: a live run's control-remember-pizza-night row
+    // read "tool: ran none (source command)" - conversationRunner.ts's
+    // scorer falls back to the stored row's command_id/pluginId when
+    // TurnValue itself carries neither, and both were empty.
+    const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "remember that pizza night is Friday"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.source).toBe("command");
+    expect(result.value.command_id).toBe("remember");
   });
 });
 
@@ -206,6 +245,13 @@ describe("turnNext.ts: consent and confirmation", () => {
     expect(resumed.ok).toBe(true);
     if (!resumed.ok || resumed.kind !== "immediate") throw new Error("expected an immediate result");
     expect(getPendingAsk(parked.value.conversation_id)).toBeNull();
+    // A review caught turnNext.ts forcing source to "confirm" for
+    // every resumed action, whether it actually ran a package or not -
+    // turnEngine.ts's own reference builder reports "plugin" (with
+    // plugin_id) once the confirmed action really executes, matching
+    // what conversationRunner.ts's scorer and any real client expect.
+    expect(resumed.value.source).toBe("plugin");
+    expect(resumed.value.plugin_id).toBe("lock-doors");
   });
 });
 

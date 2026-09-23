@@ -37,6 +37,7 @@ import { resolveTurnBudget } from "./budget";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal } from "./contract";
+import type { Source } from "@maipai/spec/gen/ts/source.js";
 
 export interface RunTurnNextOpts {
   conversationId?: string;
@@ -44,8 +45,19 @@ export interface RunTurnNextOpts {
   signal?: AbortSignal;
 }
 
-function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string): TurnValue {
+function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
   const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0);
+  // A live acceptance run (U2d) caught this omitting plugin_id/
+  // command_id/sources entirely - turnEngine.ts's own equivalent
+  // builder always carries the package id that ran (plugin_id for a
+  // model-proposed tool, command_id for a household command) and any
+  // sources, and the bench's own scorer reads exactly these two
+  // fields (driven.value?.plugin_id, driven.value?.sources) before it
+  // ever falls back to a stored row. Without them every tool/command/
+  // source-bearing check failed on the new path, live, even for a
+  // turn that ran the right package - a real bug, not a scoring gap.
+  const lastOutcome = state.outcomes.at(-1);
+  const packageId = source === "plugin" || source === "command" ? lastOutcome?.packageId : undefined;
   return {
     reply: { text, speech },
     source,
@@ -61,6 +73,9 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // emitting this turn AND output_gate's own safety pass over the
     // span didn't refuse it - the gated span itself, never the raw one.
     reasoning,
+    ...(source === "plugin" && packageId ? { plugin_id: packageId } : {}),
+    ...(source === "command" && packageId ? { command_id: packageId } : {}),
+    ...(sources && sources.length > 0 ? { sources } : {}),
   } as TurnValue;
 }
 
@@ -211,15 +226,24 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
   } else if (finalState === "blocked") {
     value = buildTurnValue(state, startedAt, "policy", "Keep passwords and keys in Credentials, not in chat.");
   } else {
-    const gateOutput = (finalSnapshot.context as { step: unknown }).step as { refused?: boolean; text?: string; speech?: string; reasoningOut?: string };
+    const gateOutput = (finalSnapshot.context as { step: unknown }).step as { refused?: boolean; text?: string; speech?: string; reasoningOut?: string; sources?: Source[] };
     // The last outcome's own `via` (commands.ts/tool.ts both tag it)
     // names which node actually produced the reply - a review caught
     // the previous version guessing "plugin" vs "model" from
     // outcomes.length alone, which stayed 0 for a matched command
     // (recordCommandOutcome, machine.ts, now pushes its outcome too).
+    // A second review caught this ALSO forcing source to "confirm"
+    // whenever preConfirmed was set: turnEngine.ts's own reference
+    // builder reports "plugin" (with plugin_id) for a confirmed
+    // action that actually ran, "confirm" only for the bare
+    // acknowledgment lines that never touch a package - lastVia
+    // already reads "tool_call" for a preConfirmed action the SAME
+    // way it does for any other, so no separate case is needed here;
+    // forcing "confirm" only hid the package id buildTurnValue()
+    // (below) needs to attach plugin_id at all.
     const lastVia = state.outcomes.at(-1)?.via;
-    const source: TurnValue["source"] = preConfirmed ? "confirm" : lastVia === "command" || lastVia === "pattern" ? "command" : lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
-    value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut);
+    const source: TurnValue["source"] = lastVia === "command" || lastVia === "pattern" ? "command" : lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
+    value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
   }
 
   logResult(state, actor, surface, text, value);

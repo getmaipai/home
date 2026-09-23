@@ -34,7 +34,13 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
     const result = await runCommand(custom);
     const outcome = outcomeOf({
       callId: `command:${custom.id}`,
-      packageId: `command:${custom.id}`,
+      // A code review (2026-09-22) caught this prefixed ("command:x"),
+      // where turnEngine.ts's own reference builder uses the bare id
+      // for TurnValue.command_id (matchedCommand.id, unprefixed) -
+      // buildTurnValue() (turnNext.ts) copies this outcome's packageId
+      // straight onto the wire, so a prefixed id here reached the
+      // household's own client under a name turnEngine.ts never used.
+      packageId: custom.id,
       status: result.ok ? "succeeded" : "failed",
       via: "command",
       userMessage: result.ok ? result.value.text : result.error,
