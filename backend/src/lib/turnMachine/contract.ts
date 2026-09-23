@@ -19,6 +19,7 @@ import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { GenerationInput } from "@/lib/turnStats";
 import type { PendingAsk } from "@/lib/conversationHistory";
 import type { PlanInput } from "@/lib/register";
+import type { Persona } from "@/lib/persona";
 
 /** ARCH-POLICY-01's ingress unit: what the model actually sees, filtered
  * before the prompt (disclosure, band, temporary mode) and typed by
@@ -118,6 +119,12 @@ export interface TurnState {
   utterance: string;
   signal: TurnSignal;
   budget: TurnBudget;
+  /** U4b: resolved once in `turnNext.ts` (the same call already feeding
+   * `planBasis.companion`'s engagement/complexity), never re-resolved
+   * later - the model node's own `messages.ts` call reads this instead
+   * of a second `resolvePersona()` lookup, the same "decided once"
+   * shape `plan`/`planBasis` already follow. */
+  persona: Persona;
   plan: ReplyPlan;
   /** U4c: the exact non-evidence `planFor()` inputs `turnNext.ts`
    * resolved once, up front (signal, surface, surfaceClass, companion,

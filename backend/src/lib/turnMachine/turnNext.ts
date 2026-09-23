@@ -160,6 +160,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     utterance: text,
     signal,
     budget,
+    persona,
     plan,
     planBasis,
     safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },

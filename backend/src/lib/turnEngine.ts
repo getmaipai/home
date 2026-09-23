@@ -917,7 +917,7 @@ const MEMORY_TRUST_REMINDER = "Prefer these facts over guessing when they're rel
 // display_name the stable identityLine() above already used - a real,
 // if small, anchor today, and already the right shape for a companion
 // package's own name once one exists.
-function companionReanchorLine(persona: Persona): string {
+export function companionReanchorLine(persona: Persona): string {
   return `\n\nRemember: you are ${persona.display_name}.`;
 }
 

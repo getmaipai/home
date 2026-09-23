@@ -8,8 +8,26 @@
 // is a labeled context line" - the label carries the source's own
 // meaning (a memory reads differently from a clock line) without a
 // separate prompt template per source.
+//
+// U4b amended this contract (dev.md "U6 rerun 2 ruling" (1)): the
+// stable message also carries `turnEngine.ts`'s own `buildStablePrefix()`
+// (identity, `composePersonaPrompt`, the information-handling and
+// naturalness policies - persona/plan are inputs now too, not "context
+// alone"), and the volatile message gains the plan line
+// (`register.ts`'s `planLine`). Both reused verbatim, never
+// re-implemented here - a plain reply with none of this decoded for
+// 6.6s against the old path's 0.5s (nothing said who was speaking, in
+// what register, or how long), and NEXT-CACHE-01's own stable message
+// had nothing but `profile`/`roster` to protect (three tokens on the
+// bench household).
 import type { ContextItem } from "./contract";
 import type { LlmMessage } from "@/lib/llm";
+import type { Persona } from "@/lib/persona";
+import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import type { SurfaceClass } from "@/lib/surfaceClass";
+import { buildStablePrefix, companionReanchorLine } from "@/lib/turnEngine";
+import { planLine } from "@/lib/register";
 
 // GROUND-01: "utterance" is excluded here too, same as "window" - it is
 // already the final "user" message contextToMessages() appends below,
@@ -76,8 +94,16 @@ function isStableContext(source: ContextItem["source"]): boolean {
  * (this stable message, unchanged for the same actor/household, plus
  * the window, unchanged once written) stays a real prefix match; only
  * the trailing volatile message and the new utterance differ, the
- * smallest part of the prompt a cache miss can cost. */
-export function contextToMessages(context: readonly ContextItem[], utterance: string): LlmMessage[] {
+ * smallest part of the prompt a cache miss can cost.
+ *
+ * U4b: `buildStablePrefix(persona)` is now the FIRST part of the
+ * stable message, ahead of the `profile`/`roster` context lines (if
+ * any) - identity before facts, the same order the old path's own
+ * `stablePrefix` versus `context` split already keeps, and the real
+ * prefix NEXT-CACHE-01 needed. `planLine()` closes the volatile
+ * message, right before the utterance - "how to answer this one" reads
+ * as the turn's own last instruction, not buried among context facts. */
+export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass): LlmMessage[] {
   const windowItems = context.filter((item) => item.source === "window");
   // "utterance" is excluded too: it rides the "utterance" argument
   // below as the final user message, the one place it belongs in the
@@ -87,18 +113,24 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   const volatile = other.filter((item) => !isStableContext(item.source));
 
   const messages: LlmMessage[] = [];
-  if (stable.length > 0) {
-    messages.push({ role: "system", content: stable.map(renderContextLine).join("\n") });
-  }
+  const stableContextLines = stable.length > 0 ? `\n\n${stable.map(renderContextLine).join("\n")}` : "";
+  messages.push({ role: "system", content: `${buildStablePrefix(persona)}${stableContextLines}` });
   // The window already alternates user/assistant/tool roles correctly
   // (buildConversationWindow()'s own job); this machine never rebuilds
   // that ordering, only replays the window's own roles verbatim.
   for (const item of windowItems) {
     messages.push({ role: windowRoleFromId(item.id), content: item.text });
   }
-  if (volatile.length > 0) {
-    messages.push({ role: "system", content: volatile.map(renderContextLine).join("\n") });
-  }
+  const volatileContextLines = volatile.length > 0 ? `${volatile.map(renderContextLine).join("\n")}\n\n` : "";
+  // A review caught this file's first cut carrying the identity line
+  // once (the stable prefix) but never again - the old path's own
+  // reanchorSection (companionReanchorLine(), turnEngine.ts) exists
+  // specifically because legacy measured real persona-voice drift after
+  // about eight turns with nothing repeating who's speaking. Reused
+  // verbatim here too, every turn, the same volatile-zone role it
+  // already has in the old path.
+  const reanchor = companionReanchorLine(persona).trim();
+  messages.push({ role: "system", content: `${volatileContextLines}${reanchor}\n\nHow to answer this one: ${planLine(plan, signal, surfaceClass)}` });
   messages.push({ role: "user", content: utterance });
   return messages;
 }

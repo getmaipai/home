@@ -210,7 +210,7 @@ function builderFallbackOutput(utterance: string, otherCalls: readonly ToolCall[
 }
 
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
-  const messages: LlmMessage[] = contextToMessages(state.context, input.utterance);
+  const messages: LlmMessage[] = contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken");
   state.messages = messages;
 
   const interimRuleApplies = input.toolsAllowed && state.budget.always_search && isWorldQuestion(state) && !householdSubjectNamed(state);

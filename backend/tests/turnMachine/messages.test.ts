@@ -6,12 +6,39 @@
 // land in the volatile message after it, and that the stable message's
 // own content never changes when only the volatile items do (the exact
 // claim the prompt cache depends on).
+//
+// U4b (dev.md "U6 rerun 2 ruling" (1)) widened the signature: persona,
+// plan, signal and surfaceClass are real inputs now, not "context
+// alone" - buildStablePrefix(persona) always opens the stable message
+// (identity, composePersonaPrompt, the two policies) and the volatile
+// one always closes with companionReanchorLine() then planLine(), so
+// there is no longer a "no stable message"/"no volatile message" case
+// at all. The reanchor line was a review's own finding on the first
+// cut: the old path resends it every turn specifically because legacy
+// measured real persona-voice drift after about eight turns with
+// nothing repeating who's speaking - carrying the identity line once,
+// in the cached stable prefix, doesn't fight that on its own.
 import { describe, expect, test } from "bun:test";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ContextItem } from "@/lib/turnMachine/contract";
+import { fallbackSignal } from "@/lib/turnSignal";
+import { planFor, type PlanInput } from "@/lib/register";
+import { buildStablePrefix, companionReanchorLine } from "@/lib/turnEngine";
+import { DEFAULT_PERSONA } from "@/lib/persona";
 
 function item(source: ContextItem["source"], text: string, id = `${source}-1`): ContextItem {
   return { id, text, source, subjects: [], disclosure: "child_ok" };
+}
+
+const signal: TurnSignal = fallbackSignal("what's the weather", "adult");
+const planInput: PlanInput = { signal, surface: "chat", surfaceClass: "spoken", brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", vocabulary: "advanced" }, band: "adult", deferred: false, disclosureWithheld: false };
+const plan = planFor(planInput);
+const STABLE_PREFIX = buildStablePrefix(DEFAULT_PERSONA);
+const REANCHOR = companionReanchorLine(DEFAULT_PERSONA).trim();
+
+function messages(context: ContextItem[], utterance = "what's the weather") {
+  return contextToMessages(context, utterance, DEFAULT_PERSONA, plan, signal, "spoken");
 }
 
 describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
@@ -22,17 +49,18 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
       item("window", "hi", "window-user-1"),
       item("window", "Hello!", "window-assistant-2"),
     ];
-    const messages = contextToMessages(context, "what's the weather");
-    expect(messages[0]).toEqual({ role: "system", content: "[profile] Sage's profile: likes hiking.\n[household] Sage" });
-    expect(messages[1]).toEqual({ role: "user", content: "hi" });
-    expect(messages[2]).toEqual({ role: "assistant", content: "Hello!" });
+    const out = messages(context);
+    expect(out[0]).toEqual({ role: "system", content: `${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage` });
+    expect(out[1]).toEqual({ role: "user", content: "hi" });
+    expect(out[2]).toEqual({ role: "assistant", content: "Hello!" });
   });
 
   test("memory and clock land in a second system message, after the window and before the utterance", () => {
     const context: ContextItem[] = [item("memory", "Sage likes tea.", "memory-1"), item("clock", "Monday 9:00 AM")];
-    const messages = contextToMessages(context, "what's the weather");
-    expect(messages[0]).toEqual({ role: "system", content: "[remembered] Sage likes tea.\n[clock] Monday 9:00 AM" });
-    expect(messages[1]).toEqual({ role: "user", content: "what's the weather" });
+    const out = messages(context);
+    expect(out[0]).toEqual({ role: "system", content: STABLE_PREFIX });
+    expect(out[1]?.content.startsWith(`[remembered] Sage likes tea.\n[clock] Monday 9:00 AM\n\n${REANCHOR}\n\nHow to answer this one:`)).toBe(true);
+    expect(out[2]).toEqual({ role: "user", content: "what's the weather" });
   });
 
   test("both halves together: stable, window, volatile, utterance, in that exact order", () => {
@@ -44,42 +72,86 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
       item("memory", "Sage likes tea.", "memory-1"),
       item("clock", "Monday 9:00 AM"),
     ];
-    const messages = contextToMessages(context, "what's the weather");
-    expect(messages.map((m) => m.role)).toEqual(["system", "user", "assistant", "system", "user"]);
-    expect(messages[0]?.content).toBe("[profile] Sage's profile: likes hiking.\n[household] Sage");
-    expect(messages[3]?.content).toBe("[remembered] Sage likes tea.\n[clock] Monday 9:00 AM");
-    expect(messages[4]).toEqual({ role: "user", content: "what's the weather" });
+    const out = messages(context);
+    expect(out.map((m) => m.role)).toEqual(["system", "user", "assistant", "system", "user"]);
+    expect(out[0]?.content).toBe(`${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage`);
+    expect(out[3]?.content.startsWith(`[remembered] Sage likes tea.\n[clock] Monday 9:00 AM\n\n${REANCHOR}\n\nHow to answer this one:`)).toBe(true);
+    expect(out[4]).toEqual({ role: "user", content: "what's the weather" });
   });
 
   // The prompt cache's own actual claim: the stable message's content
-  // is a function of the stable items alone, never the volatile ones -
-  // two turns in the same conversation with the same profile/roster
-  // but different memory matches and a different clock reading must
-  // produce byte-identical stable messages, the real-common-prefix
-  // property llama-server's cache needs to hit at all.
-  test("the stable message is byte-identical across two turns whose only difference is volatile context", () => {
+  // is a function of persona and the stable items alone, never plan,
+  // signal or the volatile items - two turns in the same conversation
+  // with the same persona/profile/roster but a different plan, signal,
+  // memory match and clock reading must produce byte-identical stable
+  // messages, the real-common-prefix property llama-server's cache
+  // needs to hit at all.
+  test("the stable message is byte-identical across two turns whose only difference is plan, signal or volatile context", () => {
     const stableItems: ContextItem[] = [item("profile", "Sage's profile: likes hiking."), item("roster", "Sage", "roster-0")];
-    const turn1 = contextToMessages([...stableItems, item("memory", "Sage likes tea.", "memory-1"), item("clock", "Monday 9:00 AM")], "what's the weather");
-    const turn2 = contextToMessages([...stableItems, item("memory", "Sage's birthday is in June.", "memory-2"), item("clock", "Monday 9:05 AM")], "who won the game");
+    const signal2 = fallbackSignal("who won the game", "adult", "identified_profile", "question");
+    const plan2 = planFor({ ...planInput, signal: signal2 });
+    const turn1 = contextToMessages([...stableItems, item("memory", "Sage likes tea.", "memory-1"), item("clock", "Monday 9:00 AM")], "what's the weather", DEFAULT_PERSONA, plan, signal, "spoken");
+    const turn2 = contextToMessages([...stableItems, item("memory", "Sage's birthday is in June.", "memory-2"), item("clock", "Monday 9:05 AM")], "who won the game", DEFAULT_PERSONA, plan2, signal2, "spoken");
     expect(turn1[0]).toEqual(turn2[0]);
   });
 
-  test("no stable items: no first system message at all, not an empty one", () => {
+  test("no stable context items: the stable message is still buildStablePrefix() alone, never empty or skipped", () => {
     const context: ContextItem[] = [item("memory", "Sage likes tea.", "memory-1")];
-    const messages = contextToMessages(context, "hi");
-    expect(messages[0]).toEqual({ role: "system", content: "[remembered] Sage likes tea." });
+    const out = messages(context);
+    expect(out[0]).toEqual({ role: "system", content: STABLE_PREFIX });
   });
 
-  test("no volatile items: no trailing system message before the utterance, not an empty one", () => {
+  test("no volatile context items: the volatile message is still the reanchor line and the plan line, never empty or skipped", () => {
     const context: ContextItem[] = [item("profile", "Sage's profile: likes hiking.")];
-    const messages = contextToMessages(context, "hi");
-    expect(messages).toEqual([{ role: "system", content: "[profile] Sage's profile: likes hiking." }, { role: "user", content: "hi" }]);
+    const out = messages(context, "hi");
+    expect(out[0]).toEqual({ role: "system", content: `${STABLE_PREFIX}\n\n[profile] Sage's profile: likes hiking.` });
+    expect(out[1]).toEqual({ role: "system", content: expect.stringContaining("How to answer this one:") });
+    expect(out[1]?.content.startsWith(REANCHOR)).toBe(true);
+    expect(out[2]).toEqual({ role: "user", content: "hi" });
   });
 
   test("the utterance itself never appears in either context message, only as the final user message", () => {
     const context: ContextItem[] = [item("profile", "Sage's profile."), item("utterance", "what's the weather", "utterance")];
-    const messages = contextToMessages(context, "what's the weather");
-    expect(messages.filter((m) => m.role === "system").every((m) => !m.content.includes("[utterance]"))).toBe(true);
-    expect(messages.at(-1)).toEqual({ role: "user", content: "what's the weather" });
+    const out = messages(context);
+    expect(out.filter((m) => m.role === "system").every((m) => !m.content.includes("[utterance]"))).toBe(true);
+    expect(out.at(-1)).toEqual({ role: "user", content: "what's the weather" });
+  });
+});
+
+// U4b's own additions, tested directly against the real functions they
+// carry over from turnEngine.ts/register.ts, never a re-typed copy.
+describe("contextToMessages(): U4b, the persona prefix, the reanchor and the plan line", () => {
+  test("the stable message opens with buildStablePrefix(persona) verbatim", () => {
+    const out = messages([]);
+    expect(out[0]?.content).toBe(STABLE_PREFIX);
+    expect(STABLE_PREFIX.length).toBeGreaterThan(0);
+  });
+
+  // A review caught the first cut of this item dropping the old path's
+  // own companionReanchorLine() entirely - identity sent once, in the
+  // cached prefix, is not the same guarantee as the old path's own
+  // every-turn repeat, the thing that actually fights persona-voice
+  // drift on a long conversation.
+  test("the volatile message repeats the persona's identity every turn (companionReanchorLine)", () => {
+    const out = messages([], "what's the weather");
+    const volatileMessage = out.find((m) => m.role === "system" && m.content.includes("How to answer this one:"));
+    expect(volatileMessage?.content.startsWith(REANCHOR)).toBe(true);
+    expect(REANCHOR).toContain(DEFAULT_PERSONA.display_name);
+  });
+
+  test("the volatile message ends with planLine()'s own words for this signal", () => {
+    const out = messages([], "what's the weather");
+    const volatileMessage = out.find((m) => m.role === "system" && m.content.includes("How to answer this one:"));
+    expect(volatileMessage).toBeDefined();
+    expect(volatileMessage?.content).toContain("a statement about themselves");
+  });
+
+  test("a different surfaceClass changes the plan line's own length clause", () => {
+    const spoken = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "spoken");
+    const written = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "written");
+    const spokenLine = spoken.find((m) => m.content.includes("How to answer this one:"))?.content;
+    const writtenLine = written.find((m) => m.content.includes("How to answer this one:"))?.content;
+    expect(spokenLine).not.toBe(writtenLine);
+    expect(writtenLine).toContain("as long as it needs");
   });
 });
