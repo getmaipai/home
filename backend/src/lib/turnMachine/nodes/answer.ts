@@ -43,6 +43,19 @@ export interface AnswerOutput {
   text: string;
   speech?: string;
   sources: Source[];
+  /** COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): set when
+   * `text` was drawn directly from a failed outcome's own `error`/
+   * `userMessage` field (the household's own custom command failing,
+   * "immediate"; a tool round's own last call failing with nothing
+   * else to say, "from_outcomes") - `output_gate`'s own provenance
+   * check refuses to deliver it verbatim, the same place and shape as
+   * the envelope catch (ENGINE-CONTRACT-03). A pattern outcome's own
+   * failure never reaches this node this way any more (it returns
+   * `matched: false` instead, commands.ts) - this tag is the
+   * structural backstop for every OTHER producer of "immediate"/
+   * "from_outcomes" text, present and future, not a single
+   * enumerated list of today's callers. */
+  provenance?: "outcome_error";
 }
 
 /** Three distinct lines plus one shared fallback, not a rule reading a
@@ -68,8 +81,15 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
   switch (input.kind) {
     case "policy_refused":
       return { outcome: { ok: true }, output: { text: policyRefusalLine(input.reason), sources: [] } };
-    case "immediate":
-      return { outcome: { ok: true }, output: { text: input.text, speech: input.speech, sources: input.outcome.sources ?? [] } };
+    case "immediate": {
+      // COMMAND-FAIL-01: a failed household custom command still
+      // returns `matched: true` with its own error text (lib/commands.ts's
+      // runCommand, out of this item's own scope - a Home Assistant
+      // failure, never a lookup) - tagged here rather than left for a
+      // later node to guess at from the text alone.
+      const provenance = input.outcome.status === "failed" ? ("outcome_error" as const) : undefined;
+      return { outcome: { ok: true }, output: { text: input.text, speech: input.speech, sources: input.outcome.sources ?? [], provenance } };
+    }
     case "model_text": {
       // A live acceptance run (U2d) caught this dropping every tool
       // round's own sources on the floor: the state table's own "the
@@ -99,8 +119,14 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // inventing new phrasing risks saying something the quote didn't.
       return { outcome: { ok: true }, output: { text: input.quote, sources: [] } };
     case "from_outcomes": {
+      // COMMAND-FAIL-01: this text is machine.ts's own last-resort
+      // fallback (`answerInputFrom`), built from `outcomes.at(-1)?.
+      // userMessage` - the SAME field this checks, so a failed last
+      // outcome (a tool round's own final call failing with rounds
+      // exhausted) is tagged the identical way "immediate" is.
       const sources = input.outcomes.flatMap((o) => o.sources ?? []);
-      return { outcome: { ok: true }, output: { text: input.text, sources } };
+      const provenance = input.outcomes.at(-1)?.status === "failed" ? ("outcome_error" as const) : undefined;
+      return { outcome: { ok: true }, output: { text: input.text, sources, provenance } };
     }
     // DEADLINE-01: the same shared line composer.ts's own all-failed
     // batch already uses for a technical failure - the identical

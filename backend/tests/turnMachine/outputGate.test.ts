@@ -75,3 +75,60 @@ describe("outputGateNode: the gate never delivers a bare envelope (ENGINE-CONTRA
     expect(output.reasoning.withheld_for).toBe("minor");
   });
 });
+
+// COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): the same place
+// and shape as ENGINE-CONTRACT-03's own envelope catch above - a
+// provenance check, not a safety call, checked right beside it.
+describe("outputGateNode: a reply tagged outcome_error never reaches the person verbatim (COMMAND-FAIL-01)", () => {
+  const RAW_ERROR = "MCP error -32000: fetch failed: 404 https://en.wikipedia.org/api/rest_v1/page/summary/Technical_benchmarking";
+
+  test("a reply whose text equals a failed outcome's own userMessage, tagged outcome_error, is refused and replaced with the honest failure line", async () => {
+    const { output } = await outputGateNode(
+      STATE,
+      { reply: { text: RAW_ERROR, sources: [], provenance: "outcome_error" }, reasoningIn: undefined, reasoningEmit: false, reasoningWithheldFor: null },
+      SIGNAL,
+    );
+    expect(output.refused).toBe(false);
+    expect(output.text).toBe(COMPOSE_FAILURE_LINE);
+    expect(output.text).not.toContain("MCP error");
+    expect(output.text).not.toContain("wikipedia");
+  });
+
+  test("the identical text with no provenance tag passes through untouched - the tag is what refuses it, never the text's own content", async () => {
+    // Unlike every other case in this file, an untagged reply falls
+    // through BOTH early catches into the real safety evaluation path
+    // (evaluateReply/speakerAgeBand), which reads `state.actor` - a
+    // minimal real actor, not the bare `{}` the rest of this file uses,
+    // since this is the one test that genuinely exercises past both.
+    const actorState = { actor: { role: "adult", birthdate: null } } as unknown as TurnState;
+    const { output } = await outputGateNode(
+      actorState,
+      { reply: { text: RAW_ERROR, sources: [] }, reasoningIn: undefined, reasoningEmit: false, reasoningWithheldFor: null },
+      SIGNAL,
+    );
+    expect(output.refused).toBe(false);
+    // repairReply() may append a sentence terminator to prose-shaped
+    // text (unrelated to this check) - proving the content survives,
+    // not exact byte equality, is the actual claim here.
+    expect(output.text).toContain("MCP error");
+    expect(output.text).not.toBe(COMPOSE_FAILURE_LINE);
+  });
+
+  test("marked refused: false, never the safety-refusal branch machine.ts routes on", async () => {
+    const { output } = await outputGateNode(
+      STATE,
+      { reply: { text: RAW_ERROR, sources: [], provenance: "outcome_error" }, reasoningIn: undefined, reasoningEmit: false, reasoningWithheldFor: null },
+      SIGNAL,
+    );
+    expect(output.refused).toBe(false);
+  });
+
+  test("the context-decided withheld_for reason survives the provenance catch, never overwritten to null", async () => {
+    const { output } = await outputGateNode(
+      STATE,
+      { reply: { text: RAW_ERROR, sources: [], provenance: "outcome_error" }, reasoningIn: undefined, reasoningEmit: false, reasoningWithheldFor: "minor" },
+      SIGNAL,
+    );
+    expect(output.reasoning.withheld_for).toBe("minor");
+  });
+});

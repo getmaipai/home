@@ -4,7 +4,7 @@
 // never a second, bespoke harness. Exercises turnNext.ts end to end
 // (the machine, every node, the real DB) with scripted model behaviour,
 // since no live engine is available in this suite.
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
@@ -1005,6 +1005,64 @@ describe("turnNext.ts: GENFAIL-01, a fresh conversation with real matched memory
     expect(result.value.source).toBe("model");
     expect(result.value.reply.text).not.toBe(COMPOSE_FAILURE_LINE);
     expect(result.value.reply.text.length).toBeGreaterThan(0);
+  });
+});
+
+// COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): end to end,
+// real turn machine, the Wikipedia 404 case as its own fixture (an MCP
+// error string with a Wikipedia URL, once delivered verbatim). music's
+// own "look up the artist *" (an imperative wildcard, kept under
+// OPENER-01) is the live pattern winner here rather than knowledge's
+// (OPENER-01 removed none of knowledge's real manifest patterns, but a
+// live "who was *"/"what is *" utterance never classifies as directive
+// in the first place - commands.test.ts's own direct, spied tests
+// cover that shape instead); "look up the artist Radiohead" genuinely
+// classifies `directive` (proven live building OPENER-01's own
+// commandOpeners wiring), so this is a real pattern winner failing for
+// real, not a forced signal override.
+describe("turnNext.ts: COMMAND-FAIL-01, a failed pattern outcome continues the turn", () => {
+  test('a failed pattern outcome never reaches the person as text; the model round runs and its own reply is delivered; the trace carries the failed outcome', async () => {
+    const plugins = await import("@/lib/plugins");
+    // The scripted stub below offers no tool_calls, so the model never
+    // proposes a second plugin call this turn - music's own pattern
+    // match (the directive-classified opener) is the only runPlugin()
+    // call a fresh "look up the artist Radiohead" turn makes.
+    const spy = spyOn(plugins, "runPlugin").mockImplementation(async () => ({
+      ok: false as const,
+      status: 502 as const,
+      error: "MCP error -32000: fetch failed: 404 https://musicbrainz.org/ws/2/artist?query=Radiohead",
+      code: "not_found",
+      fallback_reply: { reply: { text: "Sorry, I'm having trouble looking that up right now." }, actions: [] },
+    }));
+    try {
+      const result = await withStub({ reply: () => "I couldn't look that up, but Radiohead is a British rock band." }, () => runTurnNext(people.owner, "chat", "look up the artist Radiohead"));
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      // buildTurnValue()'s own source label is derived from the LAST
+      // outcome's `via` alone (turnNext.ts ~303), never its `status` -
+      // a real, separate finding filed for the coordinator, out of
+      // this item's own files (commands.ts/answer.ts/outputGate.ts):
+      // a failed-but-continued pattern outcome reports `source:
+      // "plugin"` even though the reply text genuinely came from the
+      // model round below. The reply TEXT is this item's own contract.
+      expect(result.value.reply.text).not.toContain("MCP error");
+      expect(result.value.reply.text).not.toContain("musicbrainz");
+      expect(result.value.reply.text).not.toBe(COMPOSE_FAILURE_LINE);
+      expect(result.value.reply.text.length).toBeGreaterThan(0);
+
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; userMessage?: string }[]) : [];
+      const musicOutcome = outcomes.find((o) => o.packageId === "music");
+      expect(musicOutcome?.status).toBe("failed");
+      expect(musicOutcome?.errorCode).toBe("not_found");
+      expect(musicOutcome?.userMessage).toContain("MCP error");
+
+      const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean } }[] };
+      const commandsEntry = (stats.nodes ?? []).find((n) => n.node === "commands");
+      expect(commandsEntry?.outcome?.ok).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

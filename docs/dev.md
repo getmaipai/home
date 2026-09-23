@@ -22927,3 +22927,87 @@ wiring), `backend/src/lib/manifestLint.ts` (new),
 manifest.json` (reverted to original). `getmaipai/catalog`'s own
 `c475887` stands as real, separate, forward-facing work, not synced
 into home's mirror pending the coordinator's own call above.
+
+## COMMAND-FAIL-01: landed (2026-09-23)
+
+`nodes/commands.ts`'s pattern loop returned `result.error` (the raw
+message a failed `runPlugin()` call carried - an MCP error string, a
+Wikipedia URL, once verbatim) as the turn's own reply text on any
+failure, and recorded `String(result.status)` ("502") as the error
+code, discarding the plugin runner's own typed `code` entirely
+(`plugins.ts`'s `{ ok: false, status, error, code, fallback_reply }`).
+
+**The commands node.** A failed pattern outcome is no longer a match:
+the outcome still joins `state.outcomes` (pushed directly from the
+node, the same pattern `model.ts`'s own `state.generations.push`
+already uses for its own failures - `machine.ts`'s
+`recordCommandOutcome` only ever runs on the `matched: true` branch,
+so this had to happen here), `errorCode` is `result.code` (the real,
+typed reason - `not_found`, `invalid_input`, whatever the plugin
+runner actually reported), and the node returns `matched: false`. The
+turn falls through to `context`/`model` exactly as an unmatched
+utterance would, so the model can say the lookup failed in its own
+words or answer from what it knows - never a rule reading the
+household's own words, the failed attempt is simply background the
+model was never told to hide. The fixed line (`COMPOSE_FAILURE_LINE`)
+stays the answer node's own floor, reached only after a failed MODEL
+round too (DEADLINE-01), never this node's own text.
+
+**The provenance tag.** `AnswerOutput` gains an optional `provenance:
+"outcome_error"`, set by `answer.ts` in exactly two places: the
+"immediate" case (a household custom command's own failure -
+`lib/commands.ts`'s `runCommand`, a Home Assistant error, out of this
+item's own scope but the same shape) when its own outcome's `status`
+is `"failed"`, and the "from_outcomes" case (`machine.ts`'s own
+last-resort fallback, built from `outcomes.at(-1)?.userMessage`) when
+that last outcome's own `status` is `"failed"`. `output_gate.ts` reads
+the tag once, in the same place and shape as the envelope catch
+(ENGINE-CONTRACT-03) - before the safety pass, since this is a
+provenance floor, never a safety decision - and delivers
+`COMPOSE_FAILURE_LINE` instead of the tagged text. The tag is a
+structural backstop for every producer of "immediate"/"from_outcomes"
+text that could ever carry a failed outcome's own words, present and
+future, not an enumerated list of today's callers - a pattern
+outcome's own failure doesn't even reach `answer.ts` this way any
+more (it returns `matched: false` from `commands.ts` instead), so the
+tag's real, live callers today are the household-command and
+tool-round-exhaustion paths, proven by direct tests of each.
+
+**Verified**: `bun test tests/turnMachine/commands.test.ts tests/
+turnMachine/answer.test.ts tests/turnMachine/outputGate.test.ts tests/
+manifestLint.test.ts` (36 pass) - `commands.test.ts`'s own two new
+cases spy `runPlugin()` failing with `not_found` (the Wikipedia 404
+fixture, verbatim) and with an unrelated `invalid_input` code, both
+proving `matched: false`, the real `errorCode` on the outcome (never
+`String(status)`), and the raw message never becoming the reply;
+`answer.test.ts` (new) proves the provenance tag follows a failed
+outcome's own `status`, never its text (a succeeded outcome whose text
+happens to equal its own `userMessage` carries no tag); `outputGate.test.ts`
+proves a tagged reply is replaced and an identical, untagged reply
+passes through untouched - the tag decides, never the content.
+`turnNext.test.ts` (new case): end to end, real turn machine, music's
+own "look up the artist *" (an imperative opener, kept under
+OPENER-01, genuinely classifies `directive` for "look up the artist
+Radiohead") failing for real via a spied `runPlugin()` - the delivered
+reply never contains "MCP error" or "musicbrainz", the model's own
+scripted reply is what's delivered, and the persisted trace's own
+`music` outcome carries `status: "failed"` and the real `errorCode`.
+
+**A real, adjacent finding, filed rather than fixed here**
+([getmaipai/home#143](https://github.com/getmaipai/home/issues/143)):
+`turnNext.ts`'s own `buildTurnValue()` derives the turn's `source`
+label purely from the last outcome's `via` field, never its `status`
+- so a failed-but-continued pattern outcome still reports `source:
+"plugin"` (and `plugin_id` naming the package that failed), even
+though the delivered text came from the model. Out of this item's own
+files (`commands.ts`/`answer.ts`/`outputGate.ts`); the reply text
+itself is correct either way.
+
+Files: `backend/src/lib/turnMachine/nodes/commands.ts` (the failure
+branch), `backend/src/lib/turnMachine/nodes/answer.ts`
+(`AnswerOutput.provenance`, the "immediate"/"from_outcomes" tagging),
+`backend/src/lib/turnMachine/nodes/outputGate.ts` (the provenance
+check), `backend/tests/turnMachine/commands.test.ts`,
+`backend/tests/turnMachine/answer.test.ts` (new),
+`backend/tests/turnMachine/outputGate.test.ts`,
+`backend/tests/turnMachine/turnNext.test.ts`.

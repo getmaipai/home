@@ -109,15 +109,42 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
       }
       const args = captured ? { [firstRequiredArg(manifest)]: captured } : {};
       const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId });
+      // COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): a failed
+      // pattern outcome used to return `matched: true` with the raw
+      // `result.error` as the reply text (an MCP error string, a
+      // Wikipedia URL, once verbatim) and the wrong error code
+      // (`String(result.status)`, discarding the plugin runner's own
+      // typed `code` - plugins.ts's `{ ok: false, status, error, code,
+      // fallback_reply }`). A failed run is not a match: the outcome
+      // still joins `state.outcomes` (pushed here directly, the same
+      // pattern model.ts's own `state.generations.push` already uses -
+      // machine.ts's `recordCommandOutcome` only ever runs on the
+      // `matched: true` branch), and the turn falls through to
+      // `context`/`model` exactly as an unmatched utterance would, so
+      // the model can say the lookup failed in its own words or answer
+      // from what it knows. The fixed line stays the answer node's own
+      // floor, reached only after a failed MODEL round too
+      // (DEADLINE-01) - never this node's own text.
+      if (!result.ok) {
+        const outcome = outcomeOf({
+          callId: `pattern:${id}`,
+          packageId: id,
+          status: "failed",
+          via: "pattern",
+          args,
+          errorCode: result.code,
+          userMessage: result.error,
+        });
+        state.outcomes.push(outcome);
+        return { outcome: { ok: true }, output: { matched: false } };
+      }
       const outcome = outcomeOf({
         callId: `pattern:${id}`,
         packageId: id,
-        status: result.ok ? "succeeded" : "failed",
+        status: "succeeded",
         via: "pattern",
         args,
-        result: result.ok ? result.value : undefined,
-        errorCode: result.ok ? undefined : String(result.status),
-        userMessage: result.ok ? undefined : result.error,
+        result: result.value,
       });
       const okOutcome: NodeOutcome = { ok: true };
       // A closed intent's own recipe almost always binds `reply` directly
@@ -127,8 +154,8 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
       // LLM call here - a real simplification for U2b's "simplest real
       // implementation," not a claim that every package's reply is
       // this direct.
-      const reply = result.ok ? usableReply({ result: result.value }) : null;
-      const text = result.ok ? (reply?.text ?? "Done.") : result.error;
+      const reply = usableReply({ result: result.value });
+      const text = reply?.text ?? "Done.";
       return { outcome: okOutcome, output: { matched: true, text, speech: reply?.speech, outcome } };
     }
   }

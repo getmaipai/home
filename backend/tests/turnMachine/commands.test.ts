@@ -7,7 +7,7 @@
 // (loadAllManifests) plus the real classifyTurnSignal() wiring
 // (turnNext.ts's own commandOpeners() call, mirrored here) rather than
 // a hand-built stand-in for either.
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, spyOn } from "bun:test";
 import { resetDb } from "../reset-db";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import { commandsNode } from "@/lib/turnMachine/nodes/commands";
@@ -141,5 +141,62 @@ describe("commandsNode: a computed wildcard fires only when the package's own re
     const state = stateFor(people.owner, "what does love equal");
     const { output } = await commandsNode(state, { utterance: "what does love equal" }, NODE_SIGNAL);
     expect(output.matched).toBe(false);
+  });
+});
+
+// COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): a failed pattern
+// outcome used to return `matched: true` with the raw `result.error` as
+// the reply (an MCP error string, a Wikipedia URL, once verbatim) and
+// `String(result.status)` as the error code, discarding the plugin
+// runner's own typed `code`. `runPlugin` is spied (the same pattern
+// turnEngine.test.ts's own `#92`/knowledge-miss tests use) since a
+// household turn matching knowledge's own opener needs a directive
+// classification forced (`signalOverride`) to reach the pattern loop
+// at all under OPENER-01's own gate - the failure handling itself is
+// what's under test here, independent of whether a real utterance
+// would classify that way.
+describe("commandsNode: a failed pattern outcome continues the turn, never the raw error (COMMAND-FAIL-01)", () => {
+  test('a "not_found" failure (the Wikipedia 404 fixture) reaches the model: matched is false, never the raw error text', async () => {
+    const plugins = await import("@/lib/plugins");
+    const spy = spyOn(plugins, "runPlugin").mockImplementation(async () => ({
+      ok: false as const,
+      status: 502 as const,
+      error: "MCP error -32000: fetch failed: 404 https://en.wikipedia.org/api/rest_v1/page/summary/Technical_benchmarking",
+      code: "not_found",
+      fallback_reply: { reply: { text: "Sorry, I'm having trouble looking that up right now." }, actions: [] },
+    }));
+    try {
+      const questionSignal: TurnSignal = { ...classifyTurnSignal({ text: "what is technical benchmarking", ageBand: "adult", commandOpeners: OPENERS }), primary_act: "directive" };
+      const state = stateFor(people.owner, "what is technical benchmarking", { signalOverride: questionSignal });
+      const { output } = await commandsNode(state, { utterance: "what is technical benchmarking" }, NODE_SIGNAL);
+      expect(output.matched).toBe(false);
+      expect(state.outcomes).toHaveLength(1);
+      expect(state.outcomes[0]?.status).toBe("failed");
+      expect(state.outcomes[0]?.packageId).toBe("knowledge");
+      expect(state.outcomes[0]?.errorCode).toBe("not_found");
+      expect(state.outcomes[0]?.userMessage).toContain("MCP error");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("a failure with any other code does the same - matched false, the outcome carries the real code, never String(status)", async () => {
+    const plugins = await import("@/lib/plugins");
+    const spy = spyOn(plugins, "runPlugin").mockImplementation(async () => ({
+      ok: false as const,
+      status: 400 as const,
+      error: "knowledge's inputs failed validation: topic is required",
+      code: "invalid_input",
+    }));
+    try {
+      const questionSignal: TurnSignal = { ...classifyTurnSignal({ text: "what is technical benchmarking", ageBand: "adult", commandOpeners: OPENERS }), primary_act: "directive" };
+      const state = stateFor(people.owner, "what is technical benchmarking", { signalOverride: questionSignal });
+      const { output } = await commandsNode(state, { utterance: "what is technical benchmarking" }, NODE_SIGNAL);
+      expect(output.matched).toBe(false);
+      expect(state.outcomes[0]?.errorCode).toBe("invalid_input");
+      expect(state.outcomes[0]?.errorCode).not.toBe("400");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

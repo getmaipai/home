@@ -74,6 +74,19 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     return { outcome: { ok: true }, output: { refused: false, text: COMPOSE_FAILURE_LINE, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
   }
 
+  // COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): the same
+  // place and shape as the envelope catch above - a provenance check,
+  // not a safety call, so it never routes through REFUSAL_FIRST
+  // either. `answer.ts` tags `provenance: "outcome_error"` exactly
+  // when its own text came straight from a failed outcome's `error`/
+  // `userMessage` field; this is the one place that tag is ever read,
+  // so text sourced from an engine's own raw error string (an MCP
+  // error, an HTTP status) never reaches a household member, whatever
+  // node produced it.
+  if (input.reply.provenance === "outcome_error") {
+    return { outcome: { ok: true }, output: { refused: false, text: COMPOSE_FAILURE_LINE, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
+  }
+
   const repaired = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const band = speakerAgeBand(state.actor, new Date());
   const evaluation = evaluateReply({ text: repaired, speech: input.reply.speech }, band);
