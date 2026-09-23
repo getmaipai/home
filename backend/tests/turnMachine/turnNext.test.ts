@@ -175,18 +175,27 @@ describe("turnNext.ts: a custom household command reports its bare id", () => {
   });
 });
 
-describe("turnNext.ts: a matched command carries its own package id", () => {
-  test('"remember that ..." reports source "command" with command_id set, not lost', async () => {
-    // The same gap the interim-rule test above closes, on the commands
-    // node's own path: a live run's control-remember-pizza-night row
-    // read "tool: ran none (source command)" - conversationRunner.ts's
-    // scorer falls back to the stored row's command_id/pluginId when
-    // TurnValue itself carries neither, and both were empty.
+describe("turnNext.ts: a matched bundled package reports plugin_id, never command_id", () => {
+  test('"remember that ..." (a literal pattern on a bundled package) reports source "plugin" with plugin_id', async () => {
+    // A SECOND live run (after the plugin_id/sources fix landed) still
+    // read control-remember-pizza-night as "tool: ran none (source
+    // command)": this test's own first draft had asserted source
+    // "command"/command_id "remember", copying commands.ts's own via
+    // ("pattern") straight to a source label without checking
+    // turnEngine.ts's real convention - "remember" is a bundled
+    // CATALOG package matched by a literal pattern (commands.ts's
+    // second loop, via "pattern"), and the old path reports every
+    // bundled-package match as source "plugin" with plugin_id,
+    // whatever matched it; "command"/command_id is for a household's
+    // own custom command only (matchCommand, via "command").
+    // conversationRunner.ts's scorer reads plugin_id exclusively for
+    // its "tool" check - it has no command_id fallback at all.
     const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "remember that pizza night is Friday"));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.source).toBe("command");
-    expect(result.value.command_id).toBe("remember");
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("remember");
+    expect(result.value.command_id).toBeUndefined();
   });
 });
 

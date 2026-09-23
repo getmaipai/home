@@ -241,8 +241,19 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     // way it does for any other, so no separate case is needed here;
     // forcing "confirm" only hid the package id buildTurnValue()
     // (below) needs to attach plugin_id at all.
+    // A live run caught this treating "pattern" (a bundled package's
+    // own literal-pattern match, e.g. "remember that X") the same as
+    // "command" (a household's own custom command, matchCommand): the
+    // old path's own convention is source "plugin"/plugin_id for a
+    // bundled package match, whatever matched it (literal pattern,
+    // Tier 2, or a tool call - turnEngine.ts's own source: "plugin"
+    // sites all report plugin_id, never command_id, for any of
+    // these), and "command"/command_id only for a genuine
+    // household-defined command (commands.ts's own custom.id branch).
+    // Both commands.ts vias reach `answer` the identical way, so only
+    // the source label here needed correcting, not the machine.
     const lastVia = state.outcomes.at(-1)?.via;
-    const source: TurnValue["source"] = lastVia === "command" || lastVia === "pattern" ? "command" : lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
+    const source: TurnValue["source"] = lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
   }
 
