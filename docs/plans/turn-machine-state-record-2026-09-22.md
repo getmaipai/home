@@ -272,7 +272,11 @@ absent and a world question gets the inability reply), `tools_available`
 (installed and reachable now), `memory_pressure` ("high" drops
 `thinking_budget_tokens` to zero and `rounds` to the minimum),
 `deadline_ms` (the caller's, capped by the budget's). The effective
-budget is the intersection, and the trace records both. The robot's
+budget is the intersection, and the trace records both. The same limits
+carry the packages' warm limits and residency: how many package
+processes stay warm and when idle ones are evicted is a deployment
+limit set from STUDIO-ACCEPT-01's measured workload, never a fixed
+"one warm process per package". The robot's
 degraded behaviour, stated: the exact commands; the permitted local
 context (its own memories and window, the disclosure filter unchanged);
 bounded generation (the small model phrases, `tool_choice: "none"`, the
