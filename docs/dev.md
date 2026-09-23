@@ -19989,6 +19989,8 @@ Jesse's own report: "I don't think dictation works in the browser yet" (Firefox,
 
 ## ENGINE-CONTRACT-01: the first recorded failure, `tool_choice: "required"` on a warm KV cache (2026-09-23)
 
+Filed upstream 2026-09-23 as ggml-org/llama.cpp issue 29295 (https://github.com/ggml-org/llama.cpp/issues/29295), the four sets, the log lines and the open question on grammar enforcement.
+
 The pinned chat engine (llama-server b10797, macOS arm64, the hub's own
 `qwen3-8b-instruct-q4-k-m.gguf`, the hub's flags: one slot, 32K
 context, `-fa on`, `--reasoning off`, `--jinja`, `--cache-reuse 256`,
