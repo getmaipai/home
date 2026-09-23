@@ -40,6 +40,15 @@ and its budget, the chat Elements and the composer. What they never
 share: a code path chosen by the tier. A tier is a set of measured
 budget records and deployment limits, nothing more.
 
+**The written reply's own length parity is per tier too** (PARITY-
+BISECT-04's ruling, `home/docs/dev.md` "PARITY-BISECT-04: arms e and
+f, and the ruling"): a smaller chat model reads a multi-sentence
+system message as a cue to answer briefly, measured and stable on
+tier 1's own 8B, so PREFIX-CLASS-01 and WRITTEN-PARITY-01 accept 0.35x
+the bare floor there, not the 0.8x a bigger model reaches; the full
+0.8x bar is the Studio's (tier 3) number, once that tier's own model
+is measured. Not yet measured on tier 2.
+
 ## The short version
 
 1. **Voice conversation needs no new model, on any tier.** The hub already listens

@@ -22853,7 +22853,117 @@ scripts/bench/parity-bisect4.ts` against the resident engine.
 
 Reported to Fable in full (both tables, the "no arm clears the floor"
 reading, and the "you" misread's non-reproduction) for the
-PREFIX-CLASS-01 composition ruling; not started pending that ruling.
+PREFIX-CLASS-01 composition ruling.
+
+## PARITY-BISECT-04: arms e and f, and the ruling (2026-09-23)
+
+The coordinator's own extended protocol, same isolation and the same
+matched seeds (1-5) as arms a-d and the ceiling: arm e (no system role
+at all - identity, the three surviving suffix sentences, and the
+descriptive voice fragments arm d already uses, all folded into one
+preamble ahead of the question on the final user message) and arm f
+(the real, unreduced production prefix, thinking ON, `max_tokens` set
+to the exact number a real written-adult thinking-on turn gets:
+`reply_ceiling_tokens + thinking_budget_tokens_toggled`, 2048 on this
+model). Both arms carry the real five-tool block
+(`state.budget.tools_offered`, sorted: remember, remind, timer,
+weather, websearch) per the ruling's own explicit test condition -
+arm e is specifically named "five-tool block present."
+
+**Table: prompt-cache question**
+
+| stage | predicted tokens (seed 1-5) | avg | vs floor | headings | lists | lowercase |
+|---|---|---|---|---|---|---|
+| floor (bare, thinking off) | 798, 848, 845, 758, 785 | 806.8 | 1.00x | yes | yes | 0/5 |
+| ceiling (for reference) | 397, 476, 534, 190, 457 | 410.8 | 0.51x | yes | yes | 0/5 |
+| arm e (no system role, tools present) | 413, 417, 397, 359, 334 | 384.0 | 0.48x | yes | yes | 0/5 |
+| arm f (full prefix, thinking on, tools) | 626, 610, 944, 313, 524 | 603.4 | 0.75x | no | no | 5/5 |
+
+**Table: benchmarking-words question**
+
+| stage | predicted tokens (seed 1-5) | avg | vs floor | headings | lists | lowercase |
+|---|---|---|---|---|---|---|
+| floor (bare, thinking off) | 659, 692, 680, 562, 572 | 633.0 | 1.00x | yes | yes | 0/5 |
+| ceiling (for reference) | 373, 293, 307, 339, 376 | 337.6 | 0.53x | yes | yes | 0/5 |
+| arm e (no system role, tools present) | 253, 199, 256, 197, 262 | 233.4 | 0.37x | yes | yes | 0/5 |
+| arm f (full prefix, thinking on, tools) | 266, 210, 385, 284, 366 | 302.2 | 0.48x | no | no | 5/5 |
+
+**Arm e's own 10 reps all stopped normally** (`stop_reason: "stop"` on
+every one, no tool call fired), so its numbers are clean, real-answer
+lengths, not contaminated by a tool round. It does not reach 0.8x on
+either question (0.48x, 0.37x), so ruling #2 does not apply.
+
+**Arm f's numbers are NOT clean answer lengths - most of its reps
+called a tool instead of answering.** Per-rep detail:
+
+| question | seed | predicted tokens | reasoning words | visible words | wall ms | stop reason |
+|---|---|---|---|---|---|---|
+| prompt-cache | 1 | 626 | 426 | 102 | 17145 | stop |
+| prompt-cache | 2 | 610 | 409 | 98 | 14444 | stop |
+| prompt-cache | 3 | 944 | 368 | 60 | 23172 | tool_calls |
+| prompt-cache | 4 | 313 | 229 | 0 | 7460 | tool_calls |
+| prompt-cache | 5 | 524 | 398 | 0 | 12415 | tool_calls |
+| benchmarking-words | 1 | 266 | 181 | 0 | 6428 | tool_calls |
+| benchmarking-words | 2 | 210 | 136 | 0 | 4987 | tool_calls |
+| benchmarking-words | 3 | 385 | 185 | 97 | 11459 | stop |
+| benchmarking-words | 4 | 284 | 198 | 0 | 7815 | tool_calls |
+| benchmarking-words | 5 | 366 | 262 | 0 | 8912 | tool_calls |
+
+(`reasoning_words`/`visible_words` are word counts on each side of
+`wellFormed.ts`'s own think-block split, not real per-segment token
+counts - the engine's own stats never break `predicted_tokens` down by
+segment.) Only 3 of 10 reps across both questions actually answered
+(`stop`, a real visible reply); the other 7 called a tool
+(`tool_calls`, 0 visible words in 6 of those 7) - with the real prefix,
+thinking on and the real tool block together, this 8B mostly reaches
+for `websearch` on a conceptual question instead of answering from its
+own knowledge, the same reach the tool-offering budget's own
+`always_search: true` plus this model's own tool-calling tendency would
+predict. So arm f's 0.75x/0.48x ratios are mostly reasoning-plus-a-
+tool-call token counts, not comparable written-adult reply lengths;
+wall time is real (7.5 s to 23.2 s per rep, thinking included) and is
+the honest cost of the toggle regardless of what the model did with
+the turn.
+
+**The ruling (2026-09-23), applied:** since arm e does not reach 0.8x
+on either question, ruling #3's honest per-tier record stands, exactly
+as given:
+
+> The reply floor per tier, decided: tier 1 (this laptop, Qwen3-8B
+> thinking off) has a written floor of 0.5x with structure (the
+> ceiling's shape: identity plus the three surviving neutral
+> sentences); the descriptive voice (arm d's third-person fragments)
+> costs 0.1 to 0.15x more and is kept; the full floor comes with the
+> Studio's model; WRITTEN-PARITY-01's bar is per tier and says so in
+> its row and in the hardware-tiers record.
+
+The ceiling's own measured numbers (0.51x, 0.53x, both with headings
+and lists) match "0.5x with structure" closely. Arm d's own measured
+numbers (0.33x, 0.42x - PARITY-BISECT-03/04's own table above) sit
+0.18x and 0.11x below the ceiling, bracketing "costs 0.1 to 0.15x more"
+(read as "costs 0.1 to 0.15x of the floor" relative to the ceiling)
+closely enough to confirm the ruling's own prior estimate, which was
+built from that same arm d data before this round ran. Arm e's own
+numbers (this round, a different composition - no system role, real
+tools present) land in a similar band (0.48x, 0.37x) by a different
+route, additional evidence for the same conclusion rather than the
+number the ruling's "0.1 to 0.15x" cites.
+
+**PREFIX-CLASS-01's row acceptance is edited in this commit
+(BACKLOG.md), citing this section**, to the ruling's own words: the
+ceiling's shape (identity plus the three surviving neutral sentences)
+plus the descriptive-voice fragments, no floor sentence, no dials or
+policies phrased as instructions, written formality naming a tone;
+acceptance on tier 1 becomes at least 0.35x the bare floor with
+headings or lists present and 0 of 5 lowercase; the 0.8x bar stays in
+the row as the Studio-tier number. WRITTEN-PARITY-01's row and the
+hardware-tiers record (`docs/plans/hardware-tiers-2026-09-23.md`) are
+each given the same one-line per-tier note in this commit.
+
+PREFIX-CLASS-01 itself (the actual `persona.ts`/`turnEngine.ts`
+implementation) is the next item, landed separately (one commit per
+logical change): this commit is the measurement and the ruling record
+only.
 
 ## FLAKE-FORCED-01: the required_miss test is deterministic (2026-09-23)
 
