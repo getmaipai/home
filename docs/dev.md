@@ -21617,3 +21617,53 @@ Off, as ruled on the owner's live turns; nothing in this run changes
 that. Turn 3's class of turn (`control-hi` 0.82x, `control-negative-
 spiderman` 1.19x, `control-negative-feeling-down` 1.37x) is already at
 parity where none of the three costs applies.
+
+## SHELL-SEARCH-01: the header's one global search (2026-09-23)
+
+Landed commons `6992fe8` (`ui-v0.5.43`), this repo's own `d8319fe6`
+(the pin bump). The template's left-area `Search.tsx` field goes away
+everywhere (already a dead branch on every real `/next` page since
+CHAT-HEADER-02 - `HeaderExtraLeft` is always set); the header's right
+group gains one global search, the icon left of the theme toggle,
+opening `command.tsx`'s own `CommandDialog` over the sidebar's own
+item list.
+
+**The named gap.** `Header.tsx`'s right group ships no extension slot
+at all - checked, not assumed: `LightDark`/`Notifications`/`Profile`
+are all hardcoded renders there, unlike the left group's own
+`HeaderExtraLeft`. Since this control is identical on every page
+(never a per-page override), a component-TYPE slot wasn't the right
+shape either; the fix is one more unconditional render, `HeaderSearch`,
+the same shape the two existing right-group icons already are -
+documented in `commons/ui/docs/dashboard-upstream.md`'s own
+pending-patches table alongside CHAT-HEADER-01/03's own Header.tsx
+patches.
+
+**Composed only from shipped parts.** `HeaderSearch.tsx` flattens
+`sidebaritems.ts`'s own `SidebarContent` (the same recursive descent
+`Search.tsx` already made, reused rather than reinvented) into
+`CommandItem`s, grouped by heading; the actual query match is `cmdk`'s
+own built-in filtering, never a hand-rolled `.includes()`. A global
+Cmd+K/Ctrl+K listener toggles the same `open` state the icon does.
+
+**A real bug found writing the test.** `command.tsx`'s own
+`CommandDialog` wraps `{children}` directly in `DialogContent`, never
+in cmdk's own `<Command>` root the way shadcn/ui's stock
+`CommandDialog` does - a `CommandInput`/`CommandItem` mounted without
+one throws (`useSyncExternalStore` reading an undefined store context),
+confirmed with a minimal repro against the shipped file alone, nothing
+product-specific. Not fixed in the shipped file (never edit a vendored
+component); `HeaderSearch.tsx` supplies its own `<Command>` wrapper
+instead, noted in its own comment for the next caller of
+`CommandDialog`.
+
+**Verified live on 8787**, not assumed from the tests alone (a fresh
+session token minted directly against `hub.db`, revoked after): the
+icon renders on Home, Chat and Settings at 1440 and 390, the left-area
+`input[placeholder="Search...."]` is gone from all three (asserted 0 in
+the DOM, not just "not screenshotted"), the icon opens the dialog,
+typing "peo" narrows the list to exactly the People result under
+"Household", and Enter navigates to `/next/people`. Captures and the
+BACKLOG row are the record; `scripts/check.sh` green before landing,
+rerun clean again after two rebases onto a busy `main` (RERUN-PROTOCOL-01's
+own landing window).
