@@ -12,6 +12,10 @@ const MANAGE_LINKS: readonly ManageLink[] = [
   { title: "Updates", description: "What's available and what's already up to date.", to: "/next/updates" },
   { title: "Repairs", description: "Open issues and the fix each one names.", to: "/next/repairs" },
   { title: "Backups", description: "History, size, and anything staged to restore.", to: "/next/backups" },
+  // ADMIN-PERF-01: the backlog's own "reached from Settings' Manage
+  // section and the System card" - the System card is DASH-CARDS-01's
+  // (not landed), so Manage is this page's only entry point for now.
+  { title: "Performance", description: "How the hub is doing over time: reply times, engines, queues, disk.", to: "/next/performance" },
 ];
 
 /** Settings' own Household tab, bottom section (owner ruling, ui-v0.5.23's

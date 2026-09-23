@@ -14,6 +14,7 @@ import { NextAppsPage } from "@/next/pages/NextAppsPage";
 import { NextPeoplePage } from "@/next/pages/NextPeoplePage";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
 import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
+import { NextPerformancePage } from "@/next/pages/NextPerformancePage";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
@@ -82,6 +83,7 @@ function NextRoutesInner({ person }: { person: Roster }) {
           <Route path="people" element={<NextPeoplePage person={person} />} />
           <Route path="settings" element={<NextSettingsPage person={person} />} />
           <Route path="engines" element={<NextEnginesPage />} />
+          <Route path="performance" element={<NextPerformancePage />} />
           <Route path="updates" element={<NextUpdatesPage person={person} />} />
           <Route path="repairs" element={<NextRepairsPage person={person} />} />
           <Route path="backups" element={<NextBackupsPage person={person} />} />

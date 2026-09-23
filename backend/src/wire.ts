@@ -722,3 +722,114 @@ export interface EnginesHealth {
   configured: boolean;
   health: StackHealthItem[];
 }
+
+// GET /api/performance (ADMIN-PERF-01): hand-copied from routes/
+// performance.ts's own zod schemas, same reason as every other type on
+// this file. No new collection - every field here is an aggregation of
+// what conversation_turns, the Repairs issues table, the memory/
+// embedding queues, the label harvest and the Stack already record.
+export interface PerformanceTurnDayStats {
+  date: string;
+  count: number;
+  median_ttft_ms: number | null;
+  p95_ttft_ms: number | null;
+  median_total_ms: number | null;
+  p95_total_ms: number | null;
+  median_tokens_per_second: number | null;
+}
+
+export interface PerformanceEngineStats {
+  /** The turn's stored `stats.engine` string (host, build, model file
+   * joined - engineIdentity.ts's own formatEngineIdentity()), the
+   * closest thing to "per model" that actually exists on a turn: no
+   * column carries a parsed-out model id on its own. */
+  engine: string;
+  count: number;
+  median_ttft_ms: number | null;
+  p95_ttft_ms: number | null;
+  median_total_ms: number | null;
+  p95_total_ms: number | null;
+  median_tokens_per_second: number | null;
+}
+
+export interface PerformanceTurns {
+  window_days: number;
+  by_day: PerformanceTurnDayStats[];
+  by_engine: PerformanceEngineStats[];
+  /** Count of turns whose stored route (source: model | plugin | command
+   * | safety_refuse | ...) matches each value, over the whole window. */
+  by_route: Array<{ route: string; count: number }>;
+}
+
+export interface PerformanceQueues {
+  judge: { pending: number; oldest_created_at: string | null };
+  embedding: { pending: number };
+  ingestion: { pending: number; by_reason: Array<{ reason: string; count: number }> };
+}
+
+export interface PerformanceLabels {
+  window_days: number;
+  turns: number;
+  guard_hits: Array<{ key: string; count: number }>;
+  rule_hits: Array<{ key: string; count: number }>;
+  rungs: Array<{ key: string; count: number }>;
+  retire_eligible: string[];
+}
+
+/** U2's per-node trace, aggregated (ADMIN-LAYERS-01's future full panel
+ * builds on this same field - the coordinator's 2026-09-22 addition to
+ * this item). `turns_with_trace` is 0, and `nodes` is empty, on any hub
+ * where `turn.pipeline.next` has never produced a row yet - the honest
+ * empty state, not an error. */
+export interface PerformanceLayerStats {
+  node: string;
+  count: number;
+  median_ms: number | null;
+  p95_ms: number | null;
+}
+
+export interface PerformanceLayers {
+  window_days: number;
+  turns_with_trace: number;
+  nodes: PerformanceLayerStats[];
+}
+
+export interface PerformanceEngines {
+  configured: boolean;
+  roles: StackRoleInfo[];
+  engines: StackEngineInfo[];
+  budget: StackBudget | null;
+  /** Repairs issues whose source names an engine (engine.* health/
+   * restart events synced from the Stack) - there is no separate
+   * restart-history table, so this is the closest real "history" a
+   * turn's own read can show. */
+  recent_issues: Array<{ source: string; key: string; severity: string; createdAt: string; resolvedAt: string | null }>;
+}
+
+export interface PerformanceHardware {
+  configured: boolean;
+  /** Passthrough - the Stack has not spec'd this shape upstream
+   * (routes/engines.ts's own HardwareSchema takes the same posture). */
+  hardware: Record<string, unknown> | null;
+}
+
+export interface PerformanceDisk {
+  total_bytes: number;
+  free_bytes: number;
+  areas: Array<{ area: string; bytes: number }>;
+}
+
+export interface Performance {
+  turns: PerformanceTurns;
+  queues: PerformanceQueues;
+  labels: PerformanceLabels;
+  layers: PerformanceLayers;
+  engines: PerformanceEngines;
+  hardware: PerformanceHardware;
+  disk: PerformanceDisk;
+  /** Documents conversation.retention's existing daily purge
+   * (conversationHistory.ts's runRetention(), household.conversation_
+   * retention_days, default 90) - not a second purge path for this
+   * data, a stated fact about the one that already deletes it. */
+  retention_days: number;
+}

@@ -313,6 +313,7 @@ const nextEnginesReview = process.argv.includes("--next-engines-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
+const nextPerformanceReview = process.argv.includes("--next-performance-review");
 const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
@@ -2662,6 +2663,45 @@ async function captureNextRepairsReview(browser: Browser, sessionValue: string):
   }
 }
 
+/** ADMIN-PERF-01's own acceptance ("captures at 1440 and 390"): both
+ * viewports, both themes, of `/next/performance`. This throwaway
+ * backend has no Stack configured and no traced turns yet (the seeded
+ * boot never ran `turn.pipeline.next`), so the real, expected capture
+ * is the two honest empty states side by side - Layers' own "No traced
+ * turns yet" and Engines' own "No Stack configured" - the same
+ * mirrored-from-NextEnginesPage empty-state posture as every other
+ * Manage page captured here. */
+async function captureNextPerformanceReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextPerformanceReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/performance`);
+        await page.locator("text=No traced turns yet").first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-performance-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** SHELL-07's own acceptance: both viewports, both themes, of `/next/
  * backups`. This throwaway backend's own fresh data directory has
  * never run a backup, so the real, expected capture is the vendored
@@ -3437,6 +3477,10 @@ async function main() {
 
     if (nextChatChildComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview) {
       await captureNextChatChildComposerReview(browser, sessionValue);
+    }
+
+    if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview) {
+      await captureNextPerformanceReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

@@ -51,6 +51,16 @@ import type {
   BareCompareEvent,
   BareCompareTrace,
   TurnStats,
+  Performance,
+  PerformanceTurnDayStats,
+  PerformanceEngineStats,
+  PerformanceQueues,
+  PerformanceLabels,
+  PerformanceLayers,
+  PerformanceLayerStats,
+  PerformanceEngines,
+  PerformanceHardware,
+  PerformanceDisk,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -74,7 +84,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats };
+export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -539,6 +549,11 @@ export const api = {
   // (no Stack set up), never an error - routes/engines.ts's own header.
   engines: () => request<EnginesOverview>("/api/engines"),
   enginesHealth: () => request<EnginesHealth>("/api/engines/health"),
+  // GET /api/performance (ADMIN-PERF-01): owner/admin only, one
+  // aggregate read of turn stats, queues, the label harvest, engine
+  // health and hardware. `days` defaults to 30 on the backend when
+  // omitted.
+  performance: (days?: number) => request<Performance>(`/api/performance${days ? `?days=${days}` : ""}`),
   createPerson: (input: { displayName: string; role: Role; secret?: string }) =>
     request<PersonRosterEntry>("/api/people", {
       method: "POST",

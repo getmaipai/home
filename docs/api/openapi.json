@@ -10028,6 +10028,497 @@
         }
       }
     },
+    "/api/performance": {
+      "get": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "The admin performance dashboard's one aggregate read",
+        "description": "Owner/admin only: how the hub is doing over time, aggregated from what it already records - turn stats, engine health, the memory/embedding queues, the label harvest, disk and hardware. No new collection.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "description": "Window size, 1-90, default 30."
+            },
+            "required": false,
+            "description": "Window size, 1-90, default 30.",
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Real numbers, aggregated live - never a 500 for a missing Stack or an empty queue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "turns": {
+                      "type": "object",
+                      "properties": {
+                        "window_days": {
+                          "type": "integer"
+                        },
+                        "by_day": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "date": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "median_ttft_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "p95_ttft_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "median_total_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "p95_total_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "median_tokens_per_second": {
+                                "type": "number",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "date",
+                              "count",
+                              "median_ttft_ms",
+                              "p95_ttft_ms",
+                              "median_total_ms",
+                              "p95_total_ms",
+                              "median_tokens_per_second"
+                            ]
+                          }
+                        },
+                        "by_engine": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "count": {
+                                "type": "integer"
+                              },
+                              "median_ttft_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "p95_ttft_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "median_total_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "p95_total_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "median_tokens_per_second": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "engine": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "count",
+                              "median_ttft_ms",
+                              "p95_ttft_ms",
+                              "median_total_ms",
+                              "p95_total_ms",
+                              "median_tokens_per_second",
+                              "engine"
+                            ]
+                          }
+                        },
+                        "by_route": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "route": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "route",
+                              "count"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "window_days",
+                        "by_day",
+                        "by_engine",
+                        "by_route"
+                      ]
+                    },
+                    "queues": {
+                      "type": "object",
+                      "properties": {
+                        "judge": {
+                          "type": "object",
+                          "properties": {
+                            "pending": {
+                              "type": "integer"
+                            },
+                            "oldest_created_at": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "pending",
+                            "oldest_created_at"
+                          ]
+                        },
+                        "embedding": {
+                          "type": "object",
+                          "properties": {
+                            "pending": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "pending"
+                          ]
+                        },
+                        "ingestion": {
+                          "type": "object",
+                          "properties": {
+                            "pending": {
+                              "type": "integer"
+                            },
+                            "by_reason": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "reason": {
+                                    "type": "string"
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "reason",
+                                  "count"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "pending",
+                            "by_reason"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "judge",
+                        "embedding",
+                        "ingestion"
+                      ]
+                    },
+                    "labels": {
+                      "type": "object",
+                      "properties": {
+                        "window_days": {
+                          "type": "integer"
+                        },
+                        "turns": {
+                          "type": "integer"
+                        },
+                        "guard_hits": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "count"
+                            ]
+                          }
+                        },
+                        "rule_hits": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "count"
+                            ]
+                          }
+                        },
+                        "rungs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "count"
+                            ]
+                          }
+                        },
+                        "retire_eligible": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "window_days",
+                        "turns",
+                        "guard_hits",
+                        "rule_hits",
+                        "rungs",
+                        "retire_eligible"
+                      ]
+                    },
+                    "layers": {
+                      "type": "object",
+                      "properties": {
+                        "window_days": {
+                          "type": "integer"
+                        },
+                        "turns_with_trace": {
+                          "type": "integer"
+                        },
+                        "nodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "node": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "median_ms": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "p95_ms": {
+                                "type": "number",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "node",
+                              "count",
+                              "median_ms",
+                              "p95_ms"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "window_days",
+                        "turns_with_trace",
+                        "nodes"
+                      ]
+                    },
+                    "engines": {
+                      "type": "object",
+                      "properties": {
+                        "configured": {
+                          "type": "boolean"
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          }
+                        },
+                        "engines": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          }
+                        },
+                        "budget": {
+                          "type": "object",
+                          "nullable": true,
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        },
+                        "recent_issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string"
+                              },
+                              "key": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "resolvedAt": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "key",
+                              "severity",
+                              "createdAt",
+                              "resolvedAt"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "configured",
+                        "roles",
+                        "engines",
+                        "budget",
+                        "recent_issues"
+                      ]
+                    },
+                    "hardware": {
+                      "type": "object",
+                      "properties": {
+                        "configured": {
+                          "type": "boolean"
+                        },
+                        "hardware": {
+                          "type": "object",
+                          "nullable": true,
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "configured",
+                        "hardware"
+                      ]
+                    },
+                    "disk": {
+                      "type": "object",
+                      "properties": {
+                        "total_bytes": {
+                          "type": "number"
+                        },
+                        "free_bytes": {
+                          "type": "number"
+                        },
+                        "areas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "area": {
+                                "type": "string"
+                              },
+                              "bytes": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "area",
+                              "bytes"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "total_bytes",
+                        "free_bytes",
+                        "areas"
+                      ]
+                    },
+                    "retention_days": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "turns",
+                    "queues",
+                    "labels",
+                    "layers",
+                    "engines",
+                    "hardware",
+                    "disk",
+                    "retention_days"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/setup/ca": {
       "get": {
         "tags": [

@@ -2050,7 +2050,24 @@ export function exportPerson(actor: PersonRow, personId: string): ConversationOp
   return { ok: true, value: rows };
 }
 
-const DEFAULT_RETENTION_DAYS = 90;
+// Exported (the constant, and the resolver below) for ADMIN-PERF-01's
+// stated-retention field (docs/dev.md) - the fact that a turn's `stats`
+// blob disappears with the rest of the turn on this same schedule, not
+// a second constant or a second copy of the household-setting fallback
+// to keep in sync with runRetention()'s own.
+export const DEFAULT_RETENTION_DAYS = 90;
+
+/** The real, effective retention window: the household's own
+ * `household.conversation_retention_days` setting when it's a positive
+ * number, `DEFAULT_RETENTION_DAYS` otherwise - runRetention()'s own
+ * resolution, factored out so a second caller (ADMIN-PERF-01's
+ * `retention_days` field) reads the actual number a household changed
+ * it to, not a hardcoded fallback dressed up as "the stated retention"
+ * (a review finding on the first cut). */
+export function effectiveRetentionDays(): number {
+  const retentionDays = getHouseholdSettingValue("household.conversation_retention_days") as number | undefined;
+  return typeof retentionDays === "number" && retentionDays > 0 ? retentionDays : DEFAULT_RETENTION_DAYS;
+}
 // 4.14: "a household setting with a floor for kid safety logs." No exact
 // number is given in the plan; 90 days is this pass's own judgment call,
 // matching the retention default itself so a household that never touches
@@ -2172,8 +2189,7 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
  * unlike memory.ts's runMaintenance() when it first shipped, the
  * scheduler (4.7) already exists by the time this was built. */
 export function runRetention(): { deleted: number } {
-  const retentionDays = getHouseholdSettingValue("household.conversation_retention_days") as number | undefined;
-  const days = typeof retentionDays === "number" && retentionDays > 0 ? retentionDays : DEFAULT_RETENTION_DAYS;
+  const days = effectiveRetentionDays();
   const now = Date.now();
   const generalCutoff = new Date(now - days * DAY_MS).toISOString();
   // The effective cutoff for a flagged-minor row is whichever of the two
