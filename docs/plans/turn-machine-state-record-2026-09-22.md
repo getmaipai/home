@@ -91,7 +91,7 @@ entry and exit is an inspection event the trace writer records.
 | State | Actor (node) | Reads | Exits |
 |---|---|---|---|
 | `safety` | `safety` | the utterance, the age band, the conversation's crisis state, temporary mode | `refused` (a refuse category, the fixed refusal line, the crisis overlay when due); `blocked` (the credential line); else `commands` |
-| `commands` | `commands` | the utterance against the closed exact-match set (household commands, the bundled closed intents: lights, timers, lists, reminders, "what time is it", "remember that", "forget that", the almanac) | `answer` with the package's reply and outcome; else `context` |
+| `commands` | `commands` | the utterance against the closed exact-match set (household commands, the bundled closed intents: lights, timers, lists, reminders, "what time is it", "remember that", "forget that", the almanac). An opener is one of three closed things (OPENER-01, 2026-09-23): a fixed phrase matched whole; an imperative wildcard, fired only on a `directive` turn; a computed wildcard on a compute or clock package, fired only after the package's own resolver accepts the remainder. A wildcard whose fixed part is a question word is not an opener. | `answer` with the package's reply and outcome; a failed outcome joins `state.outcomes` and the turn goes on to `context` (COMMAND-FAIL-01), never the error as text; else `context` |
 | `context` | `context` | the window (in-process for a temporary chat), the memories as dated and labeled items, the episodes, the profile line, the clock, the roster, the disclosure filter for this reader and the presence on this surface | `model`; sets `reasoning.emit` (false, with `withheld_for`, when the speaker is a minor, the surface is not a typed chat screen, or presence says a child may be in the room) |
 | `model` | `model` | `messages` built from the context list, the fixed tool set, `tool_choice` per the interim rule, the plan's `max_tokens` plus the thinking budget | a tool call: `policy`; text: `answer`; no visible text: one regeneration with thinking off, then `answer`; reasoning spans go to the wire only when `reasoning.emit` is true, and only after `output_gate` has passed them; otherwise they are consumed and dropped inside the node |
 | `policy` | `policy` | each `ActionProposal`: the manifest's `min_role`, `consequential`, `permissions`; the grounding of the arguments against the context list (term-level, see "Grounding, stated exactly"); the household-subject rule for a search; temporary mode (no `memory:write`); the crisis state (no lookups) | `tool` for an allowed read-only request; `asked` (the machine parks with a pending ask) for a consent or a confirmation; `answer` with the refusal line for `min_role`; for a side-effecting request the executor runs the typed plan and returns its outcome to `tool` |
@@ -391,7 +391,10 @@ generated that would then need withholding.
 No lookup ladder, no engine-written query, no draft reader, no repeat
 guard, no register guards, no deliverable rules, no per-turn tool
 ranking, no device or hardware-tier branch, no second plan object, no
-second log. A behaviour that seems to need one of those is a bench row
+second log. No wildcard opener that decides what a question means,
+and no error string as a reply: text that came from an outcome's
+`error` or `userMessage` field is refused by `output_gate` the way an
+envelope is (2026-09-23). A behaviour that seems to need one of those is a bench row
 on the replay set first, then either a node's own change or a budget
 field, never a rule added in front of the model.
 

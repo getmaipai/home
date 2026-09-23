@@ -21755,3 +21755,98 @@ Rows: `WRITTEN-PARITY-01` builds the measurement; U4b (the written
 policy, the surface-aware engagement fragment, the written cap as
 room) and PHRASE-01 (the written composition instruction) carry the
 fixes and accept on the column.
+
+## The knowledge hijack: openers on questions, and a raw error as the reply (2026-09-23)
+
+Jesse asked "what is technical benchmarking and why do you need it" on
+the new path (U4b live) and received, verbatim, an MCP error string
+with a Wikipedia URL that returned 404. The trace: `commands` 224 ms,
+outcome `pattern:knowledge`, via `pattern`, args `{ topic: "technical
+benchmarking and why do you need it" }`, status failed, errorCode
+"502", userMessage the MCP string; `answer` and `output_gate` delivered
+it; `context`, `model`, `policy` and `tool` never ran. Two defects,
+both design, read from the code.
+
+### (a) A wildcard opener on a question is a word rule
+
+The bundled `knowledge` manifest declares `routing.patterns` `["who was
+*", "what is *", "tell me about *", "what's the capital of *", "who
+invented *"]`, and the commands node (`nodes/commands.ts`) fires any
+manifest pattern `matchPattern` accepts, binding the whole remainder to
+the first required argument. "what is *" matched the question and the
+tail became a Wikipedia page title. RULES-AND-LEARNED-COMPONENTS.md:
+code decides only closed, exact things, "exact commands (matched whole
+or not at all)"; a wildcard whose fixed part is a question word decides
+what a person means, which is the model's job with the tool offered.
+
+The rule for the commands node, `OPENER-01`: an opener fires only when
+it is one of three closed things. A fixed phrase matched whole ("what
+time is it", "tell me a joke", "what's on my shopping list"). An
+imperative wildcard, where the fixed part instructs the hub and the
+remainder is the argument by definition ("set a timer for *", "remind
+me *", "convert *", "define *", "calculate *", "add * to the shopping
+list", "turn off the * light", "remember that *", "translate *", "look
+up the artist *"), which fires only when the signal's `primary_act` is
+`directive`. And a computed wildcard on a compute or clock package,
+which fires on a question too but only after the package's own
+deterministic resolver accepts the remainder before anything runs (the
+spec's `evaluateExpression` for "what does * equal", the zone library
+for SIGNAL-02's "what time is it in *"); a remainder the resolver
+rejects yields to the model, never fires. Every other wildcard whose
+fixed part is a question word leaves its manifest: knowledge's five;
+media-lookup's "what's the runtime of *", "who directed *", "what is *
+about", "is * any good", "when did * come out", "who's in *", "what is *
+rated", "tell me about the movie *"; music's "who is the singer *";
+weather's six ("what's the weather in *", "weather in *", "how's the
+weather in *", "what's the weather like in *", "is it going to rain in
+*", "will it rain in *"); define's "what does * mean" and "what's the
+definition of *"; recall's two (the context node already recalls;
+TOOLSET-01). Those packages stay reachable as the model's tools and
+through their `examples`. Each opener kept is a counted rule row: the
+`[turn]` line's `via: pattern` outcome is its counter, and the
+manifest lint refuses a new wildcard whose fixed part opens with a
+question word.
+
+### (b) A failed pattern outcome is never the reply
+
+The commands node returns `result.error` as the turn's text on any
+failure and records `String(result.status)` ("502") as the error code,
+discarding the typed `code` the plugin runner carries
+(`plugins.ts`: `{ ok: false, status: 502, error, code, fallback_reply }`).
+The old path reads that code: a pattern winner of an outside-looking
+package whose run raised `not_found` "found nothing" and the turn goes
+on to the model with the failed outcome on the list (`turnEngine.ts`
+around 3216, #92, the rule the knowledge handler's own header comment
+describes), and every other failure speaks the fixed
+`LOOKUP_FAILED_LINE` ("That lookup didn't work, sorry."), never the raw
+error. That is the difference between the two paths on Jesse's words:
+the opener fired on both; the old path fell through to the model and he
+saw a model answer, the new path delivered the error. (The one fact to
+confirm from his old-path turn row: `routing.tier` "pattern" with
+`source` "model".)
+
+Rule, `COMMAND-FAIL-01`: a failed command or pattern outcome continues
+the turn. The commands node records the outcome with `errorCode` from
+`result.code`, pushes it to `state.outcomes`, and returns `matched:
+false`; `context` and `model` run with the failed outcome in the list,
+so the model may say the lookup failed in its own words or answer from
+what it knows; the fixed line is the answer node's floor only when the
+model round also fails (DEADLINE-01's `model_failed`). And `output_gate`
+refuses any reply whose text came from an outcome's `error` or
+`userMessage` field, a provenance check in the same place and shape as
+the envelope catch: text is tagged at the answer node by where it came
+from, and error-sourced text never leaves the machine.
+
+### (c) The replay row
+
+`benchmarking-typed-adult`, in Jesse's exact words: "what is technical
+benchmarking and why do you need it", surface chat, an adult: expects
+no `via: pattern` outcome, a reply from `source: model` (a search may
+run under the interim rule; `toolRan` is not asserted), and the written
+floor judged by WRITTEN-PARITY-01's column. Named plainly: under the
+interim rule this question is `question` with `target: world`, so the
+new path forces a search and phrases from results; if that reply cannot
+meet the bare floor where the bare model does, the interim rule's
+trigger is the layer at fault (a conceptual question with no fresh
+fact needs no lookup), and that is a design question for the flip,
+raised by this row, not decided here.
