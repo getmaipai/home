@@ -175,7 +175,27 @@ export function weeklyReport(week: string, labels: readonly Label[]): WeeklyRepo
   return report;
 }
 
-export function formatReport(report: WeeklyReport): string {
+/** The org rule retires a rule with zero hits over the weekly report; the
+ * first real week (2026-09-21) had 47 labelled turns and 55 zero-hit rules,
+ * so zero hits alone is not a signal; both numbers live here and nowhere
+ * else. */
+export const RETIRE_FLOOR = { weeks: 4, turns: 500 } as const;
+
+/** The rules that had zero hits in EVERY one of the last `floor.weeks`
+ * reports (reports are in week order; fewer reports than `floor.weeks`
+ * returns []) AND whose summed turn count over those weeks is at least
+ * `floor.turns`; sorted. */
+export function retireEligible(reports: readonly WeeklyReport[], allRules: readonly string[], floor: { weeks: number; turns: number } = RETIRE_FLOOR): string[] {
+  if (reports.length < floor.weeks) return [];
+  const last = reports.slice(-floor.weeks);
+  const turns = last.reduce((sum, r) => sum + r.turns, 0);
+  if (turns < floor.turns) return [];
+  return allRules
+    .filter((rule) => last.every((r) => !(rule in r.rule_hits)))
+    .sort();
+}
+
+export function formatReport(report: WeeklyReport, allReports?: readonly WeeklyReport[], allRules?: readonly string[]): string {
   const lines = [`== ${report.week}: ${report.turns} turn(s)`];
   const section = (title: string, counts: Record<string, number>) => {
     lines.push(`-- ${title}`);
@@ -189,6 +209,12 @@ export function formatReport(report: WeeklyReport): string {
   section("corrections by rung", report.corrections_by_rung);
   lines.push(`-- rules with zero hits this week (${report.zero_hit_rules.length})`);
   for (const rule of report.zero_hit_rules) lines.push(`   ${rule}`);
+  if (allReports && allRules) {
+    const eligible = retireEligible(allReports, allRules);
+    lines.push(`-- retire-eligible (${RETIRE_FLOOR.weeks} consecutive zero-hit weeks past ${RETIRE_FLOOR.turns} turns)`);
+    if (eligible.length === 0) lines.push("   (none)");
+    for (const rule of eligible) lines.push(`   ${rule}`);
+  }
   return lines.join("\n");
 }
 
@@ -258,7 +284,7 @@ async function main(): Promise<void> {
   const outDir = join(dataDir, "labels");
   const reports = exportLabels(labels, outDir);
   console.log(`[labels] ${labels.length} turn(s) since ${since} (${rows.length - labels.length} credential turn(s) skipped) into ${outDir}`);
-  for (const report of reports) console.log(formatReport(report));
+  for (const report of reports) console.log(formatReport(report, reports, knownRules()));
 }
 
 if (import.meta.main) {

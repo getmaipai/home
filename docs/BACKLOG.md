@@ -913,7 +913,7 @@ not permission to expand scope.
       `capability_claim`, `claimed_experience`, `tag_question`), no
       corrections; 55 of the 65 rules had zero hits, `almanac` among
       them.
-    - [ ] **RVW-1b: A sample floor before a zero-hit rule retires** (S).
+    - [x] **RVW-1b: A sample floor before a zero-hit rule retires** (S). Landed 2026-09-23 (c-99l).
       The org rule (RULES-AND-LEARNED-COMPONENTS.md) retires a rule with
       zero hits over the weekly report, but the first real week had 47
       labelled turns and 55 zero-hit rules, most of them guards for

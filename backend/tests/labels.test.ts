@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CREDENTIAL_REDACTION } from "@/lib/memoryContentPolicy";
-import { toRosterForm, weekKey, labelOf, exportLabels, weeklyReport, formatReport, knownRules, summarizeFeedback, type LabelRow } from "../scripts/bench/labels";
+import { toRosterForm, weekKey, labelOf, exportLabels, weeklyReport, formatReport, knownRules, summarizeFeedback, retireEligible, RETIRE_FLOOR, type LabelRow } from "../scripts/bench/labels";
 
 const signal = (act: string, source = "rule", stance = "asserted") => JSON.stringify({ primary_act: act, expressed_emotion: "neutral", emotion_intensity: "none", source, clauses: [{ stance }] });
 
@@ -89,5 +89,24 @@ describe("the export", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("retireEligible needs zero hits in every of the last floor.weeks reports and the summed turn floor", () => {
+    const rules = ["almanac", "signal.rule"];
+    const weeks = ["2026-W35", "2026-W36", "2026-W37", "2026-W38", "2026-W39"];
+    const reports = weeks.map((week, i) => ({
+      week,
+      turns: i === 0 ? 100 : 125,
+      guard_hits: {} as Record<string, number>,
+      rule_hits: (i === 2 ? { "signal.rule": 1 } : {}) as Record<string, number>,
+      rungs: {} as Record<string, number>,
+      corrections_by_rung: {} as Record<string, number>,
+      zero_hit_rules: i === 2 ? ["almanac"] : ["almanac", "signal.rule"],
+    }));
+    expect(retireEligible(reports.slice(0, 4), rules)).toEqual([]);
+    expect(retireEligible(reports, rules)).toEqual(["almanac"]);
+    expect(retireEligible(reports.slice(0, 3), rules)).toEqual([]);
+    expect(retireEligible(reports, rules, { weeks: 4, turns: 501 })).toEqual([]);
+    expect(retireEligible(reports, rules, RETIRE_FLOOR)).toEqual(["almanac"]);
   });
 });
