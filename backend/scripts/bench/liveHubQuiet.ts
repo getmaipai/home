@@ -23,10 +23,22 @@ function currentTurnLineCount(hubLog: string): number {
   }
 }
 
-/** The working directory (via lsof) of a running scripts/check.sh,
- * bun test, or vite build process - a plain pgrep can only see the
- * command line, which never names the worktree a bare `bash
- * scripts/check.sh` runs from. */
+const CD_PREFIX_RE = /\bcd\s+(\S+)\s*&&/;
+
+/** The worktree a running scripts/check.sh/bun test/vite build process
+ * started from, WITHOUT lsof - the coordinator's own warning (this
+ * host hangs in the kernel under load on an lsof call) ruled it out
+ * after the first version of this file used it. A bare `bash
+ * scripts/check.sh` never shows its own cwd on the command line, but
+ * the Claude Code session wrapper that launched it does (`cd
+ * /path/to/worktree && bash scripts/check.sh ...`), and `pgrep -f`
+ * already matches that OUTER wrapper too, since "scripts/check.sh"
+ * appears in its own full argv string - `ps -o command=` reads back
+ * exactly what pgrep matched against, no second lookup needed. A
+ * matching pid whose own line carries no `cd ... &&` (the plain child
+ * process, not its wrapper) is reported with an empty path - never
+ * silently ignorable by MAIPAI_BENCH_IGNORE_GATE_CWD below, since an
+ * empty string never matches a substring filter. */
 function gatePidsByCwd(): Map<number, string> {
   const cwds = new Map<number, string>();
   let pids: string[];
@@ -37,10 +49,10 @@ function gatePidsByCwd(): Map<number, string> {
   }
   for (const pidStr of pids) {
     try {
-      const out = execSync(`lsof -p ${pidStr} 2>/dev/null | awk '$4=="cwd"{print $9}'`, { encoding: "utf-8" }).trim();
-      if (out) cwds.set(Number(pidStr), out);
+      const command = execSync(`ps -o command= -p ${pidStr}`, { encoding: "utf-8" }).trim();
+      cwds.set(Number(pidStr), CD_PREFIX_RE.exec(command)?.[1] ?? "");
     } catch {
-      // a pid that exited between pgrep and lsof - not a live gate
+      // a pid that exited between pgrep and ps - not a live gate
     }
   }
   return cwds;
