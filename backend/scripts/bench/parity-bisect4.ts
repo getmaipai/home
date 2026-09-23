@@ -20,6 +20,7 @@ import { resolvePersona } from "@/lib/persona";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import { __setSamplingSeedForBench } from "@/lib/benchSampling";
+import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { buildStages4, QUESTION, BENCHMARKING_QUESTION, type Stage4 } from "./parity-bisect4-stages";
 
 const REPS = Number(process.env.MAIPAI_BENCH_REPEATS ?? 5);
@@ -32,12 +33,24 @@ const startsLowercase = (text: string): boolean => {
   return firstLetter !== null && firstLetter[0] === firstLetter[0].toLowerCase() && firstLetter[0] !== firstLetter[0].toUpperCase();
 };
 
+const wordCount = (text: string): number => (text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length);
+
 interface RepResult {
   seed: number;
   predictedTokens: number | null;
   stopReason: string | null;
   lowercase: boolean;
   text: string;
+  wallMs: number;
+  // Arm f's own split (Fable: "recording the reasoning tokens
+  // separately from the visible reply"): the engine's own stats never
+  // break predicted_tokens down by segment, so this is a WORD count on
+  // each side of wellFormed.ts's own think-block split, not a token
+  // count - named accordingly rather than claiming a precision the
+  // engine doesn't report. predictedTokens above stays the one real,
+  // engine-reported token total for every arm, thinking or not.
+  reasoningWords: number;
+  visibleWords: number;
 }
 interface StageResult {
   stage: string;
@@ -45,9 +58,10 @@ interface StageResult {
   sampleText: string;
 }
 
-async function runOnce(messages: LlmMessage[], opts: LlmCompleteOptions): Promise<{ predictedTokens: number | null; stopReason: string | null; text: string }> {
+async function runOnce(messages: LlmMessage[], opts: LlmCompleteOptions): Promise<{ predictedTokens: number | null; stopReason: string | null; text: string; wallMs: number }> {
+  const startedAt = Date.now();
   const started = await startCompleteStream("chat", messages, opts);
-  if (!started.ok) return { predictedTokens: null, stopReason: `FAILED: ${started.code}`, text: "" };
+  if (!started.ok) return { predictedTokens: null, stopReason: `FAILED: ${started.code}`, text: "", wallMs: Date.now() - startedAt };
   let raw = "";
   for (;;) {
     const step = await started.tokens.next();
@@ -55,7 +69,7 @@ async function runOnce(messages: LlmMessage[], opts: LlmCompleteOptions): Promis
     raw += step.value;
   }
   const predictedTokens = finite(started.stats.usage?.completion_tokens) ?? finite(started.stats.timings?.predicted_n);
-  return { predictedTokens, stopReason: started.stats.stopReason ?? null, text: raw };
+  return { predictedTokens, stopReason: started.stats.stopReason ?? null, text: raw, wallMs: Date.now() - startedAt };
 }
 
 async function runStage(stage: Stage4): Promise<StageResult> {
@@ -67,9 +81,11 @@ async function runStage(stage: Stage4): Promise<StageResult> {
       __setSamplingSeedForBench(seed);
       const result = await runOnce(stage.messages, stage.opts);
       const lowercase = startsLowercase(result.text);
-      reps.push({ seed, predictedTokens: result.predictedTokens, stopReason: result.stopReason, lowercase, text: result.text });
+      const reasoningWords = wordCount(extractReasoningText(result.text) ?? "");
+      const visibleWords = wordCount(visibleText(result.text));
+      reps.push({ seed, predictedTokens: result.predictedTokens, stopReason: result.stopReason, lowercase, text: result.text, wallMs: result.wallMs, reasoningWords, visibleWords });
       if (i === 0) sampleText = result.text;
-      console.log(`  [${stage.name}] seed=${seed}: predicted_tokens=${result.predictedTokens} stop_reason=${result.stopReason} lowercase=${lowercase}`);
+      console.log(`  [${stage.name}] seed=${seed}: predicted_tokens=${result.predictedTokens} stop_reason=${result.stopReason} lowercase=${lowercase} wall_ms=${result.wallMs}`);
     }
   } finally {
     __setSamplingSeedForBench(null);
@@ -107,6 +123,21 @@ function printTable(label: string, results: StageResult[]): void {
   console.log(`\nfloor (re-measured, same seeds 1-5): ${floorAvg?.toFixed(1) ?? "n/a"}`);
 }
 
+// Arm f's own detail (Fable: "tokens, structure, lowercase, and total
+// wall time per rep for (f)"): predictedTokens/lowercase/structure
+// already print in the main table above; this adds the wall time and
+// the reasoning/visible word split thinking-on needs that no other arm
+// does.
+function printArmFDetail(label: string, results: StageResult[]): void {
+  const armF = results.find((r) => r.stage === "arm-f-full-prefix-thinking-on");
+  if (!armF) return;
+  console.log(`\n=== arm f detail: ${label} (reasoning vs visible, wall time) ===`);
+  console.log("seed | predicted_tokens (total) | reasoning_words | visible_words | wall_ms | stop_reason");
+  for (const rep of armF.reps) {
+    console.log(`${rep.seed} | ${rep.predictedTokens} | ${rep.reasoningWords} | ${rep.visibleWords} | ${rep.wallMs} | ${rep.stopReason}`);
+  }
+}
+
 async function main() {
   await startBench();
 
@@ -117,6 +148,8 @@ async function main() {
 
   printTable("prompt-cache", primary);
   printTable("benchmarking-words", benchmarking);
+  printArmFDetail("prompt-cache", primary);
+  printArmFDetail("benchmarking-words", benchmarking);
 
   console.log("\n=== sample replies (seed 1 of each stage): prompt-cache ===");
   for (const r of primary) {

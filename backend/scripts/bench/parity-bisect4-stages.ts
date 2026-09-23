@@ -10,7 +10,7 @@
 // Split from parity-bisect4.ts for the same reason the earlier bisect
 // stages files are: no `import "./setup"` at module scope, so a test
 // can import buildStages4() directly.
-import type { LlmMessage, LlmCompleteOptions } from "@/lib/llm";
+import type { LlmMessage, LlmCompleteOptions, ToolSpec } from "@/lib/llm";
 import {
   type Persona,
   FORMALITY_FRAGMENT_WRITTEN,
@@ -21,6 +21,8 @@ import {
   INFORMATION_HANDLING_POLICY,
 } from "@/lib/persona";
 import { identityLine, STABLE_SYSTEM_SUFFIX, STABLE_SYSTEM_SUFFIX_SENTENCES, buildStablePrefix } from "@/lib/turnEngine";
+import { resolveTurnBudget } from "@/lib/turnMachine/budget";
+import { loadManifestOnly } from "@/lib/plugins";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
 
@@ -33,6 +35,56 @@ export const QUESTION = "how does a prompt cache make a language model faster an
 // floor and ChatGPT both read it as the person's own "you").
 export const BENCHMARKING_QUESTION = "what is technical benchmarking and why do you need it";
 export const ENGINE_DEFAULT_TEMPERATURE = 0.8;
+
+// Arm f's own max_tokens: the exact number a real written-adult,
+// thinking-on turn gets (nodes/model.ts's replyMaxTokensFor:
+// reply_ceiling_tokens + thinking_budget_tokens_toggled), read from the
+// resident model's own catalog entry (modelCatalog.ts's
+// "qwen3-8b-instruct-q4-k-m", confirmed against the live engine's own
+// identity string in every bisect log) rather than copied by hand, so
+// it can never drift from production if the catalog entry changes.
+// Runs at module scope (a review flagged this): a bad or renamed
+// RESIDENT_MODEL_ID would fail every importer of this file, including
+// the unit test, rather than only a live run - accepted here since the
+// id is a fixed literal against a real catalog entry, not computed, and
+// this file already resolves several other module-scope constants the
+// same eager way.
+const RESIDENT_MODEL_ID = "qwen3-8b-instruct-q4-k-m";
+const RESIDENT_BUDGET = resolveTurnBudget(RESIDENT_MODEL_ID);
+export const THINKING_ON_MAX_TOKENS = RESIDENT_BUDGET.reply_ceiling_tokens + RESIDENT_BUDGET.thinking_budget_tokens_toggled;
+
+// The real, ordinary-turn tool block (nodes/model.ts's own
+// `state.budget.tools_offered.slice().sort().map(toolSpecFor)`, the
+// non-forced, non-interim-rule branch) - Fable's own ruling names it
+// explicitly for arm e ("five-tool block present"): an isolated bench
+// without it would not be testing the shape a real turn actually sends.
+// Built the same way toolSpecFor() does (loadManifestOnly()),
+// filesystem-only, no DB - safe at module scope here too. Does NOT
+// mirror toolSpecFor's ANSWER_FROM_CONTEXT_TOOL_ID special case (that
+// ToolSpec constant is private to model.ts, not exported, and this
+// file makes no production source changes to get at it) - the assert
+// below turns that gap into a loud failure instead of a silent one if
+// this budget's own answer_from_context_tool ever flips true. A
+// manifest that fails to load is a loud failure too, never a silently
+// shorter tool list: "five-tool block present" is the ruling's own
+// literal test condition, not "up to five."
+function productionTools(): ToolSpec[] {
+  if (RESIDENT_BUDGET.answer_from_context_tool) {
+    throw new Error("productionTools() does not build the answer-from-context tool - RESIDENT_BUDGET.answer_from_context_tool is now true, so this bench's tool block no longer matches production's");
+  }
+  const tools = RESIDENT_BUDGET.tools_offered
+    .slice()
+    .sort()
+    .map((id) => {
+      const loaded = loadManifestOnly(id);
+      if (!loaded.ok) throw new Error(`productionTools(): manifest for "${id}" failed to load (${loaded.status} ${loaded.error}) - the tool block would be silently short of the ruling's "five-tool block present"`);
+      return { id, description: loaded.value.description, args: loaded.value.args };
+    });
+  if (tools.length !== RESIDENT_BUDGET.tools_offered.length) {
+    throw new Error(`productionTools(): expected ${RESIDENT_BUDGET.tools_offered.length} tools, built ${tools.length}`);
+  }
+  return tools;
+}
 
 // Fable's own sentence, prepended ahead of the real prefix in arms a
 // and c: names the floor as an instruction, not a hope.
@@ -89,6 +141,16 @@ function descriptivePrefix(persona: Persona): string {
     // Fable's own given text, verbatim.
     "Facts about this household's own people, plans and home come only from what it was told here; anything about the world it answers from what it knows.",
   ].join(" ");
+  return [IDENTITY_DESCRIPTIVE, suffixDescriptive, voiceDescriptive(persona)].join(" ");
+}
+
+// Arm e's own "descriptive voice fragments": the same six persona-dial
+// and policy rewrites descriptivePrefix() uses, WITHOUT its identity or
+// suffix sentences (arm e supplies those separately, in their real,
+// non-descriptive form). Pulled out as its own function so arm d and
+// arm e share one rewritten wording rather than two copies that could
+// drift from each other.
+function voiceDescriptive(persona: Persona): string {
   const formalityDescriptive: Record<Persona["formality"], string> = {
     casual: "MaiPai writes in a relaxed, friendly tone, with contractions (it's, doesn't, isn't).",
     neutral: "MaiPai writes in a natural, unforced tone, with contractions, neither stiff nor overly casual.",
@@ -118,8 +180,6 @@ function descriptivePrefix(persona: Persona): string {
     "MaiPai's replies on a screen use headings and lists where they make an answer clearest.",
   ].join(" ");
   return [
-    IDENTITY_DESCRIPTIVE,
-    suffixDescriptive,
     formalityDescriptive[persona.formality],
     complexityDescriptive[persona.complexity],
     engagementDescriptive[persona.engagement],
@@ -135,9 +195,9 @@ export interface Stage4 {
   opts: LlmCompleteOptions;
 }
 
-function stage(name: string, systemContent: string | null, userContent: string): Stage4 {
+function stage(name: string, systemContent: string | null, userContent: string, optsOverride?: Partial<LlmCompleteOptions>): Stage4 {
   const messages: LlmMessage[] = systemContent !== null ? [{ role: "system", content: systemContent }, { role: "user", content: userContent }] : [{ role: "user", content: userContent }];
-  return { name, messages, opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: false } };
+  return { name, messages, opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: false, ...optsOverride } };
 }
 
 /** Pure: builds every PARITY-BISECT-04 stage's own request, no live
@@ -187,5 +247,30 @@ export function buildStages4(persona: Persona, question: string = QUESTION): Sta
   // only - nothing else, no floor sentence, no dials, no policies.
   const ceiling = stage("ceiling-identity-plus-surviving-suffix", `${identity} ${survivingSuffixSentences()}`, question);
 
-  return [floor, armA, armB, armC, armD, ceiling];
+  // Arm e: no system message at all - the identity line, the three
+  // surviving suffix sentences, and the descriptive voice fragments
+  // (arm d's own rewrites, minus its identity and suffix sentences,
+  // which arm e supplies in their real form instead) all folded into
+  // one preamble at the top of the final user message, above the
+  // person's own words. Fable's own ruling names this arm's real test
+  // condition explicitly: "five-tool block present" - the ordinary
+  // turn's real tool definitions (productionTools() above), not a bare
+  // completion call, since a real turn always carries them when tools
+  // are allowed.
+  const armE = stage("arm-e-no-system-preamble-only", null, `${identity} ${survivingSuffixSentences()} ${voiceDescriptive(persona)}\n\n${question}`, { tools: productionTools() });
+
+  // Arm f: the full prefix exactly as landed (buildStablePrefix, no
+  // floor sentence, no reduction - the real production system
+  // message), with thinking ON and max_tokens set to the exact number
+  // a real written-adult thinking-on turn gets (THINKING_ON_MAX_TOKENS
+  // above). Tests whether this 8B's own reasoning pass, not a prompt
+  // change, is what a written adult question needs (PARITY-BISECT-01's
+  // own control: the bare thinking-on floor was 1836 against 806.8
+  // thinking-off on this question). Carries the same real tool block as
+  // arm e, for the same reason: "the full prefix as landed" means the
+  // real turn shape, and an ordinary written-adult turn always offers
+  // tools.
+  const armF = stage("arm-f-full-prefix-thinking-on", buildStablePrefix(persona, "written"), question, { thinking: true, max_tokens: THINKING_ON_MAX_TOKENS, tools: productionTools() });
+
+  return [floor, armA, armB, armC, armD, ceiling, armE, armF];
 }
