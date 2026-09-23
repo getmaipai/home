@@ -57,7 +57,8 @@ record, `spec/schemas/share.schema.json`: `id`, `file_id`, `from_person_id`,
 (the turn or the page that made it); never a second file record, never
 a copy of the bytes. Re-sharing (bramble shares a picture with lucia,
 lucia shares it with the family) is another pointer on the same file;
-what a person may re-share is question 6.
+re-sharing within the household is allowed for anything shared with a
+person, a child only within the household (decision 6).
 
 The attachment fixture becomes a `file` fixture with `origin: sent`; the
 Python package regenerates; the tag is bumped and `home` and `bot` pin
@@ -84,8 +85,8 @@ and counts against the owner's usage only, never the recipient's. Bounds
 that already exist apply: a child's sharing is limited by the consent
 floors (a child may share with the household and with the household's
 adults; sharing with a named sibling is a household share in practice;
-sharing outside the household does not exist for anyone today, see
-question 2), a package reads a shared file only if its `min_role` and
+sharing outside the household is decision 2 for a child, never, and the
+external-sharing record for an adult), a package reads a shared file only if its `min_role` and
 permissions allow, and the disclosure filter in the turn pipeline treats
 a shared file as context with the owner's disclosure. Unsharing deletes the
 pointer, the owner's one action, and takes effect at once; a re-share
@@ -102,7 +103,7 @@ Settings keys, in the registry, rendered by the generic renderer
 | `storage.person.default_cap_bytes` | household | basic | every person's cap unless overridden |
 | `storage.person.cap_bytes` | person, set by an admin | advanced | one person's override |
 
-Defaults are question 1. A cap is a number a parent reads in the
+Defaults are decision 1 (20 GB per person; the household total from the disk). A cap is a number a parent reads in the
 wizard's words ("Each person can keep 20 GB; the family 100 GB").
 
 ## Enforcement: at write time, in the person's words, never a purge
@@ -113,8 +114,8 @@ household past its total, is refused with the reason in the person's
 words: for a child, "Your storage is full; delete some pictures or ask a
 parent for more room"; for an adult, the same with "or raise the limit
 under Settings". Nothing is ever deleted by a background job to make
-room. A running picture or video job whose output would not fit is
-question 3.
+room. A picture or video job whose output would not fit is refused before it
+starts (decision 3).
 
 ## Usage, computed from the records
 
@@ -178,29 +179,27 @@ say: a transfer, never a translation.
   the consent bounds for a child, the disclosure filter reading a shared
   file with the owner's disclosure, and a second person's identical bytes
   becoming a pointer to the first person's file.
-- `STORE-DELETE-01` (home, S): the person-deletion step: unshared files
-  and their orphaned blobs purged, shared files passed to the household.
+- `STORE-DELETE-01` (home, S): the person-deletion step: an export
+  offered first, then unshared files and their orphaned blobs purged,
+  shared files passed to the household; memorialization keeps everything
+  (decision 5).
 - `STORE-PAGE-01` (home, S): the Storage page and the performance panel
   on one function.
 - The robot's side rides on the portability rows in `bot`, not a new row
   here.
 
-## Questions for Jesse
+## Decisions (owner, 2026-09-23)
 
-1. Defaults for the caps: a per-person default and a household total for
-   a first install (a proposal: 20 GB per person, the household total
-   set by the wizard from the disk, leaving the hub its own room).
-2. Can a child share a file outside the household at all (a link, an
-   export to a device), or is sharing bounded to the household for a
-   child until an adult acts?
-3. What a full store does to a running picture or video job: refuse the
-   job before it starts when the estimate will not fit (my
-   recommendation), or let it run and refuse the write at the end.
-4. Whether a shared file counts against the owner only (my
-   recommendation), or against every recipient.
-5. What happens to a person's files when that person is removed or
-   memorialized: the deletion rule above purges the unshared ones; is an
-   export offered first, and does memorialization keep everything.
-6. What a person may re-share: anything shared with them (the natural
-   rule for a household), or only what the owner marked re-shareable,
-   and whether a child may re-share at all.
+1. Caps default to 20 GB per person; the household total is set by the
+   wizard from the disk, keeping the hub its own room.
+2. A child is bounded to the household until an adult acts; a child never
+   shares outside it.
+3. A picture or video job that will not fit is refused before it starts.
+4. A shared file counts against its owner only.
+5. An export is offered before a removed person's files are purged;
+   memorialization keeps everything.
+6. Anything shared with a person may be re-shared within the household; a
+   child re-shares only within the household.
+
+External links (a file shared outside the house by a unique URL) are
+their own record, `external-sharing-2026-09-23.md`.
