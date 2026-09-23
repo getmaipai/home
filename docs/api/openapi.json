@@ -202,7 +202,8 @@
                                 "none",
                                 "spawned",
                                 "restarting",
-                                "failed"
+                                "failed",
+                                "blocked"
                               ]
                             },
                             "pid": {
@@ -235,7 +236,8 @@
                                 "none",
                                 "spawned",
                                 "restarting",
-                                "failed"
+                                "failed",
+                                "blocked"
                               ]
                             },
                             "pid": {
@@ -268,7 +270,8 @@
                                 "none",
                                 "spawned",
                                 "restarting",
-                                "failed"
+                                "failed",
+                                "blocked"
                               ]
                             },
                             "pid": {
