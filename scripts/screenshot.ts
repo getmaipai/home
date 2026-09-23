@@ -259,6 +259,7 @@ const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-rev
 const chatListReview = process.argv.includes("--chat-list-review");
 const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-alignment-review");
 const chatFindBubbleHoverWidthReview = process.argv.includes("--chat-find-bubble-hover-width-review");
+const chatFindComposerShiftReview = process.argv.includes("--chat-find-composer-shift-review");
 const chatHeaderTitleReview = process.argv.includes("--chat-header-title-review");
 const nextPageHeaderIconReview = process.argv.includes("--next-page-header-icon-review");
 const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
@@ -1979,6 +1980,72 @@ async function verifyChatFindBubbleHoverWidth(browser: Browser, sessionValue: st
       );
     }
     console.log(`bubble width unchanged: rest ${restWidth}px, hovered ${hoverWidth}px`);
+  } finally {
+    await context.close();
+  }
+}
+
+/** Screen finding: typing the first character into a new chat visibly
+ * shifted the composer down a few pixels. Root cause (ui-v0.5.48,
+ * commons): the welcome view's suggestions row used to unmount the
+ * instant the composer stopped being empty, removing its own `gap-4`
+ * flex unit from the vertically-centered welcome block, which
+ * re-centered and dropped everything in it. Real getBoundingClientRect()
+ * on the composer's own textbox before and after typing one character
+ * into a brand-new (empty) chat, same happy-dom-computes-no-real-layout
+ * reason every other pixel claim in this file is proven this way. */
+async function verifyChatFindComposerShift(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`verifyChatFindComposerShift: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const context = await newContext(browser, { slug: "wide", width: 1440, height: 1000 }, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.goto(`${BASE_URL}/next/chat`);
+    const textbox = page.getByRole("textbox", { name: "Message input" });
+    await textbox.waitFor();
+    await settleAnimations(page);
+
+    const measureTop = () => textbox.evaluate((el) => el.getBoundingClientRect().top);
+
+    const beforeTop = await measureTop();
+    const beforeFile = join(outDir, "chat-find-composer-shift-before.png");
+    await page.screenshot({ path: beforeFile, fullPage: false });
+    console.log(`Wrote ${beforeFile}`);
+
+    // Control: wait the same order of time typing would take, without
+    // actually typing, to rule out a settle-timing artifact (a font or
+    // animation still resolving) rather than something the keystroke
+    // itself causes.
+    await page.waitForTimeout(300);
+    const controlTop = await measureTop();
+    if (Math.abs(controlTop - beforeTop) > 0.5) {
+      throw new Error(
+        `verifyChatFindComposerShift: composer moved with no keystroke at all (a settle-timing artifact, not this check's own target) - at rest ${beforeTop}px, 300ms later ${controlTop}px`,
+      );
+    }
+
+    await textbox.pressSequentially("h", { delay: 0 });
+    await settleAnimations(page);
+    const afterTop = await measureTop();
+    const afterFile = join(outDir, "chat-find-composer-shift-after.png");
+    await page.screenshot({ path: afterFile, fullPage: false });
+    console.log(`Wrote ${afterFile}`);
+
+    console.log(`composer top: before=${beforeTop}px after=${afterTop}px delta=${afterTop - beforeTop}px`);
+    if (Math.abs(afterTop - beforeTop) > 0.5) {
+      throw new Error(
+        `verifyChatFindComposerShift: composer moved on the first keystroke - before top ${beforeTop}px, after top ${afterTop}px`,
+      );
+    }
   } finally {
     await context.close();
   }
@@ -3826,6 +3893,10 @@ async function main() {
       await verifyChatFindBubbleHoverWidth(browser, sessionValue);
     }
 
+    if (!a11yOnly && chatFindComposerShiftReview) {
+      await verifyChatFindComposerShift(browser, sessionValue);
+    }
+
     if (!a11yOnly && chatHeaderTitleReview) {
       await captureChatHeaderTitleReview(browser, sessionValue);
     }
@@ -3838,7 +3909,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
