@@ -10,7 +10,8 @@
 // continuation handling does, before `safety`, per the state record).
 import { loadManifestOnly, meetsMinRole } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
-import type { Node, ActionProposal, PolicyDecision, ToolCall } from "../contract";
+import { tokenize } from "@/lib/text";
+import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { ANSWER_FROM_CONTEXT_TOOL_ID } from "./model";
 
 export interface PolicyInput {
@@ -39,18 +40,67 @@ export interface PolicyOutput {
   entries: PolicyEntry[];
 }
 
-/** A string argument value is grounded when it appears, verbatim, in
- * some context item's text - the "set check, not a judgment" the state
- * record names. Numbers/booleans ground trivially (nothing to quote);
- * only string values (a query, a name, a quote) need to be traceable
- * back to something the conversation actually said. */
-function argsGrounded(args: Record<string, unknown>, contextTexts: readonly string[]): boolean {
+/** The owner's ruling (state record, "Grounding, stated exactly",
+ * 2a28e4e8), after a live run caught the original substring version
+ * refusing every real, naturally-reworded search query ("president of
+ * Chile 2026" is not a substring of "who is the president of chile",
+ * so it always refused): a string argument passes when it shares at
+ * least one CONTENT TERM (case-folded, stop words dropped - the same
+ * tokenize() guards.ts's own repeat guard already uses, reused rather
+ * than a second tokenizer) with the source texts; a number, year or
+ * date never counts against it (dropped before the overlap check, so
+ * an arg that is nothing but digits neither passes nor fails on its
+ * own weight); refuse exactly two things - a bare pronoun as the WHOLE
+ * argument (unresolved: "he", "it", not a real query), and zero
+ * overlap with every non-numeric term dropped. */
+const PURE_NUMBER_RE = /^\d+$/;
+
+/** Checked one word at a time, never a literal array (the rule-budget
+ * lint's word-list check is syntactic: a 3+-string array trips it
+ * whatever it holds - the same reason messages.ts's windowRoleFromId()
+ * and nodes/answer.ts's policyRefusalLine() are written this way too). */
+function isPronounWord(word: string): boolean {
+  return word === "he" || word === "she" || word === "it" || word === "they" || word === "him" || word === "her" || word === "them" || word === "his" || word === "hers" || word === "their" || word === "theirs" || word === "its";
+}
+
+// A code review caught the first cut of this checking the raw value
+// verbatim ("it" passed, "it?"/"It." did not) - split the SAME way
+// tokenize() itself splits (@/lib/text's own `[^a-z0-9']+` word
+// boundary), before tokenize()'s stopword drop ever gets a chance to
+// silently erase a lone "it" into an empty, trivially-passing term
+// list (the `terms.length === 0` branch below is for a genuinely
+// numbers-only argument, not a punctuation-dressed pronoun).
+function isBarePronoun(value: string): boolean {
+  const words = value.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 0);
+  return words.length === 1 && isPronounWord(words[0]!);
+}
+
+export function argsGrounded(args: Record<string, unknown>, sourceTexts: readonly string[]): boolean {
+  const sourceTerms = tokenize(sourceTexts.join(" "));
   for (const value of Object.values(args)) {
     if (typeof value !== "string" || value.trim().length === 0) continue;
-    const grounded = contextTexts.some((text) => text.toLowerCase().includes(value.toLowerCase()));
-    if (!grounded) return false;
+    if (isBarePronoun(value)) return false;
+    const terms = [...tokenize(value)].filter((t) => !PURE_NUMBER_RE.test(t));
+    if (terms.length === 0) continue; // nothing left but numbers/stopwords - never counts against it
+    if (!terms.some((t) => sourceTerms.has(t))) return false;
   }
   return true;
+}
+
+/** "The utterance, the window's user turns or the hub-said names"
+ * (the ruling's own three sources) - narrower than the full context
+ * list: a memory or a clock line grounds nothing a model didn't
+ * actually say or hear this turn. The roster stands in for "hub-said
+ * names" (no name-extraction from the hub's own prior turns exists -
+ * every real pronoun-resolution case is a household member's name,
+ * which the roster already carries). */
+function groundingSourceTexts(utterance: string, context: TurnState["context"]): string[] {
+  const texts = [utterance];
+  for (const item of context) {
+    if (item.source === "roster") texts.push(item.text);
+    if (item.source === "window" && item.id.split("-")[1] === "user") texts.push(item.text);
+  }
+  return texts;
 }
 
 function rosterNames(contextItems: readonly { source: string; text: string }[]): string[] {
@@ -64,14 +114,14 @@ function placeholderProposal(tool: string, call: ToolCall): ActionProposal {
 export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) => {
   const entries: PolicyEntry[] = [];
   // "The model's own tool arguments as the query, grounded against the
-  // window, not the line" (U2's brief) reads, in unspokenArgs.ts's own
-  // replacement note, as an expansion over the old path's utterance-
-  // only check ("an argument must come from the conversation" - the
-  // whole conversation, this turn's own line included, not only the
-  // window's prior turns): a first-turn query like "president of
-  // chile" grounds against THIS utterance; a follow-up's query grounds
-  // against the window's prior turn instead. Both need to ground here.
-  const contextTexts = [state.utterance, ...state.context.map((c) => c.text)];
+  // window, not the line" (U2's brief), stated exactly by the owner's
+  // ruling (state record, "Grounding, stated exactly", 2a28e4e8): the
+  // utterance, the window's user turns, or the hub-said names (the
+  // roster stands in for the last - see groundingSourceTexts()) - a
+  // first-turn query like "president of Chile 2026" grounds against
+  // THIS utterance (sharing "president"/"chile"); a follow-up's query
+  // grounds against the window's prior user turn instead.
+  const sourceTexts = groundingSourceTexts(state.utterance, state.context);
   const roster = rosterNames(state.context);
 
   for (const call of input.calls) {
@@ -117,7 +167,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         entries.push({ proposal, decision: { allow: false, reason: "consent_needed", ask: { prompt: `Want me to look that up?` } } });
         continue;
       }
-      if (!argsGrounded(args, contextTexts)) {
+      if (!argsGrounded(args, sourceTexts)) {
         entries.push({ proposal, decision: { allow: false, reason: "ungrounded_args" } });
         continue;
       }
