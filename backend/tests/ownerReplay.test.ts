@@ -13,7 +13,7 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { loadFixture, summarizeRepeats } from "../scripts/bench/replay";
+import { loadFixture, summarizeRepeats, interleavedPlan, computeBarSummary, type BarScore } from "../scripts/bench/replay";
 import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy, startFakeHomeAssistant, startFakeSearxng, type RunDeps } from "../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
@@ -137,5 +137,121 @@ describe("owner-replay.json", () => {
     // this as a no-op that always equalled REPEATS).
     expect(a.forcedRepeats).toBe(1);
     expect(a.failures.some((f) => f.includes("engine (ENGINE-CONTRACT-01)"))).toBe(true);
+  });
+});
+
+// RERUN-PROTOCOL-01 (dev.md "U6 rerun ruling" (c)): Fable's own
+// acceptance protocol, unit-tested the way summarizeRepeats() already
+// is - synthetic rows, no engine, no filesystem.
+describe("interleavedPlan(): old, new, old, new per row before the next row", () => {
+  test("two rows, two repeats: old/new alternate within a row, never across rows first", () => {
+    const rows = [
+      { id: "a", category: "failed" as const, conv: { id: "a", category: "knowledge" as const, turns: [] } },
+      { id: "b", category: "control" as const, conv: { id: "b", category: "knowledge" as const, turns: [] } },
+    ];
+    const plan = interleavedPlan(rows, 2);
+    expect(plan.map((s) => `${s.row.id}:${s.path}:${s.repeat}`)).toEqual(["a:old:1", "a:new:1", "a:old:2", "a:new:2", "b:old:1", "b:new:1", "b:old:2", "b:new:2"]);
+  });
+
+  test("one row, three repeats: six steps, old always immediately before new on the same repeat", () => {
+    const rows = [{ id: "a", category: "failed" as const, conv: { id: "a", category: "knowledge" as const, turns: [] } }];
+    const plan = interleavedPlan(rows, 3);
+    expect(plan.length).toBe(6);
+    for (let i = 0; i < plan.length; i += 2) {
+      expect(plan[i]?.path).toBe("old");
+      expect(plan[i + 1]?.path).toBe("new");
+      expect(plan[i]?.repeat).toBe(plan[i + 1]?.repeat);
+    }
+  });
+});
+
+describe("computeBarSummary(): the bar's five conditions, each read off the interleaved run's own scores", () => {
+  const FAILED_ROWS = ["president-of-france-repeat", "apple-announce-this-week", "search-mariners-game", "chatgpt-6-luna", "corey-feldman-michael-jackson-friendship"].map((id) => ({ id, category: "failed" as const }));
+  const CONTROL_ROWS = ["control-search-mariners-explicit", "control-negative-spiderman", "control-negative-feeling-down"].map((id) => ({ id, category: "control" as const }));
+  const ALL_ROWS = [...FAILED_ROWS, ...CONTROL_ROWS];
+  const clean: BarScore = { pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok" } };
+  function fullyClean(): Map<string, BarScore[]> {
+    const m = new Map<string, BarScore[]>();
+    for (const row of ALL_ROWS) for (let r = 1; r <= 3; r++) m.set(`${row.id}#${r}`, [clean]);
+    return m;
+  }
+
+  test("all five conditions pass on an identical, fully clean run", () => {
+    const scores = fullyClean();
+    const conditions = computeBarSummary(scores, scores, ALL_ROWS, 3);
+    expect(conditions.every((c) => c.pass)).toBe(true);
+    expect(conditions.length).toBe(5);
+  });
+
+  test("condition 1 fails when a named failed row has a real check failure", () => {
+    const newScores = fullyClean();
+    newScores.set("president-of-france-repeat#1", [{ pass: false, turnIndex: 0, checks: [{ name: "tool", pass: false, detail: "ran none" }], observed: { totalMs: 100, reply: "ok" } }]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[0]?.pass).toBe(false);
+  });
+
+  test("condition 1 fails on an empty reply even when checks pass", () => {
+    const newScores = fullyClean();
+    newScores.set("apple-announce-this-week#2", [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "" } }]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[0]?.pass).toBe(false);
+  });
+
+  test("condition 2 fails when a named control regresses", () => {
+    const newScores = fullyClean();
+    newScores.set("control-negative-spiderman#3", [{ pass: false, turnIndex: 0, checks: [{ name: "toolRan", pass: false, detail: "ran recall" }], observed: { totalMs: 100, reply: "ok" } }]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[1]?.pass).toBe(false);
+  });
+
+  test("condition 3 fails when a plain turn's new-path total exceeds 1.25x the old path's", () => {
+    const oldScores = fullyClean();
+    const newScores = fullyClean();
+    newScores.set("control-search-mariners-explicit#1", [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 200, reply: "ok" } }]);
+    const conditions = computeBarSummary(oldScores, newScores, ALL_ROWS, 3);
+    expect(conditions[2]?.pass).toBe(false);
+  });
+
+  test("condition 3 passes at exactly 1.25x", () => {
+    const oldScores = fullyClean();
+    const newScores = fullyClean();
+    newScores.set("control-search-mariners-explicit#1", [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 125, reply: "ok" } }]);
+    const conditions = computeBarSummary(oldScores, newScores, ALL_ROWS, 3);
+    expect(conditions[2]?.pass).toBe(true);
+  });
+
+  test("condition 4 fails when forced-search turns' median total is 10s or over", () => {
+    const newScores = fullyClean();
+    for (let r = 1; r <= 3; r++) newScores.set(`president-of-france-repeat#${r}`, [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 11_000, reply: "ok", requiredHonored: true } }]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[3]?.pass).toBe(false);
+  });
+
+  test("condition 4 passes with no forced-search turns at all (nothing to measure)", () => {
+    const scores = fullyClean();
+    const conditions = computeBarSummary(scores, scores, ALL_ROWS, 3);
+    expect(conditions[3]?.pass).toBe(true);
+    expect(conditions[3]?.detail).toContain("no forced-search turns");
+  });
+
+  test("condition 5 fails when a multi-turn row's cached_tokens drops between turns", () => {
+    const newScores = fullyClean();
+    newScores.set("president-of-france-repeat#1", [
+      { pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 500 }] } },
+      { pass: true, turnIndex: 1, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 200 }] } },
+    ]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[4]?.pass).toBe(false);
+    expect(conditions[4]?.detail).toContain("president-of-france-repeat#1");
+  });
+
+  test("condition 5 passes when cached_tokens rises (or ties) across a multi-turn row", () => {
+    const newScores = fullyClean();
+    newScores.set("president-of-france-repeat#1", [
+      { pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 3 }] } },
+      { pass: true, turnIndex: 1, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 480 }] } },
+    ]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[4]?.pass).toBe(true);
   });
 });

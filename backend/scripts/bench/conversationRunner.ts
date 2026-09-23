@@ -350,7 +350,34 @@ async function driveTurn(
   if (!result.ok) return { value: null, text: "", timings: { firstDeltaMs: null, firstSentenceMs: null, totalMs: elapsed() }, error: result.error, interrupted: false, spokenCue: null };
   if (result.kind === "immediate") {
     const total = elapsed();
-    return { value: result.value, text: result.value.reply.text, timings: { firstDeltaMs: total, firstSentenceMs: total, totalMs: total }, error: null, interrupted: false, spokenCue: null };
+    // RERUN-PROTOCOL-01 (dev.md "U6 rerun ruling" (c) 3, "both paths on
+    // the same runner shape"): an immediate result (runTurnNext's own
+    // header note - it always resolves this way) still made real,
+    // internally-streamed engine calls (model.ts's startCompleteStream);
+    // this just never surfaced that stream to the caller. The turn's
+    // own stored generation record already has the real first-token
+    // time (request_sent_ms, turn-relative, plus that request's own
+    // first_delta_ms) - reading it back gives an honest firstDeltaMs
+    // instead of collapsing it to the whole call's total, the one gap
+    // that made every new-path row's own "first delta" identical to
+    // its total regardless of how fast the model actually answered.
+    // firstSentenceMs has no equivalent: nothing in this path detects a
+    // sentence boundary mid-generation, so it stays total - an honest
+    // limit, not a guess.
+    let firstDeltaMs = total;
+    const firstGen = db.select({ stats: conversationTurns.stats }).from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+    if (firstGen?.stats) {
+      try {
+        const parsed = JSON.parse(firstGen.stats) as { generations?: { request_sent_ms: number; first_delta_ms: number | null }[] };
+        const gen = parsed.generations?.[0];
+        if (gen && gen.first_delta_ms !== null) firstDeltaMs = gen.request_sent_ms + gen.first_delta_ms;
+      } catch {
+        // Malformed stats JSON (should not happen - buildTurnStats()
+        // always writes valid JSON) falls back to total rather than
+        // throwing mid-bench over a diagnostic-only field.
+      }
+    }
+    return { value: result.value, text: result.value.reply.text, timings: { firstDeltaMs, firstSentenceMs: total, totalMs: total }, error: null, interrupted: false, spokenCue: null };
   }
   // The route (src/routes/turn.ts, streamTurnEvents) plays the spoken cue
   // when the model's first token is slow to arrive (a race against a
@@ -709,6 +736,22 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     // (a summary refresh may follow it on the same proxy).
     const own = requests[0];
     const requiredCall = requests.find((r) => r.toolChoice === "required");
+    // RERUN-PROTOCOL-01: the turn row's own stored stats.nodes[]/
+    // generations[], read once here rather than a second time in
+    // replay.ts - one definition of "how a turn's stats JSON gets
+    // parsed," the same row `row?.source`/`row?.pluginId` above already
+    // read from. A review caught the first cut here with no try/catch,
+    // unlike the sibling parse in driveTurn() above - a malformed
+    // `stats` value would throw mid-loop and abort the whole
+    // conversation run over a diagnostic-only field.
+    let parsedStats: { nodes?: TurnObserved["nodeTrace"]; generations?: TurnObserved["generationTrace"] } | null = null;
+    if (row?.stats) {
+      try {
+        parsedStats = JSON.parse(row.stats as unknown as string) as { nodes?: TurnObserved["nodeTrace"]; generations?: TurnObserved["generationTrace"] };
+      } catch {
+        // Falls back to null rather than throwing mid-bench.
+      }
+    }
     const currentMediaUrls = (driven.value?.media_items ?? (driven.value?.media ? [driven.value.media] : [])).map((item) => item.url);
     const previousUrls = previousMediaUrls[conversationId] ?? [];
     const mediaDisjointFromPrevious = previousUrls.length > 0 && currentMediaUrls.length > 0 && currentMediaUrls.every((url) => !previousUrls.includes(url));
@@ -790,6 +833,8 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       requiredHonored: requiredCall?.hasToolCalls ?? null,
       requiredCachedTokens: requiredCall?.cachedTokens ?? null,
       requiredPromptTokens: requiredCall?.promptTokens ?? null,
+      nodeTrace: parsedStats?.nodes ?? null,
+      generationTrace: parsedStats?.generations ?? null,
     };
     previousReplies[conversationId] = observed.reply;
     previousMediaUrls[conversationId] = currentMediaUrls;

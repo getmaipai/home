@@ -148,6 +148,18 @@ export interface TurnObserved {
    * no `usage`). */
   requiredCachedTokens?: number | null;
   requiredPromptTokens?: number | null;
+  /** RERUN-PROTOCOL-01 (dev.md "U6 rerun ruling" (c) 1): the turn's own
+   * stored `stats.nodes[]`, verbatim off the DB row - `null` when no
+   * turn row was written (a threw conversation). The interleaved rerun
+   * prints this per turn (context, each generation's thinking flag,
+   * prompt/cached tokens and timing, the tool call's own wall time,
+   * answer); nothing here is scored, only printed. */
+  nodeTrace?: readonly { node: string; startMs: number; endMs: number; outcome: unknown; reasoning?: unknown }[] | null;
+  /** The same row's own `stats.generations[]`, verbatim - RERUN-
+   * PROTOCOL-01's own per-generation detail (reason, thinking,
+   * prompt_n, cache_n, prompt_ms, predicted_ms), printed beside
+   * `nodeTrace`'s `model` entries rather than duplicated into them. */
+  generationTrace?: readonly { reason: string; thinking: boolean; prompt_n: number | null; cache_n: number | null; prompt_ms: number | null; predicted_ms: number | null }[] | null;
 }
 
 export interface Check {

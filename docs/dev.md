@@ -21218,3 +21218,87 @@ Jesse found the composer's own waveform trigger reading as a dark circle with a 
 **Low-effort review, two rounds - both real findings, both fixed.** (1) The desktop rail's own `onStartTemporary` didn't reset `railPeeked` the way `onNewThread`'s own wrapper already does (`onThreadIdChange`'s `closeSheet` closes the Sheet/artifact/compare panels on any thread-id change, but never touches `railPeeked`, and a click inside `#next-chat-rail` never fires the pointer/blur-based `closeRailPeek`) - a peeked-open collapsed rail would stay stuck open after starting a temporary chat from it. Fixed by mirroring `onNewThread`'s own `setRailPeeked(false)` exactly. (2) The button carried both an `aria-label` and a redundant `sr-only` span with the same text - dead markup once `aria-label` wins accessible-name computation, a future desync risk if only one copy is ever updated. Fixed by dropping the `aria-label`, leaving the visible `sr-only` span as the one source of the accessible name (the same shape `ThreadListNew`'s own default children already use). The re-review (scoped to just these two hunks, per the review-budget policy) confirmed both fixes and checked the one thing they might have missed - whether the mobile Sheet's own `onStartTemporary={armTemporaryChat}` needed the identical treatment - and confirmed it doesn't (`railPeeked` is desktop-rail-only, `lg:block`, mutually exclusive with the phone Sheet). It also surfaced one adjacent, pre-existing gap, out of either hunk's own scope: clicking an EXISTING thread row while the rail is peeked open leaves it stuck too (nothing new - `closeSheet` never had `railPeeked` reach, this item's own new button just happened to be what surfaced it). Filed as [getmaipai/home#139](https://github.com/getmaipai/home/issues/139), not fixed here.
 
 **Verified:** three new tests (`NextChatPage.test.tsx`) - the button appears for the default (owner) role, renders nothing for a child, and marks the next turn's `temporary: true` the same way CHAT-HEADER-01's own sibling test proves the header's entry does. Full frontend suite green (719 tests, up from 716). A new `--chat-list-review` capture (`scripts/screenshot.ts`) seeds `ui.shell.next` and one real conversation, opens the phone Sheet via "Show threads" (scoped to the open dialog - the rail column stays in the DOM, hidden, once the Sheet's own copy of the list opens beside it, the same disambiguation `NextChatPage.test.tsx`'s own Sheet test already needed), four images (1440/390 × light/dark) opened and judged: the incognito pill sits beside New Thread in both themes and both viewports, no overlap, no wrap. The standalone-flag/default-matrix isolation gap (named in CHAT-HEADER-03/02's own entries) reproduced again here - `docs/assets/screens/` regenerated as a side effect, discarded via `git checkout -- docs/assets/screens/ && git clean -fd docs/assets/screens/`, confirmed against the real gate's own `bun run a11y` (which uses `--a11y-only` and doesn't trigger it) that this item's actual code changes never touch those files. Still out of scope to fix, same as the last two times.
+
+## RERUN-PROTOCOL-01: Fable's own acceptance protocol, built into the bench (2026-09-23)
+
+The flip's own acceptance run (dev.md "U6 rerun ruling" (c)) was a
+manual procedure - the exact opposite of everything else in this
+plan's own discipline about not trusting a session to remember a
+protocol correctly twice. Built into `replay.ts` as its own mode,
+`--interleaved`, so the next rerun runs it rather than someone
+re-reading section (c) and hand-assembling it again.
+
+**Old, new, old, new, on the same row, before moving to the next.**
+`interleavedPlan()` (pure, exported) turns the row list into the exact
+step sequence (c).2 names - `repeat 1 old, repeat 1 new, repeat 2 old,
+...` for each row in turn, never all of one path before starting the
+other - so a load spike from another session on this shared machine
+lands on both paths roughly equally instead of biasing whichever
+happened to run in the quieter half. A `systemLoadLine()` (load
+average, `who`'s own line count) prints before every step - diagnostic
+only, wrapped so a machine with no `who` gets "unknown" rather than a
+crashed run.
+
+**The turn's own trace, printed, not just scored.** `stats.nodes[]`
+(c).1 asks for was already written to every turn row; `TurnObserved`
+now carries it back out (`nodeTrace`, `generationTrace` - the row's own
+stored JSON, parsed once in `conversationRunner.ts` where every other
+field already reads that row) so `renderNodeTrace()` can print context/
+model/tool/answer wall time, each generation's thinking flag, and its
+prompt/cached tokens, per turn, in the run's own console output.
+
+**The new path streams too - or close enough to matter.** `driveTurn()`
+used to collapse the new path's own `firstDeltaMs`/`firstSentenceMs`/
+`totalMs` to one identical number, since `runTurnNext()` always
+resolves "immediate" (its own header note - it has no live token
+stream to the caller). But the engine call underneath it already
+streams (`model.ts`'s `startCompleteStream`, real SSE to the engine) -
+the turn's own stored generation record already has a real first-token
+time, just never read back. `driveTurn()` now computes it
+(`request_sent_ms + first_delta_ms` on the first generation, both
+already turn-relative) instead of guessing at the total. Real
+token-by-token streaming exposed to the bench itself is a separate,
+larger unit (wiring the new path into the live HTTP route is already
+named elsewhere as later work) - this is the honest middle ground: real
+data, not a live stream, for a measurement that only needs the number,
+not the stream. `firstSentenceMs` stays `total` - nothing in this path
+detects a sentence boundary mid-generation, and pretending precision
+it doesn't have would be worse than naming the limit.
+
+**The bar, as five pass/fail lines, not a table someone reads by eye.**
+`computeBarSummary()` reads the interleaved run's own scores (never
+re-derives anything from a printed table) and prints:
+
+1. The five named failed rows (`president-of-france-repeat`, `apple-
+   announce-this-week`, `search-mariners-game`, `chatgpt-6-luna`,
+   `corey-feldman-michael-jackson-friendship`) clean, no engine-classed
+   row, no empty reply.
+2. The three named controls (`control-search-mariners-explicit`,
+   `control-negative-spiderman`, `control-negative-feeling-down`) 3/3.
+3. Every plain (non-forced) turn's total within 1.25x the old path's
+   total, matched by row/repeat/turn-index between the two paths.
+4. Every forced-search turn's total under 10s median.
+5. `cached_tokens` rising, or tying, across every multi-turn row -
+   never dropping; a tie passes (two identical-cost turns are not a
+   regression), a real decrease fails.
+
+These five are named explicitly (not derived from the fixture's own
+wider failed/control split, 8 and 13 rows) because the bar itself
+names them - `primetime-trailer-correction` and the two chile rows stay
+out on purpose (real parity gaps, `SIGNAL-01`/`CONFIRM-01`'s own
+scope, not this bar's).
+
+**Verified:** `interleavedPlan()`'s own step order (two rows/two
+repeats; one row/three repeats, checking old always immediately
+precedes new on the same repeat number). `computeBarSummary()` against
+synthetic rows built from a narrow `BarScore` shape (never a full
+fixture object, the same narrowing `summarizeRepeats()` already uses) -
+each of the five conditions proven to both pass on a clean run and fail
+on a targeted break (a real check failure, an empty reply, a control
+regression, a 1.26x plain-turn ratio, an 11s forced-turn median, a
+cache-token drop between two turns of the same row). Full backend suite
+(3935/3935) and `tsc --noEmit` green.
+
+**Not run here.** The live interleaved rerun itself waits for
+`ENGINE-CONTRACT-03` and a window the coordinator clears (every lane's
+gates paused) - this item is the tooling, never the measurement.

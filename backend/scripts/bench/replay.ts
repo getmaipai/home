@@ -18,6 +18,7 @@
 //   bun run backend/scripts/bench/replay.ts --hub-live           U2d's own acceptance run only
 //   bun run backend/scripts/bench/replay.ts --hub-live --new     ...on the new path (turn.pipeline.next)
 //   bun run backend/scripts/bench/replay.ts --hub-live --keep-data   ...and keep the isolated data dir's turn traces after
+//   bun run backend/scripts/bench/replay.ts --hub-live --interleaved   RERUN-PROTOCOL-01: both paths, old/new/old/new per row, the bar's five conditions as pass/fail lines
 //
 // Scripted mode needs no engine at all: it starts one in-process stub
 // (@maipai/spec's own stubServer, the same double
@@ -41,11 +42,12 @@
 // check before starting, one request at a time, a 30s quiet wait after
 // any real household [turn] line), never used for an ordinary bench.
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, loadavg } from "node:os";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
 import type { BenchConversation, TurnExpectation } from "./conversationFixture";
 import { HONESTY_LINES } from "./conversationFixture";
-import type { TurnScore } from "./conversationScore";
+import type { TurnScore, TurnObserved } from "./conversationScore";
 import type { RecordingProxy } from "./recordingProxy";
 
 export interface ReplayFixture {
@@ -189,24 +191,209 @@ export function summarizeRepeats(rows: readonly { id: string; category: "failed"
   });
 }
 
-if (import.meta.main) {
-  await runMain();
+// RERUN-PROTOCOL-01 (dev.md "U6 rerun ruling" (c)): Fable's own
+// acceptance protocol, built into the bench as its own mode rather than
+// a manual procedure someone has to remember. `--interleaved` (with
+// `--hub-live`) runs old, new, old, new - the same row, before moving
+// to the next - so load cancels between the two paths instead of
+// biasing whichever happened to run in the machine's own quieter half.
+const INTERLEAVED = process.argv.includes("--interleaved");
+
+export interface InterleavedStep {
+  path: "old" | "new";
+  row: { id: string; category: "failed" | "control"; conv: BenchConversation };
+  repeat: number;
 }
 
-async function runMain(): Promise<void> {
-  if (HUB_LIVE) {
-    const { refuseIfGateRunning } = await import("./liveHubQuiet");
-    refuseIfGateRunning("replay --hub-live");
+/** Pure (no engine, no filesystem) so a test drives it directly against
+ * a small synthetic row list rather than a live run. */
+export function interleavedPlan(rows: readonly { id: string; category: "failed" | "control"; conv: BenchConversation }[], repeats: number): InterleavedStep[] {
+  const steps: InterleavedStep[] = [];
+  for (const row of rows) {
+    for (let repeat = 1; repeat <= repeats; repeat++) {
+      steps.push({ path: "old", row, repeat });
+      steps.push({ path: "new", row, repeat });
+    }
   }
+  return steps;
+}
 
-  const fixture = loadFixture();
-
-  let ownDataDir: string | null = null;
-  if (!process.env.MAIPAI_DATA_DIR) {
-    ownDataDir = mkdtempSync(join(tmpdir(), "owner-replay-"));
-    process.env.MAIPAI_DATA_DIR = ownDataDir;
+/** A best-effort, diagnostic-only line - never part of any scored
+ * condition, never thrown over. `who` is POSIX (both macOS and Linux
+ * carry it); a machine without it, or without a shell at all, gets
+ * "unknown" instead of a crashed run. */
+function systemLoadLine(): string {
+  const load = loadavg().map((n) => n.toFixed(2)).join(", ");
+  let users = "unknown";
+  try {
+    const out = execSync("who", { encoding: "utf-8", timeout: 2000 });
+    users = String(out.split("\n").filter((l) => l.trim().length > 0).length);
+  } catch {
+    // No `who`, no shell, or it timed out - diagnostic only.
   }
+  return `load average ${load}; ${users} logged-in user line(s)`;
+}
 
+/** RERUN-PROTOCOL-01 (c).1: "stats.nodes[] printed per turn: context,
+ * each model generation with its thinking flag, prompt tokens, cached
+ * tokens and wall time, the tool call with the package and its wall
+ * time, answer." `generationTrace` is turn-scoped, not node-scoped (a
+ * retry or a second round can add a generation without a second
+ * `model` node entry, or vice versa), so it prints once per turn,
+ * after every node's own line, rather than nested under one model
+ * entry it might not line up with. */
+function renderNodeTrace(observed: TurnObserved): string[] {
+  const lines: string[] = [];
+  for (const n of observed.nodeTrace ?? []) {
+    const wallMs = n.endMs - n.startMs;
+    const label = n.node === "tool" ? `tool (${observed.pluginId ?? "?"})` : n.node;
+    lines.push(`       ${label}: ${wallMs}ms`);
+  }
+  for (const g of observed.generationTrace ?? []) {
+    lines.push(`       generation "${g.reason}": thinking=${g.thinking} prompt_n=${g.prompt_n ?? "?"} cache_n=${g.cache_n ?? "?"} prompt_ms=${g.prompt_ms ?? "?"} predicted_ms=${g.predicted_ms ?? "?"}`);
+  }
+  return lines;
+}
+
+function median(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2 : (sorted[mid] ?? 0);
+}
+
+export interface BarCondition {
+  label: string;
+  pass: boolean;
+  detail: string;
+}
+
+// The bar's own named rows (dev.md "U6 rerun ruling" (d)): the five
+// failed rows already clean before this protocol exists to prove
+// (primetime-trailer-correction and the two chile rows stay out - real
+// parity gaps, SIGNAL-01/CONFIRM-01's own scope, not this bar's), and
+// the three controls regression B found. Named here, not derived from
+// the fixture's own failed/control split, because that split is wider
+// than the bar (8 failed rows, 13 controls) and the bar is explicit
+// about which of each it means.
+const BAR_CLEAN_FAILED_ROW_IDS = ["president-of-france-repeat", "apple-announce-this-week", "search-mariners-game", "chatgpt-6-luna", "corey-feldman-michael-jackson-friendship"];
+const BAR_CONTROL_ROW_IDS = ["control-search-mariners-explicit", "control-negative-spiderman", "control-negative-feeling-down"];
+
+/** The exact structural slice this function reads - never the full
+ * TurnScore/TurnObserved (40-odd required fields) - the same narrowing
+ * summarizeRepeats() above already uses, so a test builds a synthetic
+ * row with `observed: { totalMs: 100, reply: "hi" }` instead of a full
+ * fixture object. */
+export interface BarScore {
+  pass: boolean | null;
+  turnIndex: number;
+  checks: readonly { name: string; pass: boolean; detail: string }[];
+  observed: { requiredHonored?: boolean | null; totalMs: number; reply: string; generationTrace?: readonly { cache_n: number | null | undefined }[] | null };
+}
+
+/** RERUN-PROTOCOL-01: the five conditions dev.md "U6 rerun ruling" (d)
+ * names as what flips U6, each read straight off the interleaved run's
+ * own scores - never re-derived by hand from a printed table again.
+ * Pure, so a test drives it with synthetic rows the same way
+ * summarizeRepeats() already is. */
+export function computeBarSummary(oldScores: ReadonlyMap<string, readonly BarScore[]>, newScores: ReadonlyMap<string, readonly BarScore[]>, rows: readonly { id: string; category: "failed" | "control" }[], repeats: number): BarCondition[] {
+  const conditions: BarCondition[] = [];
+  const isForced = (s: BarScore) => s.observed.requiredHonored === true || s.observed.requiredHonored === false;
+
+  const namedFailedRows = rows.filter((r) => BAR_CLEAN_FAILED_ROW_IDS.includes(r.id));
+  const failedVerdicts = summarizeRepeats(namedFailedRows, newScores, repeats);
+  const failedClean = failedVerdicts.every((v) => v.passRepeats === repeats);
+  const noEngineRow = failedVerdicts.every((v) => v.engineRepeats === 0);
+  const noEmptyReply = namedFailedRows.every((row) => {
+    for (let r = 1; r <= repeats; r++) {
+      if ((newScores.get(`${row.id}#${r}`) ?? []).some((s) => s.observed.reply.trim().length === 0)) return false;
+    }
+    return true;
+  });
+  conditions.push({
+    label: "the five named failed rows stay clean, no engine-classed row, no empty reply",
+    pass: failedClean && noEngineRow && noEmptyReply,
+    detail: failedVerdicts.map((v) => `${v.id}: ${v.passRepeats}/${repeats} clean, ${v.engineRepeats} engine`).join("; "),
+  });
+
+  const namedControlRows = rows.filter((r) => BAR_CONTROL_ROW_IDS.includes(r.id));
+  const controlVerdicts = summarizeRepeats(namedControlRows, newScores, repeats);
+  const controlsClean = controlVerdicts.every((v) => v.passRepeats === repeats);
+  conditions.push({
+    label: "the three named controls are 3/3 clean",
+    pass: controlsClean,
+    detail: controlVerdicts.map((v) => `${v.id}: ${v.passRepeats}/${repeats}`).join("; "),
+  });
+
+  let worstPlainRatio = 0;
+  let plainCount = 0;
+  for (const row of rows) {
+    for (let r = 1; r <= repeats; r++) {
+      const oldTurns = (oldScores.get(`${row.id}#${r}`) ?? []).filter((s) => !isForced(s));
+      const newTurns = (newScores.get(`${row.id}#${r}`) ?? []).filter((s) => !isForced(s));
+      for (let i = 0; i < Math.min(oldTurns.length, newTurns.length); i++) {
+        const oldMs = oldTurns[i]!.observed.totalMs;
+        const newMs = newTurns[i]!.observed.totalMs;
+        if (oldMs <= 0) continue;
+        plainCount++;
+        worstPlainRatio = Math.max(worstPlainRatio, newMs / oldMs);
+      }
+    }
+  }
+  conditions.push({
+    // A review caught this failing hard on zero plain turns, unlike
+    // condition 4's own "nothing to measure" treatment below for the
+    // identical shape (no matching data) - aligned to the same
+    // convention: nothing to measure is not a regression.
+    label: "every plain turn's total is within 1.25x the old path's total",
+    pass: plainCount === 0 || worstPlainRatio <= 1.25,
+    detail: plainCount === 0 ? "no plain turns matched between the two paths" : `worst ratio ${worstPlainRatio.toFixed(2)}x across ${plainCount} plain turns`,
+  });
+
+  const forcedTotals: number[] = [];
+  for (const row of rows) {
+    for (let r = 1; r <= repeats; r++) {
+      for (const s of (newScores.get(`${row.id}#${r}`) ?? []).filter(isForced)) forcedTotals.push(s.observed.totalMs);
+    }
+  }
+  const forcedMedian = median(forcedTotals);
+  conditions.push({
+    label: "every forced-search turn's total is under 10s median",
+    pass: forcedTotals.length === 0 || forcedMedian < 10_000,
+    detail: forcedTotals.length === 0 ? "no forced-search turns this run" : `median ${forcedMedian.toFixed(0)}ms across ${forcedTotals.length} forced turns`,
+  });
+
+  let multiTurnRows = 0;
+  const cacheFailures: string[] = [];
+  for (const row of rows) {
+    for (let r = 1; r <= repeats; r++) {
+      const newTurns = newScores.get(`${row.id}#${r}`) ?? [];
+      if (newTurns.length < 2) continue;
+      multiTurnRows++;
+      let prevCache = -Infinity;
+      for (const t of newTurns) {
+        const cache = t.observed.generationTrace?.[0]?.cache_n;
+        if (cache === undefined || cache === null) continue;
+        if (cache < prevCache) {
+          cacheFailures.push(`${row.id}#${r}`);
+          break;
+        }
+        prevCache = cache;
+      }
+    }
+  }
+  conditions.push({
+    label: "cached_tokens rises across every multi-turn row",
+    pass: multiTurnRows === 0 || cacheFailures.length === 0,
+    detail: multiTurnRows === 0 ? "no multi-turn rows in this fixture" : `${multiTurnRows - cacheFailures.length}/${multiTurnRows} rows rising${cacheFailures.length > 0 ? `; failed: ${cacheFailures.join(", ")}` : ""}`,
+  });
+
+  return conditions;
+}
+
+/** The `--hub-live`/`--live`/scripted upstream selection every mode
+ * shares - factored out so `runInterleaved()` doesn't duplicate it. */
+async function resolveUpstream(): Promise<{ stub: { url: string; stop: () => void } | null; proxy: RecordingProxy | null }> {
   let stub: { url: string; stop: () => void } | null = null;
   let proxy: RecordingProxy | null = null;
   if (HUB_LIVE) {
@@ -234,6 +421,127 @@ async function runMain(): Promise<void> {
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     if (!process.env.MAIPAI_EMBED_URL) process.env.MAIPAI_EMBED_URL = stub.url;
   }
+  return { stub, proxy };
+}
+
+async function runInterleaved(): Promise<void> {
+  if (HUB_LIVE) {
+    const { refuseIfGateRunning } = await import("./liveHubQuiet");
+    refuseIfGateRunning("replay --interleaved");
+  }
+
+  const fixture = loadFixture();
+  let ownDataDir: string | null = null;
+  if (!process.env.MAIPAI_DATA_DIR) {
+    ownDataDir = mkdtempSync(join(tmpdir(), "owner-replay-interleaved-"));
+    process.env.MAIPAI_DATA_DIR = ownDataDir;
+  }
+
+  const { stub, proxy } = await resolveUpstream();
+  const setup = await import("./setup");
+  const { startBench, finishBench } = setup;
+  const runner = await import("./conversationRunner");
+  const { setHouseholdSettingValue } = await import("@/lib/settings");
+
+  await startBench();
+
+  console.log("\n## Run header\n");
+  console.log(
+    JSON.stringify(
+      {
+        mode: HUB_LIVE ? "hub-live interleaved (127.0.0.1:8788, waits for household quiet)" : LIVE ? "live interleaved" : "scripted interleaved (no live model - see file header)",
+        date: new Date().toISOString(),
+        chat: process.env.MAIPAI_LLAMA_SERVER_URL,
+        embed: process.env.MAIPAI_EMBED_URL,
+        repeats: REPEATS,
+        failedRows: fixture.failed.length,
+        controlRows: fixture.control.length,
+      },
+      null,
+      2,
+    ),
+  );
+
+  const beforeTurn = HUB_LIVE ? (await import("./liveHubQuiet")).waitForHubQuiet.bind(null, undefined, (msg: string) => console.log(msg.replace("live-hub-quiet", "replay --interleaved"))) : undefined;
+
+  const log = runner.captureTurnLog();
+  const people = runner.createBenchPeople();
+  const homeAssistant = runner.startFakeHomeAssistant();
+  const searxng = runner.startFakeSearxng();
+  const oldScoresByConversationId = new Map<string, TurnScore[]>();
+  const newScoresByConversationId = new Map<string, TurnScore[]>();
+  const rows: { id: string; category: "failed" | "control"; conv: BenchConversation }[] = [
+    ...fixture.failed.map((conv) => ({ id: conv.id, category: "failed" as const, conv })),
+    ...fixture.control.map((conv) => ({ id: conv.id, category: "control" as const, conv })),
+  ];
+  const plan = interleavedPlan(rows, REPEATS);
+
+  try {
+    for (const step of plan) {
+      setHouseholdSettingValue("turn.pipeline.next", step.path === "new");
+      if (step.path === "new") setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
+      console.log(`\n[replay --interleaved] ${step.path} repeat ${step.repeat}/${REPEATS}: ${step.row.id}`);
+      console.log(`       ${systemLoadLine()}`);
+      const run = await runner
+        .runConversation(step.row.conv, {
+          people,
+          proxy,
+          log,
+          drainJudge: async () => {},
+          backdate: (days, turnIds) => runner.backdateBenchRows(people, days, turnIds),
+          homeAssistant,
+          beforeTurn,
+        })
+        .catch((err: Error) => {
+          console.error(`[replay --interleaved] ${step.path} ${step.row.id} repeat ${step.repeat} threw: ${err.message}`);
+          return { scores: [], turnIds: [] as string[] };
+        });
+      for (const s of run.scores) for (const line of renderNodeTrace(s.observed)) console.log(line);
+      const target = step.path === "old" ? oldScoresByConversationId : newScoresByConversationId;
+      target.set(`${step.row.id}#${step.repeat}`, run.scores);
+    }
+  } finally {
+    log.stop();
+    homeAssistant.stop();
+    searxng.stop();
+  }
+
+  console.log("\n## Bar summary\n");
+  for (const c of computeBarSummary(oldScoresByConversationId, newScoresByConversationId, rows, REPEATS)) {
+    console.log(`${c.pass ? "PASS" : "FAIL"} ${c.label}`);
+    console.log(`     ${c.detail}`);
+  }
+
+  runner.cleanupBenchPeople(people);
+  if (proxy) proxy.stop();
+  if (stub) stub.stop();
+  // RERUN-PROTOCOL-01 (c).1: "--keep-data on for the run" - always,
+  // this mode's own data dir is never deleted, unlike the single-path
+  // modes above where --keep-data stays opt-in.
+  if (ownDataDir) console.log(`\nturn traces kept at ${ownDataDir}`);
+
+  finishBench({ executed: [...oldScoresByConversationId.values(), ...newScoresByConversationId.values()].flat().length, engine: HUB_LIVE ? `hub-live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : LIVE ? `live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : "scripted (stub, no live model)" });
+}
+
+if (import.meta.main) {
+  await (INTERLEAVED ? runInterleaved() : runMain());
+}
+
+async function runMain(): Promise<void> {
+  if (HUB_LIVE) {
+    const { refuseIfGateRunning } = await import("./liveHubQuiet");
+    refuseIfGateRunning("replay --hub-live");
+  }
+
+  const fixture = loadFixture();
+
+  let ownDataDir: string | null = null;
+  if (!process.env.MAIPAI_DATA_DIR) {
+    ownDataDir = mkdtempSync(join(tmpdir(), "owner-replay-"));
+    process.env.MAIPAI_DATA_DIR = ownDataDir;
+  }
+
+  const { stub, proxy } = await resolveUpstream();
 
   const setup = await import("./setup");
   const { startBench, finishBench } = setup;
