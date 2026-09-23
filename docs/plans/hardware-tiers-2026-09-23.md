@@ -21,6 +21,7 @@ capabilities.
 | Voice (stt, tts) | sherpa-onnx on the CPU, resident | sherpa-onnx in process, resident, under 1 GB | the same, on the CPU | the same |
 | Photo understanding (`vision` role) | not available | a small vision model on demand (Qwen3-VL-4B at Q4, about 3.5 GB while a photo turn runs), evicted when idle | the same model on demand on the second card | resident |
 | Picture creation (`image` role) | not available | on demand on a second in-house machine when one exists (a URL-tier engine); otherwise on this machine's MPS with the chat engine paused for about a minute per picture | on demand on the second card (FLUX.2 Klein 4B at fp8 or 4-bit, the text encoder in RAM), chat unaffected; when both cards are needed, the judge yields first | on the Studio itself, admitted by the governor beside a resident chat model |
+| Video creation (`video` role) | not available | off by default; a step-up a person may turn on where the budget allows (the catalog's candidate `wan-2-2-ti2v-5b-fp8`, unmeasured on this tier) | off by default; the same step-up on the second card | off by default; the same candidate under the governor beside chat |
 | Deployment limits | one conversation, typed or spoken, at a time | one conversation with speech plus one photo or picture job at a time | the same, with the image job on its own card | two conversations with speech, a photo and a picture job at once (STUDIO-ACCEPT-01's original workload) |
 
 The table is the default proposal at each reference point, never what a
@@ -235,7 +236,16 @@ and the default proposal, nothing more.
    the rest of the computer, the expected speed, and what a smaller
    choice loses ("photos take longer", "no pictures", "shorter
    answers"). The person may set any role to a smaller pinned
-   candidate, to on demand instead of resident, or off. The page is the
+   candidate, to on demand instead of resident, or off, and the trade
+   runs both ways (owner's rule, 2026-09-23): the proposal is a budget
+   allocation across roles, and memory freed by turning a role off or
+   stepping it down may go to another role, a larger chat model than
+   the tier's default or the vision model resident. The page says the
+   trade in a parent's words ("turn off pictures and chat can use the
+   bigger model, which answers better") and refuses a set that does
+   not fit the machine's measured budget, naming what to turn down.
+   Video generation is a role the budget holds too, off on every tier
+   today, so it is a later step-up, not a redesign. The page is the
    template's form layout, no hand-built control.
 3. **One Setting record per role.** The choice is a declared settings
    key per role (`engines.<role>.choice`: `proposed`, a smaller pinned
@@ -266,11 +276,14 @@ input that accepts a per-role choice below the proposal: the governor's
 route or setting carries a step-down. Two rows, in the order table:
 `STACK-SIZE-01` (M, Sonnet; `stack/backend/src/profiles.ts`,
 `lib/supervisor.ts`, `lib/governor.ts`, the hardware and models routes):
-the sizer takes the per-role choice from the settings record, applies it
-at or below the proposal (a larger choice than the proposal is refused
-with the reason), and the residency budget honours it; test: a p64
-machine with `chat` stepped to the 8B and `image` set to `off` runs the
-8B and never admits an image job. `SETUP-SIZE-01` (M, Sonnet; the
+the sizer takes the per-role choice from the settings record and accepts
+any per-role allocation that fits the machine's measured budget with the
+governor's margin kept, in both directions, refusing a set that does not
+fit with the reason and the roles to turn down; tests: a p64 machine
+with `chat` stepped to the 8B and `image` off runs the 8B and never
+admits an image job, and a p32-class machine with `image` off admits
+the next larger chat candidate the catalog pins while the same machine
+with `image` on refuses it with the reason. `SETUP-SIZE-01` (M, Sonnet; the
 hardware step of "The first-run wizard, end to end" and the same page
 under Settings, a shadcndashboard form layout, the settings key spec
 first): the proposal with impact per role and the step-down controls;
