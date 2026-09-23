@@ -27,6 +27,13 @@ capabilities.
 The table is the default proposal at each reference point, never what a
 machine is locked to (see "The configuration is proposed, never fixed").
 
+Tier 2's bench machine is the household's Linux laptop, kept for that
+role on 2026-09-23 (reversing the 2026-09-17 decision to sell it after
+the move; `studio-day-one-2026-09-23.md`, decision 2): the tier 2
+limits are measured on it, it is FLOOR-ACCEPT-01's stand-in only until
+an 8 GB machine is on the bench, and it stays the Session C lane until
+STUDIO-LANE-01 takes over.
+
 What the tiers share: the roles (`chat`, `judge`, `embed`, `stt`, `tts`,
 `vision`, `image`), the on-demand admission and eviction, the machine
 and its budget, the chat Elements and the composer. What they never

@@ -27,15 +27,16 @@ place on day one.
 | llama-server b10797, macOS arm64 | the pinned archive (`engineCatalog.ts`) | small | already under `data/engines` on this Mac |
 | Qwen3.8-27B | GGUF at Q6 for llama-server, the official repository at a pinned revision | about 22 GB `(?)` | MEASURE-02's first Studio candidate |
 | Qwen3.6-35B-A3B | GGUF at Q6, pinned | about 29 GB `(?)` | the second candidate |
-| Qwen3.8-27B-Splash | Splash's package (4-bit, with its DFlash 2 draft and the vision encoder) | 17.4 GB | Splash ships 4-bit only; question 4 |
+| Qwen3.8-27B-Splash | Splash's package (4-bit, with its DFlash 2 draft and the vision encoder) | 17.4 GB | Splash ships 4-bit only; both quantizations are measured (decision 4) |
 | Qwen3.6-35B-A3B-Splash | the same | 20.9 GB | |
+| Qwen3.8-27B and Qwen3.6-35B-A3B, MLX format | the MLX-community conversions at pinned revisions, for oMLX and mlx-serve | about 15 and 20 GB at 4-bit `(?)` | the engine set is measured, not assumed |
 | Splash itself | `brew install incoai/tap/splash` | small | Homebrew needs the network on day one; the one allowed download, small, and its formula revision recorded |
 | Bun, uv, sherpa-onnx assets, the embedder, the judge 4B, Pocket TTS | the pins the installer and the Stack already carry | a few GB | already on this Mac; copied, not re-fetched |
 
 Two facts checked on 2026-09-23: Splash requires "Apple M3 or newer,
 macOS 26.4 or later, Homebrew, and 36 GB of unified memory" (its
-README); this Mac reports macOS 27.0, and the Studio's shipped version
-is question 1. Splash's README documents downloading models on first
+README); this Mac reports macOS 27.0, and the Studio ships with 26.4
+(decision 1), so the floor is met on day one. Splash's README documents downloading models on first
 run and says nothing about pre-downloading a package or running
 offline; its packages go to the Hugging Face cache, so the staging kit
 pre-seeds that cache and the dry run proves whether `splash serve`
@@ -56,7 +57,7 @@ rest gain the same flag).
 
 | Step | Command | Check |
 |---|---|---|
-| 1. macOS and account | Settings: the household's own account, FileVault on, automatic login off, sleep never for the desktop | `sw_vers` at or above 26.4; `sysctl hw.memsize` reads 128 GB |
+| 1. macOS and account | Settings: the household's own account, FileVault on, automatic login off, sleep never for the desktop | `sw_vers` reads 26.4 (decision 1); `sysctl hw.memsize` reads 128 GB |
 | 2. Homebrew, Bun, uv | the installer's own `ensure_bun`; `brew install incoai/tap/splash` | `bun --version` matches the pin; `splash --version` |
 | 3. Copy the staging kit | `scripts/studio/stage.sh --install /Volumes/<drive>` | `stage.sh --verify` green on the copy |
 | 4. Install Home and the Stack | `bash scripts/install.sh` (the tagged release, the Stack at `STACK_TAG`) | the launchd services up; `curl localhost:3000/health` and the Stack's health both ok |
@@ -78,8 +79,12 @@ One scripted run, `scripts/studio/evaluate.sh`, chains what already
 exists and writes tables, so a Claude session reads tables and never
 babysits: the Stack's Studio bench protocol (`stack/scripts/bench/
 studio-bench.sh`, STACK-74: load time, first token, tokens per second,
-footprint per pinned model); ENGINE-CONTRACT-01's suite per engine
-(llama-server at b10797, Splash at its formula revision); ENGINE-SPLASH-01's
+footprint per pinned model); ENGINE-CONTRACT-01's suite per engine, and the engine set is four:
+llama-server at b10797, oMLX, mlx-serve and Splash at their pinned
+revisions (the 2026-09-17 survey adopted oMLX as the MLX language-engine
+candidate measured on the same bench, and the Stack's chat engine setting
+already names mlx-serve), each through the same contract suite, the same
+MEASURE-02 rows and the same acceptance workload; ENGINE-SPLASH-01's
 comparison on the two candidates; MEASURE-02's rows for each candidate
 (tool-calling at ten repeats, the inverse miss, query rewrite, latency
 cold and warm at 32K with the effective rate, the end-to-end search
@@ -89,10 +94,14 @@ bench already writes a report; the script runs them in order on a
 scratch data directory, collects the summary rows into one
 `report.md` in the protocol's own shape, and appends the summary rows to
 dev.md "Measured so far". The verdict on the Studio's chat model and
-engine is then a reading of tables: the candidate that passes the
-contract suite, clears the tool-calling bars, and gives the best first
-useful answer under the workload, with its budget record filled from the
-numbers. Row: `STUDIO-EVAL-01` (M).
+engine is then a reading of tables: the candidate and engine that pass
+the contract suite, clear the tool-calling bars, and give the best first
+useful answer under the workload, with the budget record filled from the
+numbers, never by a headline claim (Inco's own table puts oMLX at about
+half Splash's decode speed on the 27B; that is Inco's number, a claim to
+measure). An engine that loses on chat keeps the role it is best at:
+oMLX its SSD prefix cache for long companion contexts, mlx-serve the
+media roles. Row: `STUDIO-EVAL-01` (M).
 
 **What the hands-on review adds (the owner's saved transcript,
 `data-scratch/splash/transcript-qwen38-27b-2x-faster-on-mac.txt`, a
@@ -173,7 +182,8 @@ designs the rest out:
   of a safety, consent or privacy change.
 - **The driver** is the coordinator's existing OpenCode HTTP driver,
   pointed at the Studio, with the budget and the fresh-session rule
-  added. Row: `STUDIO-LANE-01` (M). The model is question 3.
+  added. Row: `STUDIO-LANE-01` (M). The model is decided by
+STUDIO-EVAL-01's numbers between the 27B and the 35B-A3B (decision 3).
 
 ## 5. The Studio beside this Mac during the move, and the rollback
 
@@ -186,7 +196,8 @@ runbook's step 11 moves Home itself, the Studio's hub restores from this
 Mac's last backup and this Mac's hub is stopped, not deleted. Rollback
 at any point: repoint the URLs back to this Mac's engines, or start this
 Mac's hub again on its own data directory, which was never touched. The
-laptop's role is question 2. Row: `STUDIO-MOVE-01` (S).
+laptop stays as the tier 2 bench machine and the lane until
+STUDIO-LANE-01 takes over (decision 2). Row: `STUDIO-MOVE-01` (S).
 
 ## Rows (a new area, "Studio day one (2026-09-23)")
 
@@ -198,16 +209,16 @@ laptop's role is question 2. Row: `STUDIO-MOVE-01` (S).
 | `STUDIO-LANE-01` | M | the lane driver on the Studio: fresh session and worktree per brief, wall-clock budget, done contract, the tool set, `splash claude` proven |
 | `STUDIO-MOVE-01` | S | the URL-tier switch first, then the move and the rollback |
 
-## Questions for Jesse
+## Decisions (owner, 2026-09-23)
 
-1. Which macOS version the Studio arrives with; Splash needs 26.4 or
-   later, and an update before step 2 is the alternative.
-2. The Linux laptop: kept as the tier 2 bench machine (the 16 GB CUDA
-   reference point needs one), or sold after the move as decided on
-   2026-09-17.
-3. The coding lane's model: the 27B (Sonnet-class on S items, measured)
-   or the 35B-A3B (faster per token, unmeasured on coding), decided by
-   STUDIO-EVAL-01's numbers or by you now.
-4. Splash packages are 4-bit only while MEASURE-02 names Q6 for
-   llama-server: measure both and let the numbers decide (my
-   recommendation), or standardize on one quantization.
+1. The Studio ships with macOS 26.4, so Splash's floor is met on day one
+   and the staging row carries no macOS contingency.
+2. The Linux laptop is kept as the tier 2 bench machine. This reverses
+   the 2026-09-17 decision to sell it after the move. Its role: the tier
+   2 limits (the 16 GB CUDA reference point), FLOOR-ACCEPT-01's stand-in
+   only until an 8 GB machine is on the bench, and the Session C lane
+   until STUDIO-LANE-01 takes over.
+3. The coding lane's model is decided by STUDIO-EVAL-01's numbers
+   between the 27B and the 35B-A3B.
+4. Both quantizations are measured, Splash's 4-bit package and
+   llama-server at Q6, and the numbers decide.
