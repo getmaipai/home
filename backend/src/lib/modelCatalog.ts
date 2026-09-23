@@ -68,7 +68,12 @@ export const CATALOG: ModelCapabilities[] = [
       rounds: 1,
       tools_offered: ["recall", "remember", "remind", "timer", "weather", "websearch"],
       always_search: true,
-      answer_from_context_tool: true,
+      // GROUND-01 (state record, "The interim rule"): off in every
+      // budget until reuse-with-freshness is built - a quote check
+      // proves a line exists in the conversation, not that it is true,
+      // which is what recycled the Chile follow-up's hallucinated name
+      // in the skeleton run.
+      answer_from_context_tool: false,
       model_transitions: true,
       context_tokens: 4000,
       thinking_budget_tokens: 512,

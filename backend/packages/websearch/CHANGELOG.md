@@ -2,6 +2,20 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.1] - 2026-09-23
+
+### Changed
+
+- `args.properties.expression` gains `search_text: true` (GROUND-01,
+  home/docs/plans/turn-machine-state-record-2026-09-22.md): the policy
+  node's grounding check now reads this mark to know which fields are a
+  household member's own free-text query, so `category` (the manifest's
+  own fixed `"images"` enum value) and `read_page` (a boolean) stop
+  being checked for term overlap against the utterance - they never
+  could pass that check on their own, since neither is something a
+  person actually said. This is what a live run caught refusing every
+  real search whose call included `category`.
+
 ## [0.2.0] - 2026-09-15
 
 ### Changed

@@ -61,6 +61,25 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
 
   const items: ContextItem[] = [];
 
+  // GROUND-01 (state record, step 3): the current utterance joins the
+  // context list as its own item, source "utterance" - the list's own
+  // contract says it is the prompt's only input, so the utterance
+  // belongs on it structurally, not just as the separate parameter
+  // messages.ts also takes. Never answer evidence on purpose: source
+  // "utterance" is excluded from contextQuoteGrounded in machine.ts
+  // (quoting the question back proves nothing) and from the prompt's
+  // context block in messages.ts (it is already the turn's final user
+  // message there, never printed twice). This does not by itself
+  // shorten the diagnosis's "cause 2" retry (a model quoting the
+  // question for answer_from_context still meets the same exclusion
+  // and forces the same forceSearchOnly round) - that path is
+  // `answer_from_context_tool: false` in every real budget today
+  // (Astra's review, the escape is off until reuse-with-freshness is
+  // built), so the extra round has no live cost to eliminate right
+  // now; this item exists so the exclusion is a stated, tested rule
+  // rather than an accident of what wasn't in the list yet.
+  items.push({ id: "utterance", text: input.utterance, source: "utterance", subjects: [], disclosure: "child_ok" });
+
   // The window: every prior turn this conversation already holds,
   // verbatim (RECALL-03's own window, unchanged for a temporary chat -
   // buildConversationWindow() reads the in-process session the same

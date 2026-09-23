@@ -24,6 +24,19 @@ import { waitForHubQuiet, refuseIfGateRunning } from "./liveHubQuiet";
 const REPEATS = Number(process.env.INTERIM_REPEATS ?? 10);
 const waitForQuiet = () => waitForHubQuiet(undefined, (msg) => console.log(msg.replace("live-hub-quiet", "interim-rule-measure")));
 
+/** GROUND-01 step 4: a search counts by the `tool` node's own outcome,
+ * never by its presence in the trace - U2e's trace-completeness fix
+ * (TraceRecorder.skip()) means a "tool" entry always exists in
+ * `stats.nodes[]`, skipped or not, so reading presence alone made
+ * every row look searched regardless of what actually ran. `ok`
+ * present (with or without an error) means the tool node actually ran;
+ * `skipped: true` means it never reached this turn. Exported and pure
+ * (no live call) so this one decision is unit-testable without the
+ * hub-live engine the rest of this script needs. */
+export function hasWebsearchOutcome(nodes: readonly { node: string; outcome?: { ok?: boolean; skipped?: boolean } }[]): boolean {
+  return nodes.some((n) => n.node === "tool" && n.outcome?.ok !== undefined);
+}
+
 async function main(): Promise<void> {
   refuseIfGateRunning("interim-rule-measure");
   const upstream = process.env.MAIPAI_LLAMA_SERVER_URL ?? "http://127.0.0.1:8788";
@@ -91,15 +104,7 @@ async function main(): Promise<void> {
         // via the trace's own node presence today (no dedicated wire
         // field yet); approximated here as "an interim_rule generation
         // ran but no websearch outcome exists on the turn."
-        // The coordinator caught this reading mere presence: U2e's own
-        // trace-completeness fix (TraceRecorder.skip()) means a "tool"
-        // entry now ALWAYS exists in stats.nodes, skipped or not, so
-        // `.some(n => n.node === "tool")` was true on every single row
-        // regardless of whether a tool actually ran - reading `.outcome`
-        // (`ok` present means it ran, with or without an error; `skipped`
-        // means it never did) is the real signal.
-        const hasWebsearchOutcome = nodesTrace.some((n) => n.node === "tool" && n.outcome?.ok !== undefined);
-        const answeredFromContext = generations.some((g) => g.reason === "interim_rule") && !hasWebsearchOutcome;
+        const answeredFromContext = generations.some((g) => g.reason === "interim_rule") && !hasWebsearchOutcome(nodesTrace);
         const sourced = (result.value.reply as { sources?: unknown[] }).sources !== undefined || false;
         rows.push({
           conversationId,
@@ -109,7 +114,7 @@ async function main(): Promise<void> {
           turnIndex: i,
           say: turns[i]!,
           ttftMs: Math.round(ttftMs),
-          searched: hasWebsearchOutcome,
+          searched: hasWebsearchOutcome(nodesTrace),
           answeredFromContext,
           sourced,
           replyText: result.value.reply.text.slice(0, 200),

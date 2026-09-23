@@ -11,8 +11,14 @@ import type { Source } from "@maipai/spec/gen/ts/source.js";
 
 /** The reasons `policy` can refuse a proposal WITHOUT parking an ask
  * (consent_needed/confirm_needed always carry one, so machine.ts's
- * `policyHasParkedAsk` guard catches those first - only these four
- * ever reach `policyAllRefused` and this node). */
+ * `policyHasParkedAsk` guard catches those first - only these ever
+ * reach `policyAllRefused` and this node). GROUND-01 split the old
+ * single `ungrounded_args` into three ("1. Split the reason", state
+ * record): `unknown_tool` (the manifest failed to load) and
+ * `context_tool_in_policy` (the answer-from-context tool reaching this
+ * node, which should never happen) now carry their own names, so the
+ * trace can tell them apart even though `policyRefusalLine()` below
+ * still prints them all as the one honesty line. */
 export type PolicyRefusedReason = Exclude<Extract<PolicyDecision, { allow: false }>["reason"], "consent_needed" | "confirm_needed">;
 
 export type AnswerInput =
@@ -33,14 +39,18 @@ export interface AnswerOutput {
   sources: Source[];
 }
 
-/** Four fixed lines, one per PolicyRefusedReason - not a rule reading a
+/** Three distinct lines plus one shared fallback, not a rule reading a
  * household member's words (RULES-AND-LEARNED-COMPONENTS.md's own
  * target), but the same kind of fixed internal-reason-code-to-text
  * mapping safety.ts's own refusal line and turnNext.ts's blocked line
  * already use. Individual branches, never a literal array, the same
  * reason messages.ts's windowRoleFromId() checks its four roles one at
  * a time (the rule-budget lint's word-list check is syntactic, not
- * semantic - a 3+-string array trips it whatever it holds). */
+ * semantic - a 3+-string array trips it whatever it holds). GROUND-01:
+ * "the refusal line stays one sentence; the trace is what changes" -
+ * `ungrounded_args`, `unknown_tool` and `context_tool_in_policy` all
+ * fall to the same honesty line on purpose; the branch and the argument
+ * name live in `stats.nodes[]`'s `policy` entry instead. */
 function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "min_role") return "That one needs a grown-up.";
   if (reason === "temporary_mode") return "I can't save anything in a temporary chat.";

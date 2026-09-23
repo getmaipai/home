@@ -25,7 +25,14 @@ import type { PendingAsk } from "@/lib/conversationHistory";
 export interface ContextItem {
   id: string;
   text: string;
-  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "tool_result" | "search_result" | "document" | "notification" | "quoted";
+  /** GROUND-01 (state record, "The live grounding refusals..."): the
+   * current utterance joins this list too, source "utterance" - a
+   * grounding source for a search (policy's own term-overlap check),
+   * but never quotable as answer evidence (machine.ts's
+   * contextQuoteGrounded excludes it, and messages.ts never re-prints
+   * it into the prompt's context block, since it is already the final
+   * user message contextToMessages() appends). */
+  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance";
   /** Entity ids the item mentions (household-subject rule, grounding). */
   subjects: string[];
   disclosure: "child_ok" | "teen_ok" | "adult_only";
@@ -48,9 +55,18 @@ export interface PendingAskInfo {
   prompt: string;
 }
 
+/** GROUND-01 (state record, "1. Split the reason"): the live diagnosis
+ * found `ungrounded_args` produced by three different branches with
+ * nothing in the trace to tell them apart - `unknown_tool` (the
+ * manifest failed to load) and `context_tool_in_policy` (the
+ * answer-from-context tool reaching policy, which should never happen -
+ * the model node's own quote check catches it first) now carry their
+ * own names; `ungrounded_args` keeps only `argsGrounded()`'s own false.
+ * The refusal line stays one sentence either way (nodes/answer.ts's
+ * policyRefusalLine()); only the trace changes. */
 export type PolicyDecision =
   | { allow: true }
-  | { allow: false; reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "temporary_mode" | "crisis_state"; ask?: PendingAskInfo };
+  | { allow: false; reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "context_tool_in_policy" | "temporary_mode" | "crisis_state"; ask?: PendingAskInfo };
 
 /** The per-model tool-calling budget (commons spec:
  * ModelCapabilities.turn_budget, U2a). Mirrors the spec shape exactly;
@@ -118,7 +134,13 @@ export interface TurnState {
   reasoning: { emit: boolean; withheld_for: "minor" | "surface" | "presence" | "gate" | null };
 }
 
-export type NodeOutcome = { ok: true } | { ok: false; code: string } | { skipped: true; reason: string };
+/** GROUND-01: `arg` is the refusing argument's NAME only, never its
+ * value (the state record's own "Grounding is a diagnostic" ruling: "A
+ * refusal's trace records the branch and the argument NAME, never the
+ * terms - terms are the person's data"). `code` already carries the
+ * branch (a PolicyDecision reason, a safety refuse category, or any
+ * other node's own failure code). */
+export type NodeOutcome = { ok: true } | { ok: false; code: string; arg?: string } | { skipped: true; reason: string };
 
 export type NodeName = "safety" | "commands" | "context" | "model" | "policy" | "tool" | "answer" | "output_gate";
 

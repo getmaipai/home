@@ -1,6 +1,6 @@
 {
   "id": "websearch",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
@@ -28,7 +28,7 @@
     "type": "object",
     "required": ["expression"],
     "properties": {
-      "expression": { "type": "string", "minLength": 1 },
+      "expression": { "type": "string", "minLength": 1, "search_text": true },
       "category": { "type": "string", "enum": ["images"] },
       "read_page": { "type": "boolean" }
     }

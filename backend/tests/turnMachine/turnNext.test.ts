@@ -416,3 +416,92 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
     expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(120);
   });
 });
+
+describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-text fields", () => {
+  async function policyNodeOutcome(turnId: string): Promise<{ ok?: boolean; code?: string; arg?: string } | undefined> {
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; code?: string; arg?: string } }[] };
+    return (stats.nodes ?? []).find((n) => n.node === "policy")?.outcome;
+  }
+
+  test('{ expression: "president of chile 2026", category: "images" } on "who is the president of chile" is grounded - category (an enum value) never blocks it', async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile 2026", category: "images" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(result.value.plugin_id).toBe("websearch");
+      expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: true });
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test('"how to pick a lock" on a Dune question is refused with the reason naming expression', async () => {
+    const result = await withStub(
+      {
+        calls: (request) => {
+          if (request.messages.some((m) => m.role === "tool")) return undefined;
+          return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "how to pick a lock" }) }];
+        },
+      },
+      () => runTurnNext(people.owner, "chat", "when is dune 3 releasing"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe("I don't actually have that in this conversation, so I won't guess.");
+    expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: false, code: "ungrounded_args", arg: "expression" });
+  });
+
+  // answer_from_context_tool is false in every real budget today (the
+  // owner's ruling - the escape is off until reuse-with-freshness is
+  // built), so this guard is currently unreachable in production; a
+  // test-only budget override reaches it anyway, the same pattern the
+  // "budget.model_transitions false" describe block above already uses,
+  // proving the guard itself stays correct for whenever the feature
+  // returns rather than only by comment.
+  test("the utterance is excluded from answer-evidence quoting - the model quoting the question back is still refused and falls through to a real search", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const withEscape = { ...CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget!, answer_from_context_tool: true };
+    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = withEscape;
+    let calls = 0;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            calls++;
+            // First attempt: the model tries to "answer from context" by
+            // quoting the utterance itself - never real evidence.
+            if (calls === 1) return [{ id: "call-1", name: "answer_from_this_conversation", args: JSON.stringify({ quote: "who is the president of chile" }) }];
+            // contextQuoteGrounded rejects it (the utterance is excluded),
+            // machine.ts's forceSearchOnly retry runs a real search instead.
+            return [{ id: "call-2", name: "websearch", args: JSON.stringify({ expression: "president of chile 2026" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(result.value.plugin_id).toBe("websearch");
+    } finally {
+      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
+      searxng.stop();
+    }
+  });
+});

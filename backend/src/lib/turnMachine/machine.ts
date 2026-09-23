@@ -152,8 +152,11 @@ export const turnMachine = setup({
       // Case-insensitive, matching policy.ts's own argsGrounded() - the
       // same "set check, not a judgment" rule for the identical kind of
       // question ("is this string really in the conversation"), a code
-      // review caught reading these two differently.
-      return quote.length > 0 && context.turnState.context.some((c) => c.text.toLowerCase().includes(quote.toLowerCase()));
+      // review caught reading these two differently. GROUND-01: the
+      // "utterance" item is excluded on purpose - quoting the question
+      // back is never answer evidence, even though it now sits in the
+      // context list for grounding.
+      return quote.length > 0 && context.turnState.context.some((c) => c.source !== "utterance" && c.text.toLowerCase().includes(quote.toLowerCase()));
     },
     policyHasParkedAsk: ({ event }) => proposalsFrom((event as unknown as { output: PolicyOutput }).output).parkedAsk !== null,
     policyAllRefused: ({ event }) => {

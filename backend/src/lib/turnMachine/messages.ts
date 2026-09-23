@@ -11,7 +11,11 @@
 import type { ContextItem } from "./contract";
 import type { LlmMessage } from "@/lib/llm";
 
-const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window">, string> = {
+// GROUND-01: "utterance" is excluded here too, same as "window" - it is
+// already the final "user" message contextToMessages() appends below,
+// so a context-block line for it would repeat the question a second
+// time in the prompt.
+const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance">, string> = {
   memory: "remembered",
   episode: "episode",
   profile: "profile",
@@ -25,7 +29,7 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window">, string> = {
 };
 
 function renderContextLine(item: ContextItem): string {
-  const label = SOURCE_LABEL[item.source as Exclude<ContextItem["source"], "window">];
+  const label = SOURCE_LABEL[item.source as Exclude<ContextItem["source"], "window" | "utterance">];
   const dated = item.at ? ` (${item.at.slice(0, 10)})` : "";
   return `[${label}${dated}] ${item.text}`;
 }
@@ -46,7 +50,10 @@ function windowRoleFromId(id: string): "system" | "user" | "assistant" | "tool" 
 
 export function contextToMessages(context: readonly ContextItem[], utterance: string): LlmMessage[] {
   const windowItems = context.filter((item) => item.source === "window");
-  const other = context.filter((item) => item.source !== "window");
+  // "utterance" is excluded too: it rides the "utterance" argument
+  // below as the final user message, the one place it belongs in the
+  // prompt - not a second time in the system context block.
+  const other = context.filter((item) => item.source !== "window" && item.source !== "utterance");
 
   const messages: LlmMessage[] = [];
   if (other.length > 0) {
