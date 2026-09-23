@@ -46,7 +46,7 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 # session to hit cold.
 if [ "$DOCS_ONLY" = 0 ]; then
   CORE_TAG="core-v0.1.0"
-  UI_TAG="ui-v0.5.43"
+  UI_TAG="ui-v0.5.46"
   SPEC_TAG="spec-v0.1.27"
   SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
   if [ ! -d "$SHARED_REPO" ]; then

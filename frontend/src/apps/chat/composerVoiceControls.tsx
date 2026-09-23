@@ -16,7 +16,7 @@
 // live voice session (VOICE-LIVE-02, `liveVoiceSession.tsx`, already
 // landed) through `voiceSessionContext.tsx`'s `open`/`setOpen`.
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@maipai/ui/src/ui/button";
+import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
@@ -24,11 +24,36 @@ import { api, type EnginesOverview } from "@/lib/api";
 
 const AudioWaveformIcon = getIcon("audio-waveform");
 
+// VOICE-LIVE-05 follow-up (Jesse's own live read, 2026-09-23): the pill
+// read too large beside the composer's own Dictate/Send buttons
+// (thread.aui.tsx's ComposerAction, both `size-7 rounded-full`). Visual
+// size matches them exactly now - `variant="default"` is Send's own
+// filled look, the one this control keeps as its "start a call"
+// affordance. Two real TooltipIconButton components exist in the kit,
+// found reading thread.aui.tsx's own import (checked, not assumed):
+// `elements/tooltip-icon-button.tsx`, the vendored/assistant-ui-shaped
+// one Dictate and Send actually use, no touch-target floor at all; and
+// `assistant-ui/tooltip-icon-button.tsx`, MaiPai's own enhanced copy
+// (a `before:-inset-3` pseudo-element keeping a real 48px+ touch target
+// regardless of the visual size override, docs/UI.md's own rule) -
+// used here on purpose, the same one `liveVoiceSession.tsx`'s own gear
+// already uses, since this button is Home's own composition (injected
+// through ComposerExtraEnd), never inside the vendored Element itself.
+// No accessibility floor forbids the visual match; this control is
+// simply safer than its un-augmented vendored neighbors already are.
 function WaveformButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button type="button" size="icon" aria-label="Start a voice conversation" onClick={onClick}>
-      <AudioWaveformIcon className="size-5" />
-    </Button>
+    <TooltipIconButton
+      tooltip="Start a voice conversation"
+      type="button"
+      variant="default"
+      size="icon"
+      className="size-7 rounded-full"
+      aria-label="Start a voice conversation"
+      onClick={onClick}
+    >
+      <AudioWaveformIcon className="size-4" />
+    </TooltipIconButton>
   );
 }
 

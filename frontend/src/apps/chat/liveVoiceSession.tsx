@@ -27,14 +27,13 @@
 // effect reacts to, never a manually chained callback tree.
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAui, useAuiState } from "@assistant-ui/react";
-import { VoiceConversation, type VoiceMode, type VoiceTurn } from "@maipai/ui/src/elements/voice-conversation";
+import { useAui } from "@assistant-ui/react";
+import { VoiceConversation, type VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
 import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
-import { messageText } from "@/apps/chat/chatMessageText";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 const SettingsIcon = getIcon("settings");
@@ -69,46 +68,21 @@ export interface LiveVoiceSessionProps {
   speakingEndedAt: number;
 }
 
-let turnCounter = 0;
-function nextTurnId(): string {
-  turnCounter += 1;
-  return `voice-turn-${turnCounter}`;
-}
-
 export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
   const aui = useAui();
-  const messages = useAuiState((s) => s.thread.messages);
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
-  const [transcript, setTranscript] = useState<VoiceTurn[]>([]);
   const [listenGeneration, setListenGeneration] = useState(0);
   const mutedRef = useRef(false);
   mutedRef.current = muted;
-  const assistantTurnIdRef = useRef<string | null>(null);
-
-  // The live thread's own last assistant message, mirrored into the
-  // widget's own transcript while a reply is thinking/speaking - the
-  // thread itself (not this state) is the real record; this is display
-  // only, the same "printed for a person to read" role the Element's
-  // own transcript prop already has.
-  useEffect(() => {
-    if (!open || assistantTurnIdRef.current === null) return;
-    const last = messages.at(-1);
-    if (!last || last.role !== "assistant") return;
-    const text = messageText(last);
-    const id = assistantTurnIdRef.current;
-    setTranscript((prev) => prev.map((turn) => (turn.id === id ? { ...turn, text } : turn)));
-  }, [messages, open]);
 
   // Reset all local display state the moment the overlay opens, so a
-  // second call never shows the previous one's transcript or mode.
+  // second call never shows the previous one's mode.
   useEffect(() => {
     if (!open) return;
     setMode("connecting");
     setAmplitude(0);
-    setTranscript([]);
-    assistantTurnIdRef.current = null;
     setListenGeneration(0);
   }, [open]);
 
@@ -168,10 +142,9 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
             break;
           case "partial":
             // Not shown: a partial can revise itself several times a
-            // second (interim ASR hypotheses), and the Element's own
-            // transcript list is meant for settled turns - the
-            // listening ring's own movement (the level meter) is
-            // already the "it's hearing you" signal while this is live.
+            // second (interim ASR hypotheses) - the listening ring's
+            // own movement (the level meter) is already the "it's
+            // hearing you" signal while this is live.
             break;
           case "final": {
             const text = message.v.trim();
@@ -188,9 +161,6 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
               break;
             }
             setMode("thinking");
-            const assistantId = nextTurnId();
-            assistantTurnIdRef.current = assistantId;
-            setTranscript((prev) => [...prev, { id: nextTurnId(), role: "user", text }, { id: assistantId, role: "assistant", text: "" }]);
             spokenNextRef.current = true;
             aui.composer.setText(text);
             void Promise.resolve(aui.composer.send());
@@ -272,18 +242,27 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="relative w-full max-w-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 sm:p-4">
+      {/* VOICE-LIVE-05 follow-up (Jesse's own live read, 2026-09-23):
+          "the phone call look" - the card itself now grows to fill this
+          overlay on the phone (VoiceConversation's own h-full/w-full
+          below sm), so this wrapper does too; at sm and up it's back to
+          the small floating card. */}
+      <div className="relative h-full w-full sm:h-auto sm:max-w-xs">
         {/* VOICE-LIVE-05: the gear into Settings > Voice - the Element
             itself has no slot for an extra control (VoiceConversation's
-            own props are mode/amplitude/transcript/mute/interrupt/end,
-            nothing else), so this sits just outside its own card,
-            composed here rather than forked into the shipped Element.
+            own props are mode/amplitude/mute/interrupt/end, nothing
+            else), so this sits just outside its own card, composed
+            here rather than forked into the shipped Element.
             VOICE-LIVE-03b already moved voice/microphone choice into
             Settings > Voice's own VoiceCatalogSection - this is the one
             way back into it from the live session, per that item's own
-            note that it's the only voice control outside Settings now. */}
-        <TooltipIconButton asChild tooltip="Voice settings" className="absolute -top-2 -right-2 z-10">
+            note that it's the only voice control outside Settings now.
+            On the phone the card fills the overlay, so "just outside
+            its own card" has no edge to sit past - inset from the
+            surface's own corner instead; at sm and up, back to sitting
+            just outside the smaller floating card's own corner. */}
+        <TooltipIconButton asChild tooltip="Voice settings" className="absolute top-4 right-4 z-10 sm:-top-2 sm:-right-2">
           <Link to="/settings/voices" aria-label="Voice settings">
             <SettingsIcon />
           </Link>
@@ -291,7 +270,6 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
         <VoiceConversation
           mode={mode}
           amplitude={amplitude}
-          transcript={transcript}
           muted={muted}
           onToggleMute={() => setMuted((value) => !value)}
           onEnd={() => onOpenChange(false)}
