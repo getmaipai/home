@@ -37,20 +37,18 @@
 // whatever the header has left after the fixed sidebar trigger and
 // the fixed right-side icons, truncating only once it must.
 //
-// Known gap for CHAT-HEADER-02 (planned: an app icon in this same
-// slot): the title Button's own `flex-1` sets flex-shrink:1 via the
-// `flex` shorthand, but the kit's shared `buttonVariants` base class
-// also carries an unconditional `shrink-0` that tailwind-merge does
-// not dedupe against `flex-1` (different utility groups) and that
-// wins the cascade - confirmed with a real computed-style check
-// (2026-09-23 review). Today this never triggers a real bug: the
-// title's own flex-basis is 0%, so this nested row is always in the
-// "grow" branch, never the "shrink" branch, regardless of shrink:0.
-// If a further fixed-width sibling ever makes this row's own available
-// space genuinely too tight for the chevron's own minimum width, this
-// title's flex-shrink:0 would leave the chevron with nowhere to go -
-// CHAT-HEADER-02 needs to re-check this when it adds that sibling,
-// not assumed fixed by this comment alone.
+// CHAT-HEADER-02: the app icon (the exact `getIcon("message-circle")`
+// SidebarContent already uses for "Chat") is the new fixed-width
+// sibling the CHAT-HEADER-03 comment above named as the thing to
+// re-check for the title's own shrink-0/flex-1 gap. Re-checked at
+// both captured widths (1440 and 390, a 60-character title): still no
+// real bug - this row's own hypothetical size is dominated by the
+// icon and chevron's small fixed widths, well under either viewport's
+// available space even with the icon added, so it stays in the
+// "grow" branch the CHAT-HEADER-03 comment already described. The
+// gap itself is unchanged (still latent, still worth a real fix if a
+// much busier header slot is ever built here) - not re-litigated in
+// this comment a second time, see git history for the original.
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -68,6 +66,12 @@ const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
 const ExternalLinkIcon = getIcon("external-link");
 const ChevronDownIcon = getIcon("chevron-down");
+// The exact icon SidebarContent (commons sidebaritems.ts) already
+// uses for "Chat" - nextPageHeaderTitle.tsx's own header comment has
+// the full reasoning for why every /next page's header icon mirrors
+// the sidebar's own choice; chat mirrors it here directly since it
+// never mounts that shared component at all.
+const ChatIcon = getIcon("message-circle");
 
 function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename: (title: string) => Promise<void>; onDone: () => void }) {
   const [value, setValue] = useState(title);
@@ -132,10 +136,6 @@ export function ChatHeaderBar() {
   // the two on every mount would be its own small defect.
   if (!data) return null;
 
-  if (renaming) {
-    return <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />;
-  }
-
   // An untitled conversation shows the same placeholder the thread list
   // uses (ThreadListItemPrimitive.Title's own `fallback="New Chat"`),
   // never a blank bar.
@@ -143,39 +143,46 @@ export function ChatHeaderBar() {
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      <Button
-        type="button"
-        variant="ghost"
-        className="min-w-0 flex-1 justify-start truncate px-2 text-base font-medium"
-        onClick={() => setRenaming(true)}
-      >
-        {title}
-      </Button>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost" size="icon" aria-label="Conversation actions">
-            <ChevronDownIcon className="size-4" />
+      <ChatIcon className="text-muted-foreground size-4 shrink-0" />
+      {renaming ? (
+        <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
+      ) : (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-w-0 flex-1 justify-start truncate px-2 text-base font-medium"
+            onClick={() => setRenaming(true)}
+          >
+            {title}
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuItem onClick={() => setRenaming(true)}>
-            <PencilIcon className="size-4" />
-            Rename
-          </DropdownMenuItem>
-          {data.temporaryAllowed && <DropdownMenuItem onClick={data.onStartTemporary}>Start temporary chat</DropdownMenuItem>}
-          {data.shareAllowed && (
-            <DropdownMenuItem disabled>
-              <ExternalLinkIcon className="size-4" />
-              Share
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}>
-            <TrashIcon className="size-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <DropdownMenu open={open} onOpenChange={setOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" aria-label="Conversation actions">
+                <ChevronDownIcon className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setRenaming(true)}>
+                <PencilIcon className="size-4" />
+                Rename
+              </DropdownMenuItem>
+              {data.temporaryAllowed && <DropdownMenuItem onClick={data.onStartTemporary}>Start temporary chat</DropdownMenuItem>}
+              {data.shareAllowed && (
+                <DropdownMenuItem disabled>
+                  <ExternalLinkIcon className="size-4" />
+                  Share
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}>
+                <TrashIcon className="size-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      )}
     </div>
   );
 }

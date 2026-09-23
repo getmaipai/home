@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type Performance } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { TurnsChart } from "@/next/pages/performance/TurnsChart";
@@ -24,6 +25,14 @@ import { DiskHardwareCard } from "@/next/pages/performance/DiskHardwareCard";
  * comes entirely from the backend, and this page is reachable only
  * through the Manage section, which `NextSettingsPage.tsx`'s Household
  * tab already hides from non-admins. */
+// Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this
+// directly for the header's left slot. This page has never shown an
+// icon anywhere in its own content before - "gauge" is the pick here,
+// the same icon NextChatPage.tsx's own turn-details trigger already
+// uses for a measurement concept, not mirrored from any prior
+// declaration on this page since none existed.
+export const PerformanceIcon = getIcon("gauge");
+
 export function NextPerformancePage() {
   useDocumentTitle("Performance");
   const query = useQuery<Performance>({ queryKey: ["performance"], queryFn: () => api.performance() });

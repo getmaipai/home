@@ -19,7 +19,10 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * the old page and the backend both agree on here (`GET /api/repairs`
  * itself is `requireRole("owner", "admin")`, unlike Updates' looser
  * read gate). */
-const RepairsIcon = getIcon("wrench");
+// Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this
+// directly for the header's left slot rather than re-declaring the
+// icon name a second time - one definition, this page's own.
+export const RepairsIcon = getIcon("wrench");
 
 interface Row extends Record<string, unknown> {
   title: string;

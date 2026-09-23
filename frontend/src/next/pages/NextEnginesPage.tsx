@@ -27,7 +27,10 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * (found landing this row, 2026-09-21: a household with no Stack
  * configured - Jesse's own - hit the Stack-unreachable branch and read
  * as a real error, not the calm, ordinary state it actually is). */
-const EnginesIcon = getIcon("cpu");
+// Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this
+// directly for the header's left slot rather than re-declaring the
+// icon name a second time - one definition, this page's own.
+export const EnginesIcon = getIcon("cpu");
 const RolesIcon = getIcon("server");
 const HealthIcon = getIcon("activity");
 

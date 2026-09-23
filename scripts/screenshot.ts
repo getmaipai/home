@@ -257,6 +257,7 @@ const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const chatHeaderTitleReview = process.argv.includes("--chat-header-title-review");
+const nextPageHeaderIconReview = process.argv.includes("--next-page-header-icon-review");
 const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
 const settingsReview = process.argv.includes("--settings-review");
 const pictureReview = process.argv.includes("--picture-review");
@@ -2419,6 +2420,48 @@ async function captureChatHeaderTitleReview(browser: Browser, sessionValue: stri
   }
 }
 
+/** CHAT-HEADER-02's own stated acceptance: "the chat header and one
+ * other app page show the same icon the sidebar shows for them" - the
+ * chat side is `--chat-header-title-review` above (the icon is now
+ * part of that same header); this covers the "one other page" half
+ * with the dashboard route (`/next`, the sidebar's own "Home" entry,
+ * `House` in `sidebaritems.ts`), the plainest page to seed - no
+ * fixture data needed beyond `ui.shell.next`. */
+async function captureNextPageHeaderIconReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextPageHeaderIconReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/next`);
+        // Scoped to the header's own unnamed <nav> - the sidebar's own
+        // "Home" group heading is a second, unrelated match otherwise
+        // (found writing NextRoutes.test.tsx's own equivalent check).
+        await page.getByRole("navigation").getByText("Home").waitFor();
+        await settleAnimations(page);
+        const path = join(outDir, `next-page-header-icon-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** SHELL-02 slice 6's own stated capture: the composer's "+" menu open -
  * the default-visible set only (photos and files, camera): Apps, Create
  * image, Web search and the voice waveform all stay behind
@@ -3585,11 +3628,15 @@ async function main() {
       await captureChatHeaderTitleReview(browser, sessionValue);
     }
 
+    if (!a11yOnly && nextPageHeaderIconReview) {
+      await captureNextPageHeaderIconReview(browser, sessionValue);
+    }
+
     if (!a11yOnly && phoneHeaderFoldReview) {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;

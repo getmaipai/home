@@ -1,13 +1,15 @@
 import { useEffect, useRef } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { useShellNext } from "@/next/useShellNext";
 import { useNextLook } from "@/next/useNextLook";
 import { useNextAppearance } from "@/next/useNextAppearance";
+import { NextPageHeaderTitle } from "@/next/nextPageHeaderTitle";
 import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
 import { NextChatPage } from "@/next/pages/NextChatPage";
 import { NextAppsPage } from "@/next/pages/NextAppsPage";
@@ -55,6 +57,21 @@ import type { Roster } from "@/lib/api";
  * `requireAuth`, so nothing can resolve `ui.shell.next` at all before
  * a session exists - named in the plan doc's own gap paragraph, not
  * silently left to spin forever unremarked. */
+// CHAT-HEADER-02: a sibling of the chat route, never an ancestor of
+// it - `NextChatPage.tsx` already owns `HeaderExtraLeft` for its own
+// lifetime (`useHeaderExtra(ChatHeaderBar)`), and `useHeaderExtra`'s
+// own effect only fires on mount/unmount of its CALLER, not on every
+// route change. Nesting this as an ancestor of chat too would race
+// the two calls' mount order on navigating into or out of chat,
+// sometimes leaving the slot on the wrong component (found designing
+// this, not live) - a true sibling route means only one of the two
+// is ever mounted for a given `/next/*` path, so each owns the slot
+// cleanly for its own lifetime, the same pattern chat already proves.
+function NextPageHeaderLayout() {
+  useHeaderExtra(NextPageHeaderTitle);
+  return <Outlet />;
+}
+
 // HOME-UI-04d: `useNextAppearance` calls the vendored `useTheme()`, so
 // it has to run inside `<ThemeProvider>`, not above it - a small inner
 // component rather than inlining the hook call in `NextRoutes` itself,
@@ -77,16 +94,18 @@ function NextRoutesInner({ person }: { person: Roster }) {
             no-match. */}
         <Route path="sign-in" element={<Navigate to="/next" replace />} />
         <Route element={<FullLayout />}>
-          <Route index element={<NextDashboardPage person={person} />} />
           <Route path="chat" element={<NextChatPage person={person} />} />
-          <Route path="apps" element={<NextAppsPage />} />
-          <Route path="people" element={<NextPeoplePage person={person} />} />
-          <Route path="settings" element={<NextSettingsPage person={person} />} />
-          <Route path="engines" element={<NextEnginesPage />} />
-          <Route path="performance" element={<NextPerformancePage />} />
-          <Route path="updates" element={<NextUpdatesPage person={person} />} />
-          <Route path="repairs" element={<NextRepairsPage person={person} />} />
-          <Route path="backups" element={<NextBackupsPage person={person} />} />
+          <Route element={<NextPageHeaderLayout />}>
+            <Route index element={<NextDashboardPage person={person} />} />
+            <Route path="apps" element={<NextAppsPage />} />
+            <Route path="people" element={<NextPeoplePage person={person} />} />
+            <Route path="settings" element={<NextSettingsPage person={person} />} />
+            <Route path="engines" element={<NextEnginesPage />} />
+            <Route path="performance" element={<NextPerformancePage />} />
+            <Route path="updates" element={<NextUpdatesPage person={person} />} />
+            <Route path="repairs" element={<NextRepairsPage person={person} />} />
+            <Route path="backups" element={<NextBackupsPage person={person} />} />
+          </Route>
         </Route>
       </Routes>
     </ChatHeaderDataProvider>

@@ -34,7 +34,10 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * (`routes/backups.ts`), the same "someone who can restart the hub
  * should not be the last to know" reasoning `BackupsSection.tsx`'s own
  * header already documents. */
-const BackupsIcon = getIcon("archive");
+// Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this
+// directly for the header's left slot rather than re-declaring the
+// icon name a second time - one definition, this page's own.
+export const BackupsIcon = getIcon("archive");
 
 interface Row extends Record<string, unknown> {
   date: string;

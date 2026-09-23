@@ -189,10 +189,13 @@ describe("NextRoutes sign-in redirect (SHELL-FLAG-01)", () => {
           </Routes>
         </MemoryRouter>,
       );
-      // The FullLayout's own header chrome (Search....) proves the
-      // dashboard shell mounted; the sign-in form's own field proves
-      // it's NOT still showing the sign-in screen.
-      expect(await view.findByPlaceholderText("Search....")).toBeVisible();
+      // The header's own left slot (CHAT-HEADER-02: icon + "Home" on
+      // the dashboard route, replacing the shipped Search field there)
+      // proves the FullLayout shell mounted; the sign-in form's own
+      // field proves it's NOT still showing the sign-in screen. Scoped
+      // to the header's own unnamed <nav> - the sidebar's own "Home"
+      // group heading is a second, unrelated match otherwise.
+      expect(await view.findByRole("navigation")).toHaveTextContent("Home");
       expect(view.queryByPlaceholderText("PIN or password")).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;

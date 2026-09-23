@@ -24,7 +24,10 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * (`UpdatesPage.tsx`'s own `AdminGatedContent`) even though `GET /api/
  * updates` itself is `requireAuth` only - matching the old page's own
  * visible gate is the parity this row asks for, not a new rule. */
-const UpdatesIcon = getIcon("refresh-cw");
+// Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this
+// directly for the header's left slot rather than re-declaring the
+// icon name a second time - one definition, this page's own.
+export const UpdatesIcon = getIcon("refresh-cw");
 
 interface Row extends Record<string, unknown> {
   name: string;

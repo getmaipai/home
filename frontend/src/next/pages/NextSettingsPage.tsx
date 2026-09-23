@@ -7,6 +7,14 @@ import { NextManageSection } from "@/next/pages/settings/NextManageSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
+// Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this
+// directly for the header's left slot rather than re-declaring the
+// icon name a second time - one definition, this page's own. Moved to
+// module scope from inside the component (it was being recomputed on
+// every render for no reason, the same as this file's sibling pages'
+// own icon constants already are).
+export const SettingsIcon = getIcon("settings");
+
 /** /next/settings: SHELL-05's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - docs/SETTINGS.md's generic renderer
  * (`NextSettingsRenderer`) under the template's own `Tabs`/`TabsList`/
@@ -32,7 +40,6 @@ export function NextSettingsPage({ person }: { person: Roster }) {
   useDocumentTitle("Settings");
   const canManageHousehold = isOwnerOrAdminRole(person.role);
   const [tab, setTab] = useState<"household" | "me">(canManageHousehold ? "household" : "me");
-  const SettingsIcon = getIcon("settings");
 
   return (
     <div className="flex flex-col gap-4">
