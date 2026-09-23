@@ -124,6 +124,16 @@ export const RULES = {
   "ask.consent": "a consent word ran the pending lookup",
   "ask.confirm": "a yes or no resolved a pending confirmation",
   "ask.cancel": "a cancel cleared the pending ask",
+  // U2c policy.ts's own grounding check (the owner's ruling, state
+  // record "Grounding, stated exactly," 2a28e4e8): a string argument
+  // passes on a shared content term, refuses on a bare pronoun or
+  // zero overlap. Not yet pushed onto a turn's own rules list (no
+  // rules-list mechanism exists on the new path yet); named here so
+  // the two closed-vocabulary regexes it uses (a pure-number shape, a
+  // pronoun-word split) satisfy the rule-budget lint's own marker
+  // requirement honestly, not as a live-fired counter yet.
+  "grounding.pure_number": "an argument token was dropped as a bare number, year, or date before the overlap check",
+  "grounding.bare_pronoun": "a tool argument was refused for being a bare pronoun with no other content",
 } as const;
 
 export type RuleName = keyof typeof RULES;

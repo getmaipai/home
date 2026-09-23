@@ -53,6 +53,7 @@ export interface PolicyOutput {
  * own weight); refuse exactly two things - a bare pronoun as the WHOLE
  * argument (unresolved: "he", "it", not a real query), and zero
  * overlap with every non-numeric term dropped. */
+// rule: grounding.pure_number (docs/plans/turn-machine-state-record-2026-09-22.md, "Grounding, stated exactly", 2a28e4e8)
 const PURE_NUMBER_RE = /^\d+$/;
 
 /** Checked one word at a time, never a literal array (the rule-budget
@@ -71,6 +72,7 @@ function isPronounWord(word: string): boolean {
 // list (the `terms.length === 0` branch below is for a genuinely
 // numbers-only argument, not a punctuation-dressed pronoun).
 function isBarePronoun(value: string): boolean {
+  // rule: grounding.bare_pronoun (docs/plans/turn-machine-state-record-2026-09-22.md, "Grounding, stated exactly", 2a28e4e8)
   const words = value.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 0);
   return words.length === 1 && isPronounWord(words[0]!);
 }
