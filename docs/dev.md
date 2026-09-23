@@ -22308,3 +22308,112 @@ contract.ts` (`NodeOutcome`), `backend/src/lib/turnStats.ts`
 (`GenerationInput`, `projectGeneration`), `backend/src/wire.ts`
 (`TurnGeneration`, `TurnNodeExecution`), `backend/tests/turnMachine/
 turnNext.test.ts`.
+
+## U4b-2: the reply floor's fixes, measured, held (2026-09-23)
+
+The four assigned fixes landed, code-reviewed clean, full backend
+suite green (3970/3971 - the one failure is the FORCED-CALL-01
+`required_miss` flake this file already documents above, confirmed
+untouched by this diff, passing alone): `WRITTEN_POLICY` beside
+`NATURALNESS_POLICY` (`persona.ts`/`turnEngine.ts`, gated by
+`isWrittenAdultTurn`); `ENGAGEMENT_FRAGMENT`'s written twin; the
+written caps read as room (`nodes/model.ts`'s `replyMaxTokensFor`
+reads `reply_ceiling_tokens`, spec-v0.1.28, for a written non-brevity
+adult turn, LAT-01's shared `visibleReplyMaxTokens` for everything
+else - merged with FORCED-CALL-01's own centralization of that
+formula during the rebase, one formula outside the written-adult
+case, not two); `compositionInstruction`'s written split
+(`composer.ts`, wired by PHRASE-01 next). A code review caught the
+persona/token-budget gate applying to `surfaceClass` alone: a child's
+written turn got told to "never cut a genuinely complete answer
+short" while still capped to a spoken-length budget. Fixed with the
+one shared predicate (`isWrittenAdultTurn`, `surfaceClass.ts`), reused
+in `messages.ts` and `nodes/model.ts` both; regression test in
+`messages.test.ts`.
+
+**The measurement, isolated** (the incident above): a fresh
+`MAIPAI_DATA_DIR` per run, `MAIPAI_LLAMA_SERVER_URL`/`MAIPAI_EMBED_URL`
+pointed at the resident engines with no supervisor spawn
+(`scripts/bench/setup.ts`'s own sanctioned isolation, the one
+`conversationLive.ts` already uses), a roster-safe bench person from
+`createBenchPeople()`. Two questions, typed, adult, world-target:
+Jesse's own "what is technical benchmarking and why do you need it",
+and a second, "how does a prompt cache make a language model faster
+and why does that matter", picked because the first hits an unrelated,
+already-named routing defect (below).
+
+**The benchmarking words: blocked on the knowledge hijack, not this
+item.** Both before and after this item's own rebase onto
+c060dc00 (which only *named* OPENER-01/COMMAND-FAIL-01 in dev.md and
+BACKLOG.md - no code changed), the new path's reply to this exact
+question is, verbatim, the commands node's raw MCP error string ("MCP
+error -32603: ... returned HTTP 404"), because the knowledge package's
+`"what is *"` wildcard still intercepts the question before `context`,
+`model`, or `policy` ever run. Bare model (16-22s across three runs):
+a full structured breakdown, headings, a table, an example, a summary.
+Old path (3.0-3.4s): two sentences, unchanged, frozen. New path: the
+raw error, 27ms. Rerun this row once OPENER-01's actual code fix
+lands, not before - the new path never reaches this item's own layers
+on this question today.
+
+**The prompt-cache question, three fix rounds, isolated:**
+
+Round 1 (the four assigned fixes plus the review fix, before the
+formality/examples fixes): new path, 3.4s, two short paragraphs, no
+headings, no lists - `stop_reason: "stop"`, `predicted_tokens: 96`
+against `max_tokens: 1024` (this bench household never sets
+`chat.model_id`, so `resolveTurnBudget()` used `NO_RECORD_BUDGET`'s
+own 1024, not the catalog's 1536 - a measurement-environment fact, the
+model stopped on its own either way, nowhere near either cap).
+Reconstructing the exact prompt (the real `classifyTurnSignal`,
+`resolvePersona`, `surfaceClassOf`, `planFor`, `contextToMessages` -
+no live call) found `WRITTEN_POLICY`, `ENGAGEMENT_FRAGMENT_WRITTEN.brief`
+and the plan line's "as long as it needs, structured where it helps"
+all present and correctly surface-gated, but two more fragments not
+gated by surface class at all, fighting them in the same message:
+`FORMALITY_FRAGMENT` ("not like a written page being read aloud", on
+every register including written) and the few-shot voice examples
+(spoken one-liners, the file's own comment: "the single biggest lever
+for small-model voice fidelity").
+
+Round 2 (`FORMALITY_FRAGMENT_WRITTEN` added, examples omitted on the
+written class): new path, 2.3s, still one flat paragraph - shorter
+than round 1, if anything.
+
+Round 3 (planLine's written length clause restated as "as complete as
+you would answer with no persona at all, then in the companion's
+voice"): new path, 2.3-2.5s, one short paragraph nearly identical in
+wording to the old path's own reply. The model stopped on its own
+every round; the cap was never the limiter.
+
+**The voice A/B** (`judgePersonaConsistency`, three written exchanges,
+`DEFAULT_PERSONA`): 0/3 with the examples block included, 0/3 without.
+Not informative either way - `personaJudge.ts`'s own `buildJudgePrompt`
+calls `composePersonaPrompt(persona)` with no surface class, so it
+always judges a written reply against the SPOKEN description; both
+conditions fail the same comparison for the same reason, a pre-existing
+gap in the judge itself, not evidence the examples block cost or saved
+voice fidelity. Flagged, not fixed here.
+
+**Held, not landed.** Per the coordinator's own acceptance bar (the
+new path's reply must carry every point and the structure of the bare
+reply, in the companion's voice) and stop-here instruction after the
+plan-line round: the prompt-cache question still fails it after all
+three rounds, on an 8B model that stops on its own well under every
+token ceiling tried. The four assigned fixes, the review fix, and the
+three fixes found live (formality, examples, plan line) are all
+correct, tested, and code-reviewed on their own terms - reading the
+reconstructed prompt confirms every one does what it says. What
+remains is outside what this item was asked to solve: getting an 8B
+instruct model to write at the bare model's own length and structure
+from a prompt, not a wiring defect in any of the seven fragments
+above. WRITTEN-PARITY-01 carries this forward. Rebased onto origin/main
+(`5212f0e1` -> `4380798a`) across FORCED-CALL-01, ENGINE-PORT-01,
+GENFAIL-01 and OPENER-01's own docs-only commit, three-way conflicts
+resolved in `nodes/model.ts` (folded into the now-shared
+`visibleReplyMaxTokens`/`replyMaxTokensFor` split) and `messages.ts`
+(`promptSurfaceClass` kept alongside CONTEXT-RECALL-01's memory
+framing); full suite reconfirmed green after. Spec pin at
+spec-v0.1.29. The commit sits on the `b-u4b2` branch, unpushed,
+pending the coordinator's own call on whether the four assigned fixes
+land on their own merits or wait for WRITTEN-PARITY-01's own verdict.
