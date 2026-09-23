@@ -19986,3 +19986,116 @@ Jesse's own report: "I don't think dictation works in the browser yet" (Firefox,
 `NextChatPage.tsx` mounts `ComposerVoiceControls` unconditionally at the new slot - the component already gates its own render on the `stt` and `tts` roles both being ready (`readyRole()`, `GET /api/engines`), the same posture `ComposerAddMenu` already takes at the leading slot. Pin bumped in `scripts/check.sh` and `frontend/package.json` to `ui-v0.5.36`, `bun install --force` run, diffed against a clean `origin/main` worktree first (only the pin path moved in `bun.lock`).
 
 **Verified:** a new `NextChatPage.tsx` describe (VOICE-LIVE-01) covers the item's own acceptance line directly - absent with stt/tts not both ready, present (waveform plus the voice chevron, both accessible-name-findable) once they are, positioned before Send in the trailing group. `composerVoiceControls.test.tsx`'s own three tests (unchanged logic, header comment updated now that the slot exists) still cover the component's own gating in isolation. Full frontend suite green (673 tests, up from 671).
+
+## ENGINE-CONTRACT-01: the first recorded failure, `tool_choice: "required"` on a warm KV cache (2026-09-23)
+
+The pinned chat engine (llama-server b10797, macOS arm64, the hub's own
+`qwen3-8b-instruct-q4-k-m.gguf`, the hub's flags: one slot, 32K
+context, `-fa on`, `--reasoning off`, `--jinja`, `--cache-reuse 256`,
+q8_0 KV) does not honour `tool_choice: "required"` once the slot's KV
+cache holds the request's prefix. Found by the oMLX versus llama-server
+tier 1 bench (`data-scratch/omlx-vs-llama/results.md`, "Re-checks
+(2026-09-23)", raw reps in its `logs/`), on a side instance on port
+8798, the hub untouched. The request in every set: user "who is the
+president of chile", `tools: [websearch]` (the hub's own manifest as an
+OpenAI function tool), `tool_choice: "required"`, `chat_template_kwargs:
+{enable_thinking: false}`, `max_tokens` 64, temperature 0.
+
+| Set | Shape | Result |
+|---|---|---|
+| A1 | the identical prompt five times, `cache_prompt: false` | 5/5 tool calls, `cached_tokens` 0 every rep |
+| A2 | the identical prompt five times, `cache_prompt: true`, cache warm | 0/5; `cached_tokens` 197 of 198 every rep; a knowledge answer ("The current president of Chile is...") with `tool_calls: []` |
+| A3 | five distinct prompts (chile, peru, norway, kenya, japan), `cache_prompt: true` | 2/5; peru and norway called the tool on partial prefix reuse (187 cached), kenya and japan answered from knowledge on the same partial reuse, chile failed on the full hit |
+| A4 | A2 again on a fresh restart with `--cache-reuse 0` | 1/5; rep 0 on the empty cache called the tool, reps 1 to 4 failed exactly as A2 |
+
+The server's own lines on every full-hit failure (A2, one block per rep):
+
+```
+W slot   operator(): id  0 | task 185 | need to evaluate at least 1 token for each active slot (n_past = 198, task.n_tokens() = 198)
+W slot   operator(): id  0 | task 185 | n_past was set to 197
+```
+
+The partial-reuse failures (A3 kenya and japan) log no warning at all:
+ten or eleven new tokens evaluated, then a knowledge answer. So the
+defect is not the clamp line; it tracks any KV reuse on the slot, and
+`--cache-reuse 0` (which only disables chunk reuse after an edit) does
+not touch it. The original bench run showed the same shape: rep 0 on an
+empty cache passed, four identical follow-ups on the warm cache failed.
+
+**What this means for the hub.** The hub sends `cache_prompt: true` on
+every chat call (`backend/src/lib/llm.ts`), by design (U1 made the
+prompt cache-stable so that `cache_reuse_tokens` grows with the
+conversation). So on the hub, the interim rule's forced search
+(`backend/src/lib/turnMachine/nodes/model.ts`, `tool_choice:
+"required"` over the websearch tool) is unreliable on exactly the turns
+it is for: the second world question in a conversation, and any question
+whose prefix the slot already holds. The always_search budget for the 8B
+assumed `required` holds on this build; it does not. The reply the
+engine returns instead is the model's own knowledge answer, which the
+interim rule forbids showing.
+
+**What was not determined, and the five-minute check that would.**
+Whether the engine enforces `required` with a grammar at all on this
+build and template, or only hints it in the prompt: a grammar-enforced
+`required` cannot produce plain content whatever the cache state, so the
+partial-reuse split in A3 (two of four pass on the same reuse) reads
+more like a near-tie at temperature 0 flipped by the numerics of a
+one-token or eleven-token batch than like a cache path that skips a
+constraint. Re-check C: the A1 request with `cache_prompt: false`,
+temperature 0.7 and a different `seed` per rep, ten reps; any rep that
+answers with content proves `required` is advisory on this build, and the
+cache merely decides which side of the tie the deterministic run lands
+on. Either answer leaves the hub-side fix below unchanged; it changes
+only the upstream issue's title. The draft issue for llama.cpp, with the
+minimal repro and the four sets, is at
+`data-scratch/omlx-vs-llama/upstream-issue-llama-server-required.md`
+(scratch, roster-safe, for the coordinator to file).
+
+**The ruling, four parts (2026-09-23).**
+
+1. *The hub-side fix, `ENGINE-CONTRACT-02` in the backlog.* The model
+   node verifies that a reply to a `required` call carries a tool call.
+   On a miss it does not re-issue the call with `cache_prompt: false`
+   (a second full prefill: 24.7 s at 8K on this Mac by LAT-03's
+   numbers, and A3 shows partial reuse fails too, so "cache off on every
+   forced request" would pay that prefill on every world question for a
+   fix that only helps the identical-repeat case). It falls to the
+   transition row the state record already has for a model without tool
+   calling: the engine builds the query (`query_writer: builder`),
+   `policy` and `tool` run the search, and the model phrases from the
+   result with `tool_choice: "none"`. The miss reply's text is discarded,
+   never shown, never persisted as an answer. The generation record
+   gains `cached_tokens` and `prompt_tokens` from `usage`, and the trace's
+   `stats.nodes[]` entry for `model` gains `required_miss: true` on such a
+   turn, so `interimRuleMeasure` counts misses by cache state and the
+   upstream bug has a live counter on the hub. Nothing is designed anew:
+   the builder row exists; the miss is one more way into it.
+2. *GROUND-01's live rerun runs now, not held.* Its harness records
+   `cached_tokens`, `prompt_tokens` and `required_honored` per request. A
+   row that fails only because the forced call was not honoured is
+   classified "engine (ENGINE-CONTRACT-01)", counted, and excluded from
+   the grounding pass bar, because the rerun measures whether the
+   grounding check passes the searches the model does make. If the
+   forced rows' miss share is above one third, the forced rows are rerun
+   once with `cache_prompt: false` for the grounding reading, and both
+   tables are reported. The interim rule's forced search is understood as
+   unreliable on cache hits until ENGINE-CONTRACT-02 lands.
+3. *The earlier bake-off numbers are not remeasured.* The 8B's 0/50
+   false calls under `auto` stands: a numerics flip toward a call would
+   have surfaced as a false call and none did. Its 19/50 fitting searches
+   under `auto` is marked in its table as a lower bound with the cache
+   state unrecorded. From today every tool-calling table carries
+   `cached_tokens` per request, and the U6 recommendation reads only
+   tables that do (U2d's rerun provides them).
+4. *oMLX clears its contract subset* with thinking off (`chat_template_kwargs:
+   {enable_thinking: false}`, the request shape the hub sends the 8B):
+   auto-negative 5/5, required 5/5, reasoning separated, its own timing
+   fields present. The original 0/5 was the bench design's own omission
+   (the auto-negative row lacked the kwarg the required row had), now
+   corrected in the design. The latency half is worth a quiet window once
+   tonight's gates end; the rule stays warm 8K effective rate unless the
+   peak breaks the p16 margin. Its 5/5 on `required` across identical
+   repeats is recorded as a point in its favour for the tool-heavy path,
+   not as decisive: whether its own prefix cache was warm on those reps
+   is unrecorded, and its abort check's verdict is still open (it needs
+   the warm short median the latency half produces).
