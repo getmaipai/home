@@ -20389,6 +20389,119 @@ repeats, both paths, live on the 8B:
 The flip happens when 1 to 3 hold on one rerun; rows 4's items are
 the next block's, not the flip's.
 
+## U6 rerun: the flip did not hold (2026-09-23)
+
+`b079cab7` (ENGINE-CONTRACT-02, widened, plus TOOLSET-01) landed on
+main and the acceptance rerun ran immediately after: same
+`owner-replay.json` fixture, 3 repeats, `--hub-live`, both paths,
+sequential (old path 08:13-08:18 UTC, new path 08:25-08:40 UTC), no
+gate running beside either (`pgrep` checked clean before each start;
+the next gate on this machine started at 08:43 UTC, after the new-path
+run had already finished). Logs: `data-scratch/ground01-flip-rerun-old.log`,
+`data-scratch/ground01-flip-rerun-new.log` (git-ignored). Same engine
+and hardware as the prior rerun (llama-server b10797-832fd6f17,
+`qwen3-8b-instruct-q4-k-m.gguf`, a MacBook Pro Apple Silicon, macOS 27).
+
+**Verdict: not yet.** Two of the three bar conditions did not hold.
+
+### Condition 1: the five named rows, no engine-classed row
+
+Old path: 3/8 failed rows clean. New path: 4/8 clean, 5/33 forced
+repeats classified engine.
+
+| row | required clean | new path |
+|---|---|---|
+| president-of-france-repeat | yes | **ok\*** (2/3 clean, 1/3 engine miss) |
+| apple-announce-this-week | yes | ok (3/3) |
+| search-mariners-game | yes | ok (3/3) |
+| chatgpt-6-luna | yes | **FAIL** (2/3 clean) |
+| corey-feldman-michael-jackson-friendship | yes | ok (3/3) |
+
+Two of the five regressed. `president-of-france-repeat` repeat 3 is the
+concerning one: the row is engine-classed (`tool_choice: required` not
+honoured on turn 1), but unlike the other rows carrying that same label
+this one also failed its own check - `tool: ran none (source model);
+sources non-empty: no sources on the delivered turn`. That means
+neither the model's own required call nor ENGINE-CONTRACT-02's builder
+fallback produced a websearch on that repeat; the fallback's own logic
+(`backend/src/lib/turnMachine/nodes/model.ts` lines 237-252) reads as
+unconditional (`requiredButMissing = tool_choice === "required" &&
+!websearchCall`, always answered with a builder call), so this failure
+does not match what the code appears to guarantee. The bench's own
+isolated data directory is a `mkdtempSync` temp dir removed in the
+script's `finally` block, so the turn's own `stats.nodes[]` trace is
+gone; this is reported as an open question rather than a diagnosed
+cause - it needs either a kept-trace rerun or a targeted regression
+test that can hold the intermediate state, not a guess.
+`chatgpt-6-luna`'s new failure (repeat 3 turn 3, a real "ran none"
+miss with no engine label at all) is a plain signal/routing failure,
+the same class already named `SIGNAL-01`.
+
+By contrast, the two other engine-classed rows this run
+(`control-dune-3`, `control-negative-stephen-king`) show no check
+failure alongside the label - those rows pass regardless of whether
+the forced call was honoured, consistent with the builder fallback
+working as designed. `president-of-france-repeat` repeat 3 is the one
+case that does not fit that pattern.
+
+### Condition 2: the three controls, TTFT within 1.25x
+
+All three controls did reach 3/3 clean on the new path (up from the
+prior rerun's regression), but time-to-first-token did not stay
+anywhere near 1.25x:
+
+| row | old path median (first sentence ms) | new path median | ratio |
+|---|---|---|---|
+| control-search-mariners-explicit | 1219 | 19546 | 16.0x |
+| control-negative-spiderman | 854 | 5067 | 5.9x |
+| control-negative-feeling-down | 799 | 5388 | 6.7x |
+
+This is not confined to these three rows - every row in the new-path
+log is 10-30 seconds, including plain no-tool conversational turns
+that carry no forced call at all (`control-dune-3` at 21.3s,
+`control-carrie-series` at 22.5s), against well under 2s on the old
+path for the equivalent turns. A uniform slowdown across unrelated row
+shapes points at something outside this item's own code rather than a
+cost specifically introduced by ENGINE-CONTRACT-02 or TOOLSET-01: no
+`check.sh`/`bun test`/`vite build` process was running during either
+window (checked immediately before each start, and again after - the
+next gate on this machine started three minutes after the new-path run
+ended), and `hub.log` carries no real household `[turn]` line in
+either window, so household contention and a concurrent gate are both
+ruled out. `uptime` read at write-up time showed a load average of
+4.0-5.7 with nine users logged into the machine, consistent with other
+concurrent sessions' own work (this is a shared dev machine per the
+org's own standing note on it) rather than a property of the new path
+itself. Reported as a confounded measurement, not a design regression:
+the ratio needs a rerun in a verifiably quiet window (no other active
+sessions, not only no gate) before it can be read as pass or fail.
+
+### One more finding, not in the bar
+
+`control-negative-dye-hair` regressed once on the new path (2/3
+clean, repeat 2 turn 1: "ran websearch (source plugin)") - a row that
+was clean on every prior rerun. This looks like the same over-search
+class already named for `control-negative-stephen-king`
+(`REPLAY-BAR-01`) rather than a new defect, but it is a different row
+regressing for the first time, so it is named here rather than folded
+in silently.
+
+### What this means for the flip
+
+The flip does not happen on this rerun. TOOLSET-01's own fix (the
+controls reaching 3/3) is confirmed working. What is not yet
+confirmed: whether ENGINE-CONTRACT-02's fallback is reliable on every
+required-miss (the one unexplained "ran none" on an engine-classed
+row) and whether the new path is actually slower in steady state or
+this run's numbers are a shared-machine artifact. Both need
+resolving with real evidence, not a decision made here: the trace gap
+means the first needs a rerun that keeps its data directory (or a
+direct regression test against `model.ts`'s fallback under the exact
+`president-of-france-repeat` shape) before it can be called a bug or
+called noise, and the second needs a rerun on a quiet machine. Neither
+is a call this session is positioned to make without inventing
+evidence it does not have.
+
 ## VOICE-LIVE-03b: the chevron leaves the composer; voice selection moves to Settings (2026-09-23)
 
 Jesse's live read of 7d3f83d7 on 8787, the same day VOICE-LIVE-03 landed: the composer's waveform was a small dark circle, not a pill, and its chevron opened a voice list of raw catalog file names - `zerocool_enhanced.wav.1e68beda@240.safetensors` under "Voice-donations". His ruling: "ChatGPT has character voice selection in Settings, not out on the prompt bar."
