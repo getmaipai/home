@@ -134,6 +134,14 @@ export interface ToolCall {
    * ToolExecutionOutcome can name the call it answers); absent for a
    * call built by a test or a stub without one. */
   id?: string;
+  /** ENGINE-CONTRACT-02 (home/docs/dev.md 2026-09-23, "U6: the flip
+   * verdict", regression A): the model's own JSON-encoded `arguments`
+   * string, kept alongside the parsed `args` so a parse failure and a
+   * literal `{}` can be told apart on the stored generation record -
+   * `args` alone collapses both to the identical `undefined`/`{}`
+   * shape. Absent for a call built by a test or by code, never from
+   * the wire (a synthetic builder call has no "raw" string to keep). */
+  rawArgs?: string;
 }
 
 export function toToolDefinition(spec: ToolSpec): ToolDefinition {
@@ -155,7 +163,7 @@ function toolCallFromWire(wire: ToolCallWire): ToolCall {
   } catch {
     args = undefined;
   }
-  return { tool: wire.function.name, args, ...(wire.id ? { id: wire.id } : {}) };
+  return { tool: wire.function.name, args, ...(wire.id ? { id: wire.id } : {}), rawArgs: wire.function.arguments };
 }
 
 export interface LlmCompleteValue {

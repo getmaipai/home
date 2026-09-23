@@ -115,6 +115,13 @@ export interface TurnGeneration {
    * time its own tokens were consumed (null if none ever were). */
   request_sent_ms: number;
   first_delta_ms: number | null;
+  /** ENGINE-CONTRACT-02 (home/docs/dev.md 2026-09-23, "U6: the flip
+   * verdict" regression A): the engine's own raw, unparsed `arguments`
+   * string for the websearch call this generation verified, forced or
+   * offered - `null` when no such call was made this generation. Kept
+   * beside the parsed call so a parse failure (`args: undefined`) and a
+   * literal `{}` are told apart on the record. */
+  tool_call_raw_args?: string | null;
 }
 
 /** U2's own per-node trace entry, TurnGeneration's structural twin -

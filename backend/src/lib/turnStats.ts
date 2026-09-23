@@ -19,6 +19,13 @@ export interface GenerationInput {
   requestSentMs: number;
   firstDeltaMs: number | null;
   stats: ChatCompletionStreamStats | null | undefined;
+  /** ENGINE-CONTRACT-02 ("U6: the flip verdict" regression A): the
+   * engine's own raw `arguments` string for the call this generation's
+   * own verification looked at (a websearch call, forced or offered),
+   * kept beside the parsed args so a parse failure and a literal `{}`
+   * are told apart on the record - `null` when no such call was made
+   * this generation. */
+  toolCallRawArgs?: string | null;
 }
 
 function projectGeneration(gen: GenerationInput): TurnGeneration {
@@ -32,12 +39,19 @@ function projectGeneration(gen: GenerationInput): TurnGeneration {
     thinking: gen.thinking,
     max_tokens: gen.maxTokens,
     prompt_n: finite(gen.stats?.usage?.prompt_tokens) ?? finite(gen.stats?.timings?.prompt_n),
-    cache_n: finite(gen.stats?.timings?.cache_n),
+    // ENGINE-CONTRACT-01/02: llama-server's own OpenAI-shaped
+    // usage.prompt_tokens_details.cached_tokens is the field the live
+    // diagnosis's own bench read (data-scratch/omlx-vs-llama/results.md)
+    // - preferred here the same "usage then timings" way prompt_n and
+    // predicted_n already fall back, so a required-miss can be read by
+    // cache state straight off the stored generation record.
+    cache_n: finite(gen.stats?.usage?.prompt_tokens_details?.cached_tokens) ?? finite(gen.stats?.timings?.cache_n),
     prompt_ms: finite(gen.stats?.timings?.prompt_ms),
     predicted_n: finite(gen.stats?.usage?.completion_tokens) ?? finite(gen.stats?.timings?.predicted_n),
     predicted_ms: finite(gen.stats?.timings?.predicted_ms),
     request_sent_ms: gen.requestSentMs,
     first_delta_ms: gen.firstDeltaMs,
+    tool_call_raw_args: gen.toolCallRawArgs ?? null,
   };
 }
 
@@ -61,7 +75,15 @@ export function buildTurnStats(
   const predictedMs = finite(stream?.timings?.predicted_ms);
   const reportedSpeed = finite(stream?.timings?.predicted_per_second);
   const tokensPerSecond = reportedSpeed ?? (predictedTokens !== null && predictedMs !== null && predictedTokens > 0 && predictedMs > 0 ? predictedTokens / predictedMs * 1000 : null);
-  const cacheTokens = finite(stream?.timings?.cache_n);
+  // ENGINE-CONTRACT-01/02: the same usage-then-timings preference
+  // projectGeneration() already uses - a review caught this summary
+  // still reading only timings.cache_n, so an engine response that
+  // reports usage.prompt_tokens_details.cached_tokens but omits or
+  // zeroes timings.cache_n (the exact gap the fallback exists for)
+  // would show a real cache hit on the last generation's own record
+  // while this turn-level summary (rendered in the chat UI's own
+  // "Cache reused"/"Cache reuse %") stayed at zero, contradicting it.
+  const cacheTokens = finite(stream?.usage?.prompt_tokens_details?.cached_tokens) ?? finite(stream?.timings?.cache_n);
   const cacheDenominator = cacheTokens !== null && promptTokens !== null ? cacheTokens + promptTokens : 0;
   const firstToken = finite(timings.first_token_ms);
   const totalTime = finite(finishedAt - startedAt);

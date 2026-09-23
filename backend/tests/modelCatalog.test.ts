@@ -105,3 +105,16 @@ describe("recommend", () => {
     }
   });
 });
+
+describe("TOOLSET-01: recall leaves the offered set", () => {
+  // dev.md "U6: the flip verdict" regression B: nodes/context.ts
+  // already calls recall() on every turn and puts the matches in
+  // context, so the tool duplicated a retrieval the model already
+  // held - no budget offers it anymore.
+  test("no chat model's turn_budget offers recall", () => {
+    for (const model of CATALOG) {
+      if (model.role !== "chat" || !model.turn_budget) continue;
+      expect(model.turn_budget.tools_offered).not.toContain("recall");
+    }
+  });
+});

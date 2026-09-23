@@ -80,14 +80,21 @@ async function main(): Promise<void> {
     say: string;
     ttftMs: number | null;
     searched: boolean;
-    answeredFromContext: boolean;
     sourced: boolean;
     replyText: string;
     pass: boolean;
     note: string;
-    /** ENGINE-CONTRACT-01: null when this turn made no `tool_choice:
-     * "required"` call at all. */
-    requiredHonored: boolean | null;
+    /** ENGINE-CONTRACT-02 (dev.md 2026-09-23, "U6: the flip verdict"):
+     * read off `stats.nodes[]`'s own `model` entries - the same field
+     * the model node itself sets on a genuine miss, never the old
+     * "an interim_rule generation with no websearch outcome" proxy
+     * (renamed from answer_from_context - the tool is never offered
+     * with the escape off, so that heuristic was only ever counting
+     * misses under a different name). */
+    /** Whether this turn made an interim_rule (forced) generation at
+     * all - `requiredMiss` is only meaningful when this is true. */
+    wasForced: boolean;
+    requiredMiss: boolean;
     requiredCachedTokens: number | null;
     requiredPromptTokens: number | null;
   }
@@ -100,36 +107,28 @@ async function main(): Promise<void> {
     try {
       for (let i = 0; i < turns.length; i++) {
         await waitForQuiet();
-        proxy.reset();
         const t0 = performance.now();
         const result = await runTurnNext(people.owner, "chat", turns[i]!, { conversationId });
         const ttftMs = performance.now() - t0;
-        // A review caught this reading proxy.requests immediately: the
-        // teed reply's own flush() (which sets hasToolCalls/cachedTokens/
-        // promptTokens from the last SSE chunk) lands a tick after the
-        // client's own read finishes (conversationRunner.ts's identical
-        // await, same reason) - reading before this settles could see
-        // the pre-flush defaults and report a real honoured call as a
-        // miss with no usage.
-        await proxy.settled();
-        const requiredCall = proxy.requests.find((r) => r.toolChoice === "required");
-        const requiredHonored = requiredCall?.hasToolCalls ?? null;
-        const requiredCachedTokens = requiredCall?.cachedTokens ?? null;
-        const requiredPromptTokens = requiredCall?.promptTokens ?? null;
         if (!result.ok) {
-          rows.push({ conversationId: conversationId ?? "", label, alwaysSearch, repeat, turnIndex: i, say: turns[i]!, ttftMs: null, searched: false, answeredFromContext: false, sourced: false, replyText: "", pass: false, note: `error: ${result.error}`, requiredHonored, requiredCachedTokens, requiredPromptTokens });
+          rows.push({ conversationId: conversationId ?? "", label, alwaysSearch, repeat, turnIndex: i, say: turns[i]!, ttftMs: null, searched: false, sourced: false, replyText: "", pass: false, note: `error: ${result.error}`, wasForced: false, requiredMiss: false, requiredCachedTokens: null, requiredPromptTokens: null });
           continue;
         }
         if (result.kind !== "immediate") continue;
         conversationId = result.value.conversation_id;
-        const nodesTrace = (result.value.stats as { nodes?: { node: string; impl: string; outcome: { ok?: boolean; skipped?: boolean } }[] } | null)?.nodes ?? [];
-        const generations = result.value.stats?.generations ?? [];
-        // answer_from_context taken: the model's own second-round choice
-        // (nodes/model.ts's ANSWER_FROM_CONTEXT_TOOL_ID) - visible only
-        // via the trace's own node presence today (no dedicated wire
-        // field yet); approximated here as "an interim_rule generation
-        // ran but no websearch outcome exists on the turn."
-        const answeredFromContext = generations.some((g) => g.reason === "interim_rule") && !hasWebsearchOutcome(nodesTrace);
+        const nodesTrace = (result.value.stats as { nodes?: { node: string; impl: string; outcome?: { ok?: boolean; skipped?: boolean; required_miss?: boolean } }[] } | null)?.nodes ?? [];
+        const generations = (result.value.stats?.generations ?? []) as { reason: string; cache_n: number | null; prompt_n: number | null }[];
+        // ENGINE-CONTRACT-02: required_miss is the model node's own
+        // trace field, set on the exact turn a required or offered
+        // websearch call missed its own verification (dev.md "U6: the
+        // flip verdict") - the real signal now, never a proxy read off
+        // node presence.
+        const requiredMiss = nodesTrace.some((n) => n.node === "model" && n.outcome?.required_miss === true);
+        // The forced attempt is always the turn's own first generation
+        // (a genuine miss returns real text, so the "no visible text"
+        // retry never runs first) - its own cache/prompt token reading
+        // is what the miss actually happened under.
+        const forcedGeneration = generations.find((g) => g.reason === "interim_rule");
         const sourced = (result.value.reply as { sources?: unknown[] }).sources !== undefined || false;
         rows.push({
           conversationId,
@@ -140,14 +139,14 @@ async function main(): Promise<void> {
           say: turns[i]!,
           ttftMs: Math.round(ttftMs),
           searched: hasWebsearchOutcome(nodesTrace),
-          answeredFromContext,
           sourced,
+          wasForced: forcedGeneration !== undefined,
+          requiredMiss,
+          requiredCachedTokens: forcedGeneration?.cache_n ?? null,
+          requiredPromptTokens: forcedGeneration?.prompt_n ?? null,
           replyText: result.value.reply.text.slice(0, 200),
           pass: result.value.safety.action !== "refuse" && result.value.reply.text.length > 0,
           note: (result.value as { source: string }).source,
-          requiredHonored,
-          requiredCachedTokens,
-          requiredPromptTokens,
         });
       }
     } finally {
@@ -184,21 +183,27 @@ async function main(): Promise<void> {
   console.log("\n## interim-rule-measure rows\n");
   console.log(JSON.stringify(rows, null, 2));
 
+  const median = (values: readonly number[]): number | null => (values.length ? [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]! : null);
+
   console.log("\n## summary\n");
   for (const label of ["chile", "france"] as const) {
     for (const alwaysSearch of [true, false]) {
       const subset = rows.filter((r) => r.label === label && r.alwaysSearch === alwaysSearch);
       const passRate = subset.length ? subset.filter((r) => r.pass).length / subset.length : 0;
       const searchedRate = subset.length ? subset.filter((r) => r.searched).length / subset.length : 0;
-      const contextRate = subset.length ? subset.filter((r) => r.answeredFromContext).length / subset.length : 0;
       const ttfts = subset.map((r) => r.ttftMs).filter((v): v is number => v !== null);
-      const medianTtft = ttfts.length ? ttfts.sort((a, b) => a - b)[Math.floor(ttfts.length / 2)] : null;
-      // ENGINE-CONTRACT-01: only over turns that actually made a forced
-      // call - most turns in this script never do (only the interim
-      // rule's own first call per conversation does).
-      const forced = subset.filter((r) => r.requiredHonored !== null);
-      const missShare = forced.length ? forced.filter((r) => r.requiredHonored === false).length / forced.length : null;
-      console.log(`${label} always_search=${alwaysSearch}: pass ${(passRate * 100).toFixed(0)}%, searched ${(searchedRate * 100).toFixed(0)}%, answer_from_context ${(contextRate * 100).toFixed(0)}%, median TTFT ${medianTtft}ms, n=${subset.length}, required_miss ${missShare === null ? "n/a" : `${(missShare * 100).toFixed(0)}%`} (${forced.length} forced calls)`);
+      // ENGINE-CONTRACT-02 (dev.md 2026-09-23, "U6: the flip verdict"):
+      // only over turns that actually made a forced call - most turns
+      // in this script never do (only the interim rule's own first
+      // call per conversation does). The counter sits beside TTFT per
+      // outcome (miss vs clean), never one aggregate median, since the
+      // builder row's own extra generation is a real latency cost the
+      // France shape (the identical-repeat conversation) pays most.
+      const forced = subset.filter((r) => r.wasForced);
+      const missShare = forced.length ? forced.filter((r) => r.requiredMiss).length / forced.length : null;
+      const missTtft = median(forced.filter((r) => r.requiredMiss).map((r) => r.ttftMs).filter((v): v is number => v !== null));
+      const cleanTtft = median(forced.filter((r) => !r.requiredMiss).map((r) => r.ttftMs).filter((v): v is number => v !== null));
+      console.log(`${label} always_search=${alwaysSearch}: pass ${(passRate * 100).toFixed(0)}%, searched ${(searchedRate * 100).toFixed(0)}%, median TTFT ${median(ttfts)}ms, n=${subset.length}, required_miss ${missShare === null ? "n/a" : `${(missShare * 100).toFixed(0)}%`} (${forced.length} forced calls) - median TTFT miss ${missTtft}ms, clean ${cleanTtft}ms`);
     }
   }
 }

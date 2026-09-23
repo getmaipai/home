@@ -461,6 +461,171 @@ describe("turnNext.ts: GROUND-01, thinking_for_minors", () => {
   });
 });
 
+describe("turnNext.ts: ENGINE-CONTRACT-02, a required miss falls to the builder row", () => {
+  async function modelNodeOutcomes(turnId: string): Promise<{ ok?: boolean; required_miss?: boolean }[]> {
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; required_miss?: boolean } }[] };
+    return (stats.nodes ?? []).filter((n) => n.node === "model").map((n) => n.outcome ?? {});
+  }
+
+  test('a scripted engine that returns content to a required call produces a searched answer, the trace shows required_miss: true on model and a builder query, and the discarded text appears nowhere', async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const DISCARDED = "The current president of Chile is a made-up name from the model's own knowledge.";
+    let calls = 0;
+    try {
+      const result = await withStub(
+        {
+          // The first (forced) call never returns a tool call at all -
+          // the required miss, exactly A2/A3's own shape
+          // (ENGINE-CONTRACT-01's dev.md finding) - and answers in
+          // plain text instead; the second call (the builder row's own
+          // phrasing round, tool_choice none) answers for real. Scripted
+          // by call order, not by a tool-role message in the request -
+          // the new path's phrasing round rebuilds its prompt from the
+          // same context list every time, never injecting the tool
+          // result back into the messages themselves (sources reach the
+          // delivered reply through state.outcomes instead, answer.ts's
+          // own "model_text" case) - a pre-existing gap, not this item's
+          // to fix, so the test scripts on order to stay independent of
+          // it.
+          reply: () => {
+            calls++;
+            return calls === 1 ? DISCARDED : "The current president of Chile answers your question, sourced.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      // Searched, sourced - the builder row ran a real search from the
+      // engine's own query (the utterance), never the discarded text.
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(result.value.plugin_id).toBe("websearch");
+      expect(result.value.sources?.length).toBeGreaterThan(0);
+      // The discarded text appears nowhere: not the reply, not stored
+      // outcomes, not the trace.
+      expect(result.value.reply.text).not.toContain(DISCARDED);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      expect(row?.replyText ?? "").not.toContain(DISCARDED);
+      expect(row?.stats ?? "").not.toContain(DISCARDED);
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
+      expect(outcomes.some((o) => o.callId === "builder" && o.args?.expression === "who is the president of chile")).toBe(true);
+      // required_miss: true on the FIRST model entry (the forced call
+      // that missed); the trace never says it about a call that
+      // honoured the choice.
+      const modelOutcomes = await modelNodeOutcomes(result.value.turn_id);
+      expect(modelOutcomes[0]?.required_miss).toBe(true);
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("a scripted engine that honours the call is unchanged", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile 2026" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.plugin_id).toBe("websearch");
+      const modelOutcomes = await modelNodeOutcomes(result.value.turn_id);
+      expect(modelOutcomes[0]?.required_miss).toBeUndefined();
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  // "U6: the flip verdict" regression A: control-search-mariners-explicit
+  // and the hallucinated-name follow-up both showed a real
+  // websearch/tool_call outcome with EMPTY args ({}) - the engine
+  // half-committed to the call (an OFFERED one, tool_choice auto, not
+  // even a forced one) with unparseable or empty arguments, policy
+  // normalized undefined to {} and grounded it vacuously (nothing to
+  // refuse in an empty object), and tool.ts's own schema validation
+  // failed it, feeding a knowledge answer back. The fix widens the
+  // verification past "required and missing" to "any websearch call,
+  // forced or offered, without a real expression."
+  test("an offered (not forced) websearch call with no valid expression also falls to the builder row (regression A)", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            // Empty args, the exact live-rerun shape (regression A):
+            // toolCallFromWire's own parse succeeded but left nothing
+            // useful, never a parse failure specifically - both collapse
+            // to the same "no valid expression" verification either way.
+            return [{ id: "call-1", name: "websearch", args: "{}" }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "Answered from the builder's own search, sourced." : "hi"),
+        },
+        // A greeting, not a world question: tool_choice is "auto" here,
+        // never "required" - proving the verification isn't gated on
+        // the interim rule's own forced call.
+        () => runTurnNext(people.owner, "chat", "good morning"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(result.value.plugin_id).toBe("websearch");
+      const modelOutcomes = await modelNodeOutcomes(result.value.turn_id);
+      expect(modelOutcomes[0]?.required_miss).toBe(true);
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  // A review caught the first cut discarding every tool call the model
+  // made on a miss, not only the bad websearch one - a reply that
+  // legitimately called another tool alongside an invalid websearch
+  // call would have silently lost that other call too.
+  test("a valid sibling tool call survives a websearch miss in the same reply", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [
+              { id: "call-1", name: "timer", args: JSON.stringify({ expression: "5 minutes" }) },
+              { id: "call-2", name: "websearch", args: "{}" },
+            ];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "Timer set, and here's what I found." : "hi"),
+        },
+        // Not a command-pattern match (timer's own "set a timer for *"
+        // would intercept that shape at the commands node, never
+        // reaching the model at all) and not a world question (tool_choice
+        // stays "auto"); shares "minutes" with the scripted timer call's
+        // own expression for policy.ts's term-overlap grounding, unrelated
+        // to the ENGINE-CONTRACT-02 fix under test.
+        () => runTurnNext(people.owner, "chat", "I need five minutes to think"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; callId: string; status: string }[]) : [];
+      expect(outcomes.some((o) => o.packageId === "timer" && o.status === "succeeded")).toBe(true);
+      expect(outcomes.some((o) => o.packageId === "websearch" && o.callId === "builder")).toBe(true);
+    } finally {
+      searxng.stop();
+    }
+  });
+});
+
 describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-text fields", () => {
   async function policyNodeOutcome(turnId: string): Promise<{ ok?: boolean; code?: string; arg?: string } | undefined> {
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();

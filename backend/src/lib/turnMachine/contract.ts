@@ -153,8 +153,14 @@ export interface TurnState {
  * refusal's trace records the branch and the argument NAME, never the
  * terms - terms are the person's data"). `code` already carries the
  * branch (a PolicyDecision reason, a safety refuse category, or any
- * other node's own failure code). */
-export type NodeOutcome = { ok: true } | { ok: false; code: string; arg?: string } | { skipped: true; reason: string };
+ * other node's own failure code). ENGINE-CONTRACT-02: `required_miss`
+ * marks the model node's own outcome when a `tool_choice: "required"`
+ * call came back with no tool call at all - llama-server b10797 treats
+ * `required` as advisory once the slot's KV cache holds the prefix
+ * (ENGINE-CONTRACT-01), so `interimRuleMeasure` and the replay bench
+ * can count this by cache state without re-deriving it from the
+ * generation record. */
+export type NodeOutcome = { ok: true; required_miss?: boolean } | { ok: false; code: string; arg?: string } | { skipped: true; reason: string };
 
 export type NodeName = "safety" | "commands" | "context" | "model" | "policy" | "tool" | "answer" | "output_gate";
 

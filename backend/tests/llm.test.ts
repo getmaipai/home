@@ -181,7 +181,10 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: { place: "Seattle" }, id: "call-1" }]); // CHAT-01: the wire's own call id rides along
+    // CHAT-01: the wire's own call id rides along; ENGINE-CONTRACT-02:
+    // rawArgs keeps the engine's own unparsed string beside the parsed
+    // value, so a parse failure and a literal "{}" can be told apart.
+    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: { place: "Seattle" }, id: "call-1", rawArgs: '{"place":"Seattle"}' }]);
   });
 
   test("two independent calls in one reply both parse", async () => {
@@ -214,7 +217,10 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: undefined, id: "call-1" }]);
+    // rawArgs keeps the original unparsed string even on a parse
+    // failure (ENGINE-CONTRACT-02) - the one place args and rawArgs
+    // genuinely disagree.
+    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: undefined, id: "call-1", rawArgs: "not valid json" }]);
   });
 
   test("tool_choice is sent through to the request verbatim", async () => {
@@ -373,7 +379,7 @@ describe("lib/llm.ts startCompleteStream() with tools (Fix E: native tool callin
         if (!started.ok) return;
         const step = await started.tokens.next();
         expect(step.done).toBe(true); // no text deltas at all for a tool-calling reply
-        expect(step.value).toEqual([{ tool: "weather", args: { place: "Seattle" }, id: "call-1" }]);
+        expect(step.value).toEqual([{ tool: "weather", args: { place: "Seattle" }, id: "call-1", rawArgs: '{"place":"Seattle"}' }]);
       },
     );
   });

@@ -66,7 +66,16 @@ export const CATALOG: ModelCapabilities[] = [
     // repeats (0 false calls in 50, 19 fitting searches in 50).
     turn_budget: {
       rounds: 1,
-      tools_offered: ["recall", "remember", "remind", "timer", "weather", "websearch"],
+      // TOOLSET-01 (dev.md 2026-09-23, "U6: the flip verdict"
+      // regression B): recall left out on purpose - nodes/context.ts
+      // already calls recall(actor, utterance) on every turn and puts
+      // up to eight matches in the context as source: "memory", so the
+      // recall tool is a second implementation of a retrieval the
+      // model already holds; at temperature 0.7 the model reached for
+      // it one time in three on small talk and doubled the turn for
+      // nothing new (control-negative-spiderman: 10,873ms against
+      // 5,283ms clean). Memory reaches the model through context only.
+      tools_offered: ["remember", "remind", "timer", "weather", "websearch"],
       always_search: true,
       // GROUND-01 (state record, "The interim rule"): off in every
       // budget until reuse-with-freshness is built - a quote check

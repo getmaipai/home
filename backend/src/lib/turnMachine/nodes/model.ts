@@ -146,7 +146,13 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
     return { ok: false, code: "generation_failed" };
   }
 
-  state.generations.push({ reason, thinking, maxTokens: maxTokensFor(state.plan) ?? null, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats });
+  // ENGINE-CONTRACT-02 ("U6: the flip verdict" regression A): the raw
+  // wire string for a websearch call this generation made, forced or
+  // offered - kept on the record regardless of whether it turns out to
+  // verify, since a parse failure or a literal "{}" is exactly what a
+  // later read of the trace needs to tell apart from a real query.
+  const websearchRawArgs = toolCalls?.find((c) => c.tool === "websearch")?.rawArgs ?? null;
+  state.generations.push({ reason, thinking, maxTokens: maxTokensFor(state.plan) ?? null, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: websearchRawArgs });
   return { ok: true, text: visibleText(raw), reasoning: extractReasoningText(raw), toolCalls, thinking };
 }
 
@@ -209,6 +215,44 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
       const quote = typeof contextAnswer.args === "object" && contextAnswer.args && "quote" in contextAnswer.args ? String((contextAnswer.args as { quote: unknown }).quote) : "";
       return { outcome: { ok: true }, output: { kind: "answer_from_context", quote, reasoning } };
     }
+  }
+
+  // ENGINE-CONTRACT-02 (dev.md 2026-09-23, "U6: the flip verdict"): the
+  // model node verifies a websearch call carries a non-empty string
+  // expression, forced or offered alike - never only "did a tool_choice
+  // required call come back with a call at all." Regression A found
+  // llama-server b10797 half-committing on an OFFERED call too: a
+  // parse-failed or empty arguments string, toolCallFromWire's own
+  // args: undefined, normalized to {} by policy.ts, grounds vacuously
+  // (nothing in an empty object to refuse), then fails tool.ts's own
+  // schema validation and feeds a knowledge answer back on the next
+  // round - the same near-tie as ENGINE-CONTRACT-01, one level down.
+  // A miss here - no websearch call at all when one was required, or a
+  // websearch call with no valid expression either way - never runs,
+  // is never fed back as a failed outcome, and takes the state
+  // record's own builder row instead (the engine builds the query, not
+  // the model), never a second call with cache_prompt: false (a second
+  // full prefill, and A3 shows partial cache reuse misses the same way
+  // A2's full hit does).
+  const websearchCall = attempt.toolCalls?.find((c) => c.tool === "websearch");
+  const websearchExpression = websearchCall && typeof websearchCall.args === "object" && websearchCall.args !== null && "expression" in websearchCall.args ? (websearchCall.args as { expression: unknown }).expression : undefined;
+  const websearchValid = typeof websearchExpression === "string" && websearchExpression.trim().length > 0;
+  const requiredButMissing = tool_choice === "required" && !websearchCall;
+  const offeredButInvalid = websearchCall !== undefined && !websearchValid;
+  if (requiredButMissing || offeredButInvalid) {
+    // A review caught the first cut here discarding every tool call the
+    // model made, not only the bad websearch one - policy.ts runs every
+    // proposal in `input.calls` (nodes/policy.ts's own `for` loop), so a
+    // reply that legitimately called another tool (weather, say)
+    // alongside an invalid websearch call would have silently lost that
+    // other call too. Only the websearch call is replaced; every other
+    // call the model made this round still runs.
+    const builderCall: ToolCall = { tool: "websearch", args: { expression: input.utterance }, id: "builder" };
+    const otherCalls = (attempt.toolCalls ?? []).filter((c) => c.tool !== "websearch");
+    return { outcome: { ok: true, required_miss: true }, output: { kind: "tool_calls", calls: [...otherCalls, builderCall], reasoning } };
+  }
+
+  if (attempt.toolCalls && attempt.toolCalls.length > 0) {
     return { outcome: { ok: true }, output: { kind: "tool_calls", calls: attempt.toolCalls, reasoning } };
   }
 
