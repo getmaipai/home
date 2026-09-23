@@ -26,13 +26,18 @@
 // finishes speaking - the whole state machine is a value the mount
 // effect reacts to, never a manually chained callback tree.
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAui, useAuiState } from "@assistant-ui/react";
 import { VoiceConversation, type VoiceMode, type VoiceTurn } from "@maipai/ui/src/elements/voice-conversation";
+import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-button";
+import { getIcon } from "@maipai/ui/src/icons";
 import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+
+const SettingsIcon = getIcon("settings");
 
 export interface LiveVoiceSessionProps {
   open: boolean;
@@ -268,14 +273,30 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <VoiceConversation
-        mode={mode}
-        amplitude={amplitude}
-        transcript={transcript}
-        muted={muted}
-        onToggleMute={() => setMuted((value) => !value)}
-        onEnd={() => onOpenChange(false)}
-      />
+      <div className="relative w-full max-w-xs">
+        {/* VOICE-LIVE-05: the gear into Settings > Voice - the Element
+            itself has no slot for an extra control (VoiceConversation's
+            own props are mode/amplitude/transcript/mute/interrupt/end,
+            nothing else), so this sits just outside its own card,
+            composed here rather than forked into the shipped Element.
+            VOICE-LIVE-03b already moved voice/microphone choice into
+            Settings > Voice's own VoiceCatalogSection - this is the one
+            way back into it from the live session, per that item's own
+            note that it's the only voice control outside Settings now. */}
+        <TooltipIconButton asChild tooltip="Voice settings" className="absolute -top-2 -right-2 z-10">
+          <Link to="/settings/voices" aria-label="Voice settings">
+            <SettingsIcon />
+          </Link>
+        </TooltipIconButton>
+        <VoiceConversation
+          mode={mode}
+          amplitude={amplitude}
+          transcript={transcript}
+          muted={muted}
+          onToggleMute={() => setMuted((value) => !value)}
+          onEnd={() => onOpenChange(false)}
+        />
+      </div>
     </div>
   );
 }

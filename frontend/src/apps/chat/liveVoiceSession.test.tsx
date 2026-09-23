@@ -7,6 +7,7 @@
 // runtime adapter that just records what it received.
 import { describe, expect, test, afterEach } from "bun:test";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { createMockSttSocket, type SttFixtureStep } from "@/lib/voice/sttSocket";
@@ -36,19 +37,21 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
   };
   const runtime = useLocalRuntime(adapter);
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <LiveVoiceSession
-        open={open}
-        onOpenChange={onOpenChange}
-        turnSchedulerRef={{ current: null as SentenceSpeechScheduler | null }}
-        liveVoiceActiveRef={{ current: false }}
-        spokenNextRef={{ current: false }}
-        isSpeaking={isSpeaking}
-        speakingEndedAt={speakingEndedAt}
-        createSocket={(handlers) => createMockSttSocket(fixture, handlers)}
-        startCapture={fakeStartCapture()}
-      />
-    </AssistantRuntimeProvider>
+    <MemoryRouter initialEntries={["/next/chat"]}>
+      <AssistantRuntimeProvider runtime={runtime}>
+        <LiveVoiceSession
+          open={open}
+          onOpenChange={onOpenChange}
+          turnSchedulerRef={{ current: null as SentenceSpeechScheduler | null }}
+          liveVoiceActiveRef={{ current: false }}
+          spokenNextRef={{ current: false }}
+          isSpeaking={isSpeaking}
+          speakingEndedAt={speakingEndedAt}
+          createSocket={(handlers) => createMockSttSocket(fixture, handlers)}
+          startCapture={fakeStartCapture()}
+        />
+      </AssistantRuntimeProvider>
+    </MemoryRouter>
   );
 }
 
@@ -141,5 +144,16 @@ describe("LiveVoiceSession", () => {
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
     act(() => view.getByRole("button", { name: "End the call" }).click());
     expect(open).toBe(false);
+  });
+
+  // VOICE-LIVE-05: the gear is the one way back into Settings > Voice
+  // from the live session (VOICE-LIVE-03b's own note: voice/microphone
+  // choice moved there, this is the only control outside Settings now).
+  test("the settings gear links to Settings > Voice", async () => {
+    const fixture: SttFixtureStep[] = [{ delayMs: 0, message: { t: "ready" } }];
+    const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    const gear = view.getByRole("link", { name: "Voice settings" });
+    expect(gear.getAttribute("href")).toBe("/settings/voices");
   });
 });
