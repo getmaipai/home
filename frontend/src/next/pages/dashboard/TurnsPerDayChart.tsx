@@ -35,7 +35,7 @@ export function TurnsPerDayChart({ series }: { series: readonly DashboardTurnsPe
         </CardTitle>
       </CardHeader>
       <CardContent className="p-5 flex flex-col gap-6">
-        <ChartContainer config={chartConfig} className="h-[215px]! w-full">
+        <ChartContainer config={chartConfig} className="h-53.75! w-full">
           <LineChart data={series as DashboardTurnsPerDay[]} margin={{ top: 8, right: 4, bottom: 0, left: -10 }}>
             <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="4 4" />
             <XAxis

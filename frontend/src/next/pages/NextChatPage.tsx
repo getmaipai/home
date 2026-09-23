@@ -228,6 +228,7 @@ function CompareWithBareModelMenuItem() {
   if (!isAdmin) return null;
   return (
     <ActionBarMorePrimitive.Item
+      // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
       className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
       disabled={!turnId || !conversationId}
       onSelect={(e) => {
@@ -255,6 +256,7 @@ function MessageDetailsMenuItem() {
   if (!stats) return null;
   return (
     <ActionBarMorePrimitive.Item
+      // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
       className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
       disabled={!turnId}
       onSelect={(e) => {
@@ -283,6 +285,7 @@ function BareModeSwitchMenuItem() {
   if (!isAdmin) return null;
   return (
     <ActionBarMorePrimitive.Item
+      // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
       className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
       onSelect={(e) => {
         e.preventDefault();
@@ -587,7 +590,10 @@ function SourcesFooterContent() {
   return (
     <div className="ms-2 pb-2">
       <Collapsible open={isOpen(turnId)} onOpenChange={() => toggle(turnId)}>
-        <CollapsibleContent className={cn(collapsePanel, "outline-none")}>
+        <CollapsibleContent
+          // eslint-disable-next-line shadcn/require-static-classes -- collapsePanel is a stable module-level constant, not a runtime-computed string
+          className={collapsePanel}
+        >
           <div className="flex flex-wrap gap-1.5 pt-2.5" data-slot="sources-list">
             {sources.map((source) => (
               <Source key={source.url} href={source.url} referrerPolicy="no-referrer" variant="secondary">
@@ -1077,7 +1083,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
     // memoized - but it defeats exhaustive-deps' own future
     // protection for no reason, since listing them doesn't actually
     // trigger the "outer-scope value" warning either.
-    const adapters = useMemo(() => ({ feedback: createChatFeedbackAdapter(), speech: createChatSpeechAdapter(), attachments: attachmentsAdapter, dictation: dictationAdapter }), [attachmentsAdapter, dictationAdapter]);
+    const adapters = useMemo(() => ({ feedback: createChatFeedbackAdapter(), speech: createChatSpeechAdapter(), attachments: attachmentsAdapter, dictation: dictationAdapter }), []);
     return useLocalRuntime(chatModelAdapter, { adapters });
   }
 
@@ -1613,6 +1619,7 @@ export function NextChatPage({ person }: { person: Roster }) {
           aria-label={toggleLabel}
           aria-expanded={toggleExpanded}
           aria-controls="next-chat-rail"
+          // eslint-disable-next-line shadcn/no-restyle -- positioning classes for the rail toggle button are intentional layout, not restyling of the button's own shape
           className="absolute top-0 left-0 z-20 hidden lg:flex"
           onPointerEnter={handleToggleEnter}
           onPointerLeave={handleToggleLeave}
@@ -1748,6 +1755,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                 // Only a click (`startRailWidthAnimation`) ever puts this
                 // back on the element - see that function's own comment.
                 // Hovering the peek open or closed must jump, never ease.
+                // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate a dynamic rail width
                 railWidthAnimating && "transition-[width] duration-200 ease-linear motion-reduce:transition-none",
                 railCollapsed
                   ? railPeeked
@@ -1783,6 +1791,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             <div
               data-slot="next-chat-pane"
               className={cn(
+                // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[margin-inline-start] is the only way to animate the pane's margin as the rail collapses
                 "min-w-0 flex-1 transition-[margin-inline-start] duration-200 ease-linear motion-reduce:transition-none",
                 railCollapsed ? "ms-0" : "ms-4",
               )}
@@ -1815,7 +1824,9 @@ export function NextChatPage({ person }: { person: Roster }) {
           </div>
         </div>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- sheet width and responsive visibility are intentional layout for the mobile thread list; max-w-[calc(100vw-2rem)] has no scale-token equivalent since Sheet has no max-width prop of its own (commons/ui/docs/dashboard-upstream.md) */}
           <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-2 lg:hidden">
+            {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
               <SheetTitle>Conversations</SheetTitle>
               <SheetDescription>Past conversations</SheetDescription>
@@ -1824,7 +1835,9 @@ export function NextChatPage({ person }: { person: Roster }) {
           </SheetContent>
         </Sheet>
         <Sheet open={openArtifactId !== null} onOpenChange={(next) => { if (!next) closeArtifact(); }}>
+          {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- max-height and scroll are intentional for the mobile artifact sheet; max-h-[85vh] has no scale-token equivalent since Sheet has no max-height prop of its own (commons/ui/docs/dashboard-upstream.md) */}
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto lg:hidden">
+            {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
               <SheetTitle>Document</SheetTitle>
               <SheetDescription>The document from this reply</SheetDescription>
@@ -1833,7 +1846,9 @@ export function NextChatPage({ person }: { person: Roster }) {
           </SheetContent>
         </Sheet>
         <Sheet open={compareTarget !== null} onOpenChange={(next) => { if (!next) closeCompare(); }}>
+          {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- max-height and scroll are intentional for the mobile compare sheet; max-h-[85vh] has no scale-token equivalent since Sheet has no max-height prop of its own (commons/ui/docs/dashboard-upstream.md) */}
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto lg:hidden">
+            {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
               <SheetTitle>Compare with the bare model</SheetTitle>
               <SheetDescription>Our reply beside the same model with no routing, packages, persona or guards</SheetDescription>

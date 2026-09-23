@@ -6,6 +6,7 @@ import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
+import { plugin as shadcn } from "@shadcn/lint";
 
 // A hand-written rule, not a config option: no shipped plugin checks
 // "does this className string pair every hover: variant with a focus
@@ -231,6 +232,22 @@ export default tseslint.config(
       ],
       "local/hover-needs-focus": "error",
       "local/type-floor": "error",
+    },
+  },
+  {
+    // LINT-UI-01: @shadcn/lint's six rules are the org's no-hand-built-UI
+    // rule made mechanical. Scoped to src/next only: the old shell
+    // retires with SHELL-09 and is not worth fixing, and the vendored
+    // trees live in the kit and are never linted.
+    files: ["src/next/**/*.{ts,tsx}"],
+    plugins: { shadcn },
+    rules: {
+      "shadcn/no-restyle": "error",
+      "shadcn/no-raw-colors": "error",
+      "shadcn/no-arbitrary-values": "error",
+      "shadcn/no-inline-styles": "error",
+      "shadcn/no-unknown-classes": "error",
+      "shadcn/require-static-classes": "error",
     },
   },
   {

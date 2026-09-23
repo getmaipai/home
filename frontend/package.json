@@ -50,6 +50,7 @@
     "@happy-dom/global-registrator": "^20.14.0",
     "@lingui/cli": "6.6.0",
     "@lingui/vite-plugin": "6.6.0",
+    "@shadcn/lint": "^0.2.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",

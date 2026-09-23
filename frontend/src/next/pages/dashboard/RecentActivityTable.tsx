@@ -30,8 +30,8 @@ export function RecentActivityTable({ rows }: { rows: readonly DashboardActivity
             <TableHeader>
               <TableRow className="hover:bg-transparent border-border">
                 <TableHead className="pl-4! px-4 py-3 h-auto text-sm font-normal text-muted-foreground">Person</TableHead>
-                <TableHead className="px-4 py-3 h-auto text-sm font-normal text-muted-foreground w-[130px]">Where</TableHead>
-                <TableHead className="pr-4! px-4 py-3 h-auto text-sm font-normal text-muted-foreground w-[160px]">When</TableHead>
+                <TableHead className="px-4 py-3 h-auto text-sm font-normal text-muted-foreground w-32.5">Where</TableHead>
+                <TableHead className="pr-4! px-4 py-3 h-auto text-sm font-normal text-muted-foreground w-40">When</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -47,10 +47,10 @@ export function RecentActivityTable({ rows }: { rows: readonly DashboardActivity
                     <TableCell className="pl-4! px-4 py-3">
                       <span className="text-sm font-medium text-foreground whitespace-nowrap">{row.display_name}</span>
                     </TableCell>
-                    <TableCell className="px-4 py-3 w-[130px]">
+                    <TableCell className="px-4 py-3 w-32.5">
                       <span className="text-sm font-normal text-muted-foreground whitespace-nowrap capitalize">{row.surface}</span>
                     </TableCell>
-                    <TableCell className="pr-4! px-4 py-3 w-[160px]">
+                    <TableCell className="pr-4! px-4 py-3 w-40">
                       <span className="text-sm font-normal text-muted-foreground whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</span>
                     </TableCell>
                   </TableRow>
