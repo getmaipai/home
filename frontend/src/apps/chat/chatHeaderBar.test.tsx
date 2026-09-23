@@ -38,9 +38,6 @@ function baseData(overrides: Partial<ChatHeaderData> = {}): ChatHeaderData {
     title: "What's 2 plus 2?",
     onRename: async () => {},
     onDelete: async () => {},
-    onStartTemporary: () => {},
-    temporaryAllowed: true,
-    shareAllowed: false,
     ...overrides,
   };
 }
@@ -115,40 +112,36 @@ describe("ChatHeaderBar", () => {
     expect(onRename).not.toHaveBeenCalled();
   });
 
-  test("the menu's actions each work: rename, temporary chat (allowed), and delete", async () => {
+  test("the menu's actions each work: rename and delete", async () => {
     const onDelete = mock(async () => {});
-    const onStartTemporary = mock(() => {});
-    const view = renderBar(baseData({ onDelete, onStartTemporary, temporaryAllowed: true }));
+    const view = renderBar(baseData({ onDelete }));
     await openActionsMenu(view);
-    await view.findByText("Rename");
-    expect(await view.findByText("Start temporary chat")).toBeVisible();
-    fireEvent.click(await view.findByText("Start temporary chat"));
-    expect(onStartTemporary).toHaveBeenCalled();
+    fireEvent.click(await view.findByText("Rename"));
+    await view.findByLabelText("Rename conversation");
 
+    fireEvent.keyDown(await view.findByLabelText("Rename conversation"), { key: "Escape" });
     await openActionsMenu(view);
     fireEvent.click(await view.findByText("Delete"));
     await waitFor(() => expect(onDelete).toHaveBeenCalled());
   });
 
-  test("Start temporary chat is absent when the actor is a minor", async () => {
-    const view = renderBar(baseData({ temporaryAllowed: false }));
+  // CHAT-FIND-0923-03: Jesse's own live finding - the menu held Rename,
+  // Start temporary chat, Share and Delete; a conversation's own
+  // actions menu holds only its own actions, the same set the thread
+  // row's own three-dots menu shows (Rename/Archive/Delete - Archive
+  // itself left out here too, since the row's own copy throws by
+  // deliberate design today, see chatThreadListAdapter.ts; CONV-
+  // ARCHIVE-01 gives both a real one from one definition once the
+  // record supports it). Temporary-chat's one real home is CHAT-LIST-
+  // 01's own button beside New Thread now, not a conversation action at
+  // all (it starts a NEW one).
+  test("the menu never shows Start temporary chat, Share, or Archive - only this conversation's own actions", async () => {
+    const view = renderBar(baseData());
     await openActionsMenu(view);
     await view.findByText("Rename");
+    await view.findByText("Delete");
     expect(view.queryByText("Start temporary chat")).toBeNull();
-  });
-
-  // Share behind the flag (SHARE-CONV-01: no share-creation route
-  // exists yet) - present but disabled, never a real handler.
-  test("Share is absent unless shareAllowed, and disabled even then", async () => {
-    const withoutShare = renderBar(baseData({ shareAllowed: false }));
-    await openActionsMenu(withoutShare);
-    await withoutShare.findByText("Rename");
-    expect(withoutShare.queryByText("Share")).toBeNull();
-    withoutShare.unmount();
-
-    const withShare = renderBar(baseData({ shareAllowed: true }));
-    await openActionsMenu(withShare);
-    const shareItem = await withShare.findByText("Share");
-    expect(shareItem.closest('[data-slot="dropdown-menu-item"]')).toHaveAttribute("data-disabled");
+    expect(view.queryByText("Share")).toBeNull();
+    expect(view.queryByText("Archive")).toBeNull();
   });
 });

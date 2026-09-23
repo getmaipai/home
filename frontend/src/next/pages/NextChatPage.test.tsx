@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { NextChatPage } from "@/next/pages/NextChatPage";
-import { ChatHeaderDataProvider, useChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
 import type { Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
@@ -48,6 +47,12 @@ afterEach(() => {
   cleanup();
   window.matchMedia = ORIGINAL_MATCH_MEDIA;
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
+  // CHAT-FIND-0923-01: clicking the rail's own collapse toggle now
+  // writes a real per-browser preference (railCollapsePreference.ts) -
+  // left uncleared, one test's click would leak into the next test's
+  // own initial-state assumption, the same isolation risk `matchMedia`
+  // and `AudioContext` above are already reset for.
+  localStorage.removeItem("maipai.chat.rail-collapsed");
 });
 
 // SHELL-02 slice 4: the artifact-card/canvas-split Elements both use
@@ -661,6 +666,87 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       const newThread = within(rail()).getByRole("button", { name: "New Thread" });
       expect(newThread.parentElement).toBe(toggle.parentElement);
       expect(view.queryByRole("button", { name: "Show conversations" })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  // CHAT-FIND-0923-01: Jesse's own live report on 8787 (`fa85640b`) -
+  // "the bug is back," the toggle that hides the left thread column no
+  // longer hiding it. Not reproducible against this code as checked
+  // (a fresh load on the running 8787, one click correctly collapsed
+  // the rail to width 0/inert, a second click correctly reopened it,
+  // repeated cleanly) - written anyway as a permanent regression test
+  // in Jesse's own words, the round trip the other tests in this block
+  // each only exercise half of. `queryByRole("New Thread")` staying
+  // non-null through the "hidden" assertion is deliberate, not a typo:
+  // "collapsed: the rail is hidden..." above already established that
+  // this rail hides via a CSS class, never unmounts (so `aria-controls`
+  // stays valid) - happy-dom applies no real stylesheet, so the class
+  // is what this test (and that one) can actually assert.
+  test("clicking the toggle hides the thread list and clicking again shows it, asserted on the real page component", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      expect(view.getByRole("button", { name: "New Thread" })).toBeVisible();
+      expect(classes(rail())).toContain("w-64");
+
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
+      expect(classes(rail())).toContain("hidden");
+      expect(classes(rail())).toContain("w-0");
+
+      const showToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
+      fireEvent.click(showToggle, { detail: 1 });
+      // "hidden" itself stays in the class list open or collapsed (the
+      // `hidden ... lg:block` responsive pair - `hidden` is the base,
+      // phone-width utility, overridden at `lg:`); `w-64` vs `w-0` is
+      // what actually distinguishes the two states, the same assertion
+      // the "open:" test above this one uses.
+      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).not.toContain("w-0");
+      expect(view.getByRole("button", { name: "New Thread" })).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  // CHAT-FIND-0923-01: hiding the column had never been a stored
+  // preference (checked against this file's whole history, `git log -S`
+  // on "railCollapsed"/"localStorage" - never once combined) - a reload
+  // has always reset it to the width-based default, since nothing ever
+  // wrote it anywhere. From a person's chair that reads the same as
+  // "the toggle doesn't hide it": Jesse's own words for this test, "the
+  // column comes back on its own" after a reload. Fixed with the same
+  // per-browser-preference shape `micDevicePreference.ts` already
+  // established (`railCollapsePreference.ts`, new) - a real remount
+  // (`renderPage` again, not the same running component) is what
+  // actually proves this, the same as a browser reload would.
+  test("hiding the column, then reloading, does not bring the column back on its own", async () => {
+    const restore = stubFetch();
+    try {
+      const first = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await first.findByLabelText("Message input");
+      fireEvent.click(first.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
+      expect(classes(rail())).toContain("w-0");
+      cleanup();
+
+      const second = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await second.findByLabelText("Message input");
+      expect(classes(rail())).toContain("w-0");
+      expect(second.queryByRole("button", { name: "Hide conversations" })).toBeNull();
     } finally {
       restore();
     }
@@ -1506,60 +1592,6 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
   });
 });
 
-describe("NextChatPage (CHAT-HEADER-01: the header's own temporary-chat entry)", () => {
-  // A code review caught this: armTemporaryChat's own switchToNewThread
-  // call is itself a deliberate switch (onThreadIdChange's own
-  // definition: the id changes and the PREVIOUS one was real), so
-  // without the startingTemporaryRef marker this file's own
-  // Thinking-reset code right beside it would reset temporaryNext too,
-  // clearing the very flag "Start temporary chat" just set before the
-  // new conversation's first send ever reads it. ChatHeaderBar itself
-  // isn't mounted in these tests (no HeaderExtraProvider/Header - see
-  // this file's other describe blocks), so this reaches the same
-  // bridge callback chatHeaderData.tsx exposes, the way a real header
-  // click would.
-  function HeaderTemporaryButton() {
-    const data = useChatHeaderData();
-    return (
-      <button type="button" onClick={() => data?.onStartTemporary()}>
-        header-start-temporary
-      </button>
-    );
-  }
-
-  test("marks the very next send as temporary - the switch it performs itself must not clear its own flag", async () => {
-    const restore = stubMultiTurnFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
-          <ChatHeaderDataProvider>
-            <HeaderTemporaryButton />
-            <NextChatPage person={makePerson()} />
-          </ChatHeaderDataProvider>
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      // A real conversation first - the bug only reproduces switching
-      // AWAY from a real (non-undefined) thread id, which is exactly
-      // what "Start temporary chat" itself triggers.
-      await sendMessage(view, "hi");
-      await view.findByText("Reply 1.");
-
-      fireEvent.click(view.getByText("header-start-temporary"));
-      await view.findByLabelText("Message input");
-      await sendMessage(view, "a private question");
-      await view.findByText("Reply 2.");
-
-      const bodies = turnRequestBodies();
-      expect(bodies).toHaveLength(2);
-      expect(bodies[0]!.temporary).toBeUndefined();
-      expect(bodies[1]!.temporary).toBe(true);
-    } finally {
-      restore();
-    }
-  });
-});
-
 describe("NextChatPage (CHAT-LIST-01: the thread list's own temporary-chat button)", () => {
   test("appears beside New Thread for a role that can have a temporary chat", async () => {
     const restore = stubFetch();
@@ -1593,11 +1625,19 @@ describe("NextChatPage (CHAT-LIST-01: the thread list's own temporary-chat butto
     }
   });
 
-  // Same real assertion as CHAT-HEADER-01's own test above (the next
-  // send's `temporary: true`) - this button reuses `armTemporaryChat`,
-  // just reached from the thread list's toolbar instead of the header's
-  // dropdown, so it must mark a chat the same way.
-  test("starts a temporary chat, marked as such, the same as the header's own entry", async () => {
+  // A real conversation first, then the switch: the same shape
+  // CHAT-HEADER-01's own now-removed test proved (armTemporaryChat's
+  // own `switchToNewThread` call is itself a deliberate switch -
+  // `onThreadIdChange`'s definition: the id changes and the PREVIOUS
+  // one was real - so without the `startingTemporaryRef` marker this
+  // file's own Thinking-reset code right beside it would reset
+  // `temporaryNext` too, clearing the very flag this button just set
+  // before the new conversation's first send ever reads it).
+  // CHAT-FIND-0923-03 removed the header's own temporary-chat entry
+  // entirely (Jesse's own finding: it isn't a conversation action, it
+  // belongs only here) - this test is the one place that protection is
+  // still proven, through the one real path left to reach it.
+  test("starts a temporary chat, marked as such, switching away from a real conversation", async () => {
     const restore = stubMultiTurnFetch();
     try {
       const view = renderPage(

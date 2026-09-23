@@ -63,8 +63,9 @@ function PinToggle({ person }: { person: Roster }) {
 }
 
 // The "MaiPai Home" text, the accent on the second word, shared by
-// Brand (the rail's own tile-plus-tagline mark, look-scaled) and
-// PhoneWordmark (a fixed size per the phone reference, not look-scaled)
+// Brand (the rail's own tile-plus-wordmark mark, no tagline since
+// CHAT-FIND-0923-05's own follow-up, look-scaled) and PhoneWordmark
+// (a fixed size per the phone reference, not look-scaled)
 // below - a code review, HOME-UI-02f: the two had retyped this same
 // text/accent pairing independently, a real drift risk (the "Studio"
 // look's own accent-glow/size pass already touched Brand's copy once).
@@ -124,36 +125,40 @@ export const Brand = forwardRef<HTMLAnchorElement, ComponentPropsWithoutRef<"a">
           tile (owner ruling, "Two looks, one setting": "the logo on a
           40px gradient tile... 12px radius"), the kit's own default
           since LOOK-01 (2026-09-21) retired Calm's own circle. */}
-      {/* 48px, the reference's own exact mark size (owner findings, "The
-          Studio look, the numbers," 2026-09-20 18:15) - was gated behind
-          a `studio:` variant, unconditional since LOOK-01 retired the
-          look that gate depended on (this was already every fresh
-          person's own default, so nothing on screen moves). The accent
-          glow already here matches that same finding's "accent glow" on
-          the mark. */}
+      {/* CHAT-FIND-0923-05 follow-up, owner's own live finding, 2026-09-23
+          ("the upper left logo is tiny - look at all the free space -
+          all we need is the logo here," with a reference screenshot):
+          supersedes the 2026-09-20 "exact figure" this size and the
+          wordmark's below were previously cited at (48px tile, 19px
+          wordmark, plus a tagline line) - kept as a real prior ruling in
+          this history, not erased, but a fresher direct instruction from
+          the same owner. The tagline is gone (absent from the owner's
+          own reference image) and the tile/wordmark grow into the row's
+          own already-reserved `pt-5 pb-6` space instead of sharing it
+          with a second text line.
+          `group-data-[collapsible=icon]:size-12`/`:p-1.5` (a review
+          caught this): the bigger 64px tile only fits the EXPANDED row
+          Jesse actually looked at - collapsed to icon-only,
+          `--sidebar-width-icon` is a fixed 72px (`ui/src/ui/sidebar.tsx`)
+          and this row's own collapsed padding is 8px each side
+          (`group-data-[collapsible=icon]:p-2!`, `app-sidebar.tsx`), so
+          the tile's own outer box would be 64+16=80px, 8px past the
+          collapsed rail's own edge, with nothing in the layout chain
+          clipping horizontal overflow to catch it. Collapsed keeps the
+          original, already-fitting 48px tile with 6px padding
+          (48+12=60px, comfortably under 72px) - this component's own
+          existing `group-data-[collapsible=icon]` pattern (the wordmark
+          wrapper below already uses it) is what makes a state-
+          conditional size correct here too. */}
       <span
-        className="flex size-12 shrink-0 items-center justify-center bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-1.5"
+        className="flex size-16 group-data-[collapsible=icon]:size-12 shrink-0 items-center justify-center bg-gradient-to-br from-[var(--hue-blue)] to-[var(--hue-violet)] p-2 group-data-[collapsible=icon]:p-1.5"
         style={{ borderRadius: "var(--tile-radius)", boxShadow: "0 0 16px color-mix(in srgb, var(--hue-violet) 25%, transparent)" }}
       >
         <img src="/brand/maipai-home-icon-light.png" alt="" className="size-full object-contain brand-logo-light" />
         <img src="/brand/maipai-home-icon-dark.png" alt="" className="size-full object-contain brand-logo-dark" />
       </span>
       <span className="min-w-0 group-data-[collapsible=icon]:hidden">
-        {/* 19px with -0.4px tracking, the reference's own exact figure
-            (owner findings, "The Studio look, the numbers," 2026-09-20
-            18:15) - arbitrary values since neither is a Tailwind step.
-            Unconditional since LOOK-01 the same way the tile above is. */}
-        <WordmarkText className="block truncate text-[19px] font-semibold tracking-[-0.4px]" />
-        {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3): a
-            compact secondary label under the wordmark, the same category
-            as a nav group heading (11px uppercase secondary) or a badge -
-            never truncated with an ellipsis (COORDINATOR, 2026-09-20: "the
-            tagline wraps to a second line... nothing in the rail is ever
-            cut"), wraps onto its own second line instead. */}
-        {/* The reference's own exact 11px (owner findings, "The Studio
-            look, the numbers," 2026-09-20 18:15), a deliberate type-floor
-            exception too - unconditional since LOOK-01. */}
-        <span className="block text-[11px] text-muted-foreground">Your AI. On your terms.</span>
+        <WordmarkText className="block truncate text-[28px] font-semibold tracking-[-0.4px]" />
       </span>
     </Link>
   );
@@ -163,9 +168,9 @@ export const Brand = forwardRef<HTMLAnchorElement, ComponentPropsWithoutRef<"a">
 // the owner's phone reference, "The phone composition" (2026-09-20) -
 // "the product wordmark at the left (16px semibold, the accent on the
 // second word as the logo does), a small version pill beside it... nothing
-// else." Deliberately not Brand: Brand is the rail's own 40px tile-plus-
-// tagline mark, sized and spaced for a sidebar row, not a compact header
-// - this is its own, smaller reading of the same wordmark.
+// else." Deliberately not Brand: Brand is the rail's own tile-plus-
+// wordmark mark, sized and spaced for a sidebar row, not a compact
+// header - this is its own, smaller reading of the same wordmark.
 function PhoneWordmark() {
   return (
     <div className="flex min-w-0 items-center gap-2">

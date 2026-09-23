@@ -23,9 +23,6 @@ export interface ChatHeaderData {
   title: string;
   onRename: (title: string) => Promise<void>;
   onDelete: () => Promise<void>;
-  onStartTemporary: () => void;
-  temporaryAllowed: boolean;
-  shareAllowed: boolean;
 }
 
 const ChatHeaderDataContext = createContext<{
@@ -65,18 +62,16 @@ export function useChatHeaderData(): ChatHeaderData | null {
  * genuinely distinguish one call from the next - breaks the cycle: a
  * ref always holds the latest full object (including its closures)
  * for the one effect run that actually happens on a real change, so
- * `onRename`/`onDelete`/`onStartTemporary` are never stale, but the
- * effect itself stops re-firing on identity churn alone. */
+ * `onRename`/`onDelete` are never stale, but the effect itself stops
+ * re-firing on identity churn alone. */
 export function useSetChatHeaderData(data: ChatHeaderData | null): void {
   const { setData } = useContext(ChatHeaderDataContext);
   const dataRef = useRef(data);
   dataRef.current = data;
   const title = data?.title;
-  const temporaryAllowed = data?.temporaryAllowed;
-  const shareAllowed = data?.shareAllowed;
   useEffect(() => {
     setData(dataRef.current);
     return () => setData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately narrower than `data` itself; see this function's own comment above.
-  }, [data === null, title, temporaryAllowed, shareAllowed, setData]);
+  }, [data === null, title, setData]);
 }

@@ -41,7 +41,7 @@ import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
-import { ComposerAddMenu, PackageScopeContext, unwiredControlsAreEnabled } from "@/apps/chat/composerAddMenu";
+import { ComposerAddMenu, PackageScopeContext } from "@/apps/chat/composerAddMenu";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
@@ -57,14 +57,23 @@ import { CURRENT_LOCAL_VISION_CAPABILITY } from "@/apps/chat/visionCapability";
 import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assistant-ui/core";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { readRailCollapsePreference, writeRailCollapsePreference } from "@/next/railCollapsePreference";
 
 const HistoryIcon = getIcon("history");
 // CHAT-UI-03 (3): the app rail's own toggle (sidebar.tsx's
 // SidebarTrigger) already uses `panel-left` - the chat column's own
 // toggle read as a mistake sharing the identical glyph in a different
-// row/alignment. A distinct one here, never touching the app rail's
+// row/alignment. A distinct pair here, never touching the app rail's
 // own (that one stays exactly where the template puts it).
-const RailToggleIcon = getIcon("message-square");
+// CHAT-FIND-0923-02: `message-square` never read as a column toggle at
+// all (Jesse's own live finding). `panel-left-close`/`panel-left-open`
+// (commons ui-v0.5.44) are the closest already-in-the-library state-
+// aware pair - still distinct from the outer trigger's plain, static
+// `panel-left` (no directional chevron), while actually showing which
+// way the click goes, the same idiom the "Show conversations"/"Hide
+// conversations" label pair already uses for the same two states.
+const RailCloseIcon = getIcon("panel-left-close");
+const RailOpenIcon = getIcon("panel-left-open");
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
 // registered fit, chosen over adding a new one to keep this item to the
@@ -1355,7 +1364,7 @@ function ChatDocumentTitle() {
  * pushes it into the data context. Same side-effect-mount shape as
  * ArtifactCacheInvalidator/ChatDocumentTitle above, just carrying data
  * instead of a DOM/browser-API side effect. */
-function ChatHeaderDataBridge({ temporaryAllowed, onStartTemporary, shareAllowed }: { temporaryAllowed: boolean; onStartTemporary: () => void; shareAllowed: boolean }) {
+function ChatHeaderDataBridge() {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
   useSetChatHeaderData({
@@ -1388,18 +1397,6 @@ function ChatHeaderDataBridge({ temporaryAllowed, onStartTemporary, shareAllowed
       // happens to fall back to.
       await aui.threads.switchToNewThread();
     },
-    // ChatHeaderBar (chatHeaderBar.tsx) renders as Header's own child,
-    // outside this provider - it has no runtime to call
-    // ThreadListPrimitive.New itself (that primitive needs an AuiProvider
-    // ancestor, which doesn't exist there), so the actual thread switch
-    // happens here, where aui is real, alongside setting the flag the new
-    // thread's own first turn reads.
-    onStartTemporary: () => {
-      onStartTemporary();
-      void aui.threads.switchToNewThread();
-    },
-    temporaryAllowed,
-    shareAllowed,
   });
   return null;
 }
@@ -1544,9 +1541,17 @@ export function NextChatPage({ person }: { person: Roster }) {
   // column STARTS, once, not an ongoing constraint that would snap a
   // deliberately-reopened column shut again on a later resize.
   const RAIL_AUTO_COLLAPSE_MAX_WIDTH = 1024;
-  const [railCollapsed, setRailCollapsed] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(`(max-width: ${RAIL_AUTO_COLLAPSE_MAX_WIDTH}px)`).matches,
-  );
+  // CHAT-FIND-0923-01: a deliberate click on the toggle is a real
+  // preference, not a one-time layout default - the stored value (once
+  // a person has ever clicked it) wins over the width-based default
+  // below, the same way `readMicDevicePreference()` already wins over
+  // "no preference." `null` (never clicked, or storage blocked) falls
+  // through to the existing matchMedia default unchanged.
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    const stored = readRailCollapsePreference();
+    if (stored !== null) return stored;
+    return typeof window !== "undefined" && window.matchMedia(`(max-width: ${RAIL_AUTO_COLLAPSE_MAX_WIDTH}px)`).matches;
+  });
   const [railPeeked, setRailPeeked] = useState(false);
   const closeRailPeek = (relatedTarget: EventTarget | null) => {
     if (!railCollapsed) return;
@@ -1828,8 +1833,10 @@ export function NextChatPage({ person }: { person: Roster }) {
     if (railCollapsed) {
       setRailCollapsed(false);
       setRailPeeked(false);
+      writeRailCollapsePreference(false);
     } else {
       setRailCollapsed(true);
+      writeRailCollapsePreference(true);
     }
   };
   const toggleLabel = railCollapsed ? "Show conversations" : "Hide conversations";
@@ -1849,7 +1856,15 @@ export function NextChatPage({ person }: { person: Roster }) {
           onFocus={handleToggleFocus}
           onClick={handleToggleClick}
         >
-          <RailToggleIcon className="size-4" />
+          {/* A review caught this: this instance stays mounted even
+              truly collapsed (it's `NextThreadList`'s own
+              `collapseToggle` prop, always passed - the "collapsed:
+              the rail is hidden and out of flow" test above proves the
+              node itself survives, CSS-hidden/`inert`, exactly so
+              `aria-controls` stays valid). Only ever VISIBLE when open
+              or peeked, never truly collapsed - the icon that reads as
+              "click to close." */}
+          <RailCloseIcon className="size-4" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>Conversations</TooltipContent>
@@ -1872,7 +1887,9 @@ export function NextChatPage({ person }: { person: Roster }) {
           onFocus={handleToggleFocus}
           onClick={handleToggleClick}
         >
-          <RailToggleIcon className="size-4" />
+          {/* This instance only ever renders truly collapsed (never
+              peeked) - the icon that reads as "click to open." */}
+          <RailOpenIcon className="size-4" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>Conversations</TooltipContent>
@@ -1897,11 +1914,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />
         <ChatDocumentTitle />
-        <ChatHeaderDataBridge
-          temporaryAllowed={canHaveTemporaryChatRole(person.role)}
-          onStartTemporary={armTemporaryChat}
-          shareAllowed={unwiredControlsAreEnabled()}
-        />
+        <ChatHeaderDataBridge />
         <LiveVoiceSession
           open={voiceOpen}
           onOpenChange={setVoiceOpen}

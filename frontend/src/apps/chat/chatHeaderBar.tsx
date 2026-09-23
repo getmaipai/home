@@ -15,11 +15,28 @@
 // title behavior thread-list.aui.tsx's own ThreadListItemRename already
 // establishes (its own aui.threadListItem.rename() call, mirrored here
 // since that Element is coupled to one list row's own props, not
-// reusable standalone). Never ThreadListPrimitive.New here specifically -
-// this renders outside the runtime tree (see chatHeaderData.tsx's own
-// header comment), and that primitive needs an AuiProvider ancestor;
-// data.onStartTemporary (chatHeaderData.tsx) already does the real
-// thread switch, from inside the tree that has one.
+// reusable standalone).
+//
+// CHAT-FIND-0923-03: the menu held Rename / Start temporary chat /
+// Share / Delete - Jesse's own finding, live: this menu is this
+// conversation's own actions, the same set the thread row's own
+// three-dots menu shows (Rename / Archive / Delete, the shipped
+// Element's fixed set - not Home's to add to or reorder), and
+// temporary-chat has nothing to do with an EXISTING conversation's
+// actions at all (it starts a NEW one). Temporary-chat's one real home
+// is CHAT-LIST-01's own button beside New Thread, which already did
+// the same job without going through this context. Share stays out
+// too, not because it doesn't belong on a conversation's own actions
+// in principle, but because a disabled placeholder is worse than no
+// entry (SHARE-CONV-01 adds a real one once share itself exists);
+// Archive isn't added either - the row's own Archive throws today by
+// deliberate design (chatThreadListAdapter.ts: "the shared record has
+// no archive state"), and this menu won't carry a second broken copy
+// of it (CONV-ARCHIVE-01 gives both menus a real Archive together, one
+// definition, once the record itself supports it). `onStartTemporary`/
+// `temporaryAllowed`/`shareAllowed` are gone from `ChatHeaderData`
+// itself (chatHeaderData.tsx) along with this - this menu was their
+// only consumer.
 //
 // CHAT-HEADER-03: the title used to cap at a fixed max-w-64 (256px)
 // regardless of how much room the header actually had - the template's
@@ -52,6 +69,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
+import { hitArea } from "@maipai/ui/src/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +82,6 @@ import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
 
 const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
-const ExternalLinkIcon = getIcon("external-link");
 const ChevronDownIcon = getIcon("chevron-down");
 // The exact icon SidebarContent (commons sidebaritems.ts) already
 // uses for "Chat" - nextPageHeaderTitle.tsx's own header comment has
@@ -148,17 +165,38 @@ export function ChatHeaderBar() {
         <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
       ) : (
         <>
+          {/* CHAT-FIND-0923-05: the kit's own "default" Button size is a
+              deliberate h-12 (48px, docs/UI.md's hard touch-target
+              floor) - correct for a real interactive control, but it
+              grew this row taller than the template's own header
+              controls (Light-Dark.tsx: `h-10 w-10`, 40px, the same
+              convention the app-sidebar's own logo row already sits at
+              - 57px, not this row's own 65px, the gap Jesse found live).
+              `h-10` plus `hitArea(1)` (the same technique `icon-lg`
+              already uses) keeps the 48px hit area a real click needs
+              while the visual line returns to 40px, matching the
+              template's own convention rather than carving out a
+              special case for this one row. */}
           <Button
             type="button"
             variant="ghost"
-            className="min-w-0 flex-1 justify-start truncate px-2 text-base font-medium"
+            className={`h-10 min-w-0 flex-1 justify-start truncate px-2 text-base font-medium ${hitArea(1)}`}
             onClick={() => setRenaming(true)}
           >
             {title}
           </Button>
           <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" aria-label="Conversation actions">
+              {/* A review caught this: `icon-lg` carries its own
+                  `hitArea(1)` (a 4px overhang each side), and so does
+                  the title button above - back-to-back on this row's
+                  own `gap-1` (4px), the two overhangs cover the exact
+                  same 4px strip between them, and this button, later in
+                  DOM order, wins every click that lands there instead
+                  of the title. `ms-1` (4px) closes the row's own gap to
+                  the buttons' own 8px, the width both overhangs
+                  together need to stop touching at all. */}
+              <Button type="button" variant="ghost" size="icon-lg" className="ms-1" aria-label="Conversation actions">
                 <ChevronDownIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -167,13 +205,6 @@ export function ChatHeaderBar() {
                 <PencilIcon className="size-4" />
                 Rename
               </DropdownMenuItem>
-              {data.temporaryAllowed && <DropdownMenuItem onClick={data.onStartTemporary}>Start temporary chat</DropdownMenuItem>}
-              {data.shareAllowed && (
-                <DropdownMenuItem disabled>
-                  <ExternalLinkIcon className="size-4" />
-                  Share
-                </DropdownMenuItem>
-              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}>
                 <TrashIcon className="size-4" />

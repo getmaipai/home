@@ -257,6 +257,7 @@ const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const chatListReview = process.argv.includes("--chat-list-review");
+const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-alignment-review");
 const chatHeaderTitleReview = process.argv.includes("--chat-header-title-review");
 const nextPageHeaderIconReview = process.argv.includes("--next-page-header-icon-review");
 const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
@@ -1849,6 +1850,71 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
       } finally {
         await context.close();
       }
+    }
+  }
+}
+
+/** CHAT-FIND-0923-05: the shell nav sidebar's own header block (the
+ * logo) and the page header used to share a bottom edge; CHAT-HEADER-
+ * 01/02/03's own new title/actions buttons defaulted to the kit's
+ * 48px touch-target floor (docs/UI.md), growing the row past the
+ * template's own 40px header-control convention (Light-Dark.tsx's own
+ * `h-10 w-10`) and breaking the line. Fixed with `h-10` + `hitArea(1)`
+ * on the title button and `size="icon-lg"` on the chevron - the 40px
+ * visual line back, the 48px hit area kept (the coordinator's own
+ * ruling, not a guess: shrinking the real touch target below the
+ * kit's own stated floor was rejected). happy-dom computes no real
+ * box layout (this whole file's own established reason every other
+ * pixel-level claim here is proven the same way), so this is the
+ * actual proof: real getBoundingClientRect() on both elements, at
+ * both widths the acceptance names, throwing on the first mismatch
+ * rather than silently capturing a still-broken page. */
+async function verifyChatFindHeaderAlignment(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`verifyChatFindHeaderAlignment: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const width of [1440, 2000]) {
+    const context = await newContext(browser, { slug: "wide", width, height: 1000 }, "light", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.goto(`${BASE_URL}/next/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      const bottoms = await page.evaluate(() => {
+        const sidebarHeader = document.querySelector('[data-slot="sidebar-header"]');
+        const header = document.querySelector("header");
+        return {
+          sidebarHeaderBottom: sidebarHeader?.getBoundingClientRect().bottom,
+          headerBottom: header?.getBoundingClientRect().bottom,
+        };
+      });
+      if (bottoms.sidebarHeaderBottom === undefined || bottoms.headerBottom === undefined) {
+        throw new Error(`verifyChatFindHeaderAlignment: could not find both elements at width ${width}: ${JSON.stringify(bottoms)}`);
+      }
+      if (Math.abs(bottoms.sidebarHeaderBottom - bottoms.headerBottom) > 0.5) {
+        throw new Error(`verifyChatFindHeaderAlignment: bottom edges don't line up at width ${width} - sidebar header bottom ${bottoms.sidebarHeaderBottom}, page header bottom ${bottoms.headerBottom}`);
+      }
+      console.log(`width ${width}: aligned, both bottoms at ${bottoms.headerBottom}`);
+      await settleAnimations(page);
+      const file = `chat-find-header-alignment-${width}.png`;
+      await page.screenshot({ path: join(outDir, file), fullPage: false });
+      console.log(`Wrote ${join(outDir, file)}`);
+      // A review caught this: 260px was tight enough that a slightly
+      // wider font render could clip "Home" at the 28px wordmark's own
+      // grown width, making a real, uncramped logo look falsely cropped
+      // in the review capture alone. 320px leaves real margin.
+      const zoomFile = `chat-find-logo-zoom-${width}.png`;
+      await page.screenshot({ path: join(outDir, zoomFile), clip: { x: 0, y: 0, width: 320, height: 100 } });
+      console.log(`Wrote ${join(outDir, zoomFile)}`);
+    } finally {
+      await context.close();
     }
   }
 }
@@ -3687,6 +3753,10 @@ async function main() {
       await captureChatListReview(browser, sessionValue);
     }
 
+    if (!a11yOnly && chatFindHeaderAlignmentReview) {
+      await verifyChatFindHeaderAlignment(browser, sessionValue);
+    }
+
     if (!a11yOnly && chatHeaderTitleReview) {
       await captureChatHeaderTitleReview(browser, sessionValue);
     }
@@ -3699,7 +3769,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatFindHeaderAlignmentReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
