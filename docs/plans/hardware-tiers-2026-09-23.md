@@ -1,15 +1,37 @@
-# Before the Studio: voice, photos and pictures on what the house has now (2026-09-23)
+# The hub's hardware tiers: voice, photos and pictures on what a family has (2026-09-23)
 
-For Jesse. The Studio is a month or more away, so voice, photo
-understanding and picture making run on the two machines the household
-has today: this 24 GB Mac (the hub) and the Linux laptop with two 8 GB
-NVIDIA cards (the model host, whose coding lane is paused). Nothing here
-is a detour: each piece is the same role contract the Studio will serve,
-so moving is a change of address, not a redesign. You decide the order.
+For Jesse. The product installs on the hardware a family already owns;
+the Studio is the top of the range, not the baseline. So this page is
+not "before the Studio". It names three supported tiers, tier 1 a 24 GB
+Apple silicon laptop (this Mac), tier 2 a 16 GB CUDA laptop (the model
+host's class: two 8 GB cards, 31 GB of RAM), tier 3 a 128 GB Studio and
+up, and states for each capability (the chat model, voice, photo
+understanding, picture creation) what runs at each tier under the one
+pipeline. Only the model's budget record and the deployment limits vary
+between tiers; there is no tier branch in the turn code. The acceptance
+workload runs on tier 1 first. You decide the order of the three
+capabilities.
+
+## The tiers at a glance
+
+| Capability | Tier 1: 24 GB Apple silicon laptop | Tier 2: 16 GB CUDA laptop (two 8 GB cards) | Tier 3: 128 GB Studio and up |
+|---|---|---|---|
+| Chat model | the 8B at Q4 on Metal, resident (about 7.7 GB measured with its cache); its budget record as measured | the 8B at Q4 on one card (about 6 GB with a smaller cache), the CUDA llama-server build; the same budget record once ENGINE-CONTRACT-01 runs on that build | the Studio's model, resident, its own budget record (MEASURE-02's candidates) |
+| Judge, embeddings | the CPU 4B and the embedder, resident | the 4B on the second card or the CPU, the embedder on the CPU | resident |
+| Voice (stt, tts) | sherpa-onnx in process, resident, under 1 GB | the same, on the CPU | the same |
+| Photo understanding (`vision` role) | a small vision model on demand (Qwen3-VL-4B at Q4, about 3.5 GB while a photo turn runs), evicted when idle | the same model on demand on the second card | resident |
+| Picture creation (`image` role) | on demand on a second in-house machine when one exists (a URL-tier engine); otherwise on this machine's MPS with the chat engine paused for about a minute per picture | on demand on the second card (FLUX.2 Klein 4B at fp8 or 4-bit, the text encoder in RAM), chat unaffected; when both cards are needed, the judge yields first | on the Studio itself, admitted by the governor beside a resident chat model |
+| Deployment limits | one conversation with speech plus one photo or picture job at a time | the same, with the image job on its own card | two conversations with speech, a photo and a picture job at once (STUDIO-ACCEPT-01's original workload) |
+
+What the tiers share: the roles (`chat`, `judge`, `embed`, `stt`, `tts`,
+`vision`, `image`), the on-demand admission and eviction, the machine
+and its budget, the chat Elements and the composer. What they never
+share: a code path chosen by the tier. A tier is a set of measured
+budget records and deployment limits, nothing more.
 
 ## The short version
 
-1. **Voice conversation needs no new model.** The hub already listens
+1. **Voice conversation needs no new model, on any tier.** The hub already listens
    (dictation) and speaks (read aloud). The live session is those two
    pieces joined into one loop, on the chat library's own voice screen.
    Three small steps; the first is a one-line slot in the chat kit.
@@ -20,12 +42,14 @@ so moving is a change of address, not a redesign. You decide the order.
    swapping the chat model for a "sees pictures" version (that would
    throw away every number measured yesterday) and over the laptop
    (whose external card drops off the bus).
-3. **Pictures: draw on the laptop's card, not the Mac.** The Mac cannot
-   draw and chat at once; the laptop's card is idle while the coding
-   lane is paused. The Stack already has the picture job queue and the
+3. **Pictures: draw where a card is free.** On tier 1 the Mac cannot
+   draw and chat at once, so it draws on a second in-house machine when
+   the house has one (today the laptop's card, idle while the coding
+   lane is paused), else on its own MPS with chat paused for about a
+   minute per picture. On tier 2 the second card draws while chat runs
+   on the first. The Stack already has the picture job queue and the
    drawing engine; it gains one address for a drawing engine on another
-   machine in the house. When the laptop is off, the Mac draws with chat
-   paused for about a minute per picture.
+   machine in the house.
 4. **Order.** Voice first (no model, the biggest daily change), photos
    second, pictures third; or pictures second if you want them sooner,
    since they touch only the laptop. Each is one to two weeks.
@@ -36,7 +60,7 @@ is shown or saved, and nothing is ever built to draw a real person.
 
 ## The detail
 
-### 1. Voice conversation (HANDSFREE-01 b)
+### 1. Voice conversation (HANDSFREE-01 b), every tier
 
 **No new model.** The `stt` role is sherpa-onnx with Moonshine and the
 Silero voice detector in process (`backend/src/lib/stt.ts`,
@@ -76,7 +100,8 @@ the acceptance workload in section 4.
 
 ### 2. Photos the model understands (ATT-01, the photo half)
 
-The record and the shape exist (`spec/schemas/attachment.schema.json`,
+Tier 1 is worked through here because it is the tightest; tier 2 runs
+the same model on its second card, tier 3 keeps it resident. The record and the shape exist (`spec/schemas/attachment.schema.json`,
 the ATT-01 design in dev.md); the vision engine was left open. Three
 ways to close it, with the Mac's memory as it stands today: the chat
 engine holds about 7.7 GB measured (the 8B at Q4 with its cache), the
@@ -87,7 +112,7 @@ GB, leaving about 5 to 7 GB free.
 |---|---|---|---|
 | A. A small vision model on the Mac, on demand | The `vision` role as a second llama-server with a multimodal projector, loaded when a photo turn starts and evicted when idle (the on-demand admission STACK-16 designed; the hub's supervisors stand in until Home runs on the Stack). Candidate: Qwen3-VL-4B-Instruct at Q4 (Apache-2.0, about 3 GB plus a 0.5 GB projector `(?)`); Gemma 3 4B is the fallback (its own licence, not Apache). | about 3.5 GB while a photo turn runs, 0 otherwise | **Recommended.** Fits in today's headroom; every chat number measured yesterday stays valid; the same role and admission serve the Studio, where the model simply stays resident |
 | B. Swap the chat role to a vision-capable 8B | One model does both (Qwen3-VL-8B at Q4, about the 8B's size plus a 0.6 GB projector `(?)`) | about the same as today | Not recommended now: the tool-calling, inverse-miss and rewrite numbers, the budget record and ENGINE-CONTRACT-01's checks all reset to a new model, and vision variants usually call tools worse; kept as the reserve if A fails the photo bench |
-| C. The `vision` role on the model host | Qwen3-VL-8B on the RTX 3070 with the coding model unloaded; photos travel over the LAN to the laptop | 0 on the Mac | Privacy unchanged (in-house), but the external card drops off its bus, the laptop leaves after the Studio, and it adds the one dependency the hub's own machine should not have for a photo |
+| C. The `vision` role on a second machine (tier 1 only) | Qwen3-VL-8B on the RTX 3070 with the coding model unloaded; photos travel over the LAN to the laptop | 0 on the Mac | Privacy unchanged (in-house), but the external card drops off its bus, the laptop leaves after the Studio, and it adds the one dependency the hub's own machine should not have for a photo |
 
 **How it enters the pipeline (one pipeline):** the context node calls
 the `vision` role with the photo and the person's question and adds the
@@ -104,9 +129,11 @@ already rules).
 
 ### 3. Picture creation (MEDIA-HOST-01 and CHAT-MEDIA-01's first slice)
 
-**Where it runs before the Studio:** the model host's RTX 3070 (8 GB,
-CUDA) on demand, with the coding model unloaded while a picture draws
-(the lane is paused). The Mac cannot draw and chat at once: a picture
+**Where it runs, by tier:** tier 2 draws on its second card while chat
+runs on the first; tier 3 on the Studio itself under the governor. Tier
+1, today, draws on the model host's RTX 3070 (8 GB, CUDA) on demand,
+with the coding model unloaded while a picture draws (the lane is
+paused), because the Mac cannot draw and chat at once: a picture
 model needs 8 to 12 GB on MPS `(?)`, which means unloading the chat
 engine, so MPS on the Mac is the fallback when the laptop is off, with
 chat paused for about a minute per picture (the governor's admission
@@ -147,7 +174,7 @@ purpose is imagery of identifiable real people (CHAT-MEDIA-01's people
 path is adult-only and consent-shaped); no "uncensored" framing
 anywhere in copy.
 
-### 4. Order, sizes, and what moves to the Studio
+### 4. Order, sizes, and what moves between tiers
 
 | Order | Item | Size | Needs from ENGINE-CONTRACT-01 | Needs from the acceptance workload |
 |---|---|---|---|---|
@@ -155,17 +182,18 @@ anywhere in copy.
 | 2 | Photos: VISION-01 | M | the vision engine's checks (image input, timing, cancellation, the pinned set) | a photo turn while a typed conversation runs: first useful answer, peak memory with the vision model loaded |
 | 3 | Pictures: IMAGE-01, IMAGE-02 | M, S | none on the Mac (the engine is remote); the URL-tier health check | a picture job while a conversation runs: chat unaffected with the laptop, chat paused and resumed cleanly without it |
 
-STUDIO-ACCEPT-01 becomes **"one realistic workload on the 24 GB Mac"**:
+STUDIO-ACCEPT-01 becomes **the tier acceptance workload, run on tier 1
+first**:
 one voice conversation and one typed conversation at once, plus one
 photo turn and one picture job in the same run, measuring first useful
 answer, first spoken word, peak memory and cancellation, and setting the
-concurrency and residency limits for this machine. The Studio reruns
-the same workload and resets the limits; nothing else changes.
+concurrency and residency limits for that tier. Tier 2 and tier 3 rerun
+the same workload and set their own limits; nothing else changes.
 
-**What moves without redesign:** the role contract (`stt`, `tts`,
+**What moves between tiers without redesign:** the role contract (`stt`, `tts`,
 `vision`, `image` by role, never a model name), the on-demand admission
 and eviction, the machine's budget and deployment limits, the chat
-Elements and the composer slot. **What the Studio changes:** the vision
-model stays resident, pictures draw on the Studio itself and the
-laptop's URL-tier address retires, and the chat role's budget is the
-Studio model's own measured record.
+Elements and the composer slot. **What a bigger tier changes:** the vision
+model stays resident, pictures draw on the hub itself and a second
+machine's URL-tier address retires, and the chat role's budget is that
+tier's model's own measured record.
