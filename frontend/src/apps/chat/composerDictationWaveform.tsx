@@ -104,7 +104,15 @@ export function ComposerDictationWaveform() {
     );
   }
   return (
-    <div className="flex h-12 min-w-0 flex-1 items-center px-1">
+    // w-full, not flex-1: the kit's own composer-shell is flex-col (the
+    // attachments row, this input row, the action row stacked
+    // vertically), so flex-1's own flex-basis: 0% fights `h-12` for the
+    // vertical dimension and wins - found live, the bars' real DOM
+    // values (getBoundingClientRect, not just the inline style) showed
+    // this whole wrapper computing to a genuine 0px height. `w-full`
+    // is the same horizontal-growth approach the kit's own Input
+    // already uses in this exact spot.
+    <div className="flex h-12 w-full items-center px-1">
       <span className="sr-only">Listening</span>
       <div aria-hidden="true" className="flex h-full min-w-0 flex-1 items-center gap-[2px] overflow-hidden">
         {levels.map((level, index) => (
