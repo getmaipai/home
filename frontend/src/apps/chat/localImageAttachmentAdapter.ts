@@ -55,9 +55,18 @@ function validateImage(file: File): void {
 }
 
 /** ATT-01d: the assistant-ui contract, with local digest bookkeeping added.
- * `add` intentionally succeeds before capability checking so a person can
- * preview and remove a staged image without sending it anywhere. `send` is
- * where the selected engine gate is enforced. */
+ * Live finding 2026-09-22: the capability check used to live in `send`,
+ * on the theory that `add` should succeed so a person can preview and
+ * remove a staged image without sending it anywhere - but assistant-ui's
+ * own composer.send() rejects the WHOLE send when any attachment's own
+ * send() throws (base-composer-runtime-core.js), and nothing in Home's
+ * composer catches that rejection - the person saw nothing happen at
+ * all, not an error. `add`'s own rejection path is the one that already
+ * works (the same one `validateImage`'s existing checks already use):
+ * caught by the runtime, surfaced as the attachment's own visible
+ * "incomplete/error" status. Checked here instead - a photo is refused
+ * the moment it's picked, with the real reason, never a silently dead
+ * Send button. */
 export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentAdapterOptions = {}): AttachmentAdapter {
   const capability = options.capability ?? (() => ({ imageParts: false, engine: "text-only" as const, transport: "local" as const }));
 
@@ -66,6 +75,7 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
 
     async add({ file }): Promise<PendingAttachment> {
       validateImage(file);
+      if (!capability().imageParts) throw new Error(IMAGE_VISION_UNAVAILABLE_MESSAGE);
       const bytes = await file.arrayBuffer();
       const digest = await sha256(bytes);
       const record: LocalImageAttachmentRecord = {

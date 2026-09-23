@@ -33,10 +33,28 @@ export function stripThinking(text: string): string {
   return stripped || "MaiPai thought about it but didn't give a final answer. Try asking again.";
 }
 
+// ATT-01, live finding 2026-09-22: a document attachment (SimpleTextAttachmentAdapter,
+// composerAddMenu.tsx's own text/Markdown path) resolves its own
+// `<attachment name="...">...</attachment>`-wrapped content onto
+// `message.attachments[i].content`, a SEPARATE array from `message.content`
+// (the typed text) - messageText() only ever read the latter, so an
+// attached text file sent successfully (no adapter error, unlike the
+// image case below) with its own content silently never reaching the
+// model at all. Backend has no separate attachment channel
+// (routes/turn.ts never mentions one) - folded into the one text field
+// it does read, the same inline shape the adapter's own tag already
+// gives it.
 function lastUserText(messages: ChatModelRunOptions["messages"]): string | undefined {
   const last = messages[messages.length - 1];
   if (!last || last.role !== "user") return undefined;
-  return messageText(last);
+  const typed = messageText(last);
+  const attachmentText = last.attachments
+    .flatMap((attachment) => attachment.content ?? [])
+    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .map((part) => part.text)
+    .join("\n\n");
+  if (!attachmentText) return typed;
+  return typed ? `${typed}\n\n${attachmentText}` : attachmentText;
 }
 
 export interface ChatModelAdapterDeps {

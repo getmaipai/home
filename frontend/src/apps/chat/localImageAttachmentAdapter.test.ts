@@ -13,7 +13,10 @@ afterEach(() => clearStagedImageAttachments());
 describe("local image attachment adapter", () => {
   test("adds a previewable pending image and records its local digest", async () => {
     const records: LocalImageAttachmentRecord[] = [];
-    const adapter = createLocalImageAttachmentAdapter({ onRecord: (record) => records.push(record) });
+    const adapter = createLocalImageAttachmentAdapter({
+      capability: () => ({ imageParts: true, engine: "vision", transport: "local" }),
+      onRecord: (record) => records.push(record),
+    });
     const pending = await adapter.add({ file: new File(["hello"], "note.png", { type: "image/png" }) }) as PendingAttachment;
 
     expect(pending.type).toBe("image");
@@ -41,17 +44,27 @@ describe("local image attachment adapter", () => {
     expect(complete.content).toEqual([{ type: "image", image: "data:image/jpeg;base64,aGk=" }]);
   });
 
-  test("refuses safely before completing an image for a text-only engine", async () => {
+  // Live finding 2026-09-22: this used to succeed at add() and only
+  // reject at send() - assistant-ui's own composer.send() rejects the
+  // WHOLE send when any attachment's send() throws, and nothing in
+  // Home's composer catches that, so the person saw nothing happen at
+  // all. Refused at add() instead, the moment the photo is picked - the
+  // one rejection path assistant-ui's runtime already surfaces as the
+  // attachment's own visible error (base-composer-runtime-core.js's
+  // addAttachment(), the same path validateImage()'s existing checks
+  // use), never a dead Send button.
+  test("refuses a photo at attach time for a text-only engine, before it ever becomes sendable", async () => {
     const adapter = createLocalImageAttachmentAdapter();
-    const pending = await adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) }) as PendingAttachment;
 
-    await expect(adapter.send(pending)).rejects.toThrow(IMAGE_VISION_UNAVAILABLE_MESSAGE);
-    expect(stagedImageAttachment(pending.id)).toBeDefined();
+    await expect(adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow(IMAGE_VISION_UNAVAILABLE_MESSAGE);
   });
 
   test("remove clears the staged local record", async () => {
     const removed: string[] = [];
-    const adapter = createLocalImageAttachmentAdapter({ onRemove: (id) => removed.push(id) });
+    const adapter = createLocalImageAttachmentAdapter({
+      capability: () => ({ imageParts: true, engine: "vision", transport: "local" }),
+      onRemove: (id) => removed.push(id),
+    });
     const pending = await adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) }) as PendingAttachment;
     await adapter.remove(pending);
 

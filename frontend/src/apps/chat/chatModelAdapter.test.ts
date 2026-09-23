@@ -135,6 +135,55 @@ describe("image capability boundary", () => {
   });
 });
 
+// ATT-01, live finding 2026-09-22: SimpleTextAttachmentAdapter (assistant-ui's
+// own, composerAddMenu.tsx's text/Markdown path) resolves a document
+// attachment's content onto message.attachments[i].content, a separate
+// array from message.content (the typed text) - lastUserText() only
+// ever read the latter, so an attached text file's own content silently
+// never reached the model, even though the attach-and-send itself
+// succeeded with no error at all.
+describe("document attachment content", () => {
+  test("attaching a text file and sending delivers the turn - its own content rides along in the outgoing text", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "Noted." },
+      { type: "done", value: { turn_id: "turn-att1", reply: { text: "Noted." }, source: "model", safety: SAFETY } },
+    ]));
+    try {
+      const message = {
+        ...fakeUserMessage("what does this say"),
+        attachments: [{
+          id: "att-local-doc",
+          type: "document",
+          name: "notes.txt",
+          contentType: "text/plain",
+          status: { type: "complete" as const },
+          content: [{ type: "text" as const, text: '<attachment name="notes.txt">\nbuy milk\n</attachment>' }],
+        }],
+      };
+      const result = await collect([message]);
+
+      expect(result.error).toBeUndefined();
+      expect(lastText(result.yields)).toBe("Noted.");
+      expect(env.turnBodies[0]).toMatchObject({ text: 'what does this say\n\n<attachment name="notes.txt">\nbuy milk\n</attachment>' });
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("no attachment: the outgoing text is exactly the typed text, unchanged", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "Hi." },
+      { type: "done", value: { turn_id: "turn-att2", reply: { text: "Hi." }, source: "model", safety: SAFETY } },
+    ]));
+    try {
+      await collect([fakeUserMessage("hello")]);
+      expect(env.turnBodies[0]).toMatchObject({ text: "hello" });
+    } finally {
+      env.restore();
+    }
+  });
+});
+
 describe("createChatModelAdapter streaming", () => {
   test("a sent message's reply text streams in and each sentence is spoken automatically", async () => {
     const env = stubEnvironment(
