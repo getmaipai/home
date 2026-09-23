@@ -196,7 +196,8 @@ anywhere in copy.
 | with 1 | SETUP-SIZE-01: the wizard's sizing page with impact per role | M | none | a stepped-down chat role visible in the next start's resident set |
 | with 1 | STACK-FLOOR-01: the `p8` profile with the robot's pins, the lowest step-down | S | none | proposed on an 8 GB probe, runnable as a step-down on the dev Mac |
 | with 1 | CAP-VOCAB-01: the capability vocabulary gains the engine roles (commons, spec first) | S | none | the fixtures and the Python package regenerate, the spec tag bumped |
-| with 1 | CAP-GATE-01: the node capability set derived from the allocation, packages filtered on `requires` | M | none | with image off, a package requiring it is absent from the packages route, the offered tools and the apps page; present with it on |
+| with 1 | PKG-UNINSTALL-01: the normal package uninstall path (route, hook, the data rule) | S | none | an installed package is uninstalled through the route, its hook runs, its data directory is kept and the reply says so |
+| with 1 | CAP-GATE-01: the node capability set derived from the allocation, packages filtered on `requires`, reconcile uninstalls what lost a required capability | M | none | with image off, a package requiring it is absent from the packages route, the offered tools and the apps page; present with it on; turning image off with it installed lists it in the confirmation and uninstalls it after |
 | after 1 | FLOOR-ACCEPT-01: the floor run of the acceptance workload | S | none | voice plus typed on this Mac with the robot's model as the stand-in, marked so, rerun on an 8 GB machine when one is on the bench |
 
 STUDIO-ACCEPT-01 becomes **the tier acceptance workload, run on tier 1
@@ -283,8 +284,30 @@ the existing `gpu_llm` (a GPU or Metal engine) or `cpu_llm` (the floor's
 CPU engine), the embed role to `embeddings`, and the vocabulary gains
 `vision`, `image`, `video`, `music`, `stt` and `tts`, named as the
 Stack's role ids; judge, router and rerank are internal roles with no
-capability of their own. Rows: `CAP-VOCAB-01` (S, spec first in
-commons) and `CAP-GATE-01` (M, home), in the order table.
+capability of their own. For every package kind under the one manifest (app, plugin,
+integration, companion and the rest), the tie is enforced, not
+displayed (owner's rule, 2026-09-23): (1) install is refused when a
+required capability is absent, with the reason and the setting that
+turns it on; (2) when the allocation changes and a required capability
+goes away (a role turned off in the wizard or under Settings, a role
+uninstalled, a role that fails to install at start), every installed
+package that requires it is uninstalled through the normal uninstall
+path, and the confirmation names them before the change is applied
+("turning pictures off removes Draw and Picture Books"); (3) an
+optional capability only degrades a package, never removes it; (4)
+reconcile runs in one place at every start and after every allocation
+change, so a role that failed to load is caught the same way as one
+turned off. What happens to a package's data at uninstall is not
+invented here: PACKAGES.md has no uninstall rule today (a gap, named
+as `PACKAGES-UNINSTALL-01` in `.github`), and the nearest standard is
+SERVICES.md's daemon rule, "uninstall removes the service and the binary
+and never the data directory, and says so"; until PACKAGES.md rules,
+the package's own data directory is kept and the confirmation says so.
+The hub's package host also has no uninstall path today
+(`packageHost.ts`, the packages routes), so `PKG-UNINSTALL-01` (S)
+builds it first and the reconcile calls it. Rows: `CAP-VOCAB-01` (S,
+spec first in commons), `PKG-UNINSTALL-01` (S, home) and `CAP-GATE-01`
+(M, home), in the order table.
 
 **The floor tier, on any machine (owner's question, 2026-09-23: "can a
 user go as low as the Pi's configuration on their own desktop or
