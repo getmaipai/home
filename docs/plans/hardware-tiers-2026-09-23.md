@@ -195,6 +195,8 @@ anywhere in copy.
 | with 1 | STACK-SIZE-01: the sizer honours a per-role step-down | M | none | the workload rerun under a stepped-down proposal inherits the smaller reference point's limits |
 | with 1 | SETUP-SIZE-01: the wizard's sizing page with impact per role | M | none | a stepped-down chat role visible in the next start's resident set |
 | with 1 | STACK-FLOOR-01: the `p8` profile with the robot's pins, the lowest step-down | S | none | proposed on an 8 GB probe, runnable as a step-down on the dev Mac |
+| with 1 | CAP-VOCAB-01: the capability vocabulary gains the engine roles (commons, spec first) | S | none | the fixtures and the Python package regenerate, the spec tag bumped |
+| with 1 | CAP-GATE-01: the node capability set derived from the allocation, packages filtered on `requires` | M | none | with image off, a package requiring it is absent from the packages route, the offered tools and the apps page; present with it on |
 | after 1 | FLOOR-ACCEPT-01: the floor run of the acceptance workload | S | none | voice plus typed on this Mac with the robot's model as the stand-in, marked so, rerun on an 8 GB machine when one is on the bench |
 
 STUDIO-ACCEPT-01 becomes **the tier acceptance workload, run on tier 1
@@ -258,6 +260,31 @@ and the default proposal, nothing more.
    point's measured limits (a chat role stepped from the tier 3 model
    to the 8B runs under the 8B's measured budget record), so nothing
    is measured twice.
+
+**Capabilities follow the allocation (owner's rule, 2026-09-23: "I
+should not have a video generation app shown if video generation's
+foundational components were purposely chosen to be off or not
+installed").** The engine allocation (the per-role Setting record plus
+the installed state the Stack reports) is the one source of a node's
+capability set for the engine roles. A manifest already declares
+`requires` and `optional` from the one capability vocabulary
+(`commons/spec/vocab/capabilities.json`); today that vocabulary has no
+entry for the engine roles, and nothing in the hub derives a node's live
+set from the allocation or filters on `requires`, so the tie is declared
+and never enforced. The rule: a package whose `requires` names a
+capability the allocation has off or not installed is not shown on the
+apps page or in the launcher, not offered to the model as a tool, and
+not installable from the catalog until the wizard turns the role on
+(the catalog page says why: "Pictures is off on this hub"); `optional`
+degrades the package instead of hiding it; the allocation page lists
+what each choice hides ("turning pictures off hides Draw and the picture
+button in chat"). The vocabulary stays one list: the chat role maps to
+the existing `gpu_llm` (a GPU or Metal engine) or `cpu_llm` (the floor's
+CPU engine), the embed role to `embeddings`, and the vocabulary gains
+`vision`, `image`, `video`, `music`, `stt` and `tts`, named as the
+Stack's role ids; judge, router and rerank are internal roles with no
+capability of their own. Rows: `CAP-VOCAB-01` (S, spec first in
+commons) and `CAP-GATE-01` (M, home), in the order table.
 
 **The floor tier, on any machine (owner's question, 2026-09-23: "can a
 user go as low as the Pi's configuration on their own desktop or
