@@ -21971,7 +21971,89 @@ born; the search found nothing."): clean 3/3 live, `toolRan: null`
 every time, no `search`/`didn't find`/`birth`/`try a different` in any
 reply ("I'm the new reply engine. How can I assist you today?", "I'm
 here to assist you with any tasks or questions you may have...",
-"Hello! I'm the new reply engine, here to help you with any tasks or
+"Hello! I'm the new reply engine, here to help you with any tasks or <!-- prose-lint: allow -->
 questions you may have..."). `control-negative-feeling-down` and
 `control-remember-pizza-night` both unchanged (pass, same shape as
 before this item: no tool for the first, `remember` for the second).
+
+## The "generation_failed" outage on the new path was a killed engine, not a prompt shape (2026-09-23)
+
+A fresh conversation's first turn worked; a minute later, in a second
+fresh conversation, every generation failed in 1.5 to 3 s with `model`
+outcome `{ ok: false, code: "generation_failed" }` (a no-tool turn, a
+forced call and a phrasing round alike) and the person saw "Sorry, I
+couldn't do that." twice. The only visible difference in the traces
+was a 360 ms `context` node (CONTEXT-RECALL-01's embedding recall
+found the first conversation's fresh memories), so the prompt's
+volatile message was suspected.
+
+**The prompt is exonerated by the log.** `messages.ts` as landed
+builds `[system: the stable prefix + profile and roster] [the window]
+[system: the memory block, the other volatile lines, the reanchor
+line, the plan line] [user: the utterance]`. A fresh conversation has
+no window, so the good turn and the failing turns sent the identical
+structure (system, system, user) and differed only in the memory
+block's bullets; the good turn proves the two-system shape and the
+Qwen3 template accept each other. Nothing in `renderMemoryBlock` can
+break a request.
+
+**What the hub log shows instead** (`data/logs/hub.log`, the tail,
+no turn records): a chain of `[sidecars] the chat engine (pid N)
+exited unexpectedly (signal SIGKILL)`, the text-understanding engine
+on 8789 killed beside it, each followed by a respawn
+(`enginePostLoadCheck` a second later; llama-server's own log shows
+"model loaded" and "listening" in under a second every time),
+`warmChatPrefix failed (non-fatal): could not reach 8788` and three
+`the chat engine did not come back` lines; 74 SIGKILL lines in the log's
+life. During each kill-and-respawn window the client's request fails
+fast ("could not reach 127.0.0.1:8788", `LlmClientError`, within its
+3 s health probe), `runOneGeneration`'s blanket catch turns any
+thrown error into `generation_failed` with no message, and
+`DEADLINE-01`'s `model_failed` line is what the person reads. The
+context node's 360 ms was the embedding call, a red herring.
+
+**Who sends the SIGKILL.** Not the watcher's health path (that logs
+"stopped answering health checks" first, which is absent), not a
+deliberate stop (marked and never logged as unexpected), not memory
+pressure now (64 percent free at the time of reading). The hub's own
+`freePort(port)` (`sidecars.ts` line 207) SIGKILLs every process whose
+command line carries `--port <n>` before every spawn, by port match,
+never by pid, and logs nothing when it does. Any second process that
+starts the hub's supervisors with the production defaults
+(`MAIPAI_LLAMA_SERVER_PORT ?? 8788`, `MAIPAI_BACKGROUND_PORT ?? 8789`,
+`MAIPAI_EMBED_PORT ?? 8794`) therefore kills the household's engines
+on its first spawn, the household's watcher respawns them, which kills
+the intruder's, and the two ping-pong: the paired kills and the "did
+not come back" lines are that shape. This is the failure class dev.md
+already records ("What was actually killing the chat engine", found
+2026-09-07): a test file that unset the port variable let a later
+spawn call `freePort()` on 8788 and kill the dev hub's engine on every
+`bun test`. `tests/isolation.ts` guards the test suite; nothing guards
+a headless repro or a bench started outside it, and the engine lane's
+repro and Session A's headless repros ran in this window. The one
+fact to close it: the repro's own start line, with or without the three
+port variables and `MAIPAI_DATA_DIR`.
+
+**The fix, in the design's own terms** (two rows, top of the chat
+rebuild area): `freePort` never kills a process it did not spawn: an
+orphan is one the hub's own pid record names from a previous instance,
+and a live foreign holder of the port is a reported condition ("port
+8788 is held by pid N, not ours: set the port variables") that refuses
+the spawn, never a kill (`ENGINE-PORT-01`); and a failed generation
+carries its reason: the thrown message and, for an HTTP failure, the
+status, on the generation record and the trace, printed on the hub's
+own log line, so "generation_failed" is never the whole story
+(`GENFAIL-01`). NEXT-CACHE-01's cache goal is untouched: nothing here
+changes the message order.
+
+**Can the lane read the engine's actual rejection today?** No. The
+new path's `runOneGeneration` swallows the thrown error without
+logging it; the generation record (`turnStats.ts` `GenerationInput`)
+has no error field and a failed generation is never pushed; the old
+path logs the thrown message with a stack (`[turn/stream] failed
+mid-stream: ... chat model unavailable: stream from ... broke`). The
+texts that exist to carry are the client's own: "could not reach
+<url>", "<path> on <url> timed out after <n>ms", "stream from <url>
+broke", and an HTTP error's status and body. Until GENFAIL-01 lands,
+the hub log's `[sidecars]` lines beside the turn's time are the only
+evidence, and they were enough here.
