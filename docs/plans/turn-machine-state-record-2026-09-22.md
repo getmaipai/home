@@ -48,6 +48,7 @@ interface TurnBudget {            // one record per model, in the catalog
   model_transitions: boolean;     // false on the robot's Pi
   context_tokens: number;
   thinking_budget_tokens: number;
+  thinking_for_minors: boolean;   // false by default: a minor's turn runs with thinking off
   deadlines_ms: { model: number; tool: number; total: number };
   measured: { false_call_rate: number; inverse_miss_rate: number; rewrite_pass_rate: number; on: string };
 }
@@ -187,17 +188,33 @@ is a second output with the same rules as the first, and one more.
 - **The stored turn holds the visible answer only.** Today the turn
   row's reply text holds the whole generation, and a reload rendered
   `<think>` text verbatim. Reasoning, when emitted, is its own
-  spec-shaped field or part on the turn (spec first), never stored for a
-  minor's turn, and the reload path renders it through the same
-  Reasoning Element as the live stream, so the withholding decision
-  holds on reload and in every client. Old rows with inline think text
-  are stripped on read. (U2e on the new path; the old path's fix is part
-  of the safety exception.)
+  spec-shaped field on the turn (REASONING-02's `reasoning` column is
+  that field; spec first for the record shape), and the reload path
+  renders it through the same Reasoning Element as the live stream, so
+  the withholding decision holds on reload and in every client. Old rows
+  with inline think text are stripped on read. (U2e on the new path; the
+  old path's fix, 141eaf86, is part of the safety exception.)
+- **Stored reasoning is gated on read, by the reading actor.** Ruling,
+  2026-09-22, reconciling this record with the old path's tested
+  contract: a minor's turn generates no reasoning by default (the budget
+  record's `thinking_for_minors` is false, so thinking is forced off
+  server-side for a minor's turn and for every non-chat surface, and
+  there is nothing to store); when a budget turns it on, the stored
+  field is readable only by an owner or admin in the parental view of
+  the child's chat, never by the minor, on the wire and on reload, the
+  same rule the memory store's parental view already keeps. Parents'
+  oversight of what the hub thought about their child's question is a
+  feature, and stored reasoning inherits the stored answer's own
+  protections (the encrypted backup, the person's own export); the
+  disclosure filter still runs on the parent's read. The list() test that
+  proves an owner may read a child's stored reasoning and the child
+  cannot stays as the contract.
 
 The decision is made once, in `context`, before the model runs, and is
-never recomputed by a later node. The thinking budget in the model's
-budget record is unchanged by this: the model may still think; the hub
-decides who sees it.
+never recomputed by a later node. For an adult on a typed screen the
+model may think and the hub decides who sees it; for a minor and for
+every non-chat surface thinking is off at the request, so nothing is
+generated that would then need withholding.
 
 ## What the machine never does
 
