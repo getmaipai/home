@@ -27,6 +27,7 @@ import { TestClient } from "./client";
 import { join } from "node:path";
 import { getChatClient, getChatLivePid, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { logsDir } from "@/lib/paths";
+import { reserveFreePort } from "./fixtures/reserveFreePort";
 
 beforeEach(() => {
   resetDb();
@@ -72,7 +73,7 @@ describe("registerSidecar/getSidecar/listSidecars", () => {
 
 describe("spawnAndWaitHealthy", () => {
   test("returns the process once healthCheck passes", async () => {
-    const port = 39201;
+    const port = reserveFreePort();
     const proc = await spawnAndWaitHealthy({
       command: ["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("ok") });`],
       port,
@@ -104,7 +105,7 @@ describe("spawnAndWaitHealthy", () => {
   // never a second rotation implementation), while still visible in the
   // terminal (unchanged debug visibility under `bun run dev`).
   test("logName pipes stdout/stderr into a rotating <logName>.log, still visible on the real terminal", async () => {
-    const port = 39202;
+    const port = reserveFreePort();
     const proc = await spawnAndWaitHealthy({
       command: ["bun", "-e", `console.log("hello from the engine"); console.error("a warning"); Bun.serve({ port: ${port}, fetch: () => new Response("ok") });`],
       port,
@@ -134,7 +135,7 @@ describe("spawnAndWaitHealthy", () => {
 
 describe("startSidecar/stopSidecar", () => {
   test("reaches running with a real health check, then stops and frees its port", async () => {
-    const port = 39202;
+    const port = reserveFreePort();
     registerSidecar({
       id: "health-server",
       command: ["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("ok") });`],
@@ -201,7 +202,7 @@ describe("startSidecar/stopSidecar", () => {
   });
 
   test("fixIssue's restart action genuinely brings a since-repaired sidecar back and resolves the issue", async () => {
-    const port = 39203;
+    const port = reserveFreePort();
     // Registered with a command that fails the first time (a script
     // whose behavior depends on an env var this test flips), proving the
     // fix handler doesn't just report success unconditionally.
@@ -234,7 +235,7 @@ describe("startSidecar/stopSidecar", () => {
   // no health loop watching it (startHealthLoop() would see `stopping`
   // already true and refuse to poll).
   test("a stopSidecar() call that races a still-starting spawn wins - the sidecar stays stopped and its process is killed", async () => {
-    const port = 39207;
+    const port = reserveFreePort();
     registerSidecar({
       id: "racy",
       // Deliberately slow to become healthy, so there's a real window to
@@ -270,7 +271,7 @@ describe("startSidecar/stopSidecar", () => {
 describe("the health-poll loop", () => {
   test("detects a crash, raises an issue, and auto-restarts with backoff", async () => {
     __setSidecarTimingForTestsOnly({ healthPollMs: 100, backoffMs: [50] });
-    const port = 39204;
+    const port = reserveFreePort();
     // A marker file makes it crash exactly once, on its first boot -
     // without it, the identical command would also self-destruct on the
     // auto-restart's respawn (and every respawn after that), making
@@ -310,7 +311,7 @@ describe("the health-poll loop", () => {
 
 describe("registerGracefulExit", () => {
   test("kills every running sidecar's process on the exit event", async () => {
-    const port = 39205;
+    const port = reserveFreePort();
     registerSidecar({
       id: "exit-victim",
       command: ["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("ok") });`],
@@ -360,6 +361,16 @@ describe("GET /api/health", () => {
     await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     process.env.MAIPAI_LLAMA_SERVER_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
+    // FLAKE-PORT-01 (issue 137): a fresh port reserved right here, not
+    // preload.ts's one port held "reserved" but unbound for this whole
+    // 200+-file test run - a real spawn on that stale value can lose a
+    // bind race to any other process on the machine. Restored after
+    // (never deleted: isolation.ts's own 2026-09-07 finding, deleting
+    // this var instead of restoring it let a later test's real spawn
+    // fall through to the production port and kill the real household
+    // engine).
+    const priorPort = process.env.MAIPAI_LLAMA_SERVER_PORT;
+    process.env.MAIPAI_LLAMA_SERVER_PORT = String(reserveFreePort());
     try {
       await getChatClient();
       const up = (await (await client.get("/api/health")).json()) as { ok: boolean; engines: { chat: { alive: boolean | null; pid: number | null } } };
@@ -381,6 +392,7 @@ describe("GET /api/health", () => {
       __resetLlmSupervisorForTests();
       delete process.env.MAIPAI_LLAMA_SERVER_BIN;
       delete process.env.MAIPAI_CHAT_MODEL_PATH;
+      process.env.MAIPAI_LLAMA_SERVER_PORT = priorPort;
     }
   }, 15_000);
 });
@@ -391,6 +403,10 @@ describe("probeAlive (what the Health page asks)", () => {
   test("a stale client to a killed process probes false", async () => {
     process.env.MAIPAI_LLAMA_SERVER_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
+    // FLAKE-PORT-01 (issue 137): see the same note above - a fresh port
+    // for this real spawn, restored after, never deleted.
+    const priorPort = process.env.MAIPAI_LLAMA_SERVER_PORT;
+    process.env.MAIPAI_LLAMA_SERVER_PORT = String(reserveFreePort());
     try {
       const staleClient = await getChatClient();
       expect(await probeAlive(staleClient)).toBe(true);
@@ -401,6 +417,7 @@ describe("probeAlive (what the Health page asks)", () => {
       __resetLlmSupervisorForTests();
       delete process.env.MAIPAI_LLAMA_SERVER_BIN;
       delete process.env.MAIPAI_CHAT_MODEL_PATH;
+      process.env.MAIPAI_LLAMA_SERVER_PORT = priorPort;
     }
   }, 10_000);
 
@@ -435,9 +452,14 @@ describe("watchEngine (the engines' auto-heal)", () => {
   // One port per test: these servers carry no `--port` flag for
   // freePort() to match, so a process from the previous test that has
   // not finished exiting yet would otherwise still hold the port.
-  let port = 39240;
+  // FLAKE-PORT-01 (issue 137): a fixed base (39240, incremented per
+  // test) avoided self-collision within one file but was the identical
+  // sequence in every concurrent `bun test` process on the machine -
+  // two worktrees running this file at once bound the exact same
+  // numbers. Reserved fresh instead.
+  let port = 0;
   beforeEach(() => {
-    port++;
+    port = reserveFreePort();
   });
   function serve(): Promise<Bun.Subprocess> {
     const p = port;
@@ -687,7 +709,7 @@ describe("freePort", () => {
   });
 
   test("kills a pid this install's own record names as its previous instance, and frees the port", async () => {
-    const port = 39172; // arbitrary, unlikely to collide with anything else in CI
+    const port = reserveFreePort();
     const child = await spawnRealListener(port, "ok");
     try {
       // Simulates a real prior spawn: spawnAndWaitHealthy() would have
@@ -719,7 +741,7 @@ describe("freePort", () => {
   // self-healing) behavior for exactly this one case, until the next
   // successful spawn records real ownership.
   test("a port with no ownership record at all is treated as a legacy orphan and killed (the bootstrap fallback)", async () => {
-    const port = 39177;
+    const port = reserveFreePort();
     const child = await spawnRealListener(port, "legacy orphan, never recorded");
     try {
       await freePort(port);
@@ -744,7 +766,7 @@ describe("freePort", () => {
   // foreign as no record at all being wrong would be; only an EXACT
   // pid match is ever killed.
   test("refuses to kill a live process a recorded (but non-matching) owner names, and reports it as blocked", async () => {
-    const port = 39176;
+    const port = reserveFreePort();
     const child = await spawnRealListener(port, "not the recorded pid");
     try {
       __recordOwnedPortForTests(port, child.pid + 1);
@@ -762,15 +784,24 @@ describe("freePort", () => {
   }, 10_000);
 
   test("a port nothing is listening on is a safe no-op", async () => {
-    await expect(freePort(39173)).resolves.toBeUndefined();
+    // reserveFreePort() binds then releases: the reservation is stale by
+    // the time freePort() runs a moment later, which is exactly the
+    // "nothing is listening" state this test wants, and it never risks
+    // colliding with a concurrent process's own genuinely fixed port.
+    await expect(freePort(reserveFreePort())).resolves.toBeUndefined();
   });
 
   // A code review (2026-09-04, before this file existed) found the
   // original matcher used a plain substring test - true for "--port
   // 87889" when freeing port 8788, since 8788 is a numeric prefix of it.
   test("never kills a process whose port has the target port as a numeric prefix", async () => {
-    const targetPort = 3917;
-    const decoyPort = 39174;
+    // FLAKE-PORT-01 (issue 137): decoyPort is a real, ephemeral,
+    // reserved port; targetPort is derived as its own numeric prefix
+    // (drop the last digit) so the two stay in the exact relationship
+    // this test proves matters, without a fixed literal either could
+    // collide with a concurrent process on.
+    const decoyPort = reserveFreePort();
+    const targetPort = Math.floor(decoyPort / 10);
     const decoy = Bun.spawn(
       ["bun", "-e", `Bun.serve({ port: ${decoyPort}, fetch: () => new Response("decoy") });`, "--port", String(decoyPort)],
       { stdout: "ignore", stderr: "ignore" },
@@ -808,7 +839,7 @@ describe("engineHealthKind: a blocked port reports \"blocked\"", () => {
   });
 
   test("a port freePort() refused to touch reads back as blocked", async () => {
-    const port = 39178;
+    const port = reserveFreePort();
     const child = await spawnRealListener(port, "blocked for this test");
     try {
       // A mismatched record, the same shape the real incident's steady

@@ -23114,3 +23114,89 @@ check), `backend/tests/turnMachine/commands.test.ts`,
 `backend/tests/turnMachine/answer.test.ts` (new),
 `backend/tests/turnMachine/outputGate.test.ts`,
 `backend/tests/turnMachine/turnNext.test.ts`.
+
+## FLAKE-PORT-01: test stub servers bind ephemeral ports, never fixed ones (2026-09-23)
+
+The row's own framing ("stubs bind fixed ports from `tests/isolation.ts`")
+did not match the code: `reserveFreePort()` already binds port 0 and
+hands the assigned number through the env vars the code under test
+reads, and `resourceGovernor.test.ts` already reserves fresh
+immediately before each real spawn. The real defect was staleness, in
+three shapes, all found by tracing the exact EADDRINUSE ("port 64736 in
+use") signature from earlier today back to its source rather than
+guessing:
+
+1. `llmSupervisor.test.ts` reserved one port ONCE at module load
+   (`const TEST_CHAT_PORT = reserveFreePort();`) and reused it across
+   three separate real-spawn tests in the "an engine that dies out from
+   under it" describe block, spread over many seconds - the widest
+   window in the file for a concurrent process to grab the identical
+   OS-assigned number before the real bind. Fixed: `spawnFakeEngine()`
+   now reserves and returns its own port per call.
+2. `sidecars.test.ts`'s "reports a dead chat engine..." and "a stale
+   client to a killed process probes false" never reserved a port at
+   all, inheriting `preload.ts`'s one port reserved once for the entire
+   200+-file, multi-minute run - by design a safety fallback (never the
+   production ports 8788/8789/8794), never meant to survive a real bind
+   attempt minutes later. Fixed: each reserves its own fresh port and
+   restores (never deletes - `preload.ts`'s own 2026-09-07 comment: a
+   deleted override let a later real spawn fall through to the
+   production port and kill the real household engine) the prior value
+   in `finally`.
+3. `sidecars.test.ts` itself turned out to have eleven literal,
+   hardcoded ports (39172 through 39207) across `spawnAndWaitHealthy`,
+   `startSidecar/stopSidecar`, the health-poll loop, `registerGracefulExit`,
+   `freePort` and `engineHealthKind` - real binds every one, invisible
+   until the acceptance test's own genuinely concurrent second `bun
+   test` process exposed them (a single full gate never triggers two
+   processes drawing the identical fixed number at once; only a real
+   concurrent run does). All replaced with `reserveFreePort()`, called
+   fresh at each site. `watchEngine`'s own "one port per test" scheme
+   (`let port = 39240; beforeEach(() => port++)`) avoided self-collision
+   within one file but was the identical incrementing sequence in every
+   concurrent process on the machine - two worktrees running this file
+   at once bound the exact same numbers every time; now reserves fresh
+   in `beforeEach` instead of incrementing a fixed base. The
+   `freePort()` numeric-prefix test (`targetPort`/`decoyPort`, proving a
+   substring-match bug stays fixed) needed the two to stay in an exact
+   digit relationship, not just both be free - `decoyPort` is now
+   reserved and `targetPort` derived as its own numeric prefix
+   (`Math.floor(decoyPort / 10)`), preserving the relationship the test
+   proves without either number being fixed.
+
+A fourth, smaller finding along the way, same root cause but a
+different shape: `sweepOrphanEngineProcesses`'s "excludes the
+background (memory) engine's own live pid" test used a fixed 200 ms
+sleep for `ps` to observe a freshly spawned process - reliable alone,
+not under two full test suites' own real CPU and process-table
+contention running at once (`getBackgroundLivePid()` still read stale,
+the exclusion list came up empty, the sweep killed the "protected"
+survivor for real). Same class of "a timing assumption that doesn't
+hold under real concurrent load" as the port staleness above; fixed the
+same way the codebase already treats it elsewhere - polled until
+`getBackgroundLivePid()` actually returns the survivor's pid, a
+deterministic 5 s ceiling kept, no timeout widened.
+
+Verified: three concurrent-run attempts, two full `bun test` processes
+started at once in two worktrees each time, fixing what each attempt's
+failures actually named rather than guessing ahead. Attempt 1 (before
+any fix beyond the original two tests): 2 and 6 failures, all
+EADDRINUSE from the literal ports above. Attempt 2 (literal ports and
+the module-level/no-reservation staleness fixed): 2 and 1 failures, the
+sweepOrphanEngineProcesses timing race found. Attempt 3 (that fixed
+too): both runs 4030/4030, 0 fail, no EADDRINUSE anywhere in either
+log; the nine "could not reach" lines each run are GENFAIL-01's and the
+forced-call tests' own deliberately scripted failures, not real ones.
+One unrelated failure seen once in attempt 2 (`memoryJudge.test.ts`,
+"a turn lease acquired mid-batch stops the loop with the rest left
+pending, not failed", processed 6 instead of the expected 1) is a
+different mechanism entirely (a batch-interrupt race, no port anywhere
+in it) - out of this item's scope, not chased, flagged for whoever
+picks it up next.
+
+Files: `backend/tests/llmSupervisor.test.ts`, `backend/tests/sidecars.test.ts`.
+Out of scope: `rep01.test.ts`/`ask02.test.ts` (the row's own original
+motivating examples) never showed the signature in any of the three
+concurrent attempts - whatever Jesse saw there earlier was very likely
+this same staleness class, already closed by the fixes above, not a
+defect of their own.

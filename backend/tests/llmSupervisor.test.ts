@@ -9,8 +9,6 @@ import { join } from "node:path";
 import { resetDb } from "./reset-db";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 
-const TEST_CHAT_PORT = reserveFreePort();
-
 afterEach(() => {
   __resetLlmSupervisorForTests();
   // Also clears any engine watch timer and the respawn history a death
@@ -195,21 +193,29 @@ describe("llmSupervisor: an engine that dies out from under it", () => {
     throw new Error("waitUntil() timed out");
   }
 
-  async function spawnFakeEngine(): Promise<number> {
+  // FLAKE-PORT-01 (issue 137): reserved fresh right here, immediately
+  // before the real spawn that binds it, rather than once for the
+  // whole file (a module-level constant sat "reserved" but unbound for
+  // the entire describe block's run - three real spawns and kills
+  // spread over many seconds - long enough for a concurrent test
+  // process on the same machine to grab the identical OS-assigned
+  // number first, and its own real bind then failed with EADDRINUSE).
+  async function spawnFakeEngine(): Promise<{ pid: number; port: number }> {
     resetDb();
+    const port = reserveFreePort();
     process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    process.env.MAIPAI_LLAMA_SERVER_PORT = String(TEST_CHAT_PORT);
+    process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
     const client = await getChatClient();
     expect(await client.health()).toBe(true);
     const pid = getEngineStatus().pid!;
     expect(pid).toBeGreaterThan(0);
-    return pid;
+    return { pid, port };
   }
 
   test("a killed engine is noticed and started again on its own: status drops it, Repairs says how it died, then clears once it is back", async () => {
     __setSidecarTimingForTestsOnly({ backoffMs: [50] });
-    const pid = await spawnFakeEngine();
+    const { pid } = await spawnFakeEngine();
 
     process.kill(pid, "SIGKILL");
     await waitUntil(() => getEngineStatus().pid !== pid);
@@ -232,9 +238,9 @@ describe("llmSupervisor: an engine that dies out from under it", () => {
   // no Repairs, in the one case that matters most.
   test("a death seen first by a failing request is still a death: reported and started again", async () => {
     __setSidecarTimingForTestsOnly({ backoffMs: [50] });
-    const pid = await spawnFakeEngine();
+    const { pid, port } = await spawnFakeEngine();
     process.kill(pid, "SIGKILL");
-    reportChatBackendUnreachable(`could not reach http://127.0.0.1:${TEST_CHAT_PORT}`);
+    reportChatBackendUnreachable(`could not reach http://127.0.0.1:${port}`);
     await waitUntil(() => getEngineStatus().pid !== null && getEngineStatus().pid !== pid);
     // Whichever signal won the race (the request's own failure, or the
     // exit itself), it was reported as a death and healed.
@@ -243,7 +249,7 @@ describe("llmSupervisor: an engine that dies out from under it", () => {
   }, 15_000);
 
   test("a deliberate stop is never reported as a death", async () => {
-    const pid = await spawnFakeEngine();
+    const { pid } = await spawnFakeEngine();
     // Await the stop: stop() sets deliberate=true synchronously before
     // calling proc.kill(), and awaits proc.exited, so by the time it
     // resolves the exit handler has fired and (seeing deliberate=true)
@@ -312,7 +318,19 @@ describe("sweepOrphanEngineProcesses", () => {
     const previous = registry!.backgroundBackend;
     registry!.backgroundBackend = { pid: survivor.pid, kind: "spawned", stop: () => {} } as unknown as never;
     try {
-      await new Promise((r) => setTimeout(r, 200)); // give `ps` a moment to see the new process, as tests/sidecars.test.ts does
+      // FLAKE-PORT-01 (issue 137): a fixed 200ms sleep for `ps` to see
+      // the new process passed reliably alone, but under two full
+      // `bun test` processes actually running at once (each spawning
+      // many real child processes, real CPU contention) `ps`'s own
+      // latency to reflect a brand-new pid could exceed it, so
+      // getBackgroundLivePid() still read null/stale and the exclusion
+      // list came up empty - not a fixed port, but the identical class
+      // of "the test's own timing assumption doesn't hold under real
+      // concurrent load." Polled instead, deterministic timeout kept.
+      const deadline = Date.now() + 5_000;
+      while (Date.now() < deadline && getBackgroundLivePid() !== survivor.pid) {
+        await new Promise((r) => setTimeout(r, 25));
+      }
       expect(getBackgroundLivePid()).toBe(survivor.pid);
       // The exclusion index.ts builds from getBackgroundLivePid(), against
       // the marker the survivor carries in its own command line. This
