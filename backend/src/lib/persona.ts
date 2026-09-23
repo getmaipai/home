@@ -218,13 +218,18 @@ const FORMALITY_FRAGMENT: Record<Persona["formality"], string> = {
 // same message. This is that fragment's written twin: how this
 // companion writes, not how it talks, nothing about pages or being
 // read aloud.
-const FORMALITY_FRAGMENT_WRITTEN: Record<Persona["formality"], string> = {
+// Exported alongside COMPLEXITY_FRAGMENT/ENGAGEMENT_FRAGMENT_WRITTEN/
+// FILLER_FRAGMENT below (PARITY-BISECT-02): scripts/bench/parity-
+// bisect2.ts isolates each stable-prefix fragment's own marginal effect
+// on a written reply's length, one at a time - it needs the exact real
+// fragment text, never a re-typed copy that can drift.
+export const FORMALITY_FRAGMENT_WRITTEN: Record<Persona["formality"], string> = {
   casual: "Write the way a person actually writes a relaxed message: use contractions (it's, you're, don't) and keep your phrasing easygoing.",
   neutral: "Write the way a person actually writes, using contractions (it's, you're, don't), in a natural, unforced tone - neither stiff nor overly casual.",
   formal: "Write in complete, well-formed sentences without contractions, the way a careful professional would in a written note: polite and precise, never stiff or robotic.",
 };
 
-const COMPLEXITY_FRAGMENT: Record<Persona["complexity"], string> = {
+export const COMPLEXITY_FRAGMENT: Record<Persona["complexity"], string> = {
   simple:
     "Use short sentences and everyday words a young child would understand, and explain anything unfamiliar in the simplest possible terms.",
   standard: "Use plain, everyday language: no unexplained jargon, no unnecessarily complex sentence structure.",
@@ -259,7 +264,7 @@ const ENGAGEMENT_FRAGMENT: Record<Persona["engagement"], string> = {
 // length constraint dropped for all three since a written answer's own
 // length already comes from the plan (register.ts's writtenBudgetFor),
 // never from this fragment.
-const ENGAGEMENT_FRAGMENT_WRITTEN: Record<Persona["engagement"], string> = {
+export const ENGAGEMENT_FRAGMENT_WRITTEN: Record<Persona["engagement"], string> = {
   brief:
     'Answer the exact question completely, then stop: no restating it back, no "let me know if you need anything else," no follow-up question tacked on - but never cut a genuinely complete answer short for the sake of being brief. Brief means no padding, not less substance.',
   balanced:
@@ -268,7 +273,7 @@ const ENGAGEMENT_FRAGMENT_WRITTEN: Record<Persona["engagement"], string> = {
     "Answer completely; when they share something personal or emotional, show you noticed - ask a brief, genuine follow-up or say something caring before moving on, the way someone who cares about them would.",
 };
 
-const FILLER_FRAGMENT: Record<Persona["filler_density"], string> = {
+export const FILLER_FRAGMENT: Record<Persona["filler_density"], string> = {
   none: "Keep your wording clean and direct, without casual filler phrases.",
   light: 'A little casual phrasing here and there ("honestly," "I mean") is fine, used naturally, never forced.',
   frequent:

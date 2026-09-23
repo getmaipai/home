@@ -581,11 +581,15 @@ export function isCrisisStop(text: string): boolean {
 // model call itself MaiPai every turn). DEFAULT_PERSONA.display_name is
 // literally "MaiPai", so this produces byte-identical text to the old
 // constant for every household that never touches persona.active_id.
-function identityLine(persona: Persona): string {
+// Exported (PARITY-BISECT-02): scripts/bench/parity-bisect2.ts isolates
+// the stable prefix's own fragments one at a time, including the
+// identity line and this suffix on their own, ahead of the persona's
+// dials - it needs the exact real text, never a re-typed copy.
+export function identityLine(persona: Persona): string {
   return `You are ${persona.display_name}, a private, self-hosted AI assistant for this household.`;
 }
 
-const STABLE_SYSTEM_SUFFIX = [
+export const STABLE_SYSTEM_SUFFIX = [
   "Be warm, concise and honest. Nothing you say leaves this house.",
   "Requests already blocked by the household's safety rules never reach you; answer anything else helpfully and honestly.",
   // getmaipai/home#67, live-found 2026-09-07: a household member asks
