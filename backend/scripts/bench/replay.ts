@@ -216,6 +216,17 @@ async function runMain(): Promise<void> {
   if (NEW_PATH) {
     const { setHouseholdSettingValue } = await import("@/lib/settings");
     setHouseholdSettingValue("turn.pipeline.next", true);
+    // A live run caught this missing entirely: resolveTurnBudget()
+    // (turnMachine/budget.ts) reads the household's own chat.model_id
+    // setting to find the model's measured turn_budget record in
+    // modelCatalog.ts - with nothing set here, every --new run resolved
+    // to NO_RECORD_BUDGET (rounds 0, tools_offered [], model_transitions
+    // false), so the model was NEVER offered a single tool, on any row,
+    // the whole time - not a turn-machine bug, a bench setup gap
+    // (interimRuleMeasure.ts already set this correctly; replay.ts
+    // never did). MAIPAI_REPLAY_MODEL_ID lets U2d's own second-model
+    // acceptance run point this at a different catalog entry.
+    setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
   }
 
   console.log("\n## Run header\n");
