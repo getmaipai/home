@@ -21302,3 +21302,113 @@ cache-token drop between two turns of the same row). Full backend suite
 **Not run here.** The live interleaved rerun itself waits for
 `ENGINE-CONTRACT-03` and a window the coordinator clears (every lane's
 gates paused) - this item is the tooling, never the measurement.
+
+## The owner's three live turns on the new path: the ruling (2026-09-23)
+
+Jesse switched `turn.pipeline.next` on for his household (the registry's
+default is off, advanced, household scope: "Use the new reply engine")
+and ran the same three turns on both paths in fresh conversations. The
+old path read faster and more accurate. From the traces (roster-safe
+facts only) and the code on `main` at 7db9756d, four rulings.
+
+### (1) A forced call that misses must cost under a second, not eleven
+
+Turn 2 ("what time is it in Tokyo") ran the interim rule's forced call
+with `max_tokens` 440 (`maxTokensFor` in `nodes/model.ts`: the plan's
+`max_words` times two) and thinking on; the model wrote a 440-token
+knowledge answer in 11.6 s, the model node marked `required_miss`, the
+builder row searched in 0.75 s and a second generation phrased it in
+2.1 s (its own cap 720). Seventeen seconds, and the phrased answer was a
+snippet-shaped hallucination with the year 2100.
+
+Ruling, both, with the numbers, as `FORCED-CALL-01`:
+- **Thinking off on every `required` call**, whatever the person's
+  toggle: a call is not a reply, and re-check C's 8/10 was measured
+  with thinking off.
+- **`max_tokens` 96 on a `required` call.** A websearch call is 30 to
+  45 tokens (the name, `expression`, `category`, `read_page` and the
+  wrapper); 96 leaves room for a long expression and can never pay
+  440. The cap is the backstop for the non-streaming Stack twin and
+  for a runaway call.
+- **Early abort on the first content delta.** `llm.ts` streams tool
+  calls as `tool_calls` fragments, never as text, and with thinking
+  off there is no reasoning text either, so on a `required` call the
+  first text delta is the miss itself. The model node runs the forced
+  generation under its own child `AbortController` chained off the
+  node signal (the shape `deadline.ts`'s `nodeSignal` already uses),
+  aborts on that first delta (COR-7's signal reaches the engine
+  request, proven by ENGINE-CONTRACT-01's abort check) and takes the
+  builder row. A miss then costs the prefill plus one token: about
+  1.6 s today on a 600-token uncached prompt at 375 tokens a second,
+  under a second once NEXT-CACHE-01 lands.
+- **The phrasing round's cap is LAT-01's own formula** (`max_words`
+  times 1.6 plus 32, no thinking allowance), not a third formula; 720
+  was a ceiling and cost nothing here (the model stops at its end),
+  but `maxTokensFor` is the second copy of a number the old path
+  already owns, and one formula is the rule.
+
+### (2) The recall latch on a turn that asked nothing
+
+Turn 1 ("this is the new reply engine": inform, target world, no
+question) got "The search didn't find any information about the
+president's birthdate. Would you like me to try a different search?"
+The conversation was fresh, so the window was empty; the prompt was
+616 tokens of context lines and the utterance, and the only
+question-shaped thing in it was a remembered lookup from an earlier
+chat. The 8B answered that.
+
+Why the rows reached the model as if they were the subject, read from
+the code:
+- `nodes/context.ts` calls `recall(state.actor, input.utterance)` bare.
+  With no `queryVector`, `memory.ts`'s recall takes the keyword path:
+  any shared non-stopword scores above zero ("new", "reply", "engine"
+  and "this" all survive `text.ts`'s stopword list), the measured tier
+  floors apply only on the vector path, and the call carries none of
+  the old path's reader options (`selfOnly`, `asOf`, `withholdSensitive`
+  from the age band, `anonymous`, `excludeSource`). It keeps eight
+  rows; the old path keeps five.
+- `messages.ts` renders each as `[remembered (date)] text` and joins
+  them into the first system message with the clock and the roster, no
+  frame, before the window and the utterance. The old path frames them
+  under "What you already know about this household:", with the trust
+  line "Prefer these facts over guessing when they're relevant." and
+  "Nothing stored here bears on this message." when nothing matched.
+
+Ruling, `CONTEXT-RECALL-01`, in the design's own terms and no rule: the
+context node recalls the way the old path does, carried whole as
+hard-won logic: the utterance embedded through `embedQueryForRecall`
+and passed as `queryVector` so the tier floors apply and small talk
+matches nothing; the reader options above; five rows. And the volatile
+context message (the one NEXT-CACHE-01 moves after the window) is framed
+with the old path's own header and trust line, so recalled rows are
+background the model may use, never the subject. Not "no recall on a
+non-question turn": an inform turn about the speaker or a named person
+("I'm feeling kind of down", "we're going to the lake this weekend") is
+exactly where memory personalizes, and the floor plus the frame do the
+job without a signal switch. The replay row, in Jesse's exact words:
+"this is the new reply engine", on a fresh conversation whose seeded
+memory holds a roster-safe remembered lookup, expecting no tool and a
+reply that never mentions a search, a birthdate or trying again.
+
+### (3) SIGNAL-02 covers Tokyo end to end
+
+Yes. The almanac-time manifest gains the opener `what time is it in *`,
+which `nodes/commands.ts` matches from `routing.patterns` before the
+model runs at all; the captured place resolves through the pinned
+offline zone library and the answer is computed, no generation, no
+search. `isWorldQuestion` (`nodes/model.ts`) reads `target === "world"`
+only, so a `computed` target is never forced. Both paths were wrong on
+this turn today (the old path's "11:19 AM in Tokyo" was the model's own
+guess against a real 22:19); after SIGNAL-02 the time comes from the
+zone library. Plainly: a phrasing the opener misses stays `world` and
+is forced to search until the classifier head exists; the row's
+`interimRuleMeasure` count on the corpus's computed rows says how often.
+
+### (4) The household default
+
+Back to off for daily use, Jesse's toggle for testing, until
+FORCED-CALL-01, CONTEXT-RECALL-01, THINK-DEFAULT-01 and NEXT-CACHE-01
+land: a 17-second "what time is it" is worse in a kitchen than a wrong
+1.4-second one, and turn 3 ("hello, how are you", 1.4 s against 1.7 s)
+shows the new path is already fine where nothing above applies. The
+registry default was never on; nothing to change there.
