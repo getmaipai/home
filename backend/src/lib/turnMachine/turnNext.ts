@@ -178,6 +178,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     messages: [],
     proposals: [],
     outcomes: [],
+    lastTools: [],
     generations: [],
     nodes: [],
     reply: null,

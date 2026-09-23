@@ -25,6 +25,8 @@ import { speakerNamedAny } from "@/lib/subjects";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnEngine";
 import { isWrittenAdultTurn } from "@/lib/surfaceClass";
+import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
+import { planLine } from "@/lib/register";
 import { contextToMessages } from "../messages";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 
@@ -183,7 +185,7 @@ function boundedGenerationError(message: string | undefined): string | undefined
  * it through the streaming client (COR-7's own signal support), and
  * drains it manually so the generator's return value (the tool calls)
  * survives - `for await...of` would discard it. */
-async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "required" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal): Promise<GenerationResult> {
+async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "required" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal): Promise<GenerationResult> {
   const forced = tool_choice === "required";
   // FORCED-CALL-01: a child AbortController chained off the node's own
   // signal (deadline.ts's nodeSignal shape, without its timer half -
@@ -312,14 +314,56 @@ function builderFallbackOutput(utterance: string, otherCalls: readonly ToolCall[
 }
 
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
-  const messages: LlmMessage[] = contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken");
-  state.messages = messages;
+  // PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
+  // follow-up): a phrasing round is the model round that runs after at
+  // least one tool round already completed this turn (`state.outcomes`
+  // populated by `machine.ts`'s own `recordOutcomes`, before this node
+  // ever sees them) AND no further tool round is still available
+  // (`input.toolsAllowed`, machine.ts's own `roundsUsed < budget.rounds`
+  // check, already computed there rather than re-derived here). A
+  // review (2026-09-23) caught the first cut using `outcomes.length > 0`
+  // alone: today's one catalog entry caps `budget.rounds` at 1, so that
+  // was equivalent, but `TurnState.budget.rounds` is typed `0 | 1 | 2`
+  // and a future `rounds: 2` entry would have misrouted the real second
+  // tool-offering round into a `tool_choice: "none"` phrasing round,
+  // silently forbidding the second search that round exists to allow.
+  // `toolsAllowed` already carries the right answer.
+  const isPhrasingRound = state.outcomes.length > 0 && !input.toolsAllowed;
 
   const interimRuleApplies = input.toolsAllowed && state.budget.always_search && isWorldQuestion(state) && !householdSubjectNamed(state);
 
+  let messages: LlmMessage[] = contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken");
   let tools: ToolSpec[];
-  let tool_choice: "auto" | "required" | undefined;
-  if (input.forceSearchOnly) {
+  let tool_choice: "auto" | "required" | "none" | undefined;
+
+  if (isPhrasingRound) {
+    // PHRASE-01's own continuation: the forced call's own messages,
+    // byte for byte (state.messages, stored below on every non-phrasing
+    // round - never a fresh contextToMessages() call, which discarded
+    // the cached prefix and produced a fresh 45-to-52-token prompt that
+    // never hit the prompt cache), then the assistant's own tool_calls
+    // message and the tool result messages (composer.ts's own builders,
+    // the identical shape the old path's composition call already
+    // sends), then one user-role instruction: the plan line
+    // (register.ts's planLine, re-derived from state.plan/state.signal,
+    // which machine.ts's own derivePlanFromEvidence already refreshed
+    // from this round's real evidence before this node ran) plus
+    // composer.ts's own phrasingInstruction for this turn's surface
+    // class - never compositionInstruction, which is the old path's own
+    // frozen text, pinned by its own tests.
+    const surfaceClass = state.planBasis.surfaceClass ?? "spoken";
+    const assistantMessage = toolCallAssistantMessage(state.outcomes);
+    const resultMessages = toolResultMessages(state.outcomes);
+    const instruction: LlmMessage = { role: "user", content: `${planLine(state.plan, state.signal, surfaceClass)} ${phrasingInstruction(surfaceClass)}` };
+    messages = [...state.messages, assistantMessage, ...resultMessages, instruction];
+    // The same tools block the forced/offered round itself sent -
+    // reused verbatim (see contract.ts's own `lastTools` doc comment:
+    // the Qwen3 template renders the tools block into the prompt's own
+    // stable prefix, so anything but a byte-identical array re-renders
+    // it and costs the cache hit this item exists to restore).
+    tools = state.lastTools;
+    tool_choice = "none";
+  } else if (input.forceSearchOnly) {
     tools = [toolSpecFor("websearch")].filter((t): t is ToolSpec => t !== null);
     tool_choice = "required";
   } else if (!input.toolsAllowed) {
@@ -337,6 +381,9 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
       .filter((t): t is ToolSpec => t !== null);
   }
 
+  state.messages = messages;
+  if (!isPhrasingRound) state.lastTools = tools;
+
   // GROUND-01: `context`'s own decideReasoning() already decided
   // `reasoning.withheld_for === "minor"` from the age band, reused here
   // rather than a second age check - a minor's turn sends `thinking:
@@ -349,15 +396,18 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // toggle - a call is not a reply, and re-check C's own miss-rate
   // measurement was taken with thinking off. Only a `required` call is
   // forced this way; an ordinary/offered call still follows the
-  // household's own toggle (THINK-DEFAULT-01) unchanged.
+  // household's own toggle (THINK-DEFAULT-01) unchanged. A phrasing
+  // round's own tool_choice is "none", never "required", so it reads
+  // the household's own toggle too, same as an ordinary call.
   const thinkingOn = tool_choice !== "required" && state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
   // FORCED-CALL-01: the forced call's own cap is fixed (FORCED_CALL_
-  // MAX_TOKENS); the phrasing/ordinary call's own cap is replyMaxTokensFor's
-  // (LAT-01's formula, or the reply floor's ceiling on a written adult
-  // turn) - thinkingOn is already forced false above for a required
-  // call, so this reads truthfully for both.
-  const maxTokens = tool_choice === "required" ? FORCED_CALL_MAX_TOKENS : replyMaxTokensFor(state, thinkingOn);
-  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, interimRuleApplies ? "interim_rule" : "model", signal);
+  // MAX_TOKENS). PHRASE-01: the phrasing round's own cap is LAT-01's
+  // visibleReplyMaxTokens formula directly, never replyMaxTokensFor's
+  // written-adult ceiling override - that override exists for the
+  // stable-prefix-only written turn PREFIX-CLASS-01 measured, not for a
+  // continuation already carrying tool results and its own instruction.
+  const maxTokens = tool_choice === "required" ? FORCED_CALL_MAX_TOKENS : isPhrasingRound ? visibleReplyMaxTokens(state.plan.max_words, thinkingOn) : replyMaxTokensFor(state, thinkingOn);
+  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : interimRuleApplies ? "interim_rule" : "model", signal);
   // DEADLINE-01: a generation that never finished (the model node's
   // own deadline, a dead engine) is one more way "the model produced
   // no query" happens - on a forced turn (tool_choice required), the
@@ -367,15 +417,42 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // `answer` as if the model had genuinely said nothing.
   if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
 
+  // ENVELOPE-NONE-01 (a code review, 2026-09-23): `tool_choice: "none"`
+  // stops the engine's own grammar from emitting a native tool call,
+  // but `runOneGeneration`'s own `envelopeToolCall()` check also
+  // recognizes a tool call the model wrote as plain text - the
+  // model's own choice, not the engine's grammar, and "none" doesn't
+  // forbid it. The phrasing round is this turn's committed final
+  // round (its own prompt already carries the tool result
+  // `composer.ts` built); a stray tool call here is discarded before
+  // it can count as "visible" below or be fed back into policy/tool
+  // as an unplanned second round. Discarding it can leave a phrasing
+  // attempt with no text at all (the model spent its whole generation
+  // writing the call instead of an answer) - `phrasingToolCallDiscarded`
+  // carries that into the retry condition below, since a plain empty
+  // reply is genuinely new here, never possible before this round
+  // could be handed a tool call to discard.
+  let phrasingToolCallDiscarded = false;
+  if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) {
+    attempt = { ...attempt, toolCalls: undefined };
+    phrasingToolCallDiscarded = true;
+  }
+
   // State table, `model`'s own exits: "no visible text: one
   // regeneration with thinking off, then answer." A tool call always
   // counts as "visible" (it is the turn's real output); only a call
   // that came back with neither text nor a tool call retries. Forced
   // calls never reach here with thinkingOn true (forced above), so
-  // this retry is only ever an ordinary/offered call's own.
-  if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && thinkingOn) {
-    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false), "model_retry_no_thinking", signal);
+  // this retry is only ever an ordinary/offered call's own - except a
+  // phrasing round whose only "call" was just discarded above, which
+  // retries even with thinking already off (ENVELOPE-NONE-01): the
+  // first attempt produced no usable text at all, so the retry is the
+  // one recourse left before this round ships an empty reply.
+  if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && (thinkingOn || phrasingToolCallDiscarded)) {
+    const retryMaxTokens = isPhrasingRound ? visibleReplyMaxTokens(state.plan.max_words, false) : replyMaxTokensFor(state, false);
+    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, retryMaxTokens, "model_retry_no_thinking", signal);
     if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+    if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) attempt = { ...attempt, toolCalls: undefined };
   }
 
   // "Reasoning is a second output" (the owner's ruling): `context`

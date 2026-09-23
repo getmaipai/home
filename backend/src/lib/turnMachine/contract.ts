@@ -14,7 +14,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
-import type { LlmMessage, ToolCall } from "@/lib/llm";
+import type { LlmMessage, ToolCall, ToolSpec } from "@/lib/llm";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { GenerationInput } from "@/lib/turnStats";
 import type { PendingAsk } from "@/lib/conversationHistory";
@@ -165,6 +165,17 @@ export interface TurnState {
   messages: LlmMessage[];
   proposals: ActionProposal[];
   outcomes: ToolExecutionOutcome[];
+  /** PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
+   * follow-up): the most recent real (non-phrasing) model round's own
+   * resolved tools array, persisted so the phrasing round that follows
+   * a forced or offered tool call can send the identical tools block -
+   * not merely an equivalent one - since the Qwen3 chat template
+   * renders the tools block into the prompt's own stable prefix;
+   * anything but a byte-identical array re-renders that prefix and
+   * costs the very prompt-cache hit this item exists to restore. Set
+   * once per non-phrasing round in `nodes/model.ts`, read once on the
+   * phrasing round that follows it - never touched by any other node. */
+  lastTools: ToolSpec[];
   generations: GenerationInput[];
   nodes: NodeExecution[];
   reply: { text: string; speech?: string; sources: Source[] } | null;

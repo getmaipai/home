@@ -111,8 +111,16 @@ export interface LlmCompleteOptions {
   tools?: ToolSpec[];
   /** "required" disallows the model declining (used only by
    * enginePostLoadCheck.ts's own capability probe); "auto" (the
-   * default) lets it answer normally instead when nothing offered fits. */
-  tool_choice?: "auto" | "required";
+   * default) lets it answer normally instead when nothing offered fits.
+   * "none" (PHRASE-01, dev.md "The written prompt on tier 1, decided"'s
+   * own follow-up): the tools block still renders (offering stays true,
+   * so the prompt's own prefix - and its cache hit - stays the forced
+   * round's own), but the engine is told never to call one this round -
+   * the phrasing round's own shape, which never asks the model to
+   * decide again. `chatRequestBody`'s own pass-through (`tool_choice ??
+   * "auto"`) already forwards any explicit value verbatim; only this
+   * type needed widening. */
+  tool_choice?: "auto" | "required" | "none";
 }
 
 /** One package (or, once D's `exposes.queries` lands, one typed query on

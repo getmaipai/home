@@ -23775,3 +23775,187 @@ stage-gating conditions (`grep` confirms each: backend stages gated on
 the rest of the frontend stages on `frontend`/`full` only) match this
 design exactly, so a real diff of each shape runs the stage set this
 record claims it does.
+
+## PHRASE-01: the phrasing round continues the forced call's prompt (2026-09-23)
+
+"U6 rerun 2 ruling" (2) named the mechanism exactly: the phrasing round
+after a forced or offered tool call built a fresh, cold prompt from
+`contextToMessages()` (45 to 52 tokens, no system message, no tools, no
+plan line, no composition instruction) instead of continuing the
+forced call's own messages, so it evicted the one cache slot's
+prefix - a forced row's sequence forced/phrasing/forced read `cache_n`
+3 then 51 instead of rising - and decoded 100 to 300 tokens of an
+unguided reply where the old path's `composition` call, on the same
+result, writes one line in 0.3 to 0.5 s.
+
+**The fix, exactly as the ruling specified.** `nodes/model.ts` detects
+the phrasing round with `state.outcomes.length > 0` (populated by
+`machine.ts`'s `recordOutcomes` before the `model` actor is
+re-invoked, never touched by any other path) and, on that round,
+builds `messages` from `state.messages` (the forced call's own array,
+now persisted rather than write-only) plus one assistant message
+carrying the tool call and one `tool` message carrying the result -
+`composer.ts`'s own `planComposition` shape, extracted into two
+exported builders (`toolCallAssistantMessage`, `toolResultMessages`) so
+the new path calls the identical construction rather than a second
+copy - then the plan line and a new `phrasingInstruction(surfaceClass)`
+export (the substance below), `tool_choice: "none"`, and the same
+`tools` array the forced round sent, persisted in a new
+`TurnState.lastTools` field for exactly this one read (the Qwen3
+template renders the tools block into the prompt's own stable prefix,
+so anything but a byte-identical array re-renders it and costs the
+cache hit this item exists to restore). `max_tokens` comes from LAT-01's
+`visibleReplyMaxTokens`, never the written-adult `reply_ceiling_tokens`
+override. `compositionInstruction` (the old path, pinned by
+`composer.test.ts`'s own literal assertions) is untouched;
+`phrasingInstruction` is new, separate, and used only here.
+
+**The composition instruction's own substance** ("The interim rule's
+trigger, decided"): answer completely from what is already known,
+structured where it helps on the written class, one to three sentences
+on the spoken class; the results above as support, not the primary
+source; any specific current fact (an office, a date, a number, a
+price, a score, what is latest) from the results or left out; the
+results win a real contradiction; where the results do not bear on the
+question, answer from what is known and say nothing about searching -
+the old "if the results don't answer the question, say so plainly"
+line was written for a lookup and produced a snippet-shaped reply on a
+conceptual one.
+
+**Tests, unit level.** Three new cases in `tests/turnMachine/turnNext.test.ts`
+(no `model.test.ts` exists; that filename in the row's own text was
+stale): the phrasing request's messages equal the forced request's own
+messages byte for byte through the shared prefix, then an assistant
+`tool_calls` message and a `tool` result message, then a user message
+carrying the new substance and none of the old "from the tool results
+above" text; the phrasing request carries the identical `tools` array
+with `tool_choice: "none"`; `max_tokens` is LAT-01's formula (608 for
+the fixture's evidence-boosted 360-word plan), not the old 1536-token
+written-adult ceiling. One pre-existing assertion in the U4c block
+(`turnNext.test.ts:528`) had hard-coded that same stale 1536 figure for
+a fixture whose phrasing round this change now correctly resizes -
+updated with its derivation shown in the comment. Full backend suite
+at this point: 4066/4066, 0 fail (a fourth new test, the review's own
+ENVELOPE-NONE-01 regression, is below).
+
+**Live verification: the interleaved rerun**
+(`bun run backend/scripts/bench/replay.ts --hub-live --interleaved`,
+`MAIPAI_HUB_LOG` pointed at the main checkout's real `data/logs/hub.log`
+- the worktree's own default path resolves to a log that never exists,
+which would have made the quiet-wait no-op silently rather than
+protect the household). 23 rows, 3 repeats, both paths, 180 cases,
+against the resident engine at 127.0.0.1:8788 through the recording
+proxy. Bar summary:
+
+- PASS - the five named failed rows stay clean, no engine-classed row,
+  no empty reply (3/3 each).
+- PASS - the three named controls are 3/3 clean.
+- FAIL - every plain turn within 1.25x: worst ratio 40.36x across 45
+  plain turns. Not this item's own scope (no plain, non-tool turn
+  passes through `phrasingInstruction` or `lastTools` at all); U6's own
+  remaining gap, U4b's.
+- PASS - every forced-search turn's total under 10 s median: median
+  2,847 ms across 45 forced turns (FORCED-CALL-01, already landed,
+  plus this item's own cache reuse on the round after it).
+- FAIL, but the three misses are named, pre-existing exclusions, not
+  this item's own defect - cached_tokens rises on 12 of 15 multi-turn
+  rows; the three that don't (`primetime-trailer-correction`#1,
+  `president-of-chile-when-born`#1, `#2`) are exactly the rows "U6
+  rerun ruling" (d) already carves out as SIGNAL-01's and CONFIRM-01's
+  own scope, real parity gaps unrelated to the cache mechanism. Every
+  multi-turn row inside this item's own scope shows `cache_n` rising
+  turn to turn (`president-of-france-repeat` r3: 340, then 398 on the
+  next turn's phrasing round) - the mechanism itself is proven correct.
+
+**The three rows named in the row's own acceptance text, measured
+against the "within 2 s of the old path" bar - not met, honestly, and
+here is why.** Row totals (old path / new path, summed from the
+`[turn]` line's own `duration_ms` on the old side and the node-trace
+lines on the new side, three repeats each):
+
+| row | old | new | gap |
+|---|---|---|---|
+| `search-mariners-game` | 1.69 / 0.65 / 0.46 s | 5.08 / 5.09 / 2.98 s | 3.40 / 4.44 / 2.52 s |
+| `corey-feldman-michael-jackson-friendship` | 1.29 / 3.14 / 2.74 s | 8.87 / 5.75 / 6.02 s | 7.57 / 2.61 / 3.28 s |
+| `control-carrie-series` | 1.33 / 1.66 / 1.68 s | 3.46 / 3.26 / 3.17 s | 2.13 / 1.59 / 1.50 s |
+
+Against "U6 rerun 2 ruling"'s own pre-fix baseline for the two rows it
+named directly, this is still a large, real win: `search-mariners-game`
+r2's new-path total fell from 8.3 s to 5.09 s (the phrasing round's own
+decode alone, 7.3 s pre-fix, is 2.68 s of `predicted_ms` now);
+`corey-feldman-...` r1 fell from 18.5 s to 8.87 s. Neither clears 2 s
+of the old path's own total, though, and the residual gap is not a
+caching defect - `cache_n` on these rows' own phrasing generations
+reuses the forced call's prefix exactly as designed (`prompt_n` 909,
+`cache_n` 614 on `search-mariners-game` r1's phrasing round, against a
+618-token forced-call prompt just before it). Two costs outside this
+item's own scope make up the rest: (1) the new path's own
+tool-decision round before the forced call fires at all (1.3 to 1.4 s),
+which the old path skips entirely for these rows (pattern-tier routing
+sends them straight to the plugin, no model call); (2) the phrasing
+round's own reply is now a genuinely longer, structured answer by
+design (`phrasingInstruction`'s "answer completely... structured where
+it helps," the interim rule's trigger's own accepted substance), not
+the old path's one-line `synthesis_hint` composition - a real
+substance difference from an already-shipped design decision, not
+something this item's own prompt-continuation fix can or should
+suppress. Named here as an open question for the coordinator's own
+ruling (does the 2 s figure get revised the way WRITTEN-PARITY-01's
+0.35x bar was, or does the phrasing reply's own length become a
+follow-up item's target), not decided unilaterally.
+
+**Second half, not attempted.** The gated universal-tools-block change
+(every generation of every turn sharing one fixed sorted tools block,
+`tool_choice` carrying the difference) needs `scripts/bench/tool-calling.ts`
+run at 50 repeats with `tool_choice: "required"` over the full set,
+compared against the existing one-tool baseline (19 of 50 fitting, 0
+of 50 false calls) - not run this landing. Per the row's own fallback,
+the forced call keeps its `[websearch]`-only block; only the
+continuation above lands.
+
+**Open finding for PERSONA-STEER-01, not measured further on this
+tier** (Fable's own note, folded in here rather than a separate
+commit): the gap between the isolated ceiling (0.51x/0.53x) and the
+same composition through the real path (0.30x/0.26x) is still open -
+candidates are the tool block, the profile and roster lines, and
+`identityLine`'s own wording.
+
+**Medium review (this changes `model.ts`/`composer.ts`'s own wire
+shape), three findings, all fixed before landing.** (1) `ENVELOPE-NONE-01`:
+`tool_choice: "none"` stops the engine's own grammar from emitting a
+native tool call, but `runOneGeneration`'s own `envelopeToolCall()`
+check reads the model's visible text for a call regardless of
+`tool_choice` - a stray call on the phrasing round (native or
+envelope-written) would have been fed back into `policy`/`tool` as an
+unplanned second round exactly like a real forced or offered call.
+Fixed: a phrasing round discards any `toolCalls` on its attempt before
+either can happen; discarding one can leave the attempt with no text
+at all, so the existing "no visible text: one regeneration with
+thinking off" retry now also fires for a phrasing round whose only
+"answer" was a discarded call, even when thinking was already off (the
+one recourse before shipping an empty reply). (2) `isPhrasingRound`'s
+first cut read `state.outcomes.length > 0` alone - equivalent to the
+right answer only because today's one catalog entry caps
+`budget.rounds` at 1; a future `rounds: 2` entry would misroute the
+real second tool-offering round into a forced `tool_choice: "none"`
+phrasing round, silently forbidding the second search it exists to
+allow. Fixed by reading `input.toolsAllowed` (`machine.ts`'s own
+`roundsUsed < budget.rounds`, already computed there) instead - proven
+behavior-neutral for today's `rounds: 1` case by the full suite
+staying green, and correct for a future `rounds: 2` case by falling
+through to the already-tested "offer tools" branch rather than
+inventing new logic; not given its own test, since no catalog entry or
+`RunTurnNextOpts` override can reach that branch yet and adding one
+would be test-only wire surface for a path nothing can reach. (3) The
+identical `contextToMessages(...)` call was duplicated across four
+branches - hoisted into one default assignment, overridden only by the
+phrasing branch's own continuation. New regression test: a phrasing
+round whose first attempt carries a phantom tool call is treated as
+text, produces exactly one websearch query (not two), and retries once
+for a real answer (`turnNext.test.ts`).
+
+Verification: `bash scripts/check.sh` (backend scope - only
+`backend/` changed), 4067/4067 backend tests, 0 fail, `bunx tsc
+--noEmit` clean; the interleaved rerun above, kept at
+`/var/folders/qr/d9yr4nz52fbf1gvkq4hjc07w0000gn/T/owner-replay-interleaved-D8tYAU`
+for tracing.

@@ -517,15 +517,17 @@ describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", 
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.sources?.length).toBeGreaterThan(0);
-      // The reply floor (U4b-2): the plan's own max_words still moves
-      // with the evidence recompute (220 -> 360 words here), but
-      // max_tokens for a written adult turn no longer derives from it -
-      // reply_ceiling_tokens is a flat per-model backstop, the same
-      // 1536 whichever plan row the evidence recompute lands on. This
-      // row's own tool result is real (a source found), so the ordinary
-      // phrasing generation actually runs and reads it, unlike the
-      // empty-rows row below.
-      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(1536);
+      // PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
+      // follow-up) superseded this row's own original comment: the
+      // phrasing round's own max_tokens no longer comes from
+      // replyMaxTokensFor's flat reply_ceiling_tokens backstop (1536
+      // regardless of evidence) - it is LAT-01's visibleReplyMaxTokens
+      // formula directly, so the evidence recompute's own max_words
+      // move (220 -> 360 words here) DOES change it: Math.ceil(360*1.6)
+      // + 32 = 608, thinking off. This row's own tool result is real (a
+      // source found), so the ordinary phrasing generation actually
+      // runs and reads it, unlike the empty-rows row below.
+      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(608);
     } finally {
       searxng.stop();
     }
@@ -1199,4 +1201,180 @@ describe("turnNext.ts: FORCED-CALL-01, a forced call that misses costs under a s
       searxng.stop();
     }
   });
+});
+
+// PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
+// follow-up): the phrasing round after a forced or offered tool call
+// continues that SAME request's own messages (composer.ts's own
+// assistant/tool-result shape appended, never a fresh contextToMessages()
+// rebuild from state.context, which discarded the cached prefix and
+// produced a fresh, cache-missing prompt), the same tools block with
+// tool_choice "none", and LAT-01's visibleReplyMaxTokens for max_tokens
+// instead of the written-adult reply-ceiling backstop.
+describe("turnNext.ts: PHRASE-01, the phrasing round continues the forced call's own prompt", () => {
+  test("the phrasing request's messages begin with the forced request's own messages byte for byte, then an assistant tool_call and a tool result", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let forcedRequest: ChatCompletionRequest | undefined;
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) {
+              phrasingRequest ??= request;
+              return undefined;
+            }
+            forcedRequest ??= request;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      expect(forcedRequest).toBeDefined();
+      expect(phrasingRequest).toBeDefined();
+      const forcedCount = forcedRequest!.messages.length;
+      for (let i = 0; i < forcedCount; i++) {
+        expect(phrasingRequest!.messages[i]).toEqual(forcedRequest!.messages[i]);
+      }
+      const assistantMessage = phrasingRequest!.messages[forcedCount];
+      expect(assistantMessage?.role).toBe("assistant");
+      expect(assistantMessage?.tool_calls?.[0]?.function.name).toBe("websearch");
+      const toolMessage = phrasingRequest!.messages[forcedCount + 1];
+      expect(toolMessage?.role).toBe("tool");
+      expect(toolMessage?.tool_call_id).toBe(assistantMessage?.tool_calls?.[0]?.id);
+      // One more user-role message closes the request: the plan line
+      // plus phrasingInstruction, never compositionInstruction's own
+      // frozen (old-path) text.
+      const lastMessage = phrasingRequest!.messages[phrasingRequest!.messages.length - 1];
+      expect(lastMessage?.role).toBe("user");
+      expect(lastMessage?.content).toContain("use the results above as support");
+      expect(lastMessage?.content).not.toContain("from the tool results above");
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("the phrasing request carries the same tools block as the forced request, with tool_choice \"none\"", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let forcedRequest: ChatCompletionRequest | undefined;
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) {
+              phrasingRequest ??= request;
+              return undefined;
+            }
+            forcedRequest ??= request;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      expect(forcedRequest?.tools?.length).toBeGreaterThan(0);
+      expect(phrasingRequest?.tools).toEqual(forcedRequest?.tools);
+      expect(phrasingRequest?.tool_choice).toBe("none");
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("the phrasing request's max_tokens is LAT-01's visibleReplyMaxTokens formula for the plan, not the written-adult reply-ceiling backstop", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { max_tokens: number | null }[] };
+      const generations = stats.generations ?? [];
+      // U4c's own sibling test (above) independently confirmed this
+      // exact fixture's own evidence-boosted plan row (a real source
+      // found, max_words 220 -> 360) produces visibleReplyMaxTokens(360,
+      // false) = 608 - the written-adult reply_ceiling_tokens backstop
+      // (1536, this model's own catalog entry) would read completely
+      // differently, so 608 here proves the formula switch, not a
+      // coincidence of two constants landing on the same number.
+      expect(generations[generations.length - 1]?.max_tokens).toBe(608);
+      expect(generations[generations.length - 1]?.max_tokens).not.toBe(1536);
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  // ENVELOPE-NONE-01 (a code review, 2026-09-23): tool_choice "none"
+  // stops the engine's own grammar from emitting a native tool call,
+  // but runOneGeneration's own envelopeToolCall() check reads the
+  // model's own visible text regardless of tool_choice - a stub
+  // standing in for an engine that doesn't honour "none" (the same
+  // near-tie behaviour this codebase already documents for
+  // "required") must not be allowed to reopen a second tool round.
+  test("a phrasing round whose first attempt carries a tool call anyway is treated as text, never a second search, and retries once for a real answer", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let phrasingAttempts = 0;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (!request.messages.some((m) => m.role === "tool")) {
+              // the forced round: a real search call
+              return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }];
+            }
+            // the phrasing round: misbehaves on its first attempt (the
+            // engine misbehaviour ENVELOPE-NONE-01 guards against, a
+            // stray tool call despite tool_choice "none"), then
+            // complies on the retry ENVELOPE-NONE-01 now forces.
+            phrasingAttempts++;
+            return phrasingAttempts === 1 ? [{ id: "call-2", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }] : undefined;
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      expect(result.ok).toBe(true);
+      // One websearch query only: the phrasing round's own phantom call
+      // on its first attempt never reached the tool node a second time.
+      expect(searxng.queries.length).toBe(1);
+      expect(phrasingAttempts).toBe(2);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toContain("The current president of Chile answers your question.");
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  // The rounds-fragility half of the same review finding is fixed by
+  // reading `input.toolsAllowed` (machine.ts's own `roundsUsed <
+  // budget.rounds`, already computed and already exercised by every
+  // other test in this file that reaches a second model invocation)
+  // instead of `outcomes.length > 0` alone - not given its own test
+  // here, since no catalog entry in this codebase sets `budget.rounds`
+  // above 1 today and `RunTurnNextOpts` has no override for it; adding
+  // one would be new test-only wire surface for a path nothing can
+  // reach yet. The fix is provably safe by two other facts already
+  // covered above: every existing case here still passes unchanged
+  // (today's `rounds: 1` means `toolsAllowed` is `false` at exactly the
+  // same point `outcomes.length > 0` was `true`, so the two conditions
+  // agree everywhere the suite can reach), and the branch a genuine
+  // second round now falls into is the plain "offer tools" `else`
+  // branch a few lines down, the same one the interim-rule and
+  // offered-turn tests already exercise.
 });

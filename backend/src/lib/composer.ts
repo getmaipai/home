@@ -857,6 +857,58 @@ function callIdOf(outcome: ToolExecutionOutcome): string {
   return outcome.callId;
 }
 
+/** The one assistant-role message carrying every outcome's own tool
+ * call, native wire shape (`tool_calls`, no visible content) - PHRASE-01
+ * (dev.md "The written prompt on tier 1, decided"'s own follow-up)
+ * needs the identical shape the old path's own `planComposition` below
+ * already builds, so this is that same construction, extracted and
+ * exported rather than duplicated a second time on the new path. */
+export function toolCallAssistantMessage(outcomes: readonly ToolExecutionOutcome[]): LlmMessage {
+  return {
+    role: "assistant",
+    content: "",
+    tool_calls: outcomes.map((o): ToolCallWire => ({ id: callIdOf(o), type: "function", function: { name: o.packageId, arguments: JSON.stringify(o.args ?? {}) } })),
+  };
+}
+
+/** One `role: "tool"` message per outcome, `toolResultContent`'s own
+ * payload as its content - the array-building half `toolResultContent`
+ * itself doesn't cover, extracted the same way and for the same reason
+ * as `toolCallAssistantMessage` above. */
+export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[]): LlmMessage[] {
+  return outcomes.map((o) => ({ role: "tool", content: toolResultContent(o), tool_call_id: callIdOf(o) }));
+}
+
+/** PHRASE-01's own phrasing-round instruction (dev.md "The written
+ * prompt on tier 1, decided"'s own follow-up, "The interim rule's
+ * trigger, decided"): deliberately NOT `compositionInstruction` above -
+ * that function's own spoken branch is the old path's frozen text,
+ * pinned by composer.test.ts's own literal assertions, and the old path
+ * is never touched. This is new, different substance for the new
+ * path's phrasing round on both surface classes: answer from what the
+ * model already knows, the results as support rather than the primary
+ * source, a specific current fact deferred to the results (or left out)
+ * rather than asserted from training data, results winning a real
+ * contradiction, and no meta-commentary ("say so plainly") when the
+ * results simply don't bear on the question - the old instruction's own
+ * "if the results don't answer the question, say so plainly" was
+ * written for a lookup, and produced a snippet-shaped reply on a
+ * conceptual question instead. No hints line (a `synthesis_hint`
+ * already rides inside `toolResultContent`'s own JSON payload, visible
+ * to the model there); no repeat-forbidden/child/constraints
+ * embellishments `compositionInstruction` carries - out of this
+ * substance's own stated scope, not silently dropped: a real gap to
+ * revisit if it turns out to matter, not assumed away here. */
+export function phrasingInstruction(surfaceClass: SurfaceClass): string {
+  const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences";
+  return [
+    `Answer completely from what you know, ${lengthClause}; use the results above as support.`,
+    "Any specific current fact - who holds an office, a date, a number, a price, a score, what is latest - comes from the results or is left out.",
+    "Where the results contradict what you know, the results win.",
+    "Where the results do not bear on the question, answer from what you know and say nothing about searching.",
+  ].join(" ");
+}
+
 /** The decision. Pure: no model call, no clock. */
 export function planComposition(input: ComposerInput): ComposePlan {
   const outcomes = input.outcomes.filter((o) => o.status !== "rejected");
@@ -878,12 +930,8 @@ export function planComposition(input: ComposerInput): ComposePlan {
   if (input.budget.spent >= COMPOSER_MAX_CALLS) {
     return { mode: "direct", reply: orderedDirect(outcomes) ?? { text: COMPOSE_FALLBACK_LINE }, sources, shape, model_calls: 0, budget_spent: true };
   }
-  const assistant: LlmMessage = {
-    role: "assistant",
-    content: "",
-    tool_calls: outcomes.map((o): ToolCallWire => ({ id: callIdOf(o), type: "function", function: { name: o.packageId, arguments: JSON.stringify(o.args ?? {}) } })),
-  };
-  const results: LlmMessage[] = outcomes.map((o) => ({ role: "tool", content: toolResultContent(o), tool_call_id: callIdOf(o) }));
+  const assistant = toolCallAssistantMessage(outcomes);
+  const results = toolResultMessages(outcomes);
   const hints = succeeded.map((o) => o.result?.synthesis_hint).filter((h): h is string => typeof h === "string" && h.trim().length > 0);
   const instruction: LlmMessage = { role: "user", content: compositionInstruction(input, hints, input.question ?? null) };
   return {
