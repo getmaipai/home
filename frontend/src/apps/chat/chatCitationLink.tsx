@@ -45,8 +45,19 @@ export function createCitationComponents(sources: Source[] | undefined, onCite: 
           </Button>
         );
       }
+      // Never the current tab, same as every other inline reply link
+      // (markdown-text.tsx's own default `a`) and every citation chip
+      // (SourcesCard.tsx, sources.aui.tsx) - this component replaces
+      // that default entirely (this file's own header comment on why),
+      // so it has to repeat the same three attributes rather than
+      // inherit them. After `{...props}`, not before (a review caught
+      // the first cut placing them ahead of the spread, which would
+      // have let an incoming `target`/`rel`/`referrerPolicy` prop -
+      // never actually supplied by react-markdown's own AST today, but
+      // still `AnchorHTMLAttributes`-typed and legal to pass - silently
+      // override the one thing this line exists to guarantee).
       return (
-        <a href={href} className={cn(MARKDOWN_LINK_CLASS, className)} {...props}>
+        <a href={href} className={cn(MARKDOWN_LINK_CLASS, className)} {...props} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">
           {children}
         </a>
       );
