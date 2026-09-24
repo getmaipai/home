@@ -517,6 +517,13 @@ export const conversationTurns = sqliteTable(
     // directly (bypassing prepareTurn()/logTurn() entirely), keeps
     // reading as finished history with no migration backfill needed.
     status: text("status").notNull().default("done"), // "running" | "done"
+    // getmaipai/home#130: the turn's structured part (lib/composer.ts's
+    // structuredPartForOutcomes()), persisted as JSON text so the reload
+    // path (lib/conversationHistory.ts's list()/listConversationTurns())
+    // can rebuild the same tool-call part chatModelAdapter.ts builds live
+    // from the done event. Null for every prose reply and every row
+    // written before this item. Hub-internal, like outcomes/reasoning.
+    structuredPart: text("structured_part"),
   },
   // buildConversationWindow() and maybeRefreshConversationSummary() (step 3)
   // both filter by conversation_id on every model-routed turn - the

@@ -78,6 +78,27 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.content).toBe("just a reply");
   });
 
+  // getmaipai/home#130: the weather/almanac card disappeared after a
+  // reload - a row carrying `structured_part` becomes the same real
+  // tool-call part chatModelAdapter.ts builds live from the done event,
+  // riding before the text part (the reference card reads above its own
+  // sentence, chatModelAdapter.ts's own live ordering: reasoning,
+  // structured, artifact, text, sources).
+  test("a row carrying a structured part becomes a real tool-call part before the reply text", () => {
+    const structuredPart = { kind: "spec_sheet" as const, tool_id: "weather", title: "Seattle", rows: [{ label: "Now", value: "57°F, partly cloudy" }] };
+    const row = { ...makeRow("row-1", "It's 57 and partly cloudy."), structured_part: structuredPart };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "tool-call", toolCallId: "row-1-structured", toolName: "weather", args: {}, argsText: "", result: structuredPart },
+      { type: "text", text: "It's 57 and partly cloudy." },
+    ]);
+  });
+
+  test("a row with no structured part keeps the plain reply text, unchanged", () => {
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "just a reply")], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toBe("just a reply");
+  });
+
   // REASONING-04 (safety ruling, 2026-09-22): a reloaded adult turn shows
   // the answer and a Reasoning block, never "<think>" - conversationHistory.ts's
   // own read-side gate is what ensures `row.reasoning` is only ever
@@ -105,11 +126,12 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.content).toBe("17 times 24 is 408.");
   });
 
-  // Slice 5(a): unlike `structured_part` (getmaipai/home#130's still-open
-  // reload gap), `sources` genuinely survives reload - the column already
-  // exists on the row - so the same real tool-call part chatModelAdapter.ts
-  // builds live rides here too, AFTER the reply text (spec.md's "a compact
-  // card under the reply," the opposite order from the artifact card above).
+  // Slice 5(a): `sources` survives reload the same way `structured_part`
+  // and `artifact` now do (getmaipai/home#130 resolved) - the column
+  // already exists on the row - so the same real tool-call part
+  // chatModelAdapter.ts builds live rides here too, AFTER the reply text
+  // (spec.md's "a compact card under the reply," the opposite order from
+  // the structured/artifact cards above).
   test("a row carrying sources becomes a real tool-call part after the reply text", () => {
     const sources: Source[] = [{ id: "src-1", kind: "web", title: "A page", url: "https://example.com/a", site: "example.com", snippet: null, source: "row-1", created_at: "2026-09-13T00:00:00Z", hlc: "1757000000000:0:abc123" }];
     const row = { ...makeRow("row-1", "High tide is at 4pm."), sources };

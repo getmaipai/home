@@ -1960,6 +1960,52 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     expect(asOwner.ok).toBe(true);
     if (asOwner.ok) expect(asOwner.value[0]?.artifact).toEqual({ id: v1.id, version: 1 });
   });
+
+  // getmaipai/home#130: the weather/almanac card on /next/chat
+  // disappeared after a reload because `structured_part` was computed
+  // fresh on every live `done` event (turnEngine.ts's logTurnSafely())
+  // but never written to the row - in these exact words, a turn with a
+  // structured part is read back with it after a fresh load.
+  test("a turn with a structured part is read back with it after a fresh load of the conversation", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const structuredPart = { kind: "spec_sheet" as const, tool_id: "weather", title: "Seattle", rows: [{ label: "Now", value: "57°F, partly cloudy" }] };
+    logTurn(actor, "chat", "what's the weather in seattle", { reply: { text: "It's 57 and partly cloudy." }, source: "plugin", plugin_id: "weather", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-structured-part", structured_part: structuredPart });
+
+    const result = listConversationTurns(actor, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value[0]?.structured_part).toEqual(structuredPart);
+  });
+
+  test("a turn with no structured part carries no structured_part field", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-no-structured-part" });
+
+    const result = listConversationTurns(actor, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value[0]?.structured_part).toBeUndefined();
+  });
+
+  // A minor's own turn keeps its structured part: REASONING-03's age
+  // gate is specific to `reasoning` (a privacy invariant about the
+  // model's own thinking), never extended to `structured_part` - the
+  // card is the reply itself, the same reasoning listConversationTurns()'s
+  // own comment above the read-side spread gives.
+  test("a minor's own structured part survives reload too - no age gate", async () => {
+    const { client } = await owner();
+    const child = await addPerson(client, "Sprout", "child");
+    const conv = resolveOrCreateConversation(child, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const structuredPart = { kind: "spec_sheet" as const, tool_id: "almanac-date", title: "Today", rows: [{ label: "Date", value: "September 23" }] };
+    logTurn(child, "chat", "what's today's date", { reply: { text: "It's September 23rd." }, source: "plugin", plugin_id: "almanac-date", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-structured-part-minor", structured_part: structuredPart });
+
+    const result = listConversationTurns(child, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value[0]?.structured_part).toEqual(structuredPart);
+  });
 });
 
 describe("resume a saved chat explicitly", () => {

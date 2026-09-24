@@ -59,7 +59,7 @@ import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Rung } from "@/lib/ruleNames";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
-import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds, Media } from "@/wire";
+import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds, Media, StructuredPart } from "@/wire";
 export type { ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
 export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 
@@ -484,6 +484,16 @@ function buildTurnRow(
     // stored, still gated on read by the reading actor
     // (listConversationTurns()/list() below).
     reasoning: minorSpeaker ? null : (value.reasoning ?? proseReasoning ?? null),
+    // getmaipai/home#130: the same structured part the done event already
+    // carries (turnEngine.ts's logTurnSafely() sets value.structured_part
+    // from structuredPartForOutcomes() beside this exact row), persisted
+    // as JSON so the reload path can rebuild the identical tool-call part
+    // chatModelAdapter.ts builds live. Null for every prose reply and
+    // every turn that produced no structured part. No age gate on read
+    // (listConversationTurns()/list() below) - the card is the reply
+    // itself, not the reasoning behind it, so REASONING-03's minor-only
+    // drop never applied to it.
+    structuredPart: value.structured_part ? JSON.stringify(value.structured_part) : null,
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
     // row (CHAT-03) they are approximate, and a `policy` turn is skipped
@@ -1538,10 +1548,12 @@ export function listConversationTurns(
   const artifactByTurn = artifactsByTurn(rows.map((r) => r.id));
 
   return { ok: true, value: rows.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, ...row } = r;
     const artifact = actor.role === "child" && r.safetyAction === "refuse" ? undefined : artifactByTurn.get(r.id);
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    // getmaipai/home#130: no age gate - see structuredPart's own write-
+    // side comment in buildTurnRow() for why.
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2036,9 +2048,11 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   // is retired with this fix (conversationHistory.test.ts).
   const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
   return capped.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, ...row } = r;
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    // getmaipai/home#130: no age gate, same call listConversationTurns()
+    // above makes - the card is the reply itself.
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

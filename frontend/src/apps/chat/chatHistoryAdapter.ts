@@ -129,11 +129,12 @@ export function rowsToBranchableMessages(
       // same order chatModelAdapter.ts's own live "done" event now uses -
       // a reloaded reply with an artifact should read identically to one
       // that just streamed in, card first, prose after.
-      // slice 5(a): `sources`, unlike `structured_part` (getmaipai/home#130's
-      // still-open reload gap), genuinely survives reload - the column
-      // already exists (`row.sources`) - so the same tool-call part
-      // chatModelAdapter.ts builds live rides AFTER the text part here
-      // too, the identical ordering (spec.md's "under the reply").
+      // slice 5(a) resolved (getmaipai/home#130): `structured_part` now
+      // survives reload the same way `artifact` and `sources` do - the
+      // column exists (`row.structured_part`) and the same tool-call
+      // part chatModelAdapter.ts builds live from the done event is
+      // rebuilt here, in the identical order that adapter's own content
+      // array uses: reasoning, structured, artifact, text, sources.
       // REASONING-04 (safety ruling, 2026-09-22): a reload renders a
       // stored reasoning value through the same Reasoning Element a live
       // turn just streamed into - reasoning-part-first, the identical
@@ -142,9 +143,10 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.artifact || row.sources?.length
+        row.reasoning || row.structured_part || row.artifact || row.sources?.length
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
+              ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
               ...(row.artifact ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
               { type: "text" as const, text: row.replyText },
               ...(row.sources?.length ? [toolCallPart(`${row.id}-sources`, "sources", row.sources)] : []),
