@@ -193,6 +193,137 @@ describe("PUT /api/settings for tts.voice_id (the registry's first real person-s
   });
 });
 
+// SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): search.safe_search
+// needs a write rule no other key has - an adult may change their own;
+// only an adult may reach a CHILD OR TEEN's level (tts.voice_id's own
+// admin-on-child case above is the child half; a teen is new ground,
+// since assertCanAccessScope's generic person-scope gate deliberately
+// stops at child, access.ts's own documented privacy boundary); a
+// child or teen may never loosen their own level below their band
+// default, whatever an admin has left it at.
+describe("PUT /api/settings for search.safe_search (a wider AND narrower person-scope rule)", () => {
+  async function ownerAndMinor(role: "child" | "teen") {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: role === "child" ? "Bramble" : "Marlow", role });
+    const { id: personId } = (await created.json()) as { id: string };
+    const client = new TestClient();
+    await client.post("/api/auth/select", { personId });
+    return { owner, client, personId };
+  }
+
+  test("an adult can set their own level to anything, including off", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const me = (await (await owner.get("/api/auth/me")).json()) as { id: string };
+    const put = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${me.id}`, key: "search.safe_search", value: "off" },
+    });
+    expect(put.status).toBe(200);
+  });
+
+  for (const role of ["child", "teen"] as const) {
+    test(`an owner/admin can set a ${role}'s level, including loosening it`, async () => {
+      const { owner, personId } = await ownerAndMinor(role);
+      const put = await owner.request("/api/settings", {
+        method: "PUT",
+        body: { scope: `person:${personId}`, key: "search.safe_search", value: "off" },
+      });
+      expect(put.status).toBe(200);
+    });
+
+    test(`a ${role} can tighten their own level (never a loosening, always allowed)`, async () => {
+      const { client, personId } = await ownerAndMinor(role);
+      const put = await client.request("/api/settings", {
+        method: "PUT",
+        body: { scope: `person:${personId}`, key: "search.safe_search", value: "strict" },
+      });
+      expect(put.status).toBe(200);
+    });
+
+    test(`a ${role} can always set their own level back to "default"`, async () => {
+      const { client, personId } = await ownerAndMinor(role);
+      const put = await client.request("/api/settings", {
+        method: "PUT",
+        body: { scope: `person:${personId}`, key: "search.safe_search", value: "default" },
+      });
+      expect(put.status).toBe(200);
+    });
+  }
+
+  test("a child cannot loosen their own level below strict (their band default)", async () => {
+    const { client, personId } = await ownerAndMinor("child");
+    for (const value of ["off", "moderate"]) {
+      const put = await client.request("/api/settings", {
+        method: "PUT",
+        body: { scope: `person:${personId}`, key: "search.safe_search", value },
+      });
+      expect(put.status).toBe(403);
+    }
+  });
+
+  test("a teen cannot loosen their own level below moderate (their band default)", async () => {
+    const { client, personId } = await ownerAndMinor("teen");
+    const put = await client.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${personId}`, key: "search.safe_search", value: "off" },
+    });
+    expect(put.status).toBe(403);
+  });
+
+  test("a teen CAN tighten to strict, and can loosen back to moderate afterward (never below their own default)", async () => {
+    const { client, personId } = await ownerAndMinor("teen");
+    const tighten = await client.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${personId}`, key: "search.safe_search", value: "strict" },
+    });
+    expect(tighten.status).toBe(200);
+    const loosenToDefault = await client.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${personId}`, key: "search.safe_search", value: "moderate" },
+    });
+    expect(loosenToDefault.status).toBe(200);
+  });
+
+  test("a non-admin cannot set another person's level at all, minor or adult", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
+    const { id: childId } = (await created.json()) as { id: string };
+    const created2 = await owner.post("/api/people", { displayName: "Marlow", role: "child" });
+    const { id: otherChildId } = (await created2.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: childId });
+    const res = await childClient.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${otherChildId}`, key: "search.safe_search", value: "off" },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test("an owner/admin still cannot reach an ADULT's own level - access.ts's own documented boundary is unchanged", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Rover", role: "adult" });
+    const { id: adultId } = (await created.json()) as { id: string };
+    const res = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${adultId}`, key: "search.safe_search", value: "off" },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test("an unrecognized value is a clean 400, not a 403 - authorization and shape are separate questions", async () => {
+    const { client, personId } = await ownerAndMinor("child");
+    const res = await client.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${personId}`, key: "search.safe_search", value: "extremely-strict" },
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("lib/settings.ts getPersonSettingValue()", () => {
   test("resolves the registry default when nothing is stored", async () => {
     const { childPerson } = await ownerAndChild();

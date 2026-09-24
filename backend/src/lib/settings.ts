@@ -8,8 +8,10 @@ import { db } from "@/db";
 import { settingsValues, people } from "@/db/schema";
 import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
 import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
-import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
+import { isOwnerOrAdmin, canAccessPerson, getPersonRole } from "@/lib/access";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { safeSearchDefaultFor, safeSearchStrictness, type SafeSearchLevel } from "@/lib/safeSearch";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { PersonRow } from "@/types";
 
@@ -245,6 +247,48 @@ function writeValue(
   return { ok: true, value: resolveForResponse(keyDef, value, "user") };
 }
 
+// SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): `search.safe_search`
+// needs a wider, and in one direction narrower, write rule than every
+// other person-scope key's generic `assertCanAccessScope`/
+// `canAccessPerson` gate - wider because an admin must reach a TEEN's
+// level too (`canAccessPerson`'s own child-only reach is a deliberate,
+// documented, conservative privacy boundary for memory/conversation
+// access - access.ts's own header - not touched here, since widening
+// it would hand an admin a teen's private memories as a side effect no
+// one asked for); narrower because a child or teen must never be able
+// to loosen their OWN level below their own band's default, which no
+// other settings key has a concept of at all. Scoped to this one key,
+// never folded into the shared predicate.
+const SAFE_SEARCH_KEY = "search.safe_search";
+
+function assertCanSetSafeSearch(actor: PersonRow, targetPersonId: string, newValue: unknown): SettingsOpResult<true> {
+  const targetIsSelf = actor.id === targetPersonId;
+  if (!targetIsSelf) {
+    if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "cannot access another person's settings" };
+    const targetRole = getPersonRole(targetPersonId);
+    if (targetRole !== "child" && targetRole !== "teen") {
+      return { ok: false, status: 403, error: "only a child's or teen's safe search level can be changed by another person" };
+    }
+    // An adult setting a minor's level on their behalf: any level,
+    // including one looser than the minor's own band default - that is
+    // the adult's call to make, the rule below only binds the minor's
+    // OWN write.
+    return { ok: true, value: true };
+  }
+  if (isOwnerOrAdmin(actor)) return { ok: true, value: true };
+  // A child or teen setting their own: "default" always resolves to
+  // their own band default, never a loosening by construction; an
+  // unrecognized value is left to `validateSelectorValue`'s own 400,
+  // not read as an authorization question here.
+  if (newValue === "default") return { ok: true, value: true };
+  if (newValue !== "off" && newValue !== "moderate" && newValue !== "strict") return { ok: true, value: true };
+  const ownDefault = safeSearchDefaultFor(speakerAgeBand(actor, new Date()));
+  if (safeSearchStrictness(newValue as SafeSearchLevel) < safeSearchStrictness(ownDefault)) {
+    return { ok: false, status: 403, error: "you can't loosen your own safe search level below your own default" };
+  }
+  return { ok: true, value: true };
+}
+
 export function setValue(
   actor: PersonRow,
   scope: string,
@@ -260,7 +304,7 @@ export function setValue(
     return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
   }
 
-  const auth = assertCanAccessScope(actor, parsed, "write");
+  const auth = key === SAFE_SEARCH_KEY && parsed.kind === "person" ? assertCanSetSafeSearch(actor, parsed.id!, value) : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
   return writeValue(scope, keyDef, value);

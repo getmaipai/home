@@ -26934,3 +26934,93 @@ bug is still open. The coordinator's own call on next steps (a
 narrower or conditional offering, a clearer tool description to
 disambiguate it from `remember`/`recall`/`websearch`, or accepting the
 cost) is owed before `modelCatalog.ts` changes again.
+
+## SEARCH-SAFE-01: a real per-person safesearch level (2026-09-24)
+
+**Objective.** `packageHost.ts`'s `searxngSearch()` sent no safe-search
+level at all (`grep "safesearch"`: nothing) - a child's web search ran
+exactly as unfiltered as an adult's. Went through two designs the same
+day, the second Jesse's own ruling, superseding the first before either
+landed.
+
+**First cut (superseded): safesearch as a pure age-band computation.**
+`speakerAgeBand`'s bands set the level directly on every request, no
+storage. Revised once live against the household's real `/config`
+(child 2, teen 2, adult 1 never 0 - the instance's own default is
+already strict, so an explicit adult 0 would have loosened it unasked)
+and an image floor of 1 at every band. Both numbers and the floor were
+withdrawn by the second design below before any of it landed - kept
+here only as the record of what was tried and why it changed, not as
+what shipped.
+
+**Shipped: `search.safe_search`, a real per-person setting (Jesse's own
+ruling).** Defaults by band: child strict, teen moderate, adult off -
+no image floor, images follow the person's own level like everything
+else. The level is `search.safe_search` (commons spec-v0.1.37, person
+scope, `default`/`off`/`moderate`/`strict`, cut in the same tag family
+as `SOURCE-SPEC-01`), resolved against the band only when it reads
+`default` (`safeSearch.ts`'s `resolveSafeSearchLevel()`, the one
+definition `settings.ts` and `packageHost.ts` both read). An adult may
+set their own to anything; only an adult may reach a child's or teen's
+(`settings.ts`'s new `assertCanSetSafeSearch()` - wider than the
+generic person-scope gate on purpose, reaching a teen `canAccessPerson`
+deliberately does not per `access.ts`'s own documented privacy
+boundary for memory/conversations, left untouched); a child or teen can
+never loosen their own level below their band default, checked at
+write time against `safeSearchStrictness()`, "default" always exempt
+since it resolves to exactly that floor. The engine filter (below)
+still applies for `strict`/`moderate`; `off` is a real, deliberate
+choice and gets no filter at all.
+
+**The engine filter, real, not a finding.** A first pass assumed
+SearXNG's `/search` response carried no per-engine safe-search-
+capability field to check, and recorded the gap rather than guessing at
+a client allowlist. The coordinator read the household's real `/config`
+live and found it does publish exactly this: `engines` is an array of
+`{name, enabled, safesearch, categories, ...}` objects, `safesearch` a
+per-engine boolean capability flag - `safesearch=<level>` alone does
+not exclude an engine with no safe-search support of its own; sending
+`engines=<names>` does. `safesearchEnginesFor(baseUrl, category)`
+fetches `/config` (never in the request path on every search - cached
+one hour per base URL, `__resetSearxngEnginesCacheForTests()` for test
+isolation, config changes only on an admin restart), filters to
+`enabled && safesearch && categories.includes(category)`. A failed or
+malformed `/config` fetch returns `null` (the search still runs, on the
+safesearch level alone - never blocking a search outright over a filter
+that could not be built); a genuinely empty safe-engine list for a
+category is treated the same way, both real, tested cases. Two real
+engine entries from the coordinator's own live read (`pinterest`,
+images, not safesearch-capable; `brave`, general, safesearch-capable)
+are the fixture, `tests/fixtures/searxng-config.json`.
+
+**The Wikipedia fallback, noted, not changed.** `wikipediaFallback()`'s
+own REST endpoints (`/w/rest.php/v1/search/page`, `/api/rest_v1/page/
+summary/...`) take no safe-search or content-rating parameter at all -
+documented at the function itself rather than silently left unmentioned;
+this fallback runs identically regardless of who is asking, since there
+is no per-request knob to pass a band or a level into.
+
+**Video search, approved the same day, not built here.** `MEDIA-SEARCH-01`
+(after `LOOKUP-FED-01`) merges `IMAGE-SEARCH-01` and video into one
+item reusing this same engine filter, so a child or teen never sees a
+video result from an engine (e.g. YouTube) without safe-search support
+unless an adult allows it for that person - `docs/plans/
+knowledge-sources-2026-09-24.md`'s own "Video search" section.
+
+Files: `backend/src/lib/safeSearch.ts` (new: `SafeSearchLevel`,
+`safeSearchDefaultFor()`, `safeSearchStrictness()`,
+`resolveSafeSearchLevel()`, `safeSearchNumericLevel()`), `settings.ts`
+(`assertCanSetSafeSearch()`, wired into `setValue()`), `packageHost.ts`
+(`searxngSearch()`, `safesearchEnginesFor()`, `wikipediaFallback()`'s
+own doc comment), `tests/packageHost.test.ts`, `tests/settings.test.ts`,
+`tests/fixtures/searxng-config.json` (new); commons `spec/schemas/
+manifest.schema.json` (unrelated, same tag), `spec/settings/keys.json`
+(`search.safe_search`, `reference.library_dir`), this repo's spec pin
+(spec-v0.1.32 to spec-v0.1.37, the last two patch tags fixing a
+formatting drift the registry gate itself caught - dev.md's
+`SOURCE-SPEC-01` entry has the full account). Verification: `bunx tsc --noEmit`
+clean; `bun test tests/settings.test.ts tests/packageHost.test.ts`
+green (156/156) after the real pin bump (`bun install --force` in both
+workspaces, the lockfile diff confirmed to touch only `@maipai/spec`);
+`tests/searxngHealth.test.ts` green (11/11). Review: medium, a safety
+path and a settings route, per the coordinator's own instruction.

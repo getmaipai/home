@@ -2,11 +2,11 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, type AttemptResult } from "@/lib/packageHost";
+import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, __resetSearxngEnginesCacheForTests, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { db } from "@/db";
@@ -950,6 +950,233 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
         { title: "Node.js", url: "https://nodejs.org/", snippet: "Node.js is a JavaScript runtime." },
         { title: "Node.js docs", url: "https://nodejs.org/docs", snippet: "API documentation." },
       ]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): with no explicit
+  // person-level set, safesearch follows the speaker's own band - child
+  // strict (2), teen moderate (1), adult off (0). No image floor: an
+  // image search carries exactly the person's own level, nothing more.
+  test("with no override, safesearch follows the speaker's own band: child 2, teen 1, adult 0", async () => {
+    for (const [role, expected] of [["child", "2"], ["teen", "1"], ["owner", "0"], ["adult", "0"]] as const) {
+      let seenUrl = new URL("http://placeholder.invalid");
+      const server = Bun.serve({
+        port: 0,
+        fetch: (req) => {
+          seenUrl = new URL(req.url);
+          return Response.json({ results: [] });
+        },
+      });
+      try {
+        // SEARCH-PACE-01's own bucket (capacity 3) is per process, not
+        // per test - this loop makes several real calls in a row, so it
+        // resets between each the same way beforeEach() does between tests.
+        __resetRateLimiterForTests();
+        __resetSearxngEnginesCacheForTests();
+        const actor = { ...(await owner()), role };
+        setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+        const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+        await host.integration.call("searxng", "search", { query: "is it going to rain" });
+        expect(seenUrl.searchParams.get("safesearch")).toBe(expected);
+      } finally {
+        server.stop(true);
+      }
+    }
+  });
+
+  test("an image search carries exactly the person's own level - no floor, an adult's own off stays off", async () => {
+    let seenUrl = new URL("http://placeholder.invalid");
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenUrl = new URL(req.url);
+        return Response.json({ results: [] });
+      },
+    });
+    try {
+      __resetSearxngEnginesCacheForTests();
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      await host.integration.call("searxng", "search", { query: "Marsh Lantern movie poster", category: "images" });
+      expect(seenUrl.searchParams.get("safesearch")).toBe("0");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // An explicit person-level override (set through the real settings
+  // write path, PUT /api/settings's own lib.setValue()) stands as
+  // given, whatever the speaker's band - here an admin loosening a
+  // child down to "moderate", the admin's own call to make.
+  test("an explicit override on the person's own setting stands over the band default", async () => {
+    let seenUrl = new URL("http://placeholder.invalid");
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenUrl = new URL(req.url);
+        return Response.json({ results: [] });
+      },
+    });
+    try {
+      __resetSearxngEnginesCacheForTests();
+      const owningAdult = await owner();
+      const now = new Date().toISOString();
+      const childId = "person-safesearchchild1";
+      db.insert(people)
+        .values({ id: childId, displayName: "Bramble", role: "child", avatarSeed: childId, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:2:testfix" })
+        .run();
+      const childRow = db.select().from(people).where(eq(people.id, childId)).get()!;
+      const setResult = setValue(owningAdult, `person:${childRow.id}`, "search.safe_search", "moderate");
+      expect(setResult.ok).toBe(true);
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(childRow, manifest({ permissions: ["integration:searxng"] }));
+      await host.integration.call("searxng", "search", { query: "is it going to rain" });
+      expect(seenUrl.searchParams.get("safesearch")).toBe("1");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // SEARCH-SAFE-01: `safesearch=<level>` alone does not exclude an
+  // engine with no safe-search support of its own (verified live,
+  // 2026-09-24) - a child or teen's request also names only the
+  // enabled, safesearch-capable engines for the category it runs,
+  // read from this instance's own /config. Fixture carries two real
+  // engine entries from that read: brave (general, safesearch-capable)
+  // and pinterest (images, not).
+  test("a child or teen's request names only /config's safesearch-capable engines for the category", async () => {
+    const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
+    let seenUrls: URL[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        seenUrls.push(url);
+        if (url.pathname === "/config") return Response.json(fixture);
+        return Response.json({ results: [] });
+      },
+    });
+    try {
+      __resetSearxngEnginesCacheForTests();
+      const actor = { ...(await owner()), role: "child" as const };
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
+      const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
+      expect(searchUrl.searchParams.get("engines")).toBe("brave");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("an adult's request never gets an engines filter, even with /config configured", async () => {
+    const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
+    let seenUrls: URL[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        seenUrls.push(url);
+        if (url.pathname === "/config") return Response.json(fixture);
+        return Response.json({ results: [] });
+      },
+    });
+    try {
+      __resetSearxngEnginesCacheForTests();
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
+      expect(seenUrls.some((u) => u.pathname === "/config")).toBe(false);
+      const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
+      expect(searchUrl.searchParams.has("engines")).toBe(false);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // The fixture's own images engine (pinterest) is not safesearch-
+  // capable, so a teen's image search finds no safe engine at all -
+  // the empty-list case, never blocking the search outright over it.
+  test("no safesearch-capable engine for the category: the search still runs, unfiltered by name", async () => {
+    const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
+    let seenUrls: URL[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        seenUrls.push(url);
+        if (url.pathname === "/config") return Response.json(fixture);
+        return Response.json({ results: [] });
+      },
+    });
+    try {
+      __resetSearxngEnginesCacheForTests();
+      const actor = { ...(await owner()), role: "teen" as const };
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      await host.integration.call("searxng", "search", { query: "volcano diagram", category: "images" });
+      const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
+      expect(searchUrl.searchParams.get("safesearch")).toBe("1");
+      expect(searchUrl.searchParams.has("engines")).toBe(false);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a failed /config never blocks the search - the safesearch level alone still applies", async () => {
+    let seenUrls: URL[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        seenUrls.push(url);
+        if (url.pathname === "/config") return new Response("not found", { status: 404 });
+        return Response.json({ results: [] });
+      },
+    });
+    try {
+      __resetSearxngEnginesCacheForTests();
+      const actor = { ...(await owner()), role: "child" as const };
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
+      expect(result).toBeTruthy();
+      const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
+      expect(searchUrl.searchParams.get("safesearch")).toBe("2");
+      expect(searchUrl.searchParams.has("engines")).toBe(false);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("the engines list is cached across calls to the same instance - one /config fetch, not one per search", async () => {
+    const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
+    let configFetches = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        if (url.pathname === "/config") {
+          configFetches++;
+          return Response.json(fixture);
+        }
+        return Response.json({ results: [] });
+      },
+    });
+    try {
+      __resetSearxngEnginesCacheForTests();
+      const actor = { ...(await owner()), role: "child" as const };
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      __resetRateLimiterForTests();
+      await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
+      __resetRateLimiterForTests();
+      await host.integration.call("searxng", "search", { query: "what is a caldera" });
+      expect(configFetches).toBe(1);
     } finally {
       server.stop(true);
     }

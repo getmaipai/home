@@ -1,0 +1,7 @@
+{
+  "engines": [
+    { "categories": ["images"], "enabled": true, "language_support": false, "languages": [], "name": "pinterest", "paging": true, "regions": [], "safesearch": false, "shortcut": "pin", "time_range_support": false, "timeout": 3.0 },
+    { "categories": ["general", "web"], "enabled": true, "language_support": true, "languages": [], "name": "brave", "paging": true, "regions": ["en-US"], "safesearch": true, "shortcut": "br", "time_range_support": true, "timeout": 3.0 }
+  ],
+  "safe_search": 2
+}

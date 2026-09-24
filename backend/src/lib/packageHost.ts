@@ -72,6 +72,9 @@ import { cachedFetch } from "@/lib/packageCache";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { resolveSafeSearchLevel, safeSearchNumericLevel, type SafeSearchLevel } from "@/lib/safeSearch";
+import { getPersonSettingValue } from "@/lib/settings";
 import { createHash } from "node:crypto";
 import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
@@ -704,6 +707,13 @@ async function wikipediaGetJson(url: string, base: string, hint: string): Promis
   }
 }
 
+// SEARCH-SAFE-01 finding, not fixed here: Wikipedia's own REST API
+// (`/w/rest.php/v1/search/page`, `/api/rest_v1/page/summary/...`, both
+// called below) takes no safe-search or content-rating parameter at
+// all - unlike SearXNG, Wikipedia has no per-request filter to pass a
+// child or teen's band into. This fallback runs identically regardless
+// of who is asking; Wikipedia's own content policy (no dedicated
+// "child mode") is the only floor, not anything this file controls.
 async function wikipediaFallback(query: string): Promise<SearxngSearchResult | null> {
   const base = wikipediaBaseUrl();
   const searchUrl = `${base}/w/rest.php/v1/search/page?q=${encodeURIComponent(query)}&limit=1`;
@@ -744,6 +754,65 @@ async function wikipediaFallback(query: string): Promise<SearxngSearchResult | n
   };
 }
 
+interface SearxngEngine {
+  name: string;
+  enabled: boolean;
+  safesearch: boolean;
+  categories: string[];
+}
+
+// SEARCH-SAFE-01: SearXNG's own `/config` (verified live against a real
+// household instance, 2026-09-24 - the shape a fixture, tests/fixtures/
+// searxng-config.json, carries two real engine entries from that read).
+// Cached per base URL: this never changes on its own (an admin edits
+// settings.yml and restarts SearXNG to change it), so a child or teen's
+// every search does not cost a second real request first - "never a
+// live fetch in the request path" is this module's own standing rule
+// (packageCache.ts's header) for exactly this reason.
+const SEARXNG_ENGINES_CACHE_TTL_MS = 60 * 60 * 1000;
+let searxngEnginesCache: { baseUrl: string; fetchedAt: number; engines: SearxngEngine[] } | null = null;
+
+/** Test-only reset, the same shape every other module-level cache here
+ * gets (__resetRateLimiterForTests, __resetPackageCacheForTests): a
+ * fake server's own port changes every test, so a cached engines list
+ * from a prior test's own fake instance must never leak into the next. */
+export function __resetSearxngEnginesCacheForTests(): void {
+  searxngEnginesCache = null;
+}
+
+/** The engine names this instance's own `/config` marks `enabled` and
+ * `safesearch`-capable for the given category, for a child or teen's
+ * request to name explicitly (SearXNG's own `engines=` parameter) -
+ * `safesearch=2` alone does not exclude an engine that simply has no
+ * safe-search support of its own; verified against a real instance,
+ * 2026-09-24. Returns `null` on any fetch or parse failure (a child's
+ * search still runs, on the safesearch level alone, never blocked
+ * outright over a filter this could not build) or an empty array when
+ * the instance genuinely has no safe-search-capable engine for this
+ * category - the caller treats both the same way. */
+async function safesearchEnginesFor(baseUrl: string, category: "general" | "images"): Promise<string[] | null> {
+  const now = Date.now();
+  if (!searxngEnginesCache || searxngEnginesCache.baseUrl !== baseUrl || now - searxngEnginesCache.fetchedAt > SEARXNG_ENGINES_CACHE_TTL_MS) {
+    const url = `${baseUrl.replace(/\/+$/, "")}/config`;
+    const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
+    if (!result.ok) return null;
+    let value: Record<string, unknown>;
+    try {
+      value = expectJsonObject(result.value, baseUrl, "SearXNG's /config didn't return JSON");
+    } catch {
+      return null;
+    }
+    const raw = Array.isArray(value.engines) ? value.engines : [];
+    const engines: SearxngEngine[] = raw.flatMap((e: unknown) => {
+      const entry = e as { name?: unknown; enabled?: unknown; safesearch?: unknown; categories?: unknown };
+      if (typeof entry.name !== "string" || typeof entry.enabled !== "boolean" || typeof entry.safesearch !== "boolean" || !Array.isArray(entry.categories)) return [];
+      return [{ name: entry.name, enabled: entry.enabled, safesearch: entry.safesearch, categories: entry.categories.filter((c): c is string => typeof c === "string") }];
+    });
+    searxngEnginesCache = { baseUrl, fetchedAt: now, engines };
+  }
+  return searxngEnginesCache.engines.filter((e) => e.enabled && e.safesearch && e.categories.includes(category)).map((e) => e.name);
+}
+
 /** `host.integration.call("searxng", "search", { query })`'s real
  * implementation - SearXNG's own `/search?q=...&format=json` (its
  * documented JSON output format, opt-in in a household's own
@@ -755,7 +824,7 @@ async function wikipediaFallback(query: string): Promise<SearxngSearchResult | n
  * (a real API answering plain text is not a fetch failure); and Wikipedia
  * answers a direct-topic query via `infoboxes`, not `results` (see
  * `formatSearxngResults`). */
-export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean } = {}): Promise<SearxngSearchResult> {
+export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel } = {}): Promise<SearxngSearchResult> {
   // SEARCH-FALLBACK-01: `opts` is never part of the recipe's own public
   // `args` schema (a model can never set it) - the one caller that
   // needs to turn the fallback off is `searxngHealth.ts`'s own canary,
@@ -775,8 +844,42 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
     throw new HostError("invalid_input", `searxng search needs a string "query" argument`);
   }
   const { baseUrl } = requireSearxngSettings();
-  const category = input?.category === "images" ? "&categories=images" : "";
-  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}`;
+  const isImages = input?.category === "images";
+  const category = isImages ? "&categories=images" : "";
+  // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24, superseding the
+  // age-band-only first cut): today's request carried no safesearch
+  // level at all, so a child's search ran exactly as unfiltered as an
+  // adult's. The real level is `search.safe_search`, a per-person
+  // setting (commons spec) resolved against the speaker's own band when
+  // it is "default" - `createHost`'s own `actor` is the one source,
+  // resolved there and threaded through as `opts.safeSearchLevel`
+  // (never trusted from a package's own args, the same floor as
+  // `category` above). Default by band: child strict, teen moderate,
+  // adult off - an adult may choose their own; only an adult may change
+  // a child's or teen's (settings.ts's own `assertCanSetSafeSearch`); a
+  // child or teen can never loosen their own below their band default,
+  // enforced at write time, not read time. No image floor: images
+  // follow the person's own level like everything else, on the
+  // owner's own instruction this session, withdrawing the first cut's
+  // floor. An absent level (the health canary's own direct call, never
+  // a household turn) defaults to off - it never resolves to a real
+  // reply, so there is no household member to protect.
+  const safesearchLevel = safeSearchNumericLevel(opts.safeSearchLevel ?? "off");
+  // Only "strict" and "moderate" also name safe engines explicitly;
+  // "off" is a real, deliberate choice for this person and gets no
+  // engine filter at all. For strict/moderate, name only the engines
+  // this instance's own /config marks safesearch-capable and enabled,
+  // for the category this request actually runs (SearXNG excludes
+  // nothing on its own when an enabled engine simply doesn't support
+  // the level sent - verified against a real household instance's
+  // /config, 2026-09-24: `engines` is an array of {name, enabled,
+  // safesearch, categories, ...}, no other field names this). The
+  // safesearch level above is still sent and still the floor even when
+  // this list is empty or unavailable - never blocking a search
+  // outright over a filter that couldn't be built.
+  const safeEngines = opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
+  const engines = safeEngines && safeEngines.length > 0 ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
+  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}`;
   // No retry, unlike getHomeAssistantState's own GET - a code review
   // (2026-09-06) found the retry doubled this call's own worst case to
   // ~20s (SEARXNG_TIMEOUT_MS twice plus the retry delay) on top of
@@ -1503,7 +1606,14 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           return homeAssistantGetState(args);
         }
         if (id === "searxng" && method === "search") {
-          return searxngSearch(args);
+          // SEARCH-SAFE-01: the real speaker's own person-scope setting,
+          // resolved against their own band when it is "default" -
+          // createHost's own actor is the one source of truth for who is
+          // actually asking, never a package argument. getPersonSettingValue
+          // reads the actor's OWN setting only (safe by construction), the
+          // exact one this call needs - actor here always is the speaker.
+          const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), speakerAgeBand(actor, new Date()));
+          return searxngSearch(args, { safeSearchLevel });
         }
         if (id === "searxng" && method === "page.read") {
           return searxngPageRead(args);
