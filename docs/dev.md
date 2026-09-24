@@ -25977,3 +25977,51 @@ required (code-splitting shiki/mermaid/katex out of Chat's eager
 entry chunk); write_document's own tool-list gap is named here for
 whichever session picks it up next, not filed as a separate backlog
 row since it is one line in an existing, owned file.
+
+## CHAT-RICH-02: the real fix - shiki/mermaid/math load lazily (2026-09-24)
+
+Landed (commons `ui-v0.5.53`, home's own pin bumped to match): the
+coordinator's own ruling that raising the PWA precache ceiling hides a
+real regression rather than fixing it. Full mechanism (React.lazy
+behind Suspense for shiki/mermaid, a raw-text math scan gating a
+dynamic import for remark-math/rehype-katex/katex, and the rejected-
+promise cache bug a review caught and fixed) is in `commons/docs/
+dev.md`'s own CHAT-RICH-02 entry.
+
+**Chat's own eager entry chunk, before and after** (`frontend/dist/
+assets/NextRoutes-*.js`, `bun run build` in `frontend/`):
+
+| state | size |
+|---|---|
+| pre-CHAT-RICH-01 baseline | 1,041.55 kB |
+| CHAT-RICH-01 (shiki/mermaid/math landed eager) | 3,060.25 kB |
+| CHAT-RICH-02 (all three lazy) | 1,047.31 kB |
+
+Back within rounding of the original baseline - shiki (`shiki-
+highlighter-*.js`, 198.76 kB), mermaid (`mermaid-diagram-*.js`,
+1,529.39 kB - `beautiful-mermaid`'s own parser is genuinely the
+heaviest of the three) and katex/rehype-katex (`rehype-katex-*.js`,
+267.83 kB) are now their own separate chunks, each comfortably under
+the 2 MiB per-file ceiling on its own, loaded only when a message
+actually contains that content. `frontend/vite.config.ts`'s own
+`maximumFileSizeToCacheInBytes` override is removed entirely (back to
+Workbox's own 2 MiB default) - **the build passes at the default
+ceiling**, no override needed, same resolution as both prior times
+this exact chunk crossed it (2026-09-06, 2026-09-21).
+
+**Verification**: `bash scripts/check.sh` (scope `full`, since `bun.
+lock`/`scripts/check.sh` changed) green: backend 4175/4175, frontend
+726/726, build (at the restored 2 MiB default), a11y, docs and
+standards all clean. Live headless verification (Playwright, a short-
+lived session minted directly against the real data directory the
+same way real login creates one, deleted immediately after use - never
+a browser window, never the fake seeded instance `scripts/screenshot.
+ts` spawns, since this needs the real household's own 8787): a
+TypeScript code block, a mermaid diagram and an inline math expression
+each sent as a live turn and each rendered correctly, screenshots
+opened and judged. 390px light/dark pair retaken the same way,
+replacing the earlier interactive-browser captures (Chrome enforces a
+500px minimum window on this machine, which the coordinator's own
+verification rule rules out anyway - headless Playwright has no such
+floor). Low-effort review clean on both sides. Restarted 8787 onto
+this landing.

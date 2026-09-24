@@ -186,15 +186,17 @@ export default defineConfig({
         // CHAT-RICH-01 (2026-09-24) crossed the default a third time:
         // katex/remark-math/rehype-katex (plus rehype-katex's own HTML-
         // parsing chain for its error fallback) landed inside Chat's own
-        // eager chunk - not lazy, by the same design as Home above - and
-        // pushed it to 3.06 MB. Real code-splitting (loading the shiki/
-        // mermaid/katex trio only when a message actually needs them,
-        // never Chat's own entry chunk) is the eventual "real fix" this
-        // file's own history above already names the shape of; not built
-        // here. Raised to 4 MiB with headroom, matching how the 2026-09-06
-        // growth was handled the same way before its own code-splitting
-        // fix landed.
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        // eager chunk, pushing it to 3.06 MB - worked around then by
+        // raising this ceiling to 4 MiB. CHAT-RICH-02 (same day) is the
+        // real fix this file's own history above already named the shape
+        // of: shiki, mermaid and math now load lazily (React.lazy behind
+        // Suspense for the first two, a dynamic import gated on a raw-
+        // text math scan for the third - commons/docs/dev.md's own
+        // CHAT-RICH-02 entry), so none of the three sit in this chunk at
+        // all any more. Entry chunk back to 1,047 KB (from 3.06 MB, and
+        // within rounding of the pre-CHAT-RICH-01 1,041 KB baseline) -
+        // under the default again, so the override is removed once
+        // more, same as both times before.
       },
     }),
   ],
