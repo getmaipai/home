@@ -19,6 +19,7 @@ import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, app
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { resolvePersona } from "@/lib/persona";
+import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
 import { surfaceClassOf } from "@/lib/surfaceClass";
@@ -467,6 +468,13 @@ export async function runTurnNextStream(actor: PersonRow, surface: Surface, text
 
   const status = new StatusChannel();
   state.status = status;
+  // STATUS-PHRASES-01: the very first thing a live client sees, before
+  // any node has even run - the frontend's own "Thinking…" fallback
+  // (chatTurnActivity.ts, shown only when no status event has arrived
+  // yet) never looked missing precisely because nothing emitted this
+  // moment before. Read back the instant it streams, same as every
+  // other status line here.
+  status.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "thinking", state.persona), stage: "thinking" });
 
   const queue = new StatusChannel<string>();
   const band = speakerAgeBand(actor, new Date());

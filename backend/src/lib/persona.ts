@@ -81,6 +81,13 @@ export interface Persona {
    * because Zod's `.optional()` on the generated companion schema allows
    * it; every bundled companion package actually sets it. */
   examples?: readonly string[];
+  /** STATUS-PHRASES-01: this companion's own waiting-line phrases
+   * (manifest.schema.json's own `companion.status_phrases`), one moment
+   * at a time - `statusPhrases.ts`'s `pickStatusPhrase()` falls back to
+   * `vocab/status-phrases.json`'s default set for a moment this leaves
+   * out (or when it's undefined entirely, the common case: no bundled
+   * companion package declares one yet). */
+  status_phrases?: { thinking?: readonly string[]; searching?: readonly string[]; checking?: readonly string[] };
 }
 
 // Read once at module load, the same "bundled packages are static this
@@ -106,6 +113,7 @@ function loadPersonaCatalog(): Persona[] {
       engagement: c.engagement,
       filler_density: c.filler_density,
       examples: c.examples,
+      status_phrases: c.status_phrases,
     });
   }
   return out;

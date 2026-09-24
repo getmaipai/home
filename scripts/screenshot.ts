@@ -2735,6 +2735,38 @@ async function captureNextChatToolsSitesReview(browser: Browser, sessionValue: s
       await context.close();
     }
   }
+
+  // STATUS-PHRASES-01's own acceptance: "a thinking phrase, then a
+  // search step's own label" - the search step is the loop above
+  // (unchanged, still real chips); a plain question here for the
+  // thinking moment specifically, never the mariners one, because the
+  // interim rule's own forced-search path never calls the model at all
+  // (a synthesized tool_calls output, nodes/model.ts) - the gap between
+  // the "thinking" status and the tool round's own status is real but
+  // sub-millisecond there, too fast for a screenshot to ever reliably
+  // land inside. A plain reply (the stub's own "herbs" branch, no tool
+  // call) makes a real HTTP round trip to the stub model before its
+  // first delta, a genuine window a screenshot can land in.
+  {
+    const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+    const context = await newContext(browser, viewport, "light", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).fill("Tell me a bedtime story");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await page.getByRole("status").first().waitFor({ timeout: 5000 });
+      await settleAnimations(page);
+      const thinkingPath = join(outDir, "status-phrases-thinking-1440-light.png");
+      await page.screenshot({ path: thinkingPath });
+      console.log(`Wrote ${thinkingPath}`);
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      await page.getByText("Once there was a sleepy fox", { exact: false }).waitFor({ timeout: 15000 });
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
 }
 
 /** CHAT-HEADER-03's own stated acceptance: "a 60-character title reads
@@ -3730,6 +3762,14 @@ async function main() {
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
+    // STATUS-PHRASES-01's own capture: a real, but short, artificial
+    // delay (FAST-04's own documented "hold the first token back"
+    // mechanism, `scriptedChatReply` may return a Promise) - this stub
+    // otherwise answers instantly on localhost, too fast for a
+    // screenshot to ever reliably land inside the "thinking" moment
+    // before the reply supersedes it (found live: the herbs question
+    // alone already resolved before the screenshot fired).
+    if (text.includes("bedtime story")) return new Promise((resolve) => setTimeout(() => resolve("Once there was a sleepy fox who wanted one more story before bed."), 1200));
     if (text.includes("book")) return "What kind of story would you enjoy: a mystery, an adventure, or something funny?";
     if (text.includes("weather like")) return "It's a clear, mild day - around 62°F with a light breeze.";
     if (text.includes("mariners game")) return "The Mariners won the game 4 to 2.";

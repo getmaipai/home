@@ -27,6 +27,7 @@ import { visibleReplyMaxTokens } from "@/lib/turnEngine";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
 import { planLine } from "@/lib/register";
+import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages } from "../messages";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
@@ -543,6 +544,13 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // silently forbidding the second search that round exists to allow.
   // `toolsAllowed` already carries the right answer.
   const isPhrasingRound = state.outcomes.length > 0 && !input.toolsAllowed;
+  // STATUS-PHRASES-01: the "checking" moment - the tool round already
+  // finished (state.outcomes is populated) and this round only phrases
+  // the answer, never calls another tool. Same conversation-scoped
+  // rotation as every other status line; `state.status` is undefined
+  // for the immediate/bench callers, same guard nodes/tool.ts's own
+  // emission already uses.
+  if (isPhrasingRound) state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "checking", state.persona), stage: "composing" });
 
   const interimRuleApplies = input.toolsAllowed && state.budget.always_search && isWorldQuestion(state) && !householdSubjectNamed(state);
 

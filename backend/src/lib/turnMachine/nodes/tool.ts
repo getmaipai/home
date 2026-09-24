@@ -9,6 +9,7 @@
 // process exits.
 import { runPlugin } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
+import { pickStatusPhrase } from "@/lib/statusPhrases";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
@@ -105,7 +106,16 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // t-keyed shape, a deliberately separate NDJSON line from wire.ts's
     // TurnStreamEvent) - the old path's own live stream never sent it
     // structured either, only ever this same text line.
-    state.status?.emit({ type: "status", text: "On it.", stage: "tool" });
+    // STATUS-PHRASES-01: a phrase from the active companion's own
+    // "searching" set (or the default vocab), never the fixed "On it."
+    // - the same conversation-scoped rotation `pickStatusPhrase()`
+    // documents (never the same phrase twice running in one
+    // conversation). No bundled package declares a `tool_label` yet
+    // (a separate, unbuilt gap - the manifest field and its own spec
+    // test predate any renderer for it), so this is always a generic
+    // phrase today; the seam is here so a real label wins the moment
+    // one exists, with no further change at this call site.
+    state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "searching", state.persona), stage: "tool" });
     const raced = await withDeadline(runPlugin(tool, state.actor, args, { id: state.turnId, conversationId: state.conversationId }), signal);
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", userMessage: "That took too long, sorry." });
