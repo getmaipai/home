@@ -113,14 +113,16 @@ ensureCoreJob("storage.check_disk_full", "every:1h");
 // most of a day to hear about it" shape as disk space, not the leaf
 // cert's own 1d cadence (lib/searxngHealth.ts's own header has the full
 // reasoning) - a no-op tick for a household that hasn't configured web
-// search at all. SEARCH-HEALTH-01: tightened from every:1h to the
-// design note's own stated cadence, "one probe query every 15 minutes"
-// while search is down - the same 15-minute cadence applies whether or
-// not it's currently down (a single canary request every 15 minutes is
-// nowhere near SEARCH-PACE-01's own person-pace budget above, and it
-// means an outage with no live household traffic to detect it any
-// other way is still noticed, and its recovery still caught, in
-// minutes rather than up to an hour).
+// search at all. SEARCH-HEALTH-01: the tick itself is every 15 minutes
+// (the scheduler's own recurrence is fixed per job, not conditional),
+// but `checkSearxngHealth()` only actually probes that often while
+// search is down or degraded, its own throttle for the healthy case -
+// a review, 2026-09-24, caught the first cut probing unconditionally
+// at this cadence, 96 real requests a day against a healthy instance
+// with no need, exactly the fan-out THIRD-PARTY-SERVICES.md rules out.
+// A tick that finds nothing wrong and isn't yet due for its hourly
+// check is a fast no-op, so the 15-minute schedule itself costs
+// nothing extra to keep - only the real probes it gates are budgeted.
 ensureCoreJob("websearch.check_searxng_health", "every:15m");
 // Step 10: "one check a day" against GitHub's own public release API -
 // see lib/updates.ts's own header for the full scope (app only; the

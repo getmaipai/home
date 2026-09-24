@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { checkSearxngHealth } from "@/lib/searxngHealth";
-import { listIssues } from "@/lib/issues";
+import { checkSearxngHealth, __resetSearxngHealthThrottleForTests } from "@/lib/searxngHealth";
+import { listIssues, dismissIssue } from "@/lib/issues";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -13,6 +13,10 @@ beforeEach(() => {
   // tokens earlier ones left it and can see a spurious rate_limited
   // instead of the real fixture response it scripted.
   __resetRateLimiterForTests();
+  // The 15-minute-while-unhealthy/hourly-while-ok throttle (below) is
+  // module state `resetDb()` never touches - without this, a test after
+  // the first sees its own probe silently skipped as "too soon".
+  __resetSearxngHealthThrottleForTests();
 });
 
 // Jesse, 2026-09-07: "we need to be able to detect if search is down,
@@ -114,6 +118,82 @@ describe("checkSearxngHealth", () => {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await checkSearxngHealth();
       expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // SEARCH-HEALTH-01 (a review, 2026-09-24): the 15-minute probe is for
+  // while search is down or degraded; a healthy household keeps the
+  // original hourly cadence - proven by request count, not a real
+  // hour's wait, since the throttle is keyed on wall-clock time and a
+  // second call moments later is always "too soon" while healthy.
+  test("while healthy, a second check moments later is throttled to the hourly cadence - the fixture sees only one request", async () => {
+    let requests = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        requests++;
+        return Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "The third planet." }] });
+      },
+    });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await checkSearxngHealth();
+      await checkSearxngHealth();
+      expect(requests).toBe(1);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // The symmetric case: once search is known down or degraded, the
+  // throttle never applies - every tick probes again, which is what
+  // "one probe query every 15 minutes ... until an engine answers
+  // again" (the design note's own words) actually depends on.
+  test("while down, every check probes again - the throttle never applies", async () => {
+    let requests = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        requests++;
+        return Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] });
+      },
+    });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await checkSearxngHealth();
+      await checkSearxngHealth();
+      expect(requests).toBe(2);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // A review (2026-09-24) caught the throttle's own health check
+  // excluding dismissed rows (listIssues()'s own default) - a person
+  // dismissing the notification while search is still genuinely broken
+  // (dismissedAt set, resolvedAt still null) must never read as
+  // healthy here, or recovery detection silently falls back to the
+  // hourly cadence for as long as it stays dismissed.
+  test("a dismissed-but-still-broken issue still gets the 15-minute cadence, not the hourly one", async () => {
+    let requests = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        requests++;
+        return Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] });
+      },
+    });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await checkSearxngHealth();
+      const issue = listIssues().find((i) => i.source === "websearch" && i.key === "searxng_empty");
+      expect(issue).toBeDefined();
+      dismissIssue(issue!.id);
+      expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0); // dismissed rows are hidden from the default list
+      await checkSearxngHealth();
+      expect(requests).toBe(2); // still probed again, never throttled to hourly just because it was dismissed
     } finally {
       server.stop(true);
     }

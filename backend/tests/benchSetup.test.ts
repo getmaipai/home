@@ -90,6 +90,45 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
     expect(out).not.toContain("bench finished");
   });
 
+  // SEARCH-HEALTH-01 (a review, 2026-09-24): the one choke point every
+  // live bench passes through (this same setup.ts) refuses a real
+  // SearXNG URL without clearance - never wired script by script.
+  // routing.ts never touches search at all; MAIPAI_SEARXNG_URL is
+  // checked here regardless of what the entry point does with it.
+  test("a real (non-fixture) MAIPAI_SEARXNG_URL without clearance is refused before any mutation", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-bench-realsearxng-"));
+    const { code, out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir, MAIPAI_SEARXNG_URL: "http://192.0.2.1:8888" });
+    expect(code).toBe(2);
+    expect(out).toContain("MAIPAI_SEARXNG_URL");
+    expect(out).toContain("MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set");
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  test("a real MAIPAI_SEARXNG_URL with MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 passes this check (the run may still fail for other reasons)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-bench-realsearxng-cleared-"));
+    const { out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir, MAIPAI_SEARXNG_URL: "http://192.0.2.1:8888", MAIPAI_BENCH_REAL_SEARXNG_CLEARED: "1" });
+    expect(out).not.toContain("MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set");
+  });
+
+  test("a local fixture MAIPAI_SEARXNG_URL never needs clearance", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-bench-fixturesearxng-"));
+    const { out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir, MAIPAI_SEARXNG_URL: "http://127.0.0.1:54321" });
+    expect(out).not.toContain("MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set");
+  });
+
+  // A review (2026-09-24) caught the first cut's classification helper
+  // failing OPEN on an unparseable URL ("fails at the real call site" -
+  // correct for its own original caller, wrong for a clearance gate) -
+  // a malformed MAIPAI_SEARXNG_URL must be refused outright, never
+  // silently treated as a safe local fixture.
+  test("an unparseable MAIPAI_SEARXNG_URL is refused outright, never treated as a safe fixture", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-bench-malformedsearxng-"));
+    const { code, out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir, MAIPAI_SEARXNG_URL: "not a url" });
+    expect(code).toBe(2);
+    expect(out).toContain("is not a valid URL");
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
   test("zero executed cases can never report success", () => {
     const codes: number[] = [];
     finishBench({ executed: 0 }, (code) => codes.push(code));

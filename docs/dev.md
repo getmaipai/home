@@ -6,6 +6,82 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## SEARCH-HEALTH-01 follow-up: the bench guard's real choke point, the probe's real cadence (2026-09-24)
+
+Two fix-ups the coordinator asked for after verifying `d70f5ac7`, review
+low, before starting SEARCH-FALLBACK-01.
+
+**1. The bench guard, universally, not script by script.** "Bench
+runners now refuse a real SearXNG URL" was a universal claim proven by
+wiring one script (`query-writer-01-live.ts`). Eleven scripts in
+`scripts/bench/` reference SearXNG; the real choke point every live
+bench passes through is `scripts/bench/setup.ts` itself - "the one
+setup every conversational live bench shares," imported first by every
+one of them (`interimRuleMeasure.ts`, `stream-next-01-live.ts`,
+`query-writer-01-live.ts`, `query-writer-01b-live.ts`, `replay.ts`,
+`read-page-01.ts`, `conversationLive.ts`, `written-set.ts`, each
+confirmed by grep). Only `interimRuleMeasure.ts` and `stream-next-01-live.ts`
+actually read `MAIPAI_SEARXNG_URL` from the environment and point the
+household setting at it beside `query-writer-01-live.ts` (already
+guarded); every other reference is `conversationRunner.ts`'s
+`startFakeSearxng()`, always a fixture, never a real URL. `setup.ts`
+gains a fourth rule, checked at import time like its existing three:
+`MAIPAI_SEARXNG_URL` set and not a local fixture (`isLocalFixtureUrl()`,
+reused from `liveHubQuiet.ts`) refuses without `MAIPAI_BENCH_REAL_
+SEARXNG_CLEARED=1`, the identical env var and message the first cut
+already established. `query-writer-01-live.ts`'s own earlier call stays
+too (a faster fail before it creates its own temp directory) -
+harmless duplication now that `setup.ts` is the real guarantee, not the
+only one. Tests: `benchSetup.test.ts` (the file already proving
+`setup.ts`'s other three rules, same `runBench()`/child-process
+pattern) gains three cases - refused without clearance, passes with
+`MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1`, a local fixture never needs it -
+run against `routing.ts`, an entry point that never touches search at
+all, proving the check applies regardless of what the bench does with
+the URL.
+
+**2. The 15-minute probe is for while search is down, not always.**
+The first cut's `every:15m` scheduler cadence probed unconditionally -
+96 real requests a day against a healthy instance with no need,
+exactly the fan-out `THIRD-PARTY-SERVICES.md` rules out (the design
+note's own words: "one probe query every 15 minutes **until an engine
+answers again**," never a standing rate). The scheduler's own tick stays
+at `every:15m` (its recurrence is fixed per job, not conditional on
+what the last run found, so the tick itself has to be fine-grained
+enough to catch a 15-minute recovery window) - but `checkSearxngHealth()`
+now only actually probes that often while `searchIsCurrentlyUnhealthy()`
+(an open `searxng_unreachable` or `searxng_empty` Repairs row); a
+healthy household's own tick is a fast no-op unless an hour has passed
+since the last real probe. Module-level `lastProbeAtMs`, never reset
+by `resetDb()` - a new `__resetSearxngHealthThrottleForTests()` export
+(the identical shape `__resetRateLimiterForTests()` already uses)
+keeps the existing tests' own back-to-back calls from seeing a
+spuriously skipped probe. Tests, by request count against a fixture
+that counts hits rather than a real hour's wait: healthy, two checks
+moments apart hit the fixture once; down, two checks moments apart hit
+it twice - the throttle never applies while genuinely unhealthy,
+exactly what "until an engine answers again" depends on.
+
+**A low review (per instruction, its own follow-up) found and fixed two
+real bugs in this same fix-up before it landed.** `searchIsCurrentlyUnhealthy()`
+called `listIssues()` with no options, which excludes dismissed rows by
+default - a household member dismissing the still-open "search is
+down" notification (dismissed, never resolved, the problem still
+genuinely broken) would have silently read as healthy, falling the
+throttle back to the hourly cadence for as long as it stayed dismissed.
+Fixed to read the full history and filter on `resolved_at` alone, the
+one field that actually means fixed. `setup.ts`'s own rule 4 reused
+`isLocalFixtureUrl()`, which fails open on an unparseable URL ("fails
+at the real call site, not here" - a deliberate, correct choice for
+its original caller, a URL about to be used directly, but wrong for a
+clearance gate) - a malformed `MAIPAI_SEARXNG_URL` would have silently
+bypassed clearance instead of being refused. Fixed by parsing the URL
+directly in `setup.ts` itself and refusing outright on a parse
+failure, never delegating that judgment to a helper built for a
+different caller's own needs. Two new regression tests.
+
+Exit: `bash scripts/check.sh` green; the seven new tests above, landed.
+
 ## SEARCH-HEALTH-01 and SEARCH-PACE-01: search knows its own health, and never floods (2026-09-24)
 
 **Objective.** `docs/plans/search-resilience-2026-09-24.md`'s items 1
