@@ -98,7 +98,7 @@ export async function checkSearxngHealth(): Promise<void> {
     // then immediately resolving the very same issue as soon as this
     // call returned "ok", every single probe. This canary has to see
     // SearXNG's own real answer, or its own real failure, unmasked.
-    result = (await searxngSearch({ query: CANARY_QUERY }, { allowWikipediaFallback: false })).text;
+    result = (await searxngSearch({ query: CANARY_QUERY }, { allowWikipediaFallback: false, bypassCache: true })).text;
   } catch {
     // searxngSearch() itself already recorded this exact outcome for
     // every error it can throw - search_unavailable as "degraded",

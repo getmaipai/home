@@ -564,9 +564,6 @@ function requireSearxngSettings(): { baseUrl: string } {
   if (!baseUrl) {
     throw new HostError("invalid_input", "Web search isn't set up yet - add a SearXNG URL in Settings first");
   }
-  if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) {
-    throw new HostError("rate_limited", "Web search is rate-limited - try again shortly");
-  }
   return { baseUrl };
 }
 
@@ -824,7 +821,44 @@ async function safesearchEnginesFor(baseUrl: string, category: "general" | "imag
  * (a real API answering plain text is not a fetch failure); and Wikipedia
  * answers a direct-topic query via `infoboxes`, not `results` (see
  * `formatSearxngResults`). */
-export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel } = {}): Promise<SearxngSearchResult> {
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
+const SEARCH_CACHE_MAX_ENTRIES = 200;
+const searchCache = new Map<string, { result: SearxngSearchResult; storedAt: number }>();
+const searchInFlight = new Map<string, Promise<SearxngSearchResult>>();
+
+export function __resetSearchCacheForTests(): void {
+  searchCache.clear();
+  searchInFlight.clear();
+}
+
+export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean } = {}): Promise<SearxngSearchResult> {
+  if (opts.bypassCache) return searxngSearchUncached(args, opts);
+  const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
+  const query = input?.query;
+  if (typeof query !== "string" || query.length === 0) return searxngSearchUncached(args, opts);
+  const { baseUrl } = requireSearxngSettings();
+  const isImages = input?.category === "images";
+  const safeLevel = opts.safeSearchLevel ?? "off";
+  const safeEngines = safeLevel === "strict" || safeLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
+  const key = [baseUrl.replace(/\/+$/, ""), query, input?.read_page === true ? "page" : "", isImages ? "images" : "general", safeLevel, (safeEngines ?? []).join(",")].join("\u001f");
+  const now = Date.now();
+  const cached = searchCache.get(key);
+  if (cached && now - cached.storedAt < SEARCH_CACHE_TTL_MS) return cached.result;
+  if (cached) searchCache.delete(key);
+  const running = searchInFlight.get(key);
+  if (running) return running;
+  const promise = searxngSearchUncached(args, { ...opts, safeEngines }).then((result) => {
+    if (result.rows.length > 0) {
+      if (searchCache.size >= SEARCH_CACHE_MAX_ENTRIES) searchCache.delete(searchCache.keys().next().value!);
+      searchCache.set(key, { result, storedAt: Date.now() });
+    }
+    return result;
+  }).finally(() => searchInFlight.delete(key));
+  searchInFlight.set(key, promise);
+  return promise;
+}
+
+async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; safeEngines?: string[] | null } = {}): Promise<SearxngSearchResult> {
   // SEARCH-FALLBACK-01: `opts` is never part of the recipe's own public
   // `args` schema (a model can never set it) - the one caller that
   // needs to turn the fallback off is `searxngHealth.ts`'s own canary,
@@ -877,9 +911,12 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   // safesearch level above is still sent and still the floor even when
   // this list is empty or unavailable - never blocking a search
   // outright over a filter that couldn't be built.
-  const safeEngines = opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
+  const safeEngines = opts.safeEngines !== undefined ? opts.safeEngines : opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
   const engines = safeEngines && safeEngines.length > 0 ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
   const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}`;
+  if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) {
+    throw new HostError("rate_limited", "Web search is rate-limited - try again shortly");
+  }
   // No retry, unlike getHomeAssistantState's own GET - a code review
   // (2026-09-06) found the retry doubled this call's own worst case to
   // ~20s (SEARXNG_TIMEOUT_MS twice plus the retry delay) on top of

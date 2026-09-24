@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, __resetSearxngEnginesCacheForTests, type AttemptResult } from "@/lib/packageHost";
+import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
@@ -28,6 +28,7 @@ beforeEach(() => {
   // right before it needs to (a no-op, called twice); this just makes
   // every test start with a full bucket regardless of run order.
   __resetRateLimiterForTests();
+  __resetSearchCacheForTests();
 });
 
 function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
@@ -1390,7 +1391,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       const codes: string[] = [];
       for (let i = 0; i < 4; i++) {
         try {
-          await host.integration.call("searxng", "search", { query: "q", read_page: i === 0 });
+          await host.integration.call("searxng", "search", { query: `q-${i}`, read_page: i === 0 });
         } catch (err) {
           codes.push((err as HostError).code);
         }
@@ -1907,6 +1908,47 @@ describe("packageHost reminders and timers (session-d-packages-and-store.md step
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["timers:write"] }));
     expect(() => host.timers.set("a while")).toThrow(HostError);
+  });
+});
+
+describe("searxng search cache", () => {
+  test("caches results, separates safe-search levels, skips empty results, dedupes in-flight calls, and expires after five minutes", async () => {
+    let searchRequests = 0;
+    let release: (() => void) | undefined;
+    const server = Bun.serve({ port: 0, fetch: async (request) => { if (new URL(request.url).pathname === "/search") { searchRequests++; if (searchRequests === 1) await new Promise<void>((resolve) => { release = resolve; }); } return Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "planet" }] }); } });
+    const previousNow = Date.now;
+    let now = 1_000_000;
+    Date.now = () => now;
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const first = searxngSearch({ query: "earth" }, { safeSearchLevel: "off" });
+      const second = searxngSearch({ query: "earth" }, { safeSearchLevel: "off" });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(searchRequests).toBe(1);
+      release!();
+      await Promise.all([first, second]);
+      await searxngSearch({ query: "earth" }, { safeSearchLevel: "moderate" });
+      expect(searchRequests).toBe(2);
+      await searxngSearch({ query: "earth" }, { safeSearchLevel: "off" });
+      expect(searchRequests).toBe(2);
+      now += 5 * 60 * 1000;
+      await searxngSearch({ query: "earth" }, { safeSearchLevel: "off" });
+      expect(searchRequests).toBe(3);
+    } finally {
+      Date.now = previousNow;
+      server.stop(true);
+    }
+  });
+
+  test("does not cache a zero-row result", async () => {
+    let requests = 0;
+    const server = Bun.serve({ port: 0, fetch: () => { requests++; return Response.json({ results: [] }); } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await searxngSearch({ query: "nothing" });
+      await searxngSearch({ query: "nothing" });
+      expect(requests).toBe(2);
+    } finally { server.stop(true); }
   });
 });
 
