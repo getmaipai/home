@@ -10,7 +10,7 @@
 // continuation handling does, before `safety`, per the state record).
 import { loadManifestOnly, meetsMinRole } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
-import { tokenize } from "@/lib/text";
+import { tokenize, isBarePronoun } from "@/lib/text";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { ANSWER_FROM_CONTEXT_TOOL_ID } from "./model";
 
@@ -92,26 +92,13 @@ interface ArgSchema {
   properties?: Record<string, ArgPropertySchema>;
 }
 
-/** Checked one word at a time, never a literal array (the rule-budget
- * lint's word-list check is syntactic: a 3+-string array trips it
- * whatever it holds - the same reason messages.ts's windowRoleFromId()
- * and nodes/answer.ts's policyRefusalLine() are written this way too). */
-function isPronounWord(word: string): boolean {
-  return word === "he" || word === "she" || word === "it" || word === "they" || word === "him" || word === "her" || word === "them" || word === "his" || word === "hers" || word === "their" || word === "theirs" || word === "its";
-}
-
-// A code review caught the first cut of this checking the raw value
-// verbatim ("it" passed, "it?"/"It." did not) - split the SAME way
-// tokenize() itself splits (@/lib/text's own `[^a-z0-9']+` word
-// boundary), before tokenize()'s stopword drop ever gets a chance to
-// silently erase a lone "it" into an empty, trivially-passing term
-// list (the `terms.length === 0` branch below is for a genuinely
-// numbers-only argument, not a punctuation-dressed pronoun).
-function isBarePronoun(value: string): boolean {
-  // rule: grounding.bare_pronoun (docs/plans/turn-machine-state-record-2026-09-22.md, "Grounding, stated exactly", 2a28e4e8)
-  const words = value.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 0);
-  return words.length === 1 && isPronounWord(words[0]!);
-}
+// isBarePronoun() moved to @/lib/text.ts (CONFIRM-01): nodes/model.ts's
+// own offeredButInvalid check needs the identical test, and this file
+// already imports from model.ts (ANSWER_FROM_CONTEXT_TOOL_ID), so the
+// reverse import would have been circular. The `terms.length === 0`
+// branch below is for a genuinely numbers-only argument, not a
+// punctuation-dressed pronoun - isBarePronoun() is checked first,
+// ahead of it, for exactly that reason.
 
 /** GROUND-01's own live capture (data-scratch/ground-01-capture.md):
  * `{ expression: "president of chile", category: "images", read_page:

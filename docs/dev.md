@@ -27289,3 +27289,99 @@ pass surfaced four real findings (the enginesDir nesting, the
 committed third-party fixture, the leftover `.download.tmp`, the
 live bench's own missing exit code on a failure path), all fixed
 before landing.
+
+## CONFIRM-01: a "yes" ran no search because a bare pronoun looked valid (2026-09-24)
+
+**Objective.** `docs/BACKLOG.md` line 95, `docs/plans/a-confirm-01-2026-09-24.md`
+(getmaipai-a3's work order): the `president-of-chile-when-born` replay
+row's turn 3 - "who is the president of chile" then "when was he
+born" - ran no search at all on the new path (`turnNext.ts`).
+
+**Root cause, traced live.** `nodes/model.ts`'s `websearchValid` check,
+before this item, was `typeof expression === "string" &&
+expression.trim().length > 0` - a plain non-empty check. When the
+model chose to call `websearch` with `{expression: "he"}`
+(a real, observed model choice, not a hypothetical), that string is
+non-empty, so the call sailed through as "valid" and never reached
+`recoveredMissingCall()` (the query-writer's grammar-constrained
+pronoun-resolution retry, QUERY-WRITER-01) - that retry only fires for
+`requiredButMissing` (no call, or a malformed one), never for
+`offeredButInvalid`'s old, too-permissive definition of "invalid."
+The call then reached `policy.ts`'s `checkGrounding()`, which already
+had its own `isBarePronoun()` check and refused the call with reason
+`ungrounded_args` - but that refusal branch parks no ask (only
+`consent_needed`/`confirm_needed` do), so the household's own "yes" on
+the next turn had nothing to resume, and the search silently never
+ran. Confirmed failing live before the fix: a scripted 2-turn
+reproduction (turn 1 real search, turn 2 model calls `websearch` with
+`{expression: "he"}`) showed turn 2's searxng queries staying exactly
+`["president of chile"]` (turn 1's own query) - no second query ever
+fired, and `getPendingAsk()` was `null` (nothing parked to resume, so a
+"yes" is not even the shape of the fix - the search needs to just run).
+
+**The fix, decided.** Fold `isBarePronoun()` into `websearchValid`
+itself (`offeredButInvalid`'s definition), the same test
+`checkGrounding()` already runs, so this exact shape of call is
+"invalid" one step earlier and recovers through the SAME query-writer
+retry `requiredButMissing` already has, rather than reaching
+`policy.ts`'s refusal at all. Rejected alternative: teaching
+`policy.ts`'s `ungrounded_args` refusal to park a `confirm_needed` ask
+so a "yes" would resume it - rejected because the household never
+actually needs to confirm anything here; the engine already knows
+enough (the prior turn's own subject) to just resolve the pronoun and
+run the real search, the same recovery path a genuinely missing call
+already gets. Two call sites needed the identical test
+(`model.ts`'s new check, `policy.ts`'s existing one), and `policy.ts`
+already imports from `model.ts` (`ANSWER_FROM_CONTEXT_TOOL_ID`), so
+`isBarePronoun()`/`isPronounWord()` moved to the shared, dependency-free
+`@/lib/text.ts` (both files import it from there now; a reverse import
+from `model.ts` back into `policy.ts` would have been circular).
+
+**Old path (`turnEngine.ts`): no equivalent gap, and no longer in
+scope.** The old path's forced-lookup flow (`runForcedLookup` →
+`resolveToolCalls`) unconditionally overwrites a forced websearch
+call's `expression` with its own `lookupQueryFor()`-computed query
+(`resolveToolCalls`'s `shaped` mapping: `lookup?.expression ? {...c,
+args: {...args, expression: lookup.expression}} : ...`), so the
+model's own argument value is irrelevant there - this specific bug
+(a model-chosen bare pronoun read as "valid") cannot occur on a forced
+call. A live scripted 2-turn reproduction against the real old path
+was attempted to check whether `lookupQueryFor()`'s `subjects`
+tracking itself resolves the pronoun correctly end-to-end (as opposed
+to policy.ts's own unit tests, which pre-supply `subjects` directly
+rather than proving the full pipeline populates it), but neither turn
+routed to a forced lookup at all under the scripted stub (the router
+picked an unrelated topic both times), so the reproduction was
+inconclusive before getmaipai-a3 changed the work order: the D1-D9
+deletion chain (queued to Codex) removes `turnEngine.ts`'s
+`resolvePendingAsk` lookup branch entirely as part of retiring the old
+path now that U6 has flipped the default to `turnNext.ts`, so an
+old-path mirror fix would be deleted work. Old-path parity is dropped
+from this item's acceptance per that direction.
+
+**Tests.** `backend/tests/turnMachine/turnNext.test.ts`: "CONFIRM-01: a
+model-chosen bare-pronoun websearch call recovers through the
+query-writer, never reaching policy's silent ungrounded_args refusal" -
+a 2-turn scripted reproduction of the exact replay row (turn 1 "who is
+the president of chile", turn 2 "when was he born" with the model
+choosing `{expression: "he"}`), asserting the query-writer's own retry
+ran (`request.response_format` seen), the real resolved query
+(`"Gabriel Boric born"`) reached searxng and no bare-pronoun query
+ever did, the turn completed with sources rather than parking an ask,
+and the outcomes row records the query-writer's call by name. Verified
+failing without the fix (`git stash` on `model.ts`/`text.ts`/
+`policy.ts` alone, same test, same assertions) before the fix landed.
+`backend/tests/text.test.ts`: `isBarePronoun()` moved here with its own
+direct describe block (previously only exercised indirectly through
+`policy.test.ts`'s `checkGrounding()` cases).
+
+**Files.** `backend/src/lib/turnMachine/nodes/model.ts`
+(`websearchValid`, `isBarePronoun` import), `backend/src/lib/
+turnMachine/nodes/policy.ts` (`isPronounWord`/`isBarePronoun` removed,
+import from `@/lib/text` instead), `backend/src/lib/text.ts`
+(`isPronounWord`/`isBarePronoun` moved in, exported), `backend/tests/
+text.test.ts`, `backend/tests/turnMachine/turnNext.test.ts`.
+Verification: `bash scripts/check.sh` (scope full - touches
+turn-machine files outside a single package); review low, target
+`main...HEAD`; single commit (code + test + this section + BACKLOG.md
+line 95).

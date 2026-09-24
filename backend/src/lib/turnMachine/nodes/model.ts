@@ -22,6 +22,7 @@ import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
+import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnEngine";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
@@ -760,7 +761,21 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // A2's full hit does).
   const websearchCall = attempt.toolCalls?.find((c) => c.tool === "websearch");
   const websearchExpression = websearchCall && typeof websearchCall.args === "object" && websearchCall.args !== null && "expression" in websearchCall.args ? (websearchCall.args as { expression: unknown }).expression : undefined;
-  const websearchValid = typeof websearchExpression === "string" && websearchExpression.trim().length > 0;
+  // CONFIRM-01: a non-empty expression that is nothing but a bare
+  // pronoun ("he", "it") is exactly as unusable as an empty one - the
+  // model chose to call the tool but had nothing real to put in it.
+  // Before this, that case passed this check trivially (a non-empty
+  // string), so policy.ts's own checkGrounding() refused it downstream
+  // via the identical isBarePronoun() test, with reason
+  // "ungrounded_args" - a branch that parks no ask (only
+  // consent_needed/confirm_needed do), so a follow-up "yes" had nothing
+  // to resume and the search never ran. Folding it into
+  // offeredButInvalid instead sends it through the SAME recovery
+  // requiredButMissing already has (recoveredMissingCall(), the query-
+  // writer's one grammar-constrained retry against the window) rather
+  // than inventing a second, parked-ask path for a case the household
+  // never needs to confirm anything about.
+  const websearchValid = typeof websearchExpression === "string" && websearchExpression.trim().length > 0 && !isBarePronoun(websearchExpression);
   // QUERY-WRITER-01b (bench-only, getmaipai-26's ruling, 2026-09-24): a
   // real required-call miss is genuinely rare and engine-dependent
   // (ENGINE-CONTRACT-02 measured 0/5 to 8/10 by temp/cache state alone)

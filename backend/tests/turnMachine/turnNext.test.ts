@@ -160,6 +160,70 @@ describe("turnNext.ts: the interim rule", () => {
     }
   });
 
+  // CONFIRM-01 (docs/BACKLOG.md line 95, president-of-chile-when-born):
+  // a model-CHOSEN websearch call with a bare-pronoun expression ("he")
+  // is not a miss by model.ts's own pre-CONFIRM-01 definition (a
+  // non-empty string), so it never reached the query-writer's own
+  // pronoun-resolution retry (QUERY-WRITER-01, tested above for a
+  // MISSING/malformed call) - it ran the gauntlet straight into
+  // policy.ts's checkGrounding(), which refuses a bare pronoun outright
+  // via reason "ungrounded_args", a branch that parks no ask (only
+  // consent_needed/confirm_needed do). A follow-up "yes" then had
+  // nothing to resume, and the search never ran on either turn - traced
+  // live (a scripted reproduction, confirmed failing before the fix
+  // below existed: turn 2's own searxng query stayed exactly
+  // `["president of chile"]`, never gaining a second query). The fix:
+  // websearchValid (model.ts) now folds isBarePronoun() into the same
+  // offeredButInvalid check requiredButMissing already uses, so this
+  // exact case recovers through the SAME query-writer retry instead of
+  // reaching policy.ts's refusal at all.
+  test("CONFIRM-01: a model-chosen bare-pronoun websearch call recovers through the query-writer, never reaching policy's silent ungrounded_args refusal", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const first = await withStub(
+        {
+          calls: (request) => (request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }]),
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile is Gabriel Boric." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
+      );
+      if (!first.ok || first.kind !== "immediate") throw new Error("expected an immediate result");
+
+      let queryWriterRequest: ChatCompletionRequest | undefined;
+      const second = await withStub(
+        {
+          calls: (request) => (request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-2", name: "websearch", args: JSON.stringify({ expression: "he" }) }]),
+          reply: (request) => {
+            if (request.response_format) {
+              queryWriterRequest = request;
+              return JSON.stringify({ expression: "Gabriel Boric born" });
+            }
+            return "Gabriel Boric was born in 1986, sourced.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "when was he born", { conversationId: first.value.conversation_id }),
+      );
+      if (!second.ok || second.kind !== "immediate") throw new Error("expected an immediate result");
+      // The query-writer's own retry ran at all (never a bare "he"
+      // reaching policy.ts silently) and resolved the real name, not
+      // the pronoun or the raw utterance.
+      expect(queryWriterRequest).toBeDefined();
+      expect(searxng.queries).toContain("Gabriel Boric born");
+      expect(searxng.queries.some((q) => q === "he" || /\bhe\b.*born|born.*\bhe\b/i.test(q))).toBe(false);
+      expect(second.value.plugin_id).toBe("websearch");
+      expect(second.value.sources?.length).toBeGreaterThan(0);
+      // Never silently refused: nothing parked, because nothing needed
+      // to be asked - the engine resolved the pronoun on its own.
+      expect(getPendingAsk(second.value.conversation_id)).toBeNull();
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, second.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
+      expect(outcomes.some((o) => o.callId === "query-writer" && o.args?.expression === "Gabriel Boric born")).toBe(true);
+    } finally {
+      searxng.stop();
+    }
+  });
+
   test("a turn that runs no tool carries no toolEvents field", async () => {
     const result = await withStub({ reply: () => "Hi there!" }, () => runTurnNext(people.owner, "chat", "hi"));
     expect(result.ok).toBe(true);
