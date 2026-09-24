@@ -49,7 +49,6 @@ export function ChatTurnStats() {
             <DetailRow label="First token" value={number(stats.time_to_first_token_ms, " ms")} />
             <DetailRow label="Total time" value={number(stats.total_time_ms, " ms")} />
             <DetailRow label="Context tokens" value={number(stats.context_tokens)} />
-            <DetailRow label="Context used" value={number(stats.context_used_percent, "%")} />
             <DetailRow label="Cache reused" value={number(stats.cache_reuse_tokens)} />
             <DetailRow label="Cache reuse" value={number(stats.cache_reuse_percent, "%")} />
             <DetailRow label="Engine" value={stats.engine} />

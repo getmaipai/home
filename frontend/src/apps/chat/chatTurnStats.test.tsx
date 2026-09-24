@@ -14,7 +14,6 @@ const STATS = {
   time_to_first_token_ms: 120,
   total_time_ms: 900,
   context_tokens: 143,
-  context_used_percent: null,
   cache_reuse_tokens: 1157,
   cache_reuse_percent: 89,
   engine: "local b10797-test family.gguf",
@@ -52,6 +51,14 @@ describe("ChatTurnStats (STATS-01)", () => {
     fireEvent.click(view.getByRole("button", { name: "View reply stats" }));
     expect(await view.findByText("Reply details")).toBeInTheDocument();
     expect(view.getByText("local b10797-test family.gguf")).toBeInTheDocument();
+  });
+
+  test("STATS-PCT-01: no 'Context used' row - the field it read was a permanent null with nothing computing it, dropped rather than shown blank", async () => {
+    const view = renderWithQueryClient(<StatsUnderTest visible message={replyMessage()} />);
+    fireEvent.click(view.getByRole("button", { name: "View reply stats" }));
+    expect(await view.findByText("Reply details")).toBeInTheDocument();
+    expect(view.queryByText("Context used")).toBeNull();
+    expect(view.getByText("Context tokens")).toBeInTheDocument();
   });
 
   test("child-band projection stays hidden even when stats metadata exists", () => {

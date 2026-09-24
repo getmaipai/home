@@ -108,7 +108,6 @@ export function buildTurnStats(
     time_to_first_token_ms: firstToken,
     total_time_ms: totalTime !== null && totalTime >= 0 ? totalTime : null,
     context_tokens: promptTokens,
-    context_used_percent: null,
     cache_reuse_tokens: cacheTokens,
     cache_reuse_percent: cacheDenominator > 0 ? cacheTokens! / cacheDenominator * 100 : null,
     engine: identity ? formatEngineIdentity(identity) : null,

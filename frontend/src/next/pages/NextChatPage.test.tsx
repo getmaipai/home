@@ -1209,7 +1209,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
 });
 
 describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
-  const STATS = { prompt_tokens: 120, predicted_tokens: 40, tokens_per_second: 22.4, time_to_first_token_ms: 400, total_time_ms: 2100, context_tokens: 120, context_used_percent: null, cache_reuse_tokens: 30, cache_reuse_percent: 25, engine: "local family.gguf", stop_reason: "stop", thinking: false };
+  const STATS = { prompt_tokens: 120, predicted_tokens: 40, tokens_per_second: 22.4, time_to_first_token_ms: 400, total_time_ms: 2100, context_tokens: 120, cache_reuse_tokens: 30, cache_reuse_percent: 25, engine: "local family.gguf", stop_reason: "stop", thinking: false };
 
   // stubTurnFetch's own shape (SHELL-02 slice 3, above), plus GET
   // /api/engines - `enginesResponse` lets each test represent both
@@ -1902,7 +1902,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
       source: "model",
       plugin_id: null,
       command_id: null,
-      stats: { prompt_tokens: 10, predicted_tokens: 5, tokens_per_second: 20, time_to_first_token_ms: 40, total_time_ms: 200, context_tokens: 10, context_used_percent: null, cache_reuse_tokens: null, cache_reuse_percent: null, engine: "local family.gguf", stop_reason: "stop", thinking: true },
+      stats: { prompt_tokens: 10, predicted_tokens: 5, tokens_per_second: 20, time_to_first_token_ms: 40, total_time_ms: 200, context_tokens: 10, cache_reuse_tokens: null, cache_reuse_percent: null, engine: "local family.gguf", stop_reason: "stop", thinking: true },
       persona_fragments: "Warm and concise.",
     },
   };

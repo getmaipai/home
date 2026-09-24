@@ -41,7 +41,6 @@ function stats(overrides: Partial<TurnStats> = {}): TurnStats {
     time_to_first_token_ms: 400,
     total_time_ms: 2000,
     context_tokens: 100,
-    context_used_percent: null,
     cache_reuse_tokens: null,
     cache_reuse_percent: null,
     engine: "local b1 qwen3-8b-instruct-q4-k-m",

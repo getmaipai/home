@@ -67,7 +67,6 @@ export interface TurnStats {
   time_to_first_token_ms: number | null;
   total_time_ms: number | null;
   context_tokens: number | null;
-  context_used_percent: number | null;
   cache_reuse_tokens: number | null;
   cache_reuse_percent: number | null;
   engine: string | null;

@@ -649,15 +649,20 @@ function buildTimingStats(stats: TurnStats): TimingStat[] {
 /** Slice 5(d): admin-only (`api.engines()` itself is owner/admin-gated) -
  * `modelContextWindow` comes from the currently-loaded chat role's own
  * `measuredContextLength` (the Stack roles API, the wiring table's own
- * "Model choice" row's source). No fallback derivation from
- * `context_used_percent`: that field is a permanent `null` in the
- * backend today (`turnStats.ts` never computes it - `context_tokens` is
- * a bare alias for `prompt_tokens`, not a real percentage-of-window
- * measurement), so dividing by it would be dividing by nothing, not a
- * real number. When the Stack isn't configured (`roles` empty, the
- * common case today per `routes/engines.ts`'s own header) or the chat
- * role's own context length hasn't been measured yet, this piece is
- * left out rather than shown with an invented window - CTX-SEG-01
+ * "Model choice" row's source), never `TurnStats` - `context_used_percent`
+ * was a permanent `null` on the backend (`turnStats.ts` never computed
+ * it - `context_tokens` is a bare alias for `prompt_tokens`, not a real
+ * percentage-of-window measurement) and STATS-PCT-01 removed the field
+ * rather than wire a synchronous per-turn source for it (the Stack's
+ * own `measuredContextLength` needs a live, possibly-unconfigured
+ * network round trip; a local engine's own context window needs
+ * verifying against its real `/props` response, which this codebase
+ * has no way to do without a running engine). This panel's own
+ * `api.engines()` query is the one place that number is actually
+ * fetched. When the Stack isn't configured (`roles` empty, the common
+ * case today per `routes/engines.ts`'s own header) or the chat role's
+ * own context length hasn't been measured yet, this piece is left out
+ * rather than shown with an invented window - CTX-SEG-01
  * (getmaipai/home#133) is the real fix (a segment breakdown that
  * doesn't need a window at all), and `context-breakdown` replaces this
  * piece the day it lands. */
