@@ -121,6 +121,32 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  // SEARCH-HEALTH-01 (docs/dev.md, 2026-09-24): "the admin gets a
+  // notification when search goes down and again when it recovers" -
+  // built generically in `lib/issues.ts`'s `resolveIssue()`, on the
+  // exact symmetric transition `repairs.new` above already fires on,
+  // so every existing error-severity issue source gets a recovery
+  // notification too, not only search health.
+  {
+    id: "repairs.resolved",
+    level: "time_sensitive",
+    audience: "adults",
+    // Not "{title} is working again" - a title is often already phrased
+    // as the broken state ("Web search can't reach your SearXNG
+    // instance"), and appending "is working again" to an arbitrary
+    // title reads wrong for many of them. "Resolved:" works for any.
+    template: "Resolved: {title}",
+    // false, not true like repairs.new: a matching Telegram toggle
+    // needs a settings key, and that key is a shared-spec record
+    // (commons's own spec/settings/keys.json) - out of scope for this
+    // item to bump the pin over (the gate's own settings-registry-drift
+    // check refused the first cut that tried). In-app fulfills "the
+    // admin gets a notification" either way; named here rather than
+    // silently left mismatched with repairs.new.
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
   // The memory judge (step 6, session-a-intelligence.md: "one
   // memory.updated notification per run that wrote something"). `person`
   // audience, not `household` or `adults`: what the judge extracted came

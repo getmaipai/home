@@ -16,6 +16,7 @@ import { issues } from "@/db/schema";
 import { newIssueId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { trigger } from "@/lib/notifications";
+import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { Issue } from "@maipai/spec/gen/ts/issue.js";
 
 export type IssueSeverity = Issue["severity"];
@@ -138,14 +139,40 @@ export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
  * source's own recheck loop calls this unconditionally once it sees the
  * problem is gone. Clears `dismissed_at` too (schema comment: a genuine
  * resolution ends the incident, so a future raise is a fresh one, not a
- * reopening of an old dismissal). */
+ * reopening of an old dismissal).
+ *
+ * SEARCH-HEALTH-01: fires the `repairs.resolved` notification on the
+ * symmetric transition to `raiseIssue()`'s own `repairs.new` gate - an
+ * open, un-dismissed `error` genuinely clearing, never a repeated
+ * resolve of something already resolved or never open (the same
+ * routine-recheck-is-not-a-notification posture). Every existing
+ * caller of this function gets the identical benefit for free (the
+ * platform's own "declared, not invented" rule: one notification,
+ * every producer, nothing bespoke) - kept synchronous, unlike
+ * `raiseIssue()`, since none of its many existing callers expect to
+ * await it; `trigger()` runs detached, its own failure logged rather
+ * than thrown into a caller that never awaited this in the first
+ * place. */
 export function resolveIssue(source: string, key: string): void {
   const existing = findRow(source, key);
   if (!existing || existing.resolvedAt) return;
+  const wasOpenError = existing.severity === "error" && !existing.dismissedAt;
   db.update(issues)
     .set({ resolvedAt: new Date().toISOString(), dismissedAt: null, hlc: nextHlc() })
     .where(eq(issues.id, existing.id))
     .run();
+  if (wasOpenError) {
+    // trackBackgroundWork (a review, 2026-09-24): the identical shape
+    // notifications.ts's own notifyIfFlagged() already uses for its own
+    // detached trigger() call, so a test's global afterEach can drain
+    // this before the next test's resetDb() wipes the rows it reads
+    // and writes (getmaipai/home#123's own fix, never re-broken here).
+    trackBackgroundWork(
+      trigger("repairs.resolved", { title: existing.title }).catch((err) => {
+        console.error(`[issues] repairs.resolved notification failed for ${source}/${key}: ${(err as Error).message}`);
+      }),
+    );
+  }
 }
 
 /** Unresolved-and-undismissed by default (the Repairs list); `includeResolved`

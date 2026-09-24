@@ -59,6 +59,7 @@ import type { Artifact as ArtifactValue } from "@maipai/spec/gen/ts/artifact.js"
 import { createArtifact, updateArtifact, getArtifactRow } from "@/lib/artifacts";
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { tryConsume } from "@/lib/rateLimiter";
+import { recordSearchHealth } from "@/lib/searchHealthState";
 import { assertNotPrivateHost, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import * as memory from "@/lib/memory";
 import { deleteAttachmentsForPerson } from "@/lib/attachments";
@@ -112,8 +113,28 @@ const HOME_ASSISTANT_TIMEOUT_MS = 5_000;
 // real search engines and waits on the slowest one, not a single LAN
 // round-trip.
 const SEARXNG_RATE_LIMIT_KEY = "searxng";
-const SEARXNG_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
+// SEARCH-PACE-01 (docs/plans/search-resilience-2026-09-24.md): tightened
+// from {capacity: 10, refillPerSecond: 0.5} (a burst of 10, then one
+// every 2s) to the design note's own stated budget - "a burst of
+// three, then about one query every six seconds on average" - after
+// tonight's own bench traffic (well within the old, looser numbers)
+// helped get the household's real SearXNG rate-limited by its upstream
+// engines. A person asking several things in a row is still a burst of
+// three; nothing beyond that was ever a person's own pace.
+const SEARXNG_RATE_LIMIT = { capacity: 3, refillPerSecond: 1 / 6 };
 const SEARXNG_TIMEOUT_MS = 10_000;
+// SEARCH-PACE-01: a review (2026-09-24) caught this budget shared with
+// `pageFetch()` below - fetching a linked page is a different kind of
+// traffic from querying SearXNG itself (one household question with
+// `read_page: true` consumes one token from EACH), and the tightened
+// search budget alone left as little as one page-read token free for
+// a second, unrelated question moments later, spuriously rate-limiting
+// ordinary back-to-back household conversation, not only a flood. Its
+// own key and budget instead, sized to CLAUDE.md's own "Third-party
+// services" rule for an arbitrary fetched page - "a page every few
+// seconds, not dozens a second."
+const SEARXNG_PAGE_RATE_LIMIT_KEY = "searxng-page";
+const SEARXNG_PAGE_RATE_LIMIT = { capacity: 3, refillPerSecond: 0.5 };
 
 // The recipe schema's own comment on `home_call_service_step`
 // ("security domains are never covered by a wildcard target") named a
@@ -641,56 +662,97 @@ export async function searxngSearch(args: unknown): Promise<{ text: string; rows
   // not the transient blip a retry is meant to paper over the way a
   // flaky LAN hop to Home Assistant is - retrying it just waits twice as
   // long for the identical result.
-  const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
-  if (result.ok) {
-    const value = expectJsonObject(
-      result.value,
-      baseUrl,
-      "check the SearXNG URL in Settings (a URL that redirects to a login page, or an instance with JSON output disabled, both look like this)",
-    );
-    const rows = Array.isArray(value.results) ? value.results.slice(0, 8).flatMap((raw: unknown) => {
-      const row = raw as { title?: unknown; url?: unknown; content?: unknown; img_src?: unknown; thumbnail_src?: unknown };
-      if (typeof row.title !== "string" || typeof row.url !== "string") return [];
-      try { const parsed = new URL(row.url); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return []; parsed.username = ""; parsed.password = ""; parsed.hash = ""; const safeUrl = (value: unknown) => { if (typeof value !== "string") return null; try { const parsed = new URL(value); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null; parsed.username = ""; parsed.password = ""; parsed.hash = ""; return parsed.toString(); } catch { return null; } }; return [{ title: row.title, url: parsed.toString(), snippet: typeof row.content === "string" ? row.content : null, ...(input?.category === "images" ? { image: safeUrl(row.img_src), thumbnail: safeUrl(row.thumbnail_src) } : {}) }]; } catch { return []; }
-    }) : [];
-    const text = formatSearxngResults(value);
-    // SEARCH-EMPTY-01 (docs/dev.md, docs/plans/search-resilience-
-    // 2026-09-24.md): SearXNG already reports the problem on every
-    // response - `unresponsive_engines`, an array of `[engine name,
-    // reason]` pairs ("Suspended: too many requests", "Suspended:
-    // CAPTCHA") for every upstream engine it could not use this
-    // request. Genuinely nothing to answer from (the same
-    // `SEARXNG_NO_RESULTS_TEXT` signal `formatSearxngResults` already
-    // computes across BOTH `results` and `infoboxes` - never re-derived
-    // narrower here, which would wrongly fail a real infobox-only answer
-    // just because some other, unrelated engine was also suspended)
-    // with at least one suspended engine is search actually failing,
-    // not a real "nothing found". The exact gap the live household
-    // conversation (conv-19awhetzdf, 2026-09-24) fell into: an empty
-    // result read as a plain "succeeded" outcome, and the phrasing
-    // round answered from its own knowledge instead, wrongly and
-    // confidently. Thrown here, the one choke point every websearch
-    // call already passes through, rather than checked per caller.
-    const unresponsiveEngines = Array.isArray(value.unresponsive_engines)
-      ? value.unresponsive_engines.some((raw: unknown) => Array.isArray(raw) && typeof raw[0] === "string")
-      : false;
-    if (text === SEARXNG_NO_RESULTS_TEXT && unresponsiveEngines) {
-      // This exact message reaches a household member verbatim only
-      // because `turnMachine/nodes/answer.ts`'s `toolOutageLine()`
-      // recognizes the "search_unavailable" code by name and delivers
-      // it directly, bypassing the generic COMPOSE_FAILURE_LINE swap
-      // every other failed outcome gets - a review, 2026-09-24, flagged
-      // that the two are in different files with nothing mechanical
-      // tying them together. Adding a new safe, hand-written HostError
-      // message anywhere else in this file (or another integration)
-      // needs a matching branch added there, or it silently gets the
-      // generic line instead.
-      throw new HostError("search_unavailable", "Search isn't working right now.");
+  // SEARCH-HEALTH-01 (docs/dev.md, docs/plans/search-resilience-
+  // 2026-09-24.md): "the one choke point (packageHost.ts searxngSearch)
+  // records [search's state] on each call" - wraps the real SearXNG
+  // network work below (the search request and its response only) so
+  // every real outcome, success or failure, updates the same Repairs
+  // rows `searxngHealth.ts`'s own periodic canary already uses
+  // (`searchHealthState.ts`'s shared `recordSearchHealth()`), never
+  // waiting for the next scheduled probe to notice a live person's own
+  // search just failed or just started working again. A self-imposed
+  // `rate_limited` throw is never a health signal - it means WE chose
+  // not to send the request, not that SearXNG itself is having
+  // trouble - so it is excluded and rethrown unchanged. Deliberately
+  // does NOT wrap the `read_page` fetch below: fetching an arbitrary
+  // linked page can fail for reasons that have nothing to do with
+  // SearXNG at all (the target site blocking the request, non-HTML
+  // content, its own rate limit) - a review, 2026-09-24, caught the
+  // first cut of this wrapping that fetch too, misreporting SearXNG as
+  // down over a problem on some other site entirely.
+  let text: string;
+  let rows: { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null }[];
+  try {
+    const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
+    if (result.ok) {
+      const value = expectJsonObject(
+        result.value,
+        baseUrl,
+        "check the SearXNG URL in Settings (a URL that redirects to a login page, or an instance with JSON output disabled, both look like this)",
+      );
+      rows = Array.isArray(value.results) ? value.results.slice(0, 8).flatMap((raw: unknown) => {
+        const row = raw as { title?: unknown; url?: unknown; content?: unknown; img_src?: unknown; thumbnail_src?: unknown };
+        if (typeof row.title !== "string" || typeof row.url !== "string") return [];
+        try { const parsed = new URL(row.url); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return []; parsed.username = ""; parsed.password = ""; parsed.hash = ""; const safeUrl = (value: unknown) => { if (typeof value !== "string") return null; try { const parsed = new URL(value); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null; parsed.username = ""; parsed.password = ""; parsed.hash = ""; return parsed.toString(); } catch { return null; } }; return [{ title: row.title, url: parsed.toString(), snippet: typeof row.content === "string" ? row.content : null, ...(input?.category === "images" ? { image: safeUrl(row.img_src), thumbnail: safeUrl(row.thumbnail_src) } : {}) }]; } catch { return []; }
+      }) : [];
+      text = formatSearxngResults(value);
+      // SEARCH-EMPTY-01 (docs/dev.md, docs/plans/search-resilience-
+      // 2026-09-24.md): SearXNG already reports the problem on every
+      // response - `unresponsive_engines`, an array of `[engine name,
+      // reason]` pairs ("Suspended: too many requests", "Suspended:
+      // CAPTCHA") for every upstream engine it could not use this
+      // request. Genuinely nothing to answer from (the same
+      // `SEARXNG_NO_RESULTS_TEXT` signal `formatSearxngResults` already
+      // computes across BOTH `results` and `infoboxes` - never re-derived
+      // narrower here, which would wrongly fail a real infobox-only answer
+      // just because some other, unrelated engine was also suspended)
+      // with at least one suspended engine is search actually failing,
+      // not a real "nothing found". The exact gap the live household
+      // conversation (conv-19awhetzdf, 2026-09-24) fell into: an empty
+      // result read as a plain "succeeded" outcome, and the phrasing
+      // round answered from its own knowledge instead, wrongly and
+      // confidently. Thrown here, the one choke point every websearch
+      // call already passes through, rather than checked per caller.
+      const unresponsiveEngines = Array.isArray(value.unresponsive_engines)
+        ? value.unresponsive_engines.some((raw: unknown) => Array.isArray(raw) && typeof raw[0] === "string")
+        : false;
+      if (text === SEARXNG_NO_RESULTS_TEXT && unresponsiveEngines) {
+        // This exact message reaches a household member verbatim only
+        // because `turnMachine/nodes/answer.ts`'s `toolOutageLine()`
+        // recognizes the "search_unavailable" code by name and delivers
+        // it directly, bypassing the generic COMPOSE_FAILURE_LINE swap
+        // every other failed outcome gets - a review, 2026-09-24, flagged
+        // that the two are in different files with nothing mechanical
+        // tying them together. Adding a new safe, hand-written HostError
+        // message anywhere else in this file (or another integration)
+        // needs a matching branch added there, or it silently gets the
+        // generic line instead.
+        throw new HostError("search_unavailable", "Search isn't working right now.");
+      }
+    } else {
+      throw result.error;
     }
-    const page = input?.read_page === true && rows[0] ? await searxngPageRead({ url: rows[0].url }) : undefined;
-    return { text, rows, ...(page ? { page } : {}) };
+  } catch (err) {
+    if (err instanceof HostError && err.code === "rate_limited") throw err;
+    if (err instanceof HostError && err.code === "search_unavailable") {
+      await recordSearchHealth({
+        kind: "degraded",
+        detail: "SearXNG reports its own search engines are currently suspended (too many requests, or a CAPTCHA) - this usually clears on its own within a while. If it doesn't, check which engines are enabled in SearXNG's own settings.",
+      });
+    } else {
+      await recordSearchHealth({
+        kind: "down",
+        detail: `${err instanceof Error ? err.message : String(err)} Check the SearXNG URL in Settings -> AI & connections -> Integrations.`,
+      });
+    }
+    throw err;
   }
-  throw result.error;
+  await recordSearchHealth({ kind: "ok" });
+  // Never wrapped in the try/catch above (this function's own header
+  // comment says why): a page-read failure is never a SearXNG health
+  // signal, so it propagates to this call's own caller unchanged.
+  const page = input?.read_page === true && rows[0] ? await searxngPageRead({ url: rows[0].url }) : undefined;
+  return { text, rows, ...(page ? { page } : {}) };
 }
 
 export interface PageReadLink {
@@ -759,7 +821,7 @@ function robotsAllows(robots: string, target: URL): boolean {
 }
 
 async function pageFetch(url: string): Promise<AttemptResult> {
-  if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
+  if (!tryConsume(SEARXNG_PAGE_RATE_LIMIT_KEY, SEARXNG_PAGE_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
   await validatePublicPageUrl(url);
   return attemptHttpFetch(
     url,

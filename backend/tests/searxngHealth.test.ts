@@ -3,9 +3,16 @@ import { checkSearxngHealth } from "@/lib/searxngHealth";
 import { listIssues } from "@/lib/issues";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { resetDb } from "./reset-db";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 
 beforeEach(() => {
   resetDb();
+  // SEARCH-PACE-01: every test here makes a real searxngSearch() call
+  // through the same shared per-host bucket, now tightened to a burst
+  // of 3 - without this, a later test in the file starts with whatever
+  // tokens earlier ones left it and can see a spurious rate_limited
+  // instead of the real fixture response it scripted.
+  __resetRateLimiterForTests();
 });
 
 // Jesse, 2026-09-07: "we need to be able to detect if search is down,

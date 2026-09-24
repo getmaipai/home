@@ -135,6 +135,48 @@ describe("resolveIssue()", () => {
     expect(listIssues({ includeResolved: true })).toHaveLength(1);
     expect(listIssues({ includeResolved: true })[0]!.resolved_at).not.toBeNull();
   });
+
+  // SEARCH-HEALTH-01: the symmetric half of raiseIssue()'s own
+  // "repairs.new" test above - "the admin gets a notification when
+  // search goes down and again when it recovers," built generically
+  // here so every error-severity issue source gets it, not just search.
+  test("resolving an open error fires repairs.resolved, once", async () => {
+    const person = await owner();
+    await raiseIssue({ source: "engine", key: "oom", severity: "error", title: "Model crashed", detail: "d" });
+    expect(listPending(person)).toHaveLength(1); // repairs.new
+
+    resolveIssue("engine", "oom");
+    const pending = listPending(person);
+    expect(pending).toHaveLength(2);
+    // Found by typeId, not array position: listPending() orders newest
+    // first by millisecond-resolution createdAt, and these two calls
+    // can land in the same millisecond, making position unstable.
+    const resolved = pending.find((p) => p.typeId === "repairs.resolved");
+    expect(resolved?.text).toBe("Resolved: Model crashed");
+
+    // Already resolved - a routine recheck's own unconditional resolveIssue() call must never re-notify.
+    resolveIssue("engine", "oom");
+    expect(listPending(person)).toHaveLength(2);
+  });
+
+  test("resolving a warning or info issue never fires repairs.resolved (it never notified on the way up either)", async () => {
+    const person = await owner();
+    await raiseIssue({ source: "backup", key: "k", severity: "warning", title: "T", detail: "d" });
+    expect(listPending(person)).toHaveLength(0);
+    resolveIssue("backup", "k");
+    expect(listPending(person)).toHaveLength(0);
+  });
+
+  test("resolving something dismissed-but-still-error does not fire repairs.resolved (never notified while dismissed)", async () => {
+    const person = await owner();
+    const issue = await raiseIssue({ source: "engine", key: "oom", severity: "error", title: "Model crashed", detail: "d" });
+    expect(listPending(person)).toHaveLength(1);
+    dismissIssue(issue.id);
+    resolveIssue("engine", "oom");
+    // Still just the one repairs.new - a dismissed issue was never
+    // re-surfaced to the person, so its own resolution isn't news either.
+    expect(listPending(person)).toHaveLength(1);
+  });
 });
 
 describe("listIssues()", () => {
@@ -233,3 +275,4 @@ describe("dismissIssue()", () => {
     expect(result.ok).toBe(false);
   });
 });
+

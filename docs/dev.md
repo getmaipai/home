@@ -6,6 +6,181 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## SEARCH-HEALTH-01 and SEARCH-PACE-01: search knows its own health, and never floods (2026-09-24)
+
+**Objective.** `docs/plans/search-resilience-2026-09-24.md`'s items 1
+and its pace section: the household's SearXNG went rate-limited for
+hours and nothing noticed, because the only detection was an hourly
+canary and there was no cost model for what "too many requests" even
+meant. Five pieces, per the coordinator's own brief: the health row,
+admin notifications on down and on recovery, quiet mode with a
+15-minute probe, one token bucket per host with its numbers stated,
+and a bench runner that refuses a real SearXNG URL without clearance.
+
+**The health row.** SEARCH-EMPTY-01 already built the two Repairs rows
+(`searxng_unreachable` = down/error, `searxng_empty` = degraded/
+warning) from the hourly canary alone. The real gap: only the canary
+ever updated them, so a live household search failing or recovering
+waited up to an hour to be reflected. `packageHost.ts`'s `searxngSearch()`
+- "the one choke point ... records [search's state] on each call," the
+design note's own words - now wraps its real network work and reports
+every real outcome (ok, degraded, down) through a new shared leaf
+module, `searchHealthState.ts`'s `recordSearchHealth()`, the moment it
+happens, never waiting for the next scheduled probe. `searxngHealth.ts`'s
+own canary now calls the identical function - the two detection paths
+land on the same two rows, never two driftable copies of the same
+raise/resolve logic - but keeps its own stricter judgment (an empty
+result for the canary's own "Earth" query is suspicious even with no
+`unresponsive_engines` at all; a real household query returning
+nothing is ordinary and never raises anything, SEARCH-EMPTY-01's own
+distinction, unchanged). A self-imposed `rate_limited` throw (our own
+budget, never SearXNG's own trouble) is excluded from health reporting
+entirely, at both call sites - a household searching several things in
+a row and briefly hitting its own token bucket must never read as an
+outage.
+
+A pre-existing, real gap found while building this: `tool.ts`'s own
+outcome errorCode already carried `result.code` (SEARCH-EMPTY-01's own
+fix), but `packageHost.ts` had never actually needed this new module
+before - `searchHealthState.ts` is deliberately a leaf import (nothing
+from either `packageHost.ts` or `searxngHealth.ts`), since
+`searxngHealth.ts` already imports FROM `packageHost.ts` and the
+reverse direction would have been a real circular import.
+
+**Admin notifications on down and on recovery.** `raiseIssue()`
+already fires the declared `repairs.new` notification on the
+transition into an open, un-dismissed `error`-severity issue (session
+F's own work) - `searxng_unreachable` is `error`, so "down" was
+already covered. "And on recovery" was a genuine gap: nothing fired on
+`resolveIssue()` at all. Built generically, in `issues.ts` itself, on
+the exact symmetric transition (`error` and un-dismissed, now
+resolving) - a new declared `repairs.resolved` notification type
+(`"Resolved: {title}"`, matching every existing issue's own title
+regardless of how it's phrased, never "{title} is working again",
+which reads wrong for a title already phrased as the broken state).
+Kept synchronous (unlike `raiseIssue()`), since none of `resolveIssue()`'s
+many existing callers across the codebase expect to await it -
+`trigger()` runs detached, its own failure logged rather than thrown
+into a caller that never awaited this function in the first place.
+This is the platform's own "declared, not invented" rule working as
+designed: every existing `error`-severity issue source (engine faults,
+smoke failures, whatever raises one next) gets a recovery notification
+for free, not something bespoke to search. `configurable: false` (in-app
+delivery only, unlike `repairs.new`'s own Telegram toggle): a first cut
+also added `notifications.repairs.resolved.telegram` to `notificationKeys.ts`,
+which the gate's own settings-registry-drift check refused - that
+settings key is a shared-spec record (`commons`'s own `spec/settings/
+keys.json`, pinned per tag), and bumping another repo's own tag was
+out of scope for this item. In-app fulfills "the admin gets a
+notification" either way; named here as a real, deliberate gap rather
+than silently left mismatched with `repairs.new`'s own shape.
+
+**Quiet mode with a 15-minute probe.** The design note: "only a
+person's own searches go out, nothing in the background." There is no
+background search caller anywhere in this codebase today (nothing
+schedules a proactive websearch) - a live person's own turn is the
+only real caller besides the canary itself, so this half is already
+true by construction; named here rather than silently assumed, since
+it is a fact about today's code, not a guarantee this item builds. The
+15-minute probe: the canary's own scheduler job (`index.ts`'s
+`ensureCoreJob("websearch.check_searxng_health", ...)`) tightened from
+`every:1h` to `every:15m` - unconditionally, not only while down. A
+single canary request every 15 minutes is nowhere near
+SEARCH-PACE-01's own person-pace budget (below) even added to it, and
+a fixed cadence needs no new scheduling machinery (the scheduler's own
+recurrence is per-job, not per-state) - it also means an outage with
+no live household traffic to detect it any other way is now noticed,
+and its recovery caught, in minutes rather than up to an hour, in
+*either* direction, not only while already known to be down.
+
+**One token bucket per host, numbers stated.** SearXNG already had a
+shared rate limiter (`packageHost.ts`'s own `SEARXNG_RATE_LIMIT_KEY`,
+`@maipai/core`'s own generic `createRateLimiter()` - "one shared
+instance across every integration ... keyed per destination host,"
+its own header comment) - this item's real work was tightening its
+numbers, not building the mechanism. `{capacity: 10, refillPerSecond:
+0.5}` (a burst of 10, then one every 2s) to the design note's own
+stated budget, `{capacity: 3, refillPerSecond: 1/6}` (a burst of
+three, then about one every six seconds) - tonight's own 25-query
+bench run fit comfortably inside the OLD numbers, which is exactly how
+it went unnoticed as flooding until the upstream engines themselves
+objected. **A design question resolved rather than asked**: the note
+also says "a query that would exceed the budget waits for a person's
+turn." The shared limiter's own contract (`@maipai/core/src/
+rateLimiter.ts`'s own doc comment) is explicit and deliberate: "never
+blocks or queues - a caller over budget gets told no immediately ...
+rather than a request silently piling up," a shared, foundational
+choice this item has no business weakening for one caller. Read
+in context, "waits for a person's turn" is the outcome from the
+person's own side, not a queuing mechanism to build: a rejected call
+already gets a clear, honest `rate_limited` refusal today, and the
+existing behavior already means the person just tries again - nothing
+new needed here beyond the tightened numbers themselves.
+
+**The bench runner refusal.** `scripts/bench/liveHubQuiet.ts` gains
+`isLocalFixtureUrl()` (a fixture always binds `127.0.0.1`/`localhost`/
+`::1`; anything else is the household's real instance) and
+`refuseRealSearxngWithoutClearance(scriptName, url)`, refusing unless
+`MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1` is set per invocation - the same
+shape `MAIPAI_BENCH_IGNORE_GATE_CWD` already uses, never a standing
+default. `query-writer-01-live.ts` (the script whose own 2026-09-24
+run sent 25 real queries) is retrofitted to call it.
+
+**Files.** `src/lib/searchHealthState.ts` (new); `src/lib/packageHost.ts`
+(the wrapping try/catch, the tightened rate limit, the separate
+page-read budget); `src/lib/searxngHealth.ts` (refactored onto the
+shared function); `src/lib/issues.ts` (`resolveIssue()`'s new
+notification); `src/lib/notificationTypes.ts` (`repairs.resolved`);
+`src/index.ts` (the
+15-minute cadence); `scripts/bench/liveHubQuiet.ts` (the clearance
+guard); `scripts/bench/query-writer-01-live.ts` (retrofitted). Tests:
+two new `searxngHealth.test.ts` cases already covered the health-row
+half in SEARCH-EMPTY-01; this item adds three `packageHost.test.ts`
+cases (a real call raising/resolving immediately, a genuinely empty
+real result raising nothing, the tightened rate limit's own numbers),
+four `issues.test.ts` cases (`repairs.resolved` fires once on a
+genuine error-to-resolved transition, never for warning/info, never
+for something resolved while dismissed), and three `liveHubQuiet.test.ts`
+cases for the URL classification the refusal guard depends on.
+
+**Out of scope, named rather than silently worked around**: a
+background search caller (none exists yet, so "nothing in the
+background" needed no new gate); SEARCH-FALLBACK-01 (Wikipedia),
+next in the queue.
+
+**A medium review (per the coordinator's own instruction - a guard)
+found and fixed four real bugs before this landed.** (1) The first
+cut's try/catch wrapped the `read_page` fetch too, so a linked page
+failing for its own reasons (the target site blocking the request,
+non-HTML content) got misreported as SearXNG itself being down -
+fixed by narrowing the health-reporting try/catch to the actual
+SearXNG request and response only; the `read_page` fetch runs after
+it, its own failures propagating unchanged, never a health signal.
+(2) The tightened search rate limit was still shared with page reads
+(one pre-existing key both used), so one household question with
+`read_page: true` cost two tokens from the one bucket, leaving as
+little as one token for a second, unrelated question moments later -
+a real risk to ordinary conversation the review's own third angle
+asked about directly, not only a bench flood. Fixed with a second,
+separate key and budget for page reads (`{capacity: 3, refillPerSecond:
+0.5}`, CLAUDE.md's own "a page every few seconds" rule for an
+arbitrary fetched page, distinct from SearXNG's own tighter "person's
+pace" budget). (3) `resolveIssue()`'s new fire-and-forget notification
+call was not wrapped in `trackBackgroundWork()`, unlike every other
+detached `trigger()` call in this codebase (`notifications.ts`'s own
+`notifyIfFlagged()`) - invisible to the test harness's global drain,
+reproducing exactly the class of bug (getmaipai/home#123) that
+mechanism exists to prevent. Fixed to match. (4) `searxngHealth.ts`'s
+own canary catch redundantly re-recorded a "down" outcome
+`packageHost.ts`'s own catch had already recorded for the identical
+failure, doing a second needless raiseIssue/DB write on every canary
+tick while down - simplified to a bare `return`, since `searxngSearch()`
+now handles every one of its own thrown error codes.
+
+Exit: `bash scripts/check.sh` green; the fourteen new/changed tests
+above (twelve plus two regression tests for the review's own findings
+1 and 2), landed.
+
 ## SEARCH-EMPTY-01: search down and search found nothing are never the same reply (2026-09-24)
 
 **Objective.** `conv-19awhetzdf` (the same conversation LIVE-0924-01

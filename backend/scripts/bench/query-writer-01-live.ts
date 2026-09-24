@@ -21,7 +21,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { refuseIfGateRunning, waitForHubQuiet } from "./liveHubQuiet";
+import { refuseIfGateRunning, refuseRealSearxngWithoutClearance, waitForHubQuiet } from "./liveHubQuiet";
 
 const REPS = Number(process.env.QUERY_WRITER_REPS ?? 5);
 // Roster-safe throughout (never the real household's own words):
@@ -44,6 +44,11 @@ async function main(): Promise<void> {
     console.error("query-writer-01-live refused: MAIPAI_SEARXNG_URL is not set - this bench measures a real forced-search miss and its recovery against the household's own live search backend, never a fixture.");
     process.exit(2);
   }
+  // SEARCH-HEALTH-01: this script's own 2026-09-24 run sent 25 real
+  // queries to the household's SearXNG - exactly the traffic that got
+  // it rate-limited that same night. Never runs against the real
+  // instance again without the coordinator's own explicit clearance.
+  refuseRealSearxngWithoutClearance("query-writer-01-live", searxngUrl);
   const ownDataDir = mkdtempSync(join(tmpdir(), "query-writer-01-live-"));
   process.env.MAIPAI_DATA_DIR = ownDataDir;
   if (!process.env.MAIPAI_LLAMA_SERVER_URL) process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:8788";

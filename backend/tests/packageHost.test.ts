@@ -14,11 +14,20 @@ import { people, memoryRecords, scheduledJobs, lists } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { remember } from "@/lib/memory";
+import { listIssues } from "@/lib/issues";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
+  // SEARCH-PACE-01: the searxng rate limit tightened to {capacity: 3,
+  // refillPerSecond: 1/6} (from {10, 0.5}) - this file's own many
+  // sequential real-searxng tests shared one bucket with no reset
+  // between them, fine under the old, looser budget and flaky under
+  // the new one. Every other caller here already resets explicitly
+  // right before it needs to (a no-op, called twice); this just makes
+  // every test start with a full bucket regardless of run order.
+  __resetRateLimiterForTests();
 });
 
 function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
@@ -1020,6 +1029,152 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       const result = (await host.integration.call("searxng", "search", { query: "no results fixture" })) as { rows: unknown[] };
       expect(result.rows).toEqual([]);
     } finally {
+      server.stop(true);
+    }
+  });
+
+  // SEARCH-HEALTH-01 (docs/dev.md, docs/plans/search-resilience-
+  // 2026-09-24.md): "the one choke point ... records [search's state]
+  // on each call" - a real, live search (never only the hourly/15-
+  // minute canary) raises and resolves the same Repairs rows
+  // immediately.
+  test("a real call that hits search_unavailable raises searxng_empty immediately, not only via the canary", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] }),
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      try {
+        await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect((err as HostError).code).toBe("search_unavailable");
+      }
+      const issue = listIssues().find((i) => i.source === "websearch" && i.key === "searxng_empty");
+      expect(issue).toBeDefined();
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a real call that fails outright raises searxng_unreachable immediately, and a later real success resolves it", async () => {
+    const actor = await owner();
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    try {
+      await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
+      throw new Error("should have thrown");
+    } catch {
+      // network_unreachable - the exact code doesn't matter here, only that it was recorded.
+    }
+    expect(listIssues().find((i) => i.source === "websearch" && i.key === "searxng_unreachable")).toBeDefined();
+
+    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "The Following", url: "https://example.com", content: "A show." }] }) });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
+      expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a genuinely empty real result, with no unresponsive_engines, raises nothing at all", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      await host.integration.call("searxng", "search", { query: "an obscure question nobody has answered" });
+      expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // A review (2026-09-24) caught the first cut of this item wrapping
+  // the read_page fetch in the same health-reporting try/catch as the
+  // SearXNG request itself - a linked page failing for its own reasons
+  // (blocked, non-HTML) got misreported as SearXNG being down. Search
+  // itself succeeds here; only the linked page fails.
+  test("a failed read_page fetch never misreports SearXNG as down - the search itself succeeded", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "Unreachable page", url: "http://127.0.0.1:1", content: "c" }] }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      try {
+        await host.integration.call("searxng", "search", { query: "q", read_page: true });
+        throw new Error("should have thrown (the linked page itself refuses the connection)");
+      } catch (err) {
+        expect((err as HostError).code).not.toBe("search_unavailable");
+      }
+      expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // SEARCH-PACE-01: the design note's own stated budget, "a burst of
+  // three, then about one query every six seconds on average" -
+  // {capacity: 3, refillPerSecond: 1/6}.
+  test("the searxng rate limit is a burst of 3, then about one every 6 seconds", async () => {
+    __resetRateLimiterForTests();
+    const actor = await owner();
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1"); // refuses the connection - real, fast, deterministic failures
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    const codes: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      try {
+        await host.integration.call("searxng", "search", { query: "q" });
+      } catch (err) {
+        codes.push((err as HostError).code);
+      }
+    }
+    // The first 3 (the burst) reach the real network call and fail some
+    // other way (a connection refused, network_unreachable); only the
+    // 4th, past the budget, is refused before ever trying.
+    expect(codes).toHaveLength(4);
+    expect(codes.slice(0, 3)).not.toContain("rate_limited");
+    expect(codes[3]).toBe("rate_limited");
+  });
+
+  // A review (2026-09-24) caught this budget originally shared with
+  // page reads: one household question with read_page: true consumed
+  // a token from each half of the SAME bucket, leaving as little as
+  // one search token free for a second, unrelated question moments
+  // later - a real risk to ordinary conversation, not only a bench
+  // flood. Proven here by token count: a combined search+read_page
+  // call now costs exactly one SEARCH token (its own separate
+  // read_page token comes from a different bucket entirely), so two
+  // more plain searches still fit inside the same 3-capacity budget.
+  test("a combined search+read_page call costs one search token, not two - page reads have their own separate budget", async () => {
+    const { __setPageReaderForTests } = await import("@/lib/packageHost");
+    __resetRateLimiterForTests();
+    __setPageReaderForTests(async (url) => ({ type: "document", attachment_id: "att-1", url, title: "T", text: "text", chunks: [], links: [], sections: [] }));
+    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "T", url: "https://example.com", content: "c" }] }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const codes: string[] = [];
+      for (let i = 0; i < 4; i++) {
+        try {
+          await host.integration.call("searxng", "search", { query: "q", read_page: i === 0 });
+        } catch (err) {
+          codes.push((err as HostError).code);
+        }
+      }
+      // All 3 within the search budget's own capacity succeed (the
+      // first one also did a page read); only the 4th, past that
+      // budget, is refused - never after just 2, which is what a
+      // still-shared bucket (the combined call costing 2) would show.
+      expect(codes).toEqual(["rate_limited"]);
+    } finally {
+      __setPageReaderForTests(null);
       server.stop(true);
     }
   });

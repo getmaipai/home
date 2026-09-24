@@ -79,6 +79,35 @@ export function refuseIfGateRunning(scriptName: string): void {
   }
 }
 
+/** SEARCH-HEALTH-01: a fixture always binds `127.0.0.1`/`localhost`
+ * (every `startFakeSearxng()` in this directory does); anything else
+ * is the household's real instance. Exported separately from
+ * `refuseRealSearxngWithoutClearance` below so its own classification
+ * logic has a direct test, never only exercised through a
+ * `process.exit`-ing guard. */
+export function isLocalFixtureUrl(url: string): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return true; // an unparseable URL fails at the real call site, not here
+  }
+  return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
+}
+
+/** SEARCH-HEALTH-01 (docs/dev.md's "Live bench protocol", 2026-09-24):
+ * a bench sending real queries to the household's own SearXNG - the
+ * exact traffic that got it rate-limited tonight - needs the
+ * coordinator's own clearance, every time, never a standing default.
+ * `MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1` is that clearance, set per
+ * invocation for the one cleared run, the same shape
+ * `MAIPAI_BENCH_IGNORE_GATE_CWD` above already uses. */
+export function refuseRealSearxngWithoutClearance(scriptName: string, searxngUrl: string): void {
+  if (isLocalFixtureUrl(searxngUrl) || process.env.MAIPAI_BENCH_REAL_SEARXNG_CLEARED === "1") return;
+  console.error(`${scriptName} refused: MAIPAI_SEARXNG_URL (${searxngUrl}) points at a real instance, not a local fixture, and MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set. A real run needs the coordinator's own clearance and stays at a person's pace once cleared (docs/dev.md's "Live bench protocol").`);
+  process.exit(2);
+}
+
 /** Resolves before the log has gone quiet for one 2s poll window;
  * every new "[turn]" line seen along the way re-arms a 30s wait. */
 export async function waitForHubQuiet(hubLog: string = process.env.MAIPAI_HUB_LOG ?? DEFAULT_HUB_LOG, onWaiting?: (msg: string) => void): Promise<void> {
