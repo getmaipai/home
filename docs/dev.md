@@ -27174,3 +27174,118 @@ gen-settings-registry.ts`, `docs/api/openapi.json` (`Source.kind`'s
 scripts/check.sh` green (551 TS + 248 pytest + ruff + gen/ drift
 clean); this repo's `bash scripts/check.sh` green (scope full: 4242
 backend + 726 frontend). Review: medium plus a low follow-up pass.
+
+## KIWIX-SIDECAR-01: kiwix-serve as a real sidecar (2026-09-24)
+
+**Objective.** `docs/plans/knowledge-sources-2026-09-24.md`'s build
+order, item 2: `kiwix-serve` installed from a pinned, checksummed
+binary the same way the engine binaries are (`kiwixCatalog.ts` mirrors
+`engineCatalog.ts`'s own shape), registered through the one generic
+process supervisor (`sidecars.ts`) rather than a second one, loopback
+only, excluded from backups. This is `sidecars.ts`'s first real caller
+- it existed with no caller before this item.
+
+**Pin.** `kiwix-tools 3.8.2 macos-arm64`, from `download.kiwix.org/
+release/kiwix-tools/` (the coordinator's own correction - not GitHub
+releases), sha256 verified against the publisher's own `.sha256` file
+before pinning. No Windows 3.8.2 build exists yet (only 3.8.1) - left
+as a deliberately-empty-sha256 placeholder `selectKiwixBinary()` filters
+out by construction (`archive.sha256.length > 0`), never a guessed pin.
+
+**The archive's own shape.** kiwix-serve refuses to start with zero ZIM
+arguments and no `--library` (verified live), so `registerKiwixSidecar()`
+always writes a `library.xml` first - via `regenerateLibrary()`, real
+`kiwix-manage add` calls (never hand-rolled XML: the legacy notes'
+own "kiwix-manage 3.8.2 stopped writing `name=`" is exactly the kind of
+version quirk reimplementing this would have to track forever), even
+when the directory holds no ZIM yet. Serves with `-i 127.0.0.1 --library
+<path> -M` (auto-reload, so `REFERENCE-LIBRARY-01`'s future installs
+never need a restart to appear).
+
+**Testability seam.** `registerKiwixSidecar(bins)` takes the already-
+resolved `{serveBin, manageBin}` rather than resolving them itself -
+the one seam that lets `kiwixSidecar.test.ts` prove the real
+registration wiring (command array, library regeneration, port/health
+URL - 11 tests, deterministic and offline) against scripted stand-in
+binaries (`fakeKiwixServe.sh`, `fakeKiwixManage.sh`), never touching
+the network. Only `startKiwixSidecar()` (called once at boot in
+`index.ts`, never from a test) resolves the real pinned binary via
+`ensureKiwixInstalled()`.
+
+**Fixture ZIM: downloaded, never vendored.** The live bench's own
+fixture (`small.zim`, openzim/zim-testing-suite, 41,155 bytes) is
+fetched by the bench itself from its own pinned URL and sha256, via
+the same `downloadUrl()` every pinned binary in this codebase already
+uses - never a committed file under `tests/fixtures`. A review caught
+a first draft that committed it directly, which the org's own
+"third-party code and assets: download, don't vendor" rule (org
+CLAUDE.md) exists specifically to rule out, and this codebase has no
+precedent of a committed binary fixture to match against either.
+
+**Live proof** (`scripts/bench/kiwix-sidecar-01-live.ts`, final run
+2026-09-24 against the post-review code, isolated `MAIPAI_DATA_DIR`,
+its own port 8799): a real download of the pinned kiwix-tools archive,
+sha256 verified, extracted (117,753 ms cold, no prior cache - the
+`.download.tmp` archive is now deleted after extraction, matching
+`modelDownloadJobs.ts`'s own pattern; the serve/manage binaries landed
+under `sidecars/kiwix-tools/...`, a sibling of `engines/`, confirming
+the orphan-sweep fix took effect); a real, pinned download of the
+fixture ZIM (152 ms), sha256 verified; a real `kiwix-manage add`
+against it; a real `kiwix-serve` process started via `registerSidecar`/
+`startSidecar` and reaching `running` with a real health check; `GET /
+suggest?content=kiwix-small&term=Test` returned `200` with `"Test ZIM
+file"` in its own `value` field (the legacy notes' own "suggest's value
+field, not label" distinction - the fixture's title is HTML-escaped
+with bold tags inside `label`, so a naive substring match on `label`
+would have failed). The fixture ZIM has no full-text index
+(`_ftindex:no` in its own tags, verified via its OPDS entry) -
+`/search` correctly answers "Fulltext search unavailable" on it, so
+this proof uses `/suggest` (title matching, which the fixture does
+support) as the honest "searchable on loopback" evidence rather than
+overclaiming full-text search; a book with a real index is
+`REFERENCE-LIBRARY-01`'s own concern.
+
+**Health row and Repairs, by construction, not a new test.**
+`registerKiwixSidecar()` registers through the same `registerSidecar()`
+every other sidecar uses, and the health-poll/crash-detection/
+Repairs-issue path lives entirely in `sidecars.ts`'s own generic
+implementation, agnostic to which id is registered - already proven
+live by `sidecars.test.ts`'s own "a command that can never spawn ends
+crashed and raises a real Repairs issue with a working fix" and
+"detects a crash, raises an issue, and auto-restarts with backoff".
+Nothing kiwix-specific touches that code path, so a kiwix-flavored
+duplicate of the same proof was skipped rather than added.
+
+**A real review catch: `kiwixToolsDir` was nested inside `enginesDir`.**
+`llmSupervisor.ts`'s `sweepOrphanEngineProcesses()` runs on every boot
+AND every `bun --hot` reload (Fix A2, 2026-09-07's incident note), and
+does a plain substring match on every process's command line against
+`enginesDir`, killing anything not in its own exclude list (chat's,
+embed's, tts's, background's live pids - JOIN-02 added the background
+engine to that list the same way, 2026-09-13). The first draft put
+`kiwixToolsDir` at `resolve(dataDir, "engines", "kiwix-tools")` - a
+real kiwix-serve process would have been a stranger to that sweep's
+exclude list and gotten SIGKILLed on the very next reload, the exact
+incident class the 2026-09-07 note documents, now for a sidecar
+instead of an engine. Fixed by moving it to a sibling directory
+(`resolve(dataDir, "sidecars", "kiwix-tools")`), never a child of
+`enginesDir`: kiwix-serve is a sidecar, tracked by `sidecars.ts`'s own
+hot-reload-safe `globalThis` registry, never an `llmSupervisor.ts`-managed
+engine, so it has no business under the one directory that sweep is
+scoped to.
+
+Files: `backend/src/lib/kiwixCatalog.ts` (new, the pin table),
+`backend/src/lib/kiwixSidecar.ts` (new, install/library/register/
+start), `backend/src/lib/paths.ts` (`kiwixToolsDir` as a sibling of
+`enginesDir`, `defaultReferenceLibraryDir`), `backend/src/index.ts`
+(`startKiwixSidecar()` alongside `startAllSidecars()`), `backend/
+tests/kiwixSidecar.test.ts` (new, 11 tests), `backend/tests/fixtures/
+fakeKiwixServe.sh`, `backend/tests/fixtures/fakeKiwixManage.sh`,
+`backend/scripts/bench/kiwix-sidecar-01-live.ts` (new; downloads its
+own fixture ZIM, never a committed one). Verification: `bash scripts/
+check.sh` green (scope full); the live bench above, run once against
+the final, post-review code, numbers recorded here. Review: low - one
+pass surfaced four real findings (the enginesDir nesting, the
+committed third-party fixture, the leftover `.download.tmp`, the
+live bench's own missing exit code on a failure path), all fixed
+before landing.
