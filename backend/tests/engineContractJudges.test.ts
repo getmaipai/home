@@ -28,6 +28,43 @@ describe("judgeRequired", () => {
     expect(result.pass).toBe(false);
     expect(result.reason).toContain("tool_calls");
   });
+
+  // A code review (2026-09-23) caught this: a malformed websearch call
+  // earlier in tool_calls used to fail the whole judge immediately, even
+  // when a later call in the same reply was a valid one - the contract
+  // ("a tool call every time") was actually met.
+  test("a malformed websearch call followed by a valid one still passes", () => {
+    const reply = {
+      choices: [
+        {
+          message: {
+            content: "",
+            tool_calls: [
+              { type: "function", function: { name: "websearch", arguments: "not valid json" } },
+              { type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "president of chile" }) } },
+            ],
+          },
+        },
+      ],
+    };
+    expect(judgeRequired(reply).pass).toBe(true);
+  });
+
+  test("every websearch call malformed still fails, naming the empty-expression reason", () => {
+    const reply = {
+      choices: [
+        {
+          message: {
+            content: "",
+            tool_calls: [{ type: "function", function: { name: "websearch", arguments: JSON.stringify({}) } }],
+          },
+        },
+      ],
+    };
+    const result = judgeRequired(reply);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toContain("missing or empty");
+  });
 });
 
 describe("judgeAutoNegative", () => {

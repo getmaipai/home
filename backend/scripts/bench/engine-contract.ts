@@ -31,9 +31,14 @@ export function judgeRequired(reply: unknown): JudgeResult {
   const message = messageOf(reply);
   const calls = Array.isArray(message?.tool_calls) ? message.tool_calls : null;
   if (!calls || calls.length === 0) return { pass: false, reason: "no tool_calls in the reply" };
+  // A malformed websearch call earlier in the array must not fail the
+  // whole judge if a later call in the same reply is a valid one - keep
+  // scanning instead of returning on the first name match.
+  let sawWebsearch = false;
   for (const call of calls) {
     const fn = asRecord(call?.function);
     if (fn?.name === "websearch") {
+      sawWebsearch = true;
       let expression: unknown;
       try {
         expression = (JSON.parse(fn.arguments as string) as Record<string, unknown>).expression;
@@ -41,9 +46,9 @@ export function judgeRequired(reply: unknown): JudgeResult {
         expression = undefined;
       }
       if (typeof expression === "string" && expression.length > 0) return { pass: true, reason: "websearch call with a non-empty expression" };
-      return { pass: false, reason: "websearch call present but its arguments.expression is missing or empty" };
     }
   }
+  if (sawWebsearch) return { pass: false, reason: "websearch call present but its arguments.expression is missing or empty" };
   return { pass: false, reason: "tool_calls present but none named websearch" };
 }
 
@@ -212,57 +217,68 @@ async function main(): Promise<void> {
   }
   records.push(...timingReps);
 
-  let abortResult: JudgeResult;
-  try {
-    const controller = new AbortController();
-    const abortTimer = setTimeout(() => controller.abort(), 100);
+  // judgeAbort() needs a real warm-short baseline (median(warmShortTtfts)
+  // below); if every "auto-negative" rep above failed before it could
+  // push a timing, that median() call throws "median of an empty array"
+  // - caught by this section's own outer try/catch and recorded under
+  // "abort" with a reason that has nothing to do with the abort probe
+  // itself. Checked and reported here, under its own name, instead of
+  // running the probe at all.
+  if (warmShortTtfts.length === 0) {
+    records.push({ check: "abort", rep: 1, pass: false, reason: "no warm-short baseline: every auto-negative rep failed before recording a timing", cached_tokens: 0, prompt_tokens: 0 });
+  } else {
+    let abortResult: JudgeResult;
     try {
-      await sendCompletion(
-        url,
-        {
-          model: process.env.MAIPAI_CHAT_MODEL ?? "default",
-          messages: [{ role: "user", content: "write a long essay about the history of the world" }],
-          max_tokens: 200,
-          temperature: 0,
-        },
-        controller.signal,
-      );
-      // The engine answered before the 100ms timer fired - nothing was
-      // actually aborted, so there is no cancellation to prove reached
-      // the engine's slot.
-      throw new Error("abort probe: the engine completed before the 100ms abort fired; nothing was cancelled");
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), 100);
+      try {
+        await sendCompletion(
+          url,
+          {
+            model: process.env.MAIPAI_CHAT_MODEL ?? "default",
+            messages: [{ role: "user", content: "write a long essay about the history of the world" }],
+            max_tokens: 200,
+            temperature: 0,
+          },
+          controller.signal,
+        );
+        // The engine answered before the 100ms timer fired - nothing was
+        // actually aborted, so there is no cancellation to prove reached
+        // the engine's slot.
+        throw new Error("abort probe: the engine completed before the 100ms abort fired; nothing was cancelled");
+      } catch (err) {
+        // The expected outcome: sendCompletion's own fetch rejects with
+        // an AbortError once the timer fires. That is proof the request
+        // was cancelled client-side; it is not yet proof the engine's
+        // own slot freed up, which is what the followup measurement
+        // below checks. Any OTHER error (a real network failure, the
+        // "nothing was cancelled" case just above) is not the abort
+        // this check exists to prove, so it re-throws to the outer catch.
+        const isAbort = err instanceof Error && (err.name === "AbortError" || /aborted|signal is aborted/i.test(err.message));
+        if (!isAbort) throw err;
+      } finally {
+        clearTimeout(abortTimer);
+      }
+      // Same measurement shape as warmShortTtfts (a full round trip
+      // through sendCompletion, not a streamed reader - these requests
+      // never set `stream: true`, so a raw reader's first chunk on a
+      // non-streaming JSON body is not a real first-token measurement),
+      // so the 200ms comparison in judgeAbort is the same unit on both
+      // sides.
+      const started = performance.now();
+      await sendCompletion(url, {
+        model: process.env.MAIPAI_CHAT_MODEL ?? "default",
+        messages: [{ role: "user", content: "good morning" }],
+        max_tokens: 16,
+        temperature: 0,
+      });
+      const followupTtftMs = performance.now() - started;
+      const warmShortMedianMs = median(warmShortTtfts);
+      abortResult = judgeAbort(followupTtftMs, warmShortMedianMs);
+      records.push({ check: "abort", rep: 1, pass: abortResult.pass, reason: abortResult.reason, cached_tokens: 0, prompt_tokens: 0 });
     } catch (err) {
-      // The expected outcome: sendCompletion's own fetch rejects with
-      // an AbortError once the timer fires. That is proof the request
-      // was cancelled client-side; it is not yet proof the engine's
-      // own slot freed up, which is what the followup measurement
-      // below checks. Any OTHER error (a real network failure, the
-      // "nothing was cancelled" case just above) is not the abort
-      // this check exists to prove, so it re-throws to the outer catch.
-      const isAbort = err instanceof Error && (err.name === "AbortError" || /aborted|signal is aborted/i.test(err.message));
-      if (!isAbort) throw err;
-    } finally {
-      clearTimeout(abortTimer);
+      records.push({ check: "abort", rep: 1, pass: false, reason: err instanceof Error ? err.message : String(err), cached_tokens: 0, prompt_tokens: 0 });
     }
-    // Same measurement shape as warmShortTtfts (a full round trip
-    // through sendCompletion, not a streamed reader - these requests
-    // never set `stream: true`, so a raw reader's first chunk on a
-    // non-streaming JSON body is not a real first-token measurement),
-    // so the 200ms comparison in judgeAbort is the same unit on both
-    // sides.
-    const started = performance.now();
-    await sendCompletion(url, {
-      model: process.env.MAIPAI_CHAT_MODEL ?? "default",
-      messages: [{ role: "user", content: "good morning" }],
-      max_tokens: 16,
-      temperature: 0,
-    });
-    const followupTtftMs = performance.now() - started;
-    const warmShortMedianMs = median(warmShortTtfts);
-    abortResult = judgeAbort(followupTtftMs, warmShortMedianMs);
-    records.push({ check: "abort", rep: 1, pass: abortResult.pass, reason: abortResult.reason, cached_tokens: 0, prompt_tokens: 0 });
-  } catch (err) {
-    records.push({ check: "abort", rep: 1, pass: false, reason: err instanceof Error ? err.message : String(err), cached_tokens: 0, prompt_tokens: 0 });
   }
 
   const byCheck = new Map<string, RepRecord[]>();
