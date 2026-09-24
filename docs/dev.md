@@ -402,6 +402,59 @@ Exit: `bash scripts/check.sh` green (backend scope; full suite unchanged
 elsewhere); the two scripted tests above, landed; the live bench script,
 committed, 0/25 natural misses recorded above.
 
+## QUERY-WRITER-01b: the forced-miss live acceptance, deterministic (2026-09-24)
+
+QUERY-WRITER-01's own live script observed 0 natural misses in 25 reps
+(above) - honest, but it never actually exercised
+`recoveredMissingCall()`/the query-writer live, and those 25 reps also
+sent 25 real queries to the household's own SearXNG, exactly the
+traffic the live-bench-protocol pace rule (this same night) now
+forbids. This item gets real live coverage without either problem.
+
+**The switch.** `turnMachine/nodes/model.ts`:
+`MAIPAI_BENCH_FORCE_REQUIRED_MISS` (checked only by its own exact
+string value `"1"`) forces `requiredButMissing` to `true` on every
+forced (`tool_choice: "required"`) turn, regardless of what the model
+actually returned - `otherCalls` still preserves any legitimate
+sibling call the model made alongside the discarded websearch one,
+identically to a real miss. Unset in every real deployment; nothing
+about a normal request can set it. This is the one and only production
+file this item touches.
+
+**The bench.** `scripts/bench/query-writer-01b-live.ts` (new), the same
+roster-safe shape and `refuseIfGateRunning`/`waitForHubQuiet` hold
+protocol as `query-writer-01-live.ts`, but an isolated hub throughout:
+its own disposable `MAIPAI_DATA_DIR`, the resident 8B via URL (chat
+:8788, embed :8794, never spawned), and `conversationRunner.ts`'s own
+`startFakeSearxng()` fixture instead of the household's real instance -
+no real search traffic, by design, since only the searched expression
+is graded, never the results. Sets the force-miss env var itself, then
+runs the person-subject turn ("marlow took over hosting the late night
+show from the old host, riff") then the pronoun follow-up ("when did
+his show end") for 5 reps, reading each rep's actual query straight
+off the fake server's own `queries` array rather than parsing the
+turn's stored `outcomes`.
+
+**Result: 5/5.** Every rep's searched expression named the resolved
+subject, never the bare pronoun:
+
+| rep | search expression |
+|---|---|
+| 0 | "when did Marlow's show end" |
+| 1 | "when did marlow's show end" |
+| 2 | "When did Marlow's show end" |
+| 3 | "when did Marlow's show end" |
+| 4 | "when did Marlow's late night show end" |
+
+Ticks QUERY-WRITER-01 (docs/BACKLOG.md) by this result: the two
+scripted tests prove the mechanism works when a miss happens; this
+bench proves it live, forced rather than hoped-for, with zero real
+search traffic.
+
+Exit: `bash scripts/check.sh` green (backend scope: 4185/4185, plus
+frontend typecheck/docs/standards unaffected). Low-effort review: no
+findings.
+
 ## STREAM-NEXT-01: real progressive streaming for the new path (2026-09-24)
 
 `runTurnNext()` always awaited the whole xstate machine to `done` before

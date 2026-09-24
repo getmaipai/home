@@ -705,7 +705,17 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   const websearchCall = attempt.toolCalls?.find((c) => c.tool === "websearch");
   const websearchExpression = websearchCall && typeof websearchCall.args === "object" && websearchCall.args !== null && "expression" in websearchCall.args ? (websearchCall.args as { expression: unknown }).expression : undefined;
   const websearchValid = typeof websearchExpression === "string" && websearchExpression.trim().length > 0;
-  const requiredButMissing = tool_choice === "required" && !websearchCall;
+  // QUERY-WRITER-01b (bench-only, getmaipai-26's ruling, 2026-09-24): a
+  // real required-call miss is genuinely rare and engine-dependent
+  // (ENGINE-CONTRACT-02 measured 0/5 to 8/10 by temp/cache state alone)
+  // - too unreliable to exercise recoveredMissingCall()/the query-writer
+  // itself from a live bench. This env var forces every forced turn
+  // into the miss branch below regardless of what the model actually
+  // returned, so a bench can drive that path deterministically. Read
+  // only by its own exact value, unset in every real deployment - a
+  // production request has no way to set it.
+  const benchForceRequiredMiss = process.env.MAIPAI_BENCH_FORCE_REQUIRED_MISS === "1";
+  const requiredButMissing = tool_choice === "required" && (!websearchCall || benchForceRequiredMiss);
   const offeredButInvalid = websearchCall !== undefined && !websearchValid;
   if (requiredButMissing || offeredButInvalid) {
     // A review caught the first cut here discarding every tool call the
