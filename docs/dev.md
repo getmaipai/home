@@ -26537,3 +26537,57 @@ quadratic formula properly typeset (fraction, radical, superscripts) -
 in both themes, both widths. Replaces CHAT-RICH-01's own interactive-
 browser 500px substitute in the record. Low-effort review clean on
 both sides. Restarted 8787 onto this landing.
+
+## SAFETY-NOTIFY-NEXT-01: the new path's own parent notification, wired to the old path's own dedupe (2026-09-24)
+
+An independent source review (Session A, reading only, no subagents or
+review skill, per the coordinator's own instruction) of two of Session
+B's landings - STREAM-NEXT-01 (the streaming per-sentence output gate)
+and SEARCH-EMPTY-01 (search-down vs. search-found-nothing) - found
+three real gaps: this one, STREAM-PARTIAL-01, and SEARCH-MIXED-01
+(their own entries below). All three ruled real and built, each its
+own commit under one shared gate.
+
+The new path (`turnMachine/`) built its own safety floor calls
+(`evaluateSafety`/`evaluateReply`/`forOutput`, the identical functions
+the old path calls) but never called `notifyOncePerTurn()` - the
+old path's own per-turn-deduped parent notification
+(`turnEngine.ts`, keyed `${turnId}:${category}` in a module-level
+`notifiedThisTurn` Set) - anywhere. A flagged turn on the new path
+never told a parent at all, silently, since nothing in either suite
+asserted on `listPending()` for a new-path turn until this item added
+that assertion. `notifyOncePerTurn` is now `export`ed from
+`turnEngine.ts` and imported directly everywhere the new path needs
+it - never copied, so the per-turn dedupe (the same flagged category
+firing twice in one turn, once on input and once on output, notifies
+only once) stays the ONE definition platform principle 4 requires.
+
+**The old path's five call sites, mapped**, each cited and matched to
+its exact new-path equivalent:
+
+| old path (`turnEngine.ts`) | what it covers | new path equivalent |
+|---|---|---|
+| `prepareTurn()` (line 3026) | the input-side check, before a reply is even chosen | `nodes/safety.ts`'s `safetyNode` - the identical input-side call, same place in the pipeline |
+| `applyOutputBoundary()` (line 4352), called from every `finalizeReply()` | the universal final output check every reply passes through (command, plugin, model alike) | `nodes/outputGate.ts`'s `outputGateNode`, its own whole-reply `evaluateReply()` branch - the new path's one shared output-safety pass for every non-streamed, non-refused `AnswerInput` kind (immediate/from_outcomes/model_text), matching `applyOutputBoundary()`'s own universal role |
+| `answerWithSafetyAndGuards()` (line 4929, a closure in `runTurnHoldingLease`'s blocking branch) | the blocking model reply's own whole-text safety pass, ahead of `finalizeReply()` | the SAME `outputGateNode` whole-reply branch above - the new path never duplicates this into two separate passes the way the old path's blocking branch does; one call covers what the old path's two calls (`answerWithSafetyAndGuards` then `applyOutputBoundary`) each did to the same text |
+| `checkAndNotify()` (line 5462, a closure in `runTurnHoldingLease`'s streaming branch) | the streamed reply's own per-sentence check, live as it generates | `nodes/outputGate.ts`'s `StreamGate.checkAndNotify()` - the identical per-sentence call, fired from `push()` and `finish()` |
+| `wholeRefusal()` (line 5470, same streaming branch) | a whole-reply-so-far re-check when a new sentence would make an otherwise-safe reply unsafe as a whole | `StreamGate.wholeRefusal()` - the identical re-check, called from the same two places |
+
+No old-path call site is without a new-path equivalent; two old sites
+collapse into one new-path call because the new pipeline never
+duplicates the blocking model reply's own safety pass the way the old
+path's `answerWithSafetyAndGuards()` + `finalizeReply()`'s own
+`applyOutputBoundary()` do. One new-path call has no old-path
+equivalent at all: `gateReasoning()`'s own `notifyOncePerTurn` call
+(a reasoning span's own safety pass) - REASONING-02 (chain-of-thought
+emission) is new-path only, so the old path never had a reasoning span
+to flag in the first place.
+
+**Tests** (`tests/turnMachine/turnNext.test.ts`, `outputGate.test.ts`):
+a flagged child turn on the streamed path notifies exactly once even
+though both the input-side and output-side checks fire on the same
+turn; the identical assertion on the immediate (non-streamed) path;
+a clean turn notifies nothing. `outputGate.test.ts`'s own `StreamGate`
+fixtures gained a real `PersonRow`/`turnId` (previously bare
+placeholders the constructor didn't yet need).
+

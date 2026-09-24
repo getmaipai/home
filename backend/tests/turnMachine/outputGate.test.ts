@@ -15,9 +15,16 @@ import { describe, expect, test } from "bun:test";
 import { outputGateNode, StreamGate } from "@/lib/turnMachine/nodes/outputGate";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 import type { TurnState } from "@/lib/turnMachine/contract";
+import type { PersonRow } from "@/lib/memoryIngestion";
 
 const STATE = {} as TurnState;
 const SIGNAL = new AbortController().signal;
+// SAFETY-NOTIFY-NEXT-01: StreamGate now notifies through the real
+// notifyOncePerTurn()/notifyIfFlagged() (the same dedupe every other
+// caller shares) - notifyIfFlagged only ever reads `displayName`, so a
+// minimal fake is exactly as unbuilt as this file's own `STATE` above.
+const FAKE_ACTOR = { displayName: "Test Person" } as PersonRow;
+const FAKE_TURN_ID = "turn-test-fake";
 
 const LUNA_ENVELOPE =
   '<function_call> {"name": "websearch", "arguments": {"expression": "when will chatgpt 6 luna be released"}} </function_call>';
@@ -151,6 +158,8 @@ describe("StreamGate (STREAM-NEXT-01 (b)): the per-sentence gate a streamed turn
     const doneCount = { count: 0 };
     const gate = new StreamGate(
       band,
+      FAKE_ACTOR,
+      FAKE_TURN_ID,
       (sentence) => released.push(sentence),
       (safety) => refusals.push(safety),
       () => { doneCount.count += 1; },

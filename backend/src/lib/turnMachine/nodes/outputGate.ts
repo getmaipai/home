@@ -28,6 +28,8 @@ import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { envelopeToolCall } from "@/lib/llm";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { notifyOncePerTurn } from "@/lib/turnEngine";
+import type { PersonRow } from "@/lib/memoryIngestion";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { Node, TurnState } from "../contract";
@@ -87,6 +89,12 @@ export class StreamGate {
 
   constructor(
     private readonly band: AgeBand,
+    // SAFETY-NOTIFY-NEXT-01: the actor/turnId turnEngine.ts's own
+    // gateOutputSafety() closes over from its own outer scope - this
+    // class has none of its own, so both arrive here instead, used only
+    // for the identical `notifyOncePerTurn()` calls below.
+    private readonly actor: PersonRow,
+    private readonly turnId: string,
     private readonly release: (sentence: string) => void,
     private readonly onRefuse: (safety: SafetyResult) => void,
     /** Fires exactly once, at the end of finish() (refused or not) -
@@ -129,17 +137,32 @@ export class StreamGate {
     return firstChar === "{" || firstChar === "<";
   }
 
+  /** turnEngine.ts's own gateOutputSafety()/checkAndNotify(): the per-
+   * sentence check plus the identical notify call, so a flagged
+   * sentence on the streamed path reaches a parent exactly as it would
+   * on the old path - never a second, silent check. */
+  private checkAndNotify(chunk: string): SafetyResult {
+    const safety = forOutput(evaluateSafety(chunk, this.band));
+    notifyOncePerTurn(this.actor, safety, this.turnId, "[turn]");
+    return safety;
+  }
+
   /** turnEngine.ts's own gateOutputSafety()/wholeRefusal(): a sentence
    * that passes its OWN check can still make the REPLY SO FAR unsafe
    * read as a whole (a claim split across two sentences, each benign
    * alone) - checked on `delivered + next`, the identical floor, every
    * time, whether or not the new span's own check already passed. Never
    * called with nothing delivered yet (whitespace alone is nothing
-   * delivered, the identical guard turnEngine.ts's own version has). */
+   * delivered, the identical guard turnEngine.ts's own version has).
+   * Notifies only on an actual refusal, the same as turnEngine.ts's own
+   * version - the non-refusing case is already covered by
+   * checkAndNotify()'s own unconditional call above it. */
   private wholeRefusal(next: string): SafetyResult | undefined {
     if (!this.delivered.trim()) return undefined;
     const whole = forOutput(evaluateSafety(`${this.delivered}${next}`, this.band));
-    return whole.action === "refuse" ? whole : undefined;
+    if (whole.action !== "refuse") return undefined;
+    notifyOncePerTurn(this.actor, whole, this.turnId, "[turn]");
+    return whole;
   }
 
   push(delta: string): void {
@@ -167,7 +190,7 @@ export class StreamGate {
         this.release(rawSpan);
         continue;
       }
-      const safety = forOutput(evaluateSafety(trimmed, this.band));
+      const safety = this.checkAndNotify(trimmed);
       if (safety.flagged) this.lastFlagged = safety;
       // A refusal carries the WHOLE reply's own result when something
       // was already delivered, so an earlier sentence's self-harm
@@ -221,7 +244,7 @@ export class StreamGate {
       if (this.refused || this.heldAsEnvelope) return;
       const remainder = this.pending.trim();
       if (!remainder) return;
-      const safety = forOutput(evaluateSafety(remainder, this.band));
+      const safety = this.checkAndNotify(remainder);
       if (safety.flagged) this.lastFlagged = safety;
       if (safety.action === "refuse") {
         this.refused = this.wholeRefusal(remainder) ?? safety;
@@ -268,9 +291,15 @@ export type OutputGateOutput =
  * itself streamed or not (STREAM-NEXT-01 (b), ruling point 5: "Reasoning
  * isn't streamed. It stays gated whole at the end, as now"), so both of
  * this node's branches share the one implementation. */
-function gateReasoning(input: OutputGateInput, band: AgeBand): { reasoningOut: string | undefined; withheldFor: TurnState["reasoning"]["withheld_for"] } {
+function gateReasoning(input: OutputGateInput, band: AgeBand, actor: PersonRow, turnId: string): { reasoningOut: string | undefined; withheldFor: TurnState["reasoning"]["withheld_for"] } {
   if (input.reasoningEmit && input.reasoningIn !== undefined) {
     const reasoningEvaluation = evaluateReply({ text: input.reasoningIn }, band);
+    // SAFETY-NOTIFY-NEXT-01: no old-path equivalent (reasoning emission,
+    // REASONING-02, is new-path-only - the old path never streamed or
+    // exposed a chain-of-thought span at all), but the same category of
+    // risk (a self-harm mention inside the model's own reasoning, say)
+    // needs the same parent notification a flagged answer already gets.
+    notifyOncePerTurn(actor, reasoningEvaluation.effective, turnId, "[turn]");
     if (reasoningEvaluation.effective.action === "refuse") return { reasoningOut: undefined, withheldFor: "gate" };
     return { reasoningOut: input.reasoningIn, withheldFor: null };
   }
@@ -339,12 +368,17 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
       const refusedWithheldFor = input.reasoningEmit ? "gate" : input.reasoningWithheldFor;
       return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]!, reasoning: { emitted: false, withheld_for: refusedWithheldFor } } };
     }
-    const { reasoningOut, withheldFor } = gateReasoning(input, band);
+    const { reasoningOut, withheldFor } = gateReasoning(input, band, state.actor, state.turnId);
     return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: withheldFor } } };
   }
 
   const repaired = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const evaluation = evaluateReply({ text: repaired, speech: input.reply.speech }, band);
+  // SAFETY-NOTIFY-NEXT-01: the immediate (non-streamed) path's own whole-
+  // reply boundary - the identical call turnEngine.ts's own
+  // applyOutputBoundary() makes right after its own equivalent
+  // evaluateReply(), unconditionally, before the refuse check below.
+  notifyOncePerTurn(state.actor, evaluation.effective, state.turnId, "[turn]");
 
   // The same safety pass the answer itself gets, over the reasoning
   // span too ("Reasoning passes the output gate ... before an adult
@@ -352,7 +386,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   // may emit one AND the model actually produced a span - the false
   // branches (never asked to emit, or nothing to gate) pass the
   // context-decided reason straight through, never re-evaluated here.
-  const { reasoningOut, withheldFor } = gateReasoning(input, band);
+  const { reasoningOut, withheldFor } = gateReasoning(input, band, state.actor, state.turnId);
   if (evaluation.effective.action === "refuse") {
     // A code review caught this reusing the reasoning span's own
     // withheldFor (from the check above, independent of the ANSWER's

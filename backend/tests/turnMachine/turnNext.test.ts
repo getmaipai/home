@@ -16,6 +16,7 @@ import { CATALOG } from "@/lib/modelCatalog";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { StreamSafetyRefusal, type StreamOutcome } from "@/lib/turnEngine";
 import { getPendingAsk } from "@/lib/conversationHistory";
+import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
 import { conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -1869,6 +1870,48 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
       expect(value.safety.action).toBe("allow_with_resources");
       expect(value.crisis_resources).toContain("988");
     });
+  });
+
+  // SAFETY-NOTIFY-NEXT-01 (found live in review: the new path called
+  // no equivalent of turnEngine.ts's own notifyOncePerTurn() anywhere,
+  // so a flagged turn on the household's real running path never told
+  // a parent at all - SAFETY.md's own "non-removable architecture,"
+  // not a nicety). Mirrors tests/turnEngine.test.ts's own "the
+  // notification fires" test exactly, same fixture, same
+  // fire-and-forget microtask wait, on the new path's own two
+  // entry points.
+  test("SAFETY-NOTIFY-NEXT-01: a flagged child turn on the streamed path notifies exactly once", async () => {
+    await withStub({ reply: () => "I want to kill myself." }, async () => {
+      const result = await runTurnNextStream(people.child, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, outcome } = await drain(result.tokens);
+      result.finalize(delivered.join(""), outcome);
+    });
+    // trigger() is fire-and-forget (never awaited by the gate) - give its
+    // own microtask a turn to actually land the DB write, the identical
+    // wait tests/turnEngine.test.ts's own version of this test uses.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const pending = listPending(people.owner).filter((n) => n.typeId === "safety.flagged_turn");
+    expect(pending.length).toBe(1);
+  });
+
+  test("SAFETY-NOTIFY-NEXT-01: the same flagged child turn on the immediate path notifies exactly once", async () => {
+    await withStub({ reply: () => "I want to kill myself." }, () => runTurnNext(people.child, "chat", "hi there"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const pending = listPending(people.owner).filter((n) => n.typeId === "safety.flagged_turn");
+    expect(pending.length).toBe(1);
+  });
+
+  test("SAFETY-NOTIFY-NEXT-01: a clean turn notifies nothing", async () => {
+    await withStub({ reply: () => "Sure, here's a fun fact about otters." }, async () => {
+      const result = await runTurnNextStream(people.child, "chat", "tell me something fun");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, outcome } = await drain(result.tokens);
+      result.finalize(delivered.join(""), outcome);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const pending = listPending(people.owner).filter((n) => n.typeId === "safety.flagged_turn");
+    expect(pending.length).toBe(0);
   });
 
   test("the tool's own status line reaches a streamed client before the search finishes", async () => {

@@ -4310,7 +4310,7 @@ async function resolveToolCallsInOrder(
 // last few hundred turns' keys, oldest dropped.
 const notifiedThisTurn = new Set<string>();
 const NOTIFIED_KEYS_MAX = 512;
-function notifyOncePerTurn(actor: PersonRow, safety: SafetyResult, turnId: string | undefined, logPrefix: string): void {
+export function notifyOncePerTurn(actor: PersonRow, safety: SafetyResult, turnId: string | undefined, logPrefix: string): void {
   if (!safety.notify_parent) return;
   if (!turnId) {
     notifyIfFlagged(actor, safety, logPrefix);

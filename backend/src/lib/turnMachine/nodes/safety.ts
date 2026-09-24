@@ -8,6 +8,7 @@
 import { evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { notifyOncePerTurn } from "@/lib/turnEngine";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 
 export interface SafetyInput {
@@ -23,6 +24,12 @@ export interface SafetyOutput {
 export const safetyNode: Node<SafetyInput, SafetyOutput> = async (state, input) => {
   const band = speakerAgeBand(state.actor, new Date());
   const safety = evaluateSafety(input.utterance, band);
+  // SAFETY-NOTIFY-NEXT-01: the identical input-side call turnEngine.ts's
+  // own prepareTurn() makes (CHAT-02: "the input side shares the per-turn
+  // dedupe with the output side") - fired regardless of `action`
+  // (allow_with_resources and refuse can both flag a minor's turn), and
+  // before a refusal is even decided, exactly as the old path does.
+  notifyOncePerTurn(state.actor, safety, state.turnId, "[turn]");
   const crisis = carriesCrisisSignal(safety);
   const credential = detectCredential(input.utterance);
   const outcome: NodeOutcome = { ok: true };

@@ -472,6 +472,8 @@ export async function runTurnNextStream(actor: PersonRow, surface: Surface, text
   const band = speakerAgeBand(actor, new Date());
   const gate = new StreamGate(
     band,
+    actor,
+    state.turnId,
     (sentence) => queue.emit(sentence),
     // onRefuse fires the instant a sentence refuses, DURING the model's
     // own generation - closing the queue here (not only from onDone,
