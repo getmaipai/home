@@ -204,7 +204,11 @@ memoryRoutes.post("/recall", requireAuth, async (c) => {
     opts.scope = body.scope;
   }
   if (body.person) opts.person = body.person;
-  return c.json(recall(actor, body.q, opts));
+  // MEMORY-FLOOR-01 added RecallMatch.forceInclude, an internal ranking
+  // detail (recall()'s own pinned/entity-match override) with no reason
+  // to become part of this route's response contract - stripped here so
+  // the wire shape stays exactly what it was before that change.
+  return c.json(recall(actor, body.q, opts).map(({ record, score }) => ({ record, score })));
 });
 
 memoryRoutes.get("/export", requireAuth, async (c) => {

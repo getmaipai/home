@@ -18,6 +18,12 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { MAX_MEMORY_SNIPPETS } from "@/lib/turnEngine";
 import type { Node, ContextItem, TurnState } from "../contract";
 
+/** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
+ * below which a match never becomes a context item, a pinned record
+ * exempted (see its own use site below for the full account and the
+ * bench numbers behind 0.1). */
+export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
+
 /** "Reasoning is a second output" (the owner's ruling): decided once,
  * here, from the age band and the surface - "a minor's turn never
  * receives reasoning" (turnEngine.ts's own `ageBand === "child" ||
@@ -135,7 +141,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen";
     const anonymous = false;
     const queryVector = await embedQueryForRecall(input.utterance);
-    const matches = recall(state.actor, input.utterance, {
+    const recalled = recall(state.actor, input.utterance, {
       selfOnly: true,
       asOf: now,
       queryVector,
@@ -155,7 +161,42 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       // already honors this same way (its own bumpUsage() call after
       // its own prompt-inclusion filter).
       bumpUsage: false,
-    }).slice(0, MAX_MEMORY_SNIPPETS);
+    });
+    // MEMORY-FLOOR-01 (getmaipai/home, found live LIVE-0923-01 (6)): a
+    // short, topic-free remark used to still reach recall()'s own
+    // "best available" match by embedding distance alone, however
+    // weak, and every sliced candidate became a context item with no
+    // further check - a context leak, privacy-adjacent (a household
+    // topic that never came up in this conversation, surfaced anyway).
+    // The old path has no equivalent filter either (turnEngine.ts's
+    // own memoryMatches = recall(...) call, checked directly: no
+    // eligibility or score gate ahead of it) - nothing to export and
+    // reuse, so this floor is new, scoped to this call site only.
+    // recall()'s own composite `score` already blends cosine,
+    // importance and recency (memory.ts's COSINE_WEIGHT/IMPORTANCE_
+    // WEIGHT/RECENCY_WEIGHT) plus a flat entity-match bonus, so it
+    // isn't a pure similarity number DURABLE_MIN_COSINE/EPISODIC_
+    // MIN_COSINE could be compared against directly - measured
+    // instead, against scripts/bench/memory-eval.ts's own 11 probes
+    // (a resident engine, embed url, 2026-09-24): every genuinely
+    // wanted match in the currently-passing rows scores 0.125 or
+    // higher (the weakest, episodic-relevant's own baseball-game
+    // recall); a pinned or entity-matched record can legitimately
+    // score near 0.000 against an unrelated remark and still has to
+    // surface (pinned-identity's own row - "the household said
+    // 'always surface this'"; a named entity, "the plan's own words
+    // for the exact same treatment" per memory.ts's own comment) -
+    // the exemption is recall()'s own `forceInclude` flag (RecallMatch,
+    // a review caught the first cut of this floor checking only
+    // `record.pinned`, silently dropping a weak-cosine entity match
+    // recall() itself force-included - fixed by exporting the flag
+    // instead of half-reproducing recall()'s own decision here). 0.1
+    // sits with real margin under 0.125, never moved a single one of
+    // the bench's 7 passing rows (verified twice), and already drops
+    // the noise a weak, non-forced entity match rides in on
+    // (entity-recall's own row: 12 candidates including six at
+    // 0.056-0.059 down to the 4 that actually matter, still passing).
+    const matches = recalled.filter((m) => m.forceInclude || m.score >= MEMORY_CONTEXT_MIN_SCORE).slice(0, MAX_MEMORY_SNIPPETS);
     // Every sliced match becomes a context item below, unconditionally
     // (no further filtering happens after this point) - so the matches
     // array itself is exactly "what reached the prompt," the same

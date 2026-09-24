@@ -12,17 +12,7 @@ import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { nextHlc } from "@/lib/hlc";
 import { compareHlc } from "@/lib/hlc";
 import type { PersonRow, MemoryRecordRow } from "@/types";
-
-// Test-only mirror of memory.ts's own (unexported) vectorToBuffer: lets
-// these tests inject a known vector directly into memory_embeddings
-// without going through a real embed() call, so recall()'s cosine
-// scoring can be exercised with hand-picked, easy-to-reason-about
-// numbers instead of the stub embedder's bag-of-words output.
-function injectVector(memoryId: string, vector: number[], space = "test"): void {
-  db.insert(memoryEmbeddings)
-    .values({ memoryId, space, dims: vector.length, vector: Buffer.from(new Float32Array(vector).buffer), hlc: "test-hlc", preprocess: "v1" })
-    .run();
-}
+import { injectVector } from "./fixtures/injectVector";
 
 beforeEach(() => {
   resetDb();

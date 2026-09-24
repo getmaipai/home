@@ -365,6 +365,20 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
 export interface RecallMatch {
   record: MemoryRecord;
   score: number;
+  /** MEMORY-FLOOR-01: whether this match cleared its tier's own cosine
+   * floor (or the keyword-fallback branch that has none) on its own
+   * merit, or is here as a deterministic override - pinned, or a
+   * named entity the utterance itself mentions (this function's own
+   * `forceInclude`, above). A caller adding its OWN, stricter floor on
+   * `score` (recall()'s own composite number, not a pure similarity)
+   * needs this to give the same overrides recall() itself already
+   * gives them, not just the pinned half. Optional because the type
+   * shouldn't force every future `RecallMatch` site to set it -
+   * `recall()` itself is the only construction site today and always
+   * does; an unset field reads as `undefined`, which every caller so
+   * far treats the same as `false` in the `||`/truthy checks it's
+   * actually used in. */
+  forceInclude?: boolean;
 }
 
 export type RecallResult = RecallMatch[] & { withheldForBand: number };
@@ -716,7 +730,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
       score = overlap / union;
     }
     if (isEntityMatch) score += 0.5;
-    if (forceInclude || score > 0) scored.push({ record: toMemoryRecord(row), score });
+    if (forceInclude || score > 0) scored.push({ record: toMemoryRecord(row), score, forceInclude });
   }
 
   scored.sort((a, b) => b.score - a.score);
