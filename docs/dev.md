@@ -27562,3 +27562,108 @@ flake tracked as issue #140 reproduced here too, 12 of 4272 tests, none
 in this item's own files); the live bench above. Review: medium (a real
 download/verification path with real network and disk side effects, per the work
 order's own instruction).
+
+## OPENWEBUI-01: why not Open WebUI, and what to take from it (2026-09-24)
+
+Research prompted by the owner's question: could Home have forked Open
+WebUI instead of building fresh. Answer: no, on four independent
+grounds, each sufficient alone.
+
+**License.** Open WebUI moved off BSD-3 at v0.6.6 (April 2025) to a
+custom "Open WebUI License," not OSI-approved. It carries a branding
+clause: the "Open WebUI" name must stay visible in any deployment,
+waived only if a single deployment stays under 50 end users in a
+rolling 30 days, or the licensee is a contributor with written
+permission, or holds an enterprise license. Forking their code means
+their branding terms travel with it permanently. That is directly
+incompatible with the org's AGPL-3.0-with-sole-copyright posture
+(LICENSING.md) and the explicit goal of keeping dual-licensing open -
+someone else's custom-licensed source cannot be cleanly relicensed as
+owned AGPL. A per-household deployment might individually clear the
+50-user waiver, but the encumbrance sits in the codebase itself, not
+per install, and constrains every future distribution decision.
+
+**Stack.** Open WebUI is Python 3.11+/FastAPI/SQLAlchemy on the
+backend, SvelteKit/Svelte 5/Tailwind/Vite on the frontend. The org's
+mandated stack is Bun/Hono/Zod/Drizzle and React/Vite (STACK.md).
+Forking means either running two language runtimes forever, a direct
+violation of principle 1 ("one definition, one implementation"), or
+rewriting the whole thing, at which point nothing of the fork survives
+and there was no fork.
+
+**Extension/security model.** Open WebUI's Tools, Functions, and
+Pipelines execute arbitrary Python on the host server; their own docs
+state plainly that a malicious plugin can access the file system,
+exfiltrate data, or compromise the entire host. The marketplace is
+one-click community import of that code. This is the inverse of the
+catalog: MaiPai packages run one sandboxed call at a time, cannot
+start a server, ship signed manifests, and go through a permission
+diff and banned-API scan in CI, with a CLA gating outside
+contributions. "Nothing leaves the house" is a structural guarantee in
+MaiPai's design; in Open WebUI's plugin model it is a policy request to
+whoever wrote the plugin. That gap is exactly what would break under a
+child profile.
+
+**Identity model.** Open WebUI's multi-user support (OAuth/LDAP, RBAC,
+SCIM, thousands of seats) is an accounts system for organizations.
+People in MaiPai is deliberately wider than accounts - members, pets, a
+delivery driver a camera recognizes, a grandparent who never logs in -
+with age-band child safety as a non-removable architectural invariant,
+not an admin toggle. Retrofitting a household's identity shape onto an
+org-accounts product is a bigger, worse project than building the
+People model against a spec designed for it. Add to this that Open
+WebUI is a chat frontend for someone else's model backend, with no
+robot-pairing concept, no installer/hardware-sizing wizard, no
+engine-provisioning daemon, no voice-first surface, no backup or
+updates architecture: the chat window is the smallest part of what
+Home has to be, and it is the only part Open WebUI actually provides.
+
+**What's genuinely worth taking from it**, sized as BACKLOG candidates:
+
+- **Channels** (L, chat/People). Open WebUI's shared, persistent,
+  multi-person and multi-model timeline (Discord/Slack-shaped,
+  @-mention a model, admin-gated beta) has no equivalent in MaiPai
+  today - every MaiPai conversation is one person plus the assistant.
+  A household "family room" where multiple members share one timeline
+  is a real gap, not a cosmetic one, and needs its own design pass:
+  whose turn budget and content-ceiling rules apply in a multi-speaker
+  turn, how per-person safe search resolves when the speakers differ,
+  how the turn machine's context list handles more than one active
+  speaker.
+- **Notes workspace** (M, a new catalog app). A persistent,
+  AI-assisted document space separate from chat, attachable to a
+  conversation for full-context injection. MaiPai has memory and
+  episodes but nothing like "draft something long-form, then pull it
+  into chat." Would need an assistant-ui Elements-shaped editor, not a
+  hand-built one, and a hook into the existing memory/context-attach
+  mechanism.
+- **Delta streaming** (S-M, chat/streaming). Open WebUI's v0.11.1
+  claims an order-of-magnitude reply-traffic reduction from
+  patch-based rather than full-token streaming. Worth measuring against
+  MaiPai's own SSE implementation before building anything - a claim to
+  verify in the installed source, per the org's own rule on library
+  claims, not a number to copy.
+- **Tool-call approval UI, and their `ask_user` builtin: not a gap.**
+  MaiPai's `policy.ts` consent/confirm gate and CONFIRM-01's parked-ask
+  mechanism already do the functional equivalent, independently arrived
+  at. Worth a look at how Open WebUI surfaces a pending call in the
+  transcript for a UI-polish idea only, never a new capability.
+- Two smaller notes, not standalone items: their terminal-style file
+  previewer (hands a document's content back into the reply) is worth a
+  glance before `REFERENCE-LAYOUTS-01` designs the citation reader;
+  their admin-set interface-defaults pattern is worth checking against
+  `docs/SETTINGS.md`'s three-disclosure-level model to confirm it
+  already covers "household default, a child can't override" as
+  cleanly.
+
+Sources: [Open WebUI License docs](https://docs.openwebui.com/license/),
+[HN discussion on the BSD-3 to Open WebUI License
+change](https://news.ycombinator.com/item?id=43901575), [DeepWiki
+architecture
+overview](https://deepwiki.com/open-webui/open-webui/3-installation-and-deployment),
+[Open WebUI Features docs](https://docs.openwebui.com/features/),
+[Tools & Functions (Plugins)
+docs](https://docs.openwebui.com/features/extensibility/plugin/),
+[Channels docs](https://docs.openwebui.com/features/channels/), [Memory
+& Personalization
+docs](https://docs.openwebui.com/features/chat-conversations/memory/).
