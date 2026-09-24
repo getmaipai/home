@@ -4,6 +4,7 @@ import { runPlugin, registerAllPackageNotificationTypes, runDueWarmJobs } from "
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
+import { startKiwixSidecar } from "@/lib/kiwixSidecar";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/lib/llmSupervisor";
 import { buildOldPathStablePrefix, ordinaryToolSpecs } from "@/lib/turnEngine";
@@ -190,6 +191,14 @@ registerDenoHostGracefulExit();
 // swept the judge's engine mid-extraction.
 await sweepOrphanEngineProcesses([getEmbedLivePid(), getTtsLivePid(), getBackgroundLivePid()]);
 await initCrashBootHold();
+// KIWIX-SIDECAR-01: registers (installing the pinned binary on first
+// boot only) and starts, fire-and-forget like startAllSidecars() below
+// (it never throws - a failed install or start is a logged line and a
+// Repairs issue, not a boot failure). Called before startAllSidecars()
+// so a sidecar registered here is already in the registry by the time
+// that pass runs; startSidecar() is idempotent, so the two racing is
+// harmless either way.
+void startKiwixSidecar();
 void startAllSidecars();
 // A latency review (2026-09-06) found none of the three engines were
 // ever touched at boot: every getChatClient()/getEmbedClient()/

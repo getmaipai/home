@@ -75,6 +75,29 @@ export const receivedBackupsDir = resolve(backupDir, "..", "received-backups");
 export const modelsDir = resolve(dataDir, "models");
 export const enginesDir = resolve(dataDir, "engines");
 
+// KIWIX-SIDECAR-01: the kiwix-tools binary (kiwix-serve/kiwix-manage),
+// same shape as enginesDir above - a pinned, re-fetchable download, not
+// household data - but deliberately NOT a subdirectory of enginesDir
+// itself: llmSupervisor.ts's sweepOrphanEngineProcesses() does a plain
+// substring match on every process's command line against enginesDir
+// on every boot AND every `bun --hot` reload (Fix A2, 2026-09-07's
+// incident note), excluding only chat/embed/tts/background's own live
+// pids - a kiwix-serve process spawned under that same directory would
+// be a stranger to that list and get SIGKILLed mid-request on the next
+// reload, exactly the incident class that note documents for the
+// memory engine (JOIN-02). kiwix-serve is a sidecar (sidecars.ts's own
+// hot-reload-safe globalThis registry already tracks it), never an
+// llmSupervisor-managed engine, so its own directory stays a sibling of
+// enginesDir, never a child. `reference.library_dir`'s own default (its
+// own empty string resolves here) is a SEPARATE directory again: the
+// installed ZIM files a household actually cares about, which
+// `SidecarConfig.backupMode` still declares "exclude" (a
+// re-provisionable cache like every other engine/model directory), but
+// which a person may point at an external drive or a NAS mount - the
+// tool binary never moves with it.
+export const kiwixToolsDir = resolve(dataDir, "sidecars", "kiwix-tools");
+export const defaultReferenceLibraryDir = resolve(dataDir, "reference");
+
 // Fix A5 (docs/dev.md's 2026-09-07 incident note): the hub's own
 // structured logs (lib/log.ts), rotated by size and days. Not synced or
 // backed up - operational history, not household data - so this stays a
