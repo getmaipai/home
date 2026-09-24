@@ -205,6 +205,21 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
   return { ok: true, value };
 }
 
+/** Every loadable package's own manifest, in `listPackageIds()`'s
+ * order - the exact `listPackageIds().map(loadPackage).filter(ok).map(
+ * manifest)` pipeline `GET /api/plugins` (routes/plugins.ts) already
+ * ran inline; a review (SHELL-SEARCH-02) caught the search route's own
+ * apps provider re-typing an identical copy rather than calling one
+ * definition. A package that fails to load (an interrupted install) is
+ * skipped, the same posture `registerAllPackageNotificationTypes()`
+ * above already takes. */
+export function listInstalledManifests(): PackageManifest[] {
+  return listPackageIds()
+    .map((id) => loadPackage(id))
+    .filter((r) => r.ok)
+    .map((r) => (r as { ok: true; value: LoadedPackage }).value.manifest);
+}
+
 /** Called once at boot (index.ts): every bundled package's own manifest
  * `notifications[]` becomes a real dispatchable type in F's shared
  * registry (lib/notificationTypes.ts). A package with no manifest yet

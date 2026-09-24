@@ -11,6 +11,7 @@ import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import type { Artifact } from "@maipai/spec/gen/ts/artifact.js";
 import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
+import type { SearchGroup } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
 import type {
   Roster,
   TurnValue,
@@ -488,6 +489,12 @@ export const api = {
   batchDeleteConversations: (ids: string[]) =>
     request<{ deleted: number }>("/api/conversations/batch-delete", { method: "POST", body: JSON.stringify({ ids }) }),
   clearConversations: () => request<{ deleted: number }>("/api/conversations/clear", { method: "POST" }),
+  // SHELL-SEARCH-02: the shape (`{groups: SearchGroup[]}`) matches
+  // `@maipai/ui`'s own `HeaderSearch` `remote` prop exactly (`SearchGroup`
+  // imported, never redeclared) - `groups` from GET /api/search is
+  // passed straight through, the kit's own render composing every
+  // result into a real command item.
+  search: (q: string) => request<{ groups: SearchGroup[] }>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.groups),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   settingsValues: (scope: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}`),

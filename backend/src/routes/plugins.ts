@@ -1,11 +1,10 @@
 import { Hono } from "hono";
 import { requireAuth, requireRole } from "@/middleware/auth";
-import { listPackageIds, loadPackage, runPlugin } from "@/lib/plugins";
+import { listInstalledManifests, runPlugin } from "@/lib/plugins";
 import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import type { AppEnv } from "@/types";
-import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 
 export const pluginsRoutes = new Hono<AppEnv>();
 
@@ -15,10 +14,7 @@ export const pluginsRoutes = new Hono<AppEnv>();
 // exists to say otherwise.
 pluginsRoutes.get("/", requireAuth, async (c) => {
   const statuses = allPackageStatuses();
-  const manifests = listPackageIds()
-    .map((id) => loadPackage(id))
-    .filter((r) => r.ok)
-    .map((r) => (r as { ok: true; value: { manifest: PackageManifest } }).value.manifest);
+  const manifests = listInstalledManifests();
   const rows = manifests.map((manifest) => {
     const status = statuses.get(manifest.id);
     return {

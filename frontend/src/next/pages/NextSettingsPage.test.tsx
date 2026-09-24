@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Roster, ResolvedSetting } from "@/lib/api";
@@ -165,11 +165,88 @@ describe("NextSettingsPage", () => {
     }
   });
 
+  // A review caught this: `tab` was seeded from `?tab=` only inside a
+  // lazy useState initializer, which React runs once at mount - a
+  // person already on Settings (react-router never remounts this
+  // component for a search-params-only URL change) who then clicked a
+  // SECOND search result naming the other tab never saw it switch.
+  test("a later navigation to a different ?tab= switches the active tab - not just the URL", async () => {
+    const appearance = makeKey({ key: "ui.appearance", scope: "person", selector: "select", range: { options: ["system", "light", "dark"] }, label: "Appearance", level: "basic" });
+    const householdKey = makeKey({ key: "household.test_key", scope: "household", selector: "boolean", label: "Household Test Setting", level: "basic" });
+    const { restore } = mockSettingsFetch([appearance, householdKey], { household: [makeValue(householdKey, false)], "person:person-abc123": [makeValue(appearance, "system")] });
+    function GoToHouseholdTab() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate("/next/settings?tab=household")}>
+          simulate a search result to the household tab
+        </button>
+      );
+    }
+    try {
+      const { getByText } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/next/settings?tab=me"]}>
+          <GoToHouseholdTab />
+          <NextSettingsPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(document.body.textContent).toContain("Appearance"));
+      expect(document.body.textContent).not.toContain("Household Test Setting");
+      fireEvent.click(getByText("simulate a search result to the household tab"));
+      await waitFor(() => expect(document.body.textContent).toContain("Household Test Setting"));
+    } finally {
+      restore();
+    }
+  });
+
+  // A review caught this: NextSettingsRenderer's own scroll-to-section
+  // effect latched a plain "have we ever scrolled" boolean permanently
+  // true - a SECOND search result naming a different section, clicked
+  // without leaving Settings (react-router never remounts this page
+  // for a search-params-only URL change), was silently ignored.
+  test("a second ?section= naming a different section scrolls again - the first scroll doesn't latch the page", async () => {
+    const first = makeKey({ key: "household.first_key", scope: "household", selector: "boolean", label: "First Setting", level: "basic", lives_in: "household.first" });
+    const second = makeKey({ key: "household.second_key", scope: "household", selector: "boolean", label: "Second Setting", level: "basic", lives_in: "household.second" });
+    const { restore } = mockSettingsFetch([first, second], { household: [makeValue(first, false), makeValue(second, false)], "person:person-abc123": [] });
+    function GoToSection({ section }: { section: string }) {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate(`/next/settings?tab=household&section=${section}`)}>
+          go to {section}
+        </button>
+      );
+    }
+    const originalScroll = HTMLElement.prototype.scrollIntoView;
+    const scrolled: string[] = [];
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.id);
+    };
+    try {
+      const { getByText } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/next/settings?tab=household&section=household.first"]}>
+          <GoToSection section="household.first" />
+          <GoToSection section="household.second" />
+          <NextSettingsPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(document.body.textContent).toContain("First Setting"));
+      await waitFor(() => expect(scrolled).toContain("settings-household.first"));
+      fireEvent.click(getByText("go to household.second"));
+      await waitFor(() => expect(scrolled).toContain("settings-household.second"));
+    } finally {
+      HTMLElement.prototype.scrollIntoView = originalScroll;
+      restore();
+    }
+  });
+
   test("a non-admin sees no tab bar, only their own settings", async () => {
     const appearance = makeKey({ key: "ui.appearance", scope: "person", selector: "select", range: { options: ["system", "light", "dark"] }, label: "Appearance", level: "basic" });
     const { restore } = mockSettingsFetch([appearance], { household: [], "person:person-abc123": [makeValue(appearance, "system")] });
     try {
-      renderWithQueryClient(<NextSettingsPage person={makePerson({ role: "adult" })} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson({ role: "adult" })} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Appearance"));
       expect(document.querySelector('[data-slot="tabs-list"]')).toBeNull();
     } finally {
@@ -181,7 +258,11 @@ describe("NextSettingsPage", () => {
     const media = makeKey({ key: "test.media_key", selector: "media", label: "Media Key", level: "basic" });
     const { restore } = mockSettingsFetch([media], { household: [], "person:person-abc123": [makeValue(media, null)] });
     try {
-      renderWithQueryClient(<NextSettingsPage person={makePerson({ role: "adult" })} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson({ role: "adult" })} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Media Key"));
       expect(document.body.textContent).toContain("Not supported in this hub version yet.");
     } finally {
@@ -193,7 +274,11 @@ describe("NextSettingsPage", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
     try {
-      renderWithQueryClient(<NextSettingsPage person={makePerson({ role: "adult" })} />);
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson({ role: "adult" })} />
+        </MemoryRouter>,
+      );
       await waitFor(() => expect(document.body.textContent).toContain("Could not load settings."));
       expect(document.body.textContent).toContain("Try again");
     } finally {

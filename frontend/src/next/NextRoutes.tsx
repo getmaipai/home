@@ -22,7 +22,7 @@ import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
-import type { Roster } from "@/lib/api";
+import { api, type Roster } from "@/lib/api";
 
 /** The `/next/*` route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): behind `ui.shell.next`, mounts the template's
@@ -93,7 +93,11 @@ function NextRoutesInner({ person }: { person: Roster }) {
             here, so it bounces to the dashboard instead of a blank
             no-match. */}
         <Route path="sign-in" element={<Navigate to="/next" replace />} />
-        <Route element={<FullLayout />}>
+        {/* SHELL-SEARCH-02: api.search, home's own header wiring for the
+            kit's HeaderSearch remote prop (FullLayout -> Header ->
+            HeaderSearch, a plain prop threaded down since FullLayout is
+            the one component this file actually instantiates itself). */}
+        <Route element={<FullLayout headerSearchRemote={api.search} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />

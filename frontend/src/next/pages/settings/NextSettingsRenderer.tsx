@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -34,6 +35,25 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * tsx`'s own instances already pass. */
 export function NextSettingsRenderer({ scope, scopeValue }: NextSettingsRendererProps) {
   const queryClient = useQueryClient();
+  // SHELL-SEARCH-02: `?section=<group.id>` (a SettingsKey's own
+  // `lives_in`, the identical id `groupSettings()` groups by below) -
+  // scrolled to once the matching group's own Card actually exists in
+  // the DOM, not on mount, since the registry/values queries above are
+  // still loading then. A ref map, not `document.getElementById`: two
+  // scopes (household/me) can each render a group sharing the same
+  // `lives_in` id (a key can be declared at more than one scope), so
+  // only THIS renderer's own DOM is ever a candidate, never whichever
+  // scope's element the DOM happens to return first.
+  const [searchParams] = useSearchParams();
+  const sectionParam = searchParams.get("section");
+  const groupRefs = useRef(new Map<string, HTMLDivElement>());
+  // Holds the section this renderer already scrolled to, not a plain
+  // "have we ever scrolled" boolean - a review caught the boolean
+  // latching permanently true, so a SECOND search result naming a
+  // different section, clicked without leaving Settings (react-router
+  // never remounts this component for a search-params-only URL
+  // change), was silently ignored.
+  const scrolledToRef = useRef<string | null>(null);
   const registryQuery = useQuery<SettingsKey[]>({
     queryKey: REGISTRY_QUERY_KEY,
     queryFn: () => api.settingsRegistry(),
@@ -83,6 +103,22 @@ export function NextSettingsRenderer({ scope, scopeValue }: NextSettingsRenderer
   const error = registryQuery.isError || valuesQuery.isError;
   const data = registryQuery.data && valuesQuery.data ? { registry: registryQuery.data, values: valuesQuery.data } : undefined;
 
+  // Runs after every render once data has loaded (no dependency array):
+  // the group Card a caller wants exists only once `groups.map()` above
+  // has actually run. `scrolledToRef` makes this scroll to a given
+  // `sectionParam` at most once (never re-scrolling on the renderer's
+  // own later, unrelated re-renders - a value edit, a reset) while
+  // still scrolling again when `sectionParam` itself changes to a
+  // DIFFERENT section, a second search result clicked without leaving
+  // Settings.
+  useEffect(() => {
+    if (!sectionParam || scrolledToRef.current === sectionParam || !data) return;
+    const el = groupRefs.current.get(sectionParam);
+    if (!el) return;
+    scrolledToRef.current = sectionParam;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
   return (
     <div className="flex flex-col gap-4">
       {writeError ? <div className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive">{writeError}</div> : null}
@@ -104,7 +140,19 @@ export function NextSettingsRenderer({ scope, scopeValue }: NextSettingsRenderer
           ) : (
             <>
               {groups.map((group) => (
-                <Card key={group.id}>
+                <Card
+                  key={group.id}
+                  // The old shell's own SettingsPage.tsx names a scroll
+                  // target the identical way ("settings-<group id>") -
+                  // matched here rather than invented, so a test can
+                  // stub scrollIntoView and assert on `this.id` the same
+                  // way that page's own test already does.
+                  id={`settings-${group.id}`}
+                  ref={(el) => {
+                    if (el) groupRefs.current.set(group.id, el);
+                    else groupRefs.current.delete(group.id);
+                  }}
+                >
                   <CardHeader>
                     <CardTitle>{sectionTitle(group.id)}</CardTitle>
                   </CardHeader>

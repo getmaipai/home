@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@maipai/ui/src/dashboard/components/ui/tabs";
 import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -39,7 +40,28 @@ export const SettingsIcon = getIcon("settings");
 export function NextSettingsPage({ person }: { person: Roster }) {
   useDocumentTitle("Settings");
   const canManageHousehold = isOwnerOrAdminRole(person.role);
-  const [tab, setTab] = useState<"household" | "me">(canManageHousehold ? "household" : "me");
+  // SHELL-SEARCH-02: a search result for a setting names which tab it
+  // lives on (`?tab=household|me`).
+  const [searchParams] = useSearchParams();
+  function tabFromParams(): "household" | "me" {
+    const requested = searchParams.get("tab");
+    if (requested === "me") return "me";
+    if (requested === "household" && canManageHousehold) return "household";
+    return canManageHousehold ? "household" : "me";
+  }
+  const [tab, setTab] = useState<"household" | "me">(tabFromParams);
+  // A review caught this: a lazy useState initializer runs once, at
+  // mount - a person already on Settings (this component stays mounted
+  // across a same-route navigation, react-router never remounts it for
+  // a search-params-only change) who then clicks a SECOND search result
+  // naming the other tab never saw it switch; the URL changed, the tab
+  // didn't. Effect only ever moves `tab` toward what the URL now says,
+  // never fights a person's own later click on a `TabsTrigger` - it
+  // re-runs on every `searchParams` change, including the one `setTab`
+  // itself never causes (choosing a tab by hand doesn't touch the URL).
+  useEffect(() => {
+    if (searchParams.get("tab") !== null) setTab(tabFromParams());
+  }, [searchParams, canManageHousehold]);
 
   return (
     <div className="flex flex-col gap-4">
