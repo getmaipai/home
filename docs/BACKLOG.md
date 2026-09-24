@@ -123,7 +123,7 @@ point 7 for the full unit list and point 6 for the migration order.
 
 - [x] **D3: delete the draft reader** (S, Codex, after D2). `readLookupDraft`, `lookupShapeOf`, `hedgedFactShape`, the promise/offer/hedge regexes. Files: `guards.ts` (~120 lines). Acceptance/exit as D1. Gating: D2. Landed `327e4918`.
 
-- [ ] **D4: delete the repeat guard and the stuck lines** (S, Codex, after D3). `isRepeatReply`, `guardRepeatSentence`, `guardRepeatQuestion`, `CHAT_LOOP`. Files: `guards.ts` (~80 lines). Acceptance/exit as D1. Gating: D3. Retires REPLY-FIND-01's stopgap, if one landed.
+- [x] **D4: delete the repeat guard and the stuck lines** (S, Codex, after D3). Done on `codex/333-d4-repeat-guard`. Accepted D1 replay exception: the same 8 owner rows and 4 control rows fail before/after, with no newly red rows; pre-existing old-path replay/gate drift follow-up #158. Trimmed routing corpus green (160/160). `isRepeatReply`, `guardRepeatSentence`, `guardRepeatQuestion`, `CHAT_LOOP`. Files: `guards.ts` (~80 lines). Gating: D3. REPLY-FIND-01's stopgap was not present in executable code.
 
 - [ ] **D5: delete the deliverable rules** (S, Codex, after D4). `composeDeliverable`, `deliverableKind`, `pictureDeliverableFor`, the "Here's a video" line. Files: `turnEngine.ts`, `turnContext.ts` (~60 lines). Acceptance/exit as D1. Gating: D4.
 

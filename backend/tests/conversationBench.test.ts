@@ -107,8 +107,8 @@ describe("the fixture", () => {
     // who-ask-declined, open-question-once), and SAFETY-01's
     // self-harm-state, and ASK-02's not-a-name, and
     // CHAT-13 chunk B's subject-before-pattern.
-    expect(CONVERSATIONS.length).toBe(112);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(112);
+    expect(CONVERSATIONS.length).toBe(110);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(110);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);

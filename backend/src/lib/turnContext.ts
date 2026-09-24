@@ -443,15 +443,12 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     personaExamples: ctx.persona.examples,
     roster: ctx.roster,
     shape: shapeOf(ctx.signal, ctx.utterance),
-    // REG-01: the act for the statement rule, and the hub's previous
-    // reply for the repeated-question check.
+    // REG-01: the act for the statement rule.
     act: ctx.signal.primary_act,
     target: ctx.signal.target,
     repair: ctx.signal.repair,
     lookupServed: ctx.offeredToolIds.includes("websearch") && !householdFrame(ctx) && lookupRequest(ctx),
     previousReply: [...ctx.history].reverse().find((m) => m.role === "assistant")?.content,
-    // REP-01: the previous two replies, newest first, for the repeat shapes.
-    previousReplies: ctx.history.filter((m) => m.role === "assistant").slice(-2).reverse().map((m) => m.content),
     // ASK-01: the unknown names, the subjects' pronouns, and the
     // pronoun families the person used this turn and the last two.
     unknownNames: framedUnknownNames(ctx),

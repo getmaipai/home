@@ -181,12 +181,9 @@ export interface TurnExpectation {
   /** An outcome of this package (and path) ran this turn with each
    * named argument matching its regex. */
   outcomeArgsMatch?: { packageId: string; via?: string; args: Readonly<Record<string, string>> };
-  /** REP-01: the turn spent exactly this many extra generations (the
-   * retry with REPEAT_RETRY_NOTE), off the `[turn]` line's timings. */
+  /** The turn spent exactly this many extra generations, off the
+   * `[turn]` line's timings. */
   retries?: number;
-  /** REP-01: the delivered reply shares under 80 percent of its content
-   * words with the previous reply and is not the same sentence again. */
-  distinctFromPrevious?: boolean;
   /** RECALL-02: exactly this many episode lines under the "From earlier
    * conversations" header in the context message (0: no episode block). */
   episodesInContext?: number;
@@ -1228,29 +1225,15 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
-  // REP-01 (dev.md section 16 part 3): the cross-turn repetition guard
-  // and the objection. The previous reply is seeded so the repeat is
-  // verbatim by construction (a live lookup's summary is never the same
-  // twice); the retry is the 8B's own second generation.
+  // The objection guard's self-assertion case remains independent of
+  // the retired cross-turn repetition checks.
   {
     id: "said-that-already",
     category: "knowledge",
-    note: "REP-01: the same sentence again never reaches the row; the retry with REPEAT_RETRY_NOTE answers what was asked (the weekday); on the objection a bare 'I do get it' is cut and the retry carries the objection. The remedy by objection type (a recomputation, a lookup) is ACT-03's plan half.",
+    note: "On an objection a bare 'I do get it' is cut and the retry carries the objection. The remedy by objection type (a recomputation, a lookup) is ACT-03's plan half.",
     turns: [
       { say: "when is the new Marsh Lantern film out", seedReply: "The new Marsh Lantern film is out on October 17.", expect: { signal: { primary_act: "question" }, guard: null } },
-      { say: "that's the second time; I asked what day of the week", seedReply: "The new Marsh Lantern film is out on October 17.", expect: { retries: 1, distinctFromPrevious: true, guardHits: ["repeat_reply"], mustContain: "monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekday|weekend", mustNotContain: "i do get it|i get it|not repeating", humanVerdict: true } },
       { say: "you're not following me", seedReply: "I do get it. The new Marsh Lantern film is out on October 17.", expect: { retries: 1, guardHits: ["self_assertion"], mustNotContain: "i do get it|i get it|i do\\b|not repeating", humanVerdict: true } },
-    ],
-  },
-  {
-    id: "same-line-twice",
-    category: "knowledge",
-    note: "REP-01: two consecutive turns seeded with the same sentence; the second is never delivered as-is, the retry ran (one extra generation), and the turn's guard array carries repeat_reply",
-    turns: [
-      { say: "how long is the new Marsh Lantern film", seedReply: "It runs ninety minutes.", expect: { signal: { primary_act: "question" }, guard: null } },
-      // Not "say that again": a repeat the person asks for is the one
-      // time the same line is right (the say-that-again row).
-      { say: "and is that with the credits", seedReply: "It runs ninety minutes.", expect: { retries: 1, guardHits: ["repeat_reply"], distinctFromPrevious: true, humanVerdict: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
@@ -1698,16 +1681,6 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "give me a list of songs by Serena Vale", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true, mustContain: "Sunday Bay", humanVerdict: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
       { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "same-line-three-turns-later",
-    category: "knowledge",
-    note: "finding 56: the repeat guard compares recent replies, so a line repeated after an intervening correction still gets retried",
-    turns: [
-      { say: "when does Marsh Lantern open", seedReply: "Marsh Lantern opens Friday.", expect: { signal: { primary_act: "question" }, guard: null } },
-      { say: "no, I meant the weekday", seedReply: "It opens Friday.", expect: { signal: { primary_act: "inform" }, humanVerdict: true } },
-      { say: "what day is that", seedReply: "Marsh Lantern opens Friday.", expect: { signal: { primary_act: "question" }, retries: 1, guardHits: ["repeat_reply"], distinctFromPrevious: true, humanVerdict: true } },
     ],
   },
   {

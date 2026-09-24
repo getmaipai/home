@@ -26,11 +26,9 @@ interface CorpusRow {
    * per-family action-claim match. */
   outcomes?: GuardContext["outcomes"];
   /** REG-01: the turn's primary act (ACT-01's signal) for the statement
-   * rule, and the hub's previous reply for the repeated-question rule. */
+   * rule. */
   act?: GuardContext["act"];
   previousReply?: string;
-  /** REP-01: the hub's previous two replies, for the repeat shapes. */
-  previousReplies?: string[];
   /** ASK-01: the turn's unknown names, the subjects' pronouns and the
    * pronoun families in play, for the two new shapes. */
   unknownNames?: string[];
@@ -52,9 +50,14 @@ interface CorpusRow {
 }
 
 const corpus: CorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "guard-corpus.json"), "utf-8"));
+// The pinned shared corpus still carries expectations for guard families
+// retired by D4; keep every remaining shared row active without restoring
+// assertions for behavior the home engine no longer implements.
+const RETIRED_REPEAT_EXPECTATIONS: ReadonlySet<string> = new Set(["repeat_question", "repeat_sentence", "repeat_reply"]);
+const isRetiredRepeat = (row: CorpusRow) => RETIRED_REPEAT_EXPECTATIONS.has(row.expect ?? "");
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
-  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, previousReplies: row.previousReplies, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };
+  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };
 }
 
 async function* sentenceStream(reply: string): AsyncGenerator<string, undefined, void> {
@@ -64,6 +67,7 @@ async function* sentenceStream(reply: string): AsyncGenerator<string, undefined,
 
 describe("guard corpus (guardReply, the non-streaming path)", () => {
   for (const row of corpus) {
+    if (isRetiredRepeat(row)) continue;
     test(row.id, () => {
       const result = guardReply(row.reply, { ...ctxFor(row), personId: "person-corpus" });
       expect(result.reason).toBe(row.expect);
@@ -83,7 +87,7 @@ describe("guard corpus (guardReply, the non-streaming path)", () => {
 // replaced by it.
 describe("guard corpus (gateGuards, the streaming path)", () => {
   for (const row of corpus) {
-    if (row.streamingSkip) continue;
+    if (row.streamingSkip || isRetiredRepeat(row)) continue;
     test(row.id, async () => {
       const gated = gateGuards(sentenceStream(row.reply), ctxFor(row), "person-corpus");
       const delivered: string[] = [];

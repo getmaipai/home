@@ -57,11 +57,8 @@ export interface ReplayFixture {
 
 const CATEGORIES: ReadonlySet<BenchConversation["category"]> = new Set(["memory", "correction", "knowledge", "tools", "etiquette", "safety", "privacy", "honesty"]);
 
-// guards.ts's CHAT_LOOP (module-private): the three stuck-reply lines
-// the repeat guard falls back to (REPLY-FIND-01's own bug: the right
-// answer to a repeated question, thrown away for this). Named here by
-// their distinguishing fragments rather than importing a private
-// constant.
+// Keep the retired stuck-reply phrases forbidden in replay output so
+// removing the old guard cannot accidentally reintroduce them elsewhere.
 const STUCK_LINES = "keep landing on the same answer|going in circles|stuck on that one";
 /** The plan's own pass-bar clause, shared by every row: "no stuck or
  * honesty line" (point 4). Merged into every turn's mustNotContain by

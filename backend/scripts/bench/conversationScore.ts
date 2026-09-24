@@ -9,7 +9,7 @@
 // apart from the scored failures.
 import { tokenize } from "@/lib/text";
 import { assessReply } from "@/lib/wellFormed";
-import { splitIntoSentences, isCloserSentence, normalizeForRepeat } from "@/lib/guards";
+import { splitIntoSentences, isCloserSentence } from "@/lib/guards";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { BenchConversation, BenchTurn, TurnExpectation, Move } from "./conversationFixture";
@@ -91,10 +91,8 @@ export interface TurnObserved {
   requiredHonored?: boolean | null;
   requiredCachedTokens?: number | null;
   requiredPromptTokens?: number | null;
-  /** REP-01: the turn's retries off the `[turn]` line, and the reply the
-   * conversation delivered before this one. */
+  /** The turn's retries off the `[turn]` line. */
   retries?: number | null;
-  previousReply?: string | null;
   /** The live relationships touching the speaker's own entity after
    * the turn: the other end's name, the provenance, whether confirmed. */
   relationships: readonly { type: string; name: string; source: string; confirmed: boolean }[];
@@ -252,7 +250,6 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.openQuestionStatus) parts.push(`open question ${e.openQuestionStatus.kind} ${e.openQuestionStatus.status}`);
   if (e.outcomeArgsMatch) parts.push(`${e.outcomeArgsMatch.packageId}${e.outcomeArgsMatch.via ? ` via ${e.outcomeArgsMatch.via}` : ""} args ~ ${Object.entries(e.outcomeArgsMatch.args).map(([k, v]) => `${k}:/${v}/`).join(", ")}`);
   if (e.retries !== undefined) parts.push(`${e.retries} retr${e.retries === 1 ? "y" : "ies"}`);
-  if (e.distinctFromPrevious) parts.push("not the previous reply again");
   if (e.episodesInContext !== undefined) parts.push(`${e.episodesInContext} episode line${e.episodesInContext === 1 ? "" : "s"}`);
   if (e.noCopiedEpisode) parts.push("no copied episode line");
   if (e.relationshipExists) parts.push(`relationship ${e.relationshipExists.type} ${e.relationshipExists.name} ${e.relationshipExists.source}${e.relationshipExists.confirmed === undefined ? "" : e.relationshipExists.confirmed ? " confirmed" : " unconfirmed"}`);
@@ -474,16 +471,6 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   }
   if (e.retries !== undefined) {
     checks.push({ name: "retries", pass: observed.retries === e.retries, detail: observed.retries === null || observed.retries === undefined ? "no retries on the turn line" : `${observed.retries} retries` });
-  }
-  if (e.distinctFromPrevious) {
-    // REP-01: the delivered reply shares under 80 percent of its content
-    // words with the previous reply and is not the same sentence again.
-    const previous = observed.previousReply ?? "";
-    const words = tokenize(observed.reply);
-    const old = tokenize(previous);
-    const overlap = words.size === 0 ? 0 : [...words].filter((w) => old.has(w)).length / words.size;
-    const same = normalizeForRepeat(observed.reply) !== null && normalizeForRepeat(observed.reply) === normalizeForRepeat(previous);
-    checks.push({ name: "distinct from previous", pass: previous.length > 0 && overlap < 0.8 && !same, detail: previous.length === 0 ? "no previous reply" : `${Math.round(overlap * 100)}% of its content words in the previous reply${same ? ", the same sentence" : ""}` });
   }
   if (e.openQuestionStatus) {
     const hit = (observed.openQuestions ?? []).find((q) => q.kind === e.openQuestionStatus!.kind && q.status === e.openQuestionStatus!.status);

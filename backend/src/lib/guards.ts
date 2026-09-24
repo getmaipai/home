@@ -72,9 +72,6 @@ export type GuardReason =
    * learning"), skipped wherever it sits; a register tail on a real
    * sentence is cut and the head kept. */
   | "assistant_register"
-  /** REG-01 (section 4): a reply sentence that is the hub's previous
-   * reply's question said back, skipped. */
-  | "repeat_question"
   /** REG-02 (dev.md section 16 part 9): a tag question on the end of a
    * declarative reply ("Got it?", "Sound good?"), cut as a register
    * tail. Never fires on a reply that is a question itself. */
@@ -93,15 +90,6 @@ export type GuardReason =
   | "pronoun_mismatch"
   | "false_capability"
   | "banned_phrase"
-  /** REP-01 (section 16 part 3): a sentence equal, after normalization,
-   * to one in either of the hub's previous two replies in this
-   * conversation. Skipped wherever it sits; a reply emptied by it takes
-   * the retry with REPEAT_RETRY_NOTE, then the CHAT_LOOP line. */
-  | "repeat_sentence"
-  /** REP-01: the whole reply overlaps a previous reply's content words
-   * by 80 percent or more with no new proper noun or number: the same
-   * reply again. The retry, then the CHAT_LOOP line. */
-  | "repeat_reply"
   /** REP-01: on an objection (target hub with a repair, or the objection
    * shapes), a first-person sentence about the hub's own understanding
    * with no content word from the subject ("I do get it", "I'm not
@@ -163,12 +151,9 @@ export interface GuardContext {
   // now, the same as any other target kind.
   target?: "self" | "other" | "hub" | "world" | "computed";
   repair?: "none" | "retraction" | "correction";
-  /** REG-01: the hub's own previous reply in this conversation, whose
-   * question sentences a reply may not say back. */
+  /** The hub's own previous reply in this conversation, used to ground
+   * "like I said" claims. */
   previousReply?: string;
-  /** REP-01: the hub's previous two replies in this conversation, newest
-   * first, for the repeat shapes. */
-  previousReplies?: readonly string[];
   /** The active persona's own few-shot voice lines (persona.ts's
    * `Persona.examples`) - borrowed for TONE, never handed back verbatim. */
   personaExamples?: readonly string[];
@@ -226,8 +211,8 @@ export interface Guarded {
    * reason only for the replaced case, so the episode store can tell a
    * canned line from an answer by the row alone. */
   replaced: boolean;
-  /** REG-01: true when every sentence was skipped as register, a
-   * repeated question or a statement's action claim and `reply` is the
+  /** REG-01: true when every sentence was skipped as register or a
+   * statement's action claim and `reply` is the
    * act's own line (emptiedLine()): the engine's cue for its one retry
    * with the note. */
   emptied?: boolean;
@@ -251,7 +236,6 @@ const CANNOT_DO = [
 // the honesty vocabulary in the tests.
 const NOT_TOLD = ["I don't have that one yet.", "I don't have that yet, sorry.", "That's one I don't have yet."];
 const DONT_KNOW = ["I don't know that one.", "I'm not sure about that one.", "I don't know that one, sorry."];
-const CHAT_LOOP = ["I keep landing on the same answer, ask me that another way?", "Hmm, I'm going in circles. Try me a different way?", "I'm stuck on that one, sorry. Ask me again some other way?"];
 // #92: a placeholder echo on a statement (the model said a bracketed
 // note back after a disclosure) is replaced with the acknowledgment the
 // disclosure deserved, never "I don't know" about something the person
@@ -1080,112 +1064,8 @@ function guardAssistantRegister(sentence: string, ctx: GuardContext, isFirstSent
   if (isFirstSentence && (ctx.act === "closing" || ctx.act === "greeting") && RECIPROCAL_RE.test(sentence)) return null;
   return isRegisterFor(sentence, ctx) ? "assistant_register" : null;
 }
-// ==== REP-01: the repeat shapes and the objection ====
-//
-// bot-legacy's structural rule (the same reply text twice in a row in
-// one conversation becomes the chat-loop line) was recorded here and
-// never ported; the evening of 2026-09-14 sent a hedge four times, a
-// cast list four times and a date five times because nothing at the
-// boundary read the row before it. The previous two replies are on the
-// context (turnContext.ts reads them off the window); the check is one
-// normalization per sentence.
+// ==== Objection handling ====
 
-/** A sentence's normal form for the repeat read: lowercased, punctuation
- * and whitespace collapsed; a closer is nothing (the register family
- * owns it), and so is a sentence of two words or fewer (a one-word
- * acknowledgment is never a repeat). */
-let bankFormsCache: Set<string> | null = null;
-/** The engine's own fixed lines in their normal form (the honesty bank,
- * the emptied lines, the families' lines): a fixed line the engine
- * chose to say again is never a repeat, the exemption by construction
- * (the stream yields the emptied line through the guards, and the same
- * question asked twice says it twice). */
-function bankForms(): Set<string> {
-  if (bankFormsCache) return bankFormsCache;
-  const plain = (line: string) => line.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
-  bankFormsCache = new Set([...allReplacementLines(), ...HONESTY_VOCABULARY].map(plain).filter((f) => f.length > 0));
-  return bankFormsCache;
-}
-export function normalizeForRepeat(sentence: string): string | null {
-  const trimmed = sentence.trim();
-  if (!trimmed || isCloserSentence(trimmed)) return null;
-  const normal = trimmed.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
-  if (normal.split(" ").length <= 2 || bankForms().has(normal)) return null;
-  return normal;
-}
-function previousSentenceForms(ctx: GuardContext): Set<string> {
-  const forms = new Set<string>();
-  for (const reply of ctx.previousReplies ?? []) {
-    for (const earlier of splitIntoSentences(reply)) {
-      const normal = normalizeForRepeat(earlier);
-      if (normal) forms.add(normal);
-    }
-  }
-  return forms;
-}
-/** REP-01: a repeat the person asked for ("say that again", "sorry,
- * what?", "come again", "one more time") is the one time the same reply
- * is right; neither shape reads it (the `say-that-again` voice-repair
- * row, a review). */
-export const REPEAT_REQUEST_RE = /^\W*(?:(?:sorry|pardon|huh|eh|hmm|what),?\s*)?(?:say (?:that|it) again|(?:can|could) you (?:say|repeat) (?:that|it)(?: again)?|repeat (?:that|it)(?: please)?|come again|one more time|what did you (?:just )?say|what was that|again\??|what\??|sorry\??|pardon(?: me)?\??|huh\??|i missed that|i didn'?t (?:catch|hear|get) (?:that|it))\W*$/i;
-export function repeatRequested(utterance: string): boolean {
-  return REPEAT_REQUEST_RE.test(utterance.trim());
-}
-function guardRepeatSentence(sentence: string, ctx: GuardContext): GuardReason | null {
-  if (!ctx.previousReplies?.length || repeatRequested(ctx.utterance)) return null;
-  const normal = normalizeForRepeat(sentence);
-  if (!normal) return null;
-  // The stream hands a long sentence over as clause spans (the chunker
-  // flushes at a clause boundary past 90 characters), so a span that is
-  // a previous sentence's own prefix, suffix or inner clause is the
-  // repeat too (the "cast list four times" shape; a review).
-  for (const form of previousSentenceForms(ctx)) {
-    if (form === normal || form.startsWith(`${normal} `) || form.endsWith(` ${normal}`) || form.includes(` ${normal} `)) return "repeat_sentence";
-  }
-  return null;
-}
-const NUMBER_RE = /\b\d[\d.,:]*\b/g;
-/** The capitalized words past each sentence's first ("It stars Serena
- * Vale" gives Serena and Vale, never It; a review). */
-function properNounsOf(text: string): Set<string> {
-  const out = new Set<string>();
-  for (const sentence of splitIntoSentences(text)) {
-    const words = sentence.trim().split(/\s+/);
-    for (const word of words.slice(1)) {
-      const bare = word.replace(/^[^\p{L}]+|[^\p{L}\p{N}'-]+$/gu, "");
-      if (/^\p{Lu}[\p{L}\p{N}'-]+$/u.test(bare) && !/^(?:I|I'm|I'll|I've|I'd)$/.test(bare)) out.add(bare.toLowerCase());
-    }
-  }
-  return out;
-}
-/** REP-01, the whole-reply case: the reply's content words and a
- * previous reply's overlap by 80 percent or more of the larger set (a
- * narrowed follow-up that answers one of three things asked is not the
- * same reply; a review), and it carries no number and no proper noun
- * the previous one lacked. A reply of two words or fewer is never one
- * (the one-word acknowledgment), nor is a repeat the person asked for. */
-export function isRepeatReply(reply: string, ctx: Pick<GuardContext, "previousReplies" | "utterance">): boolean {
-  const previous = ctx.previousReplies ?? [];
-  if (previous.length === 0 || repeatRequested(ctx.utterance ?? "")) return false;
-  if (reply.trim().split(/\s+/).filter(Boolean).length <= 2) return false;
-  // A reply that is only the engine's own fixed lines is never a repeat.
-  if (splitIntoSentences(reply).every((s) => normalizeForRepeat(s) === null)) return false;
-  const words = tokenize(reply);
-  if (words.size === 0) return false;
-  const numbers = new Set((reply.match(NUMBER_RE) ?? []).map((n) => n.replace(/[.,:]+$/, "")));
-  const propers = properNounsOf(reply);
-  return previous.some((earlier) => {
-    const old = tokenize(earlier);
-    if (old.size === 0) return false;
-    const overlap = [...words].filter((w) => old.has(w)).length;
-    if (overlap < 0.8 * Math.max(words.size, old.size)) return false;
-    const oldNumbers = new Set((earlier.match(NUMBER_RE) ?? []).map((n) => n.replace(/[.,:]+$/, "")));
-    const oldPropers = properNounsOf(earlier);
-    const newNumber = [...numbers].some((n) => !oldNumbers.has(n));
-    const newProper = [...propers].some((p) => !oldPropers.has(p));
-    return !newNumber && !newProper;
-  });
-}
 /** REP-01, rule 3: the objection shapes beside the signal's own reading
  * (target hub with a repair). */
 export const OBJECTION_RE = /\b(?:you (?:already|just) said that|same answer(?: again)?|you'?re repeating yourself|you (?:keep )?repeat(?:ed|ing)? (?:that|yourself)|you'?re not (?:following|listening|getting it)|not what i asked|that'?s not what i (?:asked|said|meant)|stop (?:that|saying that|repeating)|that'?s (?:twice|three times|the (?:second|third) time))\b/i;
@@ -1206,18 +1086,14 @@ function guardSelfAssertion(sentence: string, ctx: GuardContext): GuardReason | 
   const content = [...tokenize(sentence)].filter((w) => (w.length > 3 || /\d/.test(w)) && !SELF_ASSERTION_WORDS.has(w));
   return content.length > 0 || /\b\d[\d.,:]*\b/.test(sentence) ? null : "self_assertion";
 }
-/** REP-01: the note the retry carries after a repeat or a self-assertion
- * emptied the reply; the objection rides with it when there was one. */
-export const REPEAT_RETRY_NOTE = "You already said that and the person heard it; say something new, or do what they asked.";
-export function repeatRetryNote(ctx: Pick<GuardContext, "utterance" | "target" | "repair">): string {
-  return isObjectionTurn(ctx) ? `${REPEAT_RETRY_NOTE} They said: "${ctx.utterance.trim()}". Do not say that you understand; address what they asked.` : REPEAT_RETRY_NOTE;
+/** The note the retry carries after a self-assertion emptied the reply. */
+export const OBJECTION_RETRY_NOTE = "You already said that and the person heard it; say something new, or do what they asked.";
+export function objectionRetryNote(ctx: Pick<GuardContext, "utterance" | "target" | "repair">): string {
+  return isObjectionTurn(ctx) ? `${OBJECTION_RETRY_NOTE} They said: "${ctx.utterance.trim()}". Do not say that you understand; address what they asked.` : OBJECTION_RETRY_NOTE;
 }
 /** The note the retry carries after the persona's own example line was
  * said back: the examples show the voice, never the answer. */
 export const EXAMPLE_PARROT_RETRY_NOTE = "The example lines in your instructions show how you sound, never what to say; they are not answers. Respond to what the person actually said.";
-export function isRepeatReason(reason: GuardReason | null | undefined): boolean {
-  return reason === "repeat_sentence" || reason === "repeat_reply" || reason === "self_assertion";
-}
 
 /** A register tail behind a comma, a semicolon, a colon or a spaced
  * dash ("Sounds fun, let me know if you need anything else.") is taken
@@ -1292,26 +1168,6 @@ export function dropConjunctionLead(sentence: string): string {
   const m = /^\s*(?:but|and|so|or|yet|plus|also|though)\b(?!\s+(?:far|long|much|many|that|then|too|what|now|on|forth)\b)[,\s]*(\S.*)$/is.exec(sentence);
   if (!m || tokenize(m[1]!).size === 0) return sentence;
   return m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1);
-}
-
-/** REG-01 (section 4): a reply sentence that says the hub's previous
- * question back (the same words, or four in five of them) is skipped. */
-function guardRepeatQuestion(sentence: string, ctx: GuardContext): GuardReason | null {
-  if (!sentence.includes("?") || !ctx.previousReply) return null;
-  const said = tokenize(sentence);
-  if (said.size < 2) return null;
-  for (const earlier of splitIntoSentences(ctx.previousReply)) {
-    if (!earlier.includes("?")) continue;
-    const had = tokenize(earlier);
-    if (had.size === 0) continue;
-    const overlap = [...said].filter((w) => had.has(w)).length;
-    // Four in five of the shorter sentence's words, and the longer no
-    // more than twice the shorter: a paraphrase with a filler ("So what
-    // made you decide to stop, then?") is the same question.
-    const shorter = Math.min(said.size, had.size);
-    if (Math.max(said.size, had.size) <= 2 * shorter && overlap >= Math.max(2, Math.ceil(0.8 * shorter))) return "repeat_question";
-  }
-  return null;
 }
 
 function guardUnrelatedRecall(sentence: string, ctx: GuardContext): GuardReason | null {
@@ -1902,9 +1758,8 @@ const LEGACY_HONESTY_LINES = [
   "I don't know, sorry.",
   "I'm not sure about that.",
   "I don't have an answer for that.",
-  "I keep landing on the same answer - ask me that another way?",
 ];
-const HONESTY_VOCABULARY: ReadonlySet<string> = new Set([...NOT_TOLD, ...DONT_KNOW, ...CHAT_LOOP, ...LEGACY_HONESTY_LINES]);
+const HONESTY_VOCABULARY: ReadonlySet<string> = new Set([...NOT_TOLD, ...DONT_KNOW, ...LEGACY_HONESTY_LINES]);
 /** GUARD-LINES: every line any guard can speak, for the test that none
  * carries the words Jesse ruled out ("told", "nobody"). */
 export function allReplacementLines(): string[] {
@@ -1987,7 +1842,7 @@ export function bankLineNote(sentence: string): string | null {
 // LOOKUP-02: the deliverable denial is dropped wherever it sits (the
 // engine already ran the lookup or is about to); the honest line stands
 // in only when the denial was the whole reply.
-const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "repeat_question", "pronoun_mismatch", "false_capability", "banned_phrase", "repeat_sentence", "self_assertion", "example_parrot"]);
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "pronoun_mismatch", "false_capability", "banned_phrase", "self_assertion", "example_parrot"]);
 
 /** REG-01: a statement (an inform, a commissive, a greeting, a closing
  * or a backchannel by the signal; a statement or first-person shape
@@ -2009,22 +1864,19 @@ function statementActionSkip(reason: GuardReason, ctx: GuardContext): boolean {
 /** The line that stands when REG-01's skips emptied a reply, by the
  * turn's act (the engine retries once with its note before this). */
 export function emptiedLine(ctx: Pick<GuardContext, "act" | "shape" | "utterance" | "personId">, reason?: GuardReason | null): string {
-  // REP-01: a reply the repeat shapes emptied says the chat-loop line
-  // (it exists and says the right thing), whatever the act.
-  if (reason === "repeat_sentence" || reason === "repeat_reply") return pickVariant(ctx.personId, "emptied:repeat", CHAT_LOOP);
   const shape = ctx.act ? null : shapeOf(ctx as GuardContext);
   const act = ctx.act ?? (shape === "question" ? "question" : shape === "command" ? "directive" : "inform");
   const bank = act === "closing" ? EMPTIED_LINES.closing : act === "greeting" ? EMPTIED_LINES.greeting : act === "question" ? DONT_KNOW : act === "directive" ? [NOTHING_RAN] : EMPTIED_LINES.statement;
   return pickVariant(ctx.personId, `emptied:${act}`, bank);
 }
 
-/** REG-01's own skips: the register, a repeated question, a statement's
+/** REG-01's own skips: the register, a statement's
  * action claim. When one of these emptied the reply, no honest line
  * about an action or an experience fits (nothing was asked), so the
  * act's own line stands and the engine retries once with its note;
  * `claimed_experience` keeps its own line and its own rule (item 1b). */
 export function isRegisterSkip(reason: GuardReason, ctx: GuardContext): boolean {
-  return reason === "assistant_register" || reason === "repeat_question" || reason === "banned_phrase" || reason === "repeat_sentence" || reason === "self_assertion" || reason === "example_parrot" || (reason === "claimed_experience" && !experienceTurn(ctx)) || statementActionSkip(reason, ctx);
+  return reason === "assistant_register" || reason === "banned_phrase" || reason === "self_assertion" || reason === "example_parrot" || (reason === "claimed_experience" && !experienceTurn(ctx)) || statementActionSkip(reason, ctx);
 }
 
 /** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
@@ -2042,7 +1894,7 @@ export function isSkippable(reason: GuardReason, ctx?: GuardContext): boolean {
 }
 
 // Per-reason lines, not one generic fallback - bot-legacy's own
-// guard_reply picks between cannot_do/not_told/dont_know/chat_loop the
+// guard_reply picks between cannot_do/not_told/dont_know the
 // same way, because "I can't do that" and "I don't know that" are
 // different true statements, not interchangeable ones.
 const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
@@ -2052,17 +1904,16 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   medication_dose: MED_CAUTION,
   capability_claim: CANNOT_DO,
   unsupported_action: CANNOT_DO,
-  like_i_said: CHAT_LOOP,
+  like_i_said: DONT_KNOW,
   example_parrot: DONT_KNOW,
   placeholder_echo: DONT_KNOW,
   claimed_experience: CANNOT_EXPERIENCE,
   claimed_statement: NO_RECORD_OF_SAYING,
   malformed: MALFORMED,
-  // REG-01: a reply that was only register or a repeated question has
-  // nothing left; the engine retries once with its note first, and the
-  // malformed line is what stands when that fails too (OUT-01's bound).
+  // REG-01: a reply that was only register has nothing left; the engine
+  // retries once with its note first, and the malformed line is what
+  // stands when that fails too (OUT-01's bound).
   assistant_register: MALFORMED,
-  repeat_question: MALFORMED,
   tag_question: MALFORMED,
   // ASK-01: the ask itself stands in (replacementFor() names the name);
   // a pronoun slip that emptied the reply is an output break.
@@ -2070,8 +1921,6 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   pronoun_mismatch: MALFORMED,
   false_capability: ["That lookup didn't work, sorry."],
   banned_phrase: MALFORMED,
-  repeat_sentence: CHAT_LOOP,
-  repeat_reply: CHAT_LOOP,
   self_assertion: MALFORMED,
 };
 
@@ -2135,7 +1984,6 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
     (containsBannedPhrase(s, ctx.bannedPhrases ?? []) ? "banned_phrase" : null) ??
     guardAssistantRegister(s, ctx, isFirstSentence) ??
     guardSelfAssertion(s, ctx) ??
-    guardRepeatQuestion(s, ctx) ??
     // The set of 2026-09-15 (pronoun-follow-up#1, household-location#2):
     // "Got it, added to the list." on a plain statement was the persona's
     // own example line said back, and the action family read it first as
@@ -2156,8 +2004,7 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
     guardFalseFamiliarity(s, ctx) ??
     guardPronounMismatch(s, ctx) ??
     guardUnrelatedRecall(s, ctx) ??
-    guardInvention(s, ctx) ??
-    guardRepeatSentence(s, ctx)
+    guardInvention(s, ctx)
   );
 }
 
@@ -2183,9 +2030,6 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   const fullReplyCtx: GuardContext = { ...ctx, replyHasQuestion: (reply || "").includes("?") };
   const kept: string[] = [];
   let skipped: { reason: GuardReason; sentence: string } | null = null;
-  // REP-01: every skipped reason, so a register opener ahead of a
-  // repeated fact does not hide the repeat (a review).
-  const skippedReasons = new Set<GuardReason>();
   let tailCut: GuardReason | null = null;
   // EXP-01's set: a sentence that followed a skipped one on a
   // conjunction ("But we can watch it together") loses the lead.
@@ -2209,7 +2053,6 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
     if (isSkippable(reason, fullReplyCtx)) {
       // Item 1b: dropped wherever it sits, the rest of the reply goes on.
       skipped ??= { reason, sentence };
-      skippedReasons.add(reason);
       justSkipped = true;
       continue;
     }
@@ -2219,15 +2062,7 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
     return { reply: replacementFor(reason, ctx.personId, { sentence, ctx: fullReplyCtx }), reason, replaced: true };
   }
   if (skipped) {
-    // REP-01: a repeat skipped with only an opener kept ("Sure thing!")
-    // answered nothing; that is the whole-reply case too, whatever
-    // reason the opener was skipped for (a review).
-    const repeated = skippedReasons.has("repeat_sentence");
-    const keptSaysSomething = kept.some((k) => normalizeForRepeat(k) !== null);
-    if (kept.length > 0 && !(repeated && !keptSaysSomething)) return { reply: kept.join(" "), reason: skipped.reason, replaced: false };
-    // REP-01: a reply the repeat read emptied is the whole-reply case;
-    // the chat-loop line stands in and the engine retries with its note.
-    if (repeated) return { reply: emptiedLine(fullReplyCtx, "repeat_reply"), reason: "repeat_reply", replaced: true, emptied: true };
+    if (kept.length > 0) return { reply: kept.join(" "), reason: skipped.reason, replaced: false };
     // REG-01: nothing was asked, so no honest line about an action
     // fits; the act's own line stands (emptiedLine()) and the engine
     // retries once with its note before accepting it. Item 1b's
@@ -2236,7 +2071,5 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
     return { reply: replacementFor(skipped.reason, ctx.personId, { sentence: skipped.sentence, ctx: fullReplyCtx }), reason: skipped.reason, replaced: true };
   }
   if (tailCut) return { reply: kept.join(" "), reason: tailCut, replaced: false };
-  // REP-01, the whole-reply case: the same reply in other words.
-  if (isRepeatReply(reply, fullReplyCtx)) return { reply: emptiedLine(fullReplyCtx, "repeat_reply"), reason: "repeat_reply", replaced: true, emptied: true };
   return { reply, reason: null, replaced: false };
 }

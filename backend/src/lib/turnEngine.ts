@@ -35,7 +35,7 @@ import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import { buildTurnStats } from "@/lib/turnStats";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, normalizeForRepeat, splitIntoSentences, bannedPhraseRetryNote, repeatRetryNote, isRepeatReason, isRepeatReply, EXAMPLE_PARROT_RETRY_NOTE, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, splitIntoSentences, bannedPhraseRetryNote, objectionRetryNote, EXAMPLE_PARROT_RETRY_NOTE, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
@@ -4470,7 +4470,7 @@ async function runTurnHoldingLease(
 
   let value: TurnValue;
   // REG-01: set by answerWithSafetyAndGuards() when the guards emptied
-  // the reply (register, a repeated question, a statement's claim).
+  // the reply (register or a statement's claim).
   let emptiedBySkips = false;
   // ACT-01: the blocking path has no first token; its `first_token_ms`
   // is the whole first completion, and `finalize_ms` runs from the last
@@ -4494,11 +4494,7 @@ async function runTurnHoldingLease(
   // (a tool_calls reply that produced no successful call still needs
   // this exact same safety/guard treatment for the plain-text answer
   // that replaces it) - one definition, not two copies drifting apart.
-  // CHAT-16: a composed package answer is exempt from the repeat family
-  // (REP-01's own exemption for a package's deterministic answer: the
-  // same question asked again gets the same answer, never the loop
-  // line), so its guard context carries no previous replies.
-  const answerWithSafetyAndGuards = (text: string, composed = false): TurnValue => {
+  const answerWithSafetyAndGuards = (text: string): TurnValue => {
     const outputSafety = forOutput(evaluateSafety(text, speakerAgeBand(actor, new Date())));
     notifyOncePerTurn(actor, outputSafety, modelPrepared.turnId, "[turn]");
     if (outputSafety.action === "refuse") {
@@ -4526,7 +4522,7 @@ async function runTurnHoldingLease(
     // fixes, never a safety category).
     // CHAT-01: derived now, not at prepare time, so an outcome pushed by
     // resolveToolCalls() above reaches the guards' `outcomes` (a code review).
-    const guarded = guardReply(text, { ...guardContextFrom(modelPrepared.turnContext), personId: actor.id, ...(composed ? { previousReplies: [] } : {}) });
+    const guarded = guardReply(text, { ...guardContextFrom(modelPrepared.turnContext), personId: actor.id });
     if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
     if (guarded.replaced) guardReplaced = true;
     emptiedBySkips = guarded.emptied === true;
@@ -4577,7 +4573,7 @@ async function runTurnHoldingLease(
     }
     modelPrepared.composed = { mode: "composition", model_calls: 1, ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
     groundOutcomes(modelPrepared.turnContext, resolutionOutcomes);
-    const guarded = answerWithSafetyAndGuards(composed, true);
+    const guarded = answerWithSafetyAndGuards(composed);
     if (guarded.source === "safety_refuse") return guarded;
     // The opener's case, as the stream's sentenceCaseStream() and the
     // model turn's finalizeReply() give it (a plugin-source value skips
@@ -4688,9 +4684,8 @@ async function runTurnHoldingLease(
         if (emptiedBySkips && prepared.timings.retries < 1) {
           prepared.timings.retries++;
           const retryPhrase = guardHits.includes("banned_phrase") ? (guardContextFrom(prepared.turnContext).bannedPhrases ?? []).find((p) => rawText.toLowerCase().includes(p.toLowerCase())) : null;
-          // REP-01: a repeat or a self-assertion emptied it: the note says
-          // so, and carries the objection when there was one.
-          const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
+          // A self-assertion emptied it: the note carries the objection.
+          const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.includes("self_assertion") ? objectionRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
           prepared.modelCalls++;
           const again = await complete("chat", [...prepared.messages, { role: "system", content: note }], { thinking: false });
           generationDone = Date.now();
@@ -5055,13 +5050,6 @@ export async function* gateGuards(
   let spokeAnything = false;
   let skipped: { reason: GuardReason; sentence: string } | null = null;
   let justSkipped = false;
-  // REP-01: what was spoken, for the whole-reply read at the end; every
-  // skipped reason, so a register opener ahead of a repeated fact does
-  // not hide the repeat; whether anything spoken said something (a
-  // two-word opener alone answers nothing; a review).
-  let spoken = "";
-  const skippedReasons = new Set<GuardReason>();
-  let spokeContent = false;
   const liveCtx = (): GuardContext => ({ ...(typeof ctx === "function" ? ctx() : ctx), personId });
   while (!step.done) {
     // REG-01, rule 2: a register tail on a spoken span is cut before the
@@ -5088,7 +5076,6 @@ export async function* gateGuards(
       // streams on; if nothing else is ever spoken, the honest line
       // stands in at the end (guardReply()'s own rule).
       skipped ??= { reason, sentence: trimmed };
-      skippedReasons.add(reason);
       onGuardHit?.(reason, false);
       step = await iterator.next();
       continue;
@@ -5111,24 +5098,14 @@ export async function* gateGuards(
     // is not something spoken: an all-skipped reply still ends in the
     // honest line, not in "\n\n" (the review of #99's fix).
     if (trimmed) spokeAnything = true;
-    if (trimmed && normalizeForRepeat(trimmed) !== null) spokeContent = true;
-    spoken += rawSpan;
     yield rawSpan;
     step = await iterator.next();
   }
-  // REP-01, the whole-reply case at the end of a stream: the text is
-  // out, so the hit is the record (the row carries repeat_reply); the
-  // per-sentence read above is what keeps a repeated opening off the
-  // wire.
-  if (spokeContent && isRepeatReply(spoken, liveCtx())) onGuardHit?.("repeat_reply", false);
-  // A repeat skipped with only an opener spoken ("Sure thing!") answered
-  // nothing: the retry runs after it, as for an emptied reply.
-  const repeatEmptied = skippedReasons.has("repeat_sentence") && !spokeContent;
-  if (skipped && (!spokeAnything || repeatEmptied)) {
+  if (skipped && !spokeAnything) {
     // REG-01, rule 1: nothing remained of a reply to a statement; one
     // retry with the note, then the act's own line (OUT-01's bound on
     // generations).
-    if (isRegisterSkip(skipped.reason, liveCtx()) || repeatEmptied) {
+    if (isRegisterSkip(skipped.reason, liveCtx())) {
       const again = regenerate ? await regenerate() : null;
       let spoke = false;
       if (again) {
@@ -5155,12 +5132,9 @@ export async function* gateGuards(
         }
       }
       // The line by the turn's act (a close, a greeting, a question, a
-      // statement), never "say that again" to a thank-you; a reply the
-      // repeat read emptied is the whole-reply case and says the
-      // chat-loop line (REP-01).
-      const emptiedReason: GuardReason = skippedReasons.has("repeat_sentence") ? "repeat_reply" : skipped.reason;
-      onGuardHit?.(emptiedReason, true);
-      yield `${emptiedLine(liveCtx(), emptiedReason)} `;
+      // statement), never "say that again" to a thank-you.
+      onGuardHit?.(skipped.reason, true);
+      yield `${emptiedLine(liveCtx(), skipped.reason)} `;
       return step.value;
     }
     onGuardHit?.(skipped.reason, true);
@@ -5650,9 +5624,9 @@ async function runTurnStreamHoldingLease(
         sentenceCaseStream(
           gateGuards(
             gateOutputSafety(guardFirstStep(holdOpening(tokens, true)), actor, prepared.turnId),
-            // CHAT-16: a composed package answer is exempt from the
-            // repeat family (REP-01's exemption for a package's answer).
-            () => (composedFrom ? { ...guardContextFrom(prepared.turnContext), previousReplies: [] } : guardContextFrom(prepared.turnContext)),
+            // The guard context is read per span so a tool outcome pushed
+            // inside the stream reaches action-claim checks immediately.
+            () => guardContextFrom(prepared.turnContext),
             actor.id,
             (reason, replaced) => {
               // The reason that replaced is the one the row records
@@ -5681,8 +5655,8 @@ async function runTurnStreamHoldingLease(
               // names the reason this generation exists - one guard
               // retry, one label, not two independent readings of
               // guardHits that could disagree.
-              const guardReason = retryPhrase ? "banned_phrase" : guardHits.some(isRepeatReason) ? "repeat" : guardHits.includes("example_parrot") ? "example_parrot" : "statement";
-              const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.some(isRepeatReason) ? repeatRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
+              const guardReason = retryPhrase ? "banned_phrase" : guardHits.includes("self_assertion") ? "objection" : guardHits.includes("example_parrot") ? "example_parrot" : "statement";
+              const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.includes("self_assertion") ? objectionRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
               const requestSentMs = Date.now() - startedAt;
               const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: note }], { thinking: false }, opts.signal);
               if (!again.ok) return null;

@@ -1027,16 +1027,6 @@ describe("REG-01: a statement is not a request, and the assistant register is st
     expect(guardReply("I've noted that.", stated()).emptied).toBe(true);
   });
 
-  test("rule 3: the hub's previous question said back is skipped; a new question stands", () => {
-    const previous = "That sounds like a lot of fuss. What made you decide to stop?";
-    const repeated = guardReply("Fair enough. What made you decide to stop?", stated({ utterance: "I wasn't asking you to do anything, just talking", previousReply: previous }));
-    expect([repeated.reason, repeated.replaced, repeated.reply]).toEqual(["repeat_question", false, "Fair enough."]);
-    const paraphrased = guardReply("So what made you decide to stop, then?", stated({ utterance: "just talking", previousReply: previous }));
-    expect(paraphrased.reason).toBe("repeat_question");
-    const fresh = guardReply("Fair enough. Will you miss the bread, or just the fuss?", stated({ utterance: "just talking", previousReply: previous }));
-    expect(fresh.reason).toBeNull();
-    expect(guardReply("What made you decide to stop?", stated({ previousReply: undefined })).reason).toBeNull();
-  });
 });
 
 describe("REG-02: wishes and tag questions are register", () => {
