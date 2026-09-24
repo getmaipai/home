@@ -28,14 +28,14 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP, feedThinkSplit, newThinkSplitState, extractReasoningText } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import { buildTurnStats } from "@/lib/turnStats";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, normalizeForRepeat, splitIntoSentences, lookupShapeOf, lookupAnswered, readLookupDraft, LOOKUP_READ_MAX_CHARS, LOOKUP_FAILED_LINES, bannedPhraseRetryNote, repeatRetryNote, isRepeatReason, isRepeatReply, EXAMPLE_PARROT_RETRY_NOTE, type LookupRead, type LookupShape, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, normalizeForRepeat, splitIntoSentences, bannedPhraseRetryNote, repeatRetryNote, isRepeatReason, isRepeatReply, EXAMPLE_PARROT_RETRY_NOTE, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
@@ -269,7 +269,6 @@ async function* stampFirstDelta<T>(gen: AsyncGenerator<string, T, void>, record:
     // `yield*`; this generator's own `finally` runs on every exit
     // (normal completion, an early return(), a thrown error), so
     // closing it here always closes the one it wraps too. The exact
-    // failure holdForLookup()'s own comment already documents for a JS
     // generator closed without this: llama-server left generating an
     // abandoned reply server-side because nothing told it to stop.
     if (it.return) await it.return(undefined as unknown as T);
@@ -309,9 +308,6 @@ interface TurnLogRecord {
    * first, the slot the bench's subject expectation reads. */
   subjects?: { type: string; name: string }[];
   subject?: string;
-  /** LOOKUP-02: what the draft confessed (a promise, an offer, a
-   * hedged fact, a denial), when it did. */
-  lookup_shape?: LookupShape;
   /** CHAT-16 (K2): the composer's decision for a turn that turned tool
    * outcomes into a reply (`<mode> calls=<n>`, the budget and fallback
    * marks), and K6's last phase. */
@@ -324,7 +320,7 @@ interface TurnLogRecord {
   rules?: string[];
 }
 
-function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], lookupShape?: LookupShape, plan?: ReplyPlan, composed?: ComposedRecord, rung?: Rung, rules?: readonly string[], stats?: TurnValue["stats"]): void {
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings, subjects?: readonly SubjectRef[], plan?: ReplyPlan, composed?: ComposedRecord, rung?: Rung, rules?: readonly string[], stats?: TurnValue["stats"]): void {
   // ASK-02: the world kind, or the kinds an unresolved name hinted.
   const named = (subjects ?? []).map((s) => ({ type: s.type, name: s.type === "household" ? (registryNameById(s.entity_id) ?? s.entity_id) : s.type === "world" ? s.display_name : s.surface_form, ...(s.type === "world" ? { kind: s.kind } : s.type === "unresolved" && s.candidate_kinds.length > 0 ? { kind: s.candidate_kinds.join("/") } : {}) }));
   const record: TurnLogRecord = {
@@ -352,7 +348,6 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     // deterministic tier's turn (a review).
     ...(value.source === "model" || (timings?.first_token_ms ?? null) !== null ? { engine: formatEngineIdentity(getActiveChatEngineIdentity()) } : {}),
     ...(named.length > 0 ? { subjects: named, subject: named[0]!.name } : {}),
-    ...(lookupShape ? { lookup_shape: lookupShape } : {}),
     ...(composed ? { composed: composedLog(composed), ...(composed.ungrounded ? { ungrounded: composed.ungrounded } : {}), phase: composed.phase } : {}),
     ...(rung ? { rung } : {}),
     ...(rules && rules.length > 0 ? { rules: [...rules] } : {}),
@@ -390,7 +385,7 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; branchFrom?: string | null; ephemeral?: boolean; temporary?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; lookupShape?: LookupShape; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; generations?: readonly GenerationRecord[]; thinking?: boolean },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; branchFrom?: string | null; ephemeral?: boolean; temporary?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; plan?: ReplyPlan; timings: TurnTimings; subjects?: readonly SubjectRef[]; inputSafety?: SafetyResult; composed?: ComposedRecord; rules?: readonly string[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; generations?: readonly GenerationRecord[]; thinking?: boolean },
 ): void {
   // RVW-1: the answering rung, read once here from the delivered value,
   // the retained outcomes and the signal, and the rules that fired (the
@@ -457,7 +452,7 @@ function logTurnSafely(
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
   }
-  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.lookupShape, meta.plan, meta.composed, rung, rules, value.stats);
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings, meta.subjects, meta.plan, meta.composed, rung, rules, value.stats);
   if (meta.ephemeral || meta.temporary) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
@@ -2115,29 +2110,11 @@ type PreparedTurn =
        * re-derived from it, since `ToolSpec` itself has no score or
        * manifest left in it once flattened. */
       ranked: RankedCandidate[];
-      /** getmaipai/home#67 code review: every `routing.always_offer`
-       * candidate this turn's own `ranked` produced (websearch is the
-       * only one bundled today) - the genuinely open-ended lookup
-       * fallback set, as opposed to `tools`' fuller mix of top-ranked
-       * candidates plus always-offer ones. Computed once here, alongside
-       * `tools`/`alwaysOffered` (this function's own local of the same
-       * name) which share the identical `ranked.filter(...always_offer)`
-       * expression - kept as its own field so runTurn()'s invention-
-       * retry doesn't recompute (and risk drifting from) that filter
-       * independently. */
-      lookupTools: ToolSpec[];
       /** ASK-01: the name the engine asks about at the end of this
        * reply ("Who's Clover?"), the first household-framed unknown of
        * the utterance with no noun settling its kind; null when there
        * is none. The question outranks the persona's engagement dial. */
       unknownAsk: string | null;
-      /** LOOKUP-02: the shape the draft confessed (a promise, an offer,
-       * a hedged fact, a denial), for the `[turn]` line; set by the
-       * read on either path. */
-      lookupShape?: LookupShape;
-      /** LOOKUP-02: the engine's query for the turn's lookup, once one
-       * ran or an offer was bound. */
-      lookupExpression?: string | null;
       /** CHAT-16 (K2): the turn's model-call counter, the one place the
        * budget is read (composer.ts's COMPOSER_MAX_CALLS): every
        * completion the turn starts, on either path, counts here. */
@@ -2172,12 +2149,6 @@ type PreparedTurn =
 // vocabularies live in consentVocab.ts (OUT-01 shares them with the
 // reply boundary's short-answer list).
 // Item 4a: the cancel of an ask is the whole utterance, never a prefix.
-/** LOOKUP-01: what a promised lookup says when the search itself
- * failed or found nothing: the lookup family's own honest line. */
-export const LOOKUP_FAILED_LINE = LOOKUP_FAILED_LINES[0]!;
-/** The lookup family's own packages (guards.ts's lookupAnswered() reads
- * the same two), the rungs of LOOKUP-02's ladder beside the search. */
-const LOOKUP_FAMILY: ReadonlySet<string> = new Set(["websearch", "knowledge"]);
 /** A hesitation fragment the sentence splitter ends on its own dots
  * ("Hmm...", "Well.", "Okay, so..."): not the reply's first sentence. */
 const HESITATION_FRAGMENT_RE = /^\W*(?:h+m+|u+m+|u+h+|a+h+|o+h+|well|ok(?:ay)?|so|right|alright|let'?s see|sure)(?:[,\s]+(?:h+m+|u+m+|well|ok(?:ay)?|so|right|alright|let'?s see))*\W*$/i;
@@ -2190,197 +2161,6 @@ export function firstSentenceIndex(sentences: readonly string[]): number | null 
 /** Whether the first real sentence has arrived whole: it ends on a stop
  * of its own (the splitter hands back an unfinished tail as a sentence
  * too). */
-/** LOOKUP-02: the first two real sentences have arrived whole. */
-export function twoSentencesComplete(sentences: readonly string[]): boolean {
-  const i = firstSentenceIndex(sentences);
-  if (i === null) return false;
-  const real = sentences.slice(i);
-  return real.length >= 2 && /[.!?…]["')\]]*\s*$/.test(real[1]!);
-}
-export function firstSentenceComplete(sentences: readonly string[]): boolean {
-  const i = firstSentenceIndex(sentences);
-  return i !== null && /[.!?…]["')\]]*\s*$/.test(sentences[i]!);
-}
-/** The draft without its first sentence's promise (and any hesitation
- * ahead of it): the rest when there is one, the honest line when the
- * promise was the whole reply. */
-/** LOOKUP-02: the draft without the sentences the read took (the
- * confessing sentence and every denial), or the fallback when nothing
- * is left. */
-export function withoutSentences(text: string, indices: readonly number[], fallback: string = LOOKUP_FAILED_LINE): string {
-  const drop = new Set(indices);
-  const rest = splitIntoSentences(text)
-    .filter((_, i) => !drop.has(i))
-    .join(" ")
-    .trim();
-  return rest.length > 0 ? rest : fallback;
-}
-export function withoutPromise(text: string, fallback: string = LOOKUP_FAILED_LINE): string {
-  const sentences = splitIntoSentences(text);
-  const rest = sentences.slice((firstSentenceIndex(sentences) ?? 0) + 1).join(" ").trim();
-  return rest.length > 0 ? rest : fallback;
-}
-/** LOOKUP-01: an offer or a promise anywhere in the reply that went
- * out, with no lookup that answered, becomes a `lookup` pending ask
- * bound to the question, so "do it", "sure", "yes", "go ahead" run the
- * websearch through resolvePendingAsk() rather than routing as a bare
- * command. A first-sentence promise the forced lookup took never
- * reaches here with the promise in it (the answer went out as the
- * package's, or the draft lost its promise); one that did reach the
- * wire (past the stream's hold bound, or after the turn's generation
- * budget was spent) is bound like any other (a review). Exported for
- * the bench's seeded-reply turns, which script the hub's reply and
- * still need the offer bound. */
-// LOOKUP-02 (section 16 part 2, rule 3): the question a lookup runs is
-// built by the engine from the turn's subjects and the sentence that
-// promised or offered it, never from the person's current words (an
-// objection turn's words were searched, a product's name answered a
-// price question with a description). The subject is the stack's
-// world or unresolved reference; the field is what the offer names
-// after its lookup verb, pronouns and fillers out; the fallback is the
-// person's last question-shaped turn about the subject, never an
-// objection, an acknowledgment or a one-word turn.
-const LOOKUP_FIELD_LEAD_RE = /^(?:what|which|how much|how many|whether|if|when|where|who|that|the|a|an|some|about|on|for|up|into|out|is|are|was|were|does|do|did|can|could|would|will|should|there)\b\s*/i;
-function stripLead(text: string): string {
-  let out = text.trim();
-  for (let i = 0; i < 4; i++) {
-    const next = out.replace(LOOKUP_FIELD_LEAD_RE, "").trim();
-    if (next === out) break;
-    out = next;
-  }
-  return out;
-}
-const LOOKUP_FIELD_FILLER_RE = /\b(?:it|its|it's|that|this|them|they|they're|their|there|for you|for me|you|me|we|us|our|your|is|are|was|were|be|being|been|do|does|did|can|could|would|should|will|get|got|of|to|the|a|an|and|or|so|then|now|just|please|too|also|really|actually|currently|right now|these days|at the moment)\b/gi;
-const NOT_A_QUESTION_TURN_RE = /^(?:(?:that'?s|this is) (?:twice|three times|the (?:second|third) time)|you (?:already|just) said|you said that|stop|enough|no|yes|ok(?:ay)?|sure|thanks|thank you|go on|do it|just do it|well|hmm|uh|um)\b/i;
-// A question whose only subject is a pronoun ("when did it happen",
-// "how long is it", "who was in it").
-// "that" and "this" stay out: "what year was that war fought" names its
-// subject (a review).
-const PRONOUN_ONLY_QUESTION_RE = /^(?:what|which|how(?: (?:long|many|much|old|far|big))?|when|where|who|why|is|are|was|were|does|do|did|can|could|would|will|should)\b[^?]{0,30}?\b(?:it|they|them|he|she|him|her)\b\s*(?:\w+\s*){0,3}\??$/i;
-const QUERY_CONNECTIVE_RE = /^(?:but|though|although|however|also|still|anyway|so|and|or|yet)$/i;
-const TIME_FILLER_RE = /^(?:ago|while|year|years|month|months|day|days|week|weeks|time|times|once|later|earlier|before|after|recently|lately|soon|already|last|next)$/i;
-// The hedge words and the promise's own lookup verb, out of the
-// confessing sentence when it becomes the query.
-// The hedge frames, not content: "around" only before a number (a review).
-const HEDGE_WORDS_RE = /\b(?:i think|i believe|i'?m not (?:entirely |completely |100% )?sure|not (?:entirely |completely )?sure|probably|typically|usually|generally|(?:around|roughly|approximately|about)(?=\s+\d)|if i remember(?: correctly| right)?|as far as i (?:know|remember|recall)|but (?:do )?check|let me (?:just |quickly )?(?:check|look(?: that| it)?(?: up)?|find out|see|verify|confirm)(?: (?:that|it|this))?(?: for you)?|i'?ll (?:check|look(?: that| it)?(?: up)?|find out|verify|confirm)(?: (?:that|it|this))?(?: for you)?)\b/gi;
-export function lookupQueryFor(input: { subjects: readonly SubjectRef[]; sentence: string; utterance: string; history: readonly string[]; roster: readonly string[]; shape?: LookupShape }): string | null {
-  const subject = input.subjects.find((s) => s.type === "world" || s.type === "unresolved");
-  const subjectName = subject ? (subject.type === "world" ? subject.display_name : subject.type === "unresolved" ? subject.surface_form : null) : null;
-  // The field the offer or promise names: the words after the lookup
-  // verb, once the frame is out.
-  // A hedged fact or a denial names no field; the person's question is
-  // the query then.
-  const namesField = input.shape === undefined || input.shape === "promise" || input.shape === "offer";
-  const verbAt = namesField ? input.sentence.search(/\b(?:look(?:ing)? (?:up|into|for)|check(?:ing)?(?: on)?|find(?:ing)?(?: out)?|search(?:ing)?(?: for)?|see (?:if|whether|what)|track down|dig up|verify|confirm)\b/i) : -1;
-  let field = verbAt >= 0 ? input.sentence.slice(verbAt).replace(/^\S+(?:\s+(?:up|into|for|on|out|if|whether|what))?\s*/i, "") : "";
-  field = stripLead(field.replace(/[?.!]+$/g, "").replace(/(?<=\p{L})[\u2019']\s*(?:re|s|m|ve|ll|d)\b/giu, ""))
-    .replace(LOOKUP_FIELD_FILLER_RE, " ")
-    .replace(/[^\p{L}\p{N}'\s-]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (subjectName && new RegExp(`(?<![\\p{L}])${subjectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}])`, "iu").test(field)) field = field.replace(new RegExp(subjectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu"), "").replace(/\s+/g, " ").trim();
-  // The person's own question about the subject, when the offer names
-  // no field: the current turn if it is one, else the latest earlier
-  // one that names the subject.
-  const questionTurns = [input.utterance, ...[...input.history].reverse()].filter((t) => t.trim().split(/\s+/).length > 1 && !NOT_A_QUESTION_TURN_RE.test(t.trim()) && (/\?\s*$/.test(t.trim()) || /^(?:what|which|how|when|where|who|why|is|are|does|do|did|can|could|would|will|should)\b/i.test(t.trim())));
-  const question = subjectName ? questionTurns.find((t) => new RegExp(subjectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").test(t)) : questionTurns[0];
-  // LOOKUP-02's set: no world or unresolved subject on the stack and a
-  // pronoun-only question ("when did it happen" after a turn about the
-  // moon landing): the confessing sentence's own words are the query,
-  // its hedge marker, its value and the fillers out ("moon landing
-  // happened"), never the pronoun question alone.
-  if (!subjectName && field.length === 0 && (input.shape === "hedged_fact" || input.shape === "promise") && PRONOUN_ONLY_QUESTION_RE.test(input.utterance.trim())) {
-    // The household's names never reach the search (a review): the
-    // roster's names come off the sentence first, possessives with them.
-    let own = input.sentence;
-    for (const name of input.roster) {
-      if (name.trim().length > 1) own = own.replace(new RegExp(`(?<![\\p{L}\\p{N}])${name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[\u2019']s)?(?![\\p{L}\\p{N}])`, "giu"), " ");
-    }
-    own = own
-      .replace(HEDGE_WORDS_RE, " ")
-      .replace(/\b\d[\d.,]*\b/g, " ")
-      .replace(/(?<=\p{L})[\u2019']\s*(?:re|s|m|ve|ll|d)\b/giu, "")
-      .replace(LOOKUP_FIELD_FILLER_RE, " ")
-      .replace(/[^\p{L}\p{N}'\s-]/gu, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const words = own.split(" ").filter((w) => w.length > 0 && !LOOKUP_FIELD_LEAD_RE.test(`${w} `) && !QUERY_CONNECTIVE_RE.test(w));
-    while (words.length > 0 && /^(?:in|on|at|by|for|of|to|from|with|since|until|around)$/i.test(words[words.length - 1]!)) words.pop();
-    // At least one content word the question did not carry (a noun the
-    // sentence introduced), never a time filler: "but year ago" and
-    // "happened while ago" search nothing (a review).
-    const asked = new Set(input.utterance.toLowerCase().split(/[^\p{L}\p{N}']+/u).filter((w) => w.length > 0).map((w) => w.slice(0, 4)));
-    const content = words.filter((w) => w.length >= 3 && !asked.has(w.toLowerCase().slice(0, 4)) && !TIME_FILLER_RE.test(w));
-    if (words.length >= 2 && content.length >= 1) return words.join(" ");
-  }
-  if (field.length > 0 && subjectName) return `${subjectName} ${field}`;
-  // The field the offer named is the query even with no subject on the
-  // stack ("I'll check the weather" is "weather tomorrow", not the
-  // question's leftovers; a review); the question is the fallback.
-  if (field.length > 0 && field.split(/\s+/).length >= 1 && !question?.toLowerCase().includes(field.toLowerCase())) return field;
-  if (question) {
-    const q = stripLead(question.replace(/[?.!]+$/g, "").replace(/(?<=\p{L})[\u2019']\s*(?:re|s|m|ve|ll|d)\b/giu, "")).replace(LOOKUP_FIELD_FILLER_RE, " ").replace(/\s+/g, " ").trim();
-    return subjectName && !new RegExp(subjectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").test(q) ? `${subjectName} ${q}` : q;
-  }
-  if (subjectName) return [subjectName, field].filter(Boolean).join(" ").trim();
-  return field.length > 0 ? field : null;
-}
-
-/** ASK-02 (rule 4): the query a confirmed world name runs. The full
- * name and the carried turn's own words (its lead and fillers out, the
- * name out) through LOOKUP-02's builder when the turn was a question;
- * for a statement, the name and the wh-phrase the statement carried
- * ("what happened to"), else the name alone. */
-export function worldAnswerQuery(subject: Extract<SubjectRef, { type: "world" }>, carried: string, askedName: string): string {
-  // The name goes with its possessive ("Serena's new film" leaves "new film").
-  const whole = (name: string) => new RegExp(`(?<![\\p{L}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[\u2019']s)?(?![\\p{L}])`, "giu");
-  const lead = carried.replace(whole(subject.display_name), " ").replace(whole(askedName), " ").replace(/\s+/g, " ").trim();
-  const questionShaped = /\?\s*$/.test(lead) || /^(?:what|which|how|when|where|who|why|is|are|does|do|did|can|could|would|will|should)\b/i.test(lead);
-  if (questionShaped) {
-    const q = stripLead(lead.replace(/[?.!]+$/g, "").replace(/(?<=\p{L})[\u2019']\s*(?:re|s|m|ve|ll|d)\b/giu, ""))
-      .replace(LOOKUP_FIELD_FILLER_RE, " ")
-      .replace(/[^\p{L}\p{N}'\s-]/gu, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (q.length > 0) return `${subject.display_name} ${q}`;
-  }
-  // The statement's wh-phrase, when it says more than the wh-word and
-  // a copula ("what happened", never "who is").
-  const wh = /\b((?:what|who|where|when|why|how)\b[^.!?,]{0,40}?)\s+(?:to|with|about|for|of)?\s*$/iu.exec(carried.replace(new RegExp(`(?<![\\p{L}])${askedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}])[\\s\\S]*$`, "iu"), ""));
-  const phrase = wh?.[1]?.trim().replace(/^(?:what|who|where|when|why|how)\b\s*(?:is|was|are|were|'s|\u2019s|did|does|do)?\s*/iu, "").trim() ?? "";
-  return wh && phrase.length > 0 ? `${subject.display_name} ${wh[1]!.trim()}` : subject.display_name;
-}
-
-// LOOKUP-02 (rule 4): the consent vocabulary's imperative forms, for a
-// pending lookup only: after a promise or an offer went out, "go on
-// then", "well find it", "just search it", "that's twice now, go on
-// and do it" run the bound question, never the model's fresh guess.
-// The whole utterance, as AFFIRMATIVE_RE is: a lead-in the person
-// adds ("well", "that's twice now,") and the imperative, nothing else,
-// so "no wait, search for the Rivet 4 instead" or "actually can you
-// check my calendar" is a new turn and routes as itself (a review).
-const LOOKUP_IMPERATIVE_RE = /^\s*(?:(?:well|ok(?:ay)?|fine|alright|just|please|yes|yeah|sure|so|then|come on|that'?s (?:twice|three times) now|you (?:already )?said that(?: already)?|again)[,\s!.]+)*(?:do it|go ahead|just do it|go on(?: then| and (?:do|find|search|look) it(?: up)?)?|go on and do it|search(?: it| for it| online)?|find it|look it up|look for it|check(?: it)?|run it|try it|yes do|please do|do that|go for it)(?:[,\s!.]+(?:please|then|now|already|thanks|thank you))*\s*[.!]*\s*$/i;
-export function lookupConsent(text: string): boolean {
-  const t = text.trim();
-  return AFFIRMATIVE_RE.test(t) || LOOKUP_IMPERATIVE_RE.test(t);
-}
-
-export function notePendingLookup(conversationId: string, replyText: string, utterance: string, outcomes: readonly ToolExecutionOutcome[] = [], lookupIds?: readonly string[], expression?: string | null): boolean {
-  if (lookupAnswered(outcomes)) return false;
-  // ASK-01: one ask at a time. A question the engine appended this turn
-  // ("Who's Clover?") owns the next utterance; an offer in the same
-  // reply binds nothing.
-  if (getPendingAsk(conversationId)) return false;
-  // Nothing to run it with (websearch not among the turn's lookup
-  // tools: not installed, or above the speaker's role): no binding, so
-  // a "yes" never reaches a package that will refuse (a review).
-  if (lookupIds && !lookupIds.includes("websearch")) return false;
-  const offered = splitIntoSentences(replyText).find((sentence) => lookupShapeOf(sentence) !== null);
-  if (!offered) return false;
-  // LOOKUP-02: the offered question, never the turn's own words.
-  setPendingAsk(conversationId, { kind: "lookup", prompt: offered, packageId: "websearch", args: { expression: expression ?? utterance } });
-  return true;
-}
 const ASK_CANCEL_RE = /^(?:(?:no|nah|nope|actually|ok(?:ay)?|oh)[,\s]+)*(?:no|nope|nah|cancel(?: (?:that|it))?|never ?mind(?: (?:that|it|about it))?|forget (?:it|that|about it)|stop|no thanks|no thank you|don'?t(?: bother| worry(?: about it)?)?|skip it|leave it)\s*[.!]?$/i;
 
 /** Session C step 2's pendingAsk continuation, either trigger
@@ -2464,10 +2244,6 @@ export async function resolvePendingAsk(
   // ASK-01: the entity a `who` answer created or confirmed, for the
   // turn's subject; ASK-02: the world subject a `who` answer named.
   protocol: { answer?: ProtocolAnswer; subjectId?: string; subject?: SubjectRef } = {},
-  // ASK-02: the turn's own crisis reading (this turn's self-harm signal
-  // or the conversation's state), so a world answer never runs a
-  // search on a turn the crisis rules own (a review).
-  opts: { inCrisis?: boolean } = {},
 ): Promise<TurnValue | null> {
   const pending = getPendingAsk(conversation.id);
   if (!pending) return null;
@@ -2511,11 +2287,8 @@ export async function resolvePendingAsk(
       if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "declined");
       return null;
     }
-    // ASK-02 (rule 4): the name is the world's. No household entity
-    // (a candidate of the name is retired as a wrong guess), a world
-    // subject of the answered kind on the turn, and the question or
-    // statement that raised the name runs as a lookup on it at once,
-    // so the reply is the answer and not the name said back.
+    // ASK-02: keep the answered name as a world subject without guessing
+    // that the engine has verified facts about it.
     if (parsed.world) {
       if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "answered");
       const twin = name ? candidateByName(actor, name) : null;
@@ -2527,21 +2300,6 @@ export async function resolvePendingAsk(
       protocol.subject = subject;
       protocol.answer = { kind: "who", answer: "value" };
       console.log(`[ask] the answer about a name made it the world's on turn ${turnId} (${parsed.world.kind})`);
-      const searchable = loaded.some(({ id, manifest }) => id === "websearch" && manifest.kind === "plugin" && meetsMinRole(actor.role, manifest.min_role)) && !(opts.inCrisis ?? conversationInCrisis(conversation.id));
-      if (pending.carriedQuestion && searchable) {
-        const expression = worldAnswerQuery(subject, pending.carriedQuestion, name);
-        const searchArgs = engineWebsearchArgs(expression);
-        const result = await runPlugin("websearch", actor, searchArgs, { id: turnId, conversationId: conversation.id });
-        outcomes.push(
-          outcomeOf(
-            result.ok
-              ? { callId: `${turnId}:who`, packageId: "websearch", status: "succeeded", args: searchArgs, via: "forced", result: result.value }
-              : { callId: `${turnId}:who`, packageId: "websearch", status: "failed", args: searchArgs, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
-          ),
-        );
-        if (result.ok) { const outcome = outcomes[outcomes.length - 1]!; return { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: "websearch", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) }; }
-        return { reply: { text: `Got it, ${subject.display_name}. ${LOOKUP_FAILED_LINE}` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
-      }
       return { reply: { text: `Got it, ${subject.display_name}.` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
     }
     const outcome = applyWhoAnswer(actor, { name, subjectId: pending.subjectId ?? null }, parsed, turnId);
@@ -2631,33 +2389,9 @@ export async function resolvePendingAsk(
     return null;
   }
 
-  // LOOKUP-01: an offer or a late promise in the hub's own reply, bound
-  // to the query. A consent word runs the websearch (via "ask", the
-  // outcome retained like any other), a refusal clears it, and anything
-  // else clears it and falls through to routing: the person moved on.
-  if (pending.kind === "lookup") {
+  if (pending.kind !== "ask") {
     setPendingAsk(conversation.id, null);
-    if (ASK_CANCEL_RE.test(text.trim())) {
-      protocol.answer = { kind: "lookup", answer: "negative" };
-      return { reply: { text: "Okay, I'll leave it." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
-    }
-    if (!lookupConsent(text)) return null;
-    const result = await runPlugin(pending.packageId, actor, pending.args, { id: turnId, conversationId: conversation.id });
-    outcomes.push(
-      outcomeOf(
-        result.ok
-          ? { callId: `${turnId}:lookup`, packageId: pending.packageId, status: "succeeded", args: pending.args, via: "ask", result: result.value }
-          : { callId: `${turnId}:lookup`, packageId: pending.packageId, status: "failed", args: pending.args, via: "ask", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
-      ),
-    );
-    protocol.answer = { kind: "lookup", answer: "affirmative" };
-    if (result.ok) {
-      const outcome = outcomes[outcomes.length - 1]!;
-      return { reply: result.value.reply ?? { text: COMPOSE_FALLBACK_LINE }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId, ...(outcome.sources?.length ? { sources: outcome.sources } : {}) };
-    }
-    // The package's own honest line on a 502 (Fix B2, as the confirm
-    // branch above), the lookup family's otherwise (a review).
-    return { reply: (result.status === 502 ? result.fallback_reply.reply : undefined) ?? { text: LOOKUP_FAILED_LINE }, source: "plugin_error", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    return null;
   }
 
   // kind: "ask" - the raw utterance is the answer; deterministicArgs()
@@ -3078,7 +2812,7 @@ async function prepareTurn(
   // rather than bound to the edited text.
   if (supersedes) setPendingAsk(conversation.id, null);
   const protocol: { answer?: ProtocolAnswer; subjectId?: string; subject?: SubjectRef } = {};
-  const pendingAskValue = continuation ? null : await resolvePendingAsk(text, actor, conversation, effectiveLoaded, turnId, safety, crisisResources, directOutcomes, protocol, { inCrisis });
+  const pendingAskValue = continuation ? null : await resolvePendingAsk(text, actor, conversation, effectiveLoaded, turnId, safety, crisisResources, directOutcomes, protocol);
   // RVW-1: the ask rule that read the answer, from the protocol layer.
   if (protocol.answer) {
     const { kind, answer } = protocol.answer;
@@ -3587,16 +3321,6 @@ async function prepareTurn(
     turnContext.intent.deliverable = { deliverable: "picture", count: pictureRebind.count, ...(pictureRebind.form ? { form: pictureRebind.form } : {}) };
   }
   const householdSubject = householdSubjectTurn(text, turnContext);
-  if (!continuation && asksHowKnown(text) && !householdSubject) {
-    const prior = outcomesForConversation(conversation.id).slice().reverse().flatMap((row) => row.outcomes.map((outcome) => ({ row, outcome }))).find(({ outcome }) => outcome.status === "succeeded" && (outcome.source?.kind === "model_knowledge" || outcome.sources?.length));
-    if (prior?.outcome.source?.kind === "model_knowledge") {
-      const question = prior.outcome.source?.title ?? text;
-      const line = "That one I just know; I didn't look it up. Want me to check?";
-      setPendingAsk(conversation.id, { kind: "lookup", prompt: line, packageId: "websearch", args: { expression: question } });
-      return immediate({ reply: { text: line }, source: "model", safety, crisis_resources: crisisResources }, subjects);
-    }
-    if (prior?.outcome.sources?.length) return immediate({ reply: { text: "I looked it up; the link's below." }, source: "plugin", plugin_id: prior.outcome.packageId, safety, crisis_resources: crisisResources, sources: prior.outcome.sources }, subjects);
-  }
   const deferredSubject = turnContext.subjects.find((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household");
   const deferredSubjectName = deferredSubject ? registryNameById(deferredSubject.entity_id) : null;
   const mayDefer = !continuation && (ageBand === "child" || ageBand === "teen") && shapeOf(signal, text) === "question" && householdSubject && memoryMatches.withheldForBand > 0 && deferredSubjectName !== null && deferredSubject !== undefined && !memoryMatches.some((match) => match.record.subject_id === deferredSubject.entity_id);
@@ -3688,21 +3412,7 @@ async function prepareTurn(
   // deliberately, not an unbounded one).
   // getmaipai/home#67: the FULL always-offer set (unlike `alwaysOffered`
   // just above, which deliberately excludes a candidate already counted
-  // via `topRanked` to avoid offering it twice in `tools`) - runTurn()'s
-  // own invention-retry wants every genuinely open-ended lookup
-  // candidate this turn regardless of whether it also happened to clear
-  // the ordinary Tier 2 floor, and needs that as its own field rather
-  // than re-filtering `ranked` a second time at the call site.
-  // LOOKUP-02: the ladder's rungs are the lookup family's own packages
-  // the router ranked above its floor (the typed source, knowledge,
-  // when the question matched it; `ranked` holds every package, a
-  // review) plus every always-offer fallback (the search), so the
-  // forced completion can pick the typed source first and the search
-  // runs next when it finds nothing.
-  const lookupTools: ToolSpec[] = continuation || inCrisis ? [] : ranked.filter((r) => r.manifest.routing?.always_offer || (LOOKUP_FAMILY.has(r.id) && r.score >= TIER2_AMBIGUOUS_FLOOR)).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
-  // The decision needs a rung to run on: with no lookup tool offered
-  // (no search installed, a role below its floor, the crisis state) the
-  // turn is the model's, never "I couldn't look that up" (a review).
+  // via `topRanked` to avoid offering it twice in `tools`).
 
   turnContext.offeredToolIds = tools.map((t) => t.id);
   // CHAT-01: the guards' context is derived from the included evidence
@@ -3710,7 +3420,7 @@ async function prepareTurn(
   // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
   // seen on both paths.
   timings.prompt_ms = Math.round(performance.now() - promptStart);
-  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, plan, timings, unknownAsk, modelCalls: 0, generations: [], rules, ...(composeDirect ? { compose: composeDirect } : {}) };
+  return { kind: "model", surface, messages, safety, crisisResources, turnId, tools, ranked, turnContext, signal, plan, timings, unknownAsk, modelCalls: 0, generations: [], rules, ...(composeDirect ? { compose: composeDirect } : {}) };
 }
 
 /** CHAT-16 (K2): whether a direct route's plugin reply is one the
@@ -3895,9 +3605,6 @@ export async function resolveToolCalls(
   crisisResources: string | undefined,
   outcomes: ToolExecutionOutcome[] = [],
   utterance?: string,
-  // LOOKUP-02: the forced lookup's calls carry `via: forced` and, for
-  // the search, the engine's own query in place of the model's.
-  lookup?: { via: "forced"; expression?: string | null; category?: "images" },
   onIgnoredModelArg?: (name: "category") => void,
 ): Promise<TurnValue | null> {
   // CHAT-15: the outcomes this batch adds are retained in model order,
@@ -3913,13 +3620,9 @@ export async function resolveToolCalls(
     delete args.category;
     return { ...c, args };
   });
-  const shaped = sanitized.map((c) => {
-    if (c.tool !== "websearch") return c;
-    const args = { ...(c.args as Record<string, unknown> | undefined), ...(lookup?.category ? { category: lookup.category } : {}) };
-    return lookup?.expression ? { ...c, args: { ...args, expression: lookup.expression } } : { ...c, args };
-  });
+  const shaped = sanitized;
   try {
-    return await resolveToolCallsInOrder(shaped, offeredIds, ranked, actor, conversationId, turnId, safety, crisisResources, outcomes, utterance, order, settleWithheld, lookup?.via ?? "tool_call");
+    return await resolveToolCallsInOrder(shaped, offeredIds, ranked, actor, conversationId, turnId, safety, crisisResources, outcomes, utterance, order, settleWithheld, "tool_call");
   } finally {
     settleWithheld.current?.();
     const added = outcomes.splice(startAt);
@@ -4441,11 +4144,6 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
       },
     };
   }
-  // An offer in the reply binds the lookup instead (notePendingLookup
-  // runs after this): the open question waits for the next reply.
-  const lookupIds = prepared.lookupTools.map((t) => t.id);
-  const offers = lookupIds.includes("websearch") && !lookupAnswered(prepared.turnContext.outcomes) && !householdSubjectTurn(utterance, prepared.turnContext) && splitIntoSentences(visible).some((sentence) => lookupShapeOf(sentence) !== null);
-  if (offers) return NO_ASK;
   // The set's read: a queued question whose subject is on the turn or
   // in the last two turns goes first; a relationship question about a
   // name not in play holds (the pet row had the judge's "Is Clover your
@@ -4471,91 +4169,6 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
       console.log(`[ask] turn ${prepared.turnId} asks the open question ${question.id} (${question.kind}${asked ? ", the model's own question" : ""})`);
     },
   };
-}
-
-/** LOOKUP-02 (section 16 part 1, rules 1 to 3): the forced lookup as a
- * ladder, one definition for both paths. The engine writes the query
- * (lookupQueryFor) from the turn's subjects and the sentence that
- * confessed; the completion under `tool_choice: required` picks the
- * rung (the typed source when one is offered, else the search) and its
- * outcomes carry `via: forced`; when that rung fails or finds nothing,
- * the search runs next with the same query before anything reaches
- * the guards; the failed rung stays in the outcomes. Null when no rung
- * answered: the caller says the honest line. */
-async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: PersonRow, conversationId: string, text: string, read: Pick<LookupRead, "shape" | "sentence">, thinking: boolean | undefined): Promise<TurnValue | null> {
-  const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
-  const history = prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content);
-  const denialDeliverable = read.shape === "denial" ? (deliverableKind(prepared.turnContext.intent.deliverable) ?? deliverableInDenial(read.sentence)) : undefined;
-  const searchDeliverable = deliverableKind(prepared.turnContext.intent.deliverable) ?? denialDeliverable;
-  const pictureCount = pictureCountOf(prepared.turnContext.intent.deliverable);
-  const expression = lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape });
-  const outcomes = prepared.turnContext.outcomes;
-  prepared.machine?.enter("executing");
-  ruleFired(prepared, "lookup.forced");
-  // CHAT-16 (K2): the model's rung runs only when it has a choice to
-  // make and the turn can still afford the composition after it. With
-  // the search the only lookup tool ranked and the query the engine's,
-  // a `tool_choice: required` completion could only call the search
-  // with that query; and on a turn whose draft already spent the first
-  // call, the rung would spend the second, leaving the search's rows
-  // with no call to phrase them (the fallback line). The search rung
-  // below runs at once instead, via forced as before; on a decided turn
-  // (no draft) with another lookup tool ranked the rung picks first.
-  const searchDirect = !!expression && lookupIds.has("websearch") && (prepared.lookupTools.length === 1 || prepared.modelCalls >= COMPOSER_MAX_CALLS - 1);
-  let resolved: TurnValue | null = null;
-  if (!searchDirect) {
-    prepared.modelCalls++;
-    const forced = await complete("chat", prepared.messages, { thinking, tools: prepared.lookupTools, tool_choice: "required" });
-    resolved =
-      forced.ok && forced.value.tool_calls && forced.value.tool_calls.length > 0
-        ? await resolveToolCalls(forced.value.tool_calls, lookupIds, prepared.ranked, actor, conversationId, prepared.turnId, prepared.safety, prepared.crisisResources, outcomes, text, { via: "forced", expression, ...(searchDeliverable === "picture" ? { category: "images" as const } : {}) }, (name) => { if (name === "category") noteIgnoredModelWebsearchCategory(prepared.rules); })
-        : null;
-  }
-  const searched = outcomes.some((o) => o.packageId === "websearch" && o.via === "forced");
-  if (!resolved && lookupIds.has("websearch") && !searched && expression) {
-    console.log(searchDirect ? `[turn] the forced lookup on turn ${prepared.turnId} is the search with the engine's query (${prepared.lookupTools.length === 1 ? "the only lookup tool" : "the budget's last call is the composition's"})` : `[turn] the forced lookup's first rung answered nothing on turn ${prepared.turnId}; the search runs next`);
-    const searchArgs = { ...engineWebsearchArgs(expression, searchDeliverable), ...(pageReadRequested(text) ? { read_page: true } : {}) };
-    const result = await runPlugin("websearch", actor, searchArgs, { id: prepared.turnId, conversationId });
-    outcomes.push(
-      outcomeOf(
-        result.ok
-          ? { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "succeeded", args: searchArgs, via: "forced", result: result.value }
-          : { callId: `${prepared.turnId}:ladder`, packageId: "websearch", status: "failed", args: searchArgs, via: "forced", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
-      ),
-    );
-    if (result.ok) {
-      const data = result.value.data && typeof result.value.data === "object" ? result.value.data as { rows?: unknown; page?: unknown } : {};
-      const rows = data.rows;
-      const page = data.page;
-      const selectedLink = denialDeliverable === "link" ? pageLinkFor(page, expression) : null;
-      const linkSources = selectedLink ? sourcesFromRows([{ title: selectedLink.title, url: selectedLink.href, snippet: selectedLink.surrounding_text }]) : [];
-      const sources = [...linkSources, ...sourcesFromRows(rows), ...pageSource(page)];
-      const filteredPictures = searchDeliverable === "picture" ? filterImageRows(rows) : { rows: [], dropped: 0 };
-      const reply = denialDeliverable === "link" && page && !selectedLink && prepared.turnContext.ageBand !== "child" ? { text: "The page does not have that." } : result.value.reply ?? { text: COMPOSE_FALLBACK_LINE };
-      resolved = { reply, source: "plugin", plugin_id: "websearch", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversationId, turn_id: prepared.turnId, ...(sources.length ? { sources } : {}) };
-      if (searchDeliverable === "picture" && filteredPictures.rows.length === 0) {
-        resolved = { ...resolved, reply: { text: emptyLookupLine(outcomes) }, sources: [], media: undefined, media_items: [] };
-      }
-    }
-  }
-  if (resolved && !resolved.sources?.length) {
-    const sourceOutcome = [...outcomes].reverse().find((item) => item.packageId === "websearch" && item.status === "succeeded");
-    const sourceRows = sourceOutcome?.result?.data && typeof sourceOutcome.result.data === "object" ? (sourceOutcome.result.data as { rows?: unknown }).rows : undefined;
-    const fallbackSources = sourceOutcome?.sources?.length ? sourceOutcome.sources : sourcesFromRows(sourceRows);
-    if (fallbackSources.length > 0) resolved = { ...resolved, sources: fallbackSources };
-  }
-  if (resolved) prepared.lookupExpression = expression;
-  if (resolved && searchDeliverable === "picture") {
-    const outcome = [...outcomes].reverse().find((item) => item.packageId === "websearch" && item.status === "succeeded");
-    const rows = outcome?.result?.data && typeof outcome.result.data === "object" ? (outcome.result.data as { rows?: unknown }).rows : undefined;
-    const filteredPictures = filterImageRows(rows);
-    if (filteredPictures.dropped > 0) noteFilteredImageRows(prepared, filteredPictures.dropped);
-    const mediaItems = mediaItemsFromRows(filteredPictures.rows, pictureCount, prepared.turnContext.pictureExclusions);
-    if (mediaItems.length > 0) resolved = { ...resolved, media: mediaItems[0], media_items: mediaItems };
-    else if (hasImageCandidateRows(rows) || !Array.isArray(rows) || rows.length === 0) resolved = { ...resolved, reply: { text: emptyLookupLine(outcomes) }, sources: [], media: undefined, media_items: [] };
-    else resolved = { ...resolved, media: undefined, media_items: [] };
-  }
-  return resolved && denialDeliverable ? composeDeliverable(resolved, denialDeliverable, prepared.turnContext.ageBand, prepared.surface, pictureCount) : resolved;
 }
 
 function composeDeliverable(
@@ -4612,10 +4225,6 @@ function deliverableKind(deliverable: TurnIntent["deliverable"]): "link" | "pict
 
 function pictureCountOf(deliverable: TurnIntent["deliverable"]): 1 | 2 | 3 | 4 {
   return typeof deliverable === "object" ? deliverable.count : 1;
-}
-
-function engineWebsearchArgs(expression: string, deliverable?: "link" | "picture" | "video"): Record<string, unknown> {
-  return { expression, ...(deliverable === "picture" ? { category: "images" } : {}) };
 }
 
 function pictureImageKey(url: string): string | null {
@@ -4981,15 +4590,6 @@ async function runTurnHoldingLease(
     // CHAT-16: a direct route's result the composer phrases (its outcome
     // is the last on the context); no initial call was spent.
     value = await composeBlocking(prepared.compose, prepared.turnContext.outcomes.slice(-1), true);
-  } else if (prepared.turnContext.intent.deliverable) {
-    const deliverableValue = prepared.turnContext.intent.deliverable;
-    const deliverable = deliverableKind(deliverableValue)!;
-    const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking);
-    const sources = resolved?.sources ?? [];
-    if (!sources.length) value = resolved ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
-    else {
-      value = composeDeliverable(resolved!, deliverable, prepared.turnContext.ageBand, prepared.surface, pictureCountOf(deliverableValue));
-    }
   } else {
     // OUT-01: the model's text meets the well-formed rule before the
     // guards read it (a fragment cannot be judged for invention). The
@@ -5047,7 +4647,7 @@ async function runTurnHoldingLease(
     // one 8-argument call instead of repeating it, per that review's
     // own duplication finding.
     const resolveOffered = (calls: ToolCall[], ids: ReadonlySet<string>) =>
-      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources, prepared.turnContext.outcomes, text, undefined, (name) => { if (name === "category") noteIgnoredModelWebsearchCategory(prepared.rules); });
+      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources, prepared.turnContext.outcomes, text, (name) => { if (name === "category") noteIgnoredModelWebsearchCategory(prepared.rules); });
 
     if (offeringTools && completion.value.tool_calls && completion.value.tool_calls.length > 0) {
       prepared.machine!.enter("executing");
@@ -5077,130 +4677,8 @@ async function runTurnHoldingLease(
         value = answerWithSafetyAndGuards(await shapeModelText(retry.value.text, false));
       }
     } else {
-      // getmaipai/home#67, live-found 2026-09-07: the model, offered
-      // websearch (always_offer) among `tools`, sometimes answers in
-      // plain text WITHOUT ever proposing a call, and that plain text
-      // turns out to be a guess guardReply() then has to catch (a proper
-      // noun, date, or number nowhere in the utterance/sources/history) -
-      // "is the movie any good" -> a confident but fabricated rating,
-      // caught and replaced with an honest "nobody's told me" line the
-      // household then had to work around by saying "look it up"
-      // themselves. The guard already proves the plain answer can't
-      // stand; before settling for the canned honest line, this gives
-      // the model ONE real chance to answer for real instead of guessing -
-      // the mirror image of the "every proposed call failed" retry just
-      // above (there: a call was proposed and didn't pan out, so retry
-      // WITHOUT tools; here: no call was ever proposed and the answer
-      // didn't pan out, so retry WITH a tool forced).
-      //
-      // A code review (2026-09-07) caught a first cut of this checking
-      // guardHits AFTER running the full guardReply() pass, which had
-      // three real bugs: (1) it forced a tool from the FULL `prepared.
-      // tools` set, so a caught guess could be "fixed" by inventing a
-      // call to an unrelated, non-consequential action tool instead
-      // (`remember`, say) - resolveToolCalls() would run it with no
-      // confirmation and write the model's OWN fabricated fact to
-      // permanent memory, a worse outcome than the honest decline it
-      // replaced; (2) it fired notifyIfFlagged() on the guessed text
-      // (inside answerWithSafetyAndGuards()) even when the retry then
-      // succeeded and the household never saw that text at all; (3) it
-      // fired the retry for ANY invention/unrelated_recall guard hit,
-      // including one guardReply() only CUT from a later sentence of an
-      // otherwise-good multi-sentence reply - discarding an already-
-      // correct kept prefix that had nothing to do with the guess.
-      //
-      // Fixed by deciding BEFORE running the real guard pass: guardSentence()
-      // on just the reply's OWN first sentence (guardReply()'s identical
-      // split, spec/safety-shaped: a cuttable reason only ever fully
-      // replaces the reply when it fires on sentence 0 with nothing kept
-      // yet - guards.ts:551-567 - so checking sentence 0 in isolation is
-      // the exact condition for "the whole reply is about to be
-      // replaced," never a later sentence's own cut). Only fires for
-      // "invention"/"unrelated_recall" specifically, by name rather than
-      // via guards.ts's exported isCuttable() - CUTTABLE happens to be
-      // exactly this same pair today, but it encodes a different axis
-      // (cut-vs-replace) than "the model stated a fact and got it
-      // wrong"; coupling this to CUTTABLE would silently start forcing a
-      // lookup for whatever unrelated reason a future guard change adds
-      // to that set. And only offers `routing.always_offer` candidates to
-      // the forced completion (websearch is the only one today) - the
-      // genuinely open-ended lookup fallback, never an action package
-      // the model could satisfy "required" with by inventing a call
-      // instead of a fact.
       let rawText = await shapeModelText(completion.value.text, true);
-      // getmaipai/home#67 code review: `replyHasQuestion` must match what
-      // guardReply() itself will compute for this SAME text a few lines
-      // down (`fullReplyCtx`, guards.ts) - a first cut left it unset
-      // here, which could make guardCapabilityClaim's own "a later
-      // sentence's '?' exempts the whole reply" exemption disagree
-      // between this pre-check and the real pass, so a genuinely
-      // fabricated first sentence could be misclassified here and the
-      // retry silently skipped for the exact turn it exists to fix.
-      // Item 1b: a skippable first sentence ("I've seen it!") is dropped
-      // by guardReply(), so the sentence that decides "whole reply
-      // replaced" is the first one the guards would not skip (a review).
-      const precheckCtx: GuardContext = { ...guardContextFrom(prepared.turnContext), personId: actor.id, replyHasQuestion: rawText.includes("?") };
-      let firstReason: GuardReason | null = null;
-      const sentences = splitIntoSentences(rawText);
-      for (let i = 0; i < sentences.length; i++) {
-        const reason = guardSentence(sentences[i]!, precheckCtx, i === 0);
-        if (reason && isSkippable(reason, precheckCtx)) continue;
-        firstReason = reason;
-        break;
-      }
-      const looksInvented = firstReason === "invention" || firstReason === "unrelated_recall";
-      // LOOKUP-01: a promise or an offer to look something up in the
-      // first sentence, with no lookup outcome on the turn, is an
-      // invalid draft: it is never sent, and the forced lookup runs (the
-      // invention retry's own mechanism). A promise later in the reply
-      // becomes a `lookup` pending ask (notePendingLookup below).
-      // The visible reply, never a think block's own "let me check what
-      // I know" (a review); the block travels on the text unchanged.
-      const visibleReply = visibleText(rawText);
-      // A household subject in the question (the roster and the
-      // registry, the same household_subject yield routeLiteral() applies
-      // to the knowledge pattern) is never looked up on the web: the
-      // promise stands as text and binds nothing (LOOKUP-01's follow-up:
-      // "why does Rover keep getting sick" ran a websearch on the dog).
-      const householdSubject = householdSubjectTurn(text, prepared.turnContext);
-      // LOOKUP-02: the read covers the first two sentences (or 160
-      // characters): a denial of a deliverable is cut first, then a
-      // promise, an offer, or a hedged fact on a world question.
-      const lookupServed = offeringTools && prepared.lookupTools.some((t) => t.id === "websearch") && !householdSubject;
-      const read = lookupAnswered(prepared.turnContext.outcomes) ? null : readLookupDraft(visibleReply, { worldQuestion: shapeOf(prepared.signal, text) === "question" && !householdSubject, lookupServed });
-      if (read) { prepared.lookupShape = read.shape; ruleFired(prepared, `lookup.read.${read.shape}`); }
-      const promisesLookup = read !== null && !householdSubject;
-      // A promise about the household is not kept by any lookup: the
-      // sentence is dropped and the rest stands, or the act's own
-      // emptied line (a review).
-      if (read !== null && householdSubject) {
-        ruleFired(prepared, "lookup.household_subject");
-        console.log(`[turn] a ${read.shape} to look up a household subject on turn ${prepared.turnId} is dropped (${read.sentence.length} chars)`);
-        rawText = `${thinkingPrefix(rawText)}${withoutSentences(visibleReply, [read.index, ...read.denials], emptiedLine({ act: prepared.signal?.primary_act, utterance: text, personId: actor.id }))}`;
-      }
-
-      // The invention retry's forced lookup stands down on a household
-      // subject too (the review of the follow-up): the web cannot ground
-      // a guess about the family, and the guards cut it as before.
-      if (offeringTools && ((looksInvented && !householdSubject) || promisesLookup) && prepared.lookupTools.length > 0) {
-        if (read) console.log(`[turn] a ${read.shape} on turn ${prepared.turnId} (${read.sentence.length} chars); the forced lookup runs`);
-        prepared.timings.retries++;
-        const before = prepared.turnContext.outcomes.length;
-        const resolved = await runForcedLookup(prepared, actor, conversation.id, text, read ?? { shape: "promise", sentence: "" }, opts.thinking);
-        generationDone = Date.now();
-        // Only the WINNING side ever reaches answerWithSafetyAndGuards()/
-        // notifyIfFlagged() - a guess the household never sees never
-        // gets logged or flagged as one, and a resolved tool answer
-        // never re-runs guardReply() on the text it replaced, matching
-        // every other plugin reply in this function.
-        // A confession whose lookup answered nothing keeps the rest of
-        // the draft without it, or the lookup family's honest line.
-        value = resolved ? await composeBlocking(resolved, prepared.turnContext.outcomes.slice(before)) : answerWithSafetyAndGuards(read ? `${thinkingPrefix(rawText)}${withoutSentences(visibleReply, [read.index, ...read.denials])}` : rawText);
-      } else {
-        value = answerWithSafetyAndGuards(rawText);
-        if (offeringTools && prepared.lookupTools.some((tool) => tool.id === "websearch") && shapeOf(prepared.signal, text) === "question" && !householdSubject && !lookupAnswered(prepared.turnContext.outcomes)) {
-          prepared.turnContext.outcomes.push(outcomeOf({ callId: `${prepared.turnId}:knowledge`, packageId: "model", status: "succeeded", via: "pattern", source: { kind: "model_knowledge", title: text.trim().replace(/[?!.]+$/, "").slice(0, 120) } }));
-        }
+      value = answerWithSafetyAndGuards(rawText);
         // REG-01, rule 1: every sentence of a reply to a statement was
         // register or an action claim; one retry with the note (the
         // turn's second generation), its own reply guarded the same way;
@@ -5228,7 +4706,6 @@ async function runTurnHoldingLease(
             }
           }
         }
-      }
     }
   }
 
@@ -5244,16 +4721,9 @@ async function runTurnHoldingLease(
   // Committed only when the delivered text still carries the question
   // (the boundary can replace the whole reply).
   if (value.source === "model") ask.commitIf(value.reply.text);
-  // LOOKUP-01: an offer or a late promise in the reply that went out
-  // binds the next consent word to the lookup.
-  if (prepared.kind === "model" && value.source === "model" && conversation.mode !== "temporary" && !householdSubjectTurn(text, prepared.turnContext)) {
-    const offered = splitIntoSentences(visibleText(value.reply.text)).find((sentence) => lookupShapeOf(sentence) !== null);
-    const expression = offered ? lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: offered, utterance: text, history: prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content), roster: prepared.turnContext.roster, shape: lookupShapeOf(offered) ?? undefined }) : null;
-    if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
-  }
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
   if (prepared.kind === "model") prepared.machine?.enter("finished");
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, temporary: conversation.mode === "temporary", outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, lookupShape: prepared.kind === "model" ? prepared.lookupShape : undefined, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, temporary: conversation.mode === "temporary", outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.kind === "model" ? prepared.turnContext.subjects : prepared.subjects, inputSafety: prepared.kind === "model" ? prepared.safety : prepared.value.safety, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
   return { ok: true, value };
 }
 
@@ -5755,14 +5225,6 @@ export { closeDanglingClause };
  * boundary, or a bound of characters so a long unbroken opener never
  * waits (a few tokens at the chat engine's rate). */
 export const OPENING_HOLD_MAX_CHARS = 40;
-/** LOOKUP-01: the first sentence is read for a promise to look
- * something up; a long first sentence is read at this many visible
- * characters (about twelve tokens) instead. */
-// LOOKUP-02: the hold widened from 72 to the read's two sentences or
-// 160 characters, whichever comes first (OUT-01's opening hold already
-// pays the first tokens, and a confessing turn is the turn that would
-// have wasted a round trip).
-export const LOOKUP_HOLD_MAX_CHARS = LOOKUP_READ_MAX_CHARS;
 /** With thinking on, the visible opening comes after the think block;
  * the hold reads the visible text and never waits past this much raw
  * text for it, so the block itself does not hold the wire. */
@@ -5874,24 +5336,13 @@ async function runTurnStreamHoldingLease(
   // line the boundary had to replace carries `malformed` on its row
   // the way the blocking path's does.
   const resolvedTrace: ReplyTrace = { hits: [], replaced: false };
-  // The model turn's own messages, for the hold's regeneration below
-  // (prepared is narrowed after this closure is defined).
+  // The model turn's own messages (prepared is narrowed after this
+  // closure is defined).
   const modelMessages = (prepared as Extract<typeof prepared, { kind: "model" }>).messages;
-  // LOOKUP-01: the model turn's view for the lookup hold below, taken
-  // the same way (a review: reading `modelPrepared` from the hold's
-  // body threw on the no-tools branch, which returns before that
-  // narrowing is declared), and the draft's own abort. holdForLookup()
-  // closes the draft when its first sentence is a promise, and closing
-  // the JS iterator alone leaves llama-server generating the abandoned
-  // reply on the slot the forced completion then waits for; aborting
-  // the fetch is what stops the engine. The caller's signal forwards,
-  // an already-aborted one at once.
+  // Prepared is narrowed after this closure is defined.
   const modelTurn = prepared as Extract<typeof prepared, { kind: "model" }>;
   // K6: the turn's phases, cancelled from any phase by the route's abort.
   modelTurn.machine = new TurnMachine(opts.signal);
-  const draftAbort = new AbortController();
-  if (opts.signal?.aborted) draftAbort.abort();
-  else opts.signal?.addEventListener("abort", () => draftAbort.abort(), { once: true });
 
   // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
   // round trip): shared by every branch below that ends up with a real
@@ -6059,118 +5510,6 @@ async function runTurnStreamHoldingLease(
     // all three sites (a code review, 2026-09-12, found the retry site
     // alone was covered). A failure after real text has streamed is
     // the route's catch and finalize() as before.
-    // LOOKUP-01: the first sentence is held (or the first
-    // LOOKUP_HOLD_MAX_CHARS of visible text, whichever comes first, on
-    // top of OUT-01's opening hold) and read for a promise or an offer
-    // to look something up. With no lookup outcome on the turn the
-    // sentence is never sent: the stream is closed and the forced lookup
-    // runs (the invention retry's own mechanism, a blocking completion
-    // with the lookup tools required), its result going out as every
-    // package answer does; a lookup that fails takes the honest line.
-    // A later promise or an offer becomes a pending ask in finalize().
-    const lookupIds = new Set(offeringTools ? modelTurn.lookupTools.map((t) => t.id) : []);
-    async function* holdForLookup(inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
-      // A household subject in the question is never looked up on the
-      // web (the follow-up, as on the blocking path): a promise about it
-      // is dropped and the rest streams, whether or not a lookup tool was
-      // offered this turn (the blocking path reads the draft either way;
-      // the stream let the promise through when the router ranked no
-      // lookup, an order-dependent red in tests/turnEngine.test.ts).
-      const householdSubject = householdSubjectTurn(text, modelTurn.turnContext);
-      if (!householdSubject && (!offeringTools || lookupIds.size === 0)) return yield* inner;
-      if (lookupAnswered(modelTurn.turnContext.outcomes)) return yield* inner;
-      const iterator = inner[Symbol.asyncIterator]();
-      let buffer = "";
-      // A think block is not held (a review: OUT-01's rule that the
-      // block never holds the wire): its deltas pass through as they
-      // come, and the hold starts at the visible text after it.
-      let inThink = false;
-      let step = await iterator.next();
-      while (!step.done) {
-        if (inThink) {
-          const close = step.value.match(/<\/think>/i);
-          if (!close || close.index === undefined) {
-            yield step.value;
-            step = await iterator.next();
-            continue;
-          }
-          const end = close.index + close[0].length;
-          yield step.value.slice(0, end);
-          buffer = step.value.slice(end);
-          inThink = false;
-        } else {
-          buffer += step.value;
-          if (/<think>/i.test(buffer) && !/<\/think>/i.test(buffer)) {
-            yield buffer;
-            buffer = "";
-            inThink = true;
-            step = await iterator.next();
-            continue;
-          }
-        }
-        // CHAT-16: a composition's deltas (the peek resolved the calls
-        // and the composer is phrasing the results) are never read for
-        // a promise: the lookup already ran.
-        if (composedFrom) {
-          yield buffer;
-          return yield* iterator;
-        }
-        const visible = visibleText(buffer);
-        // LOOKUP-02: the first two real sentences, complete (a
-        // hesitation fragment ahead of them is not one, a review), or
-        // the read's character bound.
-        if (visible.length >= LOOKUP_HOLD_MAX_CHARS || twoSentencesComplete(splitIntoSentences(visible))) break;
-        step = await iterator.next();
-      }
-      const visibleHeld = visibleText(buffer);
-      const read = readLookupDraft(visibleHeld, { worldQuestion: shapeOf(modelTurn.signal, text) === "question" && !householdSubject, lookupServed: lookupIds.has("websearch") && !householdSubject });
-      const shape = read?.shape ?? null;
-      const first = read?.sentence ?? "";
-      if (read) { modelTurn.lookupShape = read.shape; ruleFired(modelTurn, `lookup.read.${read.shape}`); }
-      if (read && householdSubject) {
-        ruleFired(modelTurn, "lookup.household_subject");
-        console.log(`[turn] a ${shape} to look up a household subject on turn ${modelTurn.turnId} is dropped (${first.length} chars)`);
-        const rest = withoutSentences(visibleHeld, [read.index, ...read.denials], "");
-        let sent = false;
-        if (rest.length > 0) {
-          yield `${thinkingPrefix(buffer)}${rest}`;
-          sent = true;
-        }
-        while (!step.done) {
-          step = await iterator.next();
-          if (step.done) break;
-          if (step.value.length > 0) sent = true;
-          yield step.value;
-        }
-        if (!sent) yield `${emptiedLine({ act: modelTurn.signal?.primary_act, utterance: text, personId: actor.id })} `;
-        return step.value;
-      }
-      if (read && !lookupAnswered(modelTurn.turnContext.outcomes) && generations < 2) {
-        // The draft stops here; what the model was about to say is not
-        // an answer: the engine's request is aborted (the slot freed),
-        // then the iterator closed. Then the lookup, forced, as a ladder
-        // (LOOKUP-02). The held sentence's shape and length are logged
-        // (never its text: a transcript fragment stays out of the log),
-        // since it reaches neither the wire nor the row.
-        console.log(`[turn] a ${shape} on turn ${modelTurn.turnId} (${first.length} chars); the draft is closed and the forced lookup runs`);
-        if (!step.done) {
-          draftAbort.abort();
-          await iterator.return(undefined).catch(() => undefined);
-        }
-        generations++;
-        prepared.timings.retries = generations - 1;
-        status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
-        const before = modelTurn.turnContext.outcomes.length;
-        const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, read, opts.thinking);
-        if (resolved) return yield* composeOrResolve(resolved, modelTurn.turnContext.outcomes.slice(before));
-        console.log(`[turn] a ${shape}'s lookup for turn ${modelTurn.turnId} ran and found nothing; the honest line stands`);
-        yield `${LOOKUP_FAILED_LINE} `;
-        return undefined;
-      }
-      if (buffer) yield buffer;
-      if (step.done) return step.value;
-      return yield* iterator;
-    }
     async function* guardFirstStep(inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>) {
       const iterator = inner[Symbol.asyncIterator]();
       let first: IteratorResult<string, ToolCall[] | undefined | { resolved: TurnValue }>;
@@ -6310,7 +5649,7 @@ async function runTurnStreamHoldingLease(
         appendAskStage(
         sentenceCaseStream(
           gateGuards(
-            gateOutputSafety(guardFirstStep(holdForLookup(holdOpening(tokens, true))), actor, prepared.turnId),
+            gateOutputSafety(guardFirstStep(holdOpening(tokens, true)), actor, prepared.turnId),
             // CHAT-16: a composed package answer is exempt from the
             // repeat family (REP-01's exemption for a package's answer).
             () => (composedFrom ? { ...guardContextFrom(prepared.turnContext), previousReplies: [] } : guardContextFrom(prepared.turnContext)),
@@ -6376,7 +5715,7 @@ async function runTurnStreamHoldingLease(
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
           return outcome.resolved;
         }
         // CHAT-16 (K2, K6): the composition's deltas were the stream:
@@ -6388,7 +5727,7 @@ async function runTurnStreamHoldingLease(
           const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace);
           finalized = composedValue;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
-          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
+          logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
           return composedValue;
         }
         const outputSafety = outcome;
@@ -6466,15 +5805,8 @@ async function runTurnStreamHoldingLease(
         // finalize() no longer leaks anything, since holdLease()'s
         // `finally` releases on the aborted fetch's throw.
         finalized = value;
-        // LOOKUP-01: an offer or a late promise that went out on the
-        // wire binds the next consent word to the lookup.
-        if (value.source === "model" && !opts.ephemeral && conversation.mode !== "temporary" && !householdSubjectTurn(text, prepared.turnContext)) {
-          const offered = splitIntoSentences(visibleText(value.reply.text)).find((sentence) => lookupShapeOf(sentence) !== null);
-          const expression = offered ? lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: offered, utterance: text, history: prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content), roster: prepared.turnContext.roster, shape: lookupShapeOf(offered) ?? undefined }) : null;
-          if (notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id), expression)) prepared.lookupExpression = expression;
-        }
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, lookupShape: prepared.lookupShape, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
         return value;
       },
     };
@@ -6535,20 +5867,6 @@ async function runTurnStreamHoldingLease(
   // TurnValue (StreamOutcome's `{ resolved }`), not as an "immediate"
   // result, because the decision is only known after the peek.
   //
-  if (modelTurn.turnContext.intent.deliverable) {
-    const deliverable = deliverableKind(modelTurn.turnContext.intent.deliverable);
-    if (!deliverable) return buildStreamResult((async function* (): AsyncGenerator<string, undefined, void> { return undefined; })());
-    async function* deliverableStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
-      status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
-      const deliverableValue = modelTurn.turnContext.intent.deliverable!;
-      const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking);
-      if (resolved?.sources?.length) return { resolved: composeDeliverable(resolved, deliverable!, modelTurn.turnContext.ageBand, modelTurn.surface, pictureCountOf(deliverableValue)) };
-      yield `${LOOKUP_FAILED_LINE} `;
-      return undefined;
-    }
-    return buildStreamResult(deliverableStream());
-  }
-
   // TS does not carry `prepared`'s narrowing (kind: "model") or
   // `startResult`'s (ok: true) into a nested generator's body, hence
   // the two casts.
@@ -6560,7 +5878,7 @@ async function runTurnStreamHoldingLease(
     "chat",
     modelPrepared.messages,
     { thinking: opts.thinking, tools: modelPrepared.tools, tool_choice: "auto", max_tokens: initialMaxTokens },
-    draftAbort.signal,
+    opts.signal,
   );
   if (!startResult.ok) {
     return { ok: false, status: 503, code: "unavailable", error: startResult.error }; // released by the caller's finally
@@ -6602,7 +5920,7 @@ async function runTurnStreamHoldingLease(
         status.emit({ type: "status", text: "On it.", stage: "tool" });
         modelTurn.machine?.enter("executing");
         const before = modelPrepared.turnContext.outcomes.length;
-        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes, text, undefined, (name) => { if (name === "category") noteIgnoredModelWebsearchCategory(modelPrepared.rules); });
+        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes, text, (name) => { if (name === "category") noteIgnoredModelWebsearchCategory(modelPrepared.rules); });
         if (resolved) {
           // The package answered. CHAT-16: the composer decides whether
           // it is handed back whole, past both gates (finalize() logs it

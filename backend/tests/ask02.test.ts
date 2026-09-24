@@ -15,7 +15,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { runTurn, worldAnswerQuery } from "@/lib/turnEngine";
+import { runTurn } from "@/lib/turnEngine";
 import { namesIn, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, type SubjectRef } from "@/lib/unknownNames";
 import { getPendingAsk } from "@/lib/conversationHistory";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -163,15 +163,6 @@ describe("rule 4: the world answer", () => {
     expect(replyAsksIdentityOf("How is Serena doing?", "Serena")).toBe(false);
     expect(replyAsksAbout("Serena, someone you know or a public figure?", "Serena")).toBe(true);
   });
-  test("the query is the full name and the raising turn's words", () => {
-    const subject: Extract<SubjectRef, { type: "world" }> = { type: "world", kind: "actress", display_name: "Serena Vale", year: null, source_kind: null, stable_key: null, recency: "unknown", carried_question: null };
-    expect(worldAnswerQuery(subject, "sounds like they worked out what happened to Serena", "Serena")).toBe("Serena Vale what happened");
-    expect(worldAnswerQuery(subject, "what's Serena been in lately", "Serena")).toMatch(/^Serena Vale .*lately$/);
-    expect(worldAnswerQuery(subject, "Serena", "Serena")).toBe("Serena Vale");
-    expect(worldAnswerQuery(subject, "Who is Serena?", "Serena")).toBe("Serena Vale");
-    expect(worldAnswerQuery(subject, "what's Serena up to these days?", "Serena")).not.toMatch(/what/);
-    expect(worldAnswerQuery(subject, "Serena's new film, is it any good?", "Serena")).toBe("Serena Vale new film any good");
-  });
 });
 
 const SEARCH_ANSWER = "The film stars Serena Vale as the keeper; she plays the lighthouse keeper and won a stage award last year.";
@@ -227,56 +218,6 @@ function turnLines(fn: () => Promise<void>): Promise<string[]> {
 }
 
 describe("the flows", () => {
-  test("hub-named-it: a name the search introduced is a world subject on the next turn, never asked back", async () => {
-    const { actor } = await owner();
-    await withLookup({ draft: (r) => (/who's in/.test(lastUser(r)) ? "Let me check that for you." : "She plays the lighthouse keeper in it.") }, async (seen) => {
-      const first = await runTurn(actor, "chat", "who's in the new Marsh Lantern film");
-      if (!first.ok) throw new Error(first.error);
-      expect(first.value.source).toBe("plugin");
-      expect(seen.forced).toBe(0);
-      const lines = await turnLines(async () => {
-        const second = await runTurn(actor, "chat", "who's Serena Vale", { conversationId: first.value.conversation_id });
-        if (!second.ok) throw new Error(second.error);
-        expect(second.value.reply.text).toBe("She plays the lighthouse keeper in it.");
-        expect(getPendingAsk(first.value.conversation_id)).toBeNull();
-      });
-      const turn = lines.filter((l) => l.startsWith("[turn] {")).map((l) => JSON.parse(l.slice(7)) as { subjects?: { type: string; name: string; kind?: string }[] }).at(-1)!;
-      expect(turn.subjects).toEqual([
-        { type: "world", name: "Serena Vale", kind: "mention" },
-        { type: "world", name: "Marsh Lantern", kind: "topic" },
-      ]);
-      expect(lines.some((l) => l.startsWith("[ask]"))).toBe(false);
-    });
-  });
-
-  test("public-figure: the model's own question binds as the ask; the world answer creates no entity and runs the raising turn as a lookup on the full name", async () => {
-    const { actor } = await owner();
-    await withLookup({ draft: () => "Serena? Is that someone you know or a public figure?" }, async (seen) => {
-      const first = await runTurn(actor, "chat", "sounds like they worked out what happened to Serena");
-      if (!first.ok) throw new Error(first.error);
-      expect(first.value.reply.text).toBe("Serena? Is that someone you know or a public figure?");
-      const pending = getPendingAsk(first.value.conversation_id);
-      expect(pending?.kind).toBe("who");
-      expect(pending?.name).toBe("Serena");
-      expect(pending?.carriedQuestion).toBe("sounds like they worked out what happened to Serena");
-      const lines = await turnLines(async () => {
-        const second = await runTurn(actor, "chat", "the actress, Serena Vale", { conversationId: first.value.conversation_id });
-        if (!second.ok) throw new Error(second.error);
-        expect(second.value.source).toBe("plugin");
-        expect(second.value.plugin_id).toBe("websearch");
-        expect(second.value.reply.text).toBe(SEARCH_ANSWER);
-        expect(seen.queries).toEqual(["Serena Vale what happened"]);
-        expect(seen.forced).toBe(0);
-        expect(getPendingAsk(first.value.conversation_id)).toBeNull();
-        expect(retained(second.value.turn_id).map((o) => [o.packageId, o.status, o.via, o.args?.expression])).toEqual([["websearch", "succeeded", "forced", "Serena Vale what happened"]]);
-      });
-      const turn = lines.filter((l) => l.startsWith("[turn] {")).map((l) => JSON.parse(l.slice(7)) as { subjects?: { type: string; name: string; kind?: string }[] }).at(-1)!;
-      expect(turn.subjects).toEqual([{ type: "world", name: "Serena Vale", kind: "actress" }]);
-      expect(db.select({ id: entities.id }).from(entities).where(and(eq(entities.name, "Serena Vale"), isNull(entities.deletedAt))).all()).toHaveLength(0);
-      expect(db.select({ id: entities.id }).from(entities).where(and(eq(entities.name, "Serena"), isNull(entities.deletedAt))).all()).toHaveLength(0);
-    });
-  });
-
   test("a world answer with nothing carried acknowledges the name and runs nothing", async () => {
     const { actor } = await owner();
     await withLookup({ draft: () => "Nova? Who's that?" }, async (seen) => {

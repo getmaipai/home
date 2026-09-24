@@ -98,15 +98,8 @@ export interface TurnExpectation {
    * extracted (A3). */
   recordRetired?: readonly (readonly string[])[];
   /** The conversation's pending ask after the turn: its kind, or null
-   * for none (A4, E2). `who` (ASK-01 part 4, an unresolved name) and
-   * `lookup` (a lookup missing one argument) are the coherence review's
-   * question 5 widening. Declared independently of
-   * `PendingAsk["kind"]` (backend/src/lib/conversationHistory.ts,
-   * currently `"confirm" | "ask"` only, the same way this field always
-   * was before this widening): backend/src/ is out of scope for this
-   * item, so whichever engine item adds `who`/`lookup` to the real
-   * `PendingAsk` must keep this union in step by hand. */
-  pendingAsk?: "confirm" | "ask" | "who" | "lookup" | null;
+   * for none (A4, E2). */
+  pendingAsk?: "confirm" | "ask" | "who" | null;
   /** Every one of these packages ran in this turn (A5). */
   toolsRan?: readonly string[];
   /** The household's lists hold an item matching each keyword (A5). */
@@ -185,14 +178,9 @@ export interface TurnExpectation {
   /** ASK-01: an OpenQuestion of this kind for the person has this
    * status after the turn ("declined" after "not now"). */
   openQuestionStatus?: { kind: OpenQuestion["kind"]; status: OpenQuestion["status"] };
-  /** LOOKUP-02: an outcome of this package (and path) ran this turn
-   * with each named argument matching its regex, so a row can check
-   * the engine's built query names the subject and the field without
-   * pinning its exact words. */
+  /** An outcome of this package (and path) ran this turn with each
+   * named argument matching its regex. */
   outcomeArgsMatch?: { packageId: string; via?: string; args: Readonly<Record<string, string>> };
-  /** LOOKUP-02: the shape the draft confessed, off the `[turn]` line
-   * (a promise, an offer, a hedged fact, a denial). */
-  lookupShape?: "promise" | "offer" | "hedged_fact" | "denial";
   /** REP-01: the turn spent exactly this many extra generations (the
    * retry with REPEAT_RETRY_NOTE), off the `[turn]` line's timings. */
   retries?: number;
@@ -332,14 +320,8 @@ export interface BenchTurn {
   interrupt?: boolean;
   /** Re-send: this turn supersedes the turn at that index (#88). */
   supersedesTurn?: number;
-  /** The coherence review's question 5, row 4 ("an offer is a pending
-   * ask"): the runner scripts this exact text as the hub's own reply
-   * for this turn instead of calling the model, so a row can test the
-   * acceptance half of an offer (a spontaneous suggestion) without the
-   * engine having to generate the offer itself yet. Not yet read by
-   * conversationRunner.ts (item 3 does not touch the runner); its own
-   * example row (`seeded-offer-accepted`) fails today for that reason,
-   * not because wiring it needs a new engine capability. */
+  /** The runner scripts this exact text as the hub's own reply for the
+   * turn instead of calling the model. */
   seedReply?: string;
   /** Before this turn, the owner confirms every unconfirmed inferred
    * relationship of theirs, the way the Confirm control does (PATCH
@@ -1190,42 +1172,6 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
-  // LOOKUP-02 (dev.md section 16 parts 1 and 2): the seeded reply is
-  // the model's next draft through the recording proxy, so it meets the
-  // reply boundary like any draft (the read, the forced lookup as a
-  // ladder, the guards); the search is the bench's fake SearXNG.
-  {
-    id: "hedged-promise",
-    category: "knowledge",
-    note: "LOOKUP-02 (findings 28, 27's denial half): a denial of a deliverable ahead of a promise is cut and the promise behind it is read; the forced lookup runs with the engine's own query (the card and 'support'), via forced, and the seeded sentences never reach the row",
-    turns: [
-      { say: "where's the maker's support page for the Cosmo 7 card", seedReply: "I can't open pages myself, but I can help you find it. Let me look it up for you.", expect: { signal: { primary_act: "question" }, mustNotContain: "let me look|i can help you find|can't open", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*support|support.*cosmo 7" } }, lookupWithSource: true } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-      { say: "anything on the warranty there", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "link-is-the-answer",
-    category: "knowledge",
-    note: "CHAT-16 part 4 rule 1: the lookup reply carries its sources",
-    turns: [
-      { say: "where's the maker's support page for the Cosmo 7 card", seedReply: "Let me look it up for you.", expect: { signal: { primary_act: "question" }, lookupWithSource: true, sourcesNonEmpty: true, mustNotContain: "http|can't (show|provide|share|access)|no link", humanVerdict: true } },
-      { say: "what's the horse called in the old Lantern Bay cartoon", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
-      { say: "where did you read that, link me", expect: { signal: { primary_act: "question" }, sourcesNonEmpty: true, lookupWithSource: true, toolRan: "websearch", mustNotContain: "can't provide|can't share|http", humanVerdict: true } },
-      { say: "got a photo of it?", expect: { sourcesNonEmpty: true, mustNotContain: "can't view|I can't see", mustContain: "below|page|link|details", humanVerdict: true } },
-      { say: "any video of it?", expect: { sourcesNonEmpty: true, mustNotContain: "can't show links|search for it yourself", humanVerdict: true } },
-    ],
-  },
-  {
-    id: "lookup-reply-only-rows",
-    category: "knowledge",
-    note: "CHAT-16 finding 61: a lookup composition that invents a title is replaced by the rows and names the ungrounded span",
-    turns: [
-      { say: "search the web for the horse in the old Lantern Bay cartoon", seedReply: "The horse is named Invented Meadow in the Invented Chronicle (2024).", expect: { signal: { primary_act: "directive" }, lookupWithSource: true, sourcesNonEmpty: true, mustContain: "Lantern Bay|Copper", mustNotContain: "Invented Meadow|Invented Chronicle|2024", composed: "grounded_fallback", ungrounded: "Invented Meadow" } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-      { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
-    ],
-  },
   {
     id: "lookup-empty-rows-says-so",
     category: "knowledge",
@@ -1244,69 +1190,6 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "what's the horse called in the old Lantern Bay cartoon", expect: { lookupWithSource: true, humanVerdict: true } },
       { say: "got a photo of it?", as: "child", expect: { sourcesEmpty: true, mustContain: "grown-up|mom|dad", humanVerdict: true } },
       { say: "thanks", as: "child", expect: { humanVerdict: true } },
-    ],
-  },
-  {
-    id: "false-capability-cut",
-    category: "knowledge",
-    note: "CHAT-16 part 4 rule 4: a denial of a deliverable is cut and the deliverable path runs with the deliverable query",
-    turns: [
-      { say: "what's the maker's support page for the Cosmo 7 card", expect: { signal: { primary_act: "question" }, lookupWithSource: true, sourcesNonEmpty: true, humanVerdict: true } },
-      { say: "what's the address of that page", seedReply: "I can't directly access URLs, but I can help you find the page by name.", expect: { signal: { primary_act: "question" }, outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*(support|official) page|page.*cosmo 7" } }, sourcesNonEmpty: true, mustNotContain: "can't (directly )?access|find the page by name|http", mustContain: "below|link", humanVerdict: true } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "offer-binds-the-question",
-    category: "knowledge",
-    note: "LOOKUP-02 (finding 37): a pending lookup binds the offered question, never the turn: the search runs on the card and 'used' or 'price', never the previous utterance verbatim",
-    turns: [
-      { say: "the old one's a Rivet 3 with 8 gigs", seedReply: "Those hold their value. Want me to look up what they're going for used?", expect: { signal: { primary_act: "inform" }, pendingAsk: "lookup" } },
-      { say: "sure", expect: { toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "ask", args: { expression: "^(?!.*with 8 gigs).*rivet 3.*(?:used|price|going)" } }, lookupWithSource: true } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "offer-binds-go-on-then",
-    category: "knowledge",
-    note: "LOOKUP-02 (rule 4): the imperative consent ('go on then') after an offer runs the bound question like a yes",
-    turns: [
-      { say: "the old one's a Rivet 3 with 8 gigs", seedReply: "Those hold their value. Want me to look up what they're going for used?", expect: { signal: { primary_act: "inform" }, pendingAsk: "lookup" } },
-      { say: "go on then", expect: { toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "ask", args: { expression: "^(?!.*with 8 gigs).*rivet 3.*(?:used|price|going)" } }, lookupWithSource: true } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "objection-reruns",
-    category: "knowledge",
-    note: "LOOKUP-02 (findings 28, 46): a late promise past the read went out and bound the question; the objection with a command re-runs the bound question, never the objection's own words, and the promise is not said again",
-    turns: [
-      { say: "where's the maker's support page for the Cosmo 7 card", seedReply: "The Cosmo 7 is a solid card. Most people like it for the price. Let me look it up for you.", expect: { signal: { primary_act: "question" }, pendingAsk: "lookup" } },
-      { say: "that's twice now, go on and do it", expect: { toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "ask", args: { expression: "^(?!.*twice).*cosmo 7.*support|^(?!.*twice).*support.*cosmo 7" } }, mustNotContain: "let me look it up" } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "hedged-draft",
-    category: "knowledge",
-    note: "LOOKUP-02 (finding 31's hedge half): a hedge beside a checkable value on a world question is the other confession; the draft is not sent, the forced lookup runs on the subject and the field, and the turn line says hedged_fact",
-    turns: [
-      // CHAT-13's lookup decision takes a count question before the
-      // model, so the row asks with no exact field and the seeded hedge
-      // is the read.
-      { say: "which connector is the Cosmo 7 card", seedReply: "It usually takes a 12-pin connector, but check the manual to be sure.", expect: { signal: { primary_act: "question" }, mustNotContain: "usually|check the manual", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "cosmo 7.*connector|connector.*cosmo 7" } }, lookupShape: "hedged_fact" } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-      { say: "is that a lot", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "ladder-falls-through",
-    category: "knowledge",
-    note: "LOOKUP-02 (finding 39): the forced lookup is a ladder; whichever rung the model picks first, the search answers when it can, the reply is the answering rung's, and a failed lookup is never a capability claim",
-    turns: [
-      { say: "what's the new Marsh Lantern film actually about", seedReply: "Let me check that for you.", expect: { signal: { primary_act: "question" }, toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "marsh lantern" } }, mustNotContain: "can't actually do that|not able to do that|not something i can do|let me check", lookupWithSource: true } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-      { say: "who's in it", expect: { signal: { primary_act: "question" }, humanVerdict: true } },
     ],
   },
   // The set of 2026-09-15 on d4fbf6e, the three reads of Session A's
@@ -1374,8 +1257,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
   // ASK-02 (dev.md section 16 part 7): the resolver's world edge. An
   // oath, a capitalized ordinary word and a brand are never asked
   // about; a name the hub's own lookup introduced is a world subject,
-  // never asked back; a name confirmed as a public figure is a lookup
-  // at once, on the turn that raised it.
+  // never asked back.
   {
     id: "not-a-name",
     category: "etiquette",
@@ -1389,58 +1271,13 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     ],
   },
   {
-    id: "hub-named-it",
-    category: "knowledge",
-    note: "ASK-02 (rule 3; finding 44): the search's cast row names Serena Vale; asked who she is, the hub never asks back about a name it introduced, and the answer comes from a lookup or the retained result",
-    turns: [
-      // The set's read: the 8B offers ("Want me to look that up?") and an
-      // offer binds rather than runs, so the promise is seeded, as
-      // ladder-falls-through seeds it, and the cast row comes.
-      { say: "who's in the new Marsh Lantern film", seedReply: "Let me check that for you.", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustContain: "serena|vale", guard: null } },
-      { say: "who's Serena Vale", expect: { signal: { primary_act: "question" }, pendingAsk: null, subjects: [{ type: "world", name: "Serena Vale" }], subjectsAbsent: [{ type: "unresolved" }], mustContain: "actress|keeper|lighthouse|film|plays|stars", mustNotContain: "who's serena|do you mean|someone you know|public figure", guard: null } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "public-figure",
-    category: "knowledge",
-    note: "ASK-02 (rule 4; finding 33): a bare name in a statement is unresolved with no engine ask; the model's own 'someone you know or a public figure?' is bound as the ask, and the answer that makes her a public figure runs the raising turn as a lookup on her at once",
-    turns: [
-      { say: "sounds like they worked out what happened to Serena", seedReply: "Serena? Is that someone you know or a public figure?", expect: { signal: { primary_act: "inform" }, subjects: [{ type: "unresolved", name: "Serena" }], pendingAsk: "who", mustNotContain: "who's serena", humanVerdict: true } },
-      { say: "the actress, Serena Vale", expect: { pendingAsk: null, subjects: [{ type: "world", name: "Serena Vale" }], entityAbsent: "Serena Vale", toolRan: "websearch", outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "serena vale" } }, lookupWithSource: true, mustContain: "actress|keeper|lighthouse|film|award|safe|missing|shoot|filming", mustNotContain: "are you saying|what are you thinking|let me know|got it, serena" } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
     id: "seeded-offer-accepted",
     category: "tools",
-    note: "row 4 (an offer is a pending ask): the hub's own spontaneous offer is seeded rather than generated, so the acceptance half (an outcome via: ask) is testable before the engine offers unprompted; the seeded reply binds a lookup offer only (LOOKUP-01), a reminder offer binds nothing yet, so this row fails until the offer kinds widen",
+    note: "row 4 (an offer is a pending ask): the hub's own spontaneous reminder offer is seeded rather than generated, so the acceptance half (an outcome via: ask) is testable before the engine offers unprompted",
     turns: [
       { say: "hey", seedReply: "Want me to remind you to walk Rover in twenty minutes?", expect: { signal: { primary_act: "greeting" }, guard: null } },
       { say: "yes please", expect: { signal: { primary_act: "backchannel" }, outcomeArgs: { packageId: "reminders", args: { subject: "walk Rover" }, via: "ask" } } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  // LOOKUP-01 (dev.md section 4): an offer to look something up is a
-  // pending ask bound to the question. The offer is seeded (the engine
-  // never offers unprompted on a lookup it could run), so the binding
-  // half is what runs: the consent word runs the websearch through the
-  // ask with the question as its expression, never as a bare command,
-  // and the answer carries a source.
-  {
-    id: "offer-binding",
-    category: "knowledge",
-    note: "section 4: an offer is a pending ask; 'do it' runs the websearch bound to the question (LOOKUP-02's built query, the frame words out), via ask, with a source",
-    turns: [
-      // CHAT-13's lookup decision takes an exact field (the date) before
-      // the model, so the offer is seeded on a question with none.
-      { say: "is the new Marsh Lantern album any good", seedReply: "I don't have a take on that one. Want me to look it up?", expect: { signal: { primary_act: "question" }, pendingAsk: "lookup", guard: null } },
-      { say: "do it", expect: { signal: { primary_act: "directive" }, pendingAsk: null, lookupWithSource: true, outcomeArgs: { packageId: "websearch", args: { expression: "new Marsh Lantern album any good" }, via: "ask" }, mustContain: "strongest|reviews?|drumming|september|22|twelve|12", mustNotContain: HONESTY_LINES } },
-      // The set's read (2026-09-14): the count sits in the previous
-      // turn's own lookup result, still in the window; answering from it
-      // is right (a person would not search again), so the row accepts a
-      // reply grounded there, a fresh lookup allowed but not required.
-      { say: "cool, and how many tracks", expect: { signal: { primary_act: "question" }, mustContain: "\\b12\\b|twelve", mustNotContain: PLAN_CLAIM + "|let me check|i'll look|want me to look|according to|search results|i found that", guard: null } },
     ],
   },
   {
@@ -1461,25 +1298,6 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     turns: [
       { say: "Willow said she'd stop by later", expect: { signal: { primary_act: "inform" }, pendingAsk: "who" } },
       { say: "she's my sister", expect: { signal: { primary_act: "inform" }, pendingAsk: null, entityExists: { kind: "person", name: "Willow" } } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "pending-ask-lookup",
-    category: "knowledge",
-    // LOOKUP-01's review: the `lookup` kind is the offer binding
-    // (section 4, the `offer-binding` conversation); a lookup package
-    // missing one argument asks through item 4a's `ask` kind.
-    // LOOKUP-01's set (2026-09-14): the phrase misses the weather
-    // package's "weather in *" patterns and the model invents a forecast
-    // ("partly cloudy with a high around thirty") with no lookup and no
-    // ask, and every guard passes it: the invented-world-fact class, the
-    // same as the currency case; CHAT-13's ladder (an exact or current
-    // field takes a source or "I couldn't find that") is the fix.
-    note: "a lookup missing one argument asks before it runs (the ask kind; the lookup kind is an offer's); CHAT-13's row until the ladder lands",
-    turns: [
-      { say: "what's the weather going to be like", expect: { signal: { primary_act: "question" }, pendingAsk: "ask" } },
-      { say: "tomorrow, here at home", expect: { signal: { primary_act: "inform" }, pendingAsk: null, lookupWithSource: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
@@ -1509,14 +1327,9 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     id: "act-register-requests",
     category: "etiquette",
     note: "section 12 part 4: a directive with a secondary question, anger at the hub, a correction, a worried question, good news",
-    // LOOKUP-02's set: the worried question is about the family's dog,
-    // and the lookup stands down for a household subject only when Rover
-    // is on the roster (a judge-inferred Rover is a candidate under
-    // ASK-01, out of the roster until the person answers; a bare
-    // unresolved name in a question is CHAT-13's world subject and the
-    // 8B's promise ran the websearch on him). The row seeds him as the
-    // registered pet its premise names; an earlier row's candidate of
-    // the same name is confirmed instead of doubled.
+    // The row seeds Rover as the registered pet its premise names; an
+    // earlier row's candidate of the same name is confirmed instead of
+    // doubled.
     seedEntities: [{ kind: "pet", name: "Rover", aliases: ["the dog"], description: "The family dog." }],
     turns: [
       { say: "add oat milk to the list, and when is Pippa's appointment", expect: { signal: { primary_act: "directive" }, toolsRan: ["list-add"], listHas: ["oat milk"], mustContain: "oat milk|added|list", guard: null } },
@@ -1567,8 +1380,8 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     turns: [
       { say: "the new Marsh Lantern film is the one I'm counting down to", expect: { signal: { primary_act: "inform" }, guard: null, mustNotContain: "heard (it|the film|the movie) is|can't wait|as excited as you|excited too", humanVerdict: true } },
       { say: "what's it about", expect: { lookupWithSource: true, mustNotContain: HONESTY_LINES + "|" + NO_CLOSER, humanVerdict: true } },
-      { say: "nope, you made that up, research it", seedReply: "The film is a cheerful comedy about a talking lighthouse.", expect: { outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "marsh lantern.*(plot|about|synopsis)" } }, humanVerdict: true } },
-      { say: "heard from who?", seedReply: "I've heard it's really intense. People say it's the best one yet.", expect: { signal: { primary_act: "question" }, guard: null, mustNotContain: "heard it|people say|supposed to be|best one yet", lookupWithSource: true } },
+      { say: "nope, you made that up, research it", seedReply: "The film is a cheerful comedy about a talking lighthouse.", expect: { humanVerdict: true } },
+      { say: "heard from who?", seedReply: "I've heard it's really intense. People say it's the best one yet.", expect: { signal: { primary_act: "question" }, guard: null, mustNotContain: "heard it|people say|supposed to be|best one yet" } },
       { say: "you were meant to find it, not describe it", seedReply: "I tried to find it but nothing came up.", expect: { signal: { primary_act: "inform" }, guardAnyOf: [null, "lookup_confession"], mustNotContain: "can't watch|can't go|haven't seen|can't visit|never been", humanVerdict: true } },
     ],
   },
@@ -1645,12 +1458,8 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "anyway, Quill was going to lend me her starter but now she's not", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, noCopiedEpisode: true, mustNotContain: "let me know if you need|here if you need|happy to help", humanVerdict: true } },
     ],
   },
-  // EXP-01 (dev.md section 7) with section 4's rows: the hub never says
-  // it has heard, seen or plans to hear anything. The two experience
-  // turns are EXP-01's acceptance; the lookup, recency and reflected-
-  // question checks are LOOKUP-01's and CHAT-13's and fail until they
-  // land (the design's own row set, kept whole so the conversation
-  // reads as one).
+  // EXP-01 (dev.md section 7): the hub never says it has heard, seen or
+  // plans to hear anything.
   {
     id: "new-album",
     category: "knowledge",
@@ -1683,10 +1492,8 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     note: "RECALL-03: this conversation's own turns past the window are evidence, the person's side only; the two live turn shapes with roster names",
     turns: [
       // The coordinator's read of this row's set: "I'll make sure to check
-      // it out when it drops" is EXP-01's plan claim. LOOKUP-01's set
-      // (2026-09-14): the 8B writes that claim in every run and the guard
-      // replaces it (right); the claim itself is the persona half, so the
-      // row is written to fail until ACT-03 with CHAT-16, not relaxed.
+      // it out when it drops" is EXP-01's plan claim. The row is written
+      // to fail until ACT-03 with CHAT-16, not relaxed.
       { say: "the new Marsh Lantern album comes out at midnight on Friday", expect: { signal: { primary_act: "inform" }, guard: null, mustNotContain: EXPERIENCE_CLAIM + "|" + PLAN_CLAIM, humanVerdict: true } },
       { say: "Pippa's been practising the piano piece for the recital every evening this week, mostly the tricky middle section where the left hand crosses over, and she's finally getting the hang of the timing, though she still rushes the last few bars when she gets excited, so we've been clapping the beat with her at the kitchen table after dinner, which she finds either helpful or deeply annoying depending on the evening, and her teacher says the run-through on Thursday will tell us whether the ending needs slowing down again or whether it's ready, and either way she wants the blue dress for the day itself, which needs the hem looked at first", expect: { humanVerdict: true } },
       { say: "Rover found the muddy patch by the back fence again this morning and tracked it right across the kitchen floor before anyone noticed him, then sat in the doorway looking pleased with himself while I got the mop out, and by the time the floor was done he'd gone back out and found the same patch a second time, so the back door is staying shut until the ground dries out a bit, which given the forecast might be a couple of days, and he's sulking about it on the rug with the look he saves for being wronged, which the kids find funnier than he would like", expect: { humanVerdict: true } },
@@ -1837,7 +1644,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "knowledge",
     note: "finding 60 part two: a poster ask forces image search and keeps the reply short while media arrives inline",
     turns: [
-      { say: "show me the movie poster for Marsh Lantern", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { category: "images", expression: "marsh lantern movie poster" } }, mediaPresent: true, maxWords: 15, humanVerdict: true } },
+      { say: "show me the movie poster for Marsh Lantern", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], outcomeArgsMatch: { packageId: "websearch", args: { category: "images", expression: "marsh lantern movie poster" } }, mediaPresent: true, maxWords: 15, humanVerdict: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
       { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
     ],
@@ -1874,21 +1681,11 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     ],
   },
   {
-    id: "forced-lookup-never-restates",
-    category: "knowledge",
-    note: "finding 54: a forced lookup composes from its rows or says nothing was found, never repeating the rejected model line",
-    turns: [
-      { say: "what happens at the end of the Marsh Lantern film", seedReply: "The Marsh Lantern ends with the lighthouse exploding.", expect: { signal: { primary_act: "question" }, guard: null } },
-      { say: "you made that up, search it", seedReply: "The Marsh Lantern ends with the lighthouse exploding.", expect: { signal: { primary_act: "inform" }, toolsRan: ["websearch"], lookupWithSource: true, mustNotContain: "lighthouse exploding", guard: null } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
     id: "indirect-poster-ask-inline",
     category: "knowledge",
     note: "finding 60 addendum: an indirect multiple-poster question is a picture deliverable, not a yes/no answer",
     turns: [
-      { say: "weren't there multiple posters for Marsh Lantern?", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { category: "images", expression: "marsh lantern movie poster" } }, mediaItems: 4, maxWords: 15, mustContain: "here|few|poster", humanVerdict: true } },
+      { say: "weren't there multiple posters for Marsh Lantern?", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], outcomeArgsMatch: { packageId: "websearch", args: { category: "images", expression: "marsh lantern movie poster" } }, mediaItems: 4, maxWords: 15, mustContain: "here|few|poster", humanVerdict: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
       { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
     ],
@@ -1901,16 +1698,6 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "give me a list of songs by Serena Vale", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true, mustContain: "Sunday Bay", humanVerdict: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
       { say: "that's helpful", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "promise-runs-the-lookup",
-    category: "knowledge",
-    note: "finding 55: a promise is backed by a lookup, and a bare do-it runs that pending lookup instead of producing another promise",
-    turns: [
-      { say: "what is the release date for the Marsh Lantern film", seedReply: "Let me look that up.", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true, mustNotContain: "let me look|let me get that right|double-check" } },
-      { say: "do it", seedReply: "Let me get that right.", expect: { signal: { primary_act: "directive" }, toolsRan: ["websearch"], lookupWithSource: true, mustNotContain: "let me look|let me get that right|double-check" } },
-      { say: "thanks", expect: { signal: { primary_act: "closing" }, guard: null, humanVerdict: true } },
     ],
   },
   {
@@ -1941,16 +1728,6 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "who sings Sunday Bay", seedReply: "It is sung by Pippa.", expect: { signal: { primary_act: "question" }, guard: null } },
       { say: "no, that's wrong, it's Serena Vale", seedReply: "You're absolutely right. Sorry about that. Serena Vale sings it.", expect: { signal: { primary_act: "inform" }, mustNotContain: "you're absolutely right|sorry about that|i messed up|because", guard: null } },
       { say: "what was the song called", seedReply: "Sunday Bay.", expect: { signal: { primary_act: "question" }, guard: null, humanVerdict: true } },
-    ],
-  },
-  {
-    id: "lookup-query-from-stack",
-    category: "knowledge",
-    note: "finding 59: a follow-up lookup query carries the subject stack's film, decade and theme, not just the latest utterance",
-    turns: [
-      { say: "the Marsh Lantern film is about a lighthouse mystery", seedReply: "Got it.", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
-      { say: "I was thinking about October", seedReply: "Got it.", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
-      { say: "what other movies like that during that time", seedReply: "Let me look that up.", expect: { signal: { primary_act: "question" }, toolsRan: ["websearch"], lookupWithSource: true, outcomeArgsMatch: { packageId: "websearch", via: "forced", args: { expression: "(?=.*marsh lantern)(?=.*october)(?=.*lighthouse)" } }, mustNotContain: "let me look", guard: null } },
     ],
   },
 ];

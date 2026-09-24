@@ -103,16 +103,13 @@ describe("the fixture", () => {
     // ACT-01's seven (three act-register, three act-memory, the curator's),
     // REG-01's statement-not-request, EXP-01's new-album, and RECALL-03's
     // recall-past-the-window (fourteen turns by design: the window has to
-    // drop turn 1), LOOKUP-01's offer-binding, ASK-01's five (the
-    // design note's three, who-ask-declined, open-question-once), and
-    // SAFETY-01's self-harm-state, and LOOKUP-02's six (hedged-promise,
-    // offer-binds-the-question and its go-on-then variant,
-    // objection-reruns, hedged-draft, ladder-falls-through), and
-    // ASK-02's three (not-a-name, hub-named-it, public-figure), and
+    // drop turn 1), ASK-01's five (the design note's three,
+    // who-ask-declined, open-question-once), and SAFETY-01's
+    // self-harm-state, and ASK-02's not-a-name, and
     // CHAT-13 chunk B's subject-before-pattern.
-    expect(CONVERSATIONS.length).toBe(128);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(128);
-    for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(c.id === "link-is-the-answer" ? 1 : 3);
+    expect(CONVERSATIONS.length).toBe(112);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(112);
+    for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
@@ -458,13 +455,10 @@ describe("lane 12 item 3: the fixture's new expectation kinds (conversationScore
     expect(scoreTurn(conv, 0, turn, observed({ notificationBodies: [{ type: "relay.due", body: "Bramble asked about a scary movie" }] })).pass).toBe(false);
   });
 
-  test("pendingAsk admits who and lookup alongside confirm and ask", () => {
+  test("pendingAsk admits who alongside confirm and ask", () => {
     const who = { say: "x", expect: { pendingAsk: "who" as const } };
     expect(scoreTurn(conv, 0, who, observed({ pendingAsk: "who" })).pass).toBe(true);
     expect(scoreTurn(conv, 0, who, observed({ pendingAsk: "ask" })).pass).toBe(false);
-    const lookup = { say: "x", expect: { pendingAsk: "lookup" as const } };
-    expect(scoreTurn(conv, 0, lookup, observed({ pendingAsk: "lookup" })).pass).toBe(true);
-    expect(scoreTurn(conv, 0, lookup, observed({ pendingAsk: null })).pass).toBe(false);
   });
 
   test("cueNeverContains: the spoken cue the turn would play is checked, never the reply", () => {
@@ -474,11 +468,9 @@ describe("lane 12 item 3: the fixture's new expectation kinds (conversationScore
     expect(scoreTurn(conv, 0, turn, observed({ spokenCue: null })).pass).toBe(true);
   });
 
-  test("seedRecords and seedReply are declared on the fixture's own types and survive on the conversation (the runner reads seedReply since LOOKUP-01, binding a lookup offer only; seedRecords is still unread)", () => {
+  test("seedRecords and seedReply are declared on the fixture's own types and survive on the conversation", () => {
     const seeded = byId("seeded-household-record");
     expect(seeded.seedRecords).toEqual([{ text: "Pippa is allergic to shellfish", category: "health", scope: "household", disclosure: "adult_only" }]);
-    const offer = byId("seeded-offer-accepted");
-    expect(offer.turns[0]?.seedReply).toBe("Want me to remind you to walk Rover in twenty minutes?");
   });
 });
 
@@ -595,37 +587,6 @@ describe("the runner against the stub (control-flow rows)", () => {
     });
   }, 20_000);
 
-  test("CHAT-16 finding 61: lookup rows replace invented composition and empty rows use the fixed line", async () => {
-    await withStubBench({ reply: () => "The horse is named Invented Meadow in the Invented Chronicle (2024)." }, async (deps) => {
-      const search = startFakeSearxng();
-      try {
-        const grounded = await runConversation(byId("lookup-reply-only-rows"), deps);
-        expect(grounded.scores[0]?.pass).toBe(true);
-        expect(grounded.scores[0]?.observed.composed?.startsWith("grounded_fallback calls=1")).toBe(true);
-        expect(grounded.scores[0]?.observed.reply).toContain("Copper");
-        const empty = await runConversation(byId("lookup-empty-rows-says-so"), deps);
-        expect(empty.scores[0]?.pass).toBe(true);
-        expect(empty.scores[0]?.observed.composed).toBe("empty_rows calls=0");
-        expect(empty.scores[0]?.observed.reply).toContain("The search found nothing on that");
-      } finally {
-        search.stop();
-      }
-    });
-  }, 30_000);
-
-  test("CHAT-16 addendum: the link-is-the-answer conversation carries sources on the delivered turns", async () => {
-    await withStubBench({ reply: () => "Okay." }, async (deps) => {
-      const search = startFakeSearxng();
-      try {
-        const { scores } = await runConversation(byId("link-is-the-answer"), deps);
-        const failures = scores.flatMap((score) => score.checks.filter((check) => !check.pass).map((check) => `${score.turnIndex}:${check.name} ${check.detail}`));
-        expect(failures).toEqual([]);
-      } finally {
-        search.stop();
-      }
-    });
-  }, 30_000);
-
   // The effect standard (docs/plans/conversation-competencies-2026-09-13.md,
   // "Bench-row rule"): each rewritten row observes the effect, and the
   // stub proves the observation itself before a live run reads it.
@@ -732,8 +693,6 @@ describe("the runner against the stub (control-flow rows)", () => {
   }, 30_000);
 
   test("act-register-requests seeds Rover as the registered pet; a seed whose name an earlier row's judge left as a candidate confirms that row instead of doubling it", async () => {
-    // The worried turn's draft promises a lookup, LOOKUP-02's set shape:
-    // with Rover on the roster the ladder stands down and no tool runs.
     const lastUser = (request: ChatCompletionRequest) => [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
     await withStubBench({ reply: (request) => (/getting sick/.test(String(lastUser(request))) ? "Let me look that up for you. Poor Rover." : "Poor Rover, that sounds worrying.") }, async (deps) => {
       const { createEntity } = await import("@/lib/entities");
@@ -750,13 +709,14 @@ describe("the runner against the stub (control-flow rows)", () => {
       expect(rovers[0]!.source).toBe("local");
       expect(rovers[0]!.confirmed_by_person_id).toBe(deps.people.owner.id);
       expect(listOpenQuestions(deps.people.owner.id).filter((q) => q.status === "pending" || q.status === "asked")).toHaveLength(0);
-      // The worried question reads the dog as the household's: the
-      // promise is dropped, nothing is looked up, the rest stands.
+      // The worried question reads the dog as the household's. With the
+      // old lookup-consent rewrite gone, the model's own promise remains
+      // visible here; the still-relevant check is that the runner does
+      // not invent a separate tool outcome.
       const sick = scores.find((s) => s.say === "why does Rover keep getting sick")!;
       expect((sick.observed.subjects ?? []).map((x) => [x.type, x.name])).toContainEqual(["household", "Rover"]);
       expect(sick.observed.source).toBe("model");
       expect(sick.observed.reply).toMatch(/Poor Rover/);
-      expect(sick.observed.reply).not.toMatch(/look that up|worrying/i); // the scripted draft, its promise dropped
       expect(sick.checks.find((c) => c.name === "tool")?.pass).toBe(true);
     });
   }, 30_000);

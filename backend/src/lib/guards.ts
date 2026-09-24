@@ -290,8 +290,7 @@ export const MALFORMED = [
   "I fumbled that one. Ask me again?",
   "Lost the thread there, sorry. One more time?",
 ];
-/** LOOKUP-02: the lookup family's honest line, one definition with
- * turnEngine.ts's LOOKUP_FAILED_LINE. */
+/** Honest fallback for a false capability claim. */
 export const LOOKUP_FAILED_LINES = ["That lookup didn't work, sorry."];
 const MED_CAUTION = [
   "I'm not able to give medication amounts - check with a pharmacist or the label.",
