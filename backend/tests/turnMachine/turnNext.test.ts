@@ -156,6 +156,39 @@ describe("turnNext.ts: the interim rule", () => {
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.toolEvents).toBeUndefined();
   });
+
+  // LIVE-0923-01 (home/docs/dev.md): a real conversation had every
+  // forced websearch call carry category:"images", even for plain text
+  // questions - policy.ts's own grounding check passes an enum value by
+  // design (never checked against the utterance), so nothing else
+  // caught it. The old path never trusted the model's own category
+  // argument either (turnEngine.ts's resolveToolCalls() call); this
+  // proves the tool node now holds the same floor.
+  test("the model's own category argument on a websearch call is stripped before the package runs", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "berlin wall anniversary", category: "images" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "Here's what I found." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "when did the berlin wall come down"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.toolEvents?.length).toBe(2);
+      const call = result.toolEvents![0]!;
+      if (call.t !== "tool_call") throw new Error(`expected tool_call, got ${call.t}`);
+      expect(call.args).toEqual({ expression: "berlin wall anniversary" });
+      expect(call.args).not.toHaveProperty("category");
+    } finally {
+      searxng.stop();
+    }
+  });
 });
 
 // home#147: logTurnSafely() (turnEngine.ts, the old path) sets both of

@@ -24582,3 +24582,174 @@ Verification: `bash scripts/check.sh` (scope `backend`, only two files
 touched) - scripts 42/42, backend 4141/4141 (two new tests: a
 successful almanac-date outcome carries the spec sheet, a plain-text
 turn carries none). Review: medium (the TurnValue wire shape).
+
+## LIVE-0923-01: seven findings from the flip's first real conversation (2026-09-24)
+
+Jesse's own first chat on the new path after the flip
+(`conv-qt17ad8r96`, 12 turns, `data/hub.db`'s `conversation_turns`,
+03:15-03:20Z). Read directly from `stats.nodes`/`stats.generations`
+and the stored `signal`/`plan`/`outcomes` columns; no household text
+quoted anywhere below, per the org's own rule - defect classes and
+file:line traces only. One fix landed this block (1); the rest are
+traces and numbers for the coordinator's own ruling on the fix design,
+per its own instruction.
+
+### (1) websearch's own `category` argument, fixed this block
+
+The model's own tool call set `category: "images"` on every one of
+this conversation's five forced websearch calls, including two plain
+text questions - `packageHost.ts:633` then asks SearXNG for image
+results, so a text question gets icon/artwork/photo snippets instead
+of real text ones. The old path never trusted the model's own
+`category` choice at all (`turnEngine.ts:4546`, the
+`resolveToolCalls()` call's own ignore-callback, `noteIgnoredModel
+WebsearchCategory`) - it computes `category` itself from
+`intent.deliverable`, a pre-model classifier the new path has no
+equivalent of. `policy.ts`'s own grounding check (line ~136) passes an
+enum value by design (an enum is never checked against the utterance),
+so nothing else on the new path caught this. Fixed in `turnMachine/
+nodes/tool.ts`'s own tool node: a websearch call's `category` argument
+is stripped before `runPlugin()` runs, the same "never trust the
+model's own category" floor the old path already holds, until a real
+picture-intent signal exists on the new path to set it deliberately.
+Regression test: `turnNext.test.ts`, a scripted websearch call carrying
+`category: "images"` on a plain text question, asserting the recorded
+`tool_call` event's own args never carry it.
+
+**Read_page, the same class of bug, not fixed here:** every one of the
+five forced calls also carried `read_page: true`, another argument the
+old path computes deterministically from the utterance
+(`turnEngine.ts:3966`, `pageReadRequested()` - "did the person actually
+ask to read/open the page") and the new path just passes through from
+the model's own choice, unfiltered, the identical pattern as (1). Named
+here since it directly affects (2)'s own numbers below, not fixed in
+this pass - the coordinator's own call whether it's folded into (1)'s
+fix shape or its own item.
+
+### (2) where the time goes on a forced-search turn
+
+Every forced-search turn's own shape: node `model` (tool-choice round,
+0.8-3.2s) → node `tool` (the websearch call itself, 0.6-4.1s, wide
+range explained by `read_page`'s own extra page-fetch-and-parse step
+firing on some calls and not others) → node `model` again (the
+phrasing round, 6.6-15.0s, this conversation's real cost center).
+
+Total wall time per forced-search turn, this conversation's five: 12.3s,
+15.3s, 16.8s, 18.4s, 15.4s, 11.7s, 12.8s (seven, not five - two more
+than the coordinator's own two named examples matched exactly:
+`prompt_n=3087`/`predicted_n=273`/`8.6s` decode for the 18.4s poster
+turn, `prompt_n=1783`/`predicted_n=489`/`12.7s` decode for the
+benchmarking question).
+
+Phrasing round detail, all seven, `prompt_n` (fresh, uncached tokens
+folded in largely by the page read) / `cache_n` (reused) / `prompt_ms`
+(prefill) / `predicted_n` (tokens out) / `predicted_ms` (decode):
+1679/431/3089ms/120/3225ms; 1598/618/2447ms/361/9273ms;
+1783/895/2231ms/489/12740ms; 3087/1841/3421ms/273/8604ms;
+3185/1819/3644ms/288/8074ms; 2422/1066/3506ms/115/3035ms;
+2614/1243/3565ms/218/6385ms.
+
+**No progressive delivery on the new path at all - "first visible
+token" is not ~9s, it's the turn's own total time.** Traced in
+`routes/turn.ts` (lines ~659-680): an "immediate" `TurnStreamResult`
+(what `runTurnNext()` always returns, by its own design) is packaged as
+one `Blob` - `turn_meta`, `signal`, every tool event, then `done` (the
+full reply) - constructed only once the whole turn has finished
+server-side, then sent as a single HTTP response. The old path's real
+token-by-token stream and its early tool-call visibility have no
+equivalent here yet; a household member sees nothing until the entire
+12-18s turn completes, including no "searching..." indicator ahead of
+time despite `TOOL-EVENTS-01(b)`'s own wire events existing in the
+payload - they are just not sent early. This is more than a read_page/
+cache latency question; it is a real, separate streaming-architecture
+gap, not measured or estimated further here since it needs its own
+scoping, not a number.
+
+### (3) media/picture cards on the new path: #147 does not cover this
+
+Checked directly: `structuredPartForOutcomes()` (composer.ts, the
+function #147 wired into the new path) only ever produces a card for
+`weather`/`almanac-date` outcomes - never for a picture or video
+request. The old path's own picture/video card
+(`turnEngine.ts:4589`, `resolved = { ...resolved, media: mediaItems[0],
+media_items: mediaItems }`) is built entirely from the SAME
+`intent.deliverable` pre-model classifier (1)'s own trace names -
+`searchDeliverable === "picture"` decides both the forced `category:
+"images"` search AND the resulting `TurnValue.media`/`media_items`.
+None of that classifier, or an equivalent, exists on the new path.
+This conversation's own two picture/video-shaped requests both landed
+as a paragraph of markdown links (websearch's own default text
+formatting), never a card - not a wiring gap like #147's, a missing
+capability. Its own design pass, not scoped here.
+
+### (4) and (5): a person's correction of the assistant's own claim
+
+Both read as a plain `inform` with `repair: "none"` (the frozen
+`[turn]` line's own `signal` column) - the turn-signal classifier never
+recognized either as a correction at all. Traced to
+`turnSignal.ts:113`, `CORRECTION_RE`: its own `that'?s not (?:it|right|
+what i)` alternative doesn't cover "that's not true" (the third item
+missed a real correction word), and none of its alternatives anchor a
+bare "wrong," as a sentence-opening correction (every "wrong" branch
+requires a subject phrase - "you're wrong," "that's wrong" - ahead of
+it). Both of this conversation's own corrections used exactly the
+shapes the regex misses.
+
+**A second, deeper gap, not just the regex:** even a corrected
+`CORRECTION_RE` would only change `signal.repair` to `"correction"` -
+`signal.repair` is read in exactly one place on either path
+(`turnEngine.ts:453`, `markPreviousTurnCorrected()`), and only when
+`signal.target === "hub"` (a correction about something the hub itself
+said or did, the protocol sense). Both of this conversation's own
+corrections were `target: "world"` (a factual claim about the outside
+world). Nothing on either path today treats "the person just corrected
+the model's own prior world-fact claim" as a signal to re-search or
+store anything - so even with the regex fixed, the empty-promise reply
+("I'll look it up," "I'll update my information") would still have
+nothing behind it, because no world-correction handler exists to give
+it something to do. The regex gap is real and precisely located; the
+handler gap is the one that actually explains the symptom, and it is
+a design question, not a word-list fix - flagged as exactly that, per
+"no hacky rules."
+
+### (6) an unrelated real memory record surfaced in a deflection reply
+
+The reply to an unrelated deflection-worthy remark offered to help with
+a household topic that had never come up in this conversation at all.
+Checked directly against `memory_records` for this person (read-only,
+nothing copied): a real, matching stored record exists - this is a
+context leak, not the model inventing a topic from nothing. Traced to
+`turnMachine/nodes/context.ts:138-158`: `recall()`'s own top-`MAX_
+MEMORY_SNIPPETS` candidates become context items unconditionally, with
+no minimum-similarity floor anywhere in `recall()` itself (checked -
+none exists) or at this call site (the comment at line 159 states it
+outright: "every sliced match becomes a context item below,
+unconditionally"). A short, topic-free utterance still returns
+`recall()`'s own "best available" match by embedding distance alone,
+however weak, and the model - given no signal that the match is
+weak - used it. `MEMORY_TRUST_REMINDER` ("Prefer these facts over
+guessing when they're relevant") tells the model the facts MIGHT not
+be relevant, but nothing stops a low-relevance record from reaching the
+prompt in the first place. A relevance floor (or a "no confident match"
+line and letting `NOTHING_STORED_LINE` fire instead) is the
+coordinator's own call, not built here.
+
+### (7) required_miss twice, both already the flip's own named exception
+
+Both of this conversation's own required_miss turns (`stats.
+generations[0]` reading `prompt_n: null` for the `interim_rule`
+generation, the forced `tool_choice: "required"` call the engine
+silently declined to honor) match the already-tracked engine
+advisory-not-mandatory defect (`llama-server-required-cache-bug` in
+memory, `ENGINE-CONTRACT-02`'s own row) - not a new finding, confirmed
+present in this real conversation too. Both fell through to the
+interim rule's own search fallback correctly, per FORCED-CALL-01's own
+design; the reply itself is what (2)'s own phrasing-latency numbers
+above are measuring for these two rows specifically.
+
+Verification (item 1 only): `bash scripts/check.sh` (scope `backend`) -
+scripts 42/42, backend green (the new args-stripping test plus the
+full suite). Review: low (a one-line scope guard on one tool, the
+model's own args untouched for every other tool - `tool.ts`'s own
+change is the smallest correct fix, not the design for (2)-(6) above,
+which the coordinator rules on next).

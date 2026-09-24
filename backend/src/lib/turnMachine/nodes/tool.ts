@@ -53,7 +53,24 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   const outcomes: ToolExecutionOutcome[] = [];
   const toolEvents: ToolStreamEvent[] = [];
   for (const proposal of input.proposals) {
-    const { tool, args, callId } = proposal.request;
+    const { tool, callId } = proposal.request;
+    // LIVE-0923-01 (home/docs/dev.md): the old path's own forced-search
+    // call never trusted the model's own `category` argument either
+    // (turnEngine.ts's resolveToolCalls() call, noteIgnoredModelWeb
+    // searchCategory) - it always computed "images" itself, only when
+    // the turn's own intent classifier decided the household wanted a
+    // picture, never from what the model proposed. This node passed
+    // proposal.request.args straight to runPlugin() with nothing
+    // stripping it, so a text question whose model call happened to
+    // set category:"images" (observed live, every forced websearch
+    // call in one real conversation - policy.ts's own grounding check
+    // passes an enum value by design, so nothing else catches this)
+    // got SearXNG's image results for a plain question. The new path
+    // has no equivalent intent classifier yet (a real gap, not solved
+    // here) - stripped unconditionally for now, the same "never trust
+    // the model's own category" floor the old path already holds,
+    // until a real picture-intent signal exists to set it deliberately.
+    const args = tool === "websearch" ? Object.fromEntries(Object.entries(proposal.request.args).filter(([k]) => k !== "category")) : proposal.request.args;
     // The proposal is accepted the moment this node starts it - before
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.
