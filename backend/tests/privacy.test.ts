@@ -111,6 +111,18 @@ describe("the hub's own connections", () => {
     expect(row?.destination).toContain("raw.githubusercontent.com");
   });
 
+  // REFERENCE-LIBRARY-01: the kiwix-tools binary download was a real
+  // gap left by KIWIX-SIDECAR-01 (kiwix-serve itself sends nothing, but
+  // installing it does), found while adding the row for this item's own
+  // new download.
+  test("kiwix-tools' own install download and reference-library downloads are both listed", () => {
+    const byId = new Map(platformConnections().map((r) => [r.id, r]));
+    expect(byId.get("platform:kiwix-tools")?.destination).toContain("download.kiwix.org");
+    const library = byId.get("platform:reference-library");
+    expect(library?.destination).toContain("library.kiwix.org");
+    expect(library?.what).toContain("third-party download mirror");
+  });
+
   // A code review (2026-09-05) found the whole speaking-voice path
   // missing from a page that tells families "if it is not on this list,
   // it does not happen": `uvx pocket-tts serve` installs from PyPI and

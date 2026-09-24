@@ -84,6 +84,31 @@ export function storageSummary(): StorageSummary {
   return { areas, packages, disk: diskUsage() };
 }
 
+export interface StorageImpact {
+  disk: DiskUsage;
+  requiredBytes: number;
+  freeBytesAfter: number;
+  fits: boolean;
+}
+
+/** REFERENCE-LIBRARY-01: "Home measures the chosen drive's free space...
+ * shows the size impact before committing, and the person can pick
+ * another" (owner's call 1, docs/plans/knowledge-sources-2026-09-24.md).
+ * Generic on purpose - `path` is whatever directory a person is
+ * considering (their own data folder, an external drive, a NAS mount:
+ * `diskUsage()` already takes any path), `requiredBytes` is the size of
+ * whatever they're about to install, already known before this is
+ * called (a package manifest's own measured `approx_bytes`, or a
+ * flavour `resolveReferenceFlavour()` just resolved) - this function
+ * only measures, it never looks anything up itself, so it works for
+ * any future thing that needs a "does this fit" answer, not just a
+ * reference set. */
+export function storageImpact(path: string, requiredBytes: number): StorageImpact {
+  const disk = diskUsage(path);
+  const freeBytesAfter = disk.freeBytes - requiredBytes;
+  return { disk, requiredBytes, freeBytesAfter, fits: freeBytesAfter >= 0 };
+}
+
 /** The only real per-person quota today: cloned voices, the one
  * per-person upload with a tracked byte count (cloned_voices.bytes -
  * lib/clonedVoices.ts, C's file, not touched here). `0` (the setting's

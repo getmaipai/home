@@ -18265,6 +18265,90 @@
         }
       }
     },
+    "/api/storage/impact": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Free space at a chosen path, before and after installing something of a given size",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "/Volumes/library-drive"
+            },
+            "required": true,
+            "name": "path",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "nullable": true,
+              "minimum": 0,
+              "example": 14400000000
+            },
+            "required": false,
+            "name": "requiredBytes",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "path falls back to the hub's own data folder when it doesn't exist yet (an external drive not currently mounted, say) - diskUsage()'s own fallback.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "disk": {
+                      "type": "object",
+                      "properties": {
+                        "totalBytes": {
+                          "type": "number"
+                        },
+                        "freeBytes": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "totalBytes",
+                        "freeBytes"
+                      ]
+                    },
+                    "requiredBytes": {
+                      "type": "number"
+                    },
+                    "freeBytesAfter": {
+                      "type": "number"
+                    },
+                    "fits": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "disk",
+                    "requiredBytes",
+                    "freeBytesAfter",
+                    "fits"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/storage/nas-mounts": {
       "get": {
         "tags": [

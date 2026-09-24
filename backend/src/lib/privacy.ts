@@ -13,6 +13,8 @@
 // uses rather than a second copy of the host name that could drift.
 import { CATALOG } from "@/lib/modelCatalog";
 import { ENGINE_BINARIES } from "@/lib/engineCatalog";
+import { KIWIX_BINARIES } from "@/lib/kiwixCatalog";
+import { KIWIX_CATALOG_URL } from "@/lib/referenceLibrary";
 import { EMBED_MODEL_URL } from "@/lib/embedAssets";
 import { BACKGROUND_MODEL_URL, BACKGROUND_MODEL_SMALL_URL } from "@/lib/backgroundAssets";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
@@ -153,6 +155,28 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:update-check", "api.github.com", {
       when: "automatically, at most once a day",
       what: "a request for this project's latest release information, and your home's internet address. Nothing anyone in the house said, asked, or saved.",
+    }),
+    // KIWIX-SIDECAR-01's own gap: kiwix-serve itself sends nothing (it
+    // only listens on this computer), but installing it in the first
+    // place downloads a real program from Kiwix, missed when that item
+    // landed - found while REFERENCE-LIBRARY-01 was adding the row
+    // below right next to it.
+    row("platform:kiwix-tools", hostsOf(KIWIX_BINARIES.map((b) => b.archive.url)), {
+      when: "once, when the hub sets up the program that serves your offline reference books",
+      what: DOWNLOAD_CARRIES,
+    }),
+    // REFERENCE-LIBRARY-01: exact wording from docs/plans/
+    // knowledge-sources-2026-09-24.md's own Privacy paragraph.
+    // A review found the first draft's destination named only the
+    // catalog lookup host - the real ZIM bytes come from a second host
+    // (the load balancer verified live, 2026-09-24: lb.download.kiwix.org,
+    // docs/dev.md), which then hands off to whichever regional mirror it
+    // picks, a third host that genuinely can't be named in advance. Both
+    // hosts this repo has actually seen a real connection to are listed
+    // structurally now, not left to prose alone.
+    row("platform:reference-library", hostsOf([KIWIX_CATALOG_URL, "https://lb.download.kiwix.org/"]), {
+      when: "when an adult installs or updates one of your household's offline reference books",
+      what: "the file name of the book being downloaded, and your home's internet address, sent to Kiwix and to a third-party download mirror Kiwix picks for you. Nothing anyone in the house said, asked, or saved.",
     }),
   ];
   return rows.filter((r): r is PrivacyConnection => r !== null);

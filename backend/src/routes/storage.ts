@@ -4,7 +4,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRoleOrGrant, requireRole } from "@/middleware/auth";
-import { storageSummary } from "@/lib/storage";
+import { storageSummary, storageImpact } from "@/lib/storage";
 import { listNasMounts, createNasMount, deleteNasMount } from "@/lib/nasMounts";
 import { stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, FACTORY_RESET_CONFIRMATION_PHRASE } from "@/lib/factoryReset";
 import { generateDiagnostics } from "@/lib/diagnostics";
@@ -30,6 +30,35 @@ const summaryRoute = createRoute({
   },
 });
 storageRoutes.openapi(summaryRoute, (c) => c.json(storageSummary(), 200));
+
+const StorageImpactSchema = z.object({
+  disk: z.object({ totalBytes: z.number(), freeBytes: z.number() }),
+  requiredBytes: z.number(),
+  freeBytesAfter: z.number(),
+  fits: z.boolean(),
+});
+
+const impactRoute = createRoute({
+  method: "get",
+  path: "/impact",
+  tags: ["Storage"],
+  summary: "Free space at a chosen path, before and after installing something of a given size",
+  middleware: [requireRoleOrGrant(["owner", "admin"], "backups.run")] as const,
+  request: {
+    query: z.object({
+      path: z.string().openapi({ param: { name: "path", in: "query" }, example: "/Volumes/library-drive" }),
+      requiredBytes: z.coerce.number().nonnegative().openapi({ param: { name: "requiredBytes", in: "query" }, example: 14_400_000_000 }),
+    }),
+  },
+  responses: {
+    200: { content: { "application/json": { schema: StorageImpactSchema } }, description: "path falls back to the hub's own data folder when it doesn't exist yet (an external drive not currently mounted, say) - diskUsage()'s own fallback." },
+    ...errorResponses({ 403: "Not owner/admin" }),
+  },
+});
+storageRoutes.openapi(impactRoute, (c) => {
+  const { path, requiredBytes } = c.req.valid("query");
+  return c.json(storageImpact(path, requiredBytes), 200);
+});
 
 const NasMountSchema = z.object({
   id: z.string(),

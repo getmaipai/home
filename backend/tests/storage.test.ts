@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { storageSummary, checkPersonQuota, checkDiskFull } from "@/lib/storage";
+import { storageSummary, storageImpact, checkPersonQuota, checkDiskFull } from "@/lib/storage";
 import { stageFactoryReset, pendingFactoryReset, applyPendingFactoryReset, cancelPendingFactoryReset, FACTORY_RESET_CONFIRMATION_PHRASE } from "@/lib/factoryReset";
 import { generateDiagnostics } from "@/lib/diagnostics";
 import { setValue, setHouseholdSettingValue } from "@/lib/settings";
@@ -61,6 +61,31 @@ describe("GET /api/storage", () => {
     const adultClient = new TestClient();
     await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     expect((await adultClient.get("/api/storage")).status).toBe(403);
+  });
+});
+
+describe("storageImpact()", () => {
+  test("fits is true when required bytes are well under free space", () => {
+    const impact = storageImpact(dataDir, 1);
+    expect(impact.fits).toBe(true);
+    expect(impact.freeBytesAfter).toBe(impact.disk.freeBytes - 1);
+  });
+
+  test("fits is false when required bytes exceed free space", () => {
+    const impact = storageImpact(dataDir, Number.MAX_SAFE_INTEGER);
+    expect(impact.fits).toBe(false);
+    expect(impact.freeBytesAfter).toBeLessThan(0);
+  });
+});
+
+describe("GET /api/storage/impact", () => {
+  test("reports disk usage and fit for a chosen path and size", async () => {
+    const { client } = await owner();
+    const res = await client.get(`/api/storage/impact?path=${encodeURIComponent(dataDir)}&requiredBytes=1`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { fits: boolean; requiredBytes: number };
+    expect(body.fits).toBe(true);
+    expect(body.requiredBytes).toBe(1);
   });
 });
 
