@@ -27106,3 +27106,71 @@ Files: `backend/packages/write_document/manifest.json` (description),
 `backend/src/lib/modelCatalog.ts` (`tools_offered`, reverted). No test
 changes - a live-model measurement, not a behavior change to gate on a
 deterministic test. Verification: `bunx tsc --noEmit` clean.
+
+## SOURCE-SPEC-01: the spec contracts for knowledge sources (2026-09-24)
+
+**Objective.** `docs/plans/knowledge-sources-2026-09-24.md`'s build
+order, item 1, revised by "Home stays lean" (`docs/plans/
+feeds-and-archive-2026-09-24.md`) the same day: declare the contracts a
+catalog package needs to be a knowledge source, never source-specific
+code in Home. Commons spec additions: the `reference` package `kind`
+(declarative, no code, like `model` and `voice`); a `knowledge_source`
+block (`origin`: archive or live, `book`, `languages`, per-flavour
+`approx_bytes`/`snapshot_date` sizing inputs the wizard needs, `query_id`
+- the lookup-source contract itself, naming which of a live-origin
+plugin's own `exposes.queries[]` entries `lookup()`'s future host
+machinery calls, `{query: string}` in, `Source[]` out, so Home never
+carries a line of code specific to one source); `archive` added to
+`Source.kind`; `reference.library_dir`, a household setting for where
+the library lives (a local folder, an external drive, or a NAS mount -
+Home's own data folder only the default, since the library manager and
+kiwix-serve sidecar ARE host machinery and stay in Home per the same
+ruling).
+
+**Landed across two tags**, both cut and pushed: `spec-v0.1.35` (the
+schema and settings additions, round-trip fixtures - `manifest.
+reference.example.json`, `source.archive.example.json`) and `spec-
+v0.1.37` (a formatting-only fix: `search.safe_search`'s own `range`
+field was hand-written compact in v0.1.35, caught the moment this
+repo's own settings-registry drift check ran a real regeneration
+against it - `gen-settings-registry.ts`'s `JSON.stringify(sorted, null,
+2)` always expands a nested array; no field value changed. `spec-
+v0.1.36`, STATUS-PHRASES-01, landed on commons `main` between the two,
+unrelated). This repo's own settings declarations moved to match:
+`backend/src/settings/searchKeys.ts` gained `search.safe_search`,
+`backend/src/settings/referenceKeys.ts` (new) declares
+`reference.library_dir`, `gen-settings-registry.ts` gained the new
+import - the actual generator source of truth `spec/settings/keys.json`
+is regenerated FROM, per `spec/settings/README.md`, never hand-edited
+in commons directly (a real process gap this item's own work found the
+hard way: the first cut of both keys was hand-written straight into
+commons's `keys.json`, which is why the range-formatting drift above
+happened at all - fixed at the source for next time by landing the real
+TS declarations here in the same pass).
+
+A real gap named, not built: `manifest.schema.json`'s own `required`
+list for `knowledge_source` only covers `["origin", "freshness"]` -
+`book` being required for an archive and `query_id` for a live source
+are documented in each field's own description, not schema-enforced
+(no `if`/`then` conditional), the same posture the existing `companion`
+block already takes for its own "required when kind is X" fields. A
+review flagged this; left as-is, matching established convention
+rather than introducing a validation pattern this file has never used,
+revisited if a real manifest ships the gap.
+
+Files (commons): `spec/schemas/manifest.schema.json`,
+`spec/schemas/source.schema.json`, `spec/settings/keys.json`,
+`spec/fixtures/records/manifest.reference.example.json`,
+`spec/fixtures/records/source.archive.example.json`,
+`spec/tests/ts/fixtures.test.ts`, `spec/tests/py/test_fixtures.py`,
+`spec/gen/ts/*`, `spec/gen/py/*` (regenerated), `ui/src/settings/
+groupSettings.ts` (section titles for the two new `lives_in` ids, the
+`household.ai`/`profile.appearance` bug class a review caught before
+landing). Files (this repo): `backend/package.json`,
+`frontend/package.json`, `scripts/check.sh` (the pin), `backend/src/
+settings/referenceKeys.ts` (new), `backend/scripts/
+gen-settings-registry.ts`, `docs/api/openapi.json` (`Source.kind`'s
+`archive` value flows through). Verification: commons's own `bash
+scripts/check.sh` green (551 TS + 248 pytest + ruff + gen/ drift
+clean); this repo's `bash scripts/check.sh` green (scope full: 4242
+backend + 726 frontend). Review: medium plus a low follow-up pass.
