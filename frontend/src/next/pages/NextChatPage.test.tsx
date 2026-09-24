@@ -1662,8 +1662,8 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
   });
 });
 
-describe("NextChatPage (CHAT-LIST-01: the thread list's own temporary-chat button)", () => {
-  test("appears beside New Thread for a role that can have a temporary chat", async () => {
+describe("NextChatPage (CHAT-WELCOME-01: the welcome screen's own temporary-chat toggle)", () => {
+  test("appears on the empty new-chat screen for a role that can have a temporary chat", async () => {
     const restore = stubFetch();
     try {
       const { findByRole } = renderPage(
@@ -1671,15 +1671,15 @@ describe("NextChatPage (CHAT-LIST-01: the thread list's own temporary-chat butto
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
-      expect(await findByRole("button", { name: "Start a temporary chat" })).toBeVisible();
+      expect(await findByRole("button", { name: "Temporary chat" })).toBeVisible();
     } finally {
       restore();
     }
   });
 
   // RESP-04 (f): a control a child profile can't use renders nothing,
-  // never a disabled one - the same rule the header's own "Start
-  // temporary chat" entry follows (canHaveTemporaryChatRole gates both).
+  // never a disabled one - the same rule CHAT-LIST-01's own sidebar
+  // button (this replaced) followed.
   test("renders nothing for a child", async () => {
     const restore = stubFetch();
     try {
@@ -1689,25 +1689,59 @@ describe("NextChatPage (CHAT-LIST-01: the thread list's own temporary-chat butto
         </MemoryRouter>,
       );
       await findByLabelText("Message input");
-      expect(queryByRole("button", { name: "Start a temporary chat" })).toBeNull();
+      expect(queryByRole("button", { name: "Temporary chat" })).toBeNull();
     } finally {
       restore();
     }
   });
 
-  // A real conversation first, then the switch: the same shape
-  // CHAT-HEADER-01's own now-removed test proved (armTemporaryChat's
-  // own `switchToNewThread` call is itself a deliberate switch -
-  // `onThreadIdChange`'s definition: the id changes and the PREVIOUS
-  // one was real - so without the `startingTemporaryRef` marker this
-  // file's own Thinking-reset code right beside it would reset
-  // `temporaryNext` too, clearing the very flag this button just set
-  // before the new conversation's first send ever reads it).
-  // CHAT-FIND-0923-03 removed the header's own temporary-chat entry
-  // entirely (Jesse's own finding: it isn't a conversation action, it
-  // belongs only here) - this test is the one place that protection is
-  // still proven, through the one real path left to reach it.
-  test("starts a temporary chat, marked as such, switching away from a real conversation", async () => {
+  test("toggling swaps the heading, and toggling again swaps it back", async () => {
+    const restore = stubFetch();
+    try {
+      const { findByRole, findByText, queryByText } = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await findByText("How can I help you today?")).toBeVisible();
+      fireEvent.click(await findByRole("button", { name: "Temporary chat" }));
+      expect(await findByText("This chat won't be saved to your history.")).toBeVisible();
+      expect(queryByText("How can I help you today?")).toBeNull();
+      fireEvent.click(await findByRole("button", { name: "Temporary chat" }));
+      expect(await findByText("How can I help you today?")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  // The toggle lives only on the CURRENT (already blank) thread now, so
+  // arming it never involves a thread switch the way CHAT-LIST-01's own
+  // sidebar button did (it reused ThreadListNew, composing the click
+  // with a real switchToNewThread) - this proves the simpler flow
+  // (armed, then sent, on the one thread) marks the turn, replacing that
+  // test's own switch-away scenario, which the new UI has no path to
+  // any more.
+  test("marks the turn temporary once armed on the blank thread and sent", async () => {
+    const restore = stubMultiTurnFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      fireEvent.click(await view.findByRole("button", { name: "Temporary chat" }));
+      await sendMessage(view, "a private question");
+      await view.findByText("Reply 1.");
+
+      const bodies = turnRequestBodies();
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0]!.temporary).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  test("a real conversation's own first send never carries it", async () => {
     const restore = stubMultiTurnFetch();
     try {
       const view = renderPage(
@@ -1718,15 +1752,9 @@ describe("NextChatPage (CHAT-LIST-01: the thread list's own temporary-chat butto
       await sendMessage(view, "hi");
       await view.findByText("Reply 1.");
 
-      fireEvent.click(view.getByRole("button", { name: "Start a temporary chat" }));
-      await view.findByLabelText("Message input");
-      await sendMessage(view, "a private question");
-      await view.findByText("Reply 2.");
-
       const bodies = turnRequestBodies();
-      expect(bodies).toHaveLength(2);
+      expect(bodies).toHaveLength(1);
       expect(bodies[0]!.temporary).toBeUndefined();
-      expect(bodies[1]!.temporary).toBe(true);
     } finally {
       restore();
     }

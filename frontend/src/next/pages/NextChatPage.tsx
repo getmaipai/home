@@ -80,8 +80,9 @@ const RailOpenIcon = getIcon("panel-left-open");
 // one kit tag it already needed for the action bars themselves.
 const CompareIcon = getIcon("grid-2x2");
 const DetailsIcon = getIcon("gauge");
-// CHAT-LIST-01: the thread list's temporary-chat button, beside New
-// Thread - the kit's own icon for anonymous/private identity.
+// CHAT-WELCOME-01 (was CHAT-LIST-01's sidebar button): the welcome
+// screen's own "Temporary chat" toggle - the kit's own icon for
+// anonymous/private identity.
 const IncognitoIcon = getIcon("incognito");
 
 // SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
@@ -177,6 +178,14 @@ const ThinkingModeContext = createContext<{
  * 'compare everything from here on'"). Session-local only; see
  * `useNextChatRuntime`'s own `bareMode` state for why. */
 const BareModeContext = createContext<{ on: boolean; toggle: () => void }>({ on: false, toggle: () => {} });
+
+/** CHAT-WELCOME-01: "Temporary chat" armed for the next send on the
+ * current (blank) thread - `NextChatWelcome`'s own toggle pill needs it
+ * the same reason `BareModeContext` above exists (`Welcome` is a bare
+ * `ComponentType` slot with no props). `allowed` mirrors the old
+ * sidebar button's own role gate (RESP-04(f): a control a child profile
+ * can't use renders nothing, never a disabled one). */
+const TemporaryChatContext = createContext<{ on: boolean; toggle: () => void; allowed: boolean }>({ on: false, toggle: () => {}, allowed: false });
 
 const THINKING_MODE_LABEL: Record<"instant" | "thinking", string> = { instant: "Instant", thinking: "Thinking" };
 const THINKING_MODE_OPTIONS: readonly { key: "instant" | "thinking" }[] = [{ key: "instant" }, { key: "thinking" }];
@@ -441,6 +450,61 @@ function ChatThinkingIndicator() {
       aria-live="polite"
       label={slow ? "Still working. This is taking longer than usual." : (activity ?? "Thinking…")}
     />
+  );
+}
+
+// CHAT-WELCOME-01 (Jesse, 2026-09-24, ChatGPT comparison): the welcome
+// screen carries its own "Temporary chat" toggle now, in place of
+// CHAT-LIST-01's permanent sidebar button - the one place it's relevant
+// is the empty new-chat screen itself, so that's the only place it
+// shows. Composed through the kit's own documented `Welcome` slot
+// (thread.aui.tsx), never a fork of the shipped default: this replaces
+// it outright rather than wrapping it, since the two states (armed/not)
+// need different heading copy, not an addition beside the same one.
+function NextChatWelcome() {
+  const { on, toggle, allowed } = useContext(TemporaryChatContext);
+  return (
+    <div className="relative mb-6 flex flex-col px-2">
+      {allowed && (
+        // z-10: the heading below carries `animate-in`/`slide-in-from-
+        // bottom-1` (tailwindcss-animate), which puts a `transform` on
+        // it and so gives it its own stacking context - without an
+        // explicit z-index here, that later, transformed sibling
+        // painted over this absolutely-positioned button and silently
+        // ate its clicks (found live: the toggle never fired).
+        <div className="absolute end-2 top-0 z-10">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={on ? "default" : "ghost"}
+                size="sm"
+                aria-pressed={on}
+                onClick={toggle}
+              >
+                <IncognitoIcon className="size-4 shrink-0" aria-hidden />
+                Temporary chat
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{on ? "Turn off temporary chat" : "Start a temporary chat"}</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+      {on ? (
+        <div className={cn("flex flex-col gap-1", allowed && "pt-10")}>
+          <p className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200">
+            Temporary chat
+          </p>
+          <p className="text-muted-foreground fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-sm duration-200">
+            This chat won&apos;t be saved to your history.
+          </p>
+        </div>
+      ) : (
+        <p className={cn("fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200", allowed && "pt-10")}>
+          How can I help you today?
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -975,60 +1039,18 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
 // so nothing renders there.
 function NextThreadList({
   onNewThread,
-  onStartTemporary,
-  temporaryAllowed,
   collapseToggle,
 }: {
   onNewThread: () => void;
-  onStartTemporary: () => void;
-  temporaryAllowed: boolean;
   collapseToggle?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
   return (
     <ThreadListRoot>
-      {/* CHAT-UI-03 (2): Jesse's own ChatGPT comparison - "New Thread"
-          read as stretched full width beside the toggle; it keeps the
-          Element's own natural button width instead (no `flex-1`). */}
       <div className="flex items-center gap-1">
         {collapseToggle}
         <ThreadListNew onClick={onNewThread} />
-        {/* CHAT-LIST-01: Jesse's own ruling (2026-09-23) - character/
-            voice-style controls live in Settings, not out on a prompt
-            bar; the thread list's own toolbar is the one place this
-            reaches the surface, as a plain icon button beside New
-            Thread rather than a second labeled row. Same shipped parts
-            as New Thread: `ThreadListNew` itself (its own
-            `ThreadListPrimitive.New` wrap already composes the click
-            handler passed here with the runtime's real thread switch,
-            the same way `onNewThread` above does), just with the kit's
-            incognito icon and a screen-reader label in place of the
-            default Plus/"New Thread" children. `onStartTemporary` only
-            arms the flag the new thread's first turn reads
-            (armTemporaryChat, NextChatPage.tsx) - it never needs to
-            call `switchToNewThread` itself, unlike ChatHeaderBar's own
-            "Start temporary chat" entry, which has no AuiProvider
-            ancestor and has to. Gated on `temporaryAllowed` the same
-            way ChatHeaderBar's own entry is (RESP-04(f): a control a
-            child profile can't use renders nothing, never a disabled
-            one). */}
-        {temporaryAllowed && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <ThreadListNew
-                onClick={onStartTemporary}
-                className="w-8 shrink-0 justify-center px-0"
-              >
-                <IncognitoIcon data-slot="aui_thread-list-new-icon" className="size-4 shrink-0" />
-                <span data-slot="aui_thread-list-new-label" className="sr-only">
-                  Start a temporary chat
-                </span>
-              </ThreadListNew>
-            </TooltipTrigger>
-            <TooltipContent>Start a temporary chat</TooltipContent>
-          </Tooltip>
-        )}
       </div>
       {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />
@@ -1100,23 +1122,19 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
   const [packageScope, setPackageScope] = useState<InstalledPackage | null>(null);
   const packageScopeRef = useRef<InstalledPackage | null>(null);
   packageScopeRef.current = packageScope;
-  // CHAT-HEADER-01: "Start temporary chat" from the header menu - single-
-  // shot like packageScope above, consumed by the very next send (the
-  // one that starts the new conversation this was chosen for). Reset by
-  // the same conversation-change effect that ends bareMode, so switching
-  // away without ever sending never leaves it armed for an unrelated
-  // later new-thread click.
+  // CHAT-WELCOME-01: the welcome screen's own "Temporary chat" toggle -
+  // single-shot like packageScope above, consumed by the very next send.
+  // Reset by the same conversation-change effect that ends bareMode, so
+  // switching to a different, real thread without ever sending never
+  // leaves it armed for a later new-thread's own first send. Toggled in
+  // place on the CURRENT (already blank) thread, unlike the old sidebar
+  // button this replaced (CHAT-LIST-01) which armed the flag and
+  // switched to a new thread in the same click - toggling here never
+  // switches threads, so there's no "which switch was this one" marker
+  // to carry.
   const [temporaryNext, setTemporaryNext] = useState(false);
   const temporaryNextRef = useRef(false);
   temporaryNextRef.current = temporaryNext;
-  // A code review caught this: "Start temporary chat" itself performs
-  // the deliberate switch below (it calls switchToNewThread right after
-  // arming the flag), so without this marker the reset meant for an
-  // UNRELATED switch away would fire on this one too and clear the flag
-  // before the new thread's first send ever reads it. Set true in
-  // armTemporaryChat, read and cleared the one time onThreadIdChange's
-  // own deliberate-switch branch actually runs for it.
-  const startingTemporaryRef = useRef(false);
 
   const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
   // SHELL-02 slice 6: the same real adapters ChatPage.tsx's composer
@@ -1305,36 +1323,25 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void) {
       if (isDeliberateSwitch) {
         thinkingRef.current = false;
         setThinking(false);
-        // Same reasoning as thinkingRef above: "Start temporary chat"
-        // is chosen for the NEW conversation about to start, and that
-        // conversation's own first send resolving its placeholder id
-        // must not read as a switch away from it. A real deliberate
-        // switch (New Thread, picking a past conversation) still clears
-        // it, so it never survives to arm an unrelated later send -
-        // UNLESS this very switch is the one armTemporaryChat caused,
-        // in which case the flag is for the thread this switch is
-        // landing ON, not the one it's leaving, and clearing it here
-        // would silently defeat the feature on every use.
-        if (startingTemporaryRef.current) {
-          startingTemporaryRef.current = false;
-        } else {
-          temporaryNextRef.current = false;
-          setTemporaryNext(false);
-        }
+        // Same reasoning as thinkingRef above: a real deliberate switch
+        // (New Thread, picking a past conversation) is a different
+        // conversation, so a "Temporary chat" toggle armed on the one
+        // being left never silently carries into whatever's next.
+        temporaryNextRef.current = false;
+        setTemporaryNext(false);
       }
     },
   });
 
-  // The only place that arms temporaryNext - bundles the flag and the
-  // marker above into one atomic call so a caller can never set one
-  // without the other.
-  function armTemporaryChat() {
-    startingTemporaryRef.current = true;
-    temporaryNextRef.current = true;
-    setTemporaryNext(true);
-  }
+  // A review caught this: a plain function redefined every render (unlike
+  // setBareMode/setPackageScope, both stable setState references) meant
+  // temporaryChatValue's own useMemo below never actually memoized -
+  // every unrelated render produced a new context value, so every
+  // TemporaryChatContext consumer re-rendered on every unrelated parent
+  // render too.
+  const toggleTemporary = useCallback(() => setTemporaryNext((value) => !value), []);
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, armTemporaryChat, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, toggleTemporary, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1642,7 +1649,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, armTemporaryChat, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, toggleTemporary, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1656,18 +1663,19 @@ export function NextChatPage({ person }: { person: Roster }) {
   );
   const bareModeValue = useMemo(() => ({ on: bareMode, toggle: () => setBareMode((value) => !value) }), [bareMode, setBareMode]);
   const packageScopeValue = useMemo(() => ({ scope: packageScope, setScope: setPackageScope }), [packageScope, setPackageScope]);
+  // CHAT-WELCOME-01: the welcome screen's own toggle (below, `Welcome:
+  // NextChatWelcome`) replaces CHAT-LIST-01's sidebar icon button -
+  // Jesse's own ruling (2026-09-24): no need for a button permanently in
+  // the left column when the one place it's relevant is the empty
+  // new-chat screen itself, matching ChatGPT's own placement.
+  const temporaryAllowed = canHaveTemporaryChatRole(person.role);
+  const temporaryChatValue = useMemo(() => ({ on: temporaryNext, toggle: toggleTemporary, allowed: temporaryAllowed }), [temporaryNext, toggleTemporary, temporaryAllowed]);
   // One base element, rendered at the phone/tablet Sheet and the
   // collapsed rail's own peek overlay - ChatPage.tsx's own fix for
   // exactly this (a code review caught two call sites drifting once one
   // grew props the other didn't). The persistent desktop rail gets its
   // own instance below, since it alone carries the collapse toggle.
-  const threadList = (
-    <NextThreadList
-      onNewThread={() => setSheetOpen(false)}
-      onStartTemporary={armTemporaryChat}
-      temporaryAllowed={canHaveTemporaryChatRole(person.role)}
-    />
-  );
+  const threadList = <NextThreadList onNewThread={() => setSheetOpen(false)} />;
   const closeArtifact = () => setOpenArtifactId(null);
   const closeCompare = () => setCompareTarget(null);
   // The toggle (see the CHAT-UI-02 comment above the state
@@ -1913,6 +1921,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <DetailsOpenContext.Provider value={detailsOpenValue}>
       <ThinkingModeContext.Provider value={thinkingModeValue}>
       <BareModeContext.Provider value={bareModeValue}>
+      <TemporaryChatContext.Provider value={temporaryChatValue}>
       <PackageScopeContext.Provider value={packageScopeValue}>
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
       <DictationLevelMeterProvider value={dictationLevelMeter}>
@@ -2054,19 +2063,6 @@ export function NextChatPage({ person }: { person: Roster }) {
             >
               <NextThreadList
                 onNewThread={() => { setSheetOpen(false); setRailPeeked(false); }}
-                // A code review caught this: `switchToNewThread`'s own
-                // `onThreadIdChange` effect closes the Sheet/artifact/
-                // compare panels on any thread-id change (including this
-                // one), but never touches `railPeeked` - only
-                // `onNewThread`'s own wrapper above does that, and a
-                // click inside `#next-chat-rail` never fires the pointer/
-                // blur-based `closeRailPeek` (its `relatedTarget` stays
-                // inside the rail). Without this, starting a temporary
-                // chat from a peeked-open collapsed rail would leave it
-                // expanded over the content instead of collapsing back
-                // the same way New Thread already does.
-                onStartTemporary={() => { armTemporaryChat(); setRailPeeked(false); }}
-                temporaryAllowed={canHaveTemporaryChatRole(person.role)}
                 collapseToggle={inlineToggle}
               />
             </div>
@@ -2096,7 +2092,9 @@ export function NextChatPage({ person }: { person: Roster }) {
               )}
             >
               <Thread
+                temporary={temporaryNext}
                 components={{
+                  Welcome: NextChatWelcome,
                   AssistantMoreItems,
                   AssistantActionBarExtra: SourcesActionBarTrigger,
                   AssistantMessageFooterExtra: MessageFooterExtra,
@@ -2177,6 +2175,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </DictationLevelMeterProvider>
       </VoiceSessionProvider>
       </PackageScopeContext.Provider>
+      </TemporaryChatContext.Provider>
       </BareModeContext.Provider>
       </ThinkingModeContext.Provider>
       </DetailsOpenContext.Provider>
