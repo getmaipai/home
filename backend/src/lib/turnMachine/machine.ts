@@ -14,7 +14,7 @@ import { nodeSignal } from "./deadline";
 import { safetyNode, applySafety, safetyRoute, type SafetyOutput } from "./nodes/safety";
 import { commandsNode, type CommandsOutput } from "./nodes/commands";
 import { contextNode, applyContext, type ContextOutput } from "./nodes/context";
-import { modelNode, ANSWER_FROM_CONTEXT_TOOL_ID, type ModelOutput } from "./nodes/model";
+import { modelNode, ANSWER_FROM_CONTEXT_TOOL_ID, rawUtteranceWebsearchCall, type ModelOutput } from "./nodes/model";
 import { policyNode, type PolicyOutput, type PolicyEntry } from "./nodes/policy";
 import { toolNode, type ToolOutput } from "./nodes/tool";
 import { answerNode, type AnswerInput, type AnswerOutput, type PolicyRefusedReason } from "./nodes/answer";
@@ -70,6 +70,17 @@ interface MachineContext {
   // loop back through the same check (model.ts's own forceSearchOnly
   // never offers answer_from_this_conversation).
   forceSearchOnly: boolean;
+  // QUERY-WRITER-01: set by the `model` state's own onDone action
+  // whenever THIS round's tool_calls came from the query-writer
+  // generation (nodes/model.ts's `recoveredMissingCall()`), never from
+  // the model's own real call or the raw-utterance builder row. Read
+  // once by `policy`'s own onDone (the `queryWriterRefused` guard) to
+  // tell "policy refused the query-writer's own answer" apart from an
+  // ordinary refusal, then cleared by `queryWriterFallback` itself so
+  // the one retry it forces can never loop back through the same
+  // check a second time - the identical shape `forceSearchOnly`
+  // already uses for `answer_from_context_check`'s own retry.
+  queryWriterUsed: boolean;
   // The last node's raw output, read by that state's own guarded
   // transitions - one shared slot rather than one typed field per
   // node, since only ever one is live at a time (the machine is
@@ -164,6 +175,19 @@ export const turnMachine = setup({
       const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
       return toRun.length === 0 && parkedAsk === null;
     },
+    // QUERY-WRITER-01: the query-writer's own round is always exactly
+    // one proposal (tool_choice "required" over websearch alone), so
+    // "every proposal refused" here can only mean that one - the
+    // ruling's own "grounding refuses it" case (a bare pronoun the
+    // query-writer couldn't resolve either). Checked as its own,
+    // earlier guard so it wins over the generic policyAllRefused
+    // (XState's own array-order guard evaluation) and routes to the
+    // raw-utterance retry instead of the honesty line every other
+    // all-refused turn gets.
+    queryWriterRefused: ({ context, event }) => {
+      const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
+      return toRun.length === 0 && parkedAsk === null && context.queryWriterUsed;
+    },
     moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
     outputRefused: ({ event }) => ((event as unknown as { output: OutputGateOutput }).output).refused === true,
     hasPreConfirmed: ({ context }) => context.preConfirmed !== undefined,
@@ -240,7 +264,7 @@ export const turnMachine = setup({
   },
 }).createMachine({
   id: "turn",
-  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, forceSearchOnly: false, step: null, modelReasoning: undefined }),
+  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, forceSearchOnly: false, queryWriterUsed: false, step: null, modelReasoning: undefined }),
   initial: "safety",
   states: {
     safety: {
@@ -299,7 +323,11 @@ export const turnMachine = setup({
         // own output overwrites `step` before `output_gate` ever runs,
         // so this is the one place that can still see it there.
         onDone: [
-          { guard: "modelIsToolCalls", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "policy" },
+          // QUERY-WRITER-01: `queryWriterUsed` reads THIS round's own
+          // output directly (never carried over from an earlier round -
+          // a real model call or a plain builder row both leave it
+          // undefined/false, matching ModelOutput's own optional field).
+          { guard: "modelIsToolCalls", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning, queryWriterUsed: (event.output as ModelOutput & { kind: "tool_calls" }).queryWriterUsed === true })), target: "policy" },
           { guard: "modelIsAnswerFromContext", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "answer_from_context_check" },
           { actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "answer" },
         ],
@@ -326,9 +354,34 @@ export const turnMachine = setup({
         input: ({ context }) => context,
         onDone: [
           { guard: "policyHasParkedAsk", actions: [assign(({ event }) => ({ step: event.output })), "parkAsk"], target: "asked" },
+          // QUERY-WRITER-01: checked before the generic policyAllRefused
+          // (see that guard's own comment) - never assigns `step` from
+          // the refused policy output, since queryWriterFallback builds
+          // its own fresh one.
+          { guard: "queryWriterRefused", target: "queryWriterFallback" },
           { guard: "policyAllRefused", actions: assign(({ event }) => ({ step: event.output })), target: "answer" },
           { actions: assign(({ event }) => ({ step: event.output })), target: "tool" },
         ],
+      },
+    },
+    // QUERY-WRITER-01: the ruling's own "fall back to the raw utterance
+    // as today" - a synchronous `always` transition, the identical shape
+    // answer_from_context_check already uses for its own retry, back
+    // through `policy` (never straight to `tool`) so the raw utterance
+    // still clears a real grounding check rather than skipping it - it
+    // always does (it IS the utterance's own terms), the same reason
+    // this retry can never loop: `queryWriterUsed` is cleared here, so
+    // a second miss on the SAME turn (today's `budget.rounds: 1` means
+    // there is no second round to reach this from, but the guard is
+    // false either way once this fires) takes the ordinary
+    // policyAllRefused path instead of retrying forever.
+    queryWriterFallback: {
+      always: {
+        actions: assign({
+          step: ({ context }) => ({ kind: "tool_calls" as const, calls: [rawUtteranceWebsearchCall(context.turnState.utterance)] }),
+          queryWriterUsed: false,
+        }),
+        target: "policy",
       },
     },
     tool: {

@@ -940,6 +940,101 @@ describe("turnNext.ts: ENGINE-CONTRACT-02, a required miss falls to the builder 
   });
 });
 
+// QUERY-WRITER-01 (dev.md, getmaipai-26's ruling, 2026-09-24): a live
+// miss - "when did [pronoun]'s show end" after a turn naming a person -
+// found the builder row searching the bare, unresolved utterance. These
+// tests use the same roster-safe shape (a person-subject turn, then a
+// pronoun follow-up), never the real household's own words.
+describe("turnNext.ts: QUERY-WRITER-01, a required miss recovers through one grammar-constrained generation before the raw-utterance builder row", () => {
+  test('a scripted engine that misses the forced call and then answers the constrained call with {"expression":"<resolved subject> show end"} searches that expression', async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      // Turn 1: establishes the subject in real conversation history -
+      // never a world question, so it never reaches the model's own
+      // forced round at all (a command/pattern-shaped statement is
+      // fine here; only turn 2's own forced round is under test).
+      const first = await withStub({ reply: () => "Got it." }, () => runTurnNext(people.owner, "chat", "marlow hosts a late night show"));
+      expect(first.ok).toBe(true);
+      if (!first.ok || first.kind !== "immediate") throw new Error("expected an immediate result");
+
+      let queryWriterRequest: ChatCompletionRequest | undefined;
+      const result = await withStub(
+        {
+          reply: (request) => {
+            if (request.response_format) {
+              queryWriterRequest = request;
+              return JSON.stringify({ expression: "marlow show end" });
+            }
+            // The forced round's own miss: plain text, never a call -
+            // the exact ENGINE-CONTRACT-01 shape this item's own fix
+            // recovers from, one round earlier than the builder row.
+            if (!request.messages.some((m) => m.role === "tool")) return "I'm not sure.";
+            return "Marlow's show ended last year, sourced.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "when did his show end", { conversationId: first.value.conversation_id }),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(searxng.queries.some((q) => q.includes("marlow show end"))).toBe(true);
+      expect(result.value.plugin_id).toBe("websearch");
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
+      expect(outcomes.some((o) => o.callId === "query-writer" && o.args?.expression === "marlow show end")).toBe(true);
+      expect(outcomes.some((o) => o.callId === "builder")).toBe(false);
+      // The constrained request itself: the schema and max_tokens the
+      // ruling names, never combined with `tools`.
+      expect(queryWriterRequest?.response_format).toEqual({ type: "json_schema", json_schema: { name: "query_writer", schema: { type: "object", properties: { expression: { type: "string" } }, required: ["expression"] } } });
+      expect(queryWriterRequest?.max_tokens).toBe(48);
+      expect(queryWriterRequest?.tools).toBeUndefined();
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("a constrained call returning a bare pronoun falls back to the raw utterance", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const first = await withStub({ reply: () => "Got it." }, () => runTurnNext(people.owner, "chat", "marlow hosts a late night show"));
+      expect(first.ok).toBe(true);
+      if (!first.ok || first.kind !== "immediate") throw new Error("expected an immediate result");
+
+      const result = await withStub(
+        {
+          reply: (request) => {
+            // The query-writer's own generation succeeds and returns
+            // valid JSON - but a BARE pronoun and nothing else, the
+            // exact shape policy.ts's own isBarePronoun() refuses
+            // outright, before any term-overlap check ever runs (a
+            // multi-word answer sharing a real word with the utterance
+            // - "his show" - would trivially ground against the
+            // utterance itself, one of policy's own grounding sources,
+            // so this has to be a single pronoun word to actually
+            // exercise the refusal this test is about).
+            if (request.response_format) return JSON.stringify({ expression: "his" });
+            if (!request.messages.some((m) => m.role === "tool")) return "I'm not sure.";
+            return "Marlow's show ended last year, sourced.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "when did his show end", { conversationId: first.value.conversation_id }),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      // Grounding refused the bare pronoun - queryWriterFallback's own
+      // retry ran the raw utterance instead, the identical builder row
+      // shape ENGINE-CONTRACT-02 already covers.
+      expect(searxng.queries.some((q) => q.includes("when did his show end"))).toBe(true);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
+      expect(outcomes.some((o) => o.callId === "builder" && o.args?.expression === "when did his show end")).toBe(true);
+    } finally {
+      searxng.stop();
+    }
+  });
+});
+
 describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-text fields", () => {
   async function policyNodeOutcome(turnId: string): Promise<{ ok?: boolean; code?: string; arg?: string } | undefined> {
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();

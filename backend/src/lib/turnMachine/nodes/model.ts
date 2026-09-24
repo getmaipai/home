@@ -69,7 +69,14 @@ export interface ModelInput {
 
 export type ModelOutput =
   | { kind: "text"; text: string; thinking: boolean; reasoning?: string }
-  | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string }
+  // QUERY-WRITER-01: `queryWriterUsed` is set only when a required-call
+  // miss was recovered by the query-writer generation below (never by
+  // the model's own real tool call, and never by the raw-utterance
+  // builder) - machine.ts's own `model` state reads it back to decide
+  // whether a LATER policy refusal of exactly this call should retry
+  // via the raw utterance (queryWriterFallback) instead of the generic
+  // honesty line every other refusal gets.
+  | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string; queryWriterUsed?: boolean }
   | { kind: "answer_from_context"; quote: string; reasoning?: string }
   // DEADLINE-01 (dev.md "U6 rerun ruling" (a)): a generation that never
   // finished at all (the model node's own deadline, a dead engine) -
@@ -346,10 +353,143 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
  * reports) while still returning the builder's `tool_calls` output -
  * the machine's own routing (`modelIsToolCalls`) reads `output.kind`
  * only, never `outcome.ok`, so the search still runs either way. */
+/** The one definition of "the builder's own row": a websearch call built
+ * straight from the utterance, never the model's own words - exported
+ * so machine.ts's own `queryWriterFallback` state (a policy refusal of
+ * the query-writer's own answer, QUERY-WRITER-01) builds the identical
+ * shape rather than a second copy of this literal. */
+export function rawUtteranceWebsearchCall(utterance: string): ToolCall {
+  return { tool: "websearch", args: { expression: utterance }, id: "builder" };
+}
+
 function builderFallbackOutput(utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, failureCode?: string, failureMessage?: string): { outcome: NodeOutcome; output: ModelOutput } {
-  const builderCall: ToolCall = { tool: "websearch", args: { expression: utterance }, id: "builder" };
   const outcome: NodeOutcome = failureCode !== undefined ? { ok: false, code: failureCode, message: failureMessage } : { ok: true, required_miss: true };
-  return { outcome, output: { kind: "tool_calls", calls: [...otherCalls, builderCall], reasoning } };
+  return { outcome, output: { kind: "tool_calls", calls: [...otherCalls, rawUtteranceWebsearchCall(utterance)], reasoning } };
+}
+
+// QUERY-WRITER-01 (dev.md "QUERY-WRITER-01", getmaipai-26's ruling,
+// 2026-09-24): the live miss - "when did [pronoun]'s show end" after a
+// turn naming a person - was the builder row above searching the
+// UTTERANCE VERBATIM (a bare pronoun) whenever the model's own required
+// call came back missing or invalid; 3 of 4 forced turns in the one
+// real conversation that found it missed this way, not the 1-in-5
+// ENGINE-CONTRACT-02 already measured for a plain miss. Grammar-
+// constrained decoding (the prebuilt technique the ruling names, never
+// a word rule or pronoun substitution in code) resolves it: one more
+// generation, on the SAME messages this round already built (the
+// window's own earlier turns are still in context, so the pronoun has
+// something real to resolve against), constrained to `{"expression":
+// string}` by the engine's own JSON-schema grammar - `response_format:
+// {type:"json_schema", json_schema}`, the identical shape and field
+// `memoryJudge.ts`'s own four call sites already prove against this
+// same installed llama-server build (b10797): OpenAI's own
+// `response_format.json_schema.schema` field, not a top-level
+// `json_schema` or `--grammar`, which is a server-startup flag, not a
+// per-request one. (oMLX is out of scope: the chat role runs on
+// llama-server today, never oMLX - docs/plans/hardware-tiers-2026-09-23.md.)
+const QUERY_WRITER_SCHEMA = {
+  name: "query_writer",
+  schema: {
+    type: "object",
+    properties: { expression: { type: "string" } },
+    required: ["expression"],
+  },
+} as const;
+
+const QUERY_WRITER_INSTRUCTION =
+  "The search you were asked to run is missing or invalid. Write the web search query it should have been: a short phrase, with any pronoun (he, she, they, it, that) resolved to the specific person or thing it refers to from the conversation above. Respond with the query alone, as JSON.";
+
+// The ruling's own number: a bare `{"expression": "..."}` object is
+// shorter than a real tool call's own envelope (name, expression,
+// category, read_page and the wrapper - FORCED_CALL_MAX_TOKENS's own
+// 96), so this gets its own, smaller cap rather than reusing that one.
+const QUERY_WRITER_MAX_TOKENS = 48;
+
+type QueryWriterResult = { ok: true; expression: string | null } | { ok: false; code: string; message: string | undefined };
+
+/** One grammar-constrained generation recovering a missing/invalid
+ * required call's own query - `{ok:true, expression: null}` on a
+ * benign non-answer (an empty/malformed response, a bare pronoun/empty
+ * string a real query could never be, the caller's own signal to fall
+ * back to `builderFallbackOutput()`'s raw-utterance row unchanged),
+ * `{ok:false, code, message}` only on a genuine generation failure
+ * (a code review, 2026-09-24: the first cut collapsed both into one
+ * `null`, so a live engine outage during this call would have been
+ * misreported as an ordinary required-call miss in the trace and the
+ * replay bench - the exact conflation DEADLINE-01's own comment above
+ * already names as a fixed, recurring bug class). Built on
+ * `startCompleteStream` directly, never `runOneGeneration` (that
+ * function's own `state.streamGate` handling is for a visible reply's
+ * own streamed text; this call's result is never shown, so reusing it
+ * would reset a stream gate this generation has nothing to do with) -
+ * but the same signal-aware draining loop, so the same review's other
+ * finding (the first cut called `complete()`, which takes no signal at
+ * all, so a slow or wedged call ran past the model node's own deadline
+ * uncancelled) is fixed the identical way every other generation in
+ * this file already is. `thinking: false`/`max_tokens: 48` (the
+ * ruling's own numbers): a short structured answer, not a reasoned
+ * one, the same floor FORCED_CALL_MAX_TOKENS already sets for a real
+ * forced call, since this is standing in for one. Never combined with
+ * `tools`: a real prefix-cache cost, not reused the way PHRASE-01's own
+ * mechanism reuses a byte-identical tools block (a code review,
+ * 2026-09-24, caught an earlier comment overclaiming this) - accepted
+ * here rather than chased, since `response_format` alongside `tools`
+ * is untested combination this codebase has no other caller of, and
+ * this whole call only ever runs on an already-rare required-call
+ * miss to begin with. */
+async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal): Promise<QueryWriterResult> {
+  const started = await startCompleteStream(
+    "chat",
+    [...messages, { role: "user", content: QUERY_WRITER_INSTRUCTION }],
+    { response_format: { type: "json_schema", json_schema: QUERY_WRITER_SCHEMA }, thinking: false, max_tokens: QUERY_WRITER_MAX_TOKENS },
+    signal,
+  );
+  if (!started.ok) return { ok: false, code: started.code, message: boundedGenerationError(started.error) };
+  let text = "";
+  try {
+    for (;;) {
+      const step = await started.tokens.next();
+      if (step.done) break;
+      text += step.value;
+    }
+  } catch (err) {
+    // GENFAIL-01's own code for this exact phase (an established stream
+    // that dies mid-generation) - `runOneGeneration`'s identical catch
+    // uses the same "generation_failed", never "unavailable" (reserved
+    // for `!started.ok` above, a pre-stream/connect-time failure); a
+    // re-review (2026-09-24) caught this call's own catch using the
+    // wrong one, which would have misclassified a mid-generation outage
+    // as a connect failure in the trace and the replay bench.
+    return { ok: false, code: "generation_failed", message: boundedGenerationError(err instanceof Error ? err.message : String(err)) };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: true, expression: null };
+  }
+  if (typeof parsed !== "object" || parsed === null) return { ok: true, expression: null };
+  const expression = (parsed as { expression?: unknown }).expression;
+  return { ok: true, expression: typeof expression === "string" && expression.trim().length > 0 ? expression : null };
+}
+
+/** The requiredButMissing/offeredButInvalid exit's own recovery: try
+ * the query-writer first (the SAME messages this round already built),
+ * and only fall back to the raw utterance when it fails outright -
+ * grounding's own refusal of an ungrounded query-writer answer (a bare
+ * pronoun it couldn't resolve either) is handled one layer up, in
+ * machine.ts's own `queryWriterFallback` state, the same shape
+ * `answer_from_context_check`'s existing retry already uses, never
+ * re-implemented here. A genuine generation failure (`written.ok ===
+ * false`) carries its own code/message into the builder row exactly
+ * like every other generation failure in this file does - never
+ * silently folded into an ordinary required_miss. */
+async function recoveredMissingCall(messages: LlmMessage[], utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, signal: AbortSignal): Promise<{ outcome: NodeOutcome; output: ModelOutput }> {
+  const written = await runQueryWriter(messages, signal);
+  if (!written.ok) return builderFallbackOutput(utterance, otherCalls, reasoning, written.code, written.message);
+  if (written.expression === null) return builderFallbackOutput(utterance, otherCalls, reasoning);
+  const queryWriterCall: ToolCall = { tool: "websearch", args: { expression: written.expression }, id: "query-writer" };
+  return { outcome: { ok: true, required_miss: true }, output: { kind: "tool_calls", calls: [...otherCalls, queryWriterCall], reasoning, queryWriterUsed: true } };
 }
 
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
@@ -577,7 +717,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // call the model made this round still runs.
     gate?.reset();
     const otherCalls = (attempt.toolCalls ?? []).filter((c) => c.tool !== "websearch");
-    return builderFallbackOutput(input.utterance, otherCalls, reasoning);
+    return recoveredMissingCall(messages, input.utterance, otherCalls, reasoning, signal);
   }
 
   if (attempt.toolCalls && attempt.toolCalls.length > 0) {
