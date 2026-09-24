@@ -178,6 +178,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     messages: [],
     proposals: [],
     outcomes: [],
+    toolEvents: [],
     lastTools: [],
     generations: [],
     nodes: [],
@@ -306,5 +307,8 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
   }
 
   logResult(state, actor, surface, text, value);
-  return { ok: true, kind: "immediate", value, signal };
+  // TOOL-EVENTS-01(b): omitted entirely (not an empty array) when this
+  // turn ran no tool - routes/turn.ts spreads it in only when present,
+  // so a turn with nothing to report costs nothing on the wire.
+  return { ok: true, kind: "immediate", value, signal, ...(state.toolEvents.length > 0 ? { toolEvents: state.toolEvents } : {}) };
 }

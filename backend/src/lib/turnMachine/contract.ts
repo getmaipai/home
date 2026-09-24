@@ -20,6 +20,7 @@ import type { GenerationInput } from "@/lib/turnStats";
 import type { PendingAsk } from "@/lib/conversationHistory";
 import type { PlanInput } from "@/lib/register";
 import type { Persona } from "@/lib/persona";
+import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 /** ARCH-POLICY-01's ingress unit: what the model actually sees, filtered
  * before the prompt (disclosure, band, temporary mode) and typed by
@@ -165,6 +166,17 @@ export interface TurnState {
   messages: LlmMessage[];
   proposals: ActionProposal[];
   outcomes: ToolExecutionOutcome[];
+  /** TOOL-EVENTS-01(b): the spec's own tool_call/tool_result/tool_error
+   * shape (spec/schemas/turn-stream-event.schema.json, keyed by `t`, not
+   * `type` - a deliberately separate event shape from wire.ts's own
+   * TurnStreamEvent union, the same split the frontend consumer
+   * (chatModelAdapter.ts, landed first) already treats it as), pushed by
+   * the `tool` node as each proposal is accepted and its outcome lands
+   * (machine.ts's `recordOutcomes` action, alongside `outcomes` above).
+   * Surfaced on turnNext.ts's "immediate" result so routes/turn.ts can
+   * include them in the response, ahead of "done" - never populated by
+   * the old path. */
+  toolEvents: ToolStreamEvent[];
   /** PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
    * follow-up): the most recent real (non-phrasing) model round's own
    * resolved tools array, persisted so the phrasing round that follows

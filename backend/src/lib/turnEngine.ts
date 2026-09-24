@@ -101,6 +101,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 // dependency instead of a hand-duplicated mirror); re-exported here since
 // this is where callers already look for them.
 import type { Media, TurnValue } from "@/wire";
+import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 export type { TurnReply, TurnValue } from "@/wire";
@@ -5268,7 +5269,11 @@ export type StreamOutcome = SafetyResult | { resolved: TurnValue } | undefined;
 
 export type TurnStreamResult =
   | TurnFailure
-  | { ok: true; kind: "immediate"; value: TurnValue; signal: TurnSignal }
+  // TOOL-EVENTS-01(b): only the new path (turnMachine/turnNext.ts)
+  // ever populates toolEvents, and only when this turn actually ran
+  // one - the old path's own "immediate" results (a safety refusal, a
+  // deterministic plugin reply) never carry it.
+  | { ok: true; kind: "immediate"; value: TurnValue; signal: TurnSignal; toolEvents?: ToolStreamEvent[] }
   | {
       ok: true;
       kind: "stream";

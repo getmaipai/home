@@ -173,6 +173,7 @@ export const turnMachine = setup({
     applyContext: ({ context }) => applyContext(context.turnState, context.step as ContextOutput),
     recordOutcomes: ({ context }) => {
       context.turnState.outcomes.push(...(context.step as ToolOutput).outcomes);
+      context.turnState.toolEvents.push(...(context.step as ToolOutput).toolEvents);
     },
     // U4c (docs/BACKLOG.md): the plan `turnNext.ts` computed up front
     // used a static `evidence: { choices: 0, sources: 0, deliverable:

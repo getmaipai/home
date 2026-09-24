@@ -13,6 +13,7 @@ import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
+import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId } from "@/lib/conversationHistory";
@@ -183,7 +184,12 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
 });
 
 const encoder = new TextEncoder();
-function ndjsonLine(event: TurnStreamEvent): Uint8Array {
+// TOOL-EVENTS-01(b): the spec's own tool_call/tool_result/tool_error
+// shape is a deliberately separate NDJSON line shape from wire.ts's own
+// TurnStreamEvent (keyed by `t`, not `type` - chatModelAdapter.ts's own
+// header comment on the frontend side of this same split), never a
+// member of that union - widened here rather than merged into it.
+function ndjsonLine(event: TurnStreamEvent | ToolStreamEvent): Uint8Array {
   return encoder.encode(`${JSON.stringify(event)}\n`);
 }
 
@@ -661,7 +667,14 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     // construction; stripped here too anyway, the same belt-and-braces
     // every other reasoning site in this route already keeps.
     const value = dropReasoning && result.value.reasoning !== undefined ? { ...result.value, reasoning: undefined } : result.value;
-    const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "signal", signal: result.signal }), ndjsonLine({ type: "done", value })]);
+    // TOOL-EVENTS-01(b): the new path's own tool_call/tool_result/
+    // tool_error lines (chatModelAdapter.ts's toolTimelinePart, its
+    // frontend consumer half, landed first) - present only when this
+    // turn actually ran a tool (turnNext.ts omits an empty array),
+    // always ahead of "done" so the tool timeline is already populated
+    // by the time the reply itself arrives.
+    const toolEventLines = (result.toolEvents ?? []).map((event) => ndjsonLine(event));
+    const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "signal", signal: result.signal }), ...toolEventLines, ndjsonLine({ type: "done", value })]);
     return new Response(body, {
       headers: { "content-type": "application/x-ndjson" },
     });

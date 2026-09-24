@@ -10,6 +10,7 @@
 import { runPlugin } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
+import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 export interface ToolInput {
   proposals: readonly ActionProposal[];
@@ -17,6 +18,13 @@ export interface ToolInput {
 
 export interface ToolOutput {
   outcomes: ToolExecutionOutcome[];
+  /** TOOL-EVENTS-01(b): one `tool_call` per proposal, pushed as it's
+   * accepted (before the call resolves), then exactly one `tool_result`
+   * (succeeded) or `tool_error` (failed or deadline-exceeded) once its
+   * outcome lands - the spec's own two-outcome split (schema.json has
+   * no third "partial" shape), never emitted for a rejected/pending
+   * proposal (policy.ts never sends one here). */
+  toolEvents: ToolStreamEvent[];
 }
 
 function withDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T | "deadline"> {
@@ -43,26 +51,37 @@ function withDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T | 
 
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   const outcomes: ToolExecutionOutcome[] = [];
+  const toolEvents: ToolStreamEvent[] = [];
   for (const proposal of input.proposals) {
     const { tool, args, callId } = proposal.request;
+    // The proposal is accepted the moment this node starts it - before
+    // the call actually resolves, so a client's tool timeline shows the
+    // step running, not just its eventual outcome.
+    toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args });
     const raced = await withDeadline(runPlugin(tool, state.actor, args, { id: state.turnId, conversationId: state.conversationId }), signal);
     if (raced === "deadline") {
-      outcomes.push(outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", userMessage: "That took too long, sorry." }));
+      const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", userMessage: "That took too long, sorry." });
+      outcomes.push(outcome);
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.userMessage! });
       continue;
     }
     const result = raced;
-    outcomes.push(
-      outcomeOf({
-        callId,
-        packageId: tool,
-        status: result.ok ? "succeeded" : "failed",
-        via: "tool_call",
-        args,
-        result: result.ok ? result.value : undefined,
-        errorCode: result.ok ? undefined : String(result.status),
-        userMessage: result.ok ? undefined : result.error,
-      }),
-    );
+    const outcome = outcomeOf({
+      callId,
+      packageId: tool,
+      status: result.ok ? "succeeded" : "failed",
+      via: "tool_call",
+      args,
+      result: result.ok ? result.value : undefined,
+      errorCode: result.ok ? undefined : String(result.status),
+      userMessage: result.ok ? undefined : result.error,
+    });
+    outcomes.push(outcome);
+    if (result.ok) {
+      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: result.value.reply?.text } });
+    } else {
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.userMessage! });
+    }
   }
-  return { outcome: { ok: true }, output: { outcomes } };
+  return { outcome: { ok: true }, output: { outcomes, toolEvents } };
 };

@@ -22,6 +22,7 @@ import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 import { remember, embedMemoryRecordSafely } from "@/lib/memory";
+import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 let people: BenchPeople;
 
@@ -127,9 +128,33 @@ describe("turnNext.ts: the interim rule", () => {
       // scorer reads exactly these two top-level fields.
       expect(result.value.plugin_id).toBe("websearch");
       expect(result.value.sources?.length).toBeGreaterThan(0);
+      // TOOL-EVENTS-01(b): the tool node's own wire events, validated
+      // against the spec's own Zod schema (spec/stack/ts/turn-stream-
+      // event.ts, the same import chatModelAdapter.ts's frontend
+      // consumer parses each NDJSON line with) - a real websearch call
+      // through the tool node produces a call then a result, in that
+      // order, each a real parse, not just a shape assumption.
+      expect(result.toolEvents?.length).toBe(2);
+      const [call, resultEvent] = result.toolEvents!;
+      const parsedCall = ToolTurnStreamEvent.parse(call);
+      const parsedResult = ToolTurnStreamEvent.parse(resultEvent);
+      if (parsedCall.t !== "tool_call") throw new Error(`expected tool_call, got ${parsedCall.t}`);
+      expect(parsedCall.package_id).toBe("websearch");
+      expect(parsedCall.args).toEqual({ expression: "president of chile" });
+      if (parsedResult.t !== "tool_result") throw new Error(`expected tool_result, got ${parsedResult.t}`);
+      expect(parsedResult.call_id).toBe(parsedCall.call_id);
+      expect(parsedResult.package_id).toBe("websearch");
+      expect(parsedResult.outcome.error_code).toBeUndefined();
     } finally {
       searxng.stop();
     }
+  });
+
+  test("a turn that runs no tool carries no toolEvents field", async () => {
+    const result = await withStub({ reply: () => "Hi there!" }, () => runTurnNext(people.owner, "chat", "hi"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.toolEvents).toBeUndefined();
   });
 });
 
