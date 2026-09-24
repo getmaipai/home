@@ -38,7 +38,6 @@ import {
   confirmPromptFor,
   type TurnStreamResult,
 } from "@/lib/turnEngine";
-import { deliverableInDenial } from "@/lib/turnContext";
 import { __embedCallCountForTests, __resetEmbedCallCountForTests } from "@/lib/routing";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { guardReply } from "@/lib/guards";

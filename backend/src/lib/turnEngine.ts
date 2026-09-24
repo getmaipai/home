@@ -28,7 +28,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP, feedThinkSplit, newThinkSplitState, extractReasoningText } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
@@ -69,7 +69,6 @@ import {
   routingStats,
   resolveSupersedes,
   lastTurnSubjects,
-  lastTurnMedia,
   lastTwoTurnsSubjects,
   lastTurnIds,
   nextOpenQuestionFor,
@@ -3232,7 +3231,7 @@ async function prepareTurn(
   const promptStart = performance.now();
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
-  const basePlan = planFor({ signal, surface, brevity: constraintsFor(conversation.id).some((c) => c.kind === "length" && /short|brief|one line/i.test(c.value)) || /\b(?:just the number(?:s)?|short answer|one line)\b/i.test(text), evidence: { choices: 0, sources: 0, deliverable: Boolean(intentFor(text, signal).deliverable) }, companion: { directness: "diplomatic", engagement: persona.engagement, complexity: persona.complexity }, band: ageBand, deferred: false, disclosureWithheld: memoryMatches.withheldForBand > 0 || Boolean(window.summaryLine) });
+  const basePlan = planFor({ signal, surface, brevity: constraintsFor(conversation.id).some((c) => c.kind === "length" && /short|brief|one line/i.test(c.value)) || /\b(?:just the number(?:s)?|short answer|one line)\b/i.test(text), evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: persona.engagement, complexity: persona.complexity }, band: ageBand, deferred: false, disclosureWithheld: memoryMatches.withheldForBand > 0 || Boolean(window.summaryLine) });
   // COMP-02: research keeps the article in the details document, so the
   // bubble remains a short handoff. The existing plan still owns all
   // safety, child-band and search_voice moves; this only lowers the line's
@@ -3308,18 +3307,6 @@ async function prepareTurn(
     subjectsCarried: carried.length > 0,
     subjectPronouns,
   };
-  // Finding 60 addendum: the picture reader owns the follow-up labels;
-  // this small continuation read only carries the prior typed form and
-  // excludes URLs already shown, so "show me more" is not a fresh image.
-  const pictureFollowup = pictureContinuationFor(conversation.id, text);
-  if (pictureFollowup && deliverableKind(turnContext.intent.deliverable) === "picture") {
-    turnContext.intent.deliverable = { deliverable: "picture", count: pictureFollowup.count, ...(pictureFollowup.form ? { form: pictureFollowup.form } : {}) };
-    turnContext.pictureExclusions = pictureFollowup.exclusions;
-  }
-  const pictureRebind = pictureRebindFor(conversation.id, text);
-  if (pictureRebind) {
-    turnContext.intent.deliverable = { deliverable: "picture", count: pictureRebind.count, ...(pictureRebind.form ? { form: pictureRebind.form } : {}) };
-  }
   const householdSubject = householdSubjectTurn(text, turnContext);
   const deferredSubject = turnContext.subjects.find((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household");
   const deferredSubjectName = deferredSubject ? registryNameById(deferredSubject.entity_id) : null;
@@ -3330,19 +3317,6 @@ async function prepareTurn(
     console.log(`[turn] deferred subject=${deferredSubjectName}`);
     setPendingAsk(conversation.id, { kind: "relay", prompt: line, packageId: "relay", args: {}, name: deferredSubjectName, subjectId: deferredSubject.entity_id });
     return immediate({ reply: { text: line }, source: "policy", safety, crisis_resources: crisisResources }, [deferredSubject]);
-  }
-  const deliverable = deliverableKind(turnContext.intent.deliverable);
-  const backReference = deliverable === "link" && /^(?:\s*(?:where did you read that|link me|the source|send me the page)(?:\s*(?:,|and)\s*(?:where did you read that|link me|the source|send me the page))?\s*[?.!]?)$/i.test(text);
-  if (deliverable) fired(`deliverable.${deliverable}`);
-  if (backReference && !composeDirect && !continuation) {
-    fired("deliverable.back_reference");
-    const recentTurns = outcomesForConversation(conversation.id).slice(-3).reverse();
-    const prior = recentTurns.flatMap((turn) => turn.outcomes).find((o) => o.status === "succeeded" && o.packageId === "websearch");
-    const priorRows = prior?.result?.data && typeof prior.result.data === "object" ? (prior.result.data as { rows?: unknown }).rows : undefined;
-    const priorSources = prior?.sources?.length ? prior.sources : sourcesFromRows(priorRows);
-    if (prior && priorSources.length > 0) {
-      return immediate({ reply: { text: "The link's below." }, source: "plugin", plugin_id: prior.packageId, safety, crisis_resources: crisisResources, sources: priorSources }, subjects);
-    }
   }
   markIncluded(turnContext, promptParts.context);
   const includedMemoryIds = new Set(turnContext.includedEvidenceIds);
@@ -4171,25 +4145,6 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
   };
 }
 
-function composeDeliverable(
-  resolved: TurnValue,
-  deliverable: "link" | "picture" | "video",
-  ageBand: string,
-  surface: Surface,
-  pictureCount = 1,
-): TurnValue {
-  const child = ageBand === "child";
-  const pictureLine = pictureCount > 1 ? "There were a few, here they are." : resolved.media ? "Here's a picture; the page it's from is below." : "I can't show the picture here yet; the page with it is below.";
-  const line = child ? "A grown-up can open that for you; ask them." : surface === "robot" ? deliverable === "link" ? "The link's on your phone." : deliverable === "picture" ? "The page with the picture is on your phone." : "The video link's on your phone." : deliverable === "link" ? "Here's the page, the link's below." : deliverable === "picture" ? pictureLine : "Here's a video, the link's below.";
-  const value: TurnValue = { ...resolved, reply: { text: line }, ...(child ? { sources: [], media: undefined, media_items: [] } : {}) };
-  deliverableLines.add(value);
-  return value;
-}
-
-/** CHAT-16: the deliverable lines composeDeliverable() built, which the
- * composer never rephrases (the brief's "not composed" list). */
-const deliverableLines = new WeakSet<TurnValue>();
-
 /** CHAT-16 (K2): the composer's input for one resolution on a model
  * turn: the outcomes that resolution produced, the turn's own messages,
  * CONS-01's constraints, the band, the surface and the budget counter. */
@@ -4213,63 +4168,6 @@ function composerInputFor(prepared: Extract<PreparedTurn, { kind: "model" }>, co
  * forced lookup), onto the prepared turn's list, once. */
 function ruleFired(prepared: Pick<Extract<PreparedTurn, { kind: "model" }>, "rules">, rule: RuleName): void {
   if (!prepared.rules.includes(rule)) prepared.rules.push(rule);
-}
-
-/** Finding 60: websearch's category is an engine decision from the
- * deliverable, never a model tool argument. SearXNG's image category is
- * the only category the host currently supports; video keeps K7's plain
- * search behavior until its own host category exists. */
-function deliverableKind(deliverable: TurnIntent["deliverable"]): "link" | "picture" | "video" | undefined {
-  return typeof deliverable === "object" ? deliverable.deliverable : deliverable;
-}
-
-function pictureCountOf(deliverable: TurnIntent["deliverable"]): 1 | 2 | 3 | 4 {
-  return typeof deliverable === "object" ? deliverable.count : 1;
-}
-
-function pictureImageKey(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (!/^https?:$/.test(parsed.protocol)) return null;
-    parsed.username = "";
-    parsed.password = "";
-    parsed.hash = "";
-    return `${parsed.host}${parsed.pathname}`;
-  } catch {
-    return null;
-  }
-}
-
-function pictureContinuationFor(conversationId: string, utterance: string): { count: 1 | 2 | 3 | 4; form?: "poster" | "cover" | "photo"; exclusions: string[] } | null {
-  if (!isPictureFollowup(utterance)) return null;
-  const prior = lastTurnMedia(conversationId);
-  const items = prior.media_items ?? (prior.media ? [prior.media] : []);
-  if (items.length === 0) return null;
-  const priorOutcome = outcomesForConversation(conversationId)
-    .slice()
-    .reverse()
-    .flatMap((row) => row.outcomes)
-    .find((outcome) => outcome.packageId === "websearch" && outcome.status === "succeeded" && typeof outcome.args?.expression === "string");
-  const expression = typeof priorOutcome?.args?.expression === "string" ? priorOutcome.args.expression : "";
-  const form = /(?:movie\s+)?poster/i.test(expression) ? "poster" : /album\s+cover|artwork/i.test(expression) ? "cover" : /\bphoto\b/i.test(expression) ? "photo" : undefined;
-  const count = Math.min(4, Math.max(1, items.length)) as 1 | 2 | 3 | 4;
-  return { count, ...(form ? { form } : {}), exclusions: items.map((item) => pictureImageKey(item.url)).filter((key): key is string => key !== null) };
-}
-
-function pictureRebindFor(conversationId: string, utterance: string): { count: 1 | 2 | 3 | 4; form?: "poster" | "cover" | "photo" } | null {
-  if (!/^\s*(?:no\s*,\s*)?of\s+(?:him|her|them|[\p{L}\p{N}][\p{L}\p{N}' -]{0,80})\s*[?.!]?\s*$/iu.test(utterance)) return null;
-  const prior = lastTurnMedia(conversationId);
-  const items = prior.media_items ?? (prior.media ? [prior.media] : []);
-  if (items.length === 0) return null;
-  const priorOutcome = outcomesForConversation(conversationId)
-    .slice()
-    .reverse()
-    .flatMap((row) => row.outcomes)
-    .find((outcome) => outcome.packageId === "websearch" && outcome.status === "succeeded" && typeof outcome.args?.expression === "string");
-  const expression = typeof priorOutcome?.args?.expression === "string" ? priorOutcome.args.expression : "";
-  const form = /(?:movie\s+)?poster/i.test(expression) ? "poster" : /album\s+cover|artwork/i.test(expression) ? "cover" : /\bphoto\b/i.test(expression) ? "photo" : undefined;
-  const count = Math.min(4, Math.max(1, items.length)) as 1 | 2 | 3 | 4;
-  return { count, ...(form ? { form } : {}) };
 }
 
 const IMAGE_RASTER_RE = /\.(?:avif|bmp|gif|jpe?g|png|tiff?|webp)(?:$|[?#])/i;
@@ -4333,8 +4231,7 @@ function mediaItemsFromRows(rows: unknown, count: 1 | 2 | 3 | 4, exclusions: rea
       image.username = "";
       image.password = "";
       image.hash = "";
-      const key = pictureImageKey(image.toString());
-      if (key === null) return [];
+      const key = `${image.host}${image.pathname}`;
       if (seen.has(key)) return [];
       seen.add(key);
       const item = { kind: "image" as const, url: image.toString(), thumbnail: typeof row.thumbnail === "string" ? row.thumbnail : null, source: source.host, source_url: source.toString() };
@@ -4543,7 +4440,7 @@ async function runTurnHoldingLease(
   // floor and guards as a model draft, the plugin's own source, id and
   // sources kept on the value. The deliverable line is never composed.
   const composeBlocking = async (resolved: TurnValue, resolutionOutcomes: readonly ToolExecutionOutcome[], direct = false): Promise<TurnValue> => {
-    if (resolved.source !== "plugin" || deliverableLines.has(resolved)) return resolved;
+    if (resolved.source !== "plugin") return resolved;
     const machine = modelPrepared.machine!;
     const plan = planComposition(composerInputFor(modelPrepared, conversation.id, resolutionOutcomes, direct));
     const sources = plan.sources.length > 0 ? plan.sources : resolved.sources;
@@ -5339,7 +5236,7 @@ async function runTurnStreamHoldingLease(
   // finalize() builds the value from the resolution and the text.
   // The deliverable line is never composed.
   async function* composeOrResolve(resolved: TurnValue, resolutionOutcomes: readonly ToolExecutionOutcome[], direct = false): AsyncGenerator<string, { resolved: TurnValue } | undefined, void> {
-    if (resolved.source !== "plugin" || deliverableLines.has(resolved)) return { resolved: finalizeReply(actor, resolved, modelTurn.surface, resolvedTrace) };
+    if (resolved.source !== "plugin") return { resolved: finalizeReply(actor, resolved, modelTurn.surface, resolvedTrace) };
     const machine = modelTurn.machine!;
     const plan = planComposition(composerInputFor(modelTurn, conversation.id, resolutionOutcomes, direct));
     const sources = plan.sources.length > 0 ? plan.sources : resolved.sources;
