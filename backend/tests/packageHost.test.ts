@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, type AttemptResult } from "@/lib/packageHost";
+import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
@@ -29,6 +29,7 @@ beforeEach(() => {
   // every test start with a full bucket regardless of run order.
   __resetRateLimiterForTests();
   __resetSearchCacheForTests();
+  __resetSearchRotationForTests();
 });
 
 function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
@@ -1073,7 +1074,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     }
   });
 
-  test("an adult's request never gets an engines filter, even with /config configured", async () => {
+  test("an adult's request rotates through the enabled web engines from /config", async () => {
     const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
     let seenUrls: URL[] = [];
     const server = Bun.serve({
@@ -1091,9 +1092,9 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
       await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
-      expect(seenUrls.some((u) => u.pathname === "/config")).toBe(false);
+      expect(seenUrls.some((u) => u.pathname === "/config")).toBe(true);
       const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
-      expect(searchUrl.searchParams.has("engines")).toBe(false);
+      expect(searchUrl.searchParams.get("engines")).toBe("brave");
     } finally {
       server.stop(true);
     }
@@ -1915,7 +1916,7 @@ describe("searxng search cache", () => {
   test("caches results, separates safe-search levels, skips empty results, dedupes in-flight calls, and expires after five minutes", async () => {
     let searchRequests = 0;
     let release: (() => void) | undefined;
-    const server = Bun.serve({ port: 0, fetch: async (request) => { if (new URL(request.url).pathname === "/search") { searchRequests++; if (searchRequests === 1) await new Promise<void>((resolve) => { release = resolve; }); } return Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "planet" }] }); } });
+    const server = Bun.serve({ port: 0, fetch: async (request) => { const pathname = new URL(request.url).pathname; if (pathname === "/config") return Response.json({ engines: [] }); if (pathname === "/search") { searchRequests++; if (searchRequests === 1) await new Promise<void>((resolve) => { release = resolve; }); } return Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "planet" }] }); } });
     const previousNow = Date.now;
     let now = 1_000_000;
     Date.now = () => now;
@@ -1923,7 +1924,7 @@ describe("searxng search cache", () => {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       const first = searxngSearch({ query: "earth" }, { safeSearchLevel: "off" });
       const second = searxngSearch({ query: "earth" }, { safeSearchLevel: "off" });
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 20));
       expect(searchRequests).toBe(1);
       release!();
       await Promise.all([first, second]);
@@ -1942,12 +1943,56 @@ describe("searxng search cache", () => {
 
   test("does not cache a zero-row result", async () => {
     let requests = 0;
-    const server = Bun.serve({ port: 0, fetch: () => { requests++; return Response.json({ results: [] }); } });
+    const server = Bun.serve({ port: 0, fetch: (request) => { const pathname = new URL(request.url).pathname; if (pathname === "/config") return Response.json({ engines: [] }); if (pathname === "/search") requests++; return Response.json({ results: [] }); } });
     try {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await searxngSearch({ query: "nothing" });
       await searxngSearch({ query: "nothing" });
       expect(requests).toBe(2);
+    } finally { server.stop(true); }
+  });
+});
+
+describe("searxng search rotation", () => {
+  test("rotates two enabled web engines and keeps wikipedia when configured", async () => {
+    const seen: string[] = [];
+    const config = { engines: [
+      { name: "alpha", enabled: true, safesearch: true, categories: ["general", "web"] },
+      { name: "bravo", enabled: true, safesearch: true, categories: ["general", "web"] },
+      { name: "charlie", enabled: true, safesearch: true, categories: ["general", "web"] },
+      { name: "wikipedia", enabled: true, safesearch: true, categories: ["general", "web"] },
+    ] };
+    const server = Bun.serve({ port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/config") return Response.json(config);
+      seen.push(url.searchParams.get("engines") ?? "");
+      return Response.json({ results: [1, 2, 3].map((n) => ({ title: `Result ${n}`, url: `https://example.com/${seen.length}-${n}`, content: "content" })) });
+    } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await searxngSearch({ query: "one" });
+      await searxngSearch({ query: "two" });
+      expect(seen).toEqual(["alpha,bravo,wikipedia", "bravo,charlie,wikipedia"]);
+    } finally { server.stop(true); }
+  });
+
+  test("a child rotates only through safe-search engines", async () => {
+    const seen: string[] = [];
+    const config = { engines: [
+      { name: "adult", enabled: true, safesearch: false, categories: ["general", "web"] },
+      { name: "safe", enabled: true, safesearch: true, categories: ["general", "web"] },
+      { name: "safe-two", enabled: true, safesearch: true, categories: ["general", "web"] },
+    ] };
+    const server = Bun.serve({ port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/config") return Response.json(config);
+      seen.push(url.searchParams.get("engines") ?? "");
+      return Response.json({ results: [{ title: "Result", url: "https://example.com/result", content: "content" }] });
+    } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await searxngSearch({ query: "child" }, { safeSearchLevel: "strict" });
+      expect(seen[0]).toBe("safe,safe-two");
     } finally { server.stop(true); }
   });
 });

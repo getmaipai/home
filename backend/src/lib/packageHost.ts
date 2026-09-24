@@ -768,6 +768,9 @@ interface SearxngEngine {
 // (packageCache.ts's header) for exactly this reason.
 const SEARXNG_ENGINES_CACHE_TTL_MS = 60 * 60 * 1000;
 let searxngEnginesCache: { baseUrl: string; fetchedAt: number; engines: SearxngEngine[] } | null = null;
+let searxngRotationIndex = 0;
+const searxngBenchedUntil = new Map<string, number>();
+const SEARXNG_ENGINE_BENCH_MS = 30 * 60 * 1000;
 
 /** Test-only reset, the same shape every other module-level cache here
  * gets (__resetRateLimiterForTests, __resetPackageCacheForTests): a
@@ -775,6 +778,11 @@ let searxngEnginesCache: { baseUrl: string; fetchedAt: number; engines: SearxngE
  * from a prior test's own fake instance must never leak into the next. */
 export function __resetSearxngEnginesCacheForTests(): void {
   searxngEnginesCache = null;
+}
+
+export function __resetSearchRotationForTests(): void {
+  searxngRotationIndex = 0;
+  searxngBenchedUntil.clear();
 }
 
 /** The engine names this instance's own `/config` marks `enabled` and
@@ -810,6 +818,31 @@ async function safesearchEnginesFor(baseUrl: string, category: "general" | "imag
   return searxngEnginesCache.engines.filter((e) => e.enabled && e.safesearch && e.categories.includes(category)).map((e) => e.name);
 }
 
+async function webRotationPool(baseUrl: string, safeLevel: SafeSearchLevel): Promise<string[] | null> {
+  const now = Date.now();
+  if (!searxngEnginesCache || searxngEnginesCache.baseUrl !== baseUrl || now - searxngEnginesCache.fetchedAt > SEARXNG_ENGINES_CACHE_TTL_MS) {
+    await safesearchEnginesFor(baseUrl, "general");
+  }
+  const engines = searxngEnginesCache?.baseUrl === baseUrl ? searxngEnginesCache.engines : null;
+  if (!engines) return null;
+  const safe = safeLevel === "strict" || safeLevel === "moderate" ? new Set(engines.filter((e) => e.enabled && e.safesearch && e.categories.includes("web")).map((e) => e.name)) : null;
+  const pool = engines.filter((e) => e.enabled && e.categories.includes("web") && (!safe || safe.has(e.name))).map((e) => e.name).sort();
+  return pool.length > 0 ? pool : null;
+}
+
+function availableRotationPool(pool: string[]): string[] {
+  const now = Date.now();
+  return pool.filter((name) => (searxngBenchedUntil.get(name) ?? 0) <= now);
+}
+
+function rotationEngines(pool: string[], count = 2): string[] {
+  const available = availableRotationPool(pool).filter((name) => name !== "wikipedia");
+  if (available.length === 0) return [];
+  if (available.length <= count) return available;
+  const start = searxngRotationIndex++ % available.length;
+  return Array.from({ length: count }, (_, i) => available[(start + i) % available.length]!);
+}
+
 /** `host.integration.call("searxng", "search", { query })`'s real
  * implementation - SearXNG's own `/search?q=...&format=json` (its
  * documented JSON output format, opt-in in a household's own
@@ -840,14 +873,26 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   const isImages = input?.category === "images";
   const safeLevel = opts.safeSearchLevel ?? "off";
   const safeEngines = safeLevel === "strict" || safeLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
-  const key = [baseUrl.replace(/\/+$/, ""), query, input?.read_page === true ? "page" : "", isImages ? "images" : "general", safeLevel, (safeEngines ?? []).join(",")].join("\u001f");
+  const rotationPool = !isImages && input?.category !== "videos" ? await webRotationPool(baseUrl, safeLevel) : null;
+  const rotated = rotationPool ? rotationEngines(rotationPool) : null;
+  const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
+  const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;
+  const key = [baseUrl.replace(/\/+$/, ""), query, input?.read_page === true ? "page" : "", isImages ? "images" : "general", safeLevel, (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
   const now = Date.now();
   const cached = searchCache.get(key);
   if (cached && now - cached.storedAt < SEARCH_CACHE_TTL_MS) return cached.result;
   if (cached) searchCache.delete(key);
   const running = searchInFlight.get(key);
   if (running) return running;
-  const promise = searxngSearchUncached(args, { ...opts, safeEngines }).then((result) => {
+  const promise = (async () => {
+    const result = await searxngSearchUncached(args, { ...opts, safeEngines: requestEngines ?? safeEngines });
+    if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3) return result;
+    const next = rotationEngines(rotationPool);
+    if (next.length === 0 || next.join(",") === requestEngines.filter((name) => name !== "wikipedia").join(",")) return result;
+    const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...next, ...wikipedia] });
+    const rows = [...result.rows, ...second.rows].filter((row, index, all) => all.findIndex((candidate) => candidate.url === row.url) === index);
+    return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };
+  })().then((result) => {
     if (result.rows.length > 0) {
       if (searchCache.size >= SEARCH_CACHE_MAX_ENTRIES) searchCache.delete(searchCache.keys().next().value!);
       searchCache.set(key, { result, storedAt: Date.now() });
@@ -977,9 +1022,11 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
       // round answered from its own knowledge instead, wrongly and
       // confidently. Thrown here, the one choke point every websearch
       // call already passes through, rather than checked per caller.
-      const unresponsiveEngines = Array.isArray(value.unresponsive_engines)
-        ? value.unresponsive_engines.some((raw: unknown) => Array.isArray(raw) && typeof raw[0] === "string")
-        : false;
+      const unresponsiveNames = Array.isArray(value.unresponsive_engines)
+        ? value.unresponsive_engines.flatMap((raw: unknown) => Array.isArray(raw) && typeof raw[0] === "string" ? [raw[0]] : [])
+        : [];
+      for (const name of unresponsiveNames) searxngBenchedUntil.set(name, Date.now() + SEARXNG_ENGINE_BENCH_MS);
+      const unresponsiveEngines = unresponsiveNames.length > 0;
       if (text === SEARXNG_NO_RESULTS_TEXT && unresponsiveEngines) {
         // This exact message reaches a household member verbatim only
         // because `turnMachine/nodes/answer.ts`'s `toolOutageLine()`
