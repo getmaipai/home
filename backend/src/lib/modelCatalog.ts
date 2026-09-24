@@ -82,6 +82,17 @@ export const CATALOG: ModelCapabilities[] = [
       // `auto`, never forced into a search - nodes/model.ts's own
       // isWorldQuestion stays `target === "world"` only, so a
       // `computed` target is never forced, just offered.
+      // DOC-TOOL-01 (dev.md "DOC-TOOL-01: the rewritten description
+      // didn't recover the three rows, 2026-09-24"): write_document's
+      // manifest description was rewritten to rule out saving a fact,
+      // answering a question, or searching (per the coordinator's own
+      // ruling that the ambiguous old wording, not "more tools," was the
+      // likely cause of CHAT-RICH-01's regression) and re-measured with
+      // write_document back in this budget - the three previously-0/5
+      // rows stayed at 0/5 (two of them now calling nothing at all,
+      // worse than before), so the offering does not land; the
+      // description's own three rows still held perfectly (5/5, 5/5,
+      // 5/5). Kept out of the budget on that gate.
       tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "timer", "weather", "websearch"],
       always_search: true,
       // GROUND-01 (state record, "The interim rule"): off in every

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Write a Document",
-  "description": "Create or edit a document the model writes for you, shown as a card you can read, edit again, and save.",
+  "description": "Write a document someone asked to have written, not to save a fact, answer a question, or search the web.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

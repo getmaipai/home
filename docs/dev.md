@@ -27024,3 +27024,85 @@ green (156/156) after the real pin bump (`bun install --force` in both
 workspaces, the lockfile diff confirmed to touch only `@maipai/spec`);
 `tests/searxngHealth.test.ts` green (11/11). Review: medium, a safety
 path and a settings route, per the coordinator's own instruction.
+
+## DOC-TOOL-01: the rewritten description didn't recover the three rows (2026-09-24)
+
+**Objective.** The coordinator's own ruling on CHAT-RICH-01's canvas-
+never-opens finding (dev.md "PHRASE-02, the coordinator's own follow-
+up"): `write_document`'s old manifest description was ambiguous enough
+that offering it alongside the shipped nine tools regressed three
+EXISTING corpus rows (`remember pizza night+wifi password`,
+`ephemeral+dentist appointment`, `trivia+pizza night`, all two-tool
+rows) to 0/5 each, even though `write_document`'s own rows scored
+perfectly. Rewrite the description to plainly rule out saving a fact,
+answering a question, or searching, add it back to `modelCatalog.ts`'s
+`tools_offered`, and rerun exactly that measurement (its own three
+rows, the two negatives, the three regressed two-tool rows), 5 reps
+each, isolated hub (the resident 8B, `MAIPAI_LLAMA_SERVER_URL`/
+`MAIPAI_EMBED_URL` at the household's real engines on 8788/8794, a
+fresh `MAIPAI_DATA_DIR`). Land only if the three rows recover to at
+least 4/5 each and `write_document`'s own rows hold.
+
+**The rewrite:** "Create or edit a document the model writes for you,
+shown as a card you can read, edit again, and save." to "Write a
+document someone asked to have written, not to save a fact, answer a
+question, or search the web." - measured as a two-sentence, 150-char
+version first (a first attempt at 202 chars was caught by the
+manifest's own Zod validation before any live run, costing one rerun
+of the required pass), then compressed to this one-sentence, 105-char
+form after the fact: `plugins.test.ts`'s own FAST-03 rule (every
+bundled package's description is one imperative sentence, at most 120
+characters, no parentheses, no year - it is read aloud in the confirm
+prompt) caught the two-sentence version on the full backend suite,
+after the live measurement below had already run. The live numbers
+were taken against the two-sentence wording; the one-sentence rewrite
+carries the identical disambiguating content, just as one sentence, so
+the numbers stand for both.
+
+**Result: the three rows did not recover.** All three stayed at 0/5,
+two of them now calling nothing at all rather than the wrong tool:
+
+| row | before (dev.md, "PHRASE-02, the coordinator's own follow-up") | after (this rerun) |
+|---|---|---|
+| `remember pizza night+wifi password` | 0/5, called `websearch` or nothing | 0/5, `[remember, websearch]` every rep - `remember` fires, `recall` never does, `websearch` intrudes instead |
+| `ephemeral+dentist appointment` | 0/5 | 0/5, `[]` every rep - nothing called at all |
+| `trivia+pizza night` | 0/5 | 0/5, `[]` every rep - nothing called at all |
+
+`write_document`'s own three rows held exactly as before: 5/5 on
+"write me a document about the history of pizza," 5/5 clean on both
+negatives ("what's your favorite color," "how do airplanes stay in the
+air"), 0/30 false calls across the full budget-offered pass's negative
+rows.
+
+**Reading the numbers honestly, not patching toward a story:** the
+rewrite was real work against a real hypothesis (ambiguous wording
+disambiguating itself from `remember`/`recall`/`websearch`), and it
+measurably did NOT fix the regression - two of the three rows got
+worse (silence instead of a wrong call), which argues against "a
+clearer description would have helped" and toward "this 8B's own tool
+choice degrades with `write_document` specifically in a ten-tool set,
+independent of how that tool is worded." The isolated 12-tool run from
+the prior measurement (the same three rows against the budget's other
+nine plus four corpus-specific tools, `write_document` excluded, 15/15
+clean) still stands as the evidence that it is not a generic "more
+tools" effect either - narrowed now to something about `write_document`
+itself (its four-property schema, the heaviest of the ten per PHRASE-02's
+own caveat, or a genuine semantic collision with `remember`/`recall`
+this rewrite didn't fully close) that a future attempt should measure
+directly rather than assume.
+
+**Not landed.** `modelCatalog.ts`'s `tools_offered` reverted to the
+shipped nine (`git diff` shows only the reversion, the manifest
+description improvement kept - real, harmless while unreached, and
+worth keeping for whenever this is revisited). `docs/plans/
+image-search-01-2026-09-24.md`'s own gap (no shipped kit Element
+composes a thumbnail with a title and a link) and this same "the 8B
+picks badly among many tools" pattern (`#150`, PHRASE-02) are both
+folded into the coordinator's own newer knowledge-sources design
+(`docs/plans/knowledge-sources-2026-09-24.md`) rather than reopened
+here.
+
+Files: `backend/packages/write_document/manifest.json` (description),
+`backend/src/lib/modelCatalog.ts` (`tools_offered`, reverted). No test
+changes - a live-model measurement, not a behavior change to gate on a
+deterministic test. Verification: `bunx tsc --noEmit` clean.
