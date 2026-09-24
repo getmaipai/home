@@ -254,7 +254,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // chatModelAdapter.test.ts's own scripted NDJSON until then.
       // Insertion order (Map's own iteration order) is step order -
       // there is no separate sequence field on these events.
-      const toolCalls = new Map<string, { packageId: string; state: "running" | "ok" | "error" }>();
+      const toolCalls = new Map<string, { packageId: string; state: "running" | "ok" | "error"; sites?: { host: string; url: string }[] }>();
 
       // Resolves as much of `raw.slice(scanPos)` as currently possible into
       // `visible`, holding back only a still-ambiguous suffix that might
@@ -408,7 +408,13 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // never saw start, a stream resumed mid-call) is ignored
               // rather than inventing a step with no start.
               const existing = toolCalls.get(e.call_id);
-              if (existing) toolCalls.set(e.call_id, { ...existing, state: e.t === "tool_result" && !e.outcome.error_code ? "ok" : "error" });
+              if (existing) {
+                // TOOL-EVENTS-02: `sites` only ever rides a `tool_result`
+                // (spec's own schema has no such field on `tool_error`) -
+                // one `e.t` check, not two, decides both `state` and
+                // whether `sites` applies.
+                toolCalls.set(e.call_id, e.t === "tool_result" ? { ...existing, state: e.outcome.error_code ? "error" : "ok", ...(e.outcome.sites ? { sites: e.outcome.sites } : {}) } : { ...existing, state: "error" });
+              }
             }
             if (activityShown) {
               activityShown = false;

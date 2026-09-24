@@ -10,7 +10,7 @@
 import { runPlugin } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
-import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
+import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 export interface ToolInput {
   proposals: readonly ActionProposal[];
@@ -138,7 +138,18 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     });
     outcomes.push(outcome);
     if (result.ok) {
-      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: result.value.reply?.text } });
+      // TOOL-EVENTS-02: the same sites `outcome.sources` already carries
+      // (sourcesFromRows, turnContext.ts) for the reply's own citation
+      // list - reused here, not recomputed. Sliced to the wire schema's
+      // own hard cap (`TOOL_RESULT_SITES_MAX`, spec's turn-stream-event.
+      // ts - the schema itself refuses a longer array), which is tighter
+      // than `sourcesFromRows`' own cap of 8: a search whose SearXNG
+      // response has 6-8 rows shows fewer chips under the step than the
+      // reply's own Sources card lists below it - a code review
+      // (2026-09-24) caught an earlier version of this comment claiming
+      // the two "can never disagree," which only holds up to five rows.
+      const sites = outcome.sources?.slice(0, TOOL_RESULT_SITES_MAX).map((s) => ({ host: s.site, url: s.url }));
+      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: result.value.reply?.text, ...(sites?.length ? { sites } : {}) } });
     } else {
       toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.userMessage! });
     }

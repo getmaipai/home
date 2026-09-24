@@ -5342,6 +5342,22 @@ export type TurnStreamResult =
        * dropped once the notification fires. */
       tokens: AsyncGenerator<string, StreamOutcome, void>;
       status: StatusChannel;
+      /** STREAM-NEXT-01 (b) left this out of the "stream" kind entirely
+       * (only the "immediate" kind above got it, TOOL-EVENTS-01(b)'s
+       * own original scope, before this route ever returned "stream" for
+       * a live turn) - found live, TOOL-EVENTS-02: a real search on the
+       * streaming path never carried a tool_call/tool_result at all,
+       * only the "immediate" bench/test path did. Optional, like the
+       * "immediate" variant's own field above (`undefined` for every
+       * hand-built test fixture that predates this, and for the old
+       * path's own builder, both unaffected) - the new path's own
+       * `state.toolEvents` (turnMachine/contract.ts) is the one real
+       * producer: a live array reference, not a snapshot, so it already
+       * holds every event the tool node pushed by the time
+       * `streamTurnEvents()` (routes/turn.ts) reads it, right after the
+       * tool round's single synchronous machine transition and strictly
+       * before the phrasing round's first delta. */
+      toolEvents?: ToolStreamEvent[];
       /** Builds the final TurnValue once the caller has drained `tokens`
        * to completion and knows the full reply text - also logs the turn
        * (conversationHistory.ts), the same "log once the real reply is

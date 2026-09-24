@@ -204,6 +204,20 @@ function isTerminalEvent(event: TurnStreamEvent): boolean {
 function shouldDeliver(stored: StoredStreamEvent, resumeFrom: number | null): boolean {
   if (resumeFrom === null) return true;
   if (stored.terminal) return true;
+  // TOOL-EVENTS-02: a tool_call/tool_result/tool_error line carries no
+  // `type` (spec's own `t`-keyed shape) and no `sequence` of its own -
+  // found live, a code review: with `afterSequence` pinned to whatever
+  // `session.sequence` was before any delta/reasoning event ever
+  // advanced it (0, if the tool round finishes before the first token,
+  // always true by construction here), `stored.afterSequence >
+  // resumeFrom` reads `0 > 0` for a client that reconnects having seen
+  // nothing but turn_meta/signal so far (chatModelAdapter.ts's own
+  // `lastAcknowledgedSequence` starts at 0) - the exact case a real
+  // search hits, and the one this route exists to fix. Always
+  // redelivered, like a terminal event above: idempotent on the
+  // consumer (chatModelAdapter.ts's own toolCalls Map just re-sets the
+  // same call's state), so an already-seen resend costs nothing.
+  if (!("type" in stored.event)) return true;
   if (stored.sequence !== null) return stored.sequence > resumeFrom;
   return stored.afterSequence > resumeFrom;
 }
@@ -405,6 +419,24 @@ export async function* streamTurnEvents(
     if (race === "status") { for (const status of result.status.drain()) yield status; pendingStatus = statusWake(); }
     if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: cue }; }
     let current = race === "timeout" || race === "status" ? await firstStep : race;
+    // TOOL-EVENTS-02: `result.toolEvents` (the machine's own live
+    // array, turnMachine/contract.ts) is already fully populated the
+    // moment this first `iterator.next()` settles - the tool round is
+    // one synchronous machine transition strictly before the phrasing
+    // round that produces this first token, never interleaved with it.
+    // Ahead of every delta, the same ordering the "immediate" kind's
+    // own toolEventLines already keep (ahead of "done"). Cast, not a
+    // widened return type: `ndjsonLine()` (the only thing that reads a
+    // yielded value off this generator, this file's `for await`
+    // consumers below and every test's own `TurnStreamEvent[]`
+    // collector) already treats a `t`-keyed line as opaque data to
+    // serialize, never dispatching on `.type` for one - widening the
+    // generator's own declared type would have forced two dozen
+    // pre-existing, unrelated test assertions across turnEngine.test.ts/
+    // safety01.test.ts/turnNext.test.ts to narrow a case their own
+    // fixtures can never actually produce (neither hand-built
+    // `TurnStreamResult` there ever sets `toolEvents`).
+    for (const event of result.toolEvents ?? []) yield event as unknown as TurnStreamEvent;
 
     while (!current.done) {
       for (const status of result.status.drain()) yield status;

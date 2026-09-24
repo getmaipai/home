@@ -524,6 +524,16 @@ export async function runTurnNextStream(actor: PersonRow, surface: Surface, text
     signal: state.signal,
     startedAt,
     cueSuppressed: state.signal.target === "hub" && state.signal.repair !== "none",
+    // TOOL-EVENTS-02: the live array `nodes/tool.ts` pushes onto as the
+    // machine's own tool round runs - a reference, not a snapshot, so
+    // streamTurnEvents() (routes/turn.ts) reads it already populated by
+    // the time it looks, right after that round's one synchronous
+    // transition and strictly before the phrasing round's first delta.
+    // Found live: TOOL-EVENTS-01(b) only ever wired this into the
+    // "immediate" kind above, never "stream" - STREAM-NEXT-01 later made
+    // every live turn return "stream", so a real search on a live chat
+    // never carried a tool_call/tool_result at all until this.
+    toolEvents: state.toolEvents,
     // ENGINEERING gap, named rather than silently worked around: the new
     // path has no equivalent of turnEngine.ts's own bannedPhrasesFor()
     // yet, so the thinking-cue filler (streamTurnEvents()'s own

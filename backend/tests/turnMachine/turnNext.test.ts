@@ -150,6 +150,11 @@ describe("turnNext.ts: the interim rule", () => {
       expect(parsedResult.call_id).toBe(parsedCall.call_id);
       expect(parsedResult.package_id).toBe("websearch");
       expect(parsedResult.outcome.error_code).toBeUndefined();
+      // TOOL-EVENTS-02: the same sites `result.value.sources` carries
+      // (the reply's own citation list) ride along on the tool_result
+      // event too, so a client can show them as chips under the step.
+      expect(parsedResult.outcome.sites?.length).toBeGreaterThan(0);
+      expect(parsedResult.outcome.sites).toEqual(result.value.sources!.map((s) => ({ host: s.site, url: s.url })));
     } finally {
       searxng.stop();
     }
@@ -2011,6 +2016,41 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
           const value = result.finalize(delivered.join(""), outcome);
           expect(searxng.queries.length).toBeGreaterThan(0);
           expect(value.reply.text.length).toBeGreaterThan(0);
+        },
+      );
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  // TOOL-EVENTS-02: found live, verifying the tool timeline's new site
+  // chips against a real browser chat - `runTurnNextStream()`'s own
+  // "stream" result carried `toolEvents` (this file's own scripted
+  // tests above all read it), but `routes/turn.ts`'s `streamTurnEvents()`
+  // only ever turned `TurnStreamResult`'s "immediate" kind's own
+  // `toolEvents` into wire lines; STREAM-NEXT-01 made every live turn
+  // return "stream" instead, so a real search on a real streamed chat
+  // never produced a tool_call/tool_result NDJSON line at all, only the
+  // "immediate" bench/test path did (a client's tool timeline stayed
+  // permanently empty on the one path a household actually uses). This
+  // drives streamTurnEvents() itself, the same function routes/turn.ts's
+  // `/stream` route calls, not just runTurnNextStream()'s own result.
+  test("a search on the streaming path carries tool_call/tool_result NDJSON lines, not just the immediate path", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      await withStub(
+        {
+          calls: (request) => (request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }]),
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president answers your question." : "searching"),
+        },
+        async () => {
+          const result = await runTurnNextStream(people.owner, "chat", "who is the president of chile");
+          if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+          const events: unknown[] = [];
+          for await (const event of streamTurnEvents(result, people.owner.id)) events.push(event);
+          const toolEvents = events.filter((e): e is { t: string } => typeof e === "object" && e !== null && "t" in e);
+          expect(toolEvents.map((e) => e.t)).toEqual(["tool_call", "tool_result"]);
         },
       );
     } finally {

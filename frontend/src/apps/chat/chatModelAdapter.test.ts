@@ -764,6 +764,34 @@ describe("createChatModelAdapter tool timeline (TOOL-EVENTS-01, frontend half)",
     }
   });
 
+  test("a tool_result's sites ride along on the tool_timeline part's call (TOOL-EVENTS-02)", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: { query: "mariners score" }, call_id: "call-1" },
+        { t: "tool_result", call_id: "call-1", package_id: "websearch", outcome: { text: "4-2", sites: [{ host: "mlb.com", url: "https://www.mlb.com/mariners" }] } },
+        { type: "delta", text: "The Mariners won 4-2." },
+        { type: "done", value: { turn_id: "turn-tools999", reply: { text: "The Mariners won 4-2." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("who won the mariners game")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        {
+          type: "tool-call",
+          toolCallId: "turn-tools999-tools",
+          toolName: "tool_timeline",
+          args: {},
+          argsText: "",
+          result: [{ callId: "call-1", packageId: "websearch", state: "ok", sites: [{ host: "mlb.com", url: "https://www.mlb.com/mariners" }] }],
+        },
+        { type: "text", text: "The Mariners won 4-2." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
   test("a tool_call with no matching result yet stays in the running state", async () => {
     const env = stubEnvironment(
       ndjsonStream([

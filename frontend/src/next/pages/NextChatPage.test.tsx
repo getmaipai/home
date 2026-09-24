@@ -499,6 +499,76 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     }
   });
 
+  // TOOL-EVENTS-02: a search step's `tool_result.outcome.sites` renders
+  // as chips under that step (host + link), through the shipped
+  // `Source`/`SourceIcon` the message-level Sources card already uses -
+  // same favicon-proxy and privacy-attribute proof as the sources test
+  // above, at the step level instead of the reply's footer.
+  test("a search step's tool_result sites render as chips under that step", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        {
+          t: "tool_call",
+          package_id: "websearch",
+          args: { query: "mariners score" },
+          call_id: "call-1",
+        },
+        {
+          t: "tool_result",
+          call_id: "call-1",
+          package_id: "websearch",
+          outcome: { text: "4-2", sites: [{ host: "mlb.com", url: "https://www.mlb.com/mariners" }] },
+        },
+        { type: "delta", text: "The Mariners won 4-2." },
+        { type: "done", value: { turn_id: "turn-tools456", reply: { text: "The Mariners won 4-2." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "who won the mariners game");
+      await view.findByText("The Mariners won 4-2.");
+      const trigger = view.getByRole("button", { name: /1 tool call/ });
+      // Collapsed by default - a site chip isn't in the DOM yet either.
+      expect(view.queryByText("mlb.com")).toBeNull();
+      fireEvent.click(trigger);
+      const row = (await view.findByText("mlb.com")).closest("a");
+      expect(row).not.toBeNull();
+      expect(row).toHaveAttribute("href", "https://www.mlb.com/mariners");
+      expect(row).toHaveAttribute("referrerpolicy", "no-referrer");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a weather step with no sites renders no chips", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { t: "tool_call", package_id: "weather", args: { location: "Portland" }, call_id: "call-1" },
+        { t: "tool_result", call_id: "call-1", package_id: "weather", outcome: { text: "58°F and overcast" } },
+        { type: "delta", text: "It's 58°F and overcast in Portland." },
+        { type: "done", value: { turn_id: "turn-tools789", reply: { text: "It's 58°F and overcast in Portland." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what's the weather in portland");
+      await view.findByText("It's 58°F and overcast in Portland.");
+      fireEvent.click(view.getByRole("button", { name: /1 tool call/ }));
+      expect(await view.findByText("weather")).toBeVisible();
+      expect(view.queryByRole("link")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   // Slice 5(c), "thinking before the reply" (2026-09-22): unlike the
   // tool timeline above, `status` is a real wire event already (CHAT-16,
   // done 2026-09-15) - this is live-rendering behavior today, not

@@ -376,7 +376,7 @@ function ArtifactTool() {
 // package id today - the seam is here so the chip starts reading a real
 // label automatically the moment a later pin bump's adapter change
 // starts providing one, with no render-side change needed then.
-type TimelineCall = { callId: string; packageId: string; label?: string; state: "running" | "ok" | "error" };
+type TimelineCall = { callId: string; packageId: string; label?: string; state: "running" | "ok" | "error"; sites?: { host: string; url: string }[] };
 const TIMELINE_VERB: Record<TimelineCall["state"], string> = {
   running: "Running",
   ok: "Ran",
@@ -389,7 +389,7 @@ const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>
   const running = result.some((call) => call.state === "running");
   return (
     <ToolTimeline
-      steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.label ?? call.packageId, icon: ToolTimelineIcon }))}
+      steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.label ?? call.packageId, icon: ToolTimelineIcon, sites: call.sites }))}
       visibleSteps={result.length}
       streaming={running}
       open={open}
@@ -400,6 +400,9 @@ const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>
       // today (the kit's own upstream use is a coding-agent timeline) -
       // a named gap, not invented data.
       stats={[]}
+      // SRC-ICON-01's own proxy (never the shipped default) - the same
+      // function `SourcesFooterContent` below already passes to `SourceIcon`.
+      faviconUrl={faviconUrl}
     />
   );
 };

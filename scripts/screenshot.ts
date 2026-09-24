@@ -266,6 +266,32 @@ const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review"
 const settingsReview = process.argv.includes("--settings-review");
 const pictureReview = process.argv.includes("--picture-review");
 let pictureSearchServer: ReturnType<typeof Bun.serve> | undefined;
+let websearchFixture: ReturnType<typeof Bun.serve> | undefined;
+
+// TOOL-EVENTS-02: a self-contained fake SearXNG, never the real one or
+// Wikipedia (getmaipai/.github's liveHubQuiet.ts guard) - the same
+// shape (a bare `/search?q=` SearXNG-style JSON endpoint) `startPicture
+// SearchFixture` above already uses, not backend/scripts/bench/
+// conversationRunner.ts's own `startFakeSearxng()`: importing it pulled
+// its whole `@/lib/...`-aliased dependency graph into `scripts/`'s own
+// isolated tsconfig (this file's own header comment on why scripts/
+// can't resolve workspace packages), which has no matching path alias
+// and fails the "scripts: typecheck" gate stage with dozens of
+// unrelated "Cannot find module '@/...'" errors - found live, running
+// the full gate before landing.
+function startWebSearchFixture(): void {
+  websearchFixture = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch(req) {
+      const url = new URL(req.url);
+      if (url.pathname !== "/search") return new Response("not found", { status: 404 });
+      const q = url.searchParams.get("q") ?? "";
+      const results = /mariners/i.test(q) ? [{ title: "Mariners win 6-3", url: "https://example.com/mariners-game-score", content: "The Seattle Mariners won last night's game 6-3, extending their winning streak to four games." }] : [];
+      return Response.json({ query: q, results });
+    },
+  });
+}
 
 function startPictureSearchFixture(): void {
   pictureSearchServer = Bun.serve({
@@ -2625,6 +2651,92 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   }
 }
 
+/** TOOL-EVENTS-02's own stated acceptance: "a live search on 8787 shows
+ * the step with its site chips while the reply streams, each chip opens
+ * its page, and a weather question shows the weather label with no
+ * chips; captures at 1440 and 390, light and dark, opened and judged."
+ * "8787" here is this script's own isolated backend (never the
+ * household's real one), and "live search" is the fake SearXNG
+ * (`websearchFixture`, main()'s own setup) - a real `runPlugin()` call
+ * through it, only the model itself is scripted. Reuses the same
+ * `nextChatToolsReview` flag as the weather capture above (one real
+ * websearch call is cheap alongside it, not worth a second CLI flag and
+ * a fifth entry in every other review's own exclusion list). */
+async function captureNextChatToolsSitesReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextChatToolsSitesReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+  // nodes/model.ts's own interim rule only forces a search
+  // (`state.budget.always_search`) for the one catalog entry that flag
+  // is set on (modelCatalog.ts, "qwen3-8b-instruct-q4-k-m") - the
+  // household's default model here has no such budget, so a plain
+  // world question never reaches websearch at all without this (found
+  // live: the reply came back right, from `scriptedChatReply` alone,
+  // with no tool call underneath it). The same model id turnNext.test.ts's
+  // own "a world question runs the search tool" test selects for the
+  // identical reason.
+  const setModel = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "chat.model_id", value: "qwen3-8b-instruct-q4-k-m" }),
+  });
+  if (!setModel.ok) throw new Error(`captureNextChatToolsSitesReview: seeding chat.model_id failed: ${setModel.status}`);
+  const setPipeline = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "turn.pipeline.next", value: true }),
+  });
+  if (!setPipeline.ok) throw new Error(`captureNextChatToolsSitesReview: seeding turn.pipeline.next failed: ${setPipeline.status}`);
+
+  // Two combos, not the full cross product (the dominant pattern this
+  // file already uses for "both sizes, both themes" - capturePeopleAnd
+  // Things and most other multi-viewport reviews here do the same):
+  // found live, TOOL-EVENTS-02, four real websearch calls in a row
+  // exhausted packageHost.ts's own SEARXNG_RATE_LIMIT bucket (capacity
+  // 10, refillPerSecond 0.5 - shared, process-lifetime state, no test-
+  // only reset hook reachable from a live HTTP run), the fourth call
+  // failing with "Web search is rate-limited" and no reply ever
+  // rendering. Two calls, spaced by a full build-and-seed cycle each,
+  // never come close.
+  for (const [viewport, theme] of [
+    [VIEWPORTS.find((v) => v.slug === "phone")!, "dark" as const],
+    [VIEWPORTS.find((v) => v.slug === "desktop")!, "light" as const],
+  ] as const) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).fill("Who won the mariners game?");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      await page.getByText("The Mariners won the game 4 to 2.").waitFor({ timeout: 15000 });
+      // Collapsed by default (ToolTimeline's own `open` state) - the
+      // site chip isn't in the DOM yet, the same assertion this item's
+      // own NextChatPage.test.tsx makes.
+      await page.getByRole("button", { name: /1 tool call/ }).click();
+      // The fixture's own "mariners" row (startWebSearchFixture, above)
+      // is `https://example.com/...` - `site` is its hostname, stripped
+      // of `www.` (turnContext.ts's sourcesFromRows), so the chip's own
+      // visible text is "example.com", never a fixture-only slug.
+      await page.getByRole("link", { name: "example.com" }).waitFor({ timeout: 15000 });
+      await settleAnimations(page);
+      const path = join(outDir, `next-chat-tools-sites-${viewport.width}-${theme}.png`);
+      await page.screenshot({ path });
+      console.log(`Wrote ${path}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 /** CHAT-HEADER-03's own stated acceptance: "a 60-character title reads
  * whole at 1440 and truncates with an ellipsis at 390, captured light
  * and dark." A real conversation, seeded the same way
@@ -3583,24 +3695,44 @@ async function main() {
     // these args into the real artifact record, so nothing about the
     // card or the canvas panel is scripted past this one model call.
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
-    if (!text.includes("pizza night")) return undefined;
-    return [{
-      id: "call-write-document",
-      type: "function",
-      function: {
-        name: "write_document",
-        arguments: JSON.stringify({
-          title: "Pizza Night",
-          kind: "markdown",
-          body: "Every Friday night, the whole family makes pizza together. Everyone picks their own toppings, and the little ones help roll out the dough.",
-        }),
-      },
-    }];
+    if (text.includes("pizza night")) {
+      return [{
+        id: "call-write-document",
+        type: "function",
+        function: {
+          name: "write_document",
+          arguments: JSON.stringify({
+            title: "Pizza Night",
+            kind: "markdown",
+            body: "Every Friday night, the whole family makes pizza together. Everyone picks their own toppings, and the little ones help roll out the dough.",
+          }),
+        },
+      }];
+    }
+    // TOOL-EVENTS-02's own capture (captureNextChatToolsSitesReview):
+    // "mariners game" is unique to that one prompt, forced to a real
+    // websearch call the same way the interim rule's own scripted tests
+    // do (turnNext.test.ts's "a world question runs the search tool",
+    // its own `withStub()` helper) - gated on `request.tools` actually
+    // being offered THIS round (a query-writer or phrasing round offers
+    // none), not just on no `tool` message yet: the first version here
+    // fired on every early round with no tools, not only the one meant
+    // to call websearch, and turnEngine never recovered a final answer.
+    const hasToolMessage = request.messages.some((message) => message.role === "tool");
+    if (request.tools?.length && !hasToolMessage && text.includes("mariners game")) {
+      return [{
+        id: "call-websearch-1",
+        type: "function",
+        function: { name: "websearch", arguments: JSON.stringify({ expression: "mariners game score" }) },
+      }];
+    }
+    return undefined;
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
     if (text.includes("book")) return "What kind of story would you enjoy: a mystery, an adventure, or something funny?";
     if (text.includes("weather like")) return "It's a clear, mild day - around 62°F with a light breeze.";
+    if (text.includes("mariners game")) return "The Mariners won the game 4 to 2.";
     // captureNextChatReview's own fixed question: a `<think>` block so
     // the stub exercises the real REASONING-01 wire split
     // (routes/turn.ts's streamTurnEvents(), lib/wellFormed.ts's
@@ -3746,6 +3878,15 @@ async function main() {
       });
       if (!searchSetting.ok) throw new Error(`seed picture search fixture failed: ${searchSetting.status}`);
     }
+    if (nextChatToolsReview) {
+      startWebSearchFixture();
+      const searchSetting = await fetch(`${BASE_URL}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+        body: JSON.stringify({ scope: "household", key: "search.searxng_url", value: `http://127.0.0.1:${websearchFixture!.port}` }),
+      });
+      if (!searchSetting.ok) throw new Error(`seed websearch fixture failed: ${searchSetting.status}`);
+    }
 
     const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
@@ -3810,6 +3951,7 @@ async function main() {
     }
 
     if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
+      await captureNextChatToolsSitesReview(browser, sessionValue);
       await captureNextChatToolsReview(browser, sessionValue);
     }
 
@@ -4064,6 +4206,7 @@ async function main() {
     backend.kill();
     chatModel.stop();
     pictureSearchServer?.stop(true);
+    websearchFixture?.stop(true);
     repairSeedListener.stop(true);
     await backend.exited;
     rmSync(DATA_DIR, { recursive: true, force: true });
