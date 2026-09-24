@@ -29,6 +29,41 @@ import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } fro
 import { planLine } from "@/lib/register";
 import { contextToMessages } from "../messages";
 import type { Node, TurnState, NodeOutcome } from "../contract";
+import type { StreamGate } from "./outputGate";
+
+/** STREAM-PARTIAL-01: `!attempt.ok` covers two different failures this
+ * function can't tell apart by its own outcome code alone - a pre-stream
+ * failure (llm.ts's `started.ok` check, nothing ever pushed to `gate`)
+ * and GENFAIL-01's own mid-stream throw (runOneGeneration's own catch,
+ * reached only after its loop already pushed real deltas to `gate` as
+ * they arrived). The gate itself is what tells them apart: `reset()`
+ * (both attempt sites used unconditionally before this) discards
+ * whatever it already released, which is correct for the first case
+ * (nothing to discard) and wrong for the second - the household already
+ * heard those sentences before the engine died or the client cancelled,
+ * so erasing them from the gate left `answer`'s own fixed model_failed
+ * line (COMPOSE_FAILURE_LINE) as the logged reply while the wire had
+ * already carried something else entirely. `finish()` (never reset())
+ * once >=1 sentence is already delivered: it repairs whatever tail was
+ * still pending (the same dangling-markup repair a clean ending gets)
+ * and marks the gate done, so output_gate's own `streamed.done` branch
+ * (outputGate.ts, "logged equals streamed by construction") picks up
+ * the real delivered text instead of `model_failed`'s fixed line -
+ * mirroring turnEngine.ts's own runTurnStream()'s finalize(), whose
+ * "cut with real partial content already streamed stays source: model"
+ * branch (turnEngine.ts, the comment beside `refusedWithNothingDelivered`)
+ * never resets a stream's already-released text for ANY ending, crash
+ * or cancel alike - only an output-safety refusal with nothing
+ * delivered yet gets the canned line there, the identical zero-delivered
+ * case this function's own `reset()` branch still covers. The
+ * generation's own error already reaches the trace unconditionally
+ * (runOneGeneration's own catch, above, pushes it onto
+ * state.generations before returning `{ ok: false }` at all) - settling
+ * the gate one way or the other never touches that. */
+function settleFailedGate(gate: StreamGate | undefined): void {
+  if (gate && gate.result().text.length > 0) gate.finish();
+  else gate?.reset();
+}
 
 export const ANSWER_FROM_CONTEXT_TOOL_ID = "answer_from_this_conversation";
 
@@ -620,7 +655,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // never the empty string this used to deliver silently through
   // `answer` as if the model had genuinely said nothing.
   if (!attempt.ok) {
-    gate?.reset();
+    settleFailedGate(gate);
     return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
   }
 
@@ -659,7 +694,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     const retryMaxTokens = isPhrasingRound ? visibleReplyMaxTokens(state.plan.max_words, false) : replyMaxTokensFor(state, false);
     attempt = await runOneGeneration(state, messages, tools, tool_choice, false, retryMaxTokens, "model_retry_no_thinking", signal);
     if (!attempt.ok) {
-      gate?.reset();
+      settleFailedGate(gate);
       return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
     }
     if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) attempt = { ...attempt, toolCalls: undefined };

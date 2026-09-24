@@ -15,6 +15,9 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { StreamSafetyRefusal, type StreamOutcome } from "@/lib/turnEngine";
+import * as llm from "@/lib/llm";
+import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
+import type { TurnStreamEvent } from "@/wire";
 import { getPendingAsk } from "@/lib/conversationHistory";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
@@ -1962,5 +1965,156 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toBe("Hello! How can I help?");
+  });
+
+  // STREAM-PARTIAL-01's own review noted this gap: outputGate.test.ts's
+  // own "a reply ending in dangling markup is released repaired" proves
+  // finish()'s own repairTail() call at the StreamGate unit alone - never
+  // through the real pipeline, where the chunker (nextSentenceBoundary)
+  // is what actually decides a trailing stray quote never crosses a
+  // sentence boundary and so is only ever seen by finish() at all. Same
+  // fixture text as that unit test, driven for real this time.
+  test("a reply ending in dangling markup is repaired through the full pipeline, not only at the StreamGate unit", async () => {
+    await withStub({ reply: () => 'The weather is nice"' }, async () => {
+      const result = await runTurnNextStream(people.owner, "chat", "tell me something");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, outcome, threw } = await drain(result.tokens);
+      expect(threw).toBeUndefined();
+      const value = result.finalize(delivered.join(""), outcome);
+      expect(value.reply.text).not.toContain('"');
+      expect(value.reply.text.endsWith(".")).toBe(true);
+      expect(value.reply.text).toBe(delivered.join(""));
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get();
+      expect(row?.replyText).toBe(value.reply.text);
+    });
+  });
+
+  // STREAM-PARTIAL-01: an independent review of STREAM-NEXT-01 (2026-09-24)
+  // found model.ts's own `!attempt.ok` branches calling `gate.reset()`
+  // unconditionally, even after runOneGeneration()'s own mid-stream catch
+  // (GENFAIL-01) had already pushed real, released sentences to the gate
+  // - the household had already heard them (`release`, above, is wired
+  // straight to `queue.emit`), but `reset()` erased them from the gate's
+  // own record before `answer`'s fixed `model_failed` line replaced them
+  // as the logged reply, an old-path bug turnEngine.ts's own
+  // runTurnStream() never has: its own finalize() (the "cut with real
+  // partial content already streamed stays source: model" branch) never
+  // discards delivered text on ANY ending, crash or cancel alike - only
+  // an output-safety refusal with nothing delivered yet gets the canned
+  // line there. These two tests drive that same real mid-stream failure
+  // two different ways (a stream that throws outright, an explicit
+  // cancel) through the real pipeline: runTurnNextStream() for real
+  // (never the StreamGate unit alone), its own result consumed through
+  // the actual production wire code (routes/turn.ts's own
+  // streamTurnEvents(), shared by the old and new paths alike - the same
+  // "on signal.aborted, still finalize with whatever accumulated" catch
+  // this file's own DEADLINE-01/GENFAIL-01 tests exercise via
+  // runTurnNext() alone, never driven through the streaming wire before
+  // now). `startCompleteStream()` itself is mocked (bun:test's own
+  // spyOn, the identical "monkey-patch the one real side effect" shape
+  // this file's own FORCED-CALL-01 spyOnAbort() already uses) - never the
+  // network layer underneath it: tests/turnEngine.test.ts's own
+  // streamTurnEvents() suite already documents why a real fixture engine
+  // can't reproduce this ("Bun.serve's own ReadableStream masks a
+  // mid-stream server-side error as a clean close from the client's
+  // side"), confirmed live here too (a hand-built Bun.serve engine
+  // calling `controller.error()` read back as a clean, error-free stream
+  // end, never a throw).
+  describe("STREAM-PARTIAL-01: a mid-stream failure after real content was already released", () => {
+    const FIRST_SENTENCE = "It's a beautiful day today.";
+
+    /** Yields FIRST_SENTENCE word by word (the real per-word shape
+     * runOneGeneration()'s own `gate.push()` chunks against
+     * nextSentenceBoundary), then fails - immediately (`mode: "throw"`,
+     * GENFAIL-01's own mid-stream catch) or only once `signal` itself
+     * aborts (`mode: "cancel"`, the identical `chat model unavailable:
+     * ...` wrapping llm.ts's own startCompleteStream() gives a genuinely
+     * aborted fetch, client.ts's own catch). Either way this is exactly
+     * the `AsyncGenerator<string, ToolCall[] | undefined, void>` shape
+     * startCompleteStream() itself returns - the mock stands in for the
+     * LLM client boundary alone; every node above it (model.ts's own
+     * gate wiring, the machine, turnNext.ts, streamTurnEvents()) runs
+     * unmodified and for real. */
+    function mockFailingStream(mode: "throw" | "cancel"): ReturnType<typeof spyOn> {
+      return spyOn(llm, "startCompleteStream").mockImplementation(async (_role, _messages, _opts, signal) => {
+        async function* tokens(): AsyncGenerator<string, undefined, void> {
+          for (const word of FIRST_SENTENCE.split(" ")) yield `${word} `;
+          if (mode === "throw") throw new Error("chat model unavailable: stub engine crashed mid-stream");
+          await new Promise<void>((_resolve, reject) => {
+            const fail = () => reject(new Error("chat model unavailable: The operation was aborted."));
+            if (signal?.aborted) fail();
+            else signal?.addEventListener("abort", fail, { once: true });
+          });
+        }
+        return { ok: true, tokens: tokens(), stats: { usage: null, timings: null, stopReason: null } };
+      });
+    }
+
+    test("a scripted stream that throws after one released sentence keeps the delivered text as the logged reply", async () => {
+      const spy = mockFailingStream("throw");
+      try {
+        const result = await runTurnNextStream(people.owner, "chat", "tell me something");
+        if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+        const events: TurnStreamEvent[] = [];
+        for await (const event of streamTurnEvents(result, people.owner.id)) events.push(event);
+        const delivered = events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
+        expect(delivered.trim()).toBe(FIRST_SENTENCE);
+        // Unlike the old path's own equivalent crash (turnEngine.test.ts:
+        // "a failed generation never also claims success"), a crash here
+        // finishes the state machine normally - `answer`'s own
+        // `model_failed` case is a routed, non-throwing outcome
+        // (machine.ts's own "model" state routes it straight to `answer`
+        // whatever `outcome.ok` says), and output_gate's own
+        // `streamed.done` branch (outputGate.ts) picks up the gate's real
+        // delivered text over the fixed line once settleFailedGate()
+        // finish()es it instead of resetting it. The household gets its
+        // real partial reply as an ordinary "done", never an "error" -
+        // strictly better than the old path's own lost-signal shape, and
+        // still exactly "the turn's reply is exactly the delivered text"
+        // (the ruling's own words) either way.
+        const done = events.find((e) => e.type === "done") as Extract<TurnStreamEvent, { type: "done" }> | undefined;
+        expect(done).toBeDefined();
+        expect(done?.value.reply.text).toBe(delivered);
+        expect(done?.value.source).toBe("model");
+        const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.turnId)).get();
+        expect(row?.replyText).toBe(delivered);
+        expect(row?.source).toBe("model");
+        const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { error?: string | null }[] };
+        expect(stats.generations?.some((g) => g.error)).toBe(true);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    test("an explicit cancel after one released sentence keeps the delivered text as the logged reply", async () => {
+      const spy = mockFailingStream("cancel");
+      const controller = new AbortController();
+      try {
+        const result = await runTurnNextStream(people.owner, "chat", "tell me something", { signal: controller.signal });
+        if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+        const events: TurnStreamEvent[] = [];
+        for await (const event of streamTurnEvents(result, people.owner.id, THINKING_CUE_DELAY_MS, controller.signal)) {
+          events.push(event);
+          if (event.type === "delta" && events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("").trim() === FIRST_SENTENCE) {
+            controller.abort();
+          }
+        }
+        const delivered = events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
+        expect(delivered.trim()).toBe(FIRST_SENTENCE);
+        expect(events.some((e) => e.type === "done")).toBe(false);
+        // The old path's own cancel branch (turn.ts): a distinct
+        // "cancelled"/turn_cancelled code, never the generic failure code
+        // a crash gets.
+        const errorEvent = events.find((e) => e.type === "error") as { type: "error"; error: string; code?: string } | undefined;
+        expect(errorEvent?.code).toBe("turn_cancelled");
+        const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.turnId)).get();
+        expect(row?.replyText).toBe(delivered);
+        expect(row?.source).toBe("model");
+        const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { error?: string | null }[] };
+        expect(stats.generations?.some((g) => g.error)).toBe(true);
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 });

@@ -26591,3 +26591,87 @@ a clean turn notifies nothing. `outputGate.test.ts`'s own `StreamGate`
 fixtures gained a real `PersonRow`/`turnId` (previously bare
 placeholders the constructor didn't yet need).
 
+## STREAM-PARTIAL-01: a mid-stream failure no longer erases what the household already heard (2026-09-24)
+
+The same independent review named in SAFETY-NOTIFY-NEXT-01's own entry
+above found this second gap.
+
+`model.ts`'s own `!attempt.ok` branches (a generation that throws mid-
+stream, GENFAIL-01's own catch, or is cancelled) called `gate.reset()`
+unconditionally before returning the fixed `model_failed` line - even
+after `runOneGeneration()`'s own loop had already pushed real,
+released sentences into the gate. `release` is wired straight to
+`queue.emit()`, so those sentences had already reached the household
+over the wire; `reset()` then erased them from the gate's own record,
+and `answer.ts`'s fixed `COMPOSE_FAILURE_LINE` became the logged reply
+in their place - logged not equal to streamed, the exact invariant
+STREAM-NEXT-01's own header comment promises ("logged equals streamed
+by construction").
+
+**The old path's own equivalent, cited**: `turnEngine.ts`'s
+`runTurnStream()`'s own `finalize()` (its `refusedWithNothingDelivered`
+branch, around line 6417-6478) never resets delivered text on ANY
+ending, crash or cancel alike - `source: refusedWithNothingDelivered ?
+"safety_refuse" : "model"` keeps `source: "model"` and the delivered
+text itself whenever `replyText.trim()` is non-empty, whatever ended
+the generation. Only a safety refusal with NOTHING delivered yet gets
+the canned line. `routes/turn.ts`'s own `streamTurnEvents()` (the
+shared consumer, both paths) confirms this at the wire level too: its
+catch calls `result.finalize(fullText.trim())` with whatever
+accumulated before the throw, on a crash (line ~519) and on a cancel
+(`signal?.aborted`, line ~482) alike; no closing line is ever
+synthesized, only the chunker's own dangling-tail repair
+(`closeDanglingClause`/`repairTail`, gated on real cut markers, never
+a normal ending).
+
+**Fix**: `model.ts`'s new `settleFailedGate()` checks
+`gate.result().text.length > 0` before deciding. Nothing delivered yet
+(the pre-stream case, or a retry that never produced text) keeps
+today's `reset()` and the fixed line. Real content already released
+calls `gate.finish()` instead - idempotent, already designed for
+exactly this ("Called once the generation itself is fully done -
+whether it ends normally or a caller's own failure path never sent
+another delta", `outputGate.ts`'s own doc comment on `finish()`,
+predating this fix). `finish()` repairs the chunker's own dangling
+tail and marks the gate done; `outputGateNode`'s own `streamed.done`
+branch then picks up the gate's real delivered text over
+`answer`'s fixed line, whatever `model_failed`'s own output said - the
+routing wins by construction, not by a second special case. The
+generation's own error already reached the trace unconditionally
+(`state.generations.push({..., error: message})`, GENFAIL-01,
+unchanged) - settling the gate one way or the other never touches
+that.
+
+One consequence, found and kept rather than patched: a crash after
+partial delivery now finishes the STATE MACHINE normally (`answer`'s
+own `model_failed` case is a routed, non-throwing outcome regardless of
+`outcome.ok`), so `runTurnNextStream()`'s own background completion
+succeeds and the wire gets an ordinary `done` event carrying the real
+partial text - never the old path's own `error` event for this case.
+Strictly better (the household's real partial reply survives as a
+coherent turn, not a lost signal), and still exactly what the ruling
+asked for ("the turn's reply is exactly the delivered text"), so kept
+rather than forced to mirror the old path's own event shape. An
+explicit CANCEL (the shared `abortSignal` also gates `waitFor()`'s own
+machine-completion wait, independent of the generation) still surfaces
+as the old path's own `turn_cancelled` error event, via the identical
+`streamTurnEvents()` catch both paths share - confirmed by a real test
+below, not assumed from the crash case's own different shape.
+
+**Tests** (`turnNext.test.ts`, driven through `runTurnNextStream()` and
+the real `streamTurnEvents()` - never the `StreamGate` unit alone, and
+never a hand-built fixture engine: `startCompleteStream()` itself is
+mocked, `spyOn`, the same "monkey-patch the one real side effect" shape
+this file's own `FORCED-CALL-01` test already uses; a real Bun.serve
+fixture engine was tried first and confirmed the SAME masking
+`streamTurnEvents()`'s own header comment already documents - a
+server-side `controller.error()` read back as a clean stream end, not
+a throw): a scripted stream that throws after one released sentence
+(the crash case, ends in an ordinary `done` event, `source: "model"`,
+the delivered text exactly); an explicit cancel after one released
+sentence (ends in a `turn_cancelled` error event, same delivered text
+persisted). Plus the coverage gap this review's own read of the code
+noted: a full-pipeline test (real stub engine, real `runTurnNextStream()`)
+proving the chunker's own dangling-tail repair survives end to end, not
+only at the `outputGate.test.ts` unit level.
+
