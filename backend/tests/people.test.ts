@@ -582,7 +582,13 @@ describe("deleting a person erases what the household held about them", () => {
     const res = await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
     const { erased } = (await res.json()) as { erased: Record<string, number> };
     expect(erased.memories).toBeGreaterThan(0);
-    expect(erased.conversations).toBeGreaterThan(0);
+    // SHELL-SEARCH-03: exactly 1, not just > 0 - the one turn logged
+    // above, read via a pre-delete SELECT COUNT(*) now (a review: the
+    // old `.changes`-from-the-DELETE read was silently inflated by
+    // conversation_turns_fts's own sync trigger, and a > 0 assertion
+    // would have passed identically whether that fix was present,
+    // absent, or later regressed).
+    expect(erased.conversations).toBe(1);
     expect(erased.conversationThreads).toBeGreaterThan(0);
     expect(erased.settings).toBeGreaterThan(0);
     expect(erased.scheduledJobs).toBeGreaterThan(0);

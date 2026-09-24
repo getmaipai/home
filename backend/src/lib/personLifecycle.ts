@@ -320,7 +320,16 @@ export function erasePersonData(personId: string): ErasureCounts {
   const feedback = sqlite
     .query("DELETE FROM reply_feedback WHERE person_id = ? OR turn_id IN (SELECT id FROM conversation_turns WHERE person_id = ?)")
     .run(personId, personId).changes;
-  const conversations = sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(personId).changes;
+  // Counted BEFORE the delete, not from `.changes` (SHELL-SEARCH-03,
+  // found live): conversation_turns_fts's own sync triggers turn one
+  // logical row delete into several more writes against its shadow
+  // tables, and SQLite's own `sqlite3_changes()` counts every one of
+  // them, not just the row this statement deleted from
+  // conversation_turns itself (reproduced in isolation: a single row
+  // delete under an otherwise-identical FTS5 trigger read back
+  // `changes: 7`).
+  const conversations = (sqlite.query("SELECT count(*) AS n FROM conversation_turns WHERE person_id = ?").get(personId) as { n: number }).n;
+  sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(personId);
   // The thread record itself (step 3's `conversations` table), not just
   // its turns: left alone, this table's own person_id column would keep
   // holding rows about a deleted person forever (caught by the schema-

@@ -88,9 +88,19 @@ function verifyContainsPerson(path: string, personId: string): void {
 function copyPersonScopedRows(table: string, whereClause: string, param: string): number {
   const columns = (sqlite.query(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name);
   const colList = columns.join(", ");
-  return sqlite
-    .query(`INSERT OR IGNORE INTO ${table} (${colList}) SELECT ${colList} FROM restore_src.${table} WHERE ${whereClause}`)
-    .run(param).changes;
+  // A before/after count, not `.run(...).changes` (SHELL-SEARCH-03,
+  // found live): this helper is generic across every table it's called
+  // for, and conversation_turns_fts's own sync triggers turn one
+  // logical row insert into several more writes against its shadow
+  // tables, which SQLite's own `sqlite3_changes()` counts too - the
+  // same shape found in conversationHistory.ts's runRetention() and
+  // personLifecycle.ts's erasure. The difference in a real row count is
+  // immune to that, for this table or any other this helper ever
+  // copies into.
+  const before = (sqlite.query(`SELECT count(*) AS n FROM ${table} WHERE ${whereClause}`).get(param) as { n: number }).n;
+  sqlite.query(`INSERT OR IGNORE INTO ${table} (${colList}) SELECT ${colList} FROM restore_src.${table} WHERE ${whereClause}`).run(param);
+  const after = (sqlite.query(`SELECT count(*) AS n FROM ${table} WHERE ${whereClause}`).get(param) as { n: number }).n;
+  return after - before;
 }
 
 /** Restores one living person's memories, conversation history and

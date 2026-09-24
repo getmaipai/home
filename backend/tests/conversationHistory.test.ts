@@ -910,12 +910,47 @@ describe("GET /api/conversations (step 3: now lists conversation THREADS, not tu
   });
 
   // HOME-UI-02e's own search box is the first real, user-reachable
-  // caller of this LIKE query since ConversationsPage was deleted -
-  // `%`/`_` are LIKE wildcards, so a literal search for "50% off"
-  // matching anything shaped "50<any char> off" instead of the actual
-  // substring typed is a correctness bug, not just a theoretical one,
-  // once a person can actually type it into a box.
-  test("a literal percent or underscore in the query matches literally, not as a SQL wildcard", async () => {
+  // caller of this query since ConversationsPage was deleted - the
+  // title half still runs on LIKE (`%`/`_` are its own wildcards, so a
+  // literal search for "50% off" matching anything shaped "50<any
+  // char> off" instead of the actual substring typed would be a
+  // correctness bug, not just a theoretical one, once a person can
+  // actually type it into a box); the turn-body half moved to FTS5
+  // (SHELL-SEARCH-03) and no longer has LIKE wildcards to escape at
+  // all - "%"/"_" are just ordinary punctuation its tokenizer drops,
+  // the same as any other symbol.
+  test("a literal percent in the query still matches only its own conversation (the title half's LIKE escaping)", async () => {
+    const { client, actor } = await owner();
+    // The turn body carries none of the query's own words (a review:
+    // an earlier version of this test only logged a turn whose BODY
+    // happened to contain "50%" and never set a title at all, so it
+    // passed via the FTS5 body match, not the title LIKE path this
+    // test is named for - proving nothing about title escaping).
+    const discount = resolveOrCreateConversation(actor, "chat");
+    if (!discount.ok) throw new Error(discount.error);
+    logTurn(actor, "chat", "completely unrelated content", { reply: { text: "noted" }, source: "model", safety: SAFE, conversation_id: discount.value.id, turn_id: "turn-escape-percent" });
+    const titled = updateConversationTitle(actor, discount.value.id, "50% off sale");
+    expect(titled.ok).toBe(true);
+    const other = createConversation(actor, { surface: "chat" });
+    if (!other.ok) throw new Error(other.error);
+    logTurn(actor, "chat", "another unrelated turn", { reply: { text: "also noted" }, source: "model", safety: SAFE, conversation_id: other.value.id, turn_id: "turn-escape-other" });
+    const otherTitled = updateConversationTitle(actor, other.value.id, "50x sale mark");
+    expect(otherTitled.ok).toBe(true);
+
+    const literalPercent = await client.get(`/api/conversations?q=${encodeURIComponent("50%")}`);
+    const literalRows = (await literalPercent.json()) as Array<{ id: string }>;
+    expect(literalRows.map((row) => row.id)).toEqual([discount.value.id]);
+  });
+
+  // SHELL-SEARCH-03: the body half's real, designed behavior - a
+  // multi-word query matches a turn containing all the words, in
+  // either order (FTS5's own AND-of-terms default over
+  // matchQueryFor()'s tokenized, AND-joined query, never LIKE's
+  // substring-only behavior). A symbol between two words ("50_off")
+  // is just a token boundary to the tokenizer, the same as a space -
+  // it finds the "50% off" turn because both "50" and "off" appear in
+  // it as separate words, not because the underscore did anything.
+  test("a multi-word query finds a turn with all the words", async () => {
     const { client, actor } = await owner();
     const discount = resolveOrCreateConversation(actor, "chat");
     if (!discount.ok) throw new Error(discount.error);
@@ -924,12 +959,32 @@ describe("GET /api/conversations (step 3: now lists conversation THREADS, not tu
     if (!unrelated.ok) throw new Error(unrelated.error);
     logTurn(actor, "chat", "50x off the mark", { reply: { text: "way off" }, source: "model", safety: SAFE, conversation_id: unrelated.value.id, turn_id: "turn-escape-unrelated" });
 
-    const literalPercent = await client.get(`/api/conversations?q=${encodeURIComponent("50%")}`);
-    const literalRows = (await literalPercent.json()) as Array<{ id: string }>;
-    expect(literalRows.map((row) => row.id)).toEqual([discount.value.id]);
+    const bothWords = await client.get(`/api/conversations?q=${encodeURIComponent("50_off")}`);
+    const bothWordsRows = (await bothWords.json()) as Array<{ id: string }>;
+    expect(bothWordsRows.map((row) => row.id)).toEqual([discount.value.id]);
+  });
 
-    const wildcardAttempt = await client.get(`/api/conversations?q=${encodeURIComponent("50_off")}`);
-    expect(await wildcardAttempt.json()).toEqual([]);
+  // matchQueryFor() quotes every term, so a word that happens to spell
+  // an FTS5 keyword is always read as literal text ("and"/"or" never
+  // reach the query string at all - both are stopwords, filtered
+  // before quoting even runs; "not"/"near" are not stopwords and do
+  // reach it, the real case this proves). An unquoted "not sure" would
+  // parse as FTS5's own binary NOT operator with a missing left
+  // operand - a query syntax error, not a wrong result - so this test
+  // fails loudly (an exception) if the quoting were ever removed,
+  // never silently returns the wrong rows.
+  test("a query word that happens to spell an FTS5 keyword is read as literal text, not a query operator", async () => {
+    const { client, actor } = await owner();
+    const matching = createConversation(actor, { surface: "chat" });
+    if (!matching.ok) throw new Error(matching.error);
+    logTurn(actor, "chat", "I am not sure about this plan", { reply: { text: "let's think it over" }, source: "model", safety: SAFE, conversation_id: matching.value.id, turn_id: "turn-keyword-not" });
+    const unrelated = createConversation(actor, { surface: "chat" });
+    if (!unrelated.ok) throw new Error(unrelated.error);
+    logTurn(actor, "chat", "completely unrelated content", { reply: { text: "noted" }, source: "model", safety: SAFE, conversation_id: unrelated.value.id, turn_id: "turn-keyword-unrelated" });
+
+    const res = await client.get(`/api/conversations?q=${encodeURIComponent("not sure")}`);
+    const rows = (await res.json()) as Array<{ id: string }>;
+    expect(rows.map((row) => row.id)).toEqual([matching.value.id]);
   });
 });
 

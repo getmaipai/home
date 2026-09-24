@@ -48,7 +48,7 @@ import { complete, type LlmMessage } from "@/lib/llm";
 import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
-import { recordEpisodes, deleteEpisodesForTurns } from "@/lib/episodes";
+import { recordEpisodes, deleteEpisodesForTurns, contentTerms } from "@/lib/episodes";
 import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import { artifactsByTurn } from "@/lib/artifacts";
 import { nextHlc, compareHlc } from "@/lib/hlc";
@@ -1345,6 +1345,27 @@ function toConversationSummary(row: ConversationRow, turnCount: number, lastTurn
  * real logTurn() and by createConversation()'s own close-the-old-one
  * step), with pinned conversations first and updated_at descending within
  * each pin state. */
+/** SHELL-SEARCH-03: an FTS5 MATCH string from free text, terms AND-
+ * joined - a narrowing search box, every word has to appear (episodes.
+ * ts's own ftsQueryFor() OR-joins the identical tokenizer's terms
+ * instead, a broadening recall candidate generator; the two jobs need
+ * the two operators, so this is its own thin builder over the shared
+ * contentTerms(), never a second tokenizer). The real injection guard
+ * is contentTerms() itself: its `[\p{L}\p{N}']+` character class can
+ * never produce a term containing an FTS5 operator, a quote, or any
+ * other query-syntax character, so a query can never inject one (AND/
+ * OR/NOT/NEAR, a bare leading `-`) - a review confirmed a term can
+ * never contain `"`, so this function's own quote-doubling for a
+ * hypothetical embedded quote is unreachable defense in depth, not
+ * the mechanism actually doing the work. `null` when every word was
+ * filtered (a stopword, a single character) - the caller skips the
+ * body search entirely rather than matching nothing, or everything. */
+export function matchQueryFor(query: string): string | null {
+  const terms = contentTerms(query);
+  if (terms.length === 0) return null;
+  return terms.map((t) => `"${t.replace(/"/g, '""')}"`).join(" AND ");
+}
+
 export function listConversations(actor: PersonRow, personId?: string, query?: string): ConversationSummary[] {
   const target = personId ?? actor.id;
   if (!canAccessPerson(actor, target)) return [];
@@ -1375,18 +1396,27 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
       )
       .all()
       .map((conversation) => conversation.id);
-    const matchingTurnIds = db
-      .select({ conversationId: conversationTurns.conversationId })
-      .from(conversationTurns)
-      .where(
-        and(
-          eq(conversationTurns.personId, target),
-          or(sql`${conversationTurns.userText} LIKE ${pattern} ESCAPE '\\'`, sql`${conversationTurns.replyText} LIKE ${pattern} ESCAPE '\\'`),
-        ),
-      )
-      .all()
-      .map((turn) => turn.conversationId)
-      .filter((id): id is string => id !== null);
+    // SHELL-SEARCH-03: message bodies through conversation_turns_fts
+    // (migrations/0063), never LIKE's own unindexed full-table scan -
+    // the title half above stays LIKE (a title's short enough that an
+    // index buys nothing, and FTS5's own tokenizer would miss a
+    // substring match inside a word that a short title search still
+    // reasonably wants). `matchQueryFor()` AND-joins terms (every word
+    // has to appear, in either order) - the search box narrows as a
+    // household types more of it, the opposite job episodes.ts's own
+    // OR-joined `ftsQueryFor()` (a broadening recall candidate
+    // generator) does, so this is its own thin query builder over the
+    // same shared `contentTerms()` tokenizer, never a second one.
+    const fts = matchQueryFor(normalizedQuery);
+    const matchingTurnIds = fts
+      ? (
+          sqlite
+            .query("SELECT ct.conversation_id AS conversationId FROM conversation_turns_fts f JOIN conversation_turns ct ON ct.rowid = f.rowid WHERE conversation_turns_fts MATCH ? AND ct.person_id = ?")
+            .all(fts, target) as Array<{ conversationId: string | null }>
+        )
+          .map((turn) => turn.conversationId)
+          .filter((id): id is string => id !== null)
+      : [];
     const matchingConversationIds = new Set([...matchingTitleIds, ...matchingTurnIds]);
     rows = rows.filter((row) => matchingConversationIds.has(row.id));
   }
@@ -2270,15 +2300,18 @@ export function runRetention(): { deleted: number } {
   deleteAttachmentsForTurns(expiring.map((t) => t.id));
   deleteEpisodesForTurns(expiring.map((t) => t.id));
 
-  // Raw sqlite for a real affected-row count, not db.delete().run(): the
-  // same escape hatch lib/memory.ts's forget() uses (Drizzle's bun-sqlite
-  // .run() types its result void even though it returns {changes} at
-  // runtime). Two statements, not one with an OR, so each cutoff date
-  // only ever applies to the rows it's meant for.
-  const normal = sqlite
-    .query("DELETE FROM conversation_turns WHERE NOT (safety_flagged = 1 AND minor_speaker = 1) AND created_at < ?")
-    .run(generalCutoff);
-  const flaggedMinor = sqlite
+  // Two statements, not one with an OR, so each cutoff date only ever
+  // applies to the rows it's meant for. `.changes` is NOT the row count
+  // here (SHELL-SEARCH-03, found live): conversation_turns_fts's own
+  // sync triggers turn one logical row delete into several more writes
+  // against its shadow tables, and SQLite's own `sqlite3_changes()`
+  // counts every one of them, not just the row this statement deleted
+  // from conversation_turns itself (reproduced in isolation: a single
+  // row delete under an otherwise-identical FTS5 trigger read back
+  // `changes: 7`). `expiring.length` (read above, before either delete,
+  // the same two cutoffs combined) is the real count instead.
+  sqlite.query("DELETE FROM conversation_turns WHERE NOT (safety_flagged = 1 AND minor_speaker = 1) AND created_at < ?").run(generalCutoff);
+  sqlite
     .query("DELETE FROM conversation_turns WHERE safety_flagged = 1 AND minor_speaker = 1 AND created_at < ?")
     .run(flaggedMinorCutoff);
 
@@ -2309,7 +2342,7 @@ export function runRetention(): { deleted: number } {
     }
   }
 
-  return { deleted: normal.changes + flaggedMinor.changes };
+  return { deleted: expiring.length };
 }
 
 export interface RoutingStats {
