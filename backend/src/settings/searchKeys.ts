@@ -48,4 +48,25 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.integrations",
     honoured_by: ["home"],
   }),
+  // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): a real per-person
+  // level, never left unset - child strict, teen moderate, adult off by
+  // default ("default" resolves against the speaker's own band,
+  // safeSearch.ts's resolveSafeSearchLevel()). The write rule this key
+  // needs (an adult may change their own; only an adult may change a
+  // child's or teen's; a child or teen can never loosen their own below
+  // their band default) lives in settings.ts's assertCanSetSafeSearch(),
+  // not in this declaration - no field here carries a writer rule, the
+  // same as every other settings key in this repo.
+  SettingsKey.parse({
+    key: "search.safe_search",
+    scope: "person",
+    selector: "select",
+    range: { options: ["default", "off", "moderate", "strict"] },
+    default: "default",
+    label: "Safe search level",
+    help: "How strictly web search filters results for you. \"Default\" follows your age: strict for a child, moderate for a teen, off for an adult. An adult can change their own; only an adult can change a child's or teen's, and a child or teen can never loosen their own below their default.",
+    level: "basic",
+    lives_in: "person.search",
+    honoured_by: ["home"],
+  }),
 ];
