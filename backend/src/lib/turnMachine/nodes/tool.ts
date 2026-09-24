@@ -121,7 +121,19 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       via: "tool_call",
       args,
       result: result.ok ? result.value : undefined,
-      errorCode: result.ok ? undefined : String(result.status),
+      // SEARCH-EMPTY-01: this carried only the numeric HTTP-style
+      // status, never the semantic HostError code a real caller (a
+      // replay bench filtering on `search_unavailable`, e.g.) actually
+      // wants. Fixed to `turnEngine.ts`'s own established pattern
+      // (`(result as {code?:string}).code ?? String(result.status)`,
+      // six call sites there) rather than `commands.ts`'s simpler
+      // `result.code` alone (a review, 2026-09-24, caught that the
+      // simpler form silently loses the guarantee of a defined
+      // `errorCode` for the non-HostError failure branches of
+      // `runPlugin()` - arg validation, role checks - that never set
+      // `.code` at all; `commands.ts` carrying the same gap is a
+      // pre-existing, separate finding, not fixed here).
+      errorCode: result.ok ? undefined : (result.code ?? String(result.status)),
       userMessage: result.ok ? undefined : result.error,
     });
     outcomes.push(outcome);

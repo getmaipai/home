@@ -168,6 +168,21 @@ export function startFakeSearxng(): FakeSearxng {
       const q = url.searchParams.get("q") ?? "";
       queries.push(q);
       const slug = q.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "query";
+      // SEARCH-EMPTY-01: distinct from "no results fixture" below - this
+      // one simulates the real 2026-09-24 incident (all three upstream
+      // engines suspended), so `searxngSearch()` throws `search_
+      // unavailable` instead of returning a genuine empty success.
+      if (/unresponsive engines fixture/i.test(q)) {
+        return Response.json({
+          query: q,
+          results: [],
+          unresponsive_engines: [
+            ["brave", "Suspended: too many requests"],
+            ["google cse", "Suspended: too many requests"],
+            ["startpage", "Suspended: CAPTCHA"],
+          ],
+        });
+      }
       // The fixture's own world subject gets real canned facts; every
       // other query gets a result that says nothing, so the rows that
       // check a real fact fail as they did with no search at all.

@@ -1035,6 +1035,109 @@ describe("turnNext.ts: QUERY-WRITER-01, a required miss recovers through one gra
   });
 });
 
+// SEARCH-EMPTY-01 (docs/dev.md, conv-19awhetzdf, 2026-09-24): a real
+// household conversation read "0 results" as a plain success and let
+// the phrasing round answer from its own knowledge, wrongly and
+// contradicting the person. Two distinct outcomes from a websearch
+// call, never conflated: a genuine engine failure (down, or all
+// upstream engines suspended) skips the phrasing round entirely and
+// answers with the failed outcome's own line; a genuine "nothing
+// found" still runs the phrasing round (there is real information to
+// report - that the search came up empty), but the round's own prompt
+// now says so explicitly.
+describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are never the same reply", () => {
+  async function modelNodeCount(turnId: string): Promise<number> {
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string }[] };
+    return (stats.nodes ?? []).filter((n) => n.node === "model").length;
+  }
+
+  test("all upstream engines suspended (unresponsive_engines, zero rows) answers with the failed outcome's own line, never a second (phrasing) model call", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let calls = 0;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon unresponsive engines fixture" }) }];
+          },
+          reply: () => {
+            calls++;
+            return "This should never run - the tool round failed outright, so there is no second round to reach.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "what shows has kevin bacon been in"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toBe("Search isn't working right now.");
+      // No phrasing round: the forced (or here, offered) call is the
+      // turn's only model generation - the `toolAllFailed` guard routed
+      // straight to `answer` instead of back to `model`.
+      expect(calls).toBe(0);
+      expect(await modelNodeCount(result.value.turn_id)).toBe(1);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes
+        ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; userMessage?: string }[])
+        : [];
+      const websearchOutcome = outcomes.find((o) => o.packageId === "websearch");
+      expect(websearchOutcome?.status).toBe("failed");
+      expect(websearchOutcome?.errorCode).toBe("search_unavailable");
+      expect(websearchOutcome?.userMessage).toBe("Search isn't working right now.");
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("zero rows with no engine failure still runs the phrasing round, whose own prompt now says plainly to report nothing found", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon no results fixture" }) }];
+          },
+          reply: (request) => {
+            if (!request.messages.some((m) => m.role === "tool")) return "searching";
+            phrasingRequest = request;
+            return "The search found nothing on that.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "what shows has kevin bacon been in"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      // The phrasing round DID run (unlike the failed-outcome test
+      // above) - this is a real succeeded outcome, just an empty one.
+      expect(await modelNodeCount(result.value.turn_id)).toBe(2);
+      expect(result.value.reply.text).toBe("The search found nothing on that.");
+      // The wiring this item actually controls: the phrasing round's own
+      // prompt carries the strengthened synthesis_hint and the real,
+      // empty rows array - proving the empty-rows case reaches the
+      // model with an explicit instruction, not just the old, looser
+      // hint that let the live incident's own model answer from its own
+      // knowledge instead. Whether a real model always obeys this is a
+      // live/bench question, the same boundary QUERY-WRITER-01's own
+      // co-reference accuracy sits behind - not provable by a scripted
+      // stub.
+      const toolMessage = phrasingRequest?.messages.find((m) => m.role === "tool");
+      expect(typeof toolMessage?.content).toBe("string");
+      expect(toolMessage?.content as string).toContain("if rows is empty, say plainly that the search found nothing");
+      expect(toolMessage?.content as string).toContain('"rows":[]');
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string }[]) : [];
+      expect(outcomes.find((o) => o.packageId === "websearch")?.status).toBe("succeeded");
+    } finally {
+      searxng.stop();
+    }
+  });
+});
+
 describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-text fields", () => {
   async function policyNodeOutcome(turnId: string): Promise<{ ok?: boolean; code?: string; arg?: string } | undefined> {
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();

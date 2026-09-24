@@ -972,6 +972,57 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       server.stop(true);
     }
   });
+
+  // SEARCH-EMPTY-01 (docs/dev.md, conv-19awhetzdf, 2026-09-24): a real
+  // household conversation read "0 results" from SearXNG (all three
+  // upstream engines suspended - too many requests, a CAPTCHA) as a
+  // plain "succeeded" outcome with nothing to answer from, and the
+  // phrasing round answered from its own knowledge instead, wrongly.
+  // SearXNG already reports the cause on the same response
+  // (`unresponsive_engines`, an array of `[engine, reason]` pairs) - this
+  // is the one choke point that turns that into a real failure.
+  test("zero rows with unresponsive_engines throws search_unavailable, never a silent empty success", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () =>
+        Response.json({
+          query: "kevin bacon tv shows",
+          results: [],
+          unresponsive_engines: [
+            ["brave", "Suspended: too many requests"],
+            ["google cse", "Suspended: too many requests"],
+            ["startpage", "Suspended: CAPTCHA"],
+          ],
+        }),
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      try {
+        await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect((err as HostError).code).toBe("search_unavailable");
+        expect((err as HostError).message).toBe("Search isn't working right now.");
+      }
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test('zero rows with no unresponsive_engines is a real, silent empty success (a genuine "nothing found", not a failure)', async () => {
+    const server = Bun.serve({ port: 0, fetch: () => Response.json({ query: "no results fixture", results: [] }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = (await host.integration.call("searxng", "search", { query: "no results fixture" })) as { rows: unknown[] };
+      expect(result.rows).toEqual([]);
+    } finally {
+      server.stop(true);
+    }
+  });
 });
 
 describe("formatSearxngResults", () => {

@@ -5,6 +5,6 @@
     { "op": "integration.call", "as": "search_results", "id": "searxng", "method": "search", "args": { "query": "{expression}", "category": "{category}", "read_page": "{read_page}" } },
     { "op": "pick", "as": "search_rows", "from": "search_results", "path": "rows" },
     { "op": "pick", "as": "page", "from": "search_results", "path": "page" },
-    { "op": "format", "as": "reply", "synthesis_hint": "answer the question from these search results and the page text when present; say plainly when they don't answer it", "data": { "rows": "{search_rows}", "query": "{expression}", "page": "{page}" } }
+    { "op": "format", "as": "reply", "synthesis_hint": "if rows is empty, say plainly that the search found nothing on this and stop there - never answer from your own knowledge and never contradict what the person already said; otherwise answer the question from these search results and the page text when present, and say plainly when they don't answer it", "data": { "rows": "{search_rows}", "query": "{expression}", "page": "{page}" } }
   ]
 }

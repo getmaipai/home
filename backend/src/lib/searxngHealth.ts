@@ -19,6 +19,7 @@
 import { searxngSearch, SEARXNG_NO_RESULTS_TEXT } from "@/lib/packageHost";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 
 const ISSUE_SOURCE = "websearch";
 
@@ -40,6 +41,26 @@ export async function checkSearxngHealth(): Promise<void> {
   try {
     result = (await searxngSearch({ query: CANARY_QUERY })).text;
   } catch (err) {
+    // SEARCH-EMPTY-01: a real, reachable, JSON-answering instance whose
+    // own upstream engines are suspended (`unresponsive_engines`,
+    // packageHost.ts's searxngSearch()) is a genuinely different
+    // condition from an unreachable/misconfigured URL, and needs the
+    // household told a different, correct thing - reusing the existing
+    // "searxng_empty" issue (the same "reachable but not really
+    // working" bucket the stale-install case below already uses) rather
+    // than the URL-check message, which would send someone chasing a
+    // Settings field that was never the problem.
+    if (err instanceof HostError && err.code === "search_unavailable") {
+      resolveIssue(ISSUE_SOURCE, "searxng_unreachable");
+      await raiseIssue({
+        source: ISSUE_SOURCE,
+        key: "searxng_empty",
+        severity: "warning",
+        title: "Web search isn't finding anything",
+        detail: "SearXNG reports its own search engines are currently suspended (too many requests, or a CAPTCHA) - this usually clears on its own within a while. If it doesn't, check which engines are enabled in SearXNG's own settings.",
+      });
+      return;
+    }
     resolveIssue(ISSUE_SOURCE, "searxng_empty");
     await raiseIssue({
       source: ISSUE_SOURCE,

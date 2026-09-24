@@ -65,6 +65,53 @@ describe("checkSearxngHealth", () => {
     }
   });
 
+  // SEARCH-EMPTY-01 (docs/dev.md, 2026-09-24): distinguished from BOTH
+  // the unreachable and the stale-install cases - a real, reachable,
+  // JSON-answering instance whose own engines are suspended must not
+  // send someone chasing the URL field in Settings, which was never
+  // the problem (a review caught the first cut of this item's own
+  // packageHost.ts throw doing exactly that, by falling into this
+  // function's catch-all branch).
+  test("engines suspended (unresponsive_engines, zero rows) raises searxng_empty, never searxng_unreachable", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] }),
+    });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await checkSearxngHealth();
+      const issues = listIssues();
+      expect(issues.find((i) => i.source === "websearch" && i.key === "searxng_empty")).toBeDefined();
+      expect(issues.find((i) => i.key === "searxng_unreachable")).toBeUndefined();
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // The infobox-only counterpart to the review's own finding: a real
+  // answer via infoboxes (never checked by rows alone, only by the
+  // shared SEARXNG_NO_RESULTS_TEXT signal) must not be misclassified as
+  // an outage just because some other, unrelated engine also reported
+  // itself suspended on the same response.
+  test("a real infobox answer alongside an unrelated suspended engine still clears both issues", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () =>
+        Response.json({
+          results: [],
+          infoboxes: [{ infobox: "Earth", content: "The third planet from the Sun." }],
+          unresponsive_engines: [["some other engine", "Suspended: too many requests"]],
+        }),
+    });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await checkSearxngHealth();
+      expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("a real result clears both issues", async () => {
     setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
     await checkSearxngHealth();

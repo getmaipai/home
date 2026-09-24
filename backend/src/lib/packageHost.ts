@@ -653,8 +653,42 @@ export async function searxngSearch(args: unknown): Promise<{ text: string; rows
       if (typeof row.title !== "string" || typeof row.url !== "string") return [];
       try { const parsed = new URL(row.url); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return []; parsed.username = ""; parsed.password = ""; parsed.hash = ""; const safeUrl = (value: unknown) => { if (typeof value !== "string") return null; try { const parsed = new URL(value); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null; parsed.username = ""; parsed.password = ""; parsed.hash = ""; return parsed.toString(); } catch { return null; } }; return [{ title: row.title, url: parsed.toString(), snippet: typeof row.content === "string" ? row.content : null, ...(input?.category === "images" ? { image: safeUrl(row.img_src), thumbnail: safeUrl(row.thumbnail_src) } : {}) }]; } catch { return []; }
     }) : [];
+    const text = formatSearxngResults(value);
+    // SEARCH-EMPTY-01 (docs/dev.md, docs/plans/search-resilience-
+    // 2026-09-24.md): SearXNG already reports the problem on every
+    // response - `unresponsive_engines`, an array of `[engine name,
+    // reason]` pairs ("Suspended: too many requests", "Suspended:
+    // CAPTCHA") for every upstream engine it could not use this
+    // request. Genuinely nothing to answer from (the same
+    // `SEARXNG_NO_RESULTS_TEXT` signal `formatSearxngResults` already
+    // computes across BOTH `results` and `infoboxes` - never re-derived
+    // narrower here, which would wrongly fail a real infobox-only answer
+    // just because some other, unrelated engine was also suspended)
+    // with at least one suspended engine is search actually failing,
+    // not a real "nothing found". The exact gap the live household
+    // conversation (conv-19awhetzdf, 2026-09-24) fell into: an empty
+    // result read as a plain "succeeded" outcome, and the phrasing
+    // round answered from its own knowledge instead, wrongly and
+    // confidently. Thrown here, the one choke point every websearch
+    // call already passes through, rather than checked per caller.
+    const unresponsiveEngines = Array.isArray(value.unresponsive_engines)
+      ? value.unresponsive_engines.some((raw: unknown) => Array.isArray(raw) && typeof raw[0] === "string")
+      : false;
+    if (text === SEARXNG_NO_RESULTS_TEXT && unresponsiveEngines) {
+      // This exact message reaches a household member verbatim only
+      // because `turnMachine/nodes/answer.ts`'s `toolOutageLine()`
+      // recognizes the "search_unavailable" code by name and delivers
+      // it directly, bypassing the generic COMPOSE_FAILURE_LINE swap
+      // every other failed outcome gets - a review, 2026-09-24, flagged
+      // that the two are in different files with nothing mechanical
+      // tying them together. Adding a new safe, hand-written HostError
+      // message anywhere else in this file (or another integration)
+      // needs a matching branch added there, or it silently gets the
+      // generic line instead.
+      throw new HostError("search_unavailable", "Search isn't working right now.");
+    }
     const page = input?.read_page === true && rows[0] ? await searxngPageRead({ url: rows[0].url }) : undefined;
-    return { text: formatSearxngResults(value), rows, ...(page ? { page } : {}) };
+    return { text, rows, ...(page ? { page } : {}) };
   }
   throw result.error;
 }

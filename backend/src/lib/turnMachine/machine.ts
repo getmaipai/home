@@ -189,6 +189,22 @@ export const turnMachine = setup({
       return toRun.length === 0 && parkedAsk === null && context.queryWriterUsed;
     },
     moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
+    // SEARCH-EMPTY-01: a round whose every outcome failed (today,
+    // always a single websearch call) has no evidence for a phrasing
+    // round to compose from - reusing that round's own generation
+    // budget on a hallucinated answer is exactly the live defect
+    // (conv-19awhetzdf, docs/dev.md) this closes. Checked before
+    // `moreRoundsAvailable` (array order), so a genuine tool failure
+    // never reaches `model` for a doomed phrasing round even on round
+    // 1, where a round otherwise always remains. `answerInputFrom()`'s
+    // own last-resort branch (`context.turnState.outcomes.length > 0`)
+    // already builds the identical `from_outcomes` answer this needs -
+    // the same mechanism the "no more rounds" exit already used, never
+    // reached from round 1 until this guard existed to route here.
+    toolAllFailed: ({ event }) => {
+      const output = (event as unknown as { output: ToolOutput }).output;
+      return output.outcomes.length > 0 && output.outcomes.every((o) => o.status === "failed");
+    },
     outputRefused: ({ event }) => ((event as unknown as { output: OutputGateOutput }).output).refused === true,
     hasPreConfirmed: ({ context }) => context.preConfirmed !== undefined,
   },
@@ -389,6 +405,20 @@ export const turnMachine = setup({
         src: "tool",
         input: ({ context }) => context,
         onDone: [
+          // Deliberately the same three actions as the no-guard
+          // fallback below (both land on `answer` with the tool
+          // round's own output recorded) - kept as two literal arrays
+          // rather than one shared reference (a review, 2026-09-24,
+          // flagged the duplication) because XState's own action-array
+          // typing is resolved per onDone entry from `createMachine`'s
+          // still-open generic at this point in the file; a future edit
+          // to what "record a finished tool round" does must be applied
+          // to both.
+          {
+            guard: "toolAllFailed",
+            actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes", "derivePlanFromEvidence"],
+            target: "answer",
+          },
           {
             guard: "moreRoundsAvailable",
             actions: [assign(({ event }) => ({ step: event.output })), assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), "recordOutcomes", "derivePlanFromEvidence"],

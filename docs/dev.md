@@ -6,6 +6,188 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## SEARCH-EMPTY-01: search down and search found nothing are never the same reply (2026-09-24)
+
+**Objective.** `conv-19awhetzdf` (the same conversation LIVE-0924-01
+and the pace rule above both trace): all three of the household's
+SearXNG upstream engines were suspended, every query answered with
+`results: []`, and the new path read that as a plain "succeeded"
+outcome with nothing to answer from. The phrasing round answered from
+the model's own knowledge instead - confidently, and it contradicted
+the person three times on a question a single search result would
+have settled, then (LIVE-0924-01 (a)) hallucinated the wrong year when
+corrected. The design note (`docs/plans/search-resilience-2026-09-24.md`,
+getmaipai-26) named two outcomes that must never be the same reply:
+search actually being down, and search genuinely finding nothing.
+
+**Search actually down.** SearXNG already reports the cause on the
+same response it returns: `unresponsive_engines`, an array of
+`[engine, reason]` pairs ("Suspended: too many requests", "Suspended:
+CAPTCHA"). `packageHost.ts`'s `searxngSearch()` - the one choke point
+every websearch call already passes through - now throws
+`HostError("search_unavailable", "Search isn't working right now.")`
+when rows is empty AND at least one engine is reported unresponsive
+(never on a genuine empty result with no engine errors, below). This
+surfaces as a real failed `ToolExecutionOutcome`
+(`errorCode: "search_unavailable"`), not a silent empty success.
+
+**A genuine failure skips the phrasing round entirely.** The new
+path's own `budget.rounds: 1` design means, before this item, ANY
+tool outcome (succeeded or failed) unconditionally routed back to
+`model` for a second, phrasing generation - so even a properly-failed
+outcome still asked the model to compose an answer from nothing,
+exactly the opening this incident exploited. `machine.ts` gains a
+`toolAllFailed` guard, checked before `moreRoundsAvailable` in the
+`tool` state's own `onDone` array (array order, the same precedence
+technique `queryWriterRefused` already uses ahead of
+`policyAllRefused`): when every outcome from a tool round failed, the
+turn routes straight to `answer`, never back to `model`. This is not
+new machinery - `answerInputFrom()`'s own existing last-resort branch
+(`context.turnState.outcomes.length > 0` → `from_outcomes` from
+`outcomes.at(-1)?.userMessage`) already built exactly this AnswerInput
+shape for the "no more rounds" exit; it was simply never reached from
+round 1, where a round always remained, until this guard existed to
+route here.
+
+**A pre-existing safety floor had to be worked with, not around.**
+`output_gate`'s own COMMAND-FAIL-01 provenance check
+(`answer.ts`'s `provenance: "outcome_error"`) unconditionally swaps
+ANY text sourced from a failed outcome's own `userMessage` for the
+generic `COMPOSE_FAILURE_LINE` ("Sorry, I couldn't do that.") - by
+design, because a raw engine error string (an MCP error, an HTTP
+status) must never reach a household member verbatim. My own
+`"Search isn't working right now."` is not a raw diagnostic; it is
+one fixed, hand-written, safe string I chose specifically for this,
+but the existing floor has no way to tell the two apart from the
+`userMessage` field alone, and weakening or special-casing that field
+for one caller would be exactly the kind of ad-hoc bypass the floor
+exists to prevent. Fixed instead by mirroring a pattern already in
+the same file: `policyRefusalLine()` already maps a small, closed set
+of policy-refusal reasons to fixed, safe lines, never derived from a
+raw string. `answer.ts` gains the identical shape, `toolOutageLine
+(errorCode)`, recognizing only `"search_unavailable"` today; `from_
+outcomes` checks it first and, when it matches, delivers that fixed
+line directly, untagged (it was never a raw diagnostic to begin with)
+- every other errorCode still falls through to the existing
+`outcome_error` tag and the generic swap, unchanged. `commands.test.ts`'s
+own regression pattern extended with two new cases in `answer.test.ts`:
+`search_unavailable` gets its own line untagged; an unrecognized code
+still gets the generic tag, so this can never become a general
+"any failed outcome's userMessage is safe" bypass.
+
+**A pre-existing, unrelated bug found and fixed along the way**:
+`tool.ts`'s own outcome-building set `errorCode: String(result.status)`
+(the numeric HTTP-style status, e.g. `"400"`), never `result.code` (the
+semantic HostError code, e.g. `"search_unavailable"`) - `commands.ts`,
+this node's own sibling, already does this correctly (`errorCode:
+result.code`). Fixed to match; without it, `toolOutageLine` would never
+have matched anything, since the outcome would have carried `"400"`,
+never `"search_unavailable"`, defeating this whole item silently.
+
+**Search genuinely finding nothing.** Zero rows with no engine errors
+is left exactly as a real, succeeded outcome - there is genuine
+information to report (that the search came up empty), so the
+phrasing round still runs, but its own prompt must make the empty-rows
+case explicit rather than leave the model to notice it unprompted (the
+live incident's own failure). The websearch package's one `synthesis_
+hint` (`packages/websearch/recipe.json`, a single static string - the
+recipe language has no conditional to pick a different one for the
+empty case) is strengthened: "if rows is empty, say plainly that the
+search found nothing on this and stop there - never answer from your
+own knowledge and never contradict what the person already said;
+otherwise answer the question from these search results and the page
+text when present, and say plainly when they don't answer it." This is
+a model instruction conditioned on data already in the same message
+(`data.rows`), never a code-level rule reading anyone's words - the
+org's own "no hacky rules" standard is about the latter.
+
+**What a scripted test can and can't prove here.** A stub test proves
+the wiring: the phrasing round's own prompt (`toolResultMessages()`'s
+JSON payload) really does carry the strengthened hint text and the
+real, empty `rows` array - `turnNext.test.ts`'s own second new test
+below asserts exactly that, by inspecting the captured request. Whether
+a real model always obeys the hint is the same live/bench-shaped
+boundary QUERY-WRITER-01's own co-reference accuracy already sits
+behind, not something a scripted stub can settle - out of scope here,
+named rather than silently assumed.
+
+**Files.** `src/lib/packageHost.ts` (`searxngSearch()`'s new
+`unresponsive_engines` check); `src/lib/turnMachine/machine.ts`
+(`toolAllFailed` guard, the `tool` state's new onDone branch);
+`src/lib/turnMachine/nodes/tool.ts` (`errorCode` fix); `src/lib/
+turnMachine/nodes/answer.ts` (`toolOutageLine()`, the `from_outcomes`
+case's new branch); `packages/websearch/recipe.json` (the strengthened
+`synthesis_hint`); `scripts/bench/conversationRunner.ts`'s
+`startFakeSearxng()` (a new `"unresponsive engines fixture"` query
+pattern, beside the existing `"no results fixture"` one). Tests:
+`tests/packageHost.test.ts` (two new unit tests: `unresponsive_engines`
+with zero rows throws `search_unavailable`; zero rows alone is a real
+succeeded empty result); `tests/turnMachine/answer.test.ts` (two new
+cases on `toolOutageLine`'s own closed mapping); `tests/turnMachine/
+turnNext.test.ts` (two new end-to-end tests, in the coordinator's own
+words: a scripted SearXNG body with suspended engines produces a
+failed outcome and an honest line, with no second model call at all;
+an empty body still runs the phrasing round, whose own prompt carries
+the strengthened instruction, and the scripted "found nothing" reply
+passes through unmodified).
+
+**Out of scope, named rather than silently worked around**: whether a
+real model reliably obeys the strengthened hint (a live/bench
+question, matching QUERY-WRITER-01's own co-reference-accuracy
+boundary); SEARCH-HEALTH-01/SEARCH-PACE-01 and SEARCH-FALLBACK-01
+(the design note's own remaining items, next in the queue).
+
+**A medium review (2026-09-24, per org policy - this item changes a
+guard and a wire shape) found and fixed two real regressions before
+this landed**, both in code this item itself touched: (1)
+`searxngHealth.ts`'s own periodic canary check calls `searxngSearch()`
+too, and its `catch` block had no way to tell my new `search_
+unavailable` throw apart from a genuinely unreachable/misconfigured
+URL - it would have raised "check the SearXNG URL in Settings" for
+exactly tonight's real incident (suspended engines), the wrong fix for
+the wrong problem. Fixed: the catch now checks for `HostError` with
+that code specifically and raises the existing `searxng_empty` issue
+(the same "reachable but not really working" bucket the stale-install
+case already uses) with a correctly-worded detail, never the
+URL-check message. (2) The emptiness check itself only ever looked at
+`rows` (built from `results` alone), never `infoboxes` - a real,
+answered infobox query (Wikipedia's own shape, `searxngSearch()`'s own
+doc comment already names this) alongside some OTHER, unrelated
+suspended engine on the same response would have been misclassified
+as a total outage. Fixed by checking the same `SEARXNG_NO_RESULTS_
+TEXT` signal `formatSearxngResults()` already computes across both
+fields, rather than a narrower, re-derived check. Two new regression
+tests cover each (`tests/searxngHealth.test.ts`).
+
+Three smaller findings from the same review, fixed: `tool.ts`'s
+`errorCode` fix (above) used `result.code` alone, matching
+`commands.ts`'s own pattern but silently losing the "always some
+errorCode string" guarantee for the non-HostError failure branches of
+`runPlugin()` (arg validation, role checks) that never set `.code` at
+all - widened to `result.code ?? String(result.status)`,
+`turnEngine.ts`'s own established pattern at six call sites
+(`commands.ts` carrying the same narrower gap is a separate,
+pre-existing finding, not fixed here); `status === "failed"` was
+computed twice in `answer.ts`'s `from_outcomes` case - now once;
+`packageHost.ts`'s own new check gained a cross-reference comment to
+`toolOutageLine()` in the other file, since nothing mechanical ties a
+future safe HostError message to that mapping.
+
+Two findings accepted and named, not fixed: `machine.ts`'s new
+`toolAllFailed` branch duplicates the no-guard fallback branch's own
+three actions verbatim (a shared reference would need breaking
+`setup(...).createMachine(...)` into two statements to keep XState's
+own action-array typing, judged not worth the risk on this guard right
+now - commented in place instead so a future edit to "record a
+finished tool round" knows to touch both); `toolOutageLine`'s own
+closed mapping lives in a different file from where its one message is
+authored, with nothing mechanical keeping them in sync beyond the new
+cross-reference comment above - acceptable for one code today, a
+real design question if a second, third safe code ever joins it.
+
+Exit: `bash scripts/check.sh` green; the six new tests above plus the
+review's own two regression tests, landed.
+
 ## LIVE-0924-01: two open findings from tonight's SearXNG-suspended conversation (2026-09-24)
 
 `conv-19awhetzdf` (`data/hub.db`'s `conversation_turns`, 08:01-08:04Z, ten

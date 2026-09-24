@@ -41,6 +41,26 @@ describe("answerNode: 'from_outcomes' tags provenance from the LAST outcome only
     const { output } = await answerNode(STATE, { kind: "from_outcomes", text: "second try failed", outcomes }, SIGNAL);
     expect(output.provenance).toBe("outcome_error");
   });
+
+  // SEARCH-EMPTY-01: `search_unavailable` is the one recognized
+  // exception - a fixed, hand-written, safe line `searxngSearch()`
+  // itself throws (never a raw engine string), so `toolOutageLine`
+  // delivers it directly and it is never tagged `outcome_error`. Every
+  // OTHER errorCode, even ones that sound similarly safe, still falls
+  // to the generic tag above - `toolOutageLine`'s own closed mapping,
+  // not a rule reading the message's own content.
+  test("a failed outcome whose code is search_unavailable delivers its own line directly, untagged", async () => {
+    const failed = outcome({ status: "failed", errorCode: "search_unavailable", userMessage: "Search isn't working right now." });
+    const { output } = await answerNode(STATE, { kind: "from_outcomes", text: "Search isn't working right now.", outcomes: [failed] }, SIGNAL);
+    expect(output.text).toBe("Search isn't working right now.");
+    expect(output.provenance).toBeUndefined();
+  });
+
+  test("a failed outcome with an unrecognized code still gets the generic outcome_error tag, never a free pass", async () => {
+    const failed = outcome({ status: "failed", errorCode: "not_found", userMessage: "no such record" });
+    const { output } = await answerNode(STATE, { kind: "from_outcomes", text: "no such record", outcomes: [failed] }, SIGNAL);
+    expect(output.provenance).toBe("outcome_error");
+  });
 });
 
 test("answerNode: 'model_text' and 'context_quote' never carry the provenance tag - only a real outcome-sourced kind can", async () => {

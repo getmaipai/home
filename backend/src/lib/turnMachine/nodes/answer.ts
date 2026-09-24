@@ -77,6 +77,26 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
   return "I don't actually have that in this conversation, so I won't guess.";
 }
 
+/** SEARCH-EMPTY-01: the identical fixed-code-to-text mapping
+ * `policyRefusalLine` above already is, for a tool outcome's own
+ * `errorCode` instead of a policy refusal reason. A package's raw
+ * `userMessage` is still never delivered verbatim (COMMAND-FAIL-01's
+ * own `outcome_error` provenance tag exists specifically because a raw
+ * engine error string can carry anything, including a diagnostic no
+ * household member should see) - but `search_unavailable`'s own
+ * `userMessage` was never a raw diagnostic to begin with; it is one
+ * fixed, safe, hand-written string `searxngSearch()` itself throws
+ * ("Search isn't working right now.", never anything from the engine's
+ * own response body). Named here, by code, the same closed way
+ * `policyRefusalLine` names its own three reasons - never a rule
+ * reading the string's own content. `null` for every other code keeps
+ * the existing floor: an unrecognized failure still falls through to
+ * `provenance: "outcome_error"` below and the generic swap. */
+function toolOutageLine(errorCode: string | undefined): string | null {
+  if (errorCode === "search_unavailable") return "Search isn't working right now.";
+  return null;
+}
+
 export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) => {
   switch (input.kind) {
     case "policy_refused":
@@ -123,9 +143,18 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // fallback (`answerInputFrom`), built from `outcomes.at(-1)?.
       // userMessage` - the SAME field this checks, so a failed last
       // outcome (a tool round's own final call failing with rounds
-      // exhausted) is tagged the identical way "immediate" is.
+      // exhausted, or SEARCH-EMPTY-01's own `toolAllFailed` guard
+      // routing straight here) is tagged the identical way "immediate"
+      // is - UNLESS `toolOutageLine` recognizes the failure's own code
+      // as one of its fixed, safe lines, in which case that line is
+      // delivered directly and never tagged `outcome_error` at all (it
+      // was never a raw diagnostic to begin with).
       const sources = input.outcomes.flatMap((o) => o.sources ?? []);
-      const provenance = input.outcomes.at(-1)?.status === "failed" ? ("outcome_error" as const) : undefined;
+      const lastOutcome = input.outcomes.at(-1);
+      const lastFailed = lastOutcome?.status === "failed";
+      const outageLine = lastFailed ? toolOutageLine(lastOutcome.errorCode) : null;
+      if (outageLine !== null) return { outcome: { ok: true }, output: { text: outageLine, sources } };
+      const provenance = lastFailed ? ("outcome_error" as const) : undefined;
       return { outcome: { ok: true }, output: { text: input.text, sources, provenance } };
     }
     // DEADLINE-01: the same shared line composer.ts's own all-failed
