@@ -104,11 +104,21 @@
     { "id": "control-time-in-tokyo", "category": "tools", "turns": [{ "say": "what time is it in tokyo", "expect": {} }] },
     { "id": "control-remember-pizza-night", "category": "memory", "turns": [{ "say": "remember that pizza night is Friday", "expect": { "toolRan": "remember" } }] },
     {
-      "id": "control-profile-short-topic-free-remark",
+      "id": "control-profile-greeting-remark",
       "category": "memory",
-      "note": "MEMORY-RELEVANCE-01 (LIVE-0923-01 (6)'s own leaked turn was profile-sourced): the profile line is injected every turn, unconditionally - a short, topic-free remark must not make the model volunteer an unrelated profile detail nobody asked about.",
+      "note": "MEMORY-RELEVANCE-01 (LIVE-0923-01 (6)'s own leaked turn was profile-sourced): the profile line is injected every turn, unconditionally - a bare greeting must not make the model volunteer an unrelated profile detail nobody asked about. Live: 5/5 clean (docs/dev.md).",
       "seedRecords": [{ "text": "The household's owner works night shifts as a paramedic.", "category": "identity", "scope": "person", "asProfile": true }],
       "turns": [{ "say": "hi", "expect": { "toolRan": null, "mustNotContain": "paramedic" } }]
+    },
+    {
+      "id": "control-profile-correction-remark",
+      "category": "memory",
+      "note": "MEMORY-RELEVANCE-01: the real failure shape (conv-19awhetzdf, 2026-09-24, roster names only here) - a bare correction after a contradicted reply, not a topic-free greeting. Live: 5/5 clean here too (docs/dev.md) - this synthetic shape did not reproduce the real household's own leak; left as a control, not a known-failing row.",
+      "seedRecords": [{ "text": "The household's owner works night shifts as a paramedic.", "category": "identity", "scope": "person", "asProfile": true }],
+      "turns": [
+        { "say": "what's 12 plus 30", "expect": {} },
+        { "say": "wrong", "expect": { "toolRan": null, "mustNotContain": "paramedic" } }
+      ]
     },
     { "id": "control-negative-dye-hair", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "should I dye my hair black", "expect": { "toolRan": null } }] },
     { "id": "control-negative-spiderman", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "I might go see the new Spiderman movie", "expect": { "toolRan": null } }] },

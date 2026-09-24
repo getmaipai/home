@@ -183,6 +183,18 @@ export default defineConfig({
         // chunk boundaries (its own comment above has the story); fixing
         // that resolution brought the entry chunk to ~1.83 MiB, under the
         // default again, so no override is needed this time either.
+        // CHAT-RICH-01 (2026-09-24) crossed the default a third time:
+        // katex/remark-math/rehype-katex (plus rehype-katex's own HTML-
+        // parsing chain for its error fallback) landed inside Chat's own
+        // eager chunk - not lazy, by the same design as Home above - and
+        // pushed it to 3.06 MB. Real code-splitting (loading the shiki/
+        // mermaid/katex trio only when a message actually needs them,
+        // never Chat's own entry chunk) is the eventual "real fix" this
+        // file's own history above already names the shape of; not built
+        // here. Raised to 4 MiB with headroom, matching how the 2026-09-06
+        // growth was handled the same way before its own code-splitting
+        // fix landed.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
     }),
   ],

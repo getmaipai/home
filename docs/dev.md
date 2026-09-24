@@ -25684,32 +25684,45 @@ non-pinned candidates in (a). This historical regression's own
 mechanism is already closed at the `recall()` floor level, independent
 of MEMORY-FLOOR-01/RELEVANCE-01.
 
-**The live replay row** (`control-profile-short-topic-free-remark`,
-`backend/scripts/bench/datasets/owner-replay.json`; `conversationFixture.
-ts`'s `BenchSeedRecord.asProfile` and `conversationRunner.ts:610-621`'s
-matching seed path are new in this same commit, so a profile-sourced
-record can be seeded by a replay row at all): a synthetic household
-whose only memory is a profile fact, probed with a bare "hi", 5 reps,
-new path (`turn.pipeline.next`), the resident 8B
+**The live replay rows** (`backend/scripts/bench/datasets/owner-
+replay.json`; `conversationFixture.ts`'s `BenchSeedRecord.asProfile`
+and `conversationRunner.ts:610-621`'s matching seed path are new in
+this same commit, so a profile-sourced record can be seeded by a
+replay row at all): a synthetic household whose only memory is a
+profile fact, new path (`turn.pipeline.next`), the resident 8B
 (`qwen3-8b-instruct-q4-k-m`), fake SearXNG (the real one is rate-
-limited tonight; this row never searches either way), `waitForHubQuiet`
-observed throughout. **5/5 reps did not volunteer the profile detail.**
-Against that, live evidence from the household's own real traffic
+limited tonight; neither row searches either way), `waitForHubQuiet`
+observed throughout, 5 live reps each.
+
+- `control-profile-greeting-remark` (a bare "hi"): **5/5 clean.**
+- `control-profile-correction-remark` (the real failure's own shape -
+  an easy question, then a bare "wrong", mirroring `conv-19awhetzdf`
+  with roster-safe content): **5/5 clean too.** This synthetic
+  reproduction attempt did not trigger the leak.
+
+Against both, live evidence from the household's own real traffic
 tonight (`conv-19awhetzdf`, turns at 2026-09-24T08:02:47Z and
 08:03:55Z): a bare "wrong" and "you're wrong again" - real household
 turns, not this bench - each did volunteer the profile's own event
-fact. Read together: the model does not volunteer a profile detail on
-an ordinary greeting, but does on a short correction/pushback remark
-that shares no topic with the fact either - a narrower trigger than
-"any short, topic-free remark," and still a real one. Not a floor
-question (see "What actually leaked" above): the profile line has no
-relevance gate by design, so this is squarely a model-behavior finding.
+fact. Read plainly: the real household leaked twice on this shape, and
+this session's own attempt to reproduce it synthetically, twice, did
+not - the two real turns carried more surrounding conversation and a
+different profile fact than this bench's own minimal single-turn setup
+supplies, and either could be why the shape alone wasn't enough to
+reproduce it. **Not concluded fixed, not concluded reproduced** - both
+rows stay as controls (not known-failing rows: a row is only marked
+known-failing by what it actually does under this bench, not by what
+matched it in the household). Not a floor question either way (see
+"What actually leaked" above): the profile line has no relevance gate
+by design, so any real fix here is squarely a model-behavior question.
 Routed to `PERSONA-STEER-01` per the coordinator's own ruling, no
-prompt-prose fix attempted here. Separately, also the coordinator's own
-note, recorded here rather than acted on: what `memoryJudge.ts`'s
-consolidation writes into the profile - an event-like fact sitting
-beside identity facts - is itself a candidate design question, not
-scoped to this item.
+prompt-prose fix attempted here; the gap between the bench's own
+negative result and the household's own positive one is itself worth
+that item's attention, not resolved by this measurement. Separately,
+also the coordinator's own note, recorded here rather than acted on:
+what `memoryJudge.ts`'s consolidation writes into the profile - an
+event-like fact sitting beside identity facts - is itself a candidate
+design question, not scoped to this item.
 
 **(d) Old path vs. new path, before each one's own `bumpUsage` call**:
 old path, `turnEngine.ts:3462` (`recall()` call, no floor beyond
