@@ -25300,3 +25300,153 @@ own "live verification outstanding" caveat was left unupdated after
 the first run despite the table above already carrying the answer;
 fixed now, on this second confirming run rather than left stale
 further.
+
+## MEMORY-RELEVANCE-01: why a cosine floor cannot close LIVE-0923-01 (6) (2026-09-24)
+
+The coordinator's own ruling on MEMORY-FLOOR-01 (`a9416ffa`): its
+`MEMORY_CONTEXT_MIN_SCORE` floor (`turnMachine/nodes/context.ts:25`,
+0.1 on `recall()`'s composite `score`) does not actually close LIVE-
+0923-01 (6) - a review found the floor mathematically incapable of
+binding on the path that turn's own leak took. This item measures why,
+against the real leaked turn, the existing 11-probe bench, a real
+owner-replay row, and a synthetic unwanted-match probe. Read-only
+throughout: two scratch scripts (not committed, deleted after their
+numbers were copied here) followed the same CHAT-22 safety shape every
+live bench in this repo uses - `MAIPAI_DATA_DIR` a fresh temp
+directory, `MAIPAI_LLAMA_SERVER_URL`/`MAIPAI_EMBED_URL` pointed at the
+household's own already-running engines (chat pid on :8788, embed pid
+on :8794 at measurement time), nothing spawned. The one exception is
+reading the real turn/memory rows themselves: a second, independent
+read-only `bun:sqlite` handle opened directly on `data/hub.db` (never
+through the app's own `@/db`, which stayed pointed at the disposable
+temp directory throughout), never written to. No household text is
+reproduced anywhere below - ids, tiers, and numbers only, the same
+discipline LIVE-0923-01's own write-up above uses.
+
+Formula and constants throughout, `lib/memory.ts:486-515,608-733`:
+`score = 0.7*cosine + 0.2*importance + 0.1*recency` (`+0.5` if the
+candidate is an entity match), `recency` is `1.0` for a durable record
+and `1/(1+ageDays*0.05)` for an episodic one, and a candidate is
+excluded from `recall()`'s results before scoring at all
+(`memory.ts:717`) when `cosine < minCosineForTier` (0.62 for both
+tiers today, `memory.ts:490-491,506-509`, real embed backend - 0.55/
+0.37 only on the stub) **unless** `forceInclude` is true
+(`memory.ts:706`: `row.pinned || isEntityMatch`) - a pinned or entity-
+matched record bypasses the cosine floor entirely, by design, regardless
+of how the query scores.
+
+**(a) The leaked turn's own record** (`turn-tpgcrh46uv`,
+`conv-qt17ad8r96`, 2026-09-24T03:17:35.774Z, `conversation_turns.
+person_id`; embed backend at measurement time: url tier, `nomic-embed-
+text-v1.5.Q4_K_M.gguf` on `b10797`, the household's real resident
+engine, not the stub). This person had 4 active memory records at
+measurement time:
+
+| record | tier | pinned | importance | cosine | tier floor | clears floor | composite |
+|---|---|---|---|---|---|---|---|
+| leaked (rank 1 by composite) | durable | **yes** | 0.9 | 0.438 | 0.62 | no | 0.587 |
+| other candidate 2 | episodic | no | 0.8 | 0.368 | 0.62 | no | 0.486 |
+| other candidate 3 | episodic | no | 0.4 | 0.450 | 0.62 | no | 0.463 |
+| other candidate 4 | episodic | no | 0.4 | 0.426 | 0.62 | no | 0.447 |
+
+None of this person's 4 active records clear the 0.62 tier floor on
+this utterance. The three non-pinned candidates are therefore excluded
+from `recall()`'s own results outright (`memory.ts:717`, `forceInclude`
+false for all three - none is pinned, none carries a `subject_id`
+matching an entity the utterance names) - they could not have reached
+`context.ts` before or after MEMORY-FLOOR-01, on either path, at any
+floor value. The one pinned record is the only one of the four that
+`recall()` can ever return for this utterance, entirely independent of
+its cosine (0.438, well under the floor) or its composite (0.587, well
+over MEMORY_CONTEXT_MIN_SCORE) - it surfaces because `forceInclude`
+short-circuits both checks, not because either number said it was
+relevant. This is the leaked record: the only one of the four capable
+of reaching the prompt at all is the one no cosine-based floor, at any
+threshold, could have excluded.
+
+**(b) The 11 memory-eval probes** (`scripts/bench/memory-eval.ts`,
+same resident engine), wanted matches only (the 3 `absent` controls
+are a different question, not measured here):
+
+| probe | tier | forceInclude | cosine | composite |
+|---|---|---|---|---|
+| pinned-identity | durable | yes (pinned) | 0.444 | 0.591 |
+| durable-pref-food | - | - | not recalled at all (< 0.62 durable floor) | - |
+| durable-pref-para | - | - | not recalled at all (< 0.62 durable floor) | - |
+| durable-goal | - | - | not recalled at all (< 0.62 durable floor) | - |
+| episodic-relevant | episodic | no | 0.654 | 0.641 |
+| entity-recall | episodic | yes (entity) | 0.862 | 1.303 |
+| entity-detail | episodic | yes (entity) | 0.625 | 1.177 |
+| entity-flood | episodic | yes (entity) | 0.733 | 1.273 |
+
+`episodic-relevant` (context.ts:181's own "the weakest, episodic-
+relevant's own baseball-game recall", cited there at composite 0.125 -
+a different run's number, this session's re-measurement reads 0.641)
+is the only wanted match in this set that clears its own tier floor on
+cosine alone, with `forceInclude` false. Every other wanted match here
+is either genuinely floor-clearing (episodic-relevant) or only present
+because of `forceInclude` (pinned-identity, the three entity rows) -
+none demonstrates a composite-only floor doing real work that a cosine
+floor plus the existing `forceInclude` exemption wouldn't also do.
+Separately and outside this item's scope: three of the eight wanted
+probes (durable-pref-food/para/goal) do not clear `DURABLE_MIN_COSINE`
+(0.62) against the real embed model at all today, independent of
+MEMORY-FLOOR-01/RELEVANCE-01 entirely - a pre-existing recall gap,
+flagged here as observed, not diagnosed further.
+
+**(c) Three highest-scoring unwanted matches**, synthetic and roster-
+safe: the same pinned durable identity-style fixture record
+(importance 0.9) probed against eight short, topic-free remarks
+("okay", "sounds good", "thanks", "sure", "got it", "no worries",
+"alright then", "sure thing"):
+
+| probe | cosine | composite |
+|---|---|---|
+| "sounds good" | 0.448 | 0.593 |
+| "thanks" | 0.447 | 0.593 |
+| "okay" | 0.442 | 0.589 |
+
+The same one record tops every one of the eight probes tried - cosine
+never clears 0.62 (so a cosine floor at or above the measured null
+range would exclude it every time), yet composite is a stable ~0.59
+regardless of what was said, comfortably over `MEMORY_CONTEXT_MIN_
+SCORE` (0.1), because `forceInclude` (pinned) bypasses both checks
+identically to case (a). A pinned record's composite score tracks its
+own importance and recency almost entirely, not the query - which is
+exactly what a "the household said always surface this" design should
+do, and exactly why no per-turn relevance floor, cosine or composite,
+can be the fix without also changing what pinning itself bypasses.
+
+**Owner-replay.json**: of its rows, exactly one has an expected
+behavior about a memory being recalled or not recalled -
+`new-engine-small-talk` (the CONTEXT-RECALL-01 regression: a fresh
+conversation's small talk must not surface an unrelated seeded
+"searched and found nothing" record). `control-remember-pizza-night`
+is a memory-write check (`toolRan: "remember"`), not a recall check,
+and is excluded on that basis. Seeded exactly as `conversationRunner.
+ts`'s own `seedRecords()` does (tier durable, importance 0.9,
+`conversationRunner.ts:607-622`): **not recalled at all** against its
+own probe utterance today - excluded by `recall()`'s own 0.62 durable
+floor before scoring, the same mechanism that excludes the three
+non-pinned candidates in (a). This historical regression's own
+mechanism is already closed at the `recall()` floor level, independent
+of MEMORY-FLOOR-01/RELEVANCE-01.
+
+**(d) Old path vs. new path, before each one's own `bumpUsage` call**:
+old path, `turnEngine.ts:3462` (`recall()` call, no floor beyond
+`recall()`'s own tier floor) then `turnEngine.ts:3533`
+(`memoryMatches.slice(0, MAX_MEMORY_SNIPPETS)` folded into
+`promptParts` unconditionally - no relevance gate of any kind);
+`bumpUsage` itself (`turnEngine.ts:3658-3659`) is gated on
+`includedEvidenceIds`, which `turnContext.ts:496` sets from whether an
+item's *rendered text survived the prompt's own truncation*, not from
+any similarity or relevance check. New path, post-MEMORY-FLOOR-01:
+`context.ts:199`, `recalled.filter((m) => m.forceInclude || m.score >=
+MEMORY_CONTEXT_MIN_SCORE).slice(0, MAX_MEMORY_SNIPPETS)` - the one
+floor that exists anywhere across both paths, and it explicitly
+exempts `forceInclude`. **The old path has no equivalent of this floor
+at all, on either side of its own `bumpUsage` call** (confirms LIVE-
+0923-01 (6)'s own claim, checked again here at the exact lines); and
+where the new path's floor does exist, it structurally cannot bind on
+a `forceInclude` record on either path - exactly the mechanism (a),
+(b), and (c) above all measure.
