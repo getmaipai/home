@@ -121,7 +121,7 @@ point 7 for the full unit list and point 6 for the migration order.
 
 - [x] **D2: delete the query builders and forced lookup** (S, Codex, after D1). `lookupQueryFor`, `runForcedLookup`, `notePendingLookup`, `worldAnswerQuery`, `holdForLookup`, `lookupConsent`, the lookup branch of `resolvePendingAsk`. Files: `turnEngine.ts` (~500 lines). Acceptance/exit as D1. Gating: D1. Landed `a5585f2c`.
 
-- [ ] **D3: delete the draft reader** (S, Codex, after D2). `readLookupDraft`, `lookupShapeOf`, `hedgedFactShape`, the promise/offer/hedge regexes. Files: `guards.ts` (~120 lines). Acceptance/exit as D1. Gating: D2.
+- [x] **D3: delete the draft reader** (S, Codex, after D2). `readLookupDraft`, `lookupShapeOf`, `hedgedFactShape`, the promise/offer/hedge regexes. Files: `guards.ts` (~120 lines). Acceptance/exit as D1. Gating: D2. Landed `327e4918`.
 
 - [ ] **D4: delete the repeat guard and the stuck lines** (S, Codex, after D3). `isRepeatReply`, `guardRepeatSentence`, `guardRepeatQuestion`, `CHAT_LOOP`. Files: `guards.ts` (~80 lines). Acceptance/exit as D1. Gating: D3. Retires REPLY-FIND-01's stopgap, if one landed.
 

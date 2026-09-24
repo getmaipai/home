@@ -36,7 +36,6 @@ interface CorpusRow {
   unknownNames?: string[];
   subjectPronouns?: { name: string; pronouns: string }[];
   pronounsInPlay?: string[];
-  /** LOOKUP-02: the turn's lookup tools serve the request. */
   lookupServed?: boolean;
   target?: GuardContext["target"];
   repair?: GuardContext["repair"];

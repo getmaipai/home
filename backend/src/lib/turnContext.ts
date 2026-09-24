@@ -448,16 +448,12 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     act: ctx.signal.primary_act,
     target: ctx.signal.target,
     repair: ctx.signal.repair,
+    lookupServed: ctx.offeredToolIds.includes("websearch") && !householdFrame(ctx) && lookupRequest(ctx),
     previousReply: [...ctx.history].reverse().find((m) => m.role === "assistant")?.content,
     // REP-01: the previous two replies, newest first, for the repeat shapes.
     previousReplies: ctx.history.filter((m) => m.role === "assistant").slice(-2).reverse().map((m) => m.content),
     // ASK-01: the unknown names, the subjects' pronouns, and the
     // pronoun families the person used this turn and the last two.
-    // LOOKUP-02: a request the turn's lookup tools serve (a world
-    // question with the search offered and no household frame) is
-    // answerable, so a failed answer is the failed-lookup line, never
-    // cannot-do.
-    lookupServed: ctx.offeredToolIds.includes("websearch") && !householdFrame(ctx) && lookupRequest(ctx),
     unknownNames: framedUnknownNames(ctx),
     unresolvedNames: ctx.subjects.filter((s): s is Extract<SubjectRef, { type: "unresolved" }> => s.type === "unresolved").map((s) => s.surface_form),
     subjectPronouns: ctx.subjectPronouns,
@@ -467,16 +463,9 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
   };
 }
 
-/** LOOKUP-02: a request the search can serve: a question, or a "find
- * me", "get me", "look up", "show me" about the world; never an action
- * request ("text Nadia", "add eggs"), which stays the capability
- * guard's. */
 const LOOKUP_REQUEST_RE = /\b(?:find|look up|look for|search|show me|pull up|get me|fetch|link|what(?:'s| is| are| was| were)|who(?:'s| is| was)|where(?:'s| is)|when(?:'s| is| does| did)|how (?:much|many|long|old|far)|which)\b/i;
 const ACTION_REQUEST_RE = /\b(?:text|message|call|email|send|remind|add|set|turn (?:on|off)|lock|unlock|play|order|book|schedule|cancel|delete|remove)\b/i;
 function lookupRequest(ctx: TurnContext): boolean {
-  // An action request stays the capability guard's even when it
-  // carries a question inside ("send the plumber a message asking
-  // what's wrong", a review).
   if (ACTION_REQUEST_RE.test(ctx.utterance)) return false;
   return shapeOf(ctx.signal, ctx.utterance) === "question" || LOOKUP_REQUEST_RE.test(ctx.utterance);
 }

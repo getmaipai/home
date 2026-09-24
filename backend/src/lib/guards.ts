@@ -91,11 +91,6 @@ export type GuardReason =
    * turn or the last two (`subjectPronouns`, `pronounsInPlay`).
    * Skipped wherever it sits. */
   | "pronoun_mismatch"
-  /** LOOKUP-02 (dev.md section 16 part 4): a sentence claiming the hub
-   * cannot show, provide, share, access, open or give links, URLs,
-   * pages, pictures, images or videos, on a turn whose lookup tools
-   * include the search. Skipped wherever it sits; the engine's read
-   * takes the lookup path as if the sentence were a promise. */
   | "false_capability"
   | "banned_phrase"
   /** REP-01 (section 16 part 3): a sentence equal, after normalization,
@@ -177,11 +172,7 @@ export interface GuardContext {
   /** The active persona's own few-shot voice lines (persona.ts's
    * `Persona.examples`) - borrowed for TONE, never handed back verbatim. */
   personaExamples?: readonly string[];
-  /** LOOKUP-02: the turn's lookup tools serve the request (a world
-   * question with the search offered and no household frame): a
-   * failed answer takes the failed-lookup line, never the cannot-do
-   * bank, and a sentence denying links, pages or pictures is
-   * `false_capability`. */
+  /** The ordinary model tool set can serve this world request. */
   lookupServed?: boolean;
   /** ASK-01: the names in this turn the hub resolved to nobody and the
    * person framed as household (the resolver's unknowns, and the
@@ -290,8 +281,6 @@ export const MALFORMED = [
   "I fumbled that one. Ask me again?",
   "Lost the thread there, sorry. One more time?",
 ];
-/** Honest fallback for a false capability claim. */
-export const LOOKUP_FAILED_LINES = ["That lookup didn't work, sorry."];
 const MED_CAUTION = [
   "I'm not able to give medication amounts - check with a pharmacist or the label.",
   "I can't advise on doses - a pharmacist or doctor is the safe call there.",
@@ -1034,111 +1023,6 @@ export function isCloserSentence(sentence: string): boolean {
   // Nothing left: a closer that names a subject ("Feel free to ask
   // about Tempo") is a line about that subject, and the guard reads it.
   return tokenize(residual).size === 0;
-}
-
-// ==== LOOKUP-01: a promise is the lookup, an offer is a pending ask ====
-// The shapes the design names (dev.md section 4): a promise to look
-// something up ("let me check that for you", "I'll look that up",
-// "I can check"), and an offer to ("want me to look it up?", "would you
-// like me to check?", "should I search?"). One definition, read by the
-// engine's first-sentence check on both paths, by its pending-ask scan
-// of the rest of the reply, and beside the lookup action family above
-// (which reads the past tense). Never a promise to remember, remind or
-// add: those are the other families' and REG-01's.
-// A lookup verb is one that reaches for a source. What the words also
-// mean is excluded where they overlap (a review): "check in", "check
-// on", "check with", "check back" are care, not lookups; "see what I
-// can do" and "I can see how that feels" are not "see what I can
-// find"; "confirm with Pippa" is a household act; and a verb whose
-// object is the household's own (the list, the calendar, a timer, a
-// memory) is a package's, never the websearch's, so it is no lookup
-// shape here.
-const HOUSEHOLD_OBJECT = String.raw`(?! (?:what'?s (?:on|in) )?(?:your|the|our|my|that|this) (?:lists?|shopping|grocery|groceries|calendar|timers?|reminders?|memory|memories|notes?)\b)`;
-// A clarification is not a lookup either: "let me see if I've got this
-// right", "let me double-check I understood", "can I check something
-// with you" (a review).
-const UNDERSTANDING = String.raw`(?! (?:i(?:'ve| have)? (?:got|understand|understood|follow|heard|read|have)|check (?:if|whether|what) i (?:remember|know|have)|that i|what you|my understanding|i'm following|we're on the same page|this is right|this right|something with you|with you))`;
-const LOOKUP_VERB = String.raw`(?:check(?:ing)?(?! (?:it|that|this|them|those) out)(?! (?:in|on|with|back|up on)\b)(?! something\b)${UNDERSTANDING}|look(?:ing)?(?: (?:that|it|this|them|those))? up|look(?:ing)? into (?:that|it|this)|find(?:ing)? out${UNDERSTANDING}|see (?:if|whether)(?! (?:i can (?:do|help)|that|you|there'?s anything i can do))${UNDERSTANDING}|see what (?:i can find|comes up|the (?:web|internet|search) (?:says|has|turns up)|the (?:date|time|schedule|reviews?|results?) (?:is|are|say))|see about|search(?:ing)?(?: (?:for|online|the web))?|dig(?:ging)? (?:that|it|this) up|double[- ]check(?:ing)?${UNDERSTANDING}|verify(?:ing)?${UNDERSTANDING}|pull(?:ing)? (?:that|it|this) up|get (?:you )?(?:the|that|those|some) (?:details|info|numbers|dates?|times?|results?|answers?))${HOUSEHOLD_OBJECT}`;
-// A filler alone ("hang on", "give me a second") is no promise; it is
-// one only with the lookup verb behind it (a review).
-// LOOKUP-02 (section 16 part 2): the hedge-plus-promise shape is itself
-// the promise ("I can't open pages myself, but I can help you find
-// it"), and the help verbs join the family.
-const LOOKUP_HELP = String.raw`(?:help(?: you)? (?:find|look for|track down|locate)(?: (?:it|that|this|them|one))?|try to find(?: (?:it|that|this|them))?|see what i can find|look for (?:it|that|this|them)|track (?:it|that|this|them) down)`;
-const LOOKUP_PROMISE_RE = new RegExp(String.raw`\b(?:let me (?:just |quickly |go (?:and )?)?(?:${LOOKUP_VERB}|${LOOKUP_HELP})|i(?:'ll| will|'m going to|'m gonna| can| could| should)(?: (?:just|quickly|go (?:and )?|try to|make sure to|double))? (?:${LOOKUP_VERB}|${LOOKUP_HELP})|(?:can'?t|cannot|unable to)[^.!?]{0,60}\bbut i can (?:${LOOKUP_VERB}|${LOOKUP_HELP})|(?:give me a (?:second|sec|moment|minute)|one (?:second|sec|moment|minute)|hold on|hang on)(?: (?:while|and) i ${LOOKUP_VERB}))\b`, "i");
-const LOOKUP_OFFER_RE = new RegExp(String.raw`\b(?:(?:do you )?want me to|would you like me to|would you like (?:me )?to|shall i|should i|can i|need me to|like me to|happy to|i could)\s+(?:\w+ )?(?:${LOOKUP_VERB}|${LOOKUP_HELP})\b|\bi can (?:${LOOKUP_HELP}|look into (?:that|it|this))\b`, "i");
-// LOOKUP-02 (part 1, rule 2): a hedge beside a checkable value is the
-// other confession: the model answered anyway, unsure. A marker plus a
-// value (a number, a date, a proper noun past the first word, a model
-// name) on a world question with no succeeded lookup is an invalid
-// draft, read the same way as a promise. A number word is a number
-// (LOOKUP-02's set: "I think it's seven tracks" went out unread);
-// "one" stays out, a pronoun as often as a count ("the one", "one of").
-const HEDGE_MARK_RE = /\b(?:typically|usually|generally|often|i think|i believe|probably|around|roughly|approximately|if i remember|as far as i (?:know|remember|recall)|but (?:do )?check|i(?:'d)? recommend (?:checking|verifying)|you(?:'ll| will| may| might)? want to (?:verify|double[- ]check|check)|double[- ]check|i'?m not (?:entirely |completely |100% )?(?:sure|certain)|not (?:entirely |completely )?sure|supposed to be|meant to be)\b/i;
-const CHECKABLE_VALUE_RE = /\b\d[\d.,]*\b|(?<=\S\s)\p{Lu}[\p{L}\p{N}-]+|\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|dozen)\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/u;
-export function hedgedFactShape(sentence: string): boolean {
-  return HEDGE_MARK_RE.test(sentence) && CHECKABLE_VALUE_RE.test(sentence);
-}
-// LOOKUP-02 (part 4, rule 4): the denial of a deliverable ("I can't
-// open pages myself", "I can't share links") on a turn the search
-// serves. The sentence is cut and the lookup runs; the deliverable is
-// the answer.
-const FALSE_CAPABILITY_RE = /\b(?:i (?:can'?t|cannot|can not|am unable to|'m unable to|don'?t have (?:the ability|a way|access) to|have no way to|am not able to|'m not able to)|(?:i )?(?:won'?t|will not) be able to|(?:i'?m|i am) not able to)\s+(?:directly\s+|actually\s+|physically\s+)?(?:show|provide|share|access|open|give|send|display|browse|pull up|bring up|find|fetch|visit|click|post|attach|include|retrieve)(?:\s+you)?(?:\s+(?:a|an|the|any|real|actual|direct|live|working|specific))?(?:\s+\w+){0,2}?\s+(?:links?|urls?|(?:web ?)?pages?|websites?|pictures?|images?|photos?|videos?|clips?|screenshots?)\b|\b(?:i (?:can'?t|cannot) (?:open|browse|visit|access) (?:pages|websites|the (?:web|internet)|links|urls))\b/i;
-export function falseCapabilityShape(sentence: string): boolean {
-  return FALSE_CAPABILITY_RE.test(sentence);
-}
-// A promise that names what it will check for the person, in the
-// hub's own words ("I'll check the weather"), is still a promise; a
-// statement that the person can check is not ("you can check the
-// label").
-export type LookupShape = "promise" | "offer" | "hedged_fact" | "denial";
-const RECALL_CHECK_RE = /\bcheck (?:if|whether|what) i (?:remember|know|have)\b/i;
-export function lookupShapeOf(sentence: string): LookupShape | null {
-  if (RECALL_CHECK_RE.test(sentence)) return null;
-  if (LOOKUP_OFFER_RE.test(sentence)) return "offer";
-  if (LOOKUP_PROMISE_RE.test(sentence)) return "promise";
-  return null;
-}
-
-/** LOOKUP-02: what the draft confesses, read over its first two real
- * sentences (or 160 characters) on both paths. A denial of a
- * deliverable is cut first (`false_capability`), so the promise behind
- * it is read; then a promise, an offer, or a hedged fact (on a world
- * question only). `sentence` is the confessing sentence, `index` its
- * place among the visible sentences, `denials` the sentences cut. */
-export const LOOKUP_READ_MAX_CHARS = 160;
-export interface LookupRead {
-  shape: LookupShape;
-  sentence: string;
-  index: number;
-  denials: number[];
-}
-export function readLookupDraft(visible: string, opts: { worldQuestion: boolean; lookupServed: boolean }): LookupRead | null {
-  const sentences = splitIntoSentences(visible);
-  const denials = opts.lookupServed ? sentences.map((s, i) => (falseCapabilityShape(s) ? i : -1)).filter((i) => i >= 0) : [];
-  const candidates = sentences.map((s, i) => ({ s, i })).filter(({ s, i }) => !denials.includes(i) && !HESITATION_ONLY_RE.test(s));
-  let chars = 0;
-  let seen = 0;
-  for (const { s, i } of candidates) {
-    if (seen >= 2 || chars > LOOKUP_READ_MAX_CHARS) break;
-    seen++;
-    chars += s.length;
-    const shape = lookupShapeOf(s);
-    // An offer asks permission: it goes out and binds the next consent
-    // word (notePendingLookup), never runs unasked; a promise, a hedged
-    // fact or a denial is the engine's to act on.
-    if (shape === "promise") return { shape, sentence: s, index: i, denials };
-    if (shape === "offer") break;
-    if (opts.worldQuestion && hedgedFactShape(s)) return { shape: "hedged_fact", sentence: s, index: i, denials };
-  }
-  if (denials.length > 0) return { shape: "denial", sentence: sentences[denials[0]!]!, index: denials[0]!, denials };
-  return null;
-}
-const HESITATION_ONLY_RE = /^\W*(?:h+m+|u+m+|u+h+|a+h+|o+h+|well|ok(?:ay)?|so|right|alright|let'?s see|sure)(?:[,\s]+(?:h+m+|u+m+|well|ok(?:ay)?|so|right|alright|let'?s see))*\W*$/i;
-/** Whether the turn already ran a lookup that answered (the lookup
- * family's own packages), so a promise beside it narrates, not lies. */
-export function lookupAnswered(outcomes: readonly Pick<ToolExecutionOutcome, "packageId" | "status">[] | undefined): boolean {
-  return (outcomes ?? []).some((o) => (o.packageId === "websearch" || o.packageId === "knowledge") && o.status === "succeeded");
 }
 
 // ==== REG-01: the assistant register, and a question said twice ====
@@ -1920,20 +1804,17 @@ function guardCapabilityClaim(sentence: string, ctx: GuardContext): GuardReason 
   // would read that opener as accepting an impossible request.
   const anySucceeded = (ctx.outcomes ?? []).some((o) => o.status === "succeeded");
   if (anySucceeded || !REQUEST_RE.test(ctx.utterance) || sentence.includes("?") || ctx.replyHasQuestion) return null;
-  // LOOKUP-02 (part 1, rule 4): a request the lookup tools serve is
-  // answerable; a failed answer is the failed-lookup line, never
-  // cannot-do. The bank is for actions the hub has no package for.
   if (ctx.lookupServed) return null;
   if (CLAIMED_RE.test(sentence) || ACCEPTS_RE.test(sentence)) return "capability_claim";
   return null;
 }
 
-/** LOOKUP-02: the deliverable denial, cut on a turn the search serves;
- * the engine ran or runs the lookup, and the deliverable is the answer. */
+const FALSE_CAPABILITY_RE = /\b(?:i (?:can'?t|cannot|can not|am unable to|'m unable to|don'?t have (?:the ability|a way|access) to|have no way to|am not able to|'m not able to)|(?:i )?(?:won'?t|will not) be able to|(?:i'?m|i am) not able to)\s+(?:directly\s+|actually\s+|physically\s+)?(?:show|provide|share|access|open|give|send|display|browse|pull up|bring up|find|fetch|visit|click|post|attach|include|retrieve)(?:\s+you)?(?:\s+(?:a|an|the|any|real|actual|direct|live|working|specific))?(?:\s+\w+){0,2}?\s+(?:links?|urls?|(?:web ?)?pages?|websites?|pictures?|images?|photos?|videos?|clips?|screenshots?)\b|\b(?:i (?:can'?t|cannot) (?:open|browse|visit|access) (?:pages|websites|the (?:web|internet)|links|urls))\b/i;
+export function falseCapabilityShape(sentence: string): boolean { return FALSE_CAPABILITY_RE.test(sentence); }
 function guardFalseCapability(sentence: string, ctx: GuardContext): GuardReason | null {
-  if (!ctx.lookupServed) return null;
-  return falseCapabilityShape(sentence) ? "false_capability" : null;
+  return ctx.lookupServed && falseCapabilityShape(sentence) ? "false_capability" : null;
 }
+
 
 // ==== "Like I said": never across conversations ====
 // bot-legacy's actual mechanism (dialogue/manager.py) is structural (the
@@ -2187,9 +2068,7 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   // a pronoun slip that emptied the reply is an output break.
   false_familiarity: DONT_KNOW,
   pronoun_mismatch: MALFORMED,
-  // LOOKUP-02: a denial that was the whole reply, with the lookup not
-  // having answered, is the lookup family's own line.
-  false_capability: LOOKUP_FAILED_LINES,
+  false_capability: ["That lookup didn't work, sorry."],
   banned_phrase: MALFORMED,
   repeat_sentence: CHAT_LOOP,
   repeat_reply: CHAT_LOOP,
