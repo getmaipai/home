@@ -151,7 +151,7 @@ describe("the shapes and the read", () => {
     expect(withoutSentences("Let me look it up.", [0])).toBe(LOOKUP_FAILED_LINE);
   });
 
-  test("lookupQueryFor(): the subject and the offer's field, the person's question as the fallback, the currency marker, never an objection", () => {
+  test("lookupQueryFor(): the subject and the offer's field, the person's question as the fallback, never an objection", () => {
     const rivet = { type: "unresolved" as const, surface_form: "Rivet 3", candidate_kinds: [], provenance: "t", confidence: 0.4, carried_question: null };
     const cosmo = { ...rivet, surface_form: "Cosmo 7" };
     expect(lookupQueryFor({ subjects: [rivet], sentence: "Want me to look up what they're going for used?", utterance: "the old one's a Rivet 3 with 8 gigs", history: [], roster: [], shape: "offer" })).toBe("Rivet 3 going for used");
@@ -160,7 +160,7 @@ describe("the shapes and the read", () => {
     expect(lookupQueryFor({ subjects: [{ ...rivet, surface_form: "Rivet OS" }], sentence: "Let me check that.", utterance: "did the new Rivet OS come out today", history: [], roster: [], shape: "promise" })).toBe("new Rivet OS come out today");
     expect(lookupQueryFor({ subjects: [], sentence: "Let me check.", utterance: "ok", history: ["thanks"], roster: [], shape: "promise" })).toBeNull();
     // The offer's field first even with no subject on the stack (a review).
-    expect(lookupQueryFor({ subjects: [], sentence: "I'll check the weather for you.", utterance: "is it going to rain tomorrow?", history: [], roster: [], shape: "promise" })).toBe("weather tomorrow");
+    expect(lookupQueryFor({ subjects: [], sentence: "I'll check the weather for you.", utterance: "is it going to rain tomorrow?", history: [], roster: [], shape: "promise" })).toBe("weather");
   });
 
   test("lookupConsent(): the imperative forms and the plain yes, never a no or a new question", () => {

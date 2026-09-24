@@ -264,7 +264,6 @@ export interface TurnIntent {
    * "step by step" (CHAT-12 reads it for the output reserve). */
   explicitDetailedAnswer: boolean;
   deliverable?: "link" | "video" | PictureDeliverable;
-  decided?: { field: string; query: string };
 }
 
 export type PictureForm = "poster" | "cover" | "photo";
@@ -273,72 +272,6 @@ export interface PictureDeliverable {
   deliverable: "picture";
   count: PictureCount;
   form?: PictureForm;
-}
-
-export const CURRENCY_MARK_RE = /\b(?:new|newest|latest|current|currently|today|tonight|tomorrow|this (?:year|week|month|season|weekend)|still|yet|upcoming|out yet|come out|came out|released?)\b/i;
-
-const FIELD_STOP_RE = /\b(?:what(?:'s| is)?|which|how|many|much|long|old|when|where|who(?:'s| is)?|is|are|was|were|does|do|did|can|could|would|will|should|it|its|this|that|the|a|an|in|on|of|to|for|out|yet|please|me|you|they|them|he|she)\b/gi;
-export function exactFieldOf(utterance: string): string | null {
-  if (/\b(?:what(?:'s| is)? the )?name(?: of)?\b|\bwhat(?:'s| is) it called\b|\bwho (?:plays|directed)\b|^\s*what(?:'s| is)\s+(?:the\s+)?(?:newest|latest|current)\b/i.test(utterance)) return "name";
-  if (/\bwho (?:is|was)\s+[A-Z][\w'-]*/.test(utterance)) return "who";
-  if (/\bhow much (?:does|is|are|was|were)\b|\bprice\b|\bcost\b/i.test(utterance)) return "price";
-  if (/\bhow many\b|\bhow much\b|\bhow long\b|\bpopulation\b|\bhow old\b/i.test(utterance)) return "count";
-  if (/\bwhen\b|\bwhat year\b|\bwhat day\b|\bwhat date\b|\brelease date\b|\bout yet\b/i.test(utterance)) return "date";
-  if (/\bwho(?:'s| is) in\b|\bcast\b/i.test(utterance)) return "cast";
-  if (/\bhow big\b|\bhow fast\b|\bwhat size\b|\bwhat resolution\b|\bspecs?\b/i.test(utterance)) return "spec";
-  if (/\bwhat(?:'s| is) the policy\b|\bis it allowed\b|\bdo they allow\b/i.test(utterance)) return "policy";
-  if (/\bwhat(?:'s| is) it about\b|\bwhat happens in\b|\bthe plot\b|\bthe premise\b|\bthe story of\b|\bwhat(?:'s| is) the story\b/i.test(utterance)) return "synopsis";
-  return null;
-}
-
-/** The noun "how many" counts ("how many tracks"), when the word after
- * it is one and not a stop word ("how many are on it" counts nothing
- * named; a review). */
-function countedNoun(utterance: string): string | null {
-  const word = utterance.match(/\bhow (?:many|much)\s+(\p{L}+)/iu)?.[1] ?? null;
-  if (!word) return null;
-  return new RegExp(`^(?:${FIELD_STOP_RE.source})$`, "i").test(word) ? null : word;
-}
-
-export function lookupDecision(utterance: string, subjects: readonly SubjectRef[], roster: readonly string[]): { field: string; query: string } | null {
-  const field = exactFieldOf(utterance);
-  if (!field) return null;
-  // Section 16 part 1 rule 1: the decision needs a world subject on the
-  // stack (a world reference not dated, or a bare unresolved name,
-  // CHAT-13's world subject) and an exact field. A currency marker
-  // alone ("when is the new album out" with nothing on the stack) names
-  // no subject to look up: the question is the model's, and a promise
-  // or an offer in its draft takes LOOKUP-02's path.
-  // The stack's head is the subject (the utterance's own first, else
-  // the carried one): a dated one ends the decision, never passed over
-  // for another entry ("when was the 2020 Marsh Lantern album out" with
-  // Rivet carried is not a Rivet lookup; a review). A bare single
-  // unresolved name with no kind ("who is Serena") is ASK-02's, not a
-  // world subject to search: an unresolved reference decides only with
-  // a kind (a brand, an organization) or more than one word.
-  const head = subjects.find((s) => s.type === "world" || s.type === "unresolved");
-  if (!head) return null;
-  if (head.type === "world" && head.recency === "dated") return null;
-  if (head.type === "unresolved" && !(head.candidate_kinds.length > 0 || head.surface_form.trim().split(/\s+/).length > 1)) return null;
-  if (head.type === "unresolved" && head.candidate_kinds.length > 0 && !head.candidate_kinds.includes("organization")) return null;
-  const subject = head;
-  const currency = utterance.match(CURRENCY_MARK_RE)?.[0];
-  const name = subject ? subject.type === "world" ? subject.display_name : subject.type === "unresolved" ? subject.surface_form : "" : "";
-  const words = utterance.replace(CURRENCY_MARK_RE, " ").replace(name ? new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu") : /$^/, " ").replace(FIELD_STOP_RE, " ").replace(/[^\p{L}\p{N}' -]/gu, " ").replace(/\s+/g, " ").trim();
-  // The asked field rides when its own words were all stop words ("how
-  // long is the new Marsh Lantern film" asks the length, not the film;
-  // a review).
-  const fieldNoun = field === "date" && /\bout\b/i.test(utterance) ? "release date" : field === "price" ? "price" : /\bhow long\b/i.test(utterance) ? "length" : /\bhow old\b/i.test(utterance) ? "age" : /\bhow (?:many|much)\b/i.test(utterance) ? (countedNoun(utterance) ? "" : "how many") : field === "count" || field === "who" || field === "name" || field === "cast" ? "" : field;
-  const fieldWords = field === "synopsis" ? "plot summary" : field === "date" && /\bout\b/i.test(utterance) ? "release date" : [words, words && fieldNoun && !new RegExp(`\\b${fieldNoun}\\b`, "i").test(words) ? fieldNoun : ""].filter(Boolean).join(" ") || fieldNoun || field;
-  // The subject leads and the field follows ("Marsh Lantern release
-  // date"). A superlative or a time word rides between them ("Rivet
-  // newest phone", "Marsh Lantern showtimes tonight" reads as "Marsh
-  // Lantern tonight showtimes"); a bare "new", "still", "yet" or "out"
-  // says nothing the subject and the field do not, and never trails
-  // ("release date new").
-  const rides = currency && /^(?:newest|latest|current|currently|today|tonight|tomorrow|this (?:year|week|month|season|weekend)|upcoming)$/i.test(currency) ? currency : "";
-  const query = [name, rides, fieldWords].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
-  return query ? { field, query } : null;
 }
 
 export interface FrozenPersona {
@@ -449,22 +382,6 @@ function pictureDeliverableFor(utterance: string): PictureDeliverable | undefine
         : 1;
   if (!PICTURE_DELIVERABLE_PHRASES.some((re) => re.test(utterance))) return undefined;
   return { deliverable: "picture", count, ...(form ? { form } : {}) };
-}
-
-export function deliverableQuery(deliverable: "link" | "picture" | "video" | PictureDeliverable, subjects: readonly SubjectRef[], utterance: string): string {
-  const subjectCandidates = subjects.filter((candidate): candidate is Extract<SubjectRef, { type: "world" | "unresolved" }> => candidate.type === "world" || candidate.type === "unresolved");
-  const explicitSubject = subjectCandidates.find((candidate) => {
-    const name = candidate.type === "world" ? candidate.display_name : candidate.surface_form;
-    return new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(utterance);
-  });
-  const subject = explicitSubject ?? subjectCandidates[0];
-  const name = subject?.type === "world" ? subject.display_name : subject?.type === "unresolved" ? subject.surface_form : undefined;
-  const fallback = utterance.toLowerCase().replace(/\b(where(?:'s| is)?|what(?:'s| is)?|how|can|i|me|a|an|the|got|any|please|show|send|link|url|page|source|picture|photo|image|video|trailer|clip|of|it|that|this|for|does|look|like)\b/gi, " ").replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
-  const base = name ?? fallback;
-  const kind = typeof deliverable === "string" ? deliverable : deliverable.deliverable;
-  const pictureForm = typeof deliverable === "object" ? deliverable.form : undefined;
-  const pictureSuffix = pictureForm === "poster" ? " movie poster" : pictureForm === "cover" ? " album cover" : pictureForm === "photo" ? " photo" : " photos";
-  return `${base}${kind === "link" ? /\bsupport\b/i.test(utterance) ? " support page" : " official page" : kind === "picture" ? pictureSuffix : " video"}`.trim();
 }
 
 export function deliverableInDenial(sentence: string): "link" | "picture" | "video" {

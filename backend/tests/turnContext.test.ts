@@ -3,7 +3,7 @@
 // own rules; tests/turnEngine.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
-import { guardContextFrom, intentFor, deliverableQuery, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, exactFieldOf, lookupDecision, sensitiveAllowed, asksHowKnown, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, sensitiveAllowed, asksHowKnown, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { worryingConversation } from "@/lib/turnContext";
 
@@ -61,50 +61,6 @@ test("sensitiveAllowed(): the robot requires a confirmed speaker who is confirme
 test("asksHowKnown(): recognizes fixed provenance questions only", () => {
   for (const text of ["how do you know", "how do you know that", "where did that come from", "are you sure", "did you make that up", "source?"]) expect(asksHowKnown(text)).toBe(true);
   expect(asksHowKnown("how do I know that?" )).toBe(false);
-});
-
-test("exactFieldOf(): recognizes exact lookup fields and leaves stable questions alone", () => {
-  expect(exactFieldOf("what's it called")).toBe("name");
-  expect(exactFieldOf("how many tracks")).toBe("count");
-  expect(exactFieldOf("when is it out")).toBe("date");
-  expect(exactFieldOf("what's the price")).toBe("price");
-  expect(exactFieldOf("who's in it")).toBe("cast");
-  expect(exactFieldOf("what resolution is it")).toBe("spec");
-  expect(exactFieldOf("what's the policy")).toBe("policy");
-  expect(exactFieldOf("what's it about")).toBe("synopsis");
-  expect(exactFieldOf("is it any good")).toBeNull();
-  expect(exactFieldOf("why is the sky blue")).toBeNull();
-  expect(exactFieldOf("what does irony mean")).toBeNull();
-  expect(exactFieldOf("how do I reset it")).toBeNull();
-});
-
-test("lookupDecision(): uses a current world subject, rejects dated subjects, and honors currency", () => {
-  expect(lookupDecision("when is it out", [{ type: "world", kind: "album", display_name: "Marsh Lantern", year: null, source_kind: "web", stable_key: null, recency: "current", carried_question: null }], [])).toEqual({ field: "date", query: "Marsh Lantern release date" });
-  expect(lookupDecision("when is it out", [{ type: "world", kind: "album", display_name: "Marsh Lantern", year: 2020, source_kind: "web", stable_key: null, recency: "dated", carried_question: null }], [])).toBeNull();
-  // A currency marker alone names no subject: nothing to decide (the
-  // model's turn, LOOKUP-02's path for a promise or an offer in it).
-  expect(lookupDecision("when is the new album out", [], [])).toBeNull();
-  const film = { type: "unresolved" as const, surface_form: "Marsh Lantern", candidate_kinds: [] as never[], provenance: "t", confidence: 0.4, carried_question: null };
-  // With the subject on the stack (a bare proper noun is CHAT-13's world
-  // subject), the subject leads, a superlative rides, and a bare "new"
-  // never trails.
-  // A brand before a product noun carries ASK-02's organization kind; a
-  // bare single name with no kind ("who is Serena") is ASK-02's ask, not
-  // a subject to search (a review).
-  const rivet = { type: "unresolved" as const, surface_form: "Rivet", candidate_kinds: ["organization"] as never[], provenance: "t", confidence: 0.4, carried_question: null };
-  expect(lookupDecision("what's the newest Rivet phone", [rivet], [])?.query).toBe("Rivet newest phone");
-  const serena = { type: "unresolved" as const, surface_form: "Serena", candidate_kinds: [] as never[], provenance: "t", confidence: 0.4, carried_question: null };
-  expect(lookupDecision("who is Serena", [serena], [])).toBeNull();
-  expect(lookupDecision("how old is Serena", [serena], [])).toBeNull();
-  // A dated head ends the decision; a carried subject never takes it.
-  const dated = { type: "world" as const, kind: "album", display_name: "Marsh Lantern", year: 2020, source_kind: null, stable_key: null, recency: "dated" as const, carried_question: null };
-  expect(lookupDecision("when was the 2020 Marsh Lantern album out", [dated, rivet], [])).toBeNull();
-  // The asked field rides when its own words were stop words.
-  expect(lookupDecision("how long is the new Marsh Lantern film", [film], [])?.query).toBe("Marsh Lantern film length");
-  expect(lookupDecision("how much is the Rivet phone", [rivet], [])).toEqual({ field: "price", query: "Rivet phone price" });
-  expect(lookupDecision("when is the new Marsh Lantern film out", [film], [])?.query).toBe("Marsh Lantern release date");
-  expect(lookupDecision("what's it about", [{ type: "world", kind: "film", display_name: "Marsh Lantern", year: null, source_kind: "web", stable_key: null, recency: "current", carried_question: null }], [])).toEqual({ field: "synopsis", query: "Marsh Lantern plot summary" });
-  expect(lookupDecision("how many tracks are on the new Marsh Lantern album", [film], [])?.query).toBe("Marsh Lantern tracks album");
 });
 
 test("sourcesFromRows(): keeps eight safe web sources and normalizes URLs", () => {
@@ -222,33 +178,16 @@ describe("intentFor(): the provisional intent", () => {
     expect(intentFor("what's the capital of Portugal", signalFor("what's the capital of Portugal")).deliverable).toBeUndefined();
   });
 
-  test("builds a deliverable query from the live world subject", () => {
-    expect(deliverableQuery("link", [{ type: "world", kind: "thing", display_name: "Cosmo 7", year: null, source_kind: null, stable_key: null, recency: "unknown", carried_question: null }], "where's the maker's support page for the Cosmo 7 card")).toBe("Cosmo 7 support page");
-  });
-
-  test("an explicit deliverable subject beats an older stack subject", () => {
-    const stack = [
-      { type: "world" as const, kind: "person", display_name: "Earlier Person", year: null, source_kind: null, stable_key: null, recency: "unknown" as const, carried_question: null },
-      { type: "unresolved" as const, surface_form: "Marsh Lantern", candidate_kinds: ["organization" as const], provenance: "turn", confidence: 0.4, carried_question: null },
-    ];
-    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "poster" }, stack, "show me the poster for the movie Marsh Lantern")).toBe("Marsh Lantern movie poster");
-    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "poster" }, stack, "your results have nothing to do with Marsh Lantern")).toBe("Marsh Lantern movie poster");
-  });
-
   test("picture classifier accepts plural and counted requests", () => {
     expect(intentFor("show me pictures of Serena Vale", signalFor("show me pictures of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 1 });
     expect(intentFor("show me 3 pictures of Serena Vale", signalFor("show me 3 pictures of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 3 });
     expect(intentFor("show me a few images of Serena Vale", signalFor("show me a few images of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 3 });
   });
 
-  test("picture forms are typed once and become query words", () => {
-    const subject = [{ type: "world" as const, kind: "film", display_name: "Marsh Lantern", year: null, source_kind: null, stable_key: null, recency: "unknown" as const, carried_question: null }];
+  test("picture forms stay typed", () => {
     expect(intentFor("show me the movie poster for Marsh Lantern", signalFor("show me the movie poster for Marsh Lantern")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "poster" });
-    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "poster" }, subject, "show me the movie poster for Marsh Lantern")).toBe("Marsh Lantern movie poster");
     expect(intentFor("show me the album cover for Marsh Lantern", signalFor("show me the album cover for Marsh Lantern")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "cover" });
-    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "cover" }, subject, "show me the album cover for Marsh Lantern")).toBe("Marsh Lantern album cover");
     expect(intentFor("show me a photo of Serena Vale", signalFor("show me a photo of Serena Vale")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "photo" });
-    expect(deliverableQuery({ deliverable: "picture", count: 1, form: "photo" }, subject, "show me a photo of Marsh Lantern")).toBe("Marsh Lantern photo");
     expect(intentFor("show me the artwork for Marsh Lantern", signalFor("show me the artwork for Marsh Lantern")).deliverable).toEqual({ deliverable: "picture", count: 1, form: "cover" });
   });
 

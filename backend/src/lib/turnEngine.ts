@@ -28,7 +28,7 @@ import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, pa
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP, feedThinkSplit, newThinkSplitState, extractReasoningText } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, deliverableQuery, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, exactFieldOf, lookupDecision, CURRENCY_MARK_RE, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
+import { intentFor, deliverableInDenial, isPictureFollowup, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, sensitiveAllowed, effectiveBand, worryingConversation, asksHowKnown, type TurnContext, type TurnIntent, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
@@ -2239,8 +2239,7 @@ export function withoutPromise(text: string, fallback: string = LOOKUP_FAILED_LI
 // world or unresolved reference; the field is what the offer names
 // after its lookup verb, pronouns and fillers out; the fallback is the
 // person's last question-shaped turn about the subject, never an
-// objection, an acknowledgment or a one-word turn. A currency marker
-// in the question ("did the new Rivet OS come out today") rides along.
+// objection, an acknowledgment or a one-word turn.
 const LOOKUP_FIELD_LEAD_RE = /^(?:what|which|how much|how many|whether|if|when|where|who|that|the|a|an|some|about|on|for|up|into|out|is|are|was|were|does|do|did|can|could|would|will|should|there)\b\s*/i;
 function stripLead(text: string): string {
   let out = text.trim();
@@ -2285,8 +2284,6 @@ export function lookupQueryFor(input: { subjects: readonly SubjectRef[]; sentenc
   // one that names the subject.
   const questionTurns = [input.utterance, ...[...input.history].reverse()].filter((t) => t.trim().split(/\s+/).length > 1 && !NOT_A_QUESTION_TURN_RE.test(t.trim()) && (/\?\s*$/.test(t.trim()) || /^(?:what|which|how|when|where|who|why|is|are|does|do|did|can|could|would|will|should)\b/i.test(t.trim())));
   const question = subjectName ? questionTurns.find((t) => new RegExp(subjectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").test(t)) : questionTurns[0];
-  const askedField = question ? exactFieldOf(question) : null;
-  const currency = [input.utterance, question ?? ""].map((t) => CURRENCY_MARK_RE.exec(t)?.[0]).find((m): m is string => !!m);
   // LOOKUP-02's set: no world or unresolved subject on the stack and a
   // pronoun-only question ("when did it happen" after a turn about the
   // moon landing): the confessing sentence's own words are the query,
@@ -2314,19 +2311,18 @@ export function lookupQueryFor(input: { subjects: readonly SubjectRef[]; sentenc
     // "happened while ago" search nothing (a review).
     const asked = new Set(input.utterance.toLowerCase().split(/[^\p{L}\p{N}']+/u).filter((w) => w.length > 0).map((w) => w.slice(0, 4)));
     const content = words.filter((w) => w.length >= 3 && !asked.has(w.toLowerCase().slice(0, 4)) && !TIME_FILLER_RE.test(w));
-    if (words.length >= 2 && content.length >= 1) return [words.join(" "), currency ?? ""].filter(Boolean).join(" ").trim();
+    if (words.length >= 2 && content.length >= 1) return words.join(" ");
   }
-  if (field.length > 0 && subjectName) return [subjectName, field, currency && !field.toLowerCase().includes(currency.toLowerCase()) ? currency : ""].filter(Boolean).join(" ");
-  if (askedField === "synopsis" && subjectName) return `${subjectName} plot summary`;
+  if (field.length > 0 && subjectName) return `${subjectName} ${field}`;
   // The field the offer named is the query even with no subject on the
   // stack ("I'll check the weather" is "weather tomorrow", not the
   // question's leftovers; a review); the question is the fallback.
-  if (field.length > 0 && field.split(/\s+/).length >= 1 && !question?.toLowerCase().includes(field.toLowerCase())) return [field, currency ?? ""].filter(Boolean).join(" ").trim();
+  if (field.length > 0 && field.split(/\s+/).length >= 1 && !question?.toLowerCase().includes(field.toLowerCase())) return field;
   if (question) {
     const q = stripLead(question.replace(/[?.!]+$/g, "").replace(/(?<=\p{L})[\u2019']\s*(?:re|s|m|ve|ll|d)\b/giu, "")).replace(LOOKUP_FIELD_FILLER_RE, " ").replace(/\s+/g, " ").trim();
     return subjectName && !new RegExp(subjectName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").test(q) ? `${subjectName} ${q}` : q;
   }
-  if (subjectName) return [subjectName, field, currency ?? ""].filter(Boolean).join(" ").trim();
+  if (subjectName) return [subjectName, field].filter(Boolean).join(" ").trim();
   return field.length > 0 ? field : null;
 }
 
@@ -3611,36 +3607,6 @@ async function prepareTurn(
     setPendingAsk(conversation.id, { kind: "relay", prompt: line, packageId: "relay", args: {}, name: deferredSubjectName, subjectId: deferredSubject.entity_id });
     return immediate({ reply: { text: line }, source: "policy", safety, crisis_resources: crisisResources }, [deferredSubject]);
   }
-  // CHAT-13, section 16 part 1 rule 1: a world subject's exact field (a
-  // date, a count, a price, a cast, a spec) is the engine's lookup before
-  // the model runs, whether the question names the subject or refers
-  // back to it; the model's knowledge is a rung only for a dated
-  // subject (lookupDecision() skips one). The slice that landed first
-  // took follow-ups only; the rule takes the question that names its
-  // subject too.
-  if (!continuation && shapeOf(signal, text) === "question" && !householdSubjectTurn(text, turnContext)) {
-    const decided = lookupDecision(text, subjects, turnContext.roster);
-    // A lookup on the previous two turns that already names the subject
-    // is in the window: the model answers from it, a person would not
-    // search again (the offer-binding row's own read; a review).
-    // The previous two turns themselves (lastTurnIds), never the last
-    // two turns that happened to run a tool, so a lookup fifteen chat
-    // turns back is not "in the window" (a review); the knowledge
-    // rung's topic counts beside the search's expression.
-    const recentTurns = new Set(lastTurnIds(conversation.id, 2));
-    const answered = decided !== null && outcomesForConversation(conversation.id, 2).some((row) => recentTurns.has(row.turnId) && row.outcomes.some((o) => {
-      const expression = typeof o.args?.expression === "string" ? o.args.expression : typeof o.args?.topic === "string" ? o.args.topic : null;
-      if (o.status !== "succeeded" || !LOOKUP_FAMILY.has(o.packageId) || expression === null) return false;
-      // The same subject and the same field: every word of the decided
-      // query is in the earlier expression (a lookup of the date does
-      // not answer the tracks).
-      const earlier = tokenize(expression);
-      const asked = [...tokenize(decided.query)];
-      return asked.length > 0 && asked.every((w) => earlier.has(w));
-    }));
-    if (decided && answered) fired("lookup.answered_recently");
-    if (decided && !answered) { fired("lookup.decided"); turnContext.intent.decided = decided; }
-  }
   const deliverable = deliverableKind(turnContext.intent.deliverable);
   const backReference = deliverable === "link" && /^(?:\s*(?:where did you read that|link me|the source|send me the page)(?:\s*(?:,|and)\s*(?:where did you read that|link me|the source|send me the page))?\s*[?.!]?)$/i.test(text);
   if (deliverable) fired(`deliverable.${deliverable}`);
@@ -3737,7 +3703,6 @@ async function prepareTurn(
   // The decision needs a rung to run on: with no lookup tool offered
   // (no search installed, a role below its floor, the crisis state) the
   // turn is the model's, never "I couldn't look that up" (a review).
-  if (turnContext.intent.decided && lookupTools.length === 0) delete turnContext.intent.decided;
 
   turnContext.offeredToolIds = tools.map((t) => t.id);
   // CHAT-01: the guards' context is derived from the included evidence
@@ -4517,13 +4482,13 @@ function appendedAsk(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: 
  * the search runs next with the same query before anything reaches
  * the guards; the failed rung stays in the outcomes. Null when no rung
  * answered: the caller says the honest line. */
-async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: PersonRow, conversationId: string, text: string, read: Pick<LookupRead, "shape" | "sentence">, thinking: boolean | undefined, queryOverride?: string): Promise<TurnValue | null> {
+async function runForcedLookup(prepared: Extract<PreparedTurn, { kind: "model" }>, actor: PersonRow, conversationId: string, text: string, read: Pick<LookupRead, "shape" | "sentence">, thinking: boolean | undefined): Promise<TurnValue | null> {
   const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
   const history = prepared.turnContext.history.filter((m) => m.role === "user").map((m) => m.content);
   const denialDeliverable = read.shape === "denial" ? (deliverableKind(prepared.turnContext.intent.deliverable) ?? deliverableInDenial(read.sentence)) : undefined;
   const searchDeliverable = deliverableKind(prepared.turnContext.intent.deliverable) ?? denialDeliverable;
   const pictureCount = pictureCountOf(prepared.turnContext.intent.deliverable);
-  const expression = queryOverride ?? (denialDeliverable ? deliverableQuery(denialDeliverable, prepared.turnContext.subjects, text) : lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape }));
+  const expression = lookupQueryFor({ subjects: prepared.turnContext.subjects, sentence: read.sentence, utterance: text, history, roster: prepared.turnContext.roster, shape: read.shape });
   const outcomes = prepared.turnContext.outcomes;
   prepared.machine?.enter("executing");
   ruleFired(prepared, "lookup.forced");
@@ -5016,14 +4981,10 @@ async function runTurnHoldingLease(
     // CHAT-16: a direct route's result the composer phrases (its outcome
     // is the last on the context); no initial call was spent.
     value = await composeBlocking(prepared.compose, prepared.turnContext.outcomes.slice(-1), true);
-  } else if (prepared.turnContext.intent.decided) {
-    const before = prepared.turnContext.outcomes.length;
-    const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, prepared.turnContext.intent.decided.query);
-    value = resolved ? await composeBlocking(resolved, prepared.turnContext.outcomes.slice(before)) : { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
   } else if (prepared.turnContext.intent.deliverable) {
     const deliverableValue = prepared.turnContext.intent.deliverable;
     const deliverable = deliverableKind(deliverableValue)!;
-    const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverableValue, prepared.turnContext.subjects, text));
+    const resolved = await runForcedLookup(prepared, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking);
     const sources = resolved?.sources ?? [];
     if (!sources.length) value = resolved ?? { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: prepared.safety, crisis_resources: prepared.crisisResources, conversation_id: conversation.id, turn_id: prepared.turnId };
     else {
@@ -6574,24 +6535,13 @@ async function runTurnStreamHoldingLease(
   // TurnValue (StreamOutcome's `{ resolved }`), not as an "immediate"
   // result, because the decision is only known after the peek.
   //
-  if (modelTurn.turnContext.intent.decided) {
-    async function* decidedLookupStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
-      status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
-      const before = modelTurn.turnContext.outcomes.length;
-      const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, modelTurn.turnContext.intent.decided!.query);
-      if (resolved) return yield* composeOrResolve(resolved, modelTurn.turnContext.outcomes.slice(before));
-      return { resolved: { reply: { text: LOOKUP_FAILED_LINE }, source: "plugin_error", safety: modelTurn.safety, crisis_resources: modelTurn.crisisResources, conversation_id: conversation.id, turn_id: modelTurn.turnId } };
-    }
-    return buildStreamResult(decidedLookupStream());
-  }
-
   if (modelTurn.turnContext.intent.deliverable) {
     const deliverable = deliverableKind(modelTurn.turnContext.intent.deliverable);
     if (!deliverable) return buildStreamResult((async function* (): AsyncGenerator<string, undefined, void> { return undefined; })());
     async function* deliverableStream(): AsyncGenerator<string, ToolCall[] | { resolved: TurnValue } | undefined, void> {
       status.emit({ type: "status", text: "Checking that for you.", stage: "lookup" });
       const deliverableValue = modelTurn.turnContext.intent.deliverable!;
-      const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking, deliverableQuery(deliverableValue, modelTurn.turnContext.subjects, text));
+      const resolved = await runForcedLookup(modelTurn, actor, conversation.id, text, { shape: "promise", sentence: "" }, opts.thinking);
       if (resolved?.sources?.length) return { resolved: composeDeliverable(resolved, deliverable!, modelTurn.turnContext.ageBand, modelTurn.surface, pictureCountOf(deliverableValue)) };
       yield `${LOOKUP_FAILED_LINE} `;
       return undefined;
