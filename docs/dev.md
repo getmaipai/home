@@ -25745,3 +25745,53 @@ mechanism (b) and (c) above measure for an ordinary pinned or entity-
 matched memory. Neither path's floor was ever going to touch (a)'s own
 leak either, but for the separate reason above: the profile line is
 not a `recall()` candidate on either path, floor or no floor.
+
+## CHAT-RICH-01: rich chat content, and the write_document gap on the new path (2026-09-24)
+
+**Landed** (commons `ui-v0.5.52`, home `fc3b770c`): shiki syntax
+highlighting, mermaid diagrams and KaTeX math wired into
+`@maipai/ui`'s `elements/markdown-text.tsx` - full write-up and
+verification in `commons/docs/dev.md`'s own "CHAT-RICH-01" entry.
+Verified live on 8787 (`/next/chat`, the new turn-pipeline path,
+`elements/thread.aui.tsx` -> `NextChatPage.tsx`): a real turn asking
+for a short TypeScript function rendered a colored, GitHub-theme code
+block with a language header and copy button, at 1512px and the
+narrowest width the interactive browser's own window would reach
+(500px - Chrome enforces a 500px minimum window width on this machine;
+390px was not reachable through the extension, so this is the closest
+live substitute, not the exact figure asked for), both light and dark,
+all four opened and judged before this was written down.
+
+**write_document/canvas: verified broken on the new path, not fixed
+here** (engine files are session B's side, per the coordinator's own
+scope). A live turn asking to "write me a short document with our
+grocery list for this week" replied with a plain bulleted list
+rendered inline in chat - no canvas opened, no document artifact was
+created. Traced to `backend/src/lib/modelCatalog.ts:85`: the resident
+model's own `tools_offered` list is `["almanac-date", "almanac-time",
+"convert", "math", "remember", "remind", "timer", "weather",
+"websearch"]` - `write_document` is not in it, and this is the only
+model entry with a turn budget today, so the new path's own tool node
+(`turnMachine/nodes/model.ts:429`, `tools = state.budget.
+tools_offered`) never offers `write_document` to the model at all,
+on any turn. `composer.ts:605` already knows how to turn a
+`write_document` outcome into a `document` artifact (real, working
+code), and `turnNext.ts:104`'s own comment already names the gap
+("no artifact - write_document's own...") - the missing piece is
+purely the budget's own tool list, a one-line addition once whichever
+session owns `modelCatalog.ts` decides the turn-budget cost is worth
+it (every added tool grows the cached tools block every offered
+turn pays for, the same tradeoff `tools_offered`'s own comments there
+already discuss for `math`/`convert`/`almanac-*`).
+
+**Verification**: live turns exercised on 8787 as above; screenshots
+opened and judged before writing this section. `bash scripts/check.sh`
+(scope `full`, since `bun.lock`/`scripts/check.sh` changed) green:
+backend 4175/4175, frontend 726/726, build, a11y, docs and standards
+all clean. Low-effort review clean (home side and commons side, two
+passes). Filed `CHAT-RICH-02` (docs/BACKLOG.md) for the real fix to
+the PWA precache-limit workaround this item's own new dependencies
+required (code-splitting shiki/mermaid/katex out of Chat's eager
+entry chunk); write_document's own tool-list gap is named here for
+whichever session picks it up next, not filed as a separate backlog
+row since it is one line in an existing, owned file.
