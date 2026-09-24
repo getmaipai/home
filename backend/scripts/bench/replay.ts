@@ -250,7 +250,7 @@ function renderNodeTrace(observed: TurnObserved): string[] {
     lines.push(`       ${label}: ${wallMs}ms`);
   }
   for (const g of observed.generationTrace ?? []) {
-    lines.push(`       generation "${g.reason}": thinking=${g.thinking} prompt_n=${g.prompt_n ?? "?"} cache_n=${g.cache_n ?? "?"} prompt_ms=${g.prompt_ms ?? "?"} predicted_ms=${g.predicted_ms ?? "?"}`);
+    lines.push(`       generation "${g.reason}": thinking=${g.thinking} prompt_n=${g.prompt_n ?? "?"} cache_n=${g.cache_n ?? "?"} prompt_ms=${g.prompt_ms ?? "?"} predicted_n=${g.predicted_n ?? "?"} predicted_ms=${g.predicted_ms ?? "?"}`);
   }
   return lines;
 }
@@ -288,7 +288,7 @@ export interface BarScore {
   pass: boolean | null;
   turnIndex: number;
   checks: readonly { name: string; pass: boolean; detail: string }[];
-  observed: { requiredHonored?: boolean | null; totalMs: number; reply: string; generationTrace?: readonly { cache_n: number | null | undefined }[] | null };
+  observed: { requiredHonored?: boolean | null; totalMs: number; reply: string; generationTrace?: readonly { cache_n: number | null | undefined; predicted_n?: number | null; predicted_ms?: number | null }[] | null };
 }
 
 /** RERUN-PROTOCOL-01: the five conditions dev.md "U6 rerun ruling" (d)
@@ -325,29 +325,64 @@ export function computeBarSummary(oldScores: ReadonlyMap<string, readonly BarSco
     detail: controlVerdicts.map((v) => `${v.id}: ${v.passRepeats}/${repeats}`).join("; "),
   });
 
-  let worstPlainRatio = 0;
-  let plainCount = 0;
+  // U6: the flip, decided (dev.md) - the old-path-ratio condition is
+  // retired, the same way PHRASE-01's own "within 2s of the old path"
+  // bar was: it compared the new path's wall clock against a shortcut
+  // the design deletes and a shorter reply the reply floor forbids, so
+  // a miss against it never proved a defect. In its place: a longer
+  // reply is not a regression, an idle gap inside a generation is - so
+  // this measures each generation's OWN decode rate (predicted_n over
+  // predicted_ms) against the engine's own rate this run, never one
+  // path's total against the other's. The reference rate is this run's
+  // own median generation rate (new path only, self-referential - no
+  // hardcoded hardware assumption, the same "the configuration is
+  // proposed, never fixed" posture the hardware-tiers record uses
+  // elsewhere); the allowance (1.5x the expected decode time, or 500ms
+  // over it, whichever is looser) is a deliberately generous floor
+  // meant to catch a genuine multi-hundred-ms-or-worse stall, not
+  // ordinary measurement noise between generations.
+  const rates: number[] = [];
   for (const row of rows) {
     for (let r = 1; r <= repeats; r++) {
-      const oldTurns = (oldScores.get(`${row.id}#${r}`) ?? []).filter((s) => !isForced(s));
-      const newTurns = (newScores.get(`${row.id}#${r}`) ?? []).filter((s) => !isForced(s));
-      for (let i = 0; i < Math.min(oldTurns.length, newTurns.length); i++) {
-        const oldMs = oldTurns[i]!.observed.totalMs;
-        const newMs = newTurns[i]!.observed.totalMs;
-        if (oldMs <= 0) continue;
-        plainCount++;
-        worstPlainRatio = Math.max(worstPlainRatio, newMs / oldMs);
+      for (const s of newScores.get(`${row.id}#${r}`) ?? []) {
+        for (const g of s.observed.generationTrace ?? []) {
+          if (typeof g.predicted_n === "number" && g.predicted_n > 0 && typeof g.predicted_ms === "number" && g.predicted_ms > 0) {
+            rates.push(g.predicted_n / (g.predicted_ms / 1000));
+          }
+        }
+      }
+    }
+  }
+  const referenceRate = median(rates);
+  let worstIdleGap: { row: string; repeat: number; excessMs: number; predictedMs: number; expectedMs: number } | null = null;
+  let idleGapCount = 0;
+  let generationCount = 0;
+  if (referenceRate > 0) {
+    for (const row of rows) {
+      for (let r = 1; r <= repeats; r++) {
+        for (const s of newScores.get(`${row.id}#${r}`) ?? []) {
+          for (const g of s.observed.generationTrace ?? []) {
+            if (typeof g.predicted_n !== "number" || g.predicted_n <= 0 || typeof g.predicted_ms !== "number" || g.predicted_ms <= 0) continue;
+            generationCount++;
+            const expectedMs = (g.predicted_n / referenceRate) * 1000;
+            const allowedMs = Math.max(expectedMs * 1.5, expectedMs + 500);
+            if (g.predicted_ms > allowedMs) {
+              idleGapCount++;
+              const excessMs = g.predicted_ms - expectedMs;
+              if (!worstIdleGap || excessMs > worstIdleGap.excessMs) worstIdleGap = { row: row.id, repeat: r, excessMs, predictedMs: g.predicted_ms, expectedMs };
+            }
+          }
+        }
       }
     }
   }
   conditions.push({
-    // A review caught this failing hard on zero plain turns, unlike
-    // condition 4's own "nothing to measure" treatment below for the
-    // identical shape (no matching data) - aligned to the same
-    // convention: nothing to measure is not a regression.
-    label: "every plain turn's total is within 1.25x the old path's total",
-    pass: plainCount === 0 || worstPlainRatio <= 1.25,
-    detail: plainCount === 0 ? "no plain turns matched between the two paths" : `worst ratio ${worstPlainRatio.toFixed(2)}x across ${plainCount} plain turns`,
+    label: "no generation's decode time exceeds the engine's own token rate for its length",
+    pass: generationCount === 0 || idleGapCount === 0,
+    detail:
+      generationCount === 0
+        ? "no timed generations this run"
+        : `${generationCount - idleGapCount}/${generationCount} generations at rate, reference ${referenceRate.toFixed(1)} tok/s${worstIdleGap ? `; worst: ${worstIdleGap.row}#${worstIdleGap.repeat} predicted_ms=${worstIdleGap.predictedMs.toFixed(0)} expected_ms=${worstIdleGap.expectedMs.toFixed(0)} (${idleGapCount} over the allowance)` : ""}`,
   });
 
   const forcedTotals: number[] = [];
@@ -373,7 +408,24 @@ export function computeBarSummary(oldScores: ReadonlyMap<string, readonly BarSco
       let prevCache = -Infinity;
       for (const t of newTurns) {
         const cache = t.observed.generationTrace?.[0]?.cache_n;
-        if (cache === undefined || cache === null) continue;
+        if (cache === undefined || cache === null) {
+          // U6: the flip, decided (dev.md) - a turn with no cache_n
+          // reading (a forced call's own interim_rule generation, when
+          // the engine never reported one) is a gap in what was
+          // measured, not evidence the prefix was evicted. The
+          // checker used to bridge straight over it, comparing the
+          // NEXT valid reading against the LAST one before the gap
+          // (control-ten-turn-spoken-drift#1's own false failure,
+          // turn 3 read against turn 1's cache_n across turn 2's own
+          // missing one) - a scorer defect, not the mechanism PHRASE-02
+          // fixes. Resetting the floor here instead means the next
+          // valid reading is compared against nothing, always passes,
+          // and becomes the new floor going forward - "compares
+          // against the last turn that HAD a cache_n value," which
+          // after a gap is no turn at all.
+          prevCache = -Infinity;
+          continue;
+        }
         if (cache < prevCache) {
           cacheFailures.push(`${row.id}#${r}`);
           break;
@@ -496,7 +548,23 @@ async function runInterleaved(): Promise<void> {
           console.error(`[replay --interleaved] ${step.path} ${step.row.id} repeat ${step.repeat} threw: ${err.message}`);
           return { scores: [], turnIds: [] as string[] };
         });
-      for (const s of run.scores) for (const line of renderNodeTrace(s.observed)) console.log(line);
+      // Rerun 3 diagnostic (asked live, not part of the bar itself):
+      // the interleaved log otherwise has no per-turn attribution for
+      // a failed check or a cache_n reading - every generation and
+      // node-trace line for every turn of a step printed back to back
+      // with nothing naming which turn it belongs to. A "-- turn N --"
+      // header makes renderNodeTrace's existing lines attributable
+      // without re-deriving anything by hand; the failed-check and
+      // reply-first-line lines read straight off the same TurnScore
+      // the bar itself scores from.
+      for (const s of run.scores) {
+        console.log(`       -- turn ${s.turnIndex + 1} --`);
+        for (const line of renderNodeTrace(s.observed)) console.log(line);
+        const failed = s.checks.filter((c) => !c.pass);
+        if (failed.length > 0) console.log(`       turn ${s.turnIndex + 1} FAILED: ${failed.map((c) => `${c.name} (${c.detail})`).join("; ")}`);
+        const firstLine = (s.observed.reply ?? "").split("\n")[0]?.slice(0, 200) ?? "";
+        console.log(`       turn ${s.turnIndex + 1} reply (totalMs=${s.observed.totalMs}): "${firstLine}"`);
+      }
       const target = step.path === "old" ? oldScoresByConversationId : newScoresByConversationId;
       target.set(`${step.row.id}#${step.repeat}`, run.scores);
     }
@@ -510,6 +578,49 @@ async function runInterleaved(): Promise<void> {
   for (const c of computeBarSummary(oldScoresByConversationId, newScoresByConversationId, rows, REPEATS)) {
     console.log(`${c.pass ? "PASS" : "FAIL"} ${c.label}`);
     console.log(`     ${c.detail}`);
+  }
+
+  // Worst plain pair (RERUN-PROTOCOL-01 fix-up): diagnostic only, never
+  // a bar condition (the ratio bar it used to feed is retired, above) -
+  // named because a reader asking "which turn got slowest relative to
+  // the old path" still needs an answer even though the ratio itself no
+  // longer gates anything.
+  const isForcedScore = (s: TurnScore) => s.observed.requiredHonored === true || s.observed.requiredHonored === false;
+  let worstPlainPair: { row: string; repeat: number; turnIndex: number; oldMs: number; newMs: number; ratio: number } | null = null;
+  for (const row of rows) {
+    for (let r = 1; r <= REPEATS; r++) {
+      const oldTurns = (oldScoresByConversationId.get(`${row.id}#${r}`) ?? []).filter((s) => !isForcedScore(s));
+      const newTurns = (newScoresByConversationId.get(`${row.id}#${r}`) ?? []).filter((s) => !isForcedScore(s));
+      for (let i = 0; i < Math.min(oldTurns.length, newTurns.length); i++) {
+        const oldMs = oldTurns[i]!.observed.totalMs;
+        const newMs = newTurns[i]!.observed.totalMs;
+        if (oldMs <= 0) continue;
+        const ratio = newMs / oldMs;
+        if (!worstPlainPair || ratio > worstPlainPair.ratio) worstPlainPair = { row: row.id, repeat: r, turnIndex: newTurns[i]!.turnIndex + 1, oldMs, newMs, ratio };
+      }
+    }
+  }
+  if (worstPlainPair) console.log(`\nworst plain pair (diagnostic, not a bar condition): ${worstPlainPair.row}#${worstPlainPair.repeat} turn ${worstPlainPair.turnIndex} - old ${worstPlainPair.oldMs}ms, new ${worstPlainPair.newMs}ms (${worstPlainPair.ratio.toFixed(2)}x)`);
+
+  // RERUN-PROTOCOL-01 fix-up (this session's own proposal, U6: the flip,
+  // decided): the full per-conversation, per-repeat TurnScore set,
+  // written beside the log every run - so a question like "what were
+  // the exact old/new totals for this pair" or "what did cache_n do
+  // across this row's own turns" is answered by reading this file, not
+  // by re-deriving it from console text after the fact (the gap that
+  // made rerun 3's own follow-up questions expensive to answer).
+  const scoresOutDir = join(process.cwd(), "data-scratch");
+  const scoresOutPath = join(scoresOutDir, `interleaved-scores-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
+  try {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    mkdirSync(scoresOutDir, { recursive: true });
+    writeFileSync(
+      scoresOutPath,
+      JSON.stringify({ old: Object.fromEntries(oldScoresByConversationId), new: Object.fromEntries(newScoresByConversationId) }, null, 2),
+    );
+    console.log(`interleaved scores written to ${scoresOutPath}`);
+  } catch (err) {
+    console.error(`[replay --interleaved] could not write the scores JSON: ${(err as Error).message}`);
   }
 
   runner.cleanupBenchPeople(people);

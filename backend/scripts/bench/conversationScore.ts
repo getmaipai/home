@@ -159,7 +159,13 @@ export interface TurnObserved {
    * PROTOCOL-01's own per-generation detail (reason, thinking,
    * prompt_n, cache_n, prompt_ms, predicted_ms), printed beside
    * `nodeTrace`'s `model` entries rather than duplicated into them. */
-  generationTrace?: readonly { reason: string; thinking: boolean; prompt_n: number | null; cache_n: number | null; prompt_ms: number | null; predicted_ms: number | null }[] | null;
+  /** `predicted_n` (U6: the flip, decided) is what lets a bar measure
+   * a generation's own decode rate (predicted_n/predicted_ms) against
+   * the engine's own, rather than one path's wall clock against the
+   * other's - the stored stats row already carries it (the raw wire
+   * JSON's own `generations[].predicted_n`), this was just never named
+   * in the narrowed type read back out of it. */
+  generationTrace?: readonly { reason: string; thinking: boolean; prompt_n: number | null; cache_n: number | null; prompt_ms: number | null; predicted_ms: number | null; predicted_n: number | null }[] | null;
   /** WRITTEN-PARITY-01: the bare model's own reply to this row's
    * question (no system message, no tools, the engine's own default
    * length) beside `replyParityJudge.ts`'s verdict on whether `reply`

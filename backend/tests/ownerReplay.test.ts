@@ -211,20 +211,42 @@ describe("computeBarSummary(): the bar's five conditions, each read off the inte
     expect(conditions[1]?.pass).toBe(false);
   });
 
-  test("condition 3 fails when a plain turn's new-path total exceeds 1.25x the old path's", () => {
-    const oldScores = fullyClean();
+  // U6: the flip, decided (dev.md) - the old-path-ratio bar retired;
+  // condition 3 now measures a generation's own decode rate
+  // (predicted_n/predicted_ms) against this run's own reference rate
+  // (the median across every timed generation), never one path's total
+  // against the other's - a longer reply is not a regression, an idle
+  // gap is.
+  test("condition 3 passes when every generation decodes at the reference rate (a longer reply is not a regression)", () => {
     const newScores = fullyClean();
-    newScores.set("control-search-mariners-explicit#1", [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 200, reply: "ok" } }]);
-    const conditions = computeBarSummary(oldScores, newScores, ALL_ROWS, 3);
-    expect(conditions[2]?.pass).toBe(false);
+    // 100 tok/s reference, one row that's simply a much longer reply
+    // (400 tokens, 4000ms) at the identical rate - never flagged.
+    for (const row of ALL_ROWS) {
+      newScores.set(`${row.id}#1`, [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 1, predicted_n: 100, predicted_ms: 1000 }] } }]);
+    }
+    newScores.set("control-search-mariners-explicit#2", [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 1, predicted_n: 400, predicted_ms: 4000 }] } }]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[2]?.pass).toBe(true);
   });
 
-  test("condition 3 passes at exactly 1.25x", () => {
-    const oldScores = fullyClean();
+  test("condition 3 fails when one generation's decode time badly exceeds the reference rate (an idle gap)", () => {
     const newScores = fullyClean();
-    newScores.set("control-search-mariners-explicit#1", [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 125, reply: "ok" } }]);
-    const conditions = computeBarSummary(oldScores, newScores, ALL_ROWS, 3);
+    for (const row of ALL_ROWS) {
+      newScores.set(`${row.id}#1`, [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 1, predicted_n: 100, predicted_ms: 1000 }] } }]);
+    }
+    // Same reference rate (100 tok/s -> 1000ms expected for 100 tokens),
+    // but this one generation takes 5000ms - a real stall, not length.
+    newScores.set("control-search-mariners-explicit#2", [{ pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 1, predicted_n: 100, predicted_ms: 5000 }] } }]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[2]?.pass).toBe(false);
+    expect(conditions[2]?.detail).toContain("control-search-mariners-explicit#2");
+  });
+
+  test("condition 3 passes with no timed generations at all (nothing to measure)", () => {
+    const scores = fullyClean();
+    const conditions = computeBarSummary(scores, scores, ALL_ROWS, 3);
     expect(conditions[2]?.pass).toBe(true);
+    expect(conditions[2]?.detail).toContain("no timed generations");
   });
 
   test("condition 4 fails when forced-search turns' median total is 10s or over", () => {
@@ -260,5 +282,34 @@ describe("computeBarSummary(): the bar's five conditions, each read off the inte
     ]);
     const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
     expect(conditions[4]?.pass).toBe(true);
+  });
+
+  // U6: the flip, decided (dev.md) - control-ten-turn-spoken-drift#1's
+  // own false failure: rerun 3 found the checker bridging straight over
+  // a turn with no cache_n reading at all (its first generation's own
+  // slot came back null), comparing the NEXT real reading against the
+  // LAST one from before the gap - turn 3 read against turn 1 across
+  // turn 2's own missing value, a scorer defect, not the mechanism
+  // PHRASE-02 fixes. A gap resets the floor instead: the next real
+  // reading is compared against nothing and always passes.
+  test("condition 5 passes when a turn with no cache_n reading sits between two turns whose readings would otherwise look like a drop", () => {
+    const newScores = fullyClean();
+    newScores.set("president-of-france-repeat#1", [
+      { pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 724 }] } },
+      { pass: true, turnIndex: 1, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: null }] } },
+      { pass: true, turnIndex: 2, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 701 }] } },
+    ]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[4]?.pass).toBe(true);
+  });
+
+  test("condition 5 still fails on a real drop with no gap involved", () => {
+    const newScores = fullyClean();
+    newScores.set("president-of-france-repeat#1", [
+      { pass: true, turnIndex: 0, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 730 }] } },
+      { pass: true, turnIndex: 1, checks: [], observed: { totalMs: 100, reply: "ok", generationTrace: [{ cache_n: 701 }] } },
+    ]);
+    const conditions = computeBarSummary(fullyClean(), newScores, ALL_ROWS, 3);
+    expect(conditions[4]?.pass).toBe(false);
   });
 });
