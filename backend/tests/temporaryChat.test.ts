@@ -19,13 +19,21 @@ import { runJudgeBatch, judgeQueueStats } from "@/lib/memoryJudge";
 import * as llm from "@/lib/llm";
 import { isTemporaryConversation, resolveOrCreateConversation, setPendingAsk, getPendingAsk } from "@/lib/conversationHistory";
 import { resolvePendingAsk } from "@/lib/turnEngine";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
 const SAFE: SafetyResult = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-01-01T00:00:00.000Z" };
 
-beforeEach(() => resetDb());
+// U6: the flip, decided (home/docs/dev.md, 2026-09-24) - this file
+// drives real turns through `resolvePendingAsk`/`routes/turn.ts`, the
+// old path by import; pinned explicitly now that it is no longer the
+// default.
+beforeEach(() => {
+  resetDb();
+  setHouseholdSettingValue("turn.pipeline.next", false);
+});
 afterEach(() => {
   __resetLlmSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;

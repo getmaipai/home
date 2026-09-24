@@ -18,12 +18,19 @@ import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
-beforeEach(() => resetDb());
+// U6: the flip, decided (home/docs/dev.md, 2026-09-24) - this file's
+// own header names `runTurnStream()`, the old path, by name: pinned
+// explicitly now that it is no longer the default.
+beforeEach(() => {
+  resetDb();
+  setHouseholdSettingValue("turn.pipeline.next", false);
+});
 afterEach(() => {
   __resetLlmSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;

@@ -27,6 +27,10 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetRateLimiterForTests();
+  // U6: the flip, decided (home/docs/dev.md, 2026-09-24) - pinned
+  // explicitly now that old is no longer the default (the direct
+  // runTurn() calls here don't care either way; a route-level case does).
+  setHouseholdSettingValue("turn.pipeline.next", false);
 });
 
 afterEach(() => {

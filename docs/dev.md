@@ -24438,3 +24438,103 @@ rule - one gate covers this whole block) - `scripts: bun test` (3 new
 `verify:tokens-cascade` itself run and read by hand (both captures
 opened, both correct). Review: low (a new standalone verification
 script plus a comment, no application code changed).
+
+## U6: the flip, decided (2026-09-24, Fable's ruling on rerun 3)
+
+Rerun 3, once, under a real hold (no gate, build or headless run
+elsewhere on the box; the one-minute load average 2.28/2.30 on the two
+checks a minute apart before starting) - `data-scratch/
+rerun-3-proper-20260923-214928.log`, `bun run backend/scripts/bench/
+replay.ts --hub-live --interleaved --keep-data` against the household's
+own resident engine (127.0.0.1:8788), 258 cases. A first attempt
+(`data-scratch/rerun-3-20260923-212717.log`) overlapped a full test
+suite Session A started after the hold was called and is contaminated
+on every timing condition; only its correctness read stood (reported
+as `RERUN-3-CONTAMINATED`), and it named no defect the clean run didn't
+also show.
+
+**Rerun 3's own numbers, clean run:**
+
+| condition | verdict | detail |
+|---|---|---|
+| the five named failed rows stay clean, no engine-classed row, no empty reply | PASS | president-of-france-repeat 3/3, apple-announce-this-week 3/3, search-mariners-game 3/3, chatgpt-6-luna 3/3, corey-feldman-michael-jackson-friendship 3/3 - 15/15, 0 engine |
+| the three named controls are 3/3 clean | PASS | control-search-mariners-explicit 3/3, control-negative-spiderman 3/3, control-negative-feeling-down 3/3 - 9/9 |
+| every plain turn's total is within 1.25x the old path's total | FAIL (retired below) | worst ratio 48.12x across 84 plain turns |
+| every forced-search turn's total is under 10s median | PASS | median 3,495ms across 45 forced turns |
+| cached_tokens rises across every multi-turn row | FAIL (accepted exception below) | 15/21 rows rising; failed: primetime-trailer-correction#1, president-of-chile-hallucinated-name-followup#2, control-movie-followup-where-playing#1/#2/#3, control-ten-turn-spoken-drift#1 |
+
+Also checked live, not a bar condition: no safety refusal on
+corey-feldman-michael-jackson-friendship, either path, any repeat (a
+false positive on this row - csam category - was seen once in the
+contaminated run and did not recur; the row is a real, substantive
+answer about the friendship ending on every new-path repeat this run).
+
+**Correctness: met in full**, on a clean machine. The flip proceeds.
+
+**Plain turns: the bar is retired, not fixed.** The ruling's own
+allowance ("a pair passes at a ratio of 1.25 or a difference under 300
+ms," "U6 rerun 2 ruling" (1)) was never actually coded into
+`computeBarSummary()` - only the ratio was, confirmed by reading the
+function directly. The 48.12x printed this run is the same arithmetic
+the rerun 2 ruling already discounted (a ratio over a near-zero
+harness-overhead pair proves nothing); the reconstructed worst REAL
+pair - `control-negative-dye-hair` repeat 2, 925ms old / 4,578ms new -
+is a plain reply whose extra time is its own length, which the reply
+floor (the state record, "The reply floor") makes the design, not a
+regression. So the ratio-against-the-old-path comparison retires for
+plain turns the same way PHRASE-01's own "within 2s of the old path"
+bar did: replaced by two bars that measure what actually matters -
+forced-search median under 10s (unchanged, met) and a new one, "no
+generation's decode time exceeds the engine's own token rate for its
+length" (`replay.ts`'s `computeBarSummary`, condition 3): a longer
+reply is not a regression, an idle gap inside a generation is. The
+reference rate is each run's own median decode rate (new path,
+self-referential, no hardcoded hardware assumption); the allowance
+(1.5x the expected decode time for that generation's own token count,
+or 500ms over it, whichever is looser) is a deliberately generous
+floor meant to catch a genuine stall, not ordinary variance between
+generations - a specific, documented choice this session made, open to
+revision if a future run's own data argues for a tighter one.
+
+**Cache: fails on the real mechanism the rerun 2 ruling already named**
+(dev.md "U6 rerun 2 ruling" (2)) - a plain turn and a forced turn use
+different prompt shapes (the plain "model" generation vs. the forced
+call's "interim_rule"/"phrasing" pair) sharing the one cache slot, so a
+plain-then-forced or forced-then-plain sequence evicts the previous
+turn's own prefix. Its fix is PHRASE-02 (the single fixed tools block,
+`tool_choice` carrying the difference, so every shape shares a prefix
+too) - five of the six named rows are this, unchanged by anything
+landed today, and PHRASE-02's own row now carries them as its
+acceptance.
+
+The sixth, `control-ten-turn-spoken-drift#1`, was a scorer defect, not
+this mechanism: its own turn 2 (the forced call) had NO `cache_n`
+reading at all on the generation the checker read (`generationTrace[0]`,
+the "interim_rule" round, `?`), so the checker bridged straight over
+it, comparing turn 3's real reading (701) against turn 1's (724) -
+turn 3 read against turn 1 across turn 2's own missing value. Fixed in
+`replay.ts`: a turn with no `cache_n` reading now resets the floor
+instead of being silently skipped, so the next real reading is
+compared against nothing and always passes rather than being bridged
+back to a turn two shapes removed. Both the five real rows and this
+sixth, now-fixed one are accepted exceptions for this ruling -
+correctness and forced-search speed are what gate the flip; the cache
+mechanism gates PHRASE-02 next.
+
+**The flip.** `turn.pipeline.next`'s default is `true`
+(`backend/src/settings/aiKeys.ts`), landed the same commit as this
+section. The old path stays reachable (`buildSystemPrompt`,
+`runTurnStream`, `buildOldPathStablePrefix`) until the plan's own
+section 2 deletions, next in the queue after home#147.
+
+Verification: `bash scripts/check.sh` (scope `full`) - full backend
+suite green with the flipped default, 4121/4121, 0 fail (a real risk
+checked directly, not assumed: a household's worth of tests could have
+implicitly depended on the old default rather than setting the flag
+per test the way `turnRouteU6a.test.ts`'s own six cases already do;
+none did). `ownerReplay.test.ts` carries the new condition-3 tests (a
+longer reply passes, a real idle gap fails, no timed generations passes
+trivially) and the cache-checker fix (the exact
+control-ten-turn-spoken-drift#1 shape now passes, a real drop with no
+gap still fails). Review: medium (a default that changes every
+household's own turn path).

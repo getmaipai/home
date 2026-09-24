@@ -118,6 +118,13 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetRateLimiterForTests();
+  // U6: the flip, decided (home/docs/dev.md, 2026-09-24) - this file
+  // is `turnEngine.ts`'s own suite, the old path by definition; its
+  // own default flipped to the new path, so a test driving a real
+  // turn here (streamTurnEvents, POST /api/turn/stream) needs the old
+  // path pinned explicitly now, the same way it always needed the
+  // stub engine pinned explicitly.
+  setHouseholdSettingValue("turn.pipeline.next", false);
 });
 
 describe("CHAT-16 K7 picture lookup output", () => {

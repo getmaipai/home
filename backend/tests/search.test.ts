@@ -144,7 +144,7 @@ describe("GET /api/search: settings", () => {
     const { client } = await owner();
     const groups = await search(client, "reply engine");
     const found = group(groups, "setting")?.results.find((r) => r.id === "turn.pipeline.next");
-    expect(found).toMatchObject({ kind: "setting", title: "Use the new reply engine", subtitle: "Off keeps today's engine. On uses the rebuilt one; it must pass the same tests on this hub before it becomes the default.", href: "/next/settings?tab=household&section=household.ai" });
+    expect(found).toMatchObject({ kind: "setting", title: "Use the new reply engine", subtitle: "On uses the rebuilt engine (the default since U6). Off falls back to the old one.", href: "/next/settings?tab=household&section=household.ai" });
   });
 
   // A review caught this: NextSettingsPage.tsx renders the Household

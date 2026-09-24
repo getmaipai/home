@@ -18,6 +18,7 @@ import { runTurn } from "@/lib/turnEngine";
 import { getPendingAsk, resolveOrCreateConversation, listOpenQuestions, queueOpenQuestion, turnSubjectsOf } from "@/lib/conversationHistory";
 import { ensureSubjectEntity, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { remember } from "@/lib/memory";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { people, entities, relationships, conversationTurns, memoryRecords, openQuestions } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
@@ -28,6 +29,12 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetRateLimiterForTests();
+  // U6: the flip, decided (home/docs/dev.md, 2026-09-24) - the direct
+  // runTurn() calls in this file are unaffected either way (old-path
+  // code, called directly by import), but its own "streaming path"
+  // cases go through routes/turn.ts, which does branch on the
+  // setting - pinned explicitly now that old is no longer the default.
+  setHouseholdSettingValue("turn.pipeline.next", false);
 });
 
 afterEach(() => {

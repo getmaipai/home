@@ -213,7 +213,7 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 if [ "$SCOPE" != "docs" ]; then
   CORE_TAG="core-v0.1.0"
   UI_TAG="ui-v0.5.50"
-  SPEC_TAG="spec-v0.1.30"
+  SPEC_TAG="spec-v0.1.31"
   SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
   if [ ! -d "$SHARED_REPO" ]; then
     echo "getmaipai/commons is missing at $SHARED_REPO (set MAIPAI_COMMONS_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."

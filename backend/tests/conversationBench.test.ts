@@ -11,6 +11,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { CONVERSATIONS, CREDENTIAL_LINE, type BenchConversation } from "../scripts/bench/conversationFixture";
 import { scoreTurn as scoreTurnBare, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence, EPISODES_HEADER_TEXT, wellFormedTotals } from "../scripts/bench/conversationScore";
@@ -40,6 +41,13 @@ beforeEach(() => {
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
   __resetRateLimiterForTests();
+  // U6: the flip, decided (home/docs/dev.md, 2026-09-24) - the stub
+  // bench's own control-flow rows (interruption, the pending-ask
+  // ladder) exercise the old path's specific streaming mechanics; the
+  // new path's own driveTurn() case is always "immediate" (its own
+  // header note), so these rows need the old path pinned explicitly
+  // now that it is no longer the default.
+  setHouseholdSettingValue("turn.pipeline.next", false);
 });
 
 afterEach(() => {
