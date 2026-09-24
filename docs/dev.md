@@ -26753,3 +26753,76 @@ with zero CPU, on both the first two-rep smoke run's follow-up attempt
 and once more before a clean run finally completed) - reported as an
 environment finding, not something this item's own code touched or
 should paper over.
+
+## B-GUARD-02: the real-SearXNG clearance check, one definition instead of two (2026-09-24)
+
+An independent review of SEARCH-HEALTH-01/SEARCH-PACE-01/SEARCH-FALLBACK-01
+(d70f5ac7, ebecfa0a, a943f67e) found the clearance gate protecting the
+household's own real SearXNG instance from bench traffic (put there the
+same night that traffic got it rate-limited) existed as two independently-
+maintained copies of the identical logic - `scripts/bench/setup.ts`'s own
+inline Rule 4 (keyed to reading `process.env.MAIPAI_SEARXNG_URL` at
+import time) and `scripts/bench/liveHubQuiet.ts`'s own
+`refuseRealSearxngWithoutClearance()`/`isLocalFixtureUrl()` (already
+called explicitly by query-writer-01-live.ts). `stream-next-01-live.ts`
+read a THIRD, differently-named env var, `MAIPAI_BENCH_SEARXNG_URL` -
+setup.ts's Rule 4 never saw it (checking one fixed name is exactly what
+let this slip through), and the script never called
+`refuseRealSearxngWithoutClearance()` either. Every run of that bench
+reached the household's real SearXNG with zero clearance gate, despite
+setup.ts's own Rule 4 comment explicitly (and wrongly) naming
+stream-next-01-live.ts as one of the three scripts it covered.
+
+**Fix: one definition, called at each real caller's own point of writing
+`search.searxng_url` into the settings that URL actually takes effect
+through** - never re-derived from a fixed env var name a future script
+could just as easily read under a different one. setup.ts's own inline
+Rule 4 is deleted outright (its own header comment now points to where
+the check moved). `liveHubQuiet.ts`'s `refuseRealSearxngWithoutClearance()`
+and `isLocalFixtureUrl()` are unchanged - kept as the one surviving
+definition, not touched beyond this fix's own stated scope (their
+existing fail-open-on-unparseable-URL behavior, already a known, narrow
+edge case from an earlier review, is untouched here).
+
+**Every script that can reach a real SearXNG, and where each now hits
+the guard:**
+
+| script | env var | guard call site |
+|---|---|---|
+| `query-writer-01-live.ts` | `MAIPAI_SEARXNG_URL` | line 51 (already correct before this fix - unchanged) |
+| `interimRuleMeasure.ts` | `MAIPAI_SEARXNG_URL` | line 70 (new - previously relied solely on setup.ts's now-deleted Rule 4) |
+| `stream-next-01-live.ts` | `MAIPAI_SEARXNG_URL` (renamed from `MAIPAI_BENCH_SEARXNG_URL`) | line 168 (new - previously unguarded entirely, the review's own finding) |
+
+`query-writer-01b-live.ts`, `search-mixed-01-live.ts`, and
+`conversationRunner.ts`'s own `startFakeSearxng()` fixture helper never
+reach a real instance at all (each builds its own local Bun.serve
+fixture, `isLocalFixtureUrl()`-safe by construction) - out of this
+table, not silently skipped.
+
+**Tests**: `tests/liveHubQuiet.test.ts` gains three tests proving
+`refuseRealSearxngWithoutClearance()` itself, end to end, via a real
+spawned one-line script (`Bun.spawn`, never a mocked `process.exit` -
+the same real-process shape `benchSetup.test.ts`'s own tests already
+use for every other exit-calling guard in this suite): a real URL
+without clearance refuses (exit 2, the exact message), a real URL with
+`MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1` passes, a local fixture URL never
+needs clearance. `tests/benchSetup.test.ts` gains a new
+"stream-next-01-live.ts's own real-SearXNG clearance" describe block
+proving the actual wiring end to end for the one real caller this
+finding was about (a real spawn of the actual script, not a fixture
+stand-in): refused without clearance, refused when the env var is unset
+at all, passes with a fixture URL. The five old tests that exercised
+setup.ts's now-deleted Rule 4 through an unrelated bench (`routing.ts`,
+injecting `MAIPAI_SEARXNG_URL` into a script that never touches search)
+are removed - they tested a mechanism that no longer exists there.
+`interimRuleMeasure.ts` is not spawned in a test for this: its own first
+line is `refuseIfGateRunning()`, which refuses a real spawn from inside
+this very `bun test` run before ever reaching the searxng check - the
+same reason `interimRuleMeasure.test.ts` only ever unit-tests its own
+exported pure function, never the whole script. It calls the identical
+shared function the identical way, visible directly in its own diff.
+
+Full backend suite green (4221/4221) both before committing and after.
+Review low (a bench-script-only, S-sized fix). Not B's own files
+(packageHost.ts/searxngHealth.ts/searchHealthState.ts untouched) - B was
+told before starting.

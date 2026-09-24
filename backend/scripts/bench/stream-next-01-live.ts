@@ -43,13 +43,14 @@
 //
 //   MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8788 \
 //   MAIPAI_EMBED_URL=http://127.0.0.1:8794 \
-//   MAIPAI_BENCH_SEARXNG_URL=<the household's own live SearXNG URL> \
+//   MAIPAI_SEARXNG_URL=<the household's own live SearXNG URL> \
 //   MAIPAI_DATA_DIR=$(mktemp -d) \
 //   bun run backend/scripts/bench/stream-next-01-live.ts
 import "./setup";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 import { TestClient } from "../../tests/client";
 import { finishBench } from "./setup";
+import { refuseRealSearxngWithoutClearance } from "./liveHubQuiet";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 
@@ -149,7 +150,7 @@ async function directSearxngLatencyMs(searxngUrl: string, query: string): Promis
   const elapsed = performance.now() - start;
   if (!res.ok) throw new Error(`directSearxngLatencyMs: SearXNG returned ${res.status} - the URL or its JSON output setting is likely misconfigured, the same failure class packageHost.ts's own searxngSearch() error copy names`);
   const body = await res.text();
-  if (!body.trim().startsWith("{")) throw new Error("directSearxngLatencyMs: SearXNG's own response was not JSON (a login redirect or an HTML error page reads exactly this way) - check MAIPAI_BENCH_SEARXNG_URL");
+  if (!body.trim().startsWith("{")) throw new Error("directSearxngLatencyMs: SearXNG's own response was not JSON (a login redirect or an HTML error page reads exactly this way) - check MAIPAI_SEARXNG_URL");
   return elapsed;
 }
 
@@ -158,11 +159,19 @@ if (import.meta.main) {
 }
 
 async function runMain(): Promise<void> {
-  const searxngUrl = process.env.MAIPAI_BENCH_SEARXNG_URL;
+  const searxngUrl = process.env.MAIPAI_SEARXNG_URL;
   if (!searxngUrl) {
-    console.error("stream-next-01-live refused: MAIPAI_BENCH_SEARXNG_URL is not set; this bench measures a forced-search turn's real tool latency and never runs against a fake SearXNG.");
+    console.error("stream-next-01-live refused: MAIPAI_SEARXNG_URL is not set; this bench measures a forced-search turn's real tool latency and never runs against a fake SearXNG.");
     process.exit(2);
   }
+  // B-GUARD-02 (a review, 2026-09-24): this script used to read a
+  // differently-named env var (MAIPAI_BENCH_SEARXNG_URL), which meant
+  // setup.ts's own former clearance check - keyed to MAIPAI_SEARXNG_URL -
+  // never saw this script's real URL at all and silently let it through
+  // with no clearance gate, every run. Renamed to the shared name, and
+  // the clearance check itself now called here, directly, at the point
+  // this script's own URL takes effect.
+  refuseRealSearxngWithoutClearance("stream-next-01-live", searxngUrl);
 
   console.log("\n## Run header\n");
   console.log(JSON.stringify({ date: new Date().toISOString(), chat: process.env.MAIPAI_LLAMA_SERVER_URL, embed: process.env.MAIPAI_EMBED_URL, reps: REPS }, null, 2));

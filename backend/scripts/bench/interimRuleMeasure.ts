@@ -19,7 +19,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { waitForHubQuiet, refuseIfGateRunning } from "./liveHubQuiet";
+import { waitForHubQuiet, refuseIfGateRunning, refuseRealSearxngWithoutClearance } from "./liveHubQuiet";
 
 const REPEATS = Number(process.env.INTERIM_REPEATS ?? 10);
 const waitForQuiet = () => waitForHubQuiet(undefined, (msg) => console.log(msg.replace("live-hub-quiet", "interim-rule-measure")));
@@ -66,7 +66,13 @@ async function main(): Promise<void> {
   // settings (never hardcoded - a LAN address, per CLAUDE.md's privacy
   // rule) so the search leg is measured for real, not against a fixture.
   const searxngUrl = process.env.MAIPAI_SEARXNG_URL;
-  if (searxngUrl) setHouseholdSettingValue("search.searxng_url", searxngUrl);
+  if (searxngUrl) {
+    // B-GUARD-02: the one clearance check, right at the point this
+    // script's own URL takes effect - never assumed covered by a guard
+    // elsewhere keyed to a specific env var name.
+    refuseRealSearxngWithoutClearance("interim-rule-measure", searxngUrl);
+    setHouseholdSettingValue("search.searxng_url", searxngUrl);
+  }
 
   const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
   const baseBudget = entry.turn_budget!;

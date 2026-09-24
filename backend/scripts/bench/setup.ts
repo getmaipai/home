@@ -61,36 +61,17 @@ if (existsSync(resolved)) {
 }
 if (!process.env.MAIPAI_LLAMA_SERVER_URL) refuse("MAIPAI_LLAMA_SERVER_URL is not set; a bench connects only to an engine already running, it never spawns or downloads one.");
 if (!process.env.MAIPAI_EMBED_URL) refuse("MAIPAI_EMBED_URL is not set; a bench connects only to an embed engine already running, it never spawns or downloads one.");
-// Rule 4 (SEARCH-HEALTH-01, 2026-09-24; a follow-up the coordinator
-// asked for after the first cut wired this into query-writer-01-live.ts
-// alone): every live bench that reads MAIPAI_SEARXNG_URL and points the
-// household setting at it (interimRuleMeasure.ts, stream-next-01-live.ts,
-// query-writer-01-live.ts) imports this module first - the one choke
-// point, so the check belongs here, not copied into each script. A
-// fixture (127.0.0.1/localhost, every startFakeSearxng() in this
-// directory) never needs clearance; the real thing does, every time,
-// per docs/dev.md's own "Live bench protocol". Parsed here first,
-// deliberately not delegated to `isLocalFixtureUrl()`'s own fail-open
-// behavior on an unparseable URL ("fails at the real call site, not
-// here" - correct for its original caller, a URL about to be used
-// directly, but wrong for a clearance gate: a review, 2026-09-24,
-// caught that reusing it here would let a malformed real URL bypass
-// clearance entirely instead of being refused) - a value that isn't a
-// valid URL at all is refused outright, never treated as a safe local
-// fixture by default.
-const searxngUrl = process.env.MAIPAI_SEARXNG_URL;
-if (searxngUrl) {
-  let parsedSearxngUrl: URL;
-  try {
-    parsedSearxngUrl = new URL(searxngUrl);
-  } catch {
-    refuse(`MAIPAI_SEARXNG_URL (${searxngUrl}) is not a valid URL.`);
-  }
-  const isLocalFixture = parsedSearxngUrl!.hostname === "127.0.0.1" || parsedSearxngUrl!.hostname === "localhost" || parsedSearxngUrl!.hostname === "::1" || parsedSearxngUrl!.hostname === "[::1]";
-  if (!isLocalFixture && process.env.MAIPAI_BENCH_REAL_SEARXNG_CLEARED !== "1") {
-    refuse(`MAIPAI_SEARXNG_URL (${searxngUrl}) points at a real instance, not a local fixture, and MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set. A real run needs the coordinator's own clearance and stays at a person's pace once cleared (docs/dev.md's "Live bench protocol").`);
-  }
-}
+// B-GUARD-02 (a review, 2026-09-24): the real-SearXNG clearance check
+// used to live here too, keyed to one specific env var name
+// (MAIPAI_SEARXNG_URL) - which meant a script reading a differently-
+// named one (stream-next-01-live.ts's own MAIPAI_BENCH_SEARXNG_URL)
+// silently skipped it entirely. Moved to liveHubQuiet.ts's
+// refuseRealSearxngWithoutClearance(), called at each script's own
+// point of writing search.searxng_url into the household setting - the
+// one definition, checked against the URL value actually about to take
+// effect, whatever variable it came from, rather than re-derived here
+// from a name this module has no way to keep in sync with every
+// caller's own choice.
 
 /** Rule 2's second half, awaited as the first line of every bench's
  * main(): both URLs answer the same /health probe the supervisors use

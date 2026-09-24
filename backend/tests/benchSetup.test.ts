@@ -90,44 +90,17 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
     expect(out).not.toContain("bench finished");
   });
 
-  // SEARCH-HEALTH-01 (a review, 2026-09-24): the one choke point every
-  // live bench passes through (this same setup.ts) refuses a real
-  // SearXNG URL without clearance - never wired script by script.
-  // routing.ts never touches search at all; MAIPAI_SEARXNG_URL is
-  // checked here regardless of what the entry point does with it.
-  test("a real (non-fixture) MAIPAI_SEARXNG_URL without clearance is refused before any mutation", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "maipai-bench-realsearxng-"));
-    const { code, out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir, MAIPAI_SEARXNG_URL: "http://192.0.2.1:8888" });
-    expect(code).toBe(2);
-    expect(out).toContain("MAIPAI_SEARXNG_URL");
-    expect(out).toContain("MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set");
-    expect(readdirSync(dir)).toEqual([]);
-  });
-
-  test("a real MAIPAI_SEARXNG_URL with MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 passes this check (the run may still fail for other reasons)", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "maipai-bench-realsearxng-cleared-"));
-    const { out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir, MAIPAI_SEARXNG_URL: "http://192.0.2.1:8888", MAIPAI_BENCH_REAL_SEARXNG_CLEARED: "1" });
-    expect(out).not.toContain("MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set");
-  });
-
-  test("a local fixture MAIPAI_SEARXNG_URL never needs clearance", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "maipai-bench-fixturesearxng-"));
-    const { out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir, MAIPAI_SEARXNG_URL: "http://127.0.0.1:54321" });
-    expect(out).not.toContain("MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set");
-  });
-
-  // A review (2026-09-24) caught the first cut's classification helper
-  // failing OPEN on an unparseable URL ("fails at the real call site" -
-  // correct for its own original caller, wrong for a clearance gate) -
-  // a malformed MAIPAI_SEARXNG_URL must be refused outright, never
-  // silently treated as a safe local fixture.
-  test("an unparseable MAIPAI_SEARXNG_URL is refused outright, never treated as a safe fixture", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "maipai-bench-malformedsearxng-"));
-    const { code, out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir, MAIPAI_SEARXNG_URL: "not a url" });
-    expect(code).toBe(2);
-    expect(out).toContain("is not a valid URL");
-    expect(readdirSync(dir)).toEqual([]);
-  });
+  // B-GUARD-02 (a review, 2026-09-24): the real-SearXNG clearance check
+  // used to live here, keyed to one env var name, checked unconditionally
+  // regardless of what the entry point does with it - which is exactly
+  // how stream-next-01-live.ts's own differently-named env var slipped
+  // past it undetected. Moved to liveHubQuiet.ts's own
+  // refuseRealSearxngWithoutClearance(), called at each real caller's own
+  // point of writing search.searxng_url - tests/liveHubQuiet.test.ts
+  // proves that one shared function directly (a real spawned process,
+  // the same Bun.spawn shape this file's own tests already use); the
+  // "stream-next-01-live.ts wiring" describe block below proves at least
+  // one real caller actually calls it, end to end.
 
   test("zero executed cases can never report success", () => {
     const codes: number[] = [];
@@ -135,6 +108,54 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
     finishBench({ executed: Number.NaN }, (code) => codes.push(code));
     finishBench({ executed: 3 }, (code) => codes.push(code));
     expect(codes).toEqual([1, 1, 0]);
+  });
+});
+
+// B-GUARD-02: stream-next-01-live.ts is the real caller the review
+// finding was about - it used to read a differently-named env var
+// (MAIPAI_BENCH_SEARXNG_URL) that setup.ts's own former clearance check
+// never saw, so every run of it reached the household's real SearXNG
+// with no clearance gate at all. Renamed to the shared MAIPAI_SEARXNG_URL
+// and now calls refuseRealSearxngWithoutClearance() itself, right where
+// its own URL takes effect - proven here end to end (a real spawn,
+// `import.meta.main`), not only at the shared function's own unit level
+// (tests/liveHubQuiet.test.ts). interimRuleMeasure.ts calls the
+// identical shared function the identical way (see its own source) but
+// isn't spawned here: its first line is refuseIfGateRunning(), which
+// refuses a real spawn from inside this very `bun test` run before ever
+// reaching the searxng check - the same reason interimRuleMeasure.test.ts
+// only ever unit-tests its own exported pure function, never the whole
+// script.
+describe("B-GUARD-02: stream-next-01-live.ts's own real-SearXNG clearance", () => {
+  async function runStreamNextLive(env: Record<string, string | undefined>): Promise<{ code: number; out: string }> {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-stream-next-live-"));
+    const proc = Bun.spawn(["bun", "run", "scripts/bench/stream-next-01-live.ts"], {
+      cwd: BACKEND,
+      env: { ...process.env, MAIPAI_LLAMA_SERVER_URL: "http://127.0.0.1:1", MAIPAI_EMBED_URL: "http://127.0.0.1:1", MAIPAI_BACKGROUND_URL: undefined, MAIPAI_DATA_DIR: dir, MAIPAI_BENCH_REAL_SEARXNG_CLEARED: undefined, ...env },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+    const code = await proc.exited;
+    return { code, out: `${out}\n${err}` };
+  }
+
+  test("a real (non-fixture) MAIPAI_SEARXNG_URL without clearance is refused before any live traffic", async () => {
+    const { code, out } = await runStreamNextLive({ MAIPAI_SEARXNG_URL: "http://192.0.2.10:8888" });
+    expect(code).toBe(2);
+    expect(out).toContain("stream-next-01-live refused");
+    expect(out).toContain("MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set");
+  });
+
+  test("MAIPAI_SEARXNG_URL is not set at all is refused with its own message, never silently skipped", async () => {
+    const { code, out } = await runStreamNextLive({});
+    expect(code).toBe(2);
+    expect(out).toContain("MAIPAI_SEARXNG_URL is not set");
+  });
+
+  test("a local fixture MAIPAI_SEARXNG_URL passes the clearance check (the run then fails later for an unrelated reason: no real engine)", async () => {
+    const { out } = await runStreamNextLive({ MAIPAI_SEARXNG_URL: "http://127.0.0.1:54321" });
+    expect(out).not.toContain("MAIPAI_BENCH_REAL_SEARXNG_CLEARED=1 is not set");
   });
 });
 
