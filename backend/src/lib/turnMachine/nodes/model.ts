@@ -22,7 +22,7 @@ import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
-import { visibleText, extractReasoningText } from "@/lib/wellFormed";
+import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnEngine";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
@@ -187,6 +187,19 @@ function boundedGenerationError(message: string | undefined): string | undefined
  * survives - `for await...of` would discard it. */
 async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "required" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal): Promise<GenerationResult> {
   const forced = tool_choice === "required";
+  // STREAM-NEXT-01 (b), ruling point 6: only a non-forced generation can
+  // legitimately end in text (a `required` call either calls the tool or
+  // is discarded by the builder row - FORCED-CALL-01's own abort-on-any-
+  // text below never lets one stream real prose), so the gate is never
+  // even touched for one. `state.streamGate` is undefined for every
+  // caller but turnNext.ts's own runTurnNextStream(), so this is a no-op
+  // everywhere else. reset() clears whatever a PRIOR, now-abandoned
+  // attempt (an offered round the model answered with a tool call
+  // instead, or an earlier empty attempt this call is retrying) left
+  // pending - this turn's real reply is always its LAST eligible
+  // generation's own text.
+  const gate = forced ? undefined : state.streamGate;
+  gate?.reset();
   // FORCED-CALL-01: a child AbortController chained off the node's own
   // signal (deadline.ts's nodeSignal shape, without its timer half -
   // this one fires on content, not a clock), so a forced call's own
@@ -220,6 +233,15 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   let firstDeltaMs: number | null = null;
   let raw = "";
   let toolCalls: ToolCall[] | undefined;
+  // STREAM-NEXT-01 (b), ruling point 5: reasoning is never streamed -
+  // split live exactly as routes/turn.ts's own streamTurnEvents() does
+  // for the old path, but every span is just discarded except the
+  // visible one, which alone reaches the gate; the full raw text (think
+  // block included) still accumulates into `raw` below unchanged, so
+  // extractReasoningText(raw) at the end of this function is completely
+  // unaffected - this split exists only to keep a think block's own
+  // content out of what the gate can release mid-stream.
+  const thinkSplit = gate ? newThinkSplitState() : undefined;
   try {
     for (;;) {
       const step = await started.tokens.next();
@@ -243,6 +265,9 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
         break;
       }
       raw += step.value;
+      if (gate && thinkSplit) {
+        for (const span of feedThinkSplit(thinkSplit, step.value)) if (!span.reasoning) gate.push(span.text);
+      }
     }
   } catch (err) {
     // GENFAIL-01: the same gap as the pre-stream branch above, mid-
@@ -255,6 +280,10 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
     console.error(`[model] generation "${reason}" failed mid-stream: ${message ?? "(no message)"}`);
     state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message });
     return { ok: false, code: "generation_failed", message };
+  }
+
+  if (gate && thinkSplit) {
+    for (const span of flushThinkSplit(thinkSplit)) if (!span.reasoning) gate.push(span.text);
   }
 
   const visible = visibleText(raw);
@@ -275,6 +304,16 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
       envelopeParsed = true;
     }
   }
+
+  // A code review caught the first cut calling gate.finish() right here,
+  // on THIS attempt's own outcome alone: modelNode's own retry (below,
+  // "no visible text: one regeneration with thinking off") can follow an
+  // attempt that had no tool calls AND no text either - finish() would
+  // have already set the gate `done` before the retry's own real answer
+  // ever ran, and StreamGate's own reset()/push() are no-ops once done,
+  // silently discarding the retry's real text. The gate's fate is
+  // modelNode's own call, made once, after every retry has settled - see
+  // its own end.
 
   // ENGINE-CONTRACT-02 ("U6: the flip verdict" regression A): the raw
   // wire string for a websearch call this generation made, forced or
@@ -397,6 +436,18 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   state.messages = messages;
   if (!isPhrasingRound) state.lastTools = tools;
 
+  // STREAM-NEXT-01 (b), ruling point 6: only a non-forced round can ever
+  // legitimately end in text (FORCED_CALL_MAX_TOKENS/the abort-on-any-
+  // text guard mean a forced round never has real prose to stream).
+  // Computed once, here, since `tool_choice` never changes across this
+  // node's own retry (below) - the SAME gate instance settles at
+  // exactly one of this function's own exit points, decided by THAT
+  // exit's own final outcome, never by an intermediate attempt a retry
+  // might still replace (a code review's own finding: finish()ing on an
+  // empty first attempt locked the gate before its own retry's real
+  // text could ever reach it).
+  const gate = tool_choice === "required" ? undefined : state.streamGate;
+
   // GROUND-01: `context`'s own decideReasoning() already decided
   // `reasoning.withheld_for === "minor"` from the age band, reused here
   // rather than a second age check - a minor's turn sends `thinking:
@@ -428,7 +479,10 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // below; otherwise the turn gets a real, fixed model_failed line,
   // never the empty string this used to deliver silently through
   // `answer` as if the model had genuinely said nothing.
-  if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+  if (!attempt.ok) {
+    gate?.reset();
+    return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+  }
 
   // ENVELOPE-NONE-01 (a code review, 2026-09-23): `tool_choice: "none"`
   // stops the engine's own grammar from emitting a native tool call,
@@ -464,7 +518,10 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && (thinkingOn || phrasingToolCallDiscarded)) {
     const retryMaxTokens = isPhrasingRound ? visibleReplyMaxTokens(state.plan.max_words, false) : replyMaxTokensFor(state, false);
     attempt = await runOneGeneration(state, messages, tools, tool_choice, false, retryMaxTokens, "model_retry_no_thinking", signal);
-    if (!attempt.ok) return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+    if (!attempt.ok) {
+      gate?.reset();
+      return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+    }
     if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) attempt = { ...attempt, toolCalls: undefined };
   }
 
@@ -478,6 +535,11 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   if (attempt.toolCalls && attempt.toolCalls.length > 0) {
     const contextAnswer = attempt.toolCalls.find((c) => c.tool === ANSWER_FROM_CONTEXT_TOOL_ID);
     if (contextAnswer) {
+      // Only ever reachable on a forced (interim-rule) round, so `gate`
+      // is already undefined here - reset() is a defensive no-op, never
+      // load-bearing, kept only so every exit point settles the gate the
+      // same explicit way.
+      gate?.reset();
       const quote = typeof contextAnswer.args === "object" && contextAnswer.args && "quote" in contextAnswer.args ? String((contextAnswer.args as { quote: unknown }).quote) : "";
       return { outcome: { ok: true }, output: { kind: "answer_from_context", quote, reasoning } };
     }
@@ -513,13 +575,18 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // alongside an invalid websearch call would have silently lost that
     // other call too. Only the websearch call is replaced; every other
     // call the model made this round still runs.
+    gate?.reset();
     const otherCalls = (attempt.toolCalls ?? []).filter((c) => c.tool !== "websearch");
     return builderFallbackOutput(input.utterance, otherCalls, reasoning);
   }
 
   if (attempt.toolCalls && attempt.toolCalls.length > 0) {
+    gate?.reset();
     return { outcome: { ok: true }, output: { kind: "tool_calls", calls: attempt.toolCalls, reasoning } };
   }
 
+  // The one exit that ever ships real, streamable text - settle the
+  // gate here, once, on the FINAL attempt (post-retry) alone.
+  gate?.finish();
   return { outcome: { ok: true }, output: { kind: "text", text: attempt.text, thinking: attempt.thinking, reasoning } };
 };

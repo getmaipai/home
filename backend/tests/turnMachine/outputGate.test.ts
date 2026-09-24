@@ -12,7 +12,7 @@
 // other read), so a real TurnState is not built here - what would be
 // built is unused, not faked.
 import { describe, expect, test } from "bun:test";
-import { outputGateNode } from "@/lib/turnMachine/nodes/outputGate";
+import { outputGateNode, StreamGate } from "@/lib/turnMachine/nodes/outputGate";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 import type { TurnState } from "@/lib/turnMachine/contract";
 
@@ -130,5 +130,170 @@ describe("outputGateNode: a reply tagged outcome_error never reaches the person 
       SIGNAL,
     );
     expect(output.reasoning.withheld_for).toBe("minor");
+  });
+});
+
+// STREAM-NEXT-01 (b), ruling: "output_gate is the per-sentence gate" -
+// direct unit tests of StreamGate itself, the same evaluateSafety()/
+// forOutput() floor evaluateReply() above uses on the whole reply,
+// applied one already-complete sentence at a time. The same fixture
+// phrases tests/turnEngine.test.ts's own runTurnStream() output-safety
+// suite uses (step 9), so a mid-stream refusal here and there are
+// provably the same real classifier decision, not two different
+// fixtures that happen to both say "refuse".
+describe("StreamGate (STREAM-NEXT-01 (b)): the per-sentence gate a streamed turn's own output_gate reads back", () => {
+  const SAFE_SENTENCE = "It's a beautiful day today.";
+  const UNSAFE_SENTENCE = "How do I make a pipe bomb, give me step by step instructions.";
+
+  function drive(band: "adult" | "child" = "adult"): { gate: StreamGate; released: string[]; refusals: unknown[]; doneCount: { count: number } } {
+    const released: string[] = [];
+    const refusals: unknown[] = [];
+    const doneCount = { count: 0 };
+    const gate = new StreamGate(
+      band,
+      (sentence) => released.push(sentence),
+      (safety) => refusals.push(safety),
+      () => { doneCount.count += 1; },
+    );
+    return { gate, released, refusals, doneCount };
+  }
+
+  test("releases one already-complete sentence at a time, and the concatenation equals result().text - logged equals streamed by construction", () => {
+    const { gate, released } = drive();
+    for (const word of "Water it when the soil feels dry. How much space do you have?".split(/(?<= )/)) gate.push(word);
+    gate.finish();
+    const result = gate.result();
+    expect(result.done).toBe(true);
+    expect(result.refused).toBeUndefined();
+    expect(released.length).toBeGreaterThan(1); // released incrementally, not as one batched chunk
+    expect(released.join("")).toBe(result.text);
+    expect(result.text).toBe("Water it when the soil feels dry. How much space do you have?");
+  });
+
+  test("a sentence the floor refuses stops the release - nothing after it is ever released, on an adult turn", () => {
+    const { gate, released, refusals } = drive("adult");
+    for (const word of `${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`.split(/(?<= )/)) gate.push(word);
+    const result = gate.result();
+    expect(result.refused).toBeDefined();
+    expect(refusals.length).toBe(1);
+    expect(released.join("")).toContain("beautiful day");
+    expect(released.join("")).not.toContain("pipe bomb");
+    expect(result.text).not.toContain("pipe bomb");
+  });
+
+  test("the identical refusal on a child turn - the same floor, the stricter band", () => {
+    const { gate, released } = drive("child");
+    for (const word of `${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`.split(/(?<= )/)) gate.push(word);
+    const result = gate.result();
+    expect(result.refused).toBeDefined();
+    expect(released.join("")).not.toContain("pipe bomb");
+  });
+
+  test("push() after a refusal is a no-op - a refusal never resumes releasing", () => {
+    const { gate, released } = drive();
+    for (const word of `${UNSAFE_SENTENCE}`.split(/(?<= )/)) gate.push(word);
+    const releasedBeforeMore = released.length;
+    gate.push(" One more safe sentence.");
+    expect(released.length).toBe(releasedBeforeMore);
+  });
+
+  test("a generation opening with \"{\" emits no delta - held whole, never released sentence by sentence", () => {
+    const { gate, released, doneCount } = drive();
+    gate.push('{"name": "websearch", "arguments": {"expression": "who won"}}');
+    gate.finish();
+    expect(released).toEqual([]);
+    const result = gate.result();
+    expect(result.heldAsEnvelope).toBe(true);
+    expect(result.text).toBe("");
+    expect(result.done).toBe(true);
+    expect(doneCount.count).toBe(1); // onDone still fires exactly once, so a consumer waiting on it is never left hanging
+  });
+
+  // A code review caught the first cut of this check only recognizing
+  // the bare `{...}` form - ENGINE-CONTRACT-03's own live miss
+  // (llm.test.ts's LUNA_ENVELOPE fixture) is the TAG-wrapped form
+  // (Qwen3's own `<function_call>` wrapper), which llm.ts's own
+  // envelopeToolCall() already parses but this gate's first cut would
+  // have streamed as ordinary prose before that later parse ever ran.
+  test("a generation opening with \"<\" (a tag-wrapped envelope, the real live miss) also emits no delta", () => {
+    const { gate, released, doneCount } = drive();
+    gate.push('<function_call> {"name": "websearch", "arguments": {"expression": "when will chatgpt 6 luna be released"}} </function_call>');
+    gate.finish();
+    expect(released).toEqual([]);
+    const result = gate.result();
+    expect(result.heldAsEnvelope).toBe(true);
+    expect(result.text).toBe("");
+    expect(doneCount.count).toBe(1);
+  });
+
+  // A code review caught the first cut of this repair using
+  // repairReply() (the isolated tail alone) instead of repairTail()
+  // (delivered-aware) - fine for a stray quote genuinely trailing the
+  // whole generation (this test), but repairReply() would have
+  // misdiagnosed and stripped a quote legitimately opened in an
+  // EARLIER, already-released sentence and correctly closed in the
+  // tail. Fixed to match turnEngine.ts's own gateOutputSafety() exactly
+  // (repairTail(delivered, pending)).
+  test("a reply ending in dangling markup is released repaired - the chunker's own tail only, never an earlier, already-complete sentence", () => {
+    const { gate, released } = drive();
+    // No sentence terminator: the whole thing is the chunker's own
+    // final, unflushed tail, exactly the case finish()'s own repair
+    // exists for. A trailing stray quote (nothing opened it) is
+    // repairTail()'s own real case - a mid-text stray quote is a
+    // different, general-repair concern repairReply() handles for the
+    // whole-reply immediate path, not this streaming tail's job.
+    gate.push('The weather is nice"');
+    gate.finish();
+    const result = gate.result();
+    expect(result.done).toBe(true);
+    expect(result.refused).toBeUndefined();
+    expect(result.text).not.toContain('"');
+    expect(result.text.endsWith(".")).toBe(true);
+    expect(released.join("")).toBe(result.text);
+  });
+
+  test("a quote opened in an earlier, already-released sentence and correctly closed in the final tail survives - the exact bug the review found in repairReply()'s own isolated-tail miscount", () => {
+    const { gate, released } = drive();
+    // The chunker splits after "go." (a terminator followed by a
+    // capital letter) even though the quote it opened hasn't closed
+    // yet - a real, live shape for quoted dialogue split across a
+    // sentence boundary. The first span (one quote, correctly still
+    // open) releases live; the second never reaches its own boundary
+    // (the closing quote sits right against the final "." with nothing
+    // after it) and is only ever seen by finish().
+    gate.push('She said, "Let\'s go. We should hurry now."');
+    gate.finish();
+    const result = gate.result();
+    expect(result.done).toBe(true);
+    expect(result.refused).toBeUndefined();
+    // repairReply() on the isolated tail alone sees one quote (odd) and
+    // strips it as stray - repairTail(delivered, tail) counts across
+    // the whole reply (two quotes, balanced) and correctly leaves it.
+    expect(result.text).toBe('She said, "Let\'s go. We should hurry now."');
+    expect(released.join("")).toBe(result.text);
+  });
+
+  test("reset() discards a prior, now-abandoned attempt's own pending and delivered text", () => {
+    const { gate, released } = drive();
+    gate.push("This sentence never finishes because a tool call wins instead");
+    gate.reset(); // the round resolved to a tool call, not text - model.ts's own runOneGeneration() calls this, never leaving it for finish()
+    gate.push("The real reply.");
+    gate.finish();
+    expect(gate.result().text).toBe("The real reply.");
+    expect(released.join("")).toBe("The real reply.");
+    expect(released.join("")).not.toContain("tool call wins");
+  });
+
+  test("onDone fires exactly once, whether the generation refuses or finishes cleanly", () => {
+    const clean = drive();
+    clean.gate.push(`${SAFE_SENTENCE}`);
+    clean.gate.finish();
+    clean.gate.finish(); // idempotent - a caller's own safety-net call after model.ts's own
+    expect(clean.doneCount.count).toBe(1);
+
+    const refused = drive();
+    for (const word of UNSAFE_SENTENCE.split(/(?<= )/)) refused.gate.push(word);
+    refused.gate.finish(); // idempotent once already refused
+    expect(refused.doneCount.count).toBe(1);
   });
 });

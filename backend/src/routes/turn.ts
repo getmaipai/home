@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnEngine";
 import { runBareTurnStream, BareModeForbidden } from "@/lib/turnBareStream";
-import { runTurnNext } from "@/lib/turnMachine/turnNext";
+import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
@@ -623,7 +623,11 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     result = body.bare === true
       ? await runBareTurnStream(actor, body.text ?? "", body.conversation_id, abortController.signal)
       : newPathOn()
-        ? await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, signal: abortController.signal })
+        // STREAM-NEXT-01: runTurnNextStream(), not runTurnNext() - this
+        // route needs the "stream" kind TurnStreamResult (a live status/
+        // tokens pair the machine hasn't finished yet), never the
+        // "immediate" one the blocking POST / route above uses.
+        ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, signal: abortController.signal })
         : await runTurnStream(actor, surface, body.text ?? "", {
             thinking: dropReasoning ? false : body.thinking,
             conversationId: body.conversation_id,
@@ -659,9 +663,11 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   if (result.kind === "immediate") {
     // A safety refusal or a plugin reply is already complete, deterministic
     // text - one "done" event, no artificial trickle for something with
-    // nothing left to stream. U6a: this is also every new-path (runTurnNext)
-    // result, always "immediate" by its own design (its own header note) -
-    // its `reasoning.emit` gate already runs inside the machine (the state
+    // nothing left to stream. Bare mode (runBareTurnStream) always lands
+    // here; the old path (runTurnStream) does for its own deterministic
+    // replies. STREAM-NEXT-01: the new path's own runTurnNextStream()
+    // (this route) returns "stream" now, not "immediate" - its own
+    // `reasoning.emit` gate still runs inside the machine (the state
     // record's "decided once, in context, before the model runs"), so
     // `result.value.reasoning` is already undefined for a minor by
     // construction; stripped here too anyway, the same belt-and-braces

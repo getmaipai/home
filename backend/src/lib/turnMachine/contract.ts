@@ -21,6 +21,8 @@ import type { PendingAsk } from "@/lib/conversationHistory";
 import type { PlanInput } from "@/lib/register";
 import type { Persona } from "@/lib/persona";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
+import type { StatusChannel } from "@/lib/statusChannel";
+import type { StreamGate } from "./nodes/outputGate";
 
 /** ARCH-POLICY-01's ingress unit: what the model actually sees, filtered
  * before the prompt (disclosure, band, temporary mode) and typed by
@@ -207,6 +209,20 @@ export interface TurnState {
    * nothing sets it today - included in the type because the record
    * names it, never produced until a presence source is built. */
   reasoning: { emit: boolean; withheld_for: "minor" | "surface" | "presence" | "gate" | null };
+  /** STREAM-NEXT-01: set only by turnNext.ts's own runTurnNextStream(),
+   * undefined for every other caller (runTurnNext(), the bench harness) -
+   * the identical StatusChannel turnEngine.ts's own old-path stream kind
+   * already uses, reused rather than a second one; nodes/tool.ts pushes
+   * the same "On it." status line onto it as each proposal starts, so it
+   * reaches a live client before the search itself runs. */
+  status?: StatusChannel;
+  /** STREAM-NEXT-01 (b): set only by runTurnNextStream(), undefined
+   * otherwise. nodes/model.ts's own runOneGeneration() pushes each raw
+   * delta of a non-forced generation into it as the engine streams;
+   * nodes/output_gate reads its already-computed verdict back instead of
+   * re-evaluating the whole reply - see outputGate.ts's own StreamGate
+   * for why this lives there, not here or in model.ts. */
+  streamGate?: StreamGate;
 }
 
 /** GROUND-01: `arg` is the refusing argument's NAME only, never its

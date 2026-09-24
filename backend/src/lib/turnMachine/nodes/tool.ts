@@ -94,6 +94,18 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.
     toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args });
+    // STREAM-NEXT-01 (a): the identical "On it." status line
+    // turnEngine.ts's own runTurnStream() emits before running a tool
+    // (turnEngine.ts:6636) - set only by turnNext.ts's own
+    // runTurnNextStream() (state.status is undefined for the immediate/
+    // bench callers), so a streamed client sees the tool is running
+    // before the search itself starts, not batched into toolEvents until
+    // the whole turn is done. The structured tool_call/tool_result/
+    // tool_error shape stays the "immediate" result's own field (spec's
+    // t-keyed shape, a deliberately separate NDJSON line from wire.ts's
+    // TurnStreamEvent) - the old path's own live stream never sent it
+    // structured either, only ever this same text line.
+    state.status?.emit({ type: "status", text: "On it.", stage: "tool" });
     const raced = await withDeadline(runPlugin(tool, state.actor, args, { id: state.turnId, conversationId: state.conversationId }), signal);
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", userMessage: "That took too long, sorry." });

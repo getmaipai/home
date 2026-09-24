@@ -1,26 +1,19 @@
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
-// the entry `routes/turn.ts` will call once turn.pipeline.next is on
-// (that wiring is a later unit - see this file's own header note
-// below), with the same TurnStreamResult shape runTurnStream() already
-// returns (turnEngine.ts, imported here, never redefined - "one
-// definition, one place"). turnEngine.ts is not edited by U2.
+// the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
+// runTurnStream() already returns (turnEngine.ts, imported here, never
+// redefined - "one definition, one place"). turnEngine.ts is not edited
+// by U2.
 //
-// Scope note for this session's build: this function always resolves
-// through TurnStreamResult's "immediate" variant. The "stream" variant
-// (StatusChannel, cueSuppressed, banned-phrase list, the finalize()
-// closure) is routes/turn.ts's own streaming/UI contract, built for
-// runTurnStream()'s token-by-token delivery to a live client; nothing
-// in the design record's own "Files" list names routes/turn.ts as a
-// U2 file, and wiring the new path into the live HTTP route (so a
-// household actually gets streamed tokens from it) is later work, not
-// this unit's. `backend/scripts/bench/replay.ts`'s scorer and a caller
-// that awaits the full reply (the acceptance bench, a future route
-// once it exists) both work correctly against "immediate" today; a
-// caller wanting live deltas mid-turn is the real gap this leaves,
-// named here rather than silently worked around.
-import { createActor, waitFor } from "xstate";
-import type { Surface, TurnValue, TurnStreamResult } from "@/lib/turnEngine";
-import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch } from "@/lib/turnEngine";
+// runTurnNext() (U2's own build) always resolves through TurnStreamResult's
+// "immediate" variant - `backend/scripts/bench/replay.ts`'s scorer and
+// routes/turn.ts's own blocking POST / route both want the whole reply
+// at once, never a live stream. STREAM-NEXT-01 (below, this file's own
+// runTurnNextStream()) is the "stream" variant a live client actually
+// needs: routes/turn.ts's `/stream` route calls it instead, when
+// turn.pipeline.next is on.
+import { createActor, waitFor, type ActorRefFrom } from "xstate";
+import type { Surface, TurnValue, TurnStreamResult, StreamOutcome } from "@/lib/turnEngine";
+import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources } from "@/lib/turnEngine";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
@@ -35,6 +28,8 @@ import { buildTurnStats } from "@/lib/turnStats";
 import { structuredPartForOutcomes, artifactForOutcomes } from "@/lib/composer";
 import { emptyTimings } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
+import { StatusChannel } from "@/lib/statusChannel";
+import { StreamGate } from "./nodes/outputGate";
 import { resolveTurnBudget } from "./budget";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
@@ -72,13 +67,29 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   // turn that ran the right package - a real bug, not a scoring gap.
   const lastOutcome = state.outcomes.at(-1);
   const packageId = source === "plugin" || source === "command" ? lastOutcome?.packageId : undefined;
+  // A code review caught this always deriving crisis_resources from
+  // state.crisis alone - the INPUT-side check computed before generation
+  // ever runs. A streamed turn's own StreamGate can carry a flagged-but-
+  // never-refused OUTPUT-side result (a self_harm mention in the
+  // model's own words, CHAT-02's "offer, never block": it flags and
+  // notifies but never refuses), the identical gap a review once found
+  // on the old path's own runTurnStream() ("always used prepared.
+  // crisisResources even when outputSafety was the one actually
+  // flagged"). `?? ` keeps the input-side line as the fallback, exactly
+  // as turnEngine.ts's own finalize() does - never dropping a genuine
+  // input-side crisis mention just because the output side had nothing
+  // to add. `state.streamGate` is undefined for every non-streaming
+  // caller, so this is a no-op there.
+  const inputCrisisLine = state.crisis ? "If you or someone you know is in crisis, help is available. Call or text 988 (US) any time." : undefined;
+  const outputFlag = state.streamGate?.result().lastFlagged;
+  const crisisResources = outputFlag ? (deriveCrisisResources(outputFlag) ?? inputCrisisLine) : inputCrisisLine;
   return {
     reply: { text, speech },
     source,
-    safety: state.safety,
+    safety: outputFlag ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,
-    crisis_resources: state.crisis ? "If you or someone you know is in crisis, help is available. Call or text 988 (US) any time." : undefined,
+    crisis_resources: crisisResources,
     // "One trace, not a second log" (section 11): every node this turn
     // ran or skipped, beside the generations buildTurnStats() already
     // projects above.
@@ -114,13 +125,45 @@ function resumesAsk(ask: PendingAsk, utterance: string): ActionProposal | null {
   return { kind: "side_effecting", request: { tool: ask.packageId, args: ask.args, callId: `resumed:${ask.packageId}` } };
 }
 
-export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {
+/** finishTurn()'s own, narrow failure: the machine itself timed out or
+ * was aborted (waitFor()'s own rejection) - never thrown for a bug
+ * anywhere else in finishTurn()'s own body, which propagates uncaught
+ * instead. The one thing each caller's own catch checks for by name. */
+class TurnMachineTimeout extends Error {}
+
+interface BegunTurn {
+  state: TurnState;
+  machineActor: ActorRefFrom<typeof turnMachine>;
+  abortSignal: AbortSignal;
+  startedAt: number;
+  // A code review caught finishTurn() reading state.temporary/
+  // state.conversationId directly (post-machine) for the "asked" branch's
+  // own setPendingAsk() call - nodes/context.ts independently re-resolves
+  // the conversation every turn and machine.ts's own applyContext action
+  // overwrites state.temporary from THAT result (hardcoding false on its
+  // own failure path), so a transient re-resolution failure could flip
+  // what finishTurn() sees after the machine ran. Captured once, here,
+  // before the machine ever starts - immune to anything a node does to
+  // `state` later, the same immunity the pre-refactor single-function
+  // runTurnNext() had by construction (its own local `conversation`/
+  // `temporary` variables, never read back off `state`).
+  temporary: boolean;
+  conversationId: string;
+}
+
+/** The prelude every caller shares (runTurnNext(), runTurnNextStream()):
+ * validate, resolve the conversation, classify the signal, build the
+ * turn's own state and start the machine actor. Never awaits the
+ * machine itself - see finishTurn() - so a streaming caller can hand
+ * back a live status/tokens pair before the turn is anywhere near
+ * done. */
+async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts): Promise<{ ok: true; value: BegunTurn } | { ok: false; result: Extract<TurnStreamResult, { ok: false }> }> {
   const startedAt = Date.now();
   const invalid = validateTurnInput(surface, text);
-  if (invalid) return invalid;
+  if (invalid) return { ok: false, result: invalid };
 
   const resolved = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary });
-  if (!resolved.ok) return { ok: false, status: resolved.status as 400 | 503, code: "invalid_input", error: resolved.error };
+  if (!resolved.ok) return { ok: false, result: { ok: false, status: resolved.status as 400 | 503, code: "invalid_input", error: resolved.error } };
   const conversation = resolved.value;
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
 
@@ -239,12 +282,31 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
 
   const machineActor = createActor(turnMachine, { input: { turnState: state, abortSignal, preConfirmed } });
   machineActor.start();
-  let finalSnapshot;
-  try {
-    finalSnapshot = await waitFor(machineActor, (s) => s.status === "done", { timeout: state.budget.deadlines_ms.total + 5000, signal: abortSignal });
-  } catch (err) {
-    return { ok: false, status: 503, code: "unavailable", error: `turn machine failed: ${(err as Error).message}` };
-  }
+  return { ok: true, value: { state, machineActor, abortSignal, startedAt, temporary, conversationId: conversation.id } };
+}
+
+/** Awaits the machine to "done" and builds the turn's own TurnValue -
+ * shared by runTurnNext() (awaited inline, as today) and
+ * runTurnNextStream()'s own background run (awaited by its `tokens`
+ * generator before it can complete, and raced against a live per-
+ * sentence refusal that resolves faster - see below). Never logs the
+ * turn itself: a streaming caller may already have logged a faster,
+ * synchronously-built refusal by the time this settles, so logging is
+ * each caller's own job, once. */
+async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
+  const { state, machineActor, abortSignal, startedAt, temporary, conversationId } = begun;
+  // A code review caught the first cut of this split letting a bug
+  // anywhere below (buildTurnValue, the trace bookkeeping) fall into the
+  // SAME catch runTurnNext() uses for this one - masking a real
+  // application defect as a generic 503 "unavailable" instead of letting
+  // it surface distinctly, unlike the pre-refactor single-function
+  // runTurnNext(), whose own try/catch only ever wrapped this waitFor()
+  // call. TurnMachineTimeout is the one thing this function itself ever
+  // throws for a caught error; every caller checks for it specifically
+  // rather than swallowing anything else this function might throw.
+  const finalSnapshot = await waitFor(machineActor, (s) => s.status === "done", { timeout: state.budget.deadlines_ms.total + 5000, signal: abortSignal }).catch((err: unknown) => {
+    throw new TurnMachineTimeout(`turn machine failed: ${(err as Error).message}`);
+  });
   const finalState = finalSnapshot.value as string;
 
   // A code review (2026-09-22) caught TraceRecorder.skip() never
@@ -276,7 +338,12 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     // conversation as today": the machine only set it on TurnState
     // (machine.ts's own parkAsk action); persisting it is turnNext.ts's
     // job, the same place the old path's own equivalent write happens.
-    if (ask && !temporary) setPendingAsk(conversation.id, ask);
+    // `temporary`/`conversationId` here are the values beginTurn()
+    // captured before the machine ever ran, never `state.temporary`/
+    // `state.conversationId` (a code review: nodes/context.ts re-
+    // resolves the conversation every turn and can overwrite
+    // `state.temporary` from that second resolution's own result).
+    if (ask && !temporary) setPendingAsk(conversationId, ask);
     value = buildTurnValue(state, startedAt, "confirm", promptText);
   } else if (finalState === "refused") {
     // A review caught this reading `step` (SafetyOutput there, not
@@ -319,10 +386,178 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     const source: TurnValue["source"] = lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
   }
+  return value;
+}
 
+export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {
+  const begun = await beginTurn(actor, surface, text, opts);
+  if (!begun.ok) return begun.result;
+  const { state } = begun.value;
+  let value: TurnValue;
+  try {
+    value = await finishTurn(begun.value);
+  } catch (err) {
+    // Only the machine's own timeout/abort becomes a 503 "unavailable" -
+    // anything else finishTurn() might throw (a real bug in buildTurnValue,
+    // the trace bookkeeping) propagates uncaught, exactly as it did
+    // before this file's beginTurn()/finishTurn() split, rather than
+    // being silently reported as an engine outage.
+    if (err instanceof TurnMachineTimeout) return { ok: false, status: 503, code: "unavailable", error: err.message };
+    throw err;
+  }
   logResult(state, actor, surface, text, value);
   // TOOL-EVENTS-01(b): omitted entirely (not an empty array) when this
   // turn ran no tool - routes/turn.ts spreads it in only when present,
   // so a turn with nothing to report costs nothing on the wire.
-  return { ok: true, kind: "immediate", value, signal, ...(state.toolEvents.length > 0 ? { toolEvents: state.toolEvents } : {}) };
+  return { ok: true, kind: "immediate", value, signal: state.signal, ...(state.toolEvents.length > 0 ? { toolEvents: state.toolEvents } : {}) };
+}
+
+/** The async-generator side of a text delivery queue (a `StatusChannel<
+ * string>`, StreamGate's own `release`/`onDone` callbacks feeding it
+ * eagerly, independent of whether anything is pulling yet - a code
+ * review caught an earlier cut hand-rolling a second, near-identical
+ * push/pull queue here instead of reusing StatusChannel's own generic
+ * one, the "one definition, one place" org standard exists for exactly
+ * this). Drains one item at a time via the channel's own `next()`
+ * rather than its `drain()` (statusChannel.ts's own comment: `drain()`
+ * exists so a status ahead of a delta lands ahead of it on the wire, an
+ * ordering concern this text-only queue has no equivalent of). */
+async function* drainDeltaQueue(channel: StatusChannel<string>): AsyncGenerator<string, void, void> {
+  for (;;) {
+    const item = await channel.next();
+    if (item === null) return;
+    yield item;
+  }
+}
+
+/** STREAM-NEXT-01: the streaming twin of runTurnNext() - the same
+ * prelude (beginTurn()) and the same machine (finishTurn()), but
+ * returns a "stream" kind TurnStreamResult before the machine is
+ * anywhere near done, so routes/turn.ts's existing stream branch
+ * (ResumeSession, streamResponse, streamTurnEvents()) can relay a live
+ * status line and gated sentences, the same contract runTurnStream()
+ * (turnEngine.ts) already fulfills for the old path - no second
+ * transport. state.status is the identical StatusChannel/"status" wire
+ * event the old path already streams; nodes/tool.ts pushes the same
+ * "On it." line onto it turnEngine.ts's own runTurnStream() does,
+ * before the search itself starts. state.streamGate (outputGate.ts) is
+ * what nodes/model.ts's own runOneGeneration() pushes raw deltas into
+ * and what nodes/output_gate itself reads back instead of re-evaluating
+ * the whole reply - see both files' own headers for why.
+ *
+ * A refused sentence is read back from the gate and thrown here
+ * (`StreamSafetyRefusal`, the identical class and wire behavior the old
+ * path's own gateOutputSafety() already uses) the moment the delivery
+ * queue closes on it - never waiting for the rest of that generation or
+ * the machine to finish, since the household has already stopped
+ * seeing more text by then (StreamGate.push() itself stops releasing
+ * the instant it refuses) and letting the model keep grinding in the
+ * background is no reason to also delay the wire's own error event.
+ * finalize() mirrors this: a refusal is built and logged synchronously,
+ * right there, from the same fixed line finishTurn()'s own "refused"
+ * branch would eventually produce (state.crisis/state.safety are set
+ * long before generation even starts, so nothing later can change it) -
+ * the machine keeps running in the background regardless (nothing here
+ * cancels it), but its own eventual finishTurn() completion checks
+ * `finalizedValue` first and never logs a second time. */
+export async function runTurnNextStream(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {
+  const begun = await beginTurn(actor, surface, text, opts);
+  if (!begun.ok) return begun.result;
+  const { state, startedAt } = begun.value;
+
+  const status = new StatusChannel();
+  state.status = status;
+
+  const queue = new StatusChannel<string>();
+  const band = speakerAgeBand(actor, new Date());
+  const gate = new StreamGate(
+    band,
+    (sentence) => queue.emit(sentence),
+    // onRefuse fires the instant a sentence refuses, DURING the model's
+    // own generation - closing the queue here (not only from onDone,
+    // below) is what lets tokens() stop waiting and throw right away,
+    // rather than only once runOneGeneration()'s own draining loop
+    // eventually reaches the end of a generation nothing told it to cut
+    // short. Idempotent alongside onDone: whichever fires first wins.
+    () => queue.close(),
+    () => queue.close(),
+  );
+  state.streamGate = gate;
+
+  let finishedValue: TurnValue | undefined;
+  let finalizedValue: TurnValue | undefined;
+  let backgroundError: Error | undefined;
+
+  const machineDone: Promise<void> = finishTurn(begun.value)
+    .then((value) => {
+      finishedValue = value;
+      if (!finalizedValue) {
+        finalizedValue = value;
+        logResult(state, actor, surface, text, value);
+      }
+    })
+    .catch((err) => {
+      backgroundError = err instanceof Error ? err : new Error(String(err));
+    })
+    .finally(() => {
+      gate.finish(); // safety net - idempotent; closes the queue via onDone when model.ts's own successful-round finish() never ran (a generation failure before any drained, or an engine timeout)
+      status.close();
+      queue.close(); // idempotent
+    });
+
+  async function* tokens(): AsyncGenerator<string, StreamOutcome, void> {
+    for await (const chunk of drainDeltaQueue(queue)) yield chunk;
+    const result = gate.result();
+    if (result.refused) throw new StreamSafetyRefusal(result.refused);
+    await machineDone;
+    if (backgroundError) throw new StreamUnavailable(backgroundError.message);
+    return result.lastFlagged;
+  }
+
+  return {
+    ok: true,
+    kind: "stream",
+    conversationId: state.conversationId,
+    turnId: state.turnId,
+    signal: state.signal,
+    startedAt,
+    cueSuppressed: state.signal.target === "hub" && state.signal.repair !== "none",
+    // ENGINEERING gap, named rather than silently worked around: the new
+    // path has no equivalent of turnEngine.ts's own bannedPhrasesFor()
+    // yet, so the thinking-cue filler (streamTurnEvents()'s own
+    // pickThinkingCue()) can repeat a phrase a recent old-path turn
+    // already used. Cosmetic only (a filler line, never the reply
+    // itself), not this item's own acceptance.
+    bannedPhrases: [],
+    status,
+    tokens: tokens(),
+    finalize: (replyText: string): TurnValue => {
+      if (finalizedValue) return finalizedValue;
+      status.close();
+      const result = gate.result();
+      if (result.refused) {
+        // The exact literal finishTurn()'s own "refused" branch would
+        // eventually produce (see this function's own header) - built
+        // here, synchronously, so the logged turn is available the
+        // instant the wire's own error event is, not seconds later once
+        // the model's own remaining generation and the rest of the
+        // machine finally finish.
+        const value = buildTurnValue(state, startedAt, "safety_refuse", "I can't help with that.");
+        finalizedValue = value;
+        logResult(state, actor, surface, text, value);
+        return value;
+      }
+      if (finishedValue) {
+        finalizedValue = finishedValue;
+        return finishedValue;
+      }
+      // Defensive fallback only: tokens() always awaits machineDone
+      // before completing on every path but the refusal one (handled
+      // above), so finalize() should never reach here in practice.
+      const fallback = buildTurnValue(state, startedAt, "model", replyText);
+      finalizedValue = fallback;
+      logResult(state, actor, surface, text, fallback);
+      return fallback;
+    },
+  };
 }

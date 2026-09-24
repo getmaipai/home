@@ -7,8 +7,9 @@
 // runs the frozen path (spied by the absence of the new path's own
 // stats.nodes[] trace, the one thing only runTurnNext's machine writes);
 // with it on, the new path (the trace present, all eight node names);
-// the response's own event shape (turn_meta, signal, done, in that
-// order) is identical either way.
+// the response's own event shape (turn_meta, signal, at least one
+// delta, done, in that order - STREAM-NEXT-01's own real streaming for
+// the new path too) is identical either way.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
@@ -89,14 +90,27 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
     });
   });
 
-  test("with turn.pipeline.next on, the same turn runs the new path - stats.nodes carries all eight nodes, and the event shape is turn_meta/signal/done, the same three the off case starts and ends with", async () => {
+  // STREAM-NEXT-01: this used to assert exactly ["turn_meta", "signal",
+  // "done"] - true only because runTurnNext() always resolved
+  // "immediate" and the whole reply arrived as one batched blob, the
+  // defect STREAM-NEXT-01 exists to fix. The route now calls
+  // runTurnNextStream(), so the new path's own event shape genuinely
+  // matches the off case's (turn_meta, signal, at least one delta,
+  // done) - proven the identical way the off case's own test above
+  // already does, never asserting an exact delta count (the stub's own
+  // chunking, never this route's contract).
+  test("with turn.pipeline.next on, the same turn runs the new path - stats.nodes carries all eight nodes, and the event shape is turn_meta/signal/delta.../done, the same shape the off case has", async () => {
     setHouseholdSettingValue("turn.pipeline.next", true);
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
     const { client } = await owner();
     await withStubReply("Hello! How can I help?", async () => {
       const res = await client.post("/api/turn/stream", { surface: "chat", text: "hi" });
       const events = await readNdjson(res);
-      expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "done"]);
+      const types = events.map((e) => e.type);
+      expect(types[0]).toBe("turn_meta");
+      expect(types[1]).toBe("signal");
+      expect(types.at(-1)).toBe("done");
+      expect(types).toContain("delta");
       const turnId = (events.find((e) => e.type === "done") as { value?: { turn_id: string } })?.value?.turn_id;
       const nodeNames = storedNodeNames(turnId!);
       for (const expected of ["safety", "commands", "context", "model", "policy", "tool", "answer", "output_gate"]) {

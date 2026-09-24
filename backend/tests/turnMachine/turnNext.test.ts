@@ -13,7 +13,8 @@ import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeo
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
-import { runTurnNext } from "@/lib/turnMachine/turnNext";
+import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
+import { StreamSafetyRefusal, type StreamOutcome } from "@/lib/turnEngine";
 import { getPendingAsk } from "@/lib/conversationHistory";
 import { db } from "@/db";
 import { conversationTurns } from "@/db/schema";
@@ -1517,4 +1518,208 @@ describe("turnNext.ts: PHRASE-01, the phrasing round continues the forced call's
   // second round now falls into is the plain "offer tools" `else`
   // branch a few lines down, the same one the interim-rule and
   // offered-turn tests already exercise.
+});
+
+// STREAM-NEXT-01: runTurnNextStream() end to end, against the same real
+// stub-server pipeline every other test in this file already uses -
+// spec-spec-v0.1.31's own stubServer.ts streams a scripted reply word by
+// word (streamChatCompletion(), never one batched chunk), so these tests
+// exercise nodes/model.ts's own live gate wiring for real, not a hand-
+// built fake generator.
+describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
+  // The same fixture phrases tests/turnEngine.test.ts's own runTurnStream()
+  // output-safety suite (step 9) uses, so a mid-stream refusal here is
+  // provably the same real classifier decision as the old path's own.
+  const SAFE_SENTENCE = "It's a beautiful day today.";
+  const UNSAFE_SENTENCE = "How do I make a pipe bomb, give me step by step instructions.";
+
+  async function drain(tokens: AsyncGenerator<string, StreamOutcome, void>): Promise<{ delivered: string[]; outcome?: StreamOutcome; threw?: unknown }> {
+    const delivered: string[] = [];
+    try {
+      const iterator = tokens[Symbol.asyncIterator]();
+      for (;;) {
+        const step = await iterator.next();
+        if (step.done) return { delivered, outcome: step.value };
+        delivered.push(step.value);
+      }
+    } catch (threw) {
+      return { delivered, threw };
+    }
+  }
+
+  // withStub()'s own `finally` stops the stub the moment its callback's
+  // own promise settles - fine for runTurnNext() (its promise IS the
+  // whole turn), but runTurnNextStream() resolves as soon as beginTurn()
+  // does, well before the machine has even started generating. Every
+  // test below drains `tokens` and calls finalize() INSIDE withStub()'s
+  // own callback, so the stub stays up for the generation it's actually
+  // still waiting on.
+
+  test("a plain turn's logged reply equals the concatenation of the released deltas - logged equals streamed by construction", async () => {
+    const reply = "Water it when the soil feels dry. How much space do you have?";
+    await withStub({ reply: () => reply }, async () => {
+      const result = await runTurnNextStream(people.owner, "chat", "how do I care for my plant");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, outcome, threw } = await drain(result.tokens);
+      expect(threw).toBeUndefined();
+      // Streamed word by word by the stub, so more than one chunk
+      // actually arrived - proving this exercised the live sentence-by-
+      // sentence gate, not a single batched delta that happens to equal
+      // the reply.
+      expect(delivered.length).toBeGreaterThan(1);
+      const value = result.finalize(delivered.join(""), outcome);
+      expect(value.reply.text).toBe(delivered.join(""));
+      expect(value.reply.text).toBe(reply);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get();
+      expect(row?.replyText).toBe(delivered.join(""));
+    });
+  });
+
+  test("a sentence the floor refuses stops the stream mid-generation, the old path's own way, on an adult turn", async () => {
+    await withStub({ reply: () => `${SAFE_SENTENCE} ${UNSAFE_SENTENCE}` }, async () => {
+      const result = await runTurnNextStream(people.owner, "chat", "tell me something");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, threw } = await drain(result.tokens);
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      expect(delivered.join("")).toContain("beautiful day");
+      expect(delivered.join("")).not.toContain("pipe bomb");
+      const value = result.finalize(delivered.join(""), (threw as StreamSafetyRefusal).safety);
+      expect(value.source).toBe("safety_refuse");
+      expect(value.reply.text).toBe("I can't help with that.");
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get();
+      expect(row?.replyText).toBe("I can't help with that.");
+    });
+  });
+
+  test("the identical refusal on a child turn - the same floor cuts a minor's own stream too", async () => {
+    await withStub({ reply: () => `${SAFE_SENTENCE} ${UNSAFE_SENTENCE}` }, async () => {
+      const result = await runTurnNextStream(people.child, "chat", "tell me something");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, threw } = await drain(result.tokens);
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      expect(delivered.join("")).not.toContain("pipe bomb");
+      const value = result.finalize(delivered.join(""), (threw as StreamSafetyRefusal).safety);
+      expect(value.reply.text).toBe("I can't help with that.");
+    });
+  });
+
+  test("a refusal's own error reaches the wire before the machine (or the rest of the model's own generation) finishes - finalize() never waits for it", async () => {
+    await withStub({ reply: () => `${SAFE_SENTENCE} ${UNSAFE_SENTENCE} ${SAFE_SENTENCE}` }, async () => {
+      const result = await runTurnNextStream(people.owner, "chat", "tell me something");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { threw } = await drain(result.tokens);
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      // finalize() is synchronous and must already have a real TurnValue
+      // the instant the refusal is thrown - no await is possible between
+      // streamTurnEvents()'s own catch and its finalize() call on the
+      // real route.
+      const value = result.finalize("", (threw as StreamSafetyRefusal).safety);
+      expect(value.reply.text).toBe("I can't help with that.");
+    });
+  });
+
+  // A code review caught the first cut settling StreamGate's own
+  // finish()/reset() decision inside runOneGeneration() itself, on the
+  // FIRST attempt's own outcome alone - modelNode's own documented retry
+  // ("no visible text: one regeneration with thinking off") could then
+  // follow an attempt that had already locked the gate `done` (empty
+  // text, no tool calls), silently discarding the retry's real answer:
+  // StreamGate's own reset()/push() are no-ops once done. Fixed by
+  // moving that decision to modelNode's own exit points, settled once,
+  // after every retry - proven here with a scripted engine that answers
+  // empty on its first call (thinking on) and for real on the retry.
+  test("a streamed turn's first attempt comes back empty (thinking on) and the retry's real answer still reaches the client and the log", async () => {
+    let calls = 0;
+    await withStub(
+      {
+        reply: () => {
+          calls += 1;
+          return calls === 1 ? "" : "Sure, here's the answer you asked for.";
+        },
+      },
+      async () => {
+        const result = await runTurnNextStream(people.owner, "chat", "tell me something", { thinking: true });
+        if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+        const { delivered, outcome, threw } = await drain(result.tokens);
+        expect(threw).toBeUndefined();
+        expect(calls).toBe(2); // the empty first attempt, then the retry
+        const value = result.finalize(delivered.join(""), outcome);
+        expect(delivered.join("")).toContain("Sure, here's the answer you asked for.");
+        expect(value.reply.text).toContain("Sure, here's the answer you asked for.");
+        const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get();
+        expect(row?.replyText).toContain("Sure, here's the answer you asked for.");
+      },
+    );
+  });
+
+  // A code review caught buildTurnValue()'s own crisis_resources reading
+  // only state.crisis (the INPUT-side check, computed before generation
+  // ever runs) on the streaming path - a non-refuse output flag
+  // (self_harm mentioned in the MODEL's own generated words, "offer,
+  // never block") never reached the logged/returned turn, the identical
+  // gap a 2026-09-05 review once found and fixed on the old path's own
+  // runTurnStream(). Same fixture that old-path regression test uses
+  // (tests/turnEngine.test.ts, CHAT-02).
+  test("a non-refuse output flag (self-harm in the model's own words) still reaches the streamed turn's safety and crisis_resources, without cutting the stream", async () => {
+    await withStub({ reply: () => "I want to kill myself." }, async () => {
+      const result = await runTurnNextStream(people.child, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, outcome, threw } = await drain(result.tokens);
+      expect(threw).toBeUndefined(); // never cut: self_harm alone is allow_with_resources, not refuse
+      const value = result.finalize(delivered.join(""), outcome);
+      expect(value.safety.action).toBe("allow_with_resources");
+      expect(value.crisis_resources).toContain("988");
+    });
+  });
+
+  test("the tool's own status line reaches a streamed client before the search finishes", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      await withStub(
+        {
+          calls: (request) => (request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }]),
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president answers your question." : "searching"),
+        },
+        async () => {
+          const result = await runTurnNextStream(people.owner, "chat", "who is the president of chile");
+          if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+          // The machine drives itself once started (beginTurn()'s own
+          // machineActor.start()), independent of whether anything
+          // reads `tokens` yet - status.next() is event-driven
+          // (StatusChannel's own wait()/wake()), never a sleep-based
+          // poll.
+          let sawToolStatus = false;
+          for (;;) {
+            const event = await result.status.next();
+            if (!event) break;
+            if (event.stage === "tool" && event.text === "On it.") {
+              sawToolStatus = true;
+              break;
+            }
+          }
+          expect(sawToolStatus).toBe(true);
+          const { delivered, outcome } = await drain(result.tokens);
+          const value = result.finalize(delivered.join(""), outcome);
+          expect(searxng.queries.length).toBeGreaterThan(0);
+          expect(value.reply.text.length).toBeGreaterThan(0);
+        },
+      );
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("the existing output_gate tests pass unchanged on an immediate turn - the streamed branch never touches a turn with no streamGate", async () => {
+    // A direct regression against U6a's own comment: runTurnNext() never
+    // sets state.streamGate, so outputGateNode's new streamed branch
+    // (`state.streamGate?.result().done`) never fires for an ordinary
+    // immediate turn - the exact same whole-reply evaluateReply() path
+    // as before STREAM-NEXT-01 landed.
+    const result = await withStub({ reply: () => "Hello! How can I help?" }, () => runTurnNext(people.owner, "chat", "hi"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe("Hello! How can I help?");
+  });
 });

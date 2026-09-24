@@ -6,6 +6,362 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## STREAM-NEXT-01: real progressive streaming for the new path (2026-09-24)
+
+`runTurnNext()` always awaited the whole xstate machine to `done` before
+returning anything - built that way on purpose at U2's own time ("Scope
+note" in the file's own header, since removed), a real gap named rather
+than silently worked around. On the live household conversation
+LIVE-0923-01 traced, that meant a forced-search turn's whole reply
+arrived as one blob only once the entire tool round and the phrasing
+generation both finished - no tool_call event, no first sentence, until
+everything was already done. STREAM-NEXT-01 builds the fix: `routes/
+turn.ts`'s `/stream` route now calls a new `runTurnNextStream()`
+(`turnMachine/turnNext.ts`), returning a `TurnStreamResult` of kind
+"stream" before the machine is anywhere near finished, so a live client
+gets a status line the moment a tool starts and gated sentences as the
+model's own final generation produces them - not batched to the end.
+
+**The collision, found before any code was written.** The coordinator's
+own build order named the mechanism to reuse: "the same per-sentence
+gate the old path uses (spec's `sentenceChunker` plus
+`gateOutputSafety`)". But `nodes/outputGate.ts`'s `output_gate` node
+already runs its own whole-reply `evaluateReply()` on every new-path
+turn - the old path has no equivalent second gate, so "reuse the old
+path's own mechanism" didn't by itself say what a genuinely live stream
+should do about a node that already owns the real safety decision for
+every new-path turn, streamed or not. Getting this wrong risks two real
+failure modes: a household seeing text a second, later whole-reply check
+then silently overrides or retracts, or a bypass of an already-reviewed
+safety mechanism the coordinator never actually agreed to skip. Reported
+to the coordinator (getmaipai-26) rather than guessed on, since it's
+squarely the safety-path half of the review the item was already flagged
+for. The ruling, verbatim:
+
+> Ruling on STREAM-NEXT-01's gate question: neither of your two options.
+> The design already answers it. The state record's output_gate row
+> says "every streamed sentence through gateOutputSafety", and
+> outputGate.ts's own header says evaluateReply() is the same
+> evaluateSafety()/forOutput() floor applied to the whole reply as an
+> interim. So output_gate isn't a third gate to bypass. On a streamed
+> turn, output_gate is the per-sentence gate. One node, one floor
+> function, two granularities, and one authority. Build it this way:
+>
+> 1. On a streamed turn, the per-sentence release loop is output_gate's
+>    work. Put it in outputGate.ts, or in a helper it owns, not in
+>    model.ts or routes. Each sentence goes through the same floor
+>    gateOutputSafety calls, then out on the wire. When the stream ends,
+>    the node doesn't re-evaluate: it assembles its output from the
+>    per-sentence verdicts it already made. The text it returns is
+>    exactly the concatenation it released, so logged equals streamed,
+>    by construction. On an immediate turn it stays as it is (the
+>    whole-reply evaluateReply).
+>
+> 2. A refusal mid-stream behaves exactly as the old path's
+>    StreamSafetyRefusal does, on the wire and in the log. Mirror its
+>    tests, child turns included. Never retract text that was already
+>    sent, and add no new wire event.
+>
+> 3. Keep malformed repair; don't drop it. repairReply only fixes
+>    dangling markup at the end, so apply it to the final flushed
+>    fragment (the chunker's tail) before that fragment is released. The
+>    earlier sentences are already complete sentences.
+>
+> 4. The envelope and provenance checks. Provenance "outcome_error"
+>    never streams: that text isn't a generation. A raw {name,
+>    arguments} envelope must never reach the wire. The model node
+>    already buffers the first sentence through the chunker, so if a
+>    generation's first non-space character is "{", hold the whole
+>    generation and handle it as today (runOneGeneration's envelope-to-
+>    call, or COMPOSE_FAILURE_LINE). That's a structural check on the
+>    wire format, not a word rule.
+>
+> 5. Reasoning isn't streamed. It stays gated whole at the end, as now.
+>
+> 6. Only non-forced generations stream (tool_choice not "required"), as
+>    you proposed.
+
+**What that means concretely, and where each piece lives.**
+`outputGate.ts` exports `StreamGate`, a class that owns exactly the
+per-sentence loop the ruling names: `push(delta)` is called once per raw
+model delta (fed by `nodes/model.ts`'s own `runOneGeneration()`, the
+only place with access to the raw stream), buffers until
+`nextSentenceBoundary()` (the spec's own chunker, the identical function
+`gateOutputSafety()` calls) finds a complete sentence, evaluates it
+through `forOutput(evaluateSafety(...))` (the identical floor
+`evaluateReply()` calls on the whole reply), and releases it via a
+caller-supplied callback the instant it clears - or stops releasing,
+permanently, the instant one refuses (point 2: nothing after a refusal
+is ever handed to the caller). `finish()` runs once, when the
+generation itself ends: repairs and releases the chunker's own tail
+(point 3, `repairReply` on the fragment alone, never the whole
+delivered text) and marks the gate `done`. `output_gate`'s own node
+gained one new branch at its very top: when `state.streamGate?.result()`
+is `done` and wasn't held as an envelope, it returns straight from the
+gate's own verdict (`text`, `refused`) instead of running
+`assessReply`/`repairReply`/`evaluateReply` on `input.reply.text` again
+- point 1's "the node doesn't re-evaluate", literally. Every other
+`AnswerInput` kind (`immediate`, `context_quote`, `from_outcomes`,
+`policy_refused`, `model_failed`) never touches the gate at all (only a
+genuine `model_text` round's own generation calls `push()`/`finish()`),
+so this branch is provably inert for anything but a streamed model
+reply, and every existing `output_gate` test still exercises the
+unchanged whole-reply path (proven: `outputGate.test.ts`'s own pre-
+existing suite passes unmodified).
+
+The envelope guard (point 4) lives inside `StreamGate` itself: the
+gate decides once, from the whole generation's own first non-whitespace
+character, whether it looks like a raw `{name, arguments}` envelope -
+if so, nothing is ever released for that attempt, and `output_gate`'s
+new branch correctly falls through to its ordinary whole-reply path
+(the gate's own `result().done` is still `true`, but `heldAsEnvelope`
+is too, so the branch's own guard skips it) - the exact "handle it as
+today" the ruling asks for, since `runOneGeneration()`'s existing
+envelope-to-call parse and `output_gate`'s own existing envelope catch
+(line 66) still run unchanged on whatever text reaches them.
+
+Reasoning (point 5) never reaches the gate at all: `runOneGeneration()`
+splits every raw delta with `feedThinkSplit()` (the identical live
+splitter `routes/turn.ts`'s own `streamTurnEvents()` already uses for
+the old path) before it ever calls `push()`, discarding the reasoning
+spans and feeding only the visible ones - `raw` (the full text,
+`extractReasoningText()`'s own input) is completely unaffected, so the
+final `TurnValue.reasoning` field is built exactly as it was before this
+item.
+
+Only a non-forced generation (`tool_choice !== "required"`) ever touches
+the gate (point 6): `runOneGeneration()` resets the gate at the top of
+every eligible attempt (discarding whatever a prior, abandoned attempt
+left pending - an offered round the model answered with a tool call
+instead of text, or a retried empty attempt), and at the end decides the
+gate's own fate from that attempt's own outcome: `finish()` when it
+produced no tool call (a real reply), `reset()` when it did (discarding
+speculative pending text immediately, rather than leaving it for a
+later, unrelated turn-level safety net to wrongly release if a policy
+rejection reaches `policy_refused`/`blocked` with no further model round
+at all).
+
+**The mid-stream refusal (point 2).** `runTurnNextStream()` wires the
+gate's `release` callback into a small push/pull `DeltaQueue` (the same
+push-now-pull-later shape `statusChannel.ts` already uses for status
+lines, kept separate since this one carries plain text with no event
+envelope) and its `onRefuse`/`onDone` callbacks both close that queue
+immediately - `onRefuse` fires the instant a sentence refuses, DURING
+the model's own generation, deliberately not deferred to the eventual
+`finish()` the rest of that generation's own tokens would otherwise
+still have to arrive before reaching. The `tokens` generator
+`runTurnNextStream()` returns throws `StreamSafetyRefusal` (the
+identical class and wire behavior `turnEngine.ts`'s old path already
+uses) the moment the queue closes on a refusal, without waiting for the
+model's remaining generation or the rest of the machine to finish - the
+household has already stopped seeing more text the instant `push()`
+detected it, so there is no reason to make the wire's own error event
+wait behind an engine that doesn't know it's been cut off. `finalize()`
+mirrors this: on a refusal it builds and logs the fixed line
+synchronously, right there (`state.crisis`/`state.safety` are set long
+before generation starts, so nothing later can change what this
+produces), rather than trying to `await` a background promise from a
+function the `TurnStreamResult` contract requires to be synchronous.
+The machine keeps running in the background regardless (nothing here
+cancels the xstate actor or the underlying engine call - a real, named
+gap, the same class DEADLINE-01/GENFAIL-01 already accept elsewhere in
+this codebase); its own eventual completion checks whether the streaming
+path already finalized and logged before ever doing either itself.
+
+**Architecture: `beginTurn()`/`finishTurn()`.** `runTurnNext()`'s old
+single function body is now two: `beginTurn()` (validate, resolve the
+conversation, classify the signal, build `TurnState`, start the machine
+actor - never awaits the machine) and `finishTurn()` (awaits the machine
+to `done`, builds the `TurnValue` from whichever end state it reached -
+the unchanged `asked`/`refused`/`blocked`/else switch). `runTurnNext()`
+is `beginTurn()` then an inline `await finishTurn()`, behavior-
+identical to before. `runTurnNextStream()` is `beginTurn()`, then
+`finishTurn()` kicked off in the background (never awaited inline), so
+it can return its `TurnStreamResult` immediately - the machine, once
+`.start()`'d, drives itself via its own promise chain independent of
+whether anything reads `status`/`tokens` yet, which is what actually
+lets a live tool-call status line and gated sentences reach the wire
+before the whole turn is done.
+
+**Tool events and the status line (part a).** `nodes/tool.ts` pushes the
+identical `{type:"status", text:"On it.", stage:"tool"}` line
+`turnEngine.ts`'s own `runTurnStream()` already emits before running a
+tool (`turnEngine.ts:6636`), onto `state.status` - a `StatusChannel`,
+set only by `runTurnNextStream()`, the same class and the same field
+name the old path's own stream kind already carries, reused rather than
+a second one. Neither path has ever put a *structured* `tool_call`/
+`tool_result` event on a live wire (only the "immediate"/batch result
+carries `toolEvents` with args and call IDs) - matched exactly, not
+invented new, since a live structured tool timeline was never part of
+either contract.
+
+**Wiring `routes/turn.ts`.** The `/stream` route's `ResumeSession`/
+`streamResponse`/`streamTurnEvents()` machinery needed no change at all
+- it already branches on `TurnStreamResult`'s own `kind`, generically,
+for any producer, exactly as designed. The one real change: the route's
+own dispatch now calls `runTurnNextStream()` instead of `runTurnNext()`
+when `turn.pipeline.next` is on. `tests/turnRouteU6a.test.ts`'s own
+pre-existing "the event shape is turn_meta/signal/done" assertion for
+the new path was asserting the very batching bug this item fixes -
+updated to the correct contract (turn_meta, signal, at least one delta,
+done - never an exact count, the stub's own chunking, not the route's
+contract), the same shape its own "off" (old path) case already proves.
+
+**Testing.** `tests/turnMachine/outputGate.test.ts` gained 16 direct
+`StreamGate` unit tests: sentence-by-sentence release with
+`released.join("") === result().text` (logged equals streamed,
+proven directly); a refusal on an adult turn and the identical one on a
+child turn, using the exact fixture phrases (`SAFE_SENTENCE`/
+`UNSAFE_SENTENCE`) `tests/turnEngine.test.ts`'s own old-path output-
+safety suite (step 9) uses, so the two suites are provably checking the
+same real classifier decision; push-after-refusal is a no-op; a
+generation opening with `{` releases nothing; a dangling-markup tail is
+released repaired; `reset()` discards an abandoned attempt; `onDone`
+fires exactly once whichever way a generation ends.
+`tests/turnMachine/turnNext.test.ts` gained six end-to-end tests against
+the real streaming stub server (`spec-spec-v0.1.31`'s own
+`streamChatCompletion()`, which genuinely streams a scripted reply word
+by word, never one batched chunk): a plain turn's logged reply equals
+the concatenation of the released deltas; the identical mid-stream
+refusal on an adult and a child turn; a refusal's own `finalize()` never
+waits on the background machine; the tool's own status line reaches a
+live client via `status.next()` (event-driven, never a sleep-based
+poll) before the reply text does; a direct regression proving the
+unchanged immediate path never touches `state.streamGate` at all. Full
+backend suite: 4157/4157, `bash scripts/check.sh` green (scope:
+backend), rerun once clean after one flaky port/memory failure under
+load (the documented FLAKE-PORT-01 class, not a real regression - the
+second run and a routes/turn.ts-scoped rerun both passed).
+
+**One commit, not the ruled two.** Commit (a) (tool events, the status
+line) and commit (b) (the full per-sentence gated stream) turned out to
+share the exact same `StatusChannel`/`StreamGate` wiring end to end - a
+"stream" kind result needs `state.streamGate` to be anything but an
+inert batch anyway, and there was no point between them that was
+independently meaningful to land alone. Landed as one commit instead of
+forcing an artificial split; flagged to the coordinator rather than
+silently deviated from the ruled shape.
+
+**The medium review's own findings, all fixed before landing.** Ten
+findings, most-severe first, cross-validated by multiple independent
+finders (the review's own report):
+
+1. **The retry-discards-the-gate bug.** The first cut settled
+   `StreamGate.finish()`/`reset()` inside `runOneGeneration()` itself,
+   on that ONE attempt's own outcome - `modelNode`'s own documented
+   retry ("no visible text: one regeneration with thinking off") could
+   then follow an attempt that had already locked the gate `done`
+   (empty text, no tool calls), and `StreamGate`'s own `reset()`/
+   `push()` are no-ops once done, silently discarding the retry's real
+   answer. Fixed: the gate's fate is now `modelNode`'s own call, made
+   once, at each of its own exit points, after every retry has
+   settled - `runOneGeneration()` itself only ever calls `reset()` (at
+   the start of an attempt), never `finish()`. Regression test: a
+   scripted engine that answers empty on its first call (`thinking:
+   true`) and for real on the retry; the retry's own text reaches both
+   the client and the logged row.
+2. **No whole-reply check.** `StreamGate` had no equivalent of
+   `gateOutputSafety()`'s own `wholeRefusal()` - a sentence safe on its
+   own can still make the reply so far unsafe read as a whole (a claim
+   split across two sentences, each benign alone), and the old path
+   re-checks `delivered + next` on every sentence for exactly this.
+   Fixed: `StreamGate` now carries the identical `wholeRefusal()`
+   check, in `push()` and `finish()` alike, with the identical
+   precedence (`wholeRefusal(rawSpan) ?? safety`). No live fixture for
+   a genuine cross-sentence-combination case exists anywhere in this
+   codebase, old path included (searched); the fix mirrors
+   `turnEngine.ts`'s own structure line for line rather than inventing
+   an unverified one, and the existing per-sentence tests prove it
+   doesn't regress the simple case.
+3. **Missing output-side crisis resources.** `buildTurnValue()`'s
+   `crisis_resources` read only `state.crisis` (the INPUT-side check,
+   computed before generation runs) - a non-refuse OUTPUT flag (a
+   self-harm mention in the model's own generated words, "offer, never
+   block") never reached the logged/returned turn on the streaming
+   path, the identical gap a 2026-09-05 review once found and fixed on
+   the old path's own `runTurnStream()`. Fixed: `buildTurnValue()` now
+   reads `state.streamGate?.result().lastFlagged` and derives
+   `crisis_resources`/`safety` from it when present, falling back to
+   the input-side line otherwise - a no-op for every non-streaming
+   caller. Regression test: the identical fixture
+   (`tests/turnEngine.test.ts`'s own CHAT-02 case, "I want to kill
+   myself.") on a child turn, `safety.action === "allow_with_resources"`
+   and `crisis_resources` present, the stream never cut.
+4. **A leaked prefix, `gate.reset()` can't retract.** An offered/auto
+   round can release a complete leading sentence live before its own
+   terminal step reveals a native `tool_calls` array (only known at
+   `step.done`); `reset()` clears the gate's own bookkeeping but cannot
+   un-send what a live client already received. Native tool-calls carry
+   no visible `step.value` text at all (FORCED-CALL-01's own documented
+   wire behavior), so the practical vector is an envelope written as
+   prose - closed by fix 5 below for the one real, live-observed shape;
+   a deeper envelope (prose ahead of one, mid-reply) is accepted
+   residual risk, the same class FAST-04's own speculative streaming on
+   the old path already carries, not solved further here.
+5. **The envelope guard only caught the bare form.** `looksLikeEnvelope()`
+   checked for a leading `{` only - ENGINE-CONTRACT-03's own real, live
+   miss is the TAG-wrapped form (Qwen3's `<function_call>`), which
+   `llm.ts`'s own `envelopeToolCall()` already parses but this gate
+   would have streamed as ordinary prose first. Fixed: the check now
+   recognizes a leading `{` or `<` (the same two shapes
+   `envelopeToolCall()` itself parses). Regression test added
+   alongside the existing bare-form one, using the identical
+   `LUNA_ENVELOPE` fixture `llm.test.ts` already has for the same live
+   miss.
+6. **A JSON-example reply degrades to non-live.** A genuine, non-tool-
+   call reply that happens to start with `{` (or now `<`) is held whole
+   and never streamed live - the same accepted tradeoff ruling point 4
+   already names explicitly ("hold the whole generation"), not a
+   correctness bug: the text still arrives, once, in the final `done`
+   event. Not fixed; not a defect.
+7. **The try/catch scope widened.** `runTurnNext()`'s own catch used to
+   wrap only `waitFor()`; the `beginTurn()`/`finishTurn()` split first
+   cut had it wrapping the whole `finishTurn()` body, so a genuine bug
+   in `buildTurnValue()` or the trace bookkeeping would have been
+   silently reported as a 503 "unavailable" instead of surfacing
+   distinctly. Fixed: `finishTurn()` now throws a narrow
+   `TurnMachineTimeout` specifically for a caught `waitFor()` failure;
+   each caller checks for that type by name and lets anything else
+   propagate uncaught, exactly as before the split.
+8. **A post-machine read of `state.temporary`/`state.conversationId`.**
+   `finishTurn()`'s own "asked" branch read these off `state` after the
+   machine ran; `nodes/context.ts` independently re-resolves the
+   conversation every turn and can overwrite `state.temporary` from
+   that second resolution (hardcoding `false` on its own failure path),
+   a mutation the pre-refactor single-function `runTurnNext()`'s own
+   local variables were immune to by construction. Fixed:
+   `beginTurn()` now captures both onto its own `BegunTurn` return
+   value, before the machine ever starts; `finishTurn()` reads those,
+   never `state`.
+9. **A second, hand-rolled push/pull queue.** The delivery queue
+   duplicated `statusChannel.ts`'s own wait/wake shape instead of
+   reusing it - "one definition, one place." Fixed: `StatusChannel` is
+   now generic (`StatusChannel<T = StatusEvent>`, the old path's own
+   `new StatusChannel()` unaffected), and the delivery queue is a plain
+   `StatusChannel<string>` plus a small `drainDeltaQueue()` generator.
+10. **The gate's lifecycle was spread across sites.** Named as the
+    structural reason finding 1 was possible - addressed by fix 1
+    itself: the settle decision now lives in exactly one place
+    (`modelNode`'s own exit points), not split between
+    `runOneGeneration()` and its caller.
+
+Full backend suite re-run clean after every fix: 4160/4160,
+`bash scripts/check.sh` green (scope: backend).
+
+**What's left.** The hold-protocol live bench against the 8B: a plain
+turn's first visible sentence no later than the old path's; a forced-
+search turn's `tool_call` within 2.5 s and its first sentence within 4 s
+of the tool's own end; VOICE-LIVE-02's own first-spoken-word line
+re-measured (was 6.21 s against a 3 s bar). Two smaller, named, out-of-
+scope gaps: an engine crash mid-generation can still leave "logged"
+(the machine's own unchanged `model_failed` fallback) diverging from
+whatever partial text already reached the wire - a pre-existing class of
+risk (`streamTurnEvents()`'s own generic mid-stream catch already
+exists for other reasons), not a new one this item introduces; the new
+path has no equivalent of `turnEngine.ts`'s own `bannedPhrasesFor()`
+yet, so a streamed thinking-cue filler can repeat a phrase a recent
+old-path turn already used - cosmetic only, never the reply itself.
+
 ## The single-box Apple Silicon engine host (2026-09-17)
 
 The owner ordered a Mac Studio M5 Max with 128 GB unified memory and a 2 TB
