@@ -578,8 +578,21 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // producing a self-description instead of an answer.
     const surfaceClass = state.planBasis.surfaceClass ?? "spoken";
     const promptSurfaceClass: SurfaceClass = promptSurfaceClassFor(surfaceClass, state.plan.age_band);
-    const assistantMessage = toolCallAssistantMessage(state.outcomes);
-    const resultMessages = toolResultMessages(state.outcomes);
+    // SEARCH-MIXED-01: a round that mixed a failed call with a succeeded
+    // one (a weather lookup that worked beside a search that didn't)
+    // never hands the phrasing round the failed one to explain, work
+    // around, or silently answer from its own training data instead -
+    // the FULL pair (its own tool_calls announcement AND its own tool
+    // result) is left out of this round's prompt entirely, never just
+    // the result alone (an assistant message announcing a call the
+    // prompt then has no matching tool response for is an invalid
+    // transcript). `answer.ts`'s own "model_text" case appends the
+    // failed outcome's own toolOutageLine afterward, deterministically,
+    // from the ORIGINAL unfiltered state.outcomes - the model is never
+    // the one deciding whether to mention it.
+    const phrasedOutcomes = state.outcomes.filter((o) => o.status !== "failed");
+    const assistantMessage = toolCallAssistantMessage(phrasedOutcomes);
+    const resultMessages = toolResultMessages(phrasedOutcomes);
     const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance);
     const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? phrasing : `${planLine(state.plan, state.signal, promptSurfaceClass)} ${phrasing}` };
     messages = [...state.messages, assistantMessage, ...resultMessages, instruction];

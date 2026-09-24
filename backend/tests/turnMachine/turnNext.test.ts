@@ -1142,6 +1142,69 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
   });
 });
 
+// SEARCH-MIXED-01: an independent review of SEARCH-EMPTY-01 (2026-09-24)
+// found `toolAllFailed` (machine.ts) only catches a round where EVERY
+// outcome failed - a round that mixes a failed websearch with a
+// succeeded other call (almanac-date here, a real live shape: "what's
+// the date and what's the latest on X") fell through to an ordinary
+// phrasing round whose own prompt carried the failed outcome's own tool
+// result same as a succeeded one, nothing stopping the model from
+// answering the searched question from its own training data instead of
+// admitting the search failed. Fixed in two places: model.ts's own
+// phrasing-round prompt now excludes a failed outcome's own tool_calls/
+// tool_result pair entirely (never hands the model something to explain
+// or work around), and answer.ts's own "model_text" case appends the
+// failed outcome's fixed toolOutageLine afterward, deterministically,
+// from the turn's real (unfiltered) outcomes.
+describe("turnNext.ts: SEARCH-MIXED-01, a round that mixes a failed search with a succeeded call", () => {
+  test("the reply phrases from the succeeded outcome only and states the search outage - never an answer to the failed search's own question", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [
+              { id: "call-1", name: "almanac-date", args: "{}" },
+              { id: "call-2", name: "websearch", args: JSON.stringify({ expression: "kevin bacon unresponsive engines fixture" }) },
+            ];
+          },
+          reply: (request) => {
+            if (!request.messages.some((m) => m.role === "tool")) return "unused";
+            phrasingRequest = request;
+            // A real model answering only from what it was actually
+            // handed (the almanac-date result) would say something like
+            // this - it was never shown the failed search at all, so it
+            // has nothing to invent an answer from even if it wanted to.
+            return "Today is Tuesday, October 6th.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "what's today's date and what shows has kevin bacon been in"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toContain("Today is Tuesday, October 6th.");
+      expect(result.value.reply.text).toContain("Search isn't working right now.");
+      // The real proof: the failed outcome's own tool_calls/tool_result
+      // pair never reached the phrasing round's own prompt at all - only
+      // the succeeded almanac-date call did.
+      const toolMessages = phrasingRequest?.messages.filter((m) => m.role === "tool") ?? [];
+      expect(toolMessages).toHaveLength(1);
+      const assistantMessage = phrasingRequest?.messages.find((m) => m.role === "assistant" && "tool_calls" in m);
+      const announcedCalls = (assistantMessage as { tool_calls?: { function: { name: string } }[] } | undefined)?.tool_calls ?? [];
+      expect(announcedCalls.map((c) => c.function.name)).toEqual(["almanac-date"]);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string }[]) : [];
+      expect(outcomes.find((o) => o.packageId === "websearch")).toMatchObject({ status: "failed", errorCode: "search_unavailable" });
+      expect(outcomes.find((o) => o.packageId === "almanac-date")?.status).toBe("succeeded");
+    } finally {
+      searxng.stop();
+    }
+  });
+});
+
 describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-text fields", () => {
   async function policyNodeOutcome(turnId: string): Promise<{ ok?: boolean; code?: string; arg?: string } | undefined> {
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();

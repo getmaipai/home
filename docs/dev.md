@@ -26675,3 +26675,81 @@ noted: a full-pipeline test (real stub engine, real `runTurnNextStream()`)
 proving the chunker's own dangling-tail repair survives end to end, not
 only at the `outputGate.test.ts` unit level.
 
+## SEARCH-MIXED-01: a round that mixes a failed search with a succeeded call never lets the model paper over the failure (2026-09-24)
+
+The same independent review named in SAFETY-NOTIFY-NEXT-01's own entry
+above found this third gap.
+
+`toolAllFailed` (machine.ts) only routes straight to `answer`'s safe
+`from_outcomes` case when EVERY outcome in a round failed
+(`output.outcomes.every((o) => o.status === "failed")`). A round that
+mixes a failed websearch with a succeeded other call (a genuine live
+shape: "what's today's date, and what's the latest on X") falls
+through to an ordinary phrasing round instead, whose own prompt
+carried the failed outcome's own tool result exactly the same way it
+carried the succeeded one - nothing stopped the model from answering
+the searched question from its own training data, or explaining the
+failure away in its own words, instead of the fixed, safe outage line
+SEARCH-EMPTY-01 already gives an all-failed round.
+
+**Fix, in two places, never a rule reading the model's own words**
+(RULES-AND-LEARNED-COMPONENTS.md's own "no hacky rules"): `model.ts`'s
+own phrasing-round message construction now filters `state.outcomes`
+to succeeded ones only before building `toolCallAssistantMessage()`/
+`toolResultMessages()` - the failed outcome's own tool_calls
+announcement AND its own tool result are both left out of the
+phrasing round's prompt (never just the result alone; an assistant
+message announcing a call the prompt has no matching tool response for
+is an invalid transcript). `answer.ts`'s own "model_text" case then
+appends the failed outcome's fixed `toolOutageLine()` afterward,
+deterministically, from the turn's real (unfiltered) `state.outcomes`
+- the SAME fixed code-to-text mapping `from_outcomes` already uses,
+never a second copy.
+
+**Test** (`turnNext.test.ts`, a new `SEARCH-MIXED-01` describe block): a
+scripted round calling `almanac-date` (succeeds) and `websearch`
+(fails, the fake SearXNG's own "unresponsive engines fixture" query)
+together asserts the reply contains BOTH the phrased almanac-date
+answer AND "Search isn't working right now.", that the phrasing
+round's own prompt carried exactly one `tool` message (almanac-date's,
+never websearch's), and that the assistant message announcing tool
+calls names only `almanac-date`.
+
+**Live measurement** (the real 8B, `qwen3-8b-instruct-q4-k-m`, against
+the resident engines at 127.0.0.1:8788/8794, an isolated
+`MAIPAI_DATA_DIR`, a hand-built fake SearXNG that fails every query
+unconditionally - a real model paraphrases its own search expression,
+so nothing here can script the exact wording `startFakeSearxng()`'s
+own magic-string trigger needs; `scripts/bench/search-mixed-01-live.ts`,
+5 reps, turn: "what's today's date? also, please search the web for
+what movies are playing this weekend"): 5/5 reps called both
+`almanac-date` and `websearch` together; `websearch` failed all 5/5
+(the fake engine's own unconditional failure); the reply stated the
+fixed outage line ("Search isn't working right now.") in all 5/5 -
+the structural fix holds under a real model every time, and neither
+`toolResultMessages()` nor `toolCallAssistantMessage()` ever exposed
+the failed call for the model to explain away or reference. **A
+separate, real finding this bench surfaced and did not patch, per the
+ruling's own instruction ("report the numbers honestly rather than
+patching with prompt prose")**: 1 of the 5 replies (rep 0) went on to
+invent a specific-sounding, entirely fabricated answer to the movies
+question anyway ("Movie A... Cinema X (Location A)... Movie B... Cinema
+Z (Location C)"), never grounded in anything the turn actually gave
+it - the phrasing round's own instruction never told it websearch even
+existed this round, so this is the model's own baseline "answer from
+what I know" habit applied to a question it was never given real
+grounding for, not the SEARCH-MIXED-01 bug this item closes (the model
+answering FROM the failed search's own visible result). One more reply
+(rep 3) hedged more vaguely without inventing named specifics; the
+other 3/5 said plainly they had no real-time access. This is a
+distinct, already-known-shape gap (the same "answer from what you know
+when nothing grounds it" honesty question `phrasingInstruction()`'s own
+header comment names as this round's substance) than SEARCH-MIXED-01's
+own scope, named here for whoever picks up a follow-up rather than
+silently absorbed into this item's own verdict. The first bench run
+also hit a genuine environment stall (a `deno run --cached-only`
+subprocess for `almanac-date`'s own handler hung for several minutes
+with zero CPU, on both the first two-rep smoke run's follow-up attempt
+and once more before a clean run finally completed) - reported as an
+environment finding, not something this item's own code touched or
+should paper over.

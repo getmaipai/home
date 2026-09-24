@@ -127,7 +127,21 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // order, across every round, so flatMap-ing it here is safe
       // either way.
       const sources = state.outcomes.flatMap((o) => o.sources ?? []);
-      return { outcome: { ok: true }, output: { text: input.text, sources } };
+      // SEARCH-MIXED-01: model.ts's own phrasing round never hands the
+      // model a failed outcome to answer around (its own tool_calls/
+      // tool_result pair is filtered out of that round's prompt
+      // entirely) - so a mixed round's own failure never has a chance
+      // to become something the model quietly worked around or
+      // answered from its own knowledge instead. The SAME fixed-code-
+      // to-text mapping "from_outcomes" already uses is applied here,
+      // deterministically, from the ORIGINAL unfiltered state.outcomes:
+      // an unrecognized failure code is silently skipped (no raw
+      // diagnostic ever reaches this line either way, only the fixed,
+      // safe lines toolOutageLine() itself names), never a rule reading
+      // what the model said.
+      const outageLines = [...new Set(state.outcomes.filter((o) => o.status === "failed").map((o) => toolOutageLine(o.errorCode)).filter((line): line is string => line !== null))];
+      const text = outageLines.length > 0 ? `${input.text} ${outageLines.join(" ")}`.trim() : input.text;
+      return { outcome: { ok: true }, output: { text, sources } };
     }
     case "context_quote":
       // The state record's own honesty rule: a world answer without a
