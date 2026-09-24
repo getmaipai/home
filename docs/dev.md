@@ -26826,3 +26826,111 @@ Full backend suite green (4221/4221) both before committing and after.
 Review low (a bench-script-only, S-sized fix). Not B's own files
 (packageHost.ts/searxngHealth.ts/searchHealthState.ts untouched) - B was
 told before starting.
+
+## PHRASE-02: gated closed on today's own numbers (2026-09-24)
+
+Attempted the second half PHRASE-01 split out: `nodes/model.ts`'s two
+forced branches (`interimRuleApplies`, `forceSearchOnly`) offering the
+budget's full fixed sorted tools block under `tool_choice: "required"`,
+the same set an offered round sends under `auto`, instead of
+`[websearch]` alone (or `[websearch, answer_from_this_conversation]`).
+The change itself worked exactly as designed - two new regression
+tests (`turnNext.test.ts`, since deleted with the revert below) proved
+the interim rule's forced round and an ordinary offered round carried
+the byte-identical tools array, and the `forceSearchOnly` retry kept
+excluding `answer_from_this_conversation` from it. The item's own gate
+is what closed it.
+
+**The gate, live against the resident 8B (`qwen3-8b-instruct-q4-k-m`,
+b10797), `scripts/bench/tool-calling.ts`'s new `requiredPass()`, the
+five inverse-miss rows ARCH-MEASURE-01 measured at `auto`
+(`data-scratch/arch-measure/tc_8b_inverse.log`), now forced (`required`)
+over the full ten-tool budget set:**
+
+| | Fitting (clean `websearch`) | False (anything else the forced choice returned) |
+|---|---|---|
+| Baseline (ARCH-MEASURE-01, `auto`, 3 tools) | 19/50 (38%) | 0/50 (0%) |
+| This gate (`required`, 10 tools) | 28/50 (56%) | 22/50 (44%) |
+
+Fitting rose (forcing removes the "declines to search" failure mode
+`auto` still has) but false calls did not hold at 0 - the bar the item's
+own text names ("no worse than... 0 of 50; worse, and this item stays
+closed with today's shape as the accepted floor"). Almost every false
+row was not a wrong-tool pick (the concern the bar was written for) but
+`no reply` - the forced request itself failing to return, four of five
+rows hitting it repeatedly (`did chatgpt 6 luna come out` 0/10 fitting,
+all ten `no reply`). Root-caused live, not assumed: the first attempt at
+this gate hung for 29 minutes with zero CPU progress on one request and
+no real household turn in `hub.log` at the time (`lsof` confirmed a
+single `ESTABLISHED` connection, no contention) - `complete()` has no
+request timeout of its own (`scripts/bench/setup.ts`'s own header names
+this exact risk), and ARCH-MEASURE-01's own "real gap found and fixed
+this session" (a 60s `completeWithTimeout()` wrapping every `complete()`
+call, `@maipai/core/src/withTimeout`) was never actually landed in
+`tool-calling.ts` - only in that session's own scratch run. Added here,
+all four of the file's own passes, and kept (it is a real, permanent
+fix independent of this item's own outcome): a request now fails at 60s
+and the bench moves on, reading as one more `no reply` rather than a
+silent hang. With the fix in, the pattern held: forcing the model to
+pick one tool out of ten, several with multi-property required-argument
+schemas, costs the local llama.cpp grammar compiler enough that a
+meaningful share of forced calls simply do not come back inside a
+minute. This is a new, worse failure mode than the one-tool shape ever
+had (a slow, occasionally-timing-out turn instead of a fast no-search
+answer), so per the item's own fallback, `nodes/model.ts`'s two forced
+branches are reverted to today's own shape (`git checkout` on that
+file), not landed. `docs/BACKLOG.md`'s `PHRASE-02` row is closed on this
+ruling, not left open.
+
+**One real caveat on the ten-tool number above, named rather than
+smoothed over**: the gate ran against ten tools, not the nine actually
+shipped in `modelCatalog.ts`'s `tools_offered` today - `write_document`
+(below) was still in the budget for this run, reverted only afterward.
+Its own schema is the heaviest of the ten (four properties, one
+required-string, one enum), so it plausibly costs the grammar compiler
+more than its share of the timeouts measured here. The numbers above are
+real for the exact combination tested (nine shipped tools plus
+`write_document`), not proven for the nine-tool shipped budget alone -
+a retry scoped to just the shipped nine, before `write_document` (or
+anything else) grows the set again, is the next thing to measure if
+this gets revisited, not a foregone conclusion from today's run.
+
+**Kept, independent of the outcome above** (`tool-calling.ts`'s own
+`Files` line names this): `requiredPass()`, `budgetOfferedPass()`, the
+five `INVERSE_MISS_ROWS`, `budgetOfferedTools()` (the real
+`qwen3-8b-instruct-q4-k-m` budget's own tools, loaded from the real
+manifests, never hand-copied), and `completeWithTimeout()` on all four
+passes. Live numbers stand as the record for a future retry (a smaller
+forced set, a lighter `write_document` schema, or an engine-side fix
+to the grammar compiler's own cost) - the next attempt does not start
+from zero.
+
+**Coordinator's own follow-up (`write_document` in the offered set,
+CHAT-RICH-01's canvas-never-opens trace), measured, not landed either:**
+`modelCatalog.ts`'s `tools_offered` gained `write_document` for this
+item's own live run (`budgetOfferedPass()`, `auto`, the full 10-tool
+set, five repeats), then was reverted along with `model.ts` once the
+numbers came back. `write_document` itself behaved perfectly - 5/5 on
+"write me a document about the history of pizza," 5/5 clean on two
+plain questions it should never fire on ("what's your favorite color,"
+"how do airplanes stay in the air"), 0/30 false calls across every
+negative row. But three EXISTING corpus rows that are clean under every
+other pass in this file (`remember pizza night+wifi password`,
+`ephemeral+dentist appointment`, `trivia+pizza night` - all two-tool
+rows) dropped from their usual near-perfect scores to 0/5 each with
+`write_document` in the set (calling `websearch` instead, or nothing at
+all). Isolated live in a one-off script (`phrase02-writedoc-isolate.ts`,
+deleted after its answer was read here, never committed): the same
+three rows against the budget's other nine tools PLUS the four
+corpus-specific ones (twelve tools, more than the real ten-tool budget)
+scored 15/15 clean with `write_document` excluded. Not a general
+"more tools confuses the model" effect (SIGNAL-02 already grew the
+budget to nine tools with no such report) - specifically
+`write_document` joining the set. Reported here rather than dropped or
+kept unilaterally, per the coordinator's own instruction: `write_document`
+is real, measurably regresses three existing rows when offered
+alongside them under `auto`, and CHAT-RICH-01's own canvas-never-opens
+bug is still open. The coordinator's own call on next steps (a
+narrower or conditional offering, a clearer tool description to
+disambiguate it from `remember`/`recall`/`websearch`, or accepting the
+cost) is owed before `modelCatalog.ts` changes again.
