@@ -158,6 +158,55 @@ describe("turnNext.ts: the interim rule", () => {
   });
 });
 
+// home#147: logTurnSafely() (turnEngine.ts, the old path) sets both of
+// these from the turn's own outcomes; buildTurnValue() (this file)
+// never did, so the weather/almanac card had nothing to build from on
+// the new path even before persistence entered into it - the card
+// never showed, live or after a reload, with the new engine on.
+// almanac-date is the package under test rather than weather: zero
+// args, no network (`offline: "full"`, no `data_sources` in its own
+// manifest), so this stays deterministic and offline without a fetch
+// mock weather's own real Open-Meteo permissions would need -
+// structuredPartForOutcomes() reads the outcome the identical way for
+// both packages (composer.test.ts's own "structuredPartForOutcomes"
+// describe block proves the function itself; this proves the wiring).
+// Forcing it into tools_offered and scripting the call (the
+// "consequential proposal" test's own technique, above) sidesteps the
+// routing question entirely - a real, separate finding, reported but
+// not fixed here, same as the issue's own text draws that line.
+describe("turnNext.ts: structured_part and artifact reach TurnValue (home#147)", () => {
+  test("a successful almanac-date outcome carries a structured_part spec sheet on the new path", async () => {
+    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "almanac-date"] };
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => (request.tools?.some((t) => t.function.name === "almanac-date") ? [{ id: "call-1", name: "almanac-date", args: "{}" }] : undefined),
+          reply: () => "unused",
+        },
+        () => runTurnNext(people.owner, "chat", "what's today's date"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.source).toBe("plugin");
+      expect(result.value.plugin_id).toBe("almanac-date");
+      expect(result.value.structured_part).toBeDefined();
+      expect(result.value.structured_part?.kind).toBe("spec_sheet");
+      expect(result.value.structured_part?.tool_id).toBe("almanac-date");
+      expect(result.value.structured_part?.rows.some((r) => r.label === "Date")).toBe(true);
+    } finally {
+      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
+    }
+  });
+
+  test("a turn with no structured-part-bearing outcome carries no structured_part", async () => {
+    const result = await withStub({ reply: () => "Hello!" }, () => runTurnNext(people.owner, "chat", "hi"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.structured_part).toBeUndefined();
+  });
+});
+
 describe("turnNext.ts: the household-subject rule", () => {
   test("a search naming a household member asks instead of running", async () => {
     // The household-subject rule (turn-machine-state-record-2026-09-22.md

@@ -24538,3 +24538,47 @@ trivially) and the cache-checker fix (the exact
 control-ten-turn-spoken-drift#1 shape now passes, a real drop with no
 gap still fails). Review: medium (a default that changes every
 household's own turn path).
+
+## home#147: the new path never set structured_part or artifact (2026-09-24, Session B)
+
+Found the day the flip landed (structural, but only visible once the
+new path is the default): `logTurnSafely()` (`turnEngine.ts`, the old
+path) sets both `TurnValue.structured_part` (`structuredPartForOutcomes
+(meta.outcomes)`) and `TurnValue.artifact` (`artifactForOutcomes(meta.
+outcomes)`) from the turn's own outcomes; `buildTurnValue()`
+(`turnMachine/turnNext.ts`, the new path) never called either function
+anywhere, so the weather/almanac card and any `write_document` artifact
+had nothing to build from on the new path, before persistence even
+entered into it. Fixed with the same two calls, `state.outcomes` in
+place of `meta.outcomes ?? []` (the new path's own outcomes list is
+never undefined).
+
+Tested against `almanac-date`, not `weather`, on purpose:
+`structuredPartForOutcomes()` reads the outcome identically for both
+packages (`composer.test.ts`'s own "structuredPartForOutcomes" describe
+block already proves the function itself), and almanac-date's own
+manifest (`offline: "full"`, no `data_sources`) needs no network mock
+the way weather's real Open-Meteo permissions would - this test proves
+the wiring, not weather's own business logic, and stays deterministic
+and offline without inventing a `host.fetch` mock this codebase has no
+general seam for yet (`smoke.ts`'s own `HostEmulator` injects into
+`runRecipe()` directly, not through `runPlugin()`'s real path
+`runTurnNext()` calls). Forced into `tools_offered` and the model's
+call scripted directly (the "consequential proposal" test's own
+technique, same file) - sidesteps the routing question below entirely.
+
+**A second, separate finding, live-reproduced but not fixed here** (the
+issue's own text already drew this line: "a separate routing question
+worth checking once this is fixed... not fixed here"): asking "what's
+the weather in Seattle" on the new path calls `websearch`, never
+`weather`, even though `weather` is a real candidate in the model's own
+offered set (`modelCatalog.ts`'s `tools_offered` carries both). Not a
+missing candidate and not a forced-search override (`signal.target`
+was `"world"`, `requiredHonored` was `null` - an ordinary, non-forced
+round). A genuine model tool-choice preference on this 8B model, filed
+as getmaipai/home#150 rather than guessed at here.
+
+Verification: `bash scripts/check.sh` (scope `backend`, only two files
+touched) - scripts 42/42, backend 4141/4141 (two new tests: a
+successful almanac-date outcome carries the spec sheet, a plain-text
+turn carries none). Review: medium (the TurnValue wire shape).

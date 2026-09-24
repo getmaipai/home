@@ -32,6 +32,7 @@ import { surfaceClassOf } from "@/lib/surfaceClass";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
 import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
+import { structuredPartForOutcomes, artifactForOutcomes } from "@/lib/composer";
 import { emptyTimings } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { resolveTurnBudget } from "./budget";
@@ -86,6 +87,13 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // emitting this turn AND output_gate's own safety pass over the
     // span didn't refuse it - the gated span itself, never the raw one.
     reasoning,
+    // home#147: turnEngine.ts's own logTurnSafely() (the old path)
+    // sets both of these from the identical outcomes list - never
+    // called here, so the new path built no structured part (the
+    // weather/almanac card) and no artifact (write_document's own
+    // outcome) for anything, on any turn. Same functions, same input.
+    structured_part: structuredPartForOutcomes(state.outcomes) ?? undefined,
+    artifact: artifactForOutcomes(state.outcomes) ?? undefined,
     ...(source === "plugin" && packageId ? { plugin_id: packageId } : {}),
     ...(source === "command" && packageId ? { command_id: packageId } : {}),
     ...(sources && sources.length > 0 ? { sources } : {}),
