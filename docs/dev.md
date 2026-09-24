@@ -25288,3 +25288,15 @@ default, the bench's own `MAIPAI_BENCH_KEEP_READ_PAGE=1` toggle keeps
 `read_page` through with `category` still stripped). Review: low (the
 same one-line-per-arg scope guard as (1), plus a new bench script
 mirroring `written-set.ts`'s own shape closely).
+
+**A second live run (2026-09-24, alongside STREAM-NEXT-01's own hold-
+protocol bench, same resident engine) reproduces the identical
+verdict:** prompt_n deltas of 0-6 tokens across six rows (announcement
+497→503, conceptual 529→529, poster 1100→1100, trailer 1069→1075,
+release-date 505→511, current-events 516→516; urgent-followup has no
+phrasing round either way), all comfortably inside the first run's own
+0-16 token range - the same small, real cost, not noise. BACKLOG row's
+own "live verification outstanding" caveat was left unupdated after
+the first run despite the table above already carrying the answer;
+fixed now, on this second confirming run rather than left stale
+further.
