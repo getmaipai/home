@@ -56,7 +56,12 @@ export async function synthesizeSpeech(text: string, voiceUrl?: string): Promise
     return { ok: false, status: 400, code: "invalid_input", error: `text must be ${MAX_TEXT_LENGTH} characters or fewer` };
   }
 
-  if (getStackUrl()) return synthesizeViaStack(text, voiceUrl);
+  // getmaipai/home#151: MAIPAI_TTS_URL before the Stack, the same
+  // ordering fix and reasoning llm.ts's complete()/startCompleteStream()/
+  // embed() already got - its own tier 1 (ttsSupervisor.ts) already
+  // treats it as the explicit override, and a review of that fix found
+  // this exact same ordering bug still live here.
+  if (!process.env.MAIPAI_TTS_URL && getStackUrl()) return synthesizeViaStack(text, voiceUrl);
 
   let client;
   try {

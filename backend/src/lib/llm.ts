@@ -431,7 +431,19 @@ export async function complete(
   const invalid = validate(role, messages);
   if (invalid) return invalid;
 
-  if (getStackUrl()) return completeViaStack(role, messages, opts);
+  // getmaipai/home#151: MAIPAI_LLAMA_SERVER_URL is already documented
+  // (llmSupervisor.ts's own tier 1) as the explicit override - "point
+  // at an already-running server (real or someone else's stub)" - the
+  // one env var a developer or a test sets specifically to be obeyed.
+  // Checking it before the household's own Stack setting matches that
+  // stated intent (a real household never sets a raw env var; the only
+  // realistic setters are a developer overriding on purpose or a
+  // test's own scripted stub) and closes a whole class of test flake
+  // at the source: four test files each needed their own resetDb() to
+  // clear a leftover engines.stack.url row that would otherwise win
+  // over this env var - this ordering means a new test calling
+  // complete()/startCompleteStream() never needs to rediscover that.
+  if (!process.env.MAIPAI_LLAMA_SERVER_URL && getStackUrl()) return completeViaStack(role, messages, opts);
 
   let client;
   try {
@@ -619,7 +631,9 @@ export async function startCompleteStream(
   const invalid = validate(role, messages);
   if (invalid) return invalid;
 
-  if (getStackUrl()) return startCompleteStreamViaStack(role, messages, opts, signal);
+  // getmaipai/home#151: the same MAIPAI_LLAMA_SERVER_URL-before-Stack
+  // ordering as complete() above, and for the identical reason.
+  if (!process.env.MAIPAI_LLAMA_SERVER_URL && getStackUrl()) return startCompleteStreamViaStack(role, messages, opts, signal);
 
   let client;
   try {
@@ -707,7 +721,11 @@ export async function embed(texts: string[]): Promise<EmbedOpResult> {
     return { ok: false, status: 400, code: "invalid_input", error: "texts must be a non-empty array of non-empty strings" };
   }
 
-  if (getStackUrl()) return embedViaStack(texts);
+  // getmaipai/home#151: MAIPAI_EMBED_URL before the Stack, the same
+  // ordering and reasoning as complete()'s own MAIPAI_LLAMA_SERVER_URL
+  // check above - its own tier 1 (embedSupervisor.ts) already treats
+  // it as the explicit override.
+  if (!process.env.MAIPAI_EMBED_URL && getStackUrl()) return embedViaStack(texts);
 
   let client;
   try {

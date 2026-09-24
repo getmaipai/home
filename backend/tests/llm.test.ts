@@ -933,6 +933,87 @@ describe("lib/llm.ts routed through a configured Stack", () => {
     const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.embed");
     expect(issue?.detail).toBe("the embed engine is not running");
   });
+
+  // getmaipai/home#151: the fix at the source - a configured Stack (a
+  // real, live household setting) used to always win over
+  // MAIPAI_LLAMA_SERVER_URL, so a leftover Stack setting from an
+  // earlier test file silently routed later tests through it instead
+  // of their own scripted stub (issue #137's own root cause,
+  // rediscovered by hand in four separate test files before this).
+  // Configures a real Stack fixture AND points the env var at a local
+  // stub in the same test, proving the env var - the explicit,
+  // deliberately-set override - wins. A review of the first cut of
+  // this fix found only complete() proven directly; startCompleteStream()
+  // and embed() got the identical one-line fix but no test of their
+  // own, so a future refactor of either's own Stack-routing condition
+  // could silently reintroduce the bug with the suite staying green -
+  // both proven directly below too.
+  test("MAIPAI_LLAMA_SERVER_URL wins over a configured Stack, not the other way around", async () => {
+    fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => {
+        throw new Error("the Stack must never be reached - the env var override should have won");
+      },
+    });
+    configureStack();
+
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "hello from the local stub, not the stack" });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const completed = await complete("chat", [{ role: "user", content: "hi" }]);
+      expect(completed.ok).toBe(true);
+      if (completed.ok) expect(completed.value.text).toBe("hello from the local stub, not the stack");
+    } finally {
+      stub.stop();
+    }
+  });
+
+  test("the same is true for startCompleteStream()", async () => {
+    fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => {
+        throw new Error("the Stack must never be reached - the env var override should have won");
+      },
+    });
+    configureStack();
+
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "hello from the local stub, not the stack" });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }]);
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+      let text = "";
+      for await (const delta of started.tokens) text += delta;
+      expect(text).toBe("hello from the local stub, not the stack");
+    } finally {
+      stub.stop();
+    }
+  });
+
+  test("MAIPAI_EMBED_URL wins over a configured Stack, not the other way around", async () => {
+    fixture = startStackFixture({
+      "POST /v1/embeddings": async () => {
+        throw new Error("the Stack must never be reached - the env var override should have won");
+      },
+    });
+    configureStack();
+
+    // The stub's own /v1/embeddings has no scripting option (unlike
+    // chat's scriptedChatReply) - its always-on deterministic default
+    // is enough here: the Stack fixture above throws unconditionally,
+    // so `result.ok` alone proves the local stub answered instead.
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0);
+    process.env.MAIPAI_EMBED_URL = stub.url;
+    try {
+      const result = await embed(["hi"]);
+      expect(result.ok).toBe(true);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_EMBED_URL;
+    }
+  });
 });
 
 // Found live: safety.test.ts's own "every real settings key, stressed to
