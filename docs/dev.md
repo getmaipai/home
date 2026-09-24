@@ -27385,3 +27385,180 @@ Verification: `bash scripts/check.sh` (scope full - touches
 turn-machine files outside a single package); review low, target
 `main...HEAD`; single commit (code + test + this section + BACKLOG.md
 line 95).
+
+## REFERENCE-LIBRARY-01: installing a reference package end to end (2026-09-24)
+
+**Objective.** `docs/plans/knowledge-sources-2026-09-24.md`'s build
+order, item 3 (work order `docs/plans/b-reference-library-01-2026-09-24.md`):
+the library manager - find the newest file for a chosen book/language/
+flavour, download it with resume, verify against Kiwix's own published
+sha-256, and on an update keep the old copy in place until the new one
+verifies, then swap. Host machinery (one of the two "Home stays lean"
+exceptions, with KIWIX-SIDECAR-01), never source-specific code.
+
+**No static pin table, unlike kiwix-tools.** `kiwixCatalog.ts`'s
+binaries are a hand-verified, rarely-changing pin array; a ZIM's own
+snapshot reissues roughly monthly, so `resolveReferenceFlavour()`
+(`backend/src/lib/referenceLibrary.ts`) asks Kiwix's own public library
+catalog live instead - `library.kiwix.org/catalog/v2/entries?q=<book>
+&lang=<lang>` (the front door, the same query a person browsing kiwix.org
+would make, org CLAUDE.md > Third-party services), matches the entry
+whose `<flavour>` equals the one asked for, follows its OPDS acquisition
+link to the file's own `.meta4` sidecar, and trusts the sha-256 and size
+published there directly (owner's call 6). The XML (the catalog's Atom
+feed and the meta4's own metalink4 shape) is parsed with `linkedom`'s
+`DOMParser` - already a real dependency in this repo (`packageHost.ts`'s
+`parseHTML`), reused rather than adding a second XML library for the
+same solved problem. Verified live, 2026-09-24: the `.meta4` URL with
+its own `.meta4` suffix stripped is the real `.zim` download URL,
+served by the same load-balanced host.
+
+**Resume and verification are `downloadUrl()`, unchanged.** No new
+resume logic - the same Range/`.part` mechanism KIWIX-SIDECAR-01 already
+proved for the kiwix-tools binary, reused as-is for a much larger file
+(a ZIM), where resume matters more.
+
+**The old-copy-kept-until-verified swap.** A new or updated flavour
+downloads to `<slot>.zim.incoming` first, at a stable, date-free slot
+name (`<name>_<flavour>.zim`, e.g. `vikidia_en_all_nopic.zim` - the
+same path across every future update, so kiwix-manage's own library
+entry and anything that links to this book never has to change). Only a
+fully downloaded AND sha256-verified file is ever renamed over the
+stable path (`renameSync`, atomic on the same filesystem) - the
+previous copy, if any, is completely untouched until that instant, and
+a failed download or a hash mismatch never reaches the rename at all
+(`downloadUrl()`'s own verification failure deletes its `.part` and
+throws, exactly the "never a silent retry loop, never a corrupt file
+left in place" the work order names). Proven with file-level before/
+after assertions in `tests/referenceLibrary.test.ts` (deterministic,
+against a scripted local catalog/meta4/ZIM server, never the real
+network) rather than a live timing race, matching this repo's own
+"deterministic and offline by default" standard - the file system state
+before and after the call is the real proof, not a wall-clock window.
+
+**Repairs integration.** `installAndPublishReferenceFlavour()` raises a
+real Repairs issue (`source: "reference-library"`, keyed per book/
+language/flavour) with a working "Try the download again" fix
+(`registerFixHandler`) on any resolve or install failure, resolved
+again on the next success - unlike KIWIX-SIDECAR-01's own kiwix-tools
+install failure, which is still console-only (a named, pre-existing gap,
+not touched here). `ensureKiwixInstalled()`/`registerKiwixSidecar()`/
+`startSidecar()` - the real network/process side of "publish" - are
+never exercised by `bun test`, the same boundary `kiwixSidecar.ts`
+itself already draws; only the failure path (which throws before any of
+those run) is unit-tested here, and the live bench below proves the
+success path's own resolve/download/verify half for real.
+
+**Disk impact: a route, not a page** (design-resolver's own pass,
+2026-09-24, medium-high confidence): `docs/plans/knowledge-sources-2026-09-24.md`
+calls the sizing UI "the wizard," but that name has meant the model-
+download flow since 2026-09-04, not the onboarding `SetupWizard.tsx`
+(whose own "packages" step is still a placeholder - "the package store
+isn't built yet" - with nothing for a reference step to join), and the
+full Reference app's own Library screen (where knowledge-sources.md's
+"add a set in a sheet showing the disk impact" literally lives) is
+`REFERENCE-APP-01`, after `LOOKUP-FED-01`, not this item. So this item
+ships disk impact as data, not UI: `storageImpact(path, requiredBytes)`
+(`backend/src/lib/storage.ts`, reusing `diskUsage()`) and `GET /api/
+storage/impact?path=&requiredBytes=` (`backend/src/routes/storage.ts`),
+generic on purpose - any future screen that needs a "does this fit"
+answer for any path and any byte count calls the same one endpoint, no
+new hand-built frontend surface (org rule, 2026-09-21). `BACKLOG.md`
+line 147's own wording is corrected from "disk impact in the wizard" to
+match.
+
+**Privacy: two rows, one a pre-existing gap.** `platform:reference-library`
+is this item's own new row (verbatim from the design's Privacy
+paragraph: a download or update check sends the file name and the
+home's address to Kiwix and a third-party mirror). `platform:kiwix-tools`
+is a real gap left by KIWIX-SIDECAR-01 - that item's own binary download
+never got a privacy row at all - found and fixed in the same pass
+rather than filed and left, since the fix was one line next to the row
+already being added.
+
+**Deliberately not built in this pass, named rather than left silent**
+(credit-pressure stop point, 2026-09-24 - the coordinator asked every
+lane to land at a safe, verified point rather than start new scope):
+- **`reference.images`, the person-scope child-images setting** (owner's
+  call 5: "default for a child is Vikidia and no image pages"). A first
+  draft declared it in `referenceKeys.ts` (same shape as
+  `search.safe_search`), then was pulled back out: SOURCE-SPEC-01's own
+  hard-won lesson is that a settings key isn't real until it's in the
+  generated `spec/settings/keys.json` (a commons tag cut and pin bump),
+  and nothing in this repo reads this particular setting yet either
+  (`REFERENCE-APP-01`/`LOOKUP-FED-01` are its first real callers) - landing
+  it half-wired (declared, unusable, 400s on every write) would have
+  repeated the exact SOURCE-SPEC-01 mistake this session already found
+  and fixed once. A follow-up item should declare it through the real
+  generator when a real caller exists.
+- **Updates rows** (`UpdatesSection.tsx`'s `rowsFrom()`, a new `"reference"`
+  kind). The existing `UpdateProjection`'s `stack` field comes from a
+  live call to the separate MaiPai Stack daemon
+  (`routes/updates.ts`'s `getStackUpdatesState()`) - a reference set's
+  own pending-update state is local to this hub and does not belong
+  under that field, so this needs its own small `reference` field
+  threaded through the backend projection, the Zod response schema, and
+  `rowsFrom()`/`rowIcon()`, not a one-line addition to an existing one.
+  Not started.
+
+**Live proof** (`scripts/bench/reference-library-01-live.ts`, run
+2026-09-24): phase 1 resolved Vikidia's own real English "nopic" flavour
+live against `library.kiwix.org` (974 ms) and installed it for real from
+`download.kiwix.org` (86,549 ms, 10,555,427 bytes, sha256-verified,
+`replacedPrevious: false` on a first install). Phase 2 started a real
+download of the "maxi" flavour (77,565,163 bytes), aborted it after
+2,014,842 bytes had reached disk (confirmed as the real `.part` file's
+own size), then called `downloadUrl()` again and it resumed and
+completed (144,810 ms) rather than restarting from zero, sha256-verified
+at the end. Both phases PASS. The hash-failure and old-copy-served
+mechanics are proven deterministically instead (see above), not
+re-proven live against Kiwix's own servers, which can't be deliberately
+corrupted for a test.
+
+**Review pass, four real findings, all fixed.** (1) `resolveReferenceFlavour()`
+matched the first catalog entry whose `<flavour>` equalled the request,
+never checking the entry's own `<name>` - Kiwix's `q=` is a fuzzy title
+search (the legacy notes' own warning), so an unrelated title sharing a
+flavour tag could have silently resolved instead of the requested book.
+Fixed by requiring `name` to start with `<book>_`. (2) Two concurrent
+installs of the same book/language/flavour (two admins, or the Repairs
+"try again" fix firing mid-install) would race the same `.incoming`/
+`.incoming.part` files. Fixed with an in-process `Set` of in-flight slot
+keys; a second call for the same slot is refused immediately, tested.
+(3) `installAndPublishReferenceFlavour()` called `registerKiwixSidecar()`
+again on every install, which calls `sidecars.ts`'s own `registerSidecar()`
+- unconditionally overwriting the registry entry (a latent gap in that
+shared function: it resets `proc`/`status`/`healthTimer` without
+clearing the OLD entry's still-running health-poll interval first).
+KIWIX-SIDECAR-01 never hit this (it only ever registers once, at boot,
+before anything is running); this item is the first caller that
+re-registers an already-running sidecar. Fixed at this item's own call
+site rather than in the shared file (smaller blast radius): when
+`getSidecar()` shows the sidecar already registered, only
+`regenerateLibrary()` runs (real kiwix-manage, no registry touch) before
+a stop/start - `registerKiwixSidecar()` itself is called only on a true
+first registration. Not independently live-tested (the live bench calls
+`installReferenceFlavour()` directly, never the "publish" half, the same
+real-network boundary this file already draws for tests) - verified by
+tracing `registerSidecar()`'s own source. (4) The `platform:reference-library`
+privacy row named only the catalog lookup host as its structured
+`destination`, though the real ZIM bytes come from a second, different
+host - fixed by adding the load-balancer host this item's own live bench
+actually connected to (`lb.download.kiwix.org`), so the destination
+field itself, not just its prose, is as concrete as a dynamically-mirrored
+download can honestly be.
+
+Files: `backend/src/lib/referenceLibrary.ts` (new),
+`backend/tests/referenceLibrary.test.ts` (new, 7 tests),
+`backend/src/lib/storage.ts` (`storageImpact()`), `backend/src/routes/
+storage.ts` (`GET /api/storage/impact`), `backend/tests/storage.test.ts`
+(4 new tests), `backend/src/lib/privacy.ts` (two new rows),
+`backend/tests/privacy.test.ts` (1 new test), `backend/src/settings/
+referenceKeys.ts` (a comment recording the deliberately-not-added
+setting), `backend/scripts/bench/reference-library-01-live.ts` (new),
+`docs/BACKLOG.md` line 147/148. Verification: `bash scripts/check.sh`
+green (scope full; the same pre-existing, unrelated turn-engine test
+flake tracked as issue #140 reproduced here too, 12 of 4272 tests, none
+in this item's own files); the live bench above. Review: medium (a real
+download/verification path with real network and disk side effects, per the work
+order's own instruction).
