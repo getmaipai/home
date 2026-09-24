@@ -43,6 +43,8 @@ import type { BenchConversation, Speaker } from "./conversationFixture";
 import { scoreTurn, type TurnObserved, type TurnScore } from "./conversationScore";
 import { __setPromptClockForBench } from "@/lib/benchSampling";
 import type { TurnTimings } from "@/lib/turnContext";
+import { complete } from "@/lib/llm";
+import { visibleText } from "@/lib/wellFormed";
 
 // ==== The [turn] / [route] log capture ====
 
@@ -231,7 +233,14 @@ export function startFakeSearxng(): FakeSearxng {
                     // turn from.
                     /mariners/i.test(q)
                     ? [{ title: "Mariners win 6-3", url: `https://example.com/${slug}`, content: "The Seattle Mariners won last night's game 6-3, extending their winning streak to four games." }]
-                    : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
+                    : // WRITTEN-PARITY-01's own `written-fresh-president-france`
+                      // row: a name no model's own training data could
+                      // already know, so a reply carrying it can only have
+                      // come from these results, never a lucky guess -
+                      // real world figures never appear here on purpose.
+                      /pr[ée]sident.*franc|franc.*pr[ée]sident/i.test(q)
+                      ? [{ title: "President of France: officeholder", url: `https://example.com/${slug}`, content: "Élodie Vasseur is the current President of France, sworn in after the last presidential election." }]
+                      : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
       return Response.json({ query: q, results });
     },
   });
@@ -284,6 +293,21 @@ export function startFakeHomeAssistant(): FakeHomeAssistant {
     if (!set.ok) throw new Error(`the fake Home Assistant could not set ${key}: ${set.error}`);
   }
   return { url, calls, stop: () => server.stop(true) };
+}
+
+// ==== WRITTEN-PARITY-01: the reply floor ====
+
+/** The bare model's own answer to a question - no system message, no
+ * tools, thinking off, the engine's own default length - the floor
+ * written-set.ts measures the path's reply against (the state record's
+ * "the reply floor": personality, register and guards may change tone,
+ * never substance, structure or usefulness). Returns "" on a failed
+ * completion rather than throwing, the same degrade posture
+ * judgePersonaConsistency's own caller already assumes for one bad
+ * call. */
+export async function bareReply(question: string): Promise<string> {
+  const result = await complete("chat", [{ role: "user", content: question }], { thinking: false });
+  return result.ok ? visibleText(result.value.text) : "";
 }
 
 export interface RunDeps {

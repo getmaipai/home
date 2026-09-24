@@ -33,8 +33,12 @@ const LIVE = process.argv.includes("--live");
 // A spread across the five kinds RESP-01 names, five questions each -
 // self-contained (never a household or world fact this bench would
 // need to seed), so `toolRan: null` and `humanVerdict: true` apply to
-// every row uniformly.
-const WRITTEN_QUESTIONS: readonly { id: string; kind: "fact" | "how-to" | "comparison" | "list" | "small-talk"; say: string }[] = [
+// every row uniformly. WRITTEN-PARITY-01 adds two more past the
+// spread, the interim rule's own row pair (below) - one still
+// self-contained, one that needs `startFakeSearxng()`'s own fixture
+// and carries a real scored check (`groundedNames`) alongside
+// `humanVerdict`, not `toolRan: null` uniformly any more.
+const WRITTEN_QUESTIONS: readonly { id: string; kind: "fact" | "how-to" | "comparison" | "list" | "small-talk"; say: string; groundedNames?: boolean }[] = [
   { id: "written-fact-1", kind: "fact", say: "what's the boiling point of water in fahrenheit" },
   { id: "written-fact-2", kind: "fact", say: "how many bones are in the human hand" },
   { id: "written-fact-3", kind: "fact", say: "what's the capital of australia" },
@@ -55,6 +59,22 @@ const WRITTEN_QUESTIONS: readonly { id: string; kind: "fact" | "how-to" | "compa
   { id: "written-list-3", kind: "list", say: "what are the primary colors" },
   { id: "written-small-talk-1", kind: "small-talk", say: "hi" },
   { id: "written-small-talk-2", kind: "small-talk", say: "how's it going" },
+  // WRITTEN-PARITY-01's own row pair for the interim rule's trigger
+  // (dev.md "The interim rule's trigger, decided"): the benchmarking
+  // question is OPENER-01's own replay row's exact words
+  // (`owner-replay.json`, `benchmarking-typed-adult`) - a plain
+  // conceptual question that must reach the model rather than a
+  // pattern, judged the same generic bare-floor way as every row
+  // above. The France question is forced-search and judged
+  // differently: `groundedNames: true` below fails the row if the
+  // reply names anyone not present in the tool results or the
+  // utterance itself, so a reply that "wins" only by guessing from the
+  // model's own (possibly stale) training data fails it exactly like
+  // one that invents a name outright - `startFakeSearxng()`'s own
+  // fixture answers with a name no model could already know, the only
+  // way to tell "grounded in the results" apart from "got lucky."
+  { id: "written-conceptual-benchmarking", kind: "fact", say: "what is technical benchmarking and why do you need it" },
+  { id: "written-fresh-president-france", kind: "fact", say: "who is the president of France", groundedNames: true },
 ];
 
 function conversationFor(row: (typeof WRITTEN_QUESTIONS)[number]): BenchConversation {
@@ -68,7 +88,7 @@ function conversationFor(row: (typeof WRITTEN_QUESTIONS)[number]): BenchConversa
     id: row.id,
     category: "knowledge",
     note: `written register, ${row.kind}`,
-    turns: [{ say: row.say, expect: { guard: null, humanVerdict: true } }],
+    turns: [{ say: row.say, expect: { guard: null, humanVerdict: true, ...(row.groundedNames ? { groundedNames: true } : {}) } }],
   };
 }
 
@@ -143,6 +163,12 @@ async function runMain(): Promise<void> {
   const homeAssistant = runner.startFakeHomeAssistant();
   const searxng = runner.startFakeSearxng();
   const allScores: TurnScore[] = [];
+  // WRITTEN-PARITY-01: the bare reply and its judge verdict are only
+  // ever measured live (both need a real completion) - one entry per
+  // row that produced a score, judged as a single batched call after
+  // every row has run, the same "one call over the whole set" shape
+  // replyParityJudge.ts mirrors from personaJudge.ts.
+  const parityRows: { score: TurnScore; bareReply: string }[] = [];
 
   try {
     for (const row of WRITTEN_QUESTIONS) {
@@ -161,6 +187,10 @@ async function runMain(): Promise<void> {
           return { scores: [], turnIds: [] as string[] };
         });
       allScores.push(...run.scores);
+      if (LIVE && run.scores[0]) {
+        const bare = await runner.bareReply(row.say);
+        parityRows.push({ score: run.scores[0], bareReply: bare });
+      }
     }
   } finally {
     log.stop();
@@ -168,7 +198,26 @@ async function runMain(): Promise<void> {
     searxng.stop();
   }
 
-  console.log("\n## Full table (read the reply column for completeness against the ChatGPT bar - humanVerdict rows are never machine-scored)\n");
+  if (LIVE && parityRows.length > 0) {
+    const { judgeReplyParity } = await import("@/lib/replyParityJudge");
+    const judged = await judgeReplyParity(parityRows.map((p) => ({ question: p.score.say, bareReply: p.bareReply, pathReply: p.score.observed.reply })));
+    for (let i = 0; i < parityRows.length; i++) {
+      const { score, bareReply } = parityRows[i]!;
+      if (judged.ok) {
+        const v = judged.verdicts.find((x) => x.index === i);
+        score.observed.bareParity = { bareReply, carriesPoints: v?.carries_points ?? false, missingPoints: v?.missing_points ?? ["judge produced no verdict for this row"] };
+      } else {
+        score.observed.bareParity = { bareReply, carriesPoints: false, missingPoints: [`judge unavailable: ${judged.error}`] };
+      }
+    }
+  } else {
+    // Scripted mode: no live completion ran, so there is nothing to
+    // judge yet - the column reads "unjudged" rather than blank, so a
+    // reader can tell "not measured" from "measured and empty."
+    for (const s of allScores) s.observed.bareParity = null;
+  }
+
+  console.log("\n## Full table (read the reply column for completeness against the ChatGPT bar - humanVerdict rows are never machine-scored; bare parity is a trend line, never a gate)\n");
   console.log(score.renderTable(allScores));
 
   const byKind = new Map<string, number>();

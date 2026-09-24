@@ -24281,3 +24281,79 @@ frontend, 0 fail, the memory sample above), once on the real diff
 about to land (39 scripts + 4081 backend + 721 frontend, 0 fail, scope
 auto-escalated to `full` by GATE-SCOPE-01's own rule since
 `scripts/check.sh` itself changed).
+
+## WRITTEN-PARITY-01: the written set measures the reply floor against the bare model (2026-09-23, Session B)
+
+Built as the row's own objective describes: `bareReply()`
+(`conversationRunner.ts`) is one `complete("chat", [{role: "user",
+content: question}], { thinking: false })` call, no system message, no
+tools, the engine's own default length - the floor the state record's
+"the reply floor" names. `replyParityJudge.ts` mirrors
+`personaJudge.ts` exactly (one batched `response_format: json_schema`
+call over the whole set, a `Map` keyed by index so a skipped or
+duplicated verdict never corrupts the result the way `personaJudge.ts`'s
+own 2026-09-06 finding did); `written-set.ts` calls `bareReply()` once
+per row in `--live` mode only (scripted mode has no live completion to
+judge, so it never calls the judge at all), then one `judgeReplyParity()`
+call for the whole batch after every row has run, writing each verdict
+onto that row's own `TurnScore.observed.bareParity` before the table
+prints. `conversationScore.ts`'s `renderTable` gained the `bare parity`
+column: `undefined` (every bench but written-set.ts never sets this
+field) prints blank, `null` (written-set.ts's own scripted-mode default)
+prints "unjudged", and a real verdict prints the bare reply plus "ok"
+or "missing: <points>".
+
+The row's own objective also named a row pair for the interim rule's
+trigger, missed in the first pass and added once re-reading the row
+caught the gap: `written-conceptual-benchmarking` (OPENER-01's own
+replay phrase, judged the same generic bare-floor way as every other
+row - no special scoring) and `written-fresh-president-france`
+(`groundedNames: true`, the SAME generic ungrounded-proper-noun check
+`conversationScore.ts` already had for a different row entirely -
+reused rather than building a second scorer). `startFakeSearxng()`
+gained a fixture matching `/pr[ée]sident.*franc|franc.*pr[ée]sident/i`:
+a French president named Élodie Vasseur, a name no model's own
+pretraining could already contain, the only way to tell "the reply is
+grounded in the tool results" apart from "the model happened to guess
+the real name from its own training data" - a real name would leave
+that question genuinely unanswerable either way.
+
+**A real finding, fixed before landing:** `replyParityJudge.test.ts`
+passed 6/6 standalone, every time, and failed 3/6 (every case
+expecting `ok: true`) under the full 4107-test backend suite, every
+time, reproducibly. Root cause, confirmed by reproducing it on purpose
+(a synthetic prior test that calls `setHouseholdSettingValue
+("engines.stack.url", "http://127.0.0.1:1/nonexistent-stack")`, then
+running it before this file): `complete()`'s Stack routing
+(`stackEngine.ts`'s `getStackUrl()`) reads a real household-settings
+DB row, not an env var; `__resetLlmSupervisorForTests()` (which this
+file's own `afterEach` already called) never touches that row; this
+file never called `resetDb()`, unlike every other test file that calls
+`complete()` against a scripted stub (`llm.test.ts`,
+`conversationBench.test.ts`) - so a household setting an EARLIER test
+file left behind (in the one shared SQLite instance the whole `bun
+test` process uses) silently routed every one of this file's own
+completions through a client for a Stack that was never actually
+there, real errors that happened to make the three `ok: false`-
+expecting cases pass for the wrong reason. `personaJudge.test.ts` has
+the identical exposure (no `resetDb()` either) and simply never landed
+on the unlucky side of file-execution order the day this was found -
+not evidence it is safe, just evidence this class of bug is
+order-dependent and easy to miss. Fixed with the same `beforeEach
+resetDb()` every other stateful test file already uses; re-verified by
+re-running the whole backend suite clean (4107/4107, 0 fail) after the
+fix, twice.
+
+Verification: `bash scripts/check.sh` (scope `full`, root
+`package.json` touched in the block's second commit) - scripts,
+backend (4107/4107, 0 fail, the fix above), frontend (723/723, 0 fail)
+all green; `bunx tsc --noEmit` clean in `backend/` and via `-p
+scripts/tsconfig.json`. `bun run backend/scripts/bench/written-set.ts`
+(scripted, 22 rows including both new ones) run end to end, prints the
+real table with "unjudged" on the `bare parity` column throughout,
+matching the scripted-mode acceptance in the row's own words. `--live`
+(a real bare-reply and judge call against a resident engine) is for
+whoever runs the acceptance measurement next - not part of this
+landing, which built and proved the harness, not the measurement
+itself. Review: low (a bench harness and one new file mirroring an
+existing one closely, no route, guard, or wire-shape change).

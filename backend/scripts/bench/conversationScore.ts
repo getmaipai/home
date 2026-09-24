@@ -160,6 +160,14 @@ export interface TurnObserved {
    * prompt_n, cache_n, prompt_ms, predicted_ms), printed beside
    * `nodeTrace`'s `model` entries rather than duplicated into them. */
   generationTrace?: readonly { reason: string; thinking: boolean; prompt_n: number | null; cache_n: number | null; prompt_ms: number | null; predicted_ms: number | null }[] | null;
+  /** WRITTEN-PARITY-01: the bare model's own reply to this row's
+   * question (no system message, no tools, the engine's own default
+   * length) beside `replyParityJudge.ts`'s verdict on whether `reply`
+   * above carries every point of it and its structure - a trend line,
+   * never a gate. `undefined` on every bench but written-set.ts (not
+   * observed there); `null` on written-set.ts itself in scripted mode
+   * (no live judge ran) or when the judge call failed. */
+  bareParity?: { bareReply: string; carriesPoints: boolean; missingPoints: readonly string[] } | null;
 }
 
 export interface Check {
@@ -654,7 +662,7 @@ const cell = (t: string) => t.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
  * and a blank verdict column; a scored row prints the checks that
  * failed (or "ok"). */
 export function renderTable(scores: readonly TurnScore[]): string {
-  const lines = ["| conversation | turn | said | expected | observed | pass | verdict | first delta ms | first sentence ms | total ms | required honoured | cached tokens |", "|---|---|---|---|---|---|---|---|---|---|---|---|"];
+  const lines = ["| conversation | turn | said | expected | observed | pass | verdict | first delta ms | first sentence ms | total ms | required honoured | cached tokens | bare parity |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"];
   for (const s of scores) {
     const failed = s.checks.filter((c) => !c.pass);
     // A failing scored row carries the reply too: the reader ranks what
@@ -673,7 +681,13 @@ export function renderTable(scores: readonly TurnScore[]): string {
     const pass = s.pass === null ? "" : s.pass ? "yes" : s.hard ? "NO (hard)" : "no";
     const requiredHonoured = s.observed.requiredHonored === null || s.observed.requiredHonored === undefined ? "" : s.observed.requiredHonored ? "yes" : "NO (ENGINE-CONTRACT-01)";
     const cachedTokens = s.observed.requiredCachedTokens ?? "";
-    lines.push(`| ${s.conversationId} | ${s.turnIndex + 1} | ${cell(s.say)} | ${cell(s.expected)} | ${cell(observed)} | ${pass} | ${s.humanVerdict ? "" : "n/a"} | ${ms(s.observed.firstDeltaMs)} | ${ms(s.observed.firstSentenceMs)} | ${ms(s.observed.totalMs)} | ${requiredHonoured} | ${cachedTokens} |`);
+    const bareParity =
+      s.observed.bareParity === undefined
+        ? ""
+        : s.observed.bareParity === null
+          ? "unjudged"
+          : `"${cell(s.observed.bareParity.bareReply)}" — ${s.observed.bareParity.carriesPoints ? "ok" : `missing: ${s.observed.bareParity.missingPoints.join(", ")}`}`;
+    lines.push(`| ${s.conversationId} | ${s.turnIndex + 1} | ${cell(s.say)} | ${cell(s.expected)} | ${cell(observed)} | ${pass} | ${s.humanVerdict ? "" : "n/a"} | ${ms(s.observed.firstDeltaMs)} | ${ms(s.observed.firstSentenceMs)} | ${ms(s.observed.totalMs)} | ${requiredHonoured} | ${cachedTokens} | ${bareParity} |`);
   }
   return lines.join("\n");
 }

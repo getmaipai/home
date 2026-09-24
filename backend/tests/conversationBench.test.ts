@@ -221,6 +221,29 @@ describe("the rubric (conversationScore.ts)", () => {
     expect(renderTable([onlyHuman])).toContain('| "Hello there." |  |  |');
   });
 
+  test("WRITTEN-PARITY-01: in scripted mode the bare parity column prints 'unjudged' on every row", () => {
+    const greeting = byId("greeting-and-thanks");
+    const row = scoreTurn(greeting, 0, { say: "hi", expect: { humanVerdict: true } }, observed({ reply: "Hello there.", bareParity: null }));
+    expect(renderTable([row])).toContain("| unjudged |");
+  });
+
+  test("WRITTEN-PARITY-01: a scripted judge reply with one missing point renders that point in the row", () => {
+    const greeting = byId("greeting-and-thanks");
+    const row = scoreTurn(
+      greeting,
+      0,
+      { say: "hi", expect: { humanVerdict: true } },
+      observed({ reply: "Hello there.", bareParity: { bareReply: "Hey! What's up?", carriesPoints: false, missingPoints: ["the follow-up question"] } }),
+    );
+    expect(renderTable([row])).toContain('"Hey! What\'s up?" — missing: the follow-up question |');
+  });
+
+  test("WRITTEN-PARITY-01: a bench that never sets bareParity prints a blank column, not 'unjudged'", () => {
+    const greeting = byId("greeting-and-thanks");
+    const row = scoreTurn(greeting, 0, { say: "hi", expect: { humanVerdict: true } }, observed({ reply: "Hello there." }));
+    expect(renderTable([row])).not.toContain("unjudged");
+  });
+
   test("the ranking puts a hard miss first, then privacy and safety, then memory, then breadth", () => {
     const hardConv = byId("consequential-once");
     const memoryConv = byId("disclose-then-recall-later");
