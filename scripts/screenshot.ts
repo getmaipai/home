@@ -2628,6 +2628,18 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
     body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
   });
   if (!setShellNext.ok) throw new Error(`captureNextChatToolsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+  // getmaipai/home#154: nodes/model.ts's own interim rule (the same
+  // gap captureNextChatToolsSitesReview's own comment names) only
+  // offers tools at all for the one catalog entry with a real
+  // turn_budget (modelCatalog.ts, "qwen3-8b-instruct-q4-k-m") - it's
+  // also the household's only chat-capable entry, but never selected
+  // by default until a household explicitly sets chat.model_id.
+  const setModel = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "chat.model_id", value: "qwen3-8b-instruct-q4-k-m" }),
+  });
+  if (!setModel.ok) throw new Error(`captureNextChatToolsReview: seeding chat.model_id failed: ${setModel.status}`);
 
   const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
   const context = await newContext(browser, viewport, "dark", sessionValue);
@@ -3756,6 +3768,23 @@ async function main() {
         id: "call-websearch-1",
         type: "function",
         function: { name: "websearch", arguments: JSON.stringify({ expression: "mariners game score" }) },
+      }];
+    }
+    // getmaipai/home#154: weather's own manifest pattern ("what's the
+    // weather like in *") is a question-word-opener wildcard, so
+    // OPENER-01's floor (manifestLint.ts's isQuestionWordOpener())
+    // refuses to route it deterministically any more - the model
+    // chooses tools now (#150), so this capture has to script that
+    // choice the way a real model would, the same shape the mariners
+    // branch above already does. The weather PACKAGE itself runs for
+    // real and unscripted (seedWeatherCache() above answers its own
+    // fetch steps from disk), so the spec-sheet card's real content
+    // still comes from the real recipe, not a canned reply.
+    if (request.tools?.length && !hasToolMessage && text.includes("weather like")) {
+      return [{
+        id: "call-weather-1",
+        type: "function",
+        function: { name: "weather", arguments: JSON.stringify({ place: WEATHER_HOUSEHOLD_PLACE }) },
       }];
     }
     return undefined;
