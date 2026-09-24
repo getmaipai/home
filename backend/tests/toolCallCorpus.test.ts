@@ -9,13 +9,26 @@
 // negative rows' real false-call rate - not testable against a scripted
 // stub, since "the stub declines because I told it to" proves nothing
 // about whether a real model would have called something anyway).
-import { describe, expect, test, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { resetDb } from "./reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { complete, type ToolSpec } from "@/lib/llm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { SPEC_DIR } from "@/lib/specDir";
+
+// getmaipai/home#137: complete()'s first check is getStackUrl() (a real
+// household-settings DB row), before it ever looks at
+// MAIPAI_LLAMA_SERVER_URL - the same exposure replyParityJudge.test.ts
+// and personaJudge.test.ts had, just via a scripted tool-call reply
+// instead of a scripted text one. Without resetDb() here, an earlier
+// test file's own `engines.stack.url` setting would silently route
+// every call in this file through the Stack instead of this file's own
+// scripted stub, whatever `MAIPAI_LLAMA_SERVER_URL` says.
+beforeEach(() => {
+  resetDb();
+});
 
 afterEach(() => {
   __resetLlmSupervisorForTests();

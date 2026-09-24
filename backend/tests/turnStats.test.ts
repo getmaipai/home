@@ -1,8 +1,20 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { startCompleteStream } from "@/lib/llm";
+import { resetDb } from "./reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { buildTurnStats } from "@/lib/turnStats";
 import { emptyTimings } from "@/lib/turnContext";
+
+// getmaipai/home#137: startCompleteStream()'s first check is
+// getStackUrl() (a real household-settings DB row), before it ever
+// looks at MAIPAI_LLAMA_SERVER_URL - the same exposure
+// replyParityJudge.test.ts/personaJudge.test.ts had for complete().
+// Without resetDb() here, an earlier test file's own
+// `engines.stack.url` setting would silently route this file's calls
+// through the Stack instead of its own scripted engine below.
+beforeEach(() => {
+  resetDb();
+});
 
 afterEach(() => {
   __resetLlmSupervisorForTests();

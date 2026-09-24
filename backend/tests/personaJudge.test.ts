@@ -1,8 +1,21 @@
-import { describe, expect, test, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { resetDb } from "./reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { judgePersonaConsistency } from "@/lib/personaJudge";
 import { DEFAULT_PERSONA, PERSONAS } from "@/lib/persona";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+
+// getmaipai/home#137: the same exposure replyParityJudge.test.ts had -
+// resetDb() is what every other file that calls complete() calls in its
+// own beforeEach (llm.test.ts, conversationBench.test.ts); its absence
+// here let an earlier test file's own `engines.stack.url` household
+// setting (a real DB row, never cleared by
+// __resetLlmSupervisorForTests()) survive into this file's own run,
+// routing every completion through a stale Stack client instead of
+// this file's own scripted stub.
+beforeEach(() => {
+  resetDb();
+});
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
