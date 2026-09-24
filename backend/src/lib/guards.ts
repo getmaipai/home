@@ -160,16 +160,12 @@ export interface GuardContext {
    * closing or a backchannel is a statement, and a statement takes no
    * action claim). Absent, the shape decides. */
   act?: "inform" | "question" | "directive" | "commissive" | "greeting" | "closing" | "backchannel";
-  // "computed" (spec-v0.1.25, SIGNAL-02: arithmetic, the clock, a
-  // conversion - a turn the hub answers with no lookup) is a real
-  // TurnSignal["target"] value the spec type now carries, structural
-  // fallout of bumping past it for USAGE-01's unrelated stream_options
-  // field (spec-v0.1.26) - accepted here only so this type keeps
-  // compiling against the wider spec shape; nothing in this codebase
-  // produces "computed" yet (classifyTurnSignal never returns it), so
-  // this is a type-only widening with no behavior change. SIGNAL-02's
-  // own home-side classifier and interim-rule wiring is a separate,
-  // not-yet-picked-up item (docs/BACKLOG.md).
+  // "computed" (SIGNAL-02: arithmetic, the clock, a conversion - a turn
+  // the hub answers with no lookup) is a real TurnSignal["target"]
+  // value: turnSignal.ts's classifyTurnSignal() returns it (via the
+  // spec's own compute evaluator or an injected computed-pattern
+  // match), so a guard reading `target` here sees it on a live turn
+  // now, the same as any other target kind.
   target?: "self" | "other" | "hub" | "world" | "computed";
   repair?: "none" | "retraction" | "correction";
   /** REG-01: the hub's own previous reply in this conversation, whose

@@ -55,20 +55,23 @@ import type { PersonRow } from "@/types";
 interface ToolCallCorpusRow {
   utterance: string;
   expect_calls: string[];
+  target?: "computed";
 }
 
 const corpus: ToolCallCorpusRow[] = JSON.parse(
   readFileSync(join(SPEC_DIR, "llm", "tool-call-corpus.json"), "utf-8"),
 );
 
-// The same four bundled packages the corpus names, loaded from their own
-// real manifests rather than hand-copied here - a code review (2026-09-07)
+// The bundled packages the corpus names, loaded from their own real
+// manifests rather than hand-copied here - a code review (2026-09-07)
 // caught this file's own hardcoded descriptions had drifted from what a
 // real turn actually offers (e.g. recall's real description is "Tells
 // you what it remembers about something you ask," not the paraphrase
 // "recall what's known about a topic" this used to say), which this
-// file's own header comment already promised not to do.
-const TOOLS: ToolSpec[] = ["remember", "recall", "define", "trivia"].map((id) => {
+// file's own header comment already promised not to do. SIGNAL-02 added
+// math/convert/almanac-time/almanac-date so the corpus's six computed
+// rows have their expected tool on offer in the fixed pass too.
+const TOOLS: ToolSpec[] = ["remember", "recall", "define", "trivia", "math", "convert", "almanac-time", "almanac-date"].map((id) => {
   const loaded = loadManifestOnly(id);
   if (!loaded.ok) throw new Error(`bundled package ${id} failed to load: ${loaded.error}`);
   return { id, description: loaded.value.description, args: loaded.value.args };

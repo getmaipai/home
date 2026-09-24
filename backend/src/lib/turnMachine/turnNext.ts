@@ -20,7 +20,7 @@
 // named here rather than silently worked around.
 import { createActor, waitFor } from "xstate";
 import type { Surface, TurnValue, TurnStreamResult } from "@/lib/turnEngine";
-import { validateTurnInput, loadAllManifests, commandOpeners } from "@/lib/turnEngine";
+import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch } from "@/lib/turnEngine";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
@@ -126,7 +126,13 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
   // is a shape cue for the signal only, never a routing decision -
   // the commands node's own temporary-mode guard still keeps a
   // memory:write package from actually firing in a temporary chat.
-  const signal = classifyTurnSignal({ text, ageBand: band, commandOpeners: commandOpeners(loadAllManifests()) });
+  // SIGNAL-02: the same loaded-manifests read commandOpeners() just
+  // took, never a second load - computedPatternMatch() (turnEngine.ts)
+  // is the injected predicate turnSignal.ts's own clauseSubject() reads
+  // to classify "what time is it in Tokyo" as target: computed instead
+  // of world, so the interim rule stops forcing a search for it.
+  const loaded = loadAllManifests();
+  const signal = classifyTurnSignal({ text, ageBand: band, commandOpeners: commandOpeners(loaded), computedPatternMatch: (t) => computedPatternMatch(loaded, t) });
   const persona = resolvePersona(getHouseholdSettingValue("persona.active_id"));
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape

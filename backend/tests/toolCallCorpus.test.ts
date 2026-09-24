@@ -25,6 +25,7 @@ afterEach(() => {
 interface ToolCallCorpusRow {
   utterance: string;
   expect_calls: string[];
+  target?: "computed";
 }
 
 const corpus: ToolCallCorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "tool-call-corpus.json"), "utf-8"));
@@ -44,6 +45,10 @@ const TOOLS: ToolSpec[] = [
   { id: "recall", description: "recall what's known about a topic", args: { type: "object", required: ["topic"], properties: { topic: { type: "string" } } } },
   { id: "define", description: "define a word", args: { type: "object", required: ["word"], properties: { word: { type: "string" } } } },
   { id: "trivia", description: "ask a trivia question", args: { type: "object", properties: {} } },
+  { id: "math", description: "Calculate a math expression.", args: { type: "object", required: ["expression"], properties: { expression: { type: "string" } } } },
+  { id: "convert", description: "Convert between units of length, weight, temperature, and volume.", args: { type: "object", required: ["expression"], properties: { expression: { type: "string" } } } },
+  { id: "almanac-time", description: "Say the current time.", args: { type: "object", properties: { place: { type: "string" } } } },
+  { id: "almanac-date", description: "Say today's date.", args: { type: "object", properties: {} } },
 ];
 
 /** Fix E: points the chat backend at a fresh stub scripted to answer

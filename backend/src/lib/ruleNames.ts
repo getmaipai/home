@@ -62,10 +62,16 @@ export function rungOf(value: Pick<TurnValue, "source" | "plugin_id">, outcomes:
   if (value.source === "model") {
     const marked = outcomes.some((o) => (o as { evidence_kind?: unknown }).evidence_kind === "model_knowledge" || (o as { kind?: unknown }).kind === "model_knowledge");
     if (marked) return "model_knowledge";
-    // A world question the model answered with no lookup on the turn;
-    // a household subject's question (the lookup stood down for it) is
-    // the household's, never the model's knowledge.
-    if (signal && signal.primary_act === "question" && signal.target === "world" && succeededLookups.length === 0 && !opts.householdSubject) return "model_knowledge";
+    // A world or computed question the model answered with no lookup on
+    // the turn (SIGNAL-02: a computed question - "what's 12 plus 30" -
+    // that the model answered from its own arithmetic instead of
+    // calling math/convert/almanac-time/almanac-date is still the
+    // model's own knowledge with no lookup, the same rung a world fact
+    // gets; narrowing `target` off of "world" for computed turns must
+    // not silently drop them to "none"); a household subject's question
+    // (the lookup stood down for it) is the household's, never the
+    // model's knowledge.
+    if (signal && signal.primary_act === "question" && (signal.target === "world" || signal.target === "computed") && succeededLookups.length === 0 && !opts.householdSubject) return "model_knowledge";
   }
   return "none";
 }

@@ -23,7 +23,12 @@
 // is stripped with the courtesy prefix so the bare almanac question
 // routes literally behind it.
 export const COURTESY_PREFIX = /^\s*(?:(?:and|so|then|ok so|okay so|also|oh and)[,\s]+)?(?:hey\s+\w+[,\s]+)?(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|please[,\s]+)?/i;
-const QUESTION_OPENER =
+// Exported (SIGNAL-02): turnSignal.ts's own computed-expression check
+// strips this same interrogative opener, one at a time, before handing
+// the remainder to the spec's compute evaluator ("what is 12 plus 30"
+// needs both "what" and "is" stripped, "what's 12 plus 30" only its
+// own contraction) - reused here, never a second, parallel word list.
+export const QUESTION_OPENER =
   /^\s*(?:who|whose|what|whats|when|where|which|why|how|is|are|was|were|am|do|does|did|can|could|should|would|will|shall|have|has|had|any|anything|anyone)\b/i;
 const TRAILING_QUESTION_MARK = /\?\s*$/;
 const FIRST_PERSON_OPENER = /^\s*(?:i|i'm|i've|i'd|i'll|we|we're|we've|we'd)\b/i;

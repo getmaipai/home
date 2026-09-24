@@ -16,6 +16,7 @@ import { detectCredential, CREDENTIAL_SAFE_MESSAGE, redactCredentials } from "@/
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin, safeFailureMessage, validatePackageArgs } from "@/lib/plugins";
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, commandOpenersFrom, type UtteranceShape, type UtteranceVector } from "@/lib/routing";
+import { COMPUTED_WILDCARD_RESOLVERS } from "@/lib/manifestLint";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged, trigger } from "@/lib/notifications";
@@ -1274,8 +1275,13 @@ export function matchPattern(text: string, pattern: string): string | null {
 // A package's `args` schema declares its call arguments (manifest.schema.json:
 // "a JSON Schema for this package's call arguments"), typed `unknown` by
 // codegen since it's arbitrary. The deterministic floor can bind a call's
-// inputs in exactly two shapes: no required args (fires with `{}`,
-// ignoring any wildcard capture), or exactly one required string arg (the
+// inputs in exactly two shapes: no required args (fires with `{}` when
+// there is no wildcard capture, or binds a non-empty capture to the
+// schema's first declared property - SIGNAL-02's almanac-time, whose
+// `place` is optional so "what time is it in *" can still carry its
+// captured place, while the argument-less "what time is it" itself
+// still fires with `{}` since matchPattern's own captured text is empty
+// for a whole-string pattern), or exactly one required string arg (the
 // wildcard capture, when there is one, binds to it). Anything richer
 // (multiple required args) is the same tier 2 gap `matchPattern` documents
 // above: no capture to bind, so the floor doesn't fire and the turn falls
@@ -1286,7 +1292,14 @@ function deterministicArgs(args: unknown, captured: string | null): Record<strin
     properties?: Record<string, { type?: unknown }>;
   };
   const required = Array.isArray(schema.required) ? schema.required : [];
-  if (required.length === 0) return {};
+  if (required.length === 0) {
+    if (!captured) return {};
+    const name = Object.keys(schema.properties ?? {})[0];
+    if (!name) return {};
+    const prop = schema.properties?.[name];
+    if (prop && prop.type !== undefined && prop.type !== "string") return {};
+    return { [name]: captured };
+  }
   if (required.length > 1 || captured === null) return null;
   const name = required[0];
   if (typeof name !== "string") return null;
@@ -1645,6 +1658,33 @@ function logRoute(
  * turn, cheaper than any cache would be worth. */
 export function commandOpeners(loaded: LoadedManifest[]): ReadonlySet<string> {
   return commandOpenersFrom(loaded.flatMap((l) => l.manifest.routing?.patterns ?? []));
+}
+
+/** SIGNAL-02: whether a compute or clock package's own manifest
+ * `routing.patterns` matches this text AND its resolver accepts the
+ * captured remainder - the identical two-part gate `nodes/commands.ts`'s
+ * own OPENER-01 loop already applies (`matchPattern`, then
+ * `COMPUTED_WILDCARD_RESOLVERS`), read here only to decide the turn
+ * signal's own `target` (`turnSignal.ts`'s injected `computedPatternMatch`
+ * - that file never imports this one, to avoid the circular import this
+ * one already has the other way), never to fire the package itself
+ * (still only ever the commands node's own job - a `true` here changes
+ * nothing about whether OPENER-01 actually runs it). Only a wildcard
+ * pattern is ever a candidate: a resolver only ever keys a wildcard
+ * entry (`matchPattern`'s own whole-string branch returns `""` for a
+ * fixed phrase, never a real captured value a resolver could accept or
+ * reject). */
+export function computedPatternMatch(loaded: LoadedManifest[], text: string): boolean {
+  for (const { id, manifest } of loaded) {
+    for (const pattern of manifest.routing?.patterns ?? []) {
+      if (!pattern.includes("*")) continue;
+      const resolver = COMPUTED_WILDCARD_RESOLVERS[`${id}:${pattern}`];
+      if (!resolver) continue;
+      const captured = matchPattern(text, pattern);
+      if (captured !== null && resolver(captured)) return true;
+    }
+  }
+  return false;
 }
 
 export interface RankedCandidate {

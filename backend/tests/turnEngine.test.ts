@@ -4878,6 +4878,20 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     expect(routeLiteral("so what's today's date", actor, loadAllManifests())?.winner?.id).toBe("almanac-date");
   });
 
+  test("SIGNAL-02: the old pipeline's deterministicArgs() binds a wildcard capture even for a schema with no required args (almanac-time's optional place), never silently drops it as an empty {}", async () => {
+    const { actor } = await owner();
+    const { routeLiteral } = await import("@/lib/turnEngine");
+    const withPlace = routeLiteral("what time is it in Tokyo", actor, loadAllManifests());
+    expect(withPlace?.winner?.id).toBe("almanac-time");
+    expect(withPlace?.winner?.args).toEqual({ place: "Tokyo" });
+    // The argument-less form still fires with no args at all - matchPattern's
+    // own captured text is empty for a whole-string pattern, so there is
+    // nothing to bind.
+    const bare = routeLiteral("what time is it", actor, loadAllManifests());
+    expect(bare?.winner?.id).toBe("almanac-time");
+    expect(bare?.winner?.args).toEqual({});
+  });
+
   test("a tools-offered turn whose first token takes 1,200 ms yields turn_meta, then spoken_cue, then deltas, in that order", async () => {
     const { client } = await owner();
     await withStub(

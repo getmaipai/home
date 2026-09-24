@@ -154,14 +154,24 @@ describe("parity-bisect4-stages: buildStages4()", () => {
     expect(THINKING_ON_MAX_TOKENS).toBeGreaterThan(0);
   });
 
-  test("arms e and f carry the real, ordinary-turn five-tool block (Fable's own ruling: 'five-tool block present') - every other arm and the floor carry none", () => {
+  test("arms e and f carry the real, ordinary-turn tool block (Fable's own ruling: 'five-tool block present', grown to nine by SIGNAL-02's math/convert/almanac-time/almanac-date) - every other arm and the floor carry none", () => {
     const stages = buildStages4(DEFAULT_PERSONA);
     const armE = stages.find((s) => s.name === "arm-e-no-system-preamble-only")!;
     const armF = stages.find((s) => s.name === "arm-f-full-prefix-thinking-on")!;
     for (const armWithTools of [armE, armF]) {
       expect(armWithTools.opts.tools).toBeDefined();
-      expect(armWithTools.opts.tools!.length).toBe(5);
-      expect(armWithTools.opts.tools!.map((t) => t.id).sort()).toEqual(["remember", "remind", "timer", "weather", "websearch"]);
+      expect(armWithTools.opts.tools!.length).toBe(9);
+      expect(armWithTools.opts.tools!.map((t) => t.id).sort()).toEqual([
+        "almanac-date",
+        "almanac-time",
+        "convert",
+        "math",
+        "remember",
+        "remind",
+        "timer",
+        "weather",
+        "websearch",
+      ]);
     }
     for (const s of stages) {
       if (s.name === "arm-e-no-system-preamble-only" || s.name === "arm-f-full-prefix-thinking-on") continue;

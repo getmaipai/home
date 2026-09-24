@@ -26,8 +26,9 @@
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { NEGATIVE_RE } from "@/lib/consentVocab";
 import { isBareSocialTurn } from "@/lib/guards";
-import { readClauses, shapeFromReading, type ClauseReading, type UtteranceClause, type UtteranceShape } from "@/lib/utteranceShape";
+import { readClauses, shapeFromReading, QUESTION_OPENER, type ClauseReading, type UtteranceClause, type UtteranceShape } from "@/lib/utteranceShape";
 import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
+import { evaluateExpression } from "@maipai/spec/interpreters/ts/compute.js";
 
 export type Act = TurnSignal["primary_act"];
 export type Stance = TurnSignal["clauses"][number]["stance"];
@@ -60,6 +61,16 @@ export interface SignalInput {
   protocol?: ProtocolAnswer;
   /** A literal-pattern win in routing: a directive by construction. */
   literalWin?: boolean;
+  /** SIGNAL-02: true when a compute or clock package's own manifest
+   * `routing.patterns` matches this clause's text and its resolver
+   * accepts the captured remainder (turnEngine.ts's
+   * `computedPatternMatch()`, the identical gate `nodes/commands.ts`'s
+   * own OPENER-01 loop applies) - injected by the caller, which already
+   * has the loaded manifests, the same shape `commandOpeners` above and
+   * `resolveEntity` already use. This file never imports turnEngine.ts
+   * directly (that would be circular - turnEngine.ts already imports
+   * this file). */
+  computedPatternMatch?: (text: string) => boolean;
   ageBand: TurnSignal["age_band"];
   ageBandBasis?: TurnSignal["age_band_basis"];
 }
@@ -277,6 +288,41 @@ function namedIn(text: string, stance: Stance, roster: readonly string[]): strin
   return relatedNamePattern().exec(text)?.[1] ?? null;
 }
 
+// SIGNAL-02: strips a leading interrogative one word at a time
+// ("what's"/"what is" both need two strips: "what" then "is"/the
+// contraction) before handing the remainder to the spec's own
+// restricted evaluator - an evaluator ACCEPT is the ground truth
+// (RULES-AND-LEARNED-COMPONENTS.md: "understanding language is the
+// model's job, never a word rule's" - this asks the real evaluator,
+// never guesses from the words), the opener strip is only clearing the
+// question wrapper off first, not deciding anything itself. Reuses
+// utteranceShape.ts's own QUESTION_OPENER (already the file's word list
+// for "is this a question," not a second one invented here). "how much"/
+// "how many" ("how much is 5 miles in kilometers," a corpus row) is
+// stripped as its own two-word unit, local to this function only:
+// QUESTION_OPENER already matches bare "how" everywhere else it's read
+// (utteranceShape.ts's own clause-signal check), and adding "much"/
+// "many" there would also make a plain statement opening with either
+// word ("many people forget", "much of the day") misread as a question
+// clause-wide - a regression this narrower, unexported strip avoids.
+const HOW_MUCH_OR_MANY = /^\s*how\s+(?:much|many)\b/i; // rule: signal.rule (docs/BACKLOG.md, "SIGNAL-02")
+function isComputedExpression(text: string): boolean {
+  let remainder = text;
+  let previous: string;
+  do {
+    previous = remainder;
+    // rule: signal.rule (docs/BACKLOG.md, "SIGNAL-02") - the interrogative wrapper strip below, ahead of the compute evaluator's own verdict
+    remainder = remainder.replace(HOW_MUCH_OR_MANY, "").replace(QUESTION_OPENER, "").replace(/^'s\b/i, "").trim();
+  } while (remainder !== previous && remainder.length > 0);
+  if (!remainder) return false;
+  try {
+    evaluateExpression(remainder);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function clauseSubject(text: string, stance: Stance, input: SignalInput): ClauseSubject {
   const named = namedIn(text, stance, input.roster ?? []);
   // A report or a quote is about its source, not the speaker who
@@ -287,6 +333,13 @@ function clauseSubject(text: string, stance: Stance, input: SignalInput): Clause
   if (FIRST_PERSON_RE.test(text) && !(named && !FIRST_PERSON_SUBJECT_RE.test(text))) return { kind: "speaker" };
   if (named) return { kind: "named", name: named, entity_id: input.resolveEntity?.(named) ?? null };
   if (HOUSEHOLD_RE.test(text)) return { kind: "household" };
+  // SIGNAL-02: the hub's own clock/calculator/converter answers this,
+  // never a search - either the compute evaluator accepts the question's
+  // body as a real expression, or a compute/clock package's own manifest
+  // pattern matches and its resolver accepts the captured remainder
+  // (turnEngine.ts's computedPatternMatch(), injected by the caller,
+  // the identical gate nodes/commands.ts's own OPENER-01 loop applies).
+  if (isComputedExpression(text) || input.computedPatternMatch?.(text)) return { kind: "computed" };
   return { kind: "world" };
 }
 
@@ -321,6 +374,10 @@ function targetOf(text: string, subject: ClauseSubject): TurnSignal["target"] {
   if (subject.kind === "named") return "other";
   if (subject.kind === "speaker") return "self";
   if (SECOND_PERSON_RE.test(text) && subject.kind === "world") return "hub";
+  // SIGNAL-02: clauseSubject() already decided "computed" (the compute
+  // evaluator accepted the question's body, or a compute/clock
+  // package's own pattern matched); nothing here can override that.
+  if (subject.kind === "computed") return "computed";
   return "world";
 }
 

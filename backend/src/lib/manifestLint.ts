@@ -13,6 +13,7 @@
 // "allowed" in one place and "gated" in a different, driftable way in
 // the other.
 import { evaluateExpression } from "@maipai/spec/interpreters/ts/compute.js";
+import { resolveZone } from "@/lib/timezones";
 
 /** The interrogative openers RULES-AND-LEARNED-COMPONENTS.md and the
  * state record both name: "who, what, when, where, which, why, how or
@@ -56,6 +57,10 @@ export const COMPUTED_WILDCARD_RESOLVERS: Readonly<Record<string, (remainder: st
       return false;
     }
   },
+  // SIGNAL-02: the zone library (lib/timezones.ts) is the resolver -
+  // "what time is it in Zzyzx" yields to the model (no real place to
+  // answer for), "what time is it in Tokyo" fires.
+  "almanac-time:what time is it in *": (remainder) => resolveZone(remainder) !== null,
 };
 
 /** Every `routing.patterns` entry on this manifest that opens with a

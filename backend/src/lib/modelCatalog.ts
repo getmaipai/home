@@ -75,7 +75,14 @@ export const CATALOG: ModelCapabilities[] = [
       // it one time in three on small talk and doubled the turn for
       // nothing new (control-negative-spiderman: 10,873ms against
       // 5,283ms clean). Memory reaches the model through context only.
-      tools_offered: ["remember", "remind", "timer", "weather", "websearch"],
+      // SIGNAL-02: math, convert, almanac-time and almanac-date added
+      // (sorted, U1) so a computed phrasing the deterministic openers
+      // miss (OPENER-01's own wildcard resolvers, nodes/commands.ts) is
+      // still answered by the model choosing the right tool under
+      // `auto`, never forced into a search - nodes/model.ts's own
+      // isWorldQuestion stays `target === "world"` only, so a
+      // `computed` target is never forced, just offered.
+      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "timer", "weather", "websearch"],
       always_search: true,
       // GROUND-01 (state record, "The interim rule"): off in every
       // budget until reuse-with-freshness is built - a quote check

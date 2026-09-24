@@ -107,7 +107,7 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
           continue;
         }
       }
-      const args = captured ? { [firstRequiredArg(manifest)]: captured } : {};
+      const args = captured ? { [firstArgName(manifest)]: captured } : {};
       const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId });
       // COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): a failed
       // pattern outcome used to return `matched: true` with the raw
@@ -163,13 +163,21 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
   return { outcome: { ok: true }, output: { matched: false } };
 };
 
-/** The manifest's own first required argument name (`args.required[0]`)
- * - the same "the argument is the remainder by definition" rule
- * RULES-AND-LEARNED-COMPONENTS.md names for these patterns, applied
- * generically instead of per-package special-casing. A manifest with no
- * required argument (an argument-less command like "what time is it")
- * never reaches this: matchPattern's own captured text is empty for a
+/** The manifest's own first declared argument name - the same "the
+ * argument is the remainder by definition" rule RULES-AND-LEARNED-
+ * COMPONENTS.md names for these patterns, applied generically instead
+ * of per-package special-casing. Prefers `args.required[0]` (every
+ * wildcard-capturing package until SIGNAL-02 declared its one argument
+ * required - math/convert's "expression", weather's "place"); falls
+ * back to `args.properties`' own first key for a package whose
+ * distinguishing argument is declared optional instead (almanac-time's
+ * "place": a bare "what time is it" must still validate with no place
+ * at all, so the arg can't be required, but the wildcard capture still
+ * needs a real name to bind to, not the old hardcoded "expression"
+ * fallback that name never belonged to). A manifest with no argument at
+ * all (an argument-less command like "what time is it" itself) never
+ * reaches this: matchPattern's own captured text is empty for a
  * whole-string pattern. */
-function firstRequiredArg(manifest: { args?: { required?: string[] } }): string {
-  return manifest.args?.required?.[0] ?? "expression";
+function firstArgName(manifest: { args?: { required?: string[]; properties?: Record<string, unknown> } }): string {
+  return manifest.args?.required?.[0] ?? Object.keys(manifest.args?.properties ?? {})[0] ?? "expression";
 }

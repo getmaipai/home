@@ -217,3 +217,55 @@ describe("ACT-01: one classification", () => {
     expect(performance.now() - start).toBeLessThan(1000);
   });
 });
+
+// SIGNAL-02 (docs/BACKLOG.md): "what's 12 plus 30" and "what time is
+// it in Tokyo" carried target: world, forcing a web search for
+// something the hub computes itself. Tests in the item's own words.
+describe("SIGNAL-02: the computed target", () => {
+  test("\"what's 12 plus 30\" classifies target: computed, subject computed, source rule", () => {
+    const s = signal("what's 12 plus 30");
+    expect(s.target).toBe("computed");
+    expect(s.clauses[0]!.subject).toEqual({ kind: "computed" });
+    expect(s.source).toBe("rule");
+  });
+
+  test("the same holds for the uncontracted and fully-spelled phrasings", () => {
+    expect(signal("what is 12 plus 30").target).toBe("computed");
+    expect(signal("whats 12 plus 30").target).toBe("computed");
+  });
+
+  test("\"how much is 5 miles in kilometers\" (the corpus's convert row) strips as its own two-word opener, not just \"how\"", () => {
+    const s = signal("how much is 5 miles in kilometers");
+    expect(s.target).toBe("computed");
+    expect(s.clauses[0]!.subject).toEqual({ kind: "computed" });
+  });
+
+  test("a compute/clock package's own manifest pattern matches through the injected resolver too - \"what time is it in Tokyo\"", () => {
+    const s = signal("what time is it in Tokyo", { computedPatternMatch: (t) => t === "what time is it in Tokyo" });
+    expect(s.target).toBe("computed");
+    expect(s.clauses[0]!.subject).toEqual({ kind: "computed" });
+  });
+
+  test("a rejected resolver never forces computed - an unresolvable place stays world", () => {
+    const s = signal("what time is it in Zzyzx", { computedPatternMatch: () => false });
+    expect(s.target).toBe("world");
+  });
+
+  test("\"who is the president of chile\" stays world - not every question is computed", () => {
+    expect(signal("who is the president of chile").target).toBe("world");
+  });
+
+  test("an ordinary world question stays world, never misread as computed", () => {
+    expect(signal("what's the weather in seattle").target).toBe("world");
+    expect(signal("when is the next full moon").target).toBe("world");
+  });
+
+  test("a named or household subject still wins over a coincidentally computable phrasing", () => {
+    // "Sage is 12" parses as a valid expression on its own (mathjs
+    // reads "is" as nothing here after stripping) only if named/
+    // household detection didn't already claim the clause first -
+    // this proves the existing subject checks still run before the
+    // computed check, never after.
+    expect(signal("Sage is 12 years old").target).toBe("other");
+  });
+});

@@ -14,10 +14,17 @@
       "what's the time",
       "do you know what time it is",
       "tell me the time",
-      "what time is it right now"
+      "what time is it right now",
+      "what time is it in Tokyo"
     ],
-    "patterns": ["what time is it", "what's the time", "tell me the time"],
+    "patterns": ["what time is it", "what's the time", "tell me the time", "what time is it in *"],
     "answers": ["relative_date"]
+  },
+  "args": {
+    "type": "object",
+    "properties": {
+      "place": { "type": "string", "minLength": 1 }
+    }
   },
   "requires": [],
   "optional": [],
