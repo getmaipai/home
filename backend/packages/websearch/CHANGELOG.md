@@ -2,6 +2,16 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.2] - 2026-09-24
+
+### Added
+
+- A second front door when your SearXNG instance is down or a search
+  finds nothing: Wikipedia's own official API, the same search words
+  and nothing else, on by default and controlled by a setting under
+  web search (`search.wikipedia_fallback`) - `data_sources` gains its
+  own "wikipedia" row for the privacy page.
+
 ## [0.2.1] - 2026-09-23
 
 ### Changed

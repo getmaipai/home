@@ -90,7 +90,15 @@ export async function checkSearxngHealth(): Promise<void> {
 
   let result: unknown;
   try {
-    result = (await searxngSearch({ query: CANARY_QUERY })).text;
+    // SEARCH-FALLBACK-01: `allowWikipediaFallback: false` - a review,
+    // 2026-09-24, caught the canary letting the fallback mask a real
+    // SearXNG outage. "Earth" is chosen specifically because it is
+    // "guaranteed to return something," which Wikipedia would then
+    // also guarantee to answer - raising the issue one line later,
+    // then immediately resolving the very same issue as soon as this
+    // call returned "ok", every single probe. This canary has to see
+    // SearXNG's own real answer, or its own real failure, unmasked.
+    result = (await searxngSearch({ query: CANARY_QUERY }, { allowWikipediaFallback: false })).text;
   } catch {
     // searxngSearch() itself already recorded this exact outcome for
     // every error it can throw - search_unavailable as "degraded",

@@ -220,4 +220,34 @@ describe("checkSearxngHealth", () => {
       server.stop(true);
     }
   });
+
+  // SEARCH-FALLBACK-01: a review, 2026-09-24, caught the canary's own
+  // "Earth" query - chosen specifically because it is "guaranteed to
+  // return something" - letting the new Wikipedia fallback mask a real
+  // SearXNG outage: Wikipedia would also always answer "Earth," so a
+  // genuine outage got raised, then immediately resolved by the very
+  // same call, every single probe. The canary must see SearXNG's own
+  // real failure, unmasked, even when Wikipedia would gladly help.
+  test("SearXNG unreachable is still raised even when Wikipedia would answer 'Earth' - the canary never lets the fallback mask a real outage", async () => {
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    const wiki = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        if (url.pathname === "/w/rest.php/v1/search/page") return Response.json({ pages: [{ id: 1, key: "Earth" }] });
+        return Response.json({ title: "Earth", extract: "Earth is the third planet from the Sun.", content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Earth" } } });
+      },
+    });
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = `http://127.0.0.1:${wiki.port}`;
+    try {
+      setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+      await checkSearxngHealth();
+      const issue = listIssues().find((i) => i.source === "websearch" && i.key === "searxng_unreachable");
+      expect(issue).toBeDefined();
+    } finally {
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      wiki.stop(true);
+    }
+  });
 });

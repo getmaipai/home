@@ -1180,6 +1180,255 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   });
 });
 
+// SEARCH-FALLBACK-01 (docs/dev.md, docs/plans/search-resilience-2026-09-24.md):
+// "when SearXNG is down or returns nothing, the websearch tool asks
+// Wikipedia through its official, documented API." Tests on the fake
+// servers only, per the coordinator's own instruction - no live
+// acceptance tonight (SearXNG suspended, no real queries).
+describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
+  function startFakeWikipedia(opts: { hasMatch: boolean; requireUserAgent?: string }): { url: string; stop: () => void; requests: { path: string; userAgent: string | null }[] } {
+    const requests: { path: string; userAgent: string | null }[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        requests.push({ path: url.pathname, userAgent: req.headers.get("user-agent") });
+        if (url.pathname === "/w/rest.php/v1/search/page") {
+          if (!opts.hasMatch) return Response.json({ pages: [] });
+          return Response.json({ pages: [{ id: 1, key: "Marlow_(topic)", title: "Marlow (topic)" }] });
+        }
+        if (url.pathname.startsWith("/api/rest_v1/page/summary/")) {
+          return Response.json({
+            title: "Marlow (topic)",
+            extract: "Marlow is a roster-safe example topic used in MaiPai's own tests.",
+            content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Marlow_(topic)" } },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    });
+    return { url: `http://127.0.0.1:${server.port}`, stop: () => server.stop(true), requests };
+  }
+
+  test("SearXNG unreachable, Wikipedia has a match: returns Wikipedia's own result instead of throwing", async () => {
+    const wiki = startFakeWikipedia({ hasMatch: true });
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = (await host.integration.call("searxng", "search", { query: "marlow" })) as { text: string; rows: { title: string; url: string }[]; page?: { text: string } };
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]!.title).toBe("Marlow (topic)");
+      expect(result.text).toContain("roster-safe example topic");
+      expect(result.page?.text).toContain("roster-safe example topic");
+      // SearXNG's own outage is still recorded - Wikipedia answering
+      // this one question never hides that the household's own
+      // instance is actually down.
+      expect(listIssues().find((i) => i.source === "websearch" && i.key === "searxng_unreachable")).toBeDefined();
+    } finally {
+      // Restored, never deleted (tests/preload.ts's own comment on
+      // why): a delete would erase the safe closed-port default preload
+      // sets for every OTHER test, not just this one.
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      wiki.stop();
+    }
+  });
+
+  test("SearXNG genuinely empty (no engine trouble), Wikipedia has a match: returns Wikipedia's own result, no issue raised", async () => {
+    const wiki = startFakeWikipedia({ hasMatch: true });
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
+    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = (await host.integration.call("searxng", "search", { query: "marlow" })) as { rows: { title: string }[] };
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]!.title).toBe("Marlow (topic)");
+      expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+    } finally {
+      // Restored, never deleted (tests/preload.ts's own comment on
+      // why): a delete would erase the safe closed-port default preload
+      // sets for every OTHER test, not just this one.
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      wiki.stop();
+      server.stop(true);
+    }
+  });
+
+  // A review, 2026-09-24, caught the first cut's early return for this
+  // exact case skipping recordSearchHealth({kind:"ok"}) - a real
+  // recovery (a stale searxng_unreachable issue from an earlier call)
+  // would never actually resolve just because Wikipedia happened to
+  // answer this particular query too.
+  test("SearXNG genuinely empty with a stale open issue: a Wikipedia-assisted answer still resolves the stale issue", async () => {
+    const wiki = startFakeWikipedia({ hasMatch: true });
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
+    try {
+      const actor = await owner();
+      // First, a real failure that leaves an open issue - the fallback
+      // is off for this one call specifically, so Wikipedia (which
+      // would otherwise happily answer "marlow" here too) can't rescue
+      // it into a false success; the point of this setup step is a
+      // genuinely open issue, not a real live outage.
+      setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+      setHouseholdSettingValue("search.wikipedia_fallback", false);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      try {
+        await host.integration.call("searxng", "search", { query: "marlow" });
+        throw new Error("should have thrown - fallback is off for this call");
+      } catch (err) {
+        expect((err as Error).message).not.toBe("should have thrown - fallback is off for this call");
+      }
+      expect(listIssues().find((i) => i.source === "websearch" && i.key === "searxng_unreachable")).toBeDefined();
+
+      // SearXNG recovers but genuinely finds nothing; Wikipedia helps
+      // now that the fallback is back on (its own real default).
+      setHouseholdSettingValue("search.wikipedia_fallback", true);
+      const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
+      try {
+        setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+        const result = (await host.integration.call("searxng", "search", { query: "marlow" })) as { rows: { title: string }[] };
+        expect(result.rows).toHaveLength(1);
+        // The stale issue from the earlier real failure is actually
+        // resolved now, not left open forever just because this
+        // particular query happened to be answerable by Wikipedia.
+        expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+      } finally {
+        server.stop(true);
+      }
+    } finally {
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      wiki.stop();
+    }
+  });
+
+  test("SearXNG unreachable AND Wikipedia has no match either: the original SearXNG error still surfaces, never masked", async () => {
+    const wiki = startFakeWikipedia({ hasMatch: false });
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      try {
+        await host.integration.call("searxng", "search", { query: "marlow" });
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect((err as HostError).message).toContain("could not reach");
+      }
+    } finally {
+      // Restored, never deleted (tests/preload.ts's own comment on
+      // why): a delete would erase the safe closed-port default preload
+      // sets for every OTHER test, not just this one.
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      wiki.stop();
+    }
+  });
+
+  test("search.wikipedia_fallback=false: never even tries Wikipedia, even though it would have a match", async () => {
+    const wiki = startFakeWikipedia({ hasMatch: true });
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+      setHouseholdSettingValue("search.wikipedia_fallback", false);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      try {
+        await host.integration.call("searxng", "search", { query: "marlow" });
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect((err as HostError).message).toContain("could not reach");
+      }
+      expect(wiki.requests).toHaveLength(0);
+    } finally {
+      // Restored, never deleted (tests/preload.ts's own comment on
+      // why): a delete would erase the safe closed-port default preload
+      // sets for every OTHER test, not just this one.
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      wiki.stop();
+    }
+  });
+
+  // Wikimedia's own User-Agent policy (foundation.wikimedia.org/wiki/
+  // Policy:User-Agent_policy, verified 2026-09-24): "<client name>/
+  // <version> (<contact information>)" - a non-compliant request risks
+  // a 403 or silent throttling, the policy's own words.
+  test("every Wikipedia request carries a policy-compliant User-Agent", async () => {
+    const wiki = startFakeWikipedia({ hasMatch: true });
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      await host.integration.call("searxng", "search", { query: "marlow" });
+      expect(wiki.requests).toHaveLength(2); // search, then the page summary
+      for (const req of wiki.requests) {
+        expect(req.userAgent).toMatch(/^\S+\/\S+ \(.+\)/); // "<name>/<version> (<contact>)"
+        expect(req.userAgent).not.toMatch(/^Mozilla\//); // never a browser-style UA
+      }
+    } finally {
+      // Restored, never deleted (tests/preload.ts's own comment on
+      // why): a delete would erase the safe closed-port default preload
+      // sets for every OTHER test, not just this one.
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      wiki.stop();
+    }
+  });
+
+  // A review, 2026-09-24, caught two real gaps: the row's own snippet
+  // duplicated the full extract byte for byte with page.text (doubling
+  // the tokens an llm_complete synthesis call pays for the identical
+  // content), and the extract had no length cap at all, unlike every
+  // other SearXNG-sourced field. Fixed with description (a short,
+  // genuinely different sentence) as the row snippet and a 32,000-char
+  // cap on page.text, the same bound parseReadablePage() already uses.
+  test("the row snippet is Wikipedia's own short description, not a duplicate of the full extract - and both are bounded", async () => {
+    const longExtract = "x".repeat(40_000); // well past both the 300-char snippet cap and the 32,000-char page.text cap
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const url = new URL(req.url);
+        if (url.pathname === "/w/rest.php/v1/search/page") return Response.json({ pages: [{ id: 1, key: "Marlow_(topic)" }] });
+        return Response.json({
+          title: "Marlow (topic)",
+          description: "A short, genuinely different summary sentence.",
+          extract: longExtract,
+          content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Marlow_(topic)" } },
+        });
+      },
+    });
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = `http://127.0.0.1:${server.port}`;
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = (await host.integration.call("searxng", "search", { query: "marlow" })) as { rows: { snippet: string | null }[]; page?: { text: string } };
+      expect(result.rows[0]!.snippet).toContain("A short, genuinely different summary sentence.");
+      expect(result.rows[0]!.snippet).not.toContain("x".repeat(1000)); // never the huge extract
+      expect(result.page?.text.length).toBeLessThanOrEqual(32_000);
+      expect(result.page?.text).toContain("x"); // still the real extract, just bounded
+    } finally {
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      server.stop(true);
+    }
+  });
+});
+
 describe("formatSearxngResults", () => {
   test("reads one scripted page into bounded text, sections, and three sanitized links", () => {
     const page = parseReadablePage(`

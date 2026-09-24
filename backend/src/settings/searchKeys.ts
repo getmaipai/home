@@ -29,4 +29,23 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.integrations",
     honoured_by: ["home"],
   }),
+  // SEARCH-FALLBACK-01 (docs/plans/search-resilience-2026-09-24.md):
+  // "a setting under web search, on whenever web search is on" - a
+  // second, real outbound connection (Wikipedia's own official API,
+  // never SearXNG), so it gets its own toggle rather than being folded
+  // silently into search.searxng_url's own behavior. Default true: it
+  // only ever fires when the main search already failed or found
+  // nothing, the exact case a household configured web search to help
+  // with in the first place.
+  SettingsKey.parse({
+    key: "search.wikipedia_fallback",
+    scope: "household",
+    selector: "boolean",
+    default: true,
+    label: "Ask Wikipedia when web search fails or finds nothing",
+    help: "When your SearXNG instance is down or a search comes back empty, MaiPai asks Wikipedia's own official API instead - covers people, shows, places, products and history. On by default whenever web search is set up; turn it off here if you don't want it.",
+    level: "advanced",
+    lives_in: "household.integrations",
+    honoured_by: ["home"],
+  }),
 ];

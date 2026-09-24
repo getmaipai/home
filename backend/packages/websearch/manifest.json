@@ -1,6 +1,6 @@
 {
   "id": "websearch",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
@@ -58,6 +58,15 @@
       "who": "the site serving the requested page",
       "opt_in": true,
       "retention": "controlled entirely by that site"
+    },
+    {
+      "id": "wikipedia",
+      "destination": "Wikipedia's own official API (en.wikipedia.org)",
+      "when": "web search is set up and either your SearXNG instance is down or a search comes back with nothing - on by default, turn it off under web search settings",
+      "what": "the search query, nothing else",
+      "who": "the Wikimedia Foundation",
+      "opt_in": false,
+      "retention": "controlled entirely by the Wikimedia Foundation; see their own privacy policy"
     }
   ],
   "permissions": ["integration:searxng", "llm:complete"],

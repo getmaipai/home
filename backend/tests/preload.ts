@@ -49,6 +49,18 @@ process.env.MAIPAI_EMBED_PORT = String(reserveFreePort());
 // real HF-cached model into what must stay a deterministic, offline
 // suite (.github/CLAUDE.md > Testing standards).
 process.env.MAIPAI_TTS_DISABLE_SPAWN = "1";
+// SEARCH-FALLBACK-01: packageHost.ts's own Wikipedia fallback has no
+// household setting for its own base URL (Wikipedia's official API,
+// never bring-your-own like SearXNG) - without this, any test whose
+// own scripted SearXNG fails or returns empty would fall through to a
+// REAL request against en.wikipedia.org, breaking "deterministic and
+// offline by default" and, worse, sending real traffic to a real
+// third-party API on every `bun test` run on this machine. A closed
+// port refuses instantly; a test that wants the fallback to actually
+// fire overrides this to its own fixture server explicitly (the same
+// override-then-restore shape every test already uses for
+// MAIPAI_BENCH_KEEP_READ_PAGE and friends).
+process.env.MAIPAI_WIKIPEDIA_BASE_URL = "http://127.0.0.1:1";
 
 // Everything above is only a guarantee while it stays set. Found live
 // 2026-09-07: a test file's own afterEach deleted MAIPAI_LLAMA_SERVER_PORT

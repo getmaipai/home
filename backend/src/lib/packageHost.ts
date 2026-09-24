@@ -136,6 +136,36 @@ const SEARXNG_TIMEOUT_MS = 10_000;
 const SEARXNG_PAGE_RATE_LIMIT_KEY = "searxng-page";
 const SEARXNG_PAGE_RATE_LIMIT = { capacity: 3, refillPerSecond: 0.5 };
 
+// SEARCH-FALLBACK-01 (docs/plans/search-resilience-2026-09-24.md): "when
+// SearXNG is down or returns nothing, the websearch tool asks Wikipedia
+// through its official, documented API ... through the same per-host
+// rate limiter" - its own key and budget, a different host from SearXNG
+// entirely, sized the identical "a page every few seconds" way
+// SEARXNG_PAGE_RATE_LIMIT already is.
+const WIKIPEDIA_RATE_LIMIT_KEY = "wikipedia";
+const WIKIPEDIA_RATE_LIMIT = { capacity: 3, refillPerSecond: 0.5 };
+// A review, 2026-09-24, named a real, accepted cost: on a full SearXNG
+// outage, its own 10s timeout plus Wikipedia's two sequential 10s
+// fetches (search, then the summary) can stack to roughly 30s worst
+// case before either an answer or the original error reaches the
+// household. The identical shape `searxngPageRead()`'s own robots.txt-
+// then-page sequence already has, already accepted there for the same
+// reason: a real, slow answer from a real backend is not the transient
+// blip a retry papers over (this file's own comment on why
+// searxngSearch() itself has no retry, above) - not re-architected
+// into a shared, reduced timeout budget across both fallback steps
+// tonight, since SearXNG genuinely being unreachable (the common case)
+// fails Wikipedia's own two calls fast, not slow.
+const WIKIPEDIA_TIMEOUT_MS = 10_000;
+// A function, not a frozen constant, the same shape `voiceCatalogUrl()`
+// already uses for its own fixed third-party URL: MAIPAI_WIKIPEDIA_BASE_URL
+// lets a test point this at a local fixture instead of the real
+// en.wikipedia.org, never read outside a test (nothing sets it in any
+// real deployment).
+function wikipediaBaseUrl(): string {
+  return process.env.MAIPAI_WIKIPEDIA_BASE_URL ?? "https://en.wikipedia.org";
+}
+
 // The recipe schema's own comment on `home_call_service_step`
 // ("security domains are never covered by a wildcard target") named a
 // design requirement with nothing implementing it. `home:<domain>`
@@ -633,6 +663,87 @@ export function formatSearxngResults(data: unknown, count = 5): string {
   return lines.length > 0 ? lines.join("\n") : SEARXNG_NO_RESULTS_TEXT;
 }
 
+type SearxngSearchResult = { text: string; rows: { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null }[]; page?: PageReadResult };
+
+/** SEARCH-FALLBACK-01: Wikipedia's own official, documented REST API,
+ * search then the page summary - "search" (the Core REST API,
+ * `MediaWiki API:REST_API/Reference`, `/w/rest.php/v1/search/page`)
+ * finds the matching article; "page summary" (the Page Content
+ * Service, `/api/rest_v1/page/summary/<title>`, verified live
+ * 2026-09-24 against `en.wikipedia.org/api/rest_v1/page/summary/Jupiter`)
+ * gives the actual extract to answer from, with `content_urls.desktop.page`
+ * as the citable source. `null` on any failure (no match, no network,
+ * an unparseable response, an empty extract) - the caller's own signal
+ * to fall back to `searxngSearch()`'s original outcome unchanged, never
+ * masking a real SearXNG problem with a worse, silent Wikipedia miss.
+ * `FETCH_USER_AGENT` (already `"MaiPai-Home/1.0 (+https://github.com/
+ * getmaipai/home)"`, the org's own product URL, no personal contact)
+ * matches Wikimedia's own User-Agent policy (`foundation.wikimedia.org/
+ * wiki/Policy:User-Agent_policy`, verified 2026-09-24): "<client name>/
+ * <version> (<contact information>)", a website URL being one of its
+ * own explicitly-accepted contact forms - a non-compliant request risks
+ * a 403 ("Scripts should use an informative User-Agent string with
+ * contact information, or they may be blocked without notice") or
+ * silent throttling, the policy's own words. */
+/** One rate-limited, User-Agent-compliant GET against a Wikipedia REST
+ * endpoint, parsed as a JSON object - `null` on any failure (budget
+ * spent, network, non-JSON), the identical "the caller falls back"
+ * contract `wikipediaFallback()` itself uses. Factored out (a review,
+ * 2026-09-24) since the search call and the summary call below were
+ * an identical copy of this same four-step sequence, which a future
+ * change (a retry, a different null convention) would otherwise have
+ * to make twice and could silently drift between. */
+async function wikipediaGetJson(url: string, base: string, hint: string): Promise<Record<string, unknown> | null> {
+  if (!tryConsume(WIKIPEDIA_RATE_LIMIT_KEY, WIKIPEDIA_RATE_LIMIT)) return null;
+  const result = await attemptHttpFetch(url, "GET", { "user-agent": FETCH_USER_AGENT }, undefined, WIKIPEDIA_TIMEOUT_MS);
+  if (!result.ok) return null;
+  try {
+    return expectJsonObject(result.value, base, hint);
+  } catch {
+    return null;
+  }
+}
+
+async function wikipediaFallback(query: string): Promise<SearxngSearchResult | null> {
+  const base = wikipediaBaseUrl();
+  const searchUrl = `${base}/w/rest.php/v1/search/page?q=${encodeURIComponent(query)}&limit=1`;
+  const searchValue = await wikipediaGetJson(searchUrl, base, "Wikipedia's search API didn't return JSON");
+  if (!searchValue) return null;
+  const pages = Array.isArray(searchValue.pages) ? searchValue.pages : [];
+  const top = pages[0] as { key?: unknown } | undefined;
+  if (!top || typeof top.key !== "string" || top.key.length === 0) return null;
+
+  const summaryUrl = `${base}/api/rest_v1/page/summary/${encodeURIComponent(top.key)}`;
+  const summary = await wikipediaGetJson(summaryUrl, base, "Wikipedia's summary API didn't return JSON");
+  if (!summary) return null;
+  const rawExtract = typeof summary.extract === "string" ? summary.extract.trim() : "";
+  if (!rawExtract) return null;
+  const title = typeof summary.title === "string" && summary.title.length > 0 ? summary.title : top.key;
+  const contentUrls = summary.content_urls as { desktop?: { page?: unknown } } | undefined;
+  const pageUrl = typeof contentUrls?.desktop?.page === "string" ? contentUrls.desktop.page : `${base}/wiki/${encodeURIComponent(top.key)}`;
+  // A review, 2026-09-24, caught two real gaps: the extract had no
+  // length cap at all (every other SearXNG-sourced field this file
+  // returns is bounded by SEARXNG_FIELD_MAX_CHARS), and the row's own
+  // snippet duplicated the full extract byte for byte with `page.text`
+  // below, doubling the tokens an `llm_complete` synthesis call pays
+  // for the identical content twice. `description` (Wikidata's own
+  // short summary, "Fifth planet from the Sun" for Jupiter) is the row
+  // snippet when Wikipedia gives one - a real, different sentence from
+  // the extract, not a duplicate; `page.text` gets the same 32,000-char
+  // bound `parseReadablePage()` already uses for a real fetched page's
+  // own text, since this is standing in for exactly that.
+  const description = typeof summary.description === "string" ? summary.description.trim() : "";
+  const snippet = truncate(description || rawExtract, SEARXNG_FIELD_MAX_CHARS);
+  const pageText = rawExtract.slice(0, 32_000);
+
+  const row = { title, url: pageUrl, snippet };
+  return {
+    text: `1. ${title} (${pageUrl}) - ${snippet}`,
+    rows: [row],
+    page: { type: "document", attachment_id: pageAttachmentId(pageUrl), url: pageUrl, title, text: pageText, chunks: [], links: [], sections: [] },
+  };
+}
+
 /** `host.integration.call("searxng", "search", { query })`'s real
  * implementation - SearXNG's own `/search?q=...&format=json` (its
  * documented JSON output format, opt-in in a household's own
@@ -644,7 +755,20 @@ export function formatSearxngResults(data: unknown, count = 5): string {
  * (a real API answering plain text is not a fetch failure); and Wikipedia
  * answers a direct-topic query via `infoboxes`, not `results` (see
  * `formatSearxngResults`). */
-export async function searxngSearch(args: unknown): Promise<{ text: string; rows: { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null }[]; page?: PageReadResult }> {
+export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean } = {}): Promise<SearxngSearchResult> {
+  // SEARCH-FALLBACK-01: `opts` is never part of the recipe's own public
+  // `args` schema (a model can never set it) - the one caller that
+  // needs to turn the fallback off is `searxngHealth.ts`'s own canary,
+  // which calls this function directly, never through `integration.call`.
+  // A review, 2026-09-24, caught the first cut always allowing the
+  // fallback: the canary's own "Earth" query, chosen specifically
+  // because it is "guaranteed to return something," meant a genuine
+  // SearXNG outage got silently answered by Wikipedia instead, then
+  // read back as `ok` and resolved the very issue this same call had
+  // just raised one line earlier - defeating SEARCH-HEALTH-01's own
+  // detection, built the same day, for the one caller whose whole job
+  // is detecting exactly that.
+  const allowWikipediaFallback = opts.allowWikipediaFallback ?? true;
   const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
   const query = input?.query;
   if (typeof query !== "string" || query.length === 0) {
@@ -729,6 +853,25 @@ export async function searxngSearch(args: unknown): Promise<{ text: string; rows
         // generic line instead.
         throw new HostError("search_unavailable", "Search isn't working right now.");
       }
+      // SEARCH-FALLBACK-01: "when SearXNG is down or returns nothing" -
+      // the "returns nothing" half. A genuinely empty result with no
+      // engine trouble is never a health problem (SEARCH-EMPTY-01's own
+      // distinction, unchanged) - it just, on its own, has nothing to
+      // answer a household member's question from, and Wikipedia is
+      // one more real chance to before giving up.
+      if (text === SEARXNG_NO_RESULTS_TEXT && allowWikipediaFallback) {
+        const fallback = await tryWikipediaFallback(query);
+        if (fallback) {
+          // A review, 2026-09-24, caught the first cut returning here
+          // before this call - SearXNG really did just answer "ok"
+          // (empty, but no engine trouble), and skipping this meant a
+          // real recovery (an issue open from a PRIOR call) never got
+          // resolved just because Wikipedia happened to have this
+          // one query's own answer.
+          await recordSearchHealth({ kind: "ok" });
+          return fallback;
+        }
+      }
     } else {
       throw result.error;
     }
@@ -745,6 +888,23 @@ export async function searxngSearch(args: unknown): Promise<{ text: string; rows
         detail: `${err instanceof Error ? err.message : String(err)} Check the SearXNG URL in Settings -> AI & connections -> Integrations.`,
       });
     }
+    // SEARCH-FALLBACK-01: "when SearXNG is down" - the other half. Tried
+    // AFTER recording SearXNG's own real health (a household still needs
+    // to know SearXNG itself is broken, whether or not Wikipedia happens
+    // to answer this one question) and never for a self-imposed
+    // rate_limited throw (excluded above, before this point - that means
+    // WE chose not to send the request, not that SearXNG failed), and
+    // never for any error OTHER than a confirmed network/availability
+    // failure (`network_unreachable`, `search_unavailable`) - a review,
+    // 2026-09-24, caught the first cut falling back for ANY thrown
+    // error, including a genuine bug in the parsing above (a future
+    // regression in `expectJsonObject`/`formatSearxngResults`/the row
+    // mapping), which would have silently masked a real code defect as
+    // a clean Wikipedia answer instead of the loud failure a bug needs.
+    if (allowWikipediaFallback && err instanceof HostError && (err.code === "network_unreachable" || err.code === "search_unavailable")) {
+      const fallback = await tryWikipediaFallback(query);
+      if (fallback) return fallback;
+    }
     throw err;
   }
   await recordSearchHealth({ kind: "ok" });
@@ -753,6 +913,20 @@ export async function searxngSearch(args: unknown): Promise<{ text: string; rows
   // signal, so it propagates to this call's own caller unchanged.
   const page = input?.read_page === true && rows[0] ? await searxngPageRead({ url: rows[0].url }) : undefined;
   return { text, rows, ...(page ? { page } : {}) };
+}
+
+/** SEARCH-FALLBACK-01's own gate: `search.wikipedia_fallback` (default
+ * true, `searchKeys.ts`) - a household can turn this off independently
+ * of web search itself, though it only ever runs when web search is
+ * already configured and already failed or found nothing (this
+ * function is only ever called from inside `searxngSearch()`, which
+ * itself already refused to run at all if `search.searxng_url` were
+ * unset). `null` on any failure, the identical "the caller falls back
+ * to what it already had" contract `wikipediaFallback()` itself uses. */
+async function tryWikipediaFallback(query: string): Promise<SearxngSearchResult | null> {
+  const enabled = getHouseholdSettingValue("search.wikipedia_fallback") as boolean | undefined;
+  if (enabled === false) return null;
+  return wikipediaFallback(query);
 }
 
 export interface PageReadLink {
