@@ -119,7 +119,7 @@ point 7 for the full unit list and point 6 for the migration order.
 
 - [x] **D1: delete the lookup ladder** (S, Codex, after U6). Landed with accepted exception (2026-09-24): replay identical before/after (2/10 owner rows clear on every-repeat grounding; no newly red rows), trimmed routing corpus green (160/160). Full gate's mDNS discovery timeout and ask02 public-figure extra empty query reproduce on clean `origin/main`; the lookup-suite issue #140 flakes named in the brief also appeared. Accepted exception: pre-existing old-path replay/gate drift, not caused by this deletion; follow-up needed in #158. `lookupDecision`, `exactFieldOf`, `CURRENCY_MARK_RE`, `deliverableQuery`, the field stop list removed. Files: `turnContext.ts`, `turnEngine.ts`. Exit: `scripts/check.sh` plus the replay bench. Gating: U6.
 
-- [ ] **D2: delete the query builders and forced lookup** (S, Codex, after D1). `lookupQueryFor`, `runForcedLookup`, `notePendingLookup`, `worldAnswerQuery`, `holdForLookup`, `lookupConsent`, the lookup branch of `resolvePendingAsk`. Files: `turnEngine.ts` (~500 lines). Acceptance/exit as D1. Gating: D1.
+- [x] **D2: delete the query builders and forced lookup** (S, Codex, after D1). `lookupQueryFor`, `runForcedLookup`, `notePendingLookup`, `worldAnswerQuery`, `holdForLookup`, `lookupConsent`, the lookup branch of `resolvePendingAsk`. Files: `turnEngine.ts` (~500 lines). Acceptance/exit as D1. Gating: D1. Landed `a5585f2c`.
 
 - [ ] **D3: delete the draft reader** (S, Codex, after D2). `readLookupDraft`, `lookupShapeOf`, `hedgedFactShape`, the promise/offer/hedge regexes. Files: `guards.ts` (~120 lines). Acceptance/exit as D1. Gating: D2.
 

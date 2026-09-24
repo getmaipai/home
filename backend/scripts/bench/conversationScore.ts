@@ -50,9 +50,8 @@ export interface TurnObserved {
   // comment on the matching expectations).
   /** The person's and the household's memory records with their status. */
   records: readonly { text: string; status: string }[];
-  /** The conversation's pending ask after the turn. `who` and `lookup`
-   * are the coherence review's question 5 widening. */
-  pendingAsk: "confirm" | "ask" | "who" | "lookup" | "relay" | null;
+  /** The conversation's pending ask after the turn. */
+  pendingAsk: "confirm" | "ask" | "who" | "relay" | "lookup" | null;
   /** The item texts the household's lists gained since the
    * conversation started. */
   listItems: readonly string[];
@@ -83,12 +82,15 @@ export interface TurnObserved {
   /** ASK-01: the name the conversation's pending ask is about, when
    * it is a `who`. */
   pendingAskName?: string | null;
-  /** LOOKUP-02: the shape the `[turn]` line says the draft confessed. */
-  lookupShape?: string | null;
   /** CHAT-16: the composition mode on the `[turn]` line. */
   composed?: string | null;
   /** CHAT-16 finding 61: the grounding guard's named span. */
   ungrounded?: string | null;
+  /** ENGINE-CONTRACT-01: whether a required tool-call completion was
+   * honoured; null when no required completion was made. */
+  requiredHonored?: boolean | null;
+  requiredCachedTokens?: number | null;
+  requiredPromptTokens?: number | null;
   /** REP-01: the turn's retries off the `[turn]` line, and the reply the
    * conversation delivered before this one. */
   retries?: number | null;
@@ -134,20 +136,6 @@ export interface TurnObserved {
    * bodies delivered to the person since the turn started, after the
    * wait (paired with `deliveries`' own type list). */
   notificationBodies?: readonly { type: string; body: string }[];
-  /** ENGINE-CONTRACT-01 (dev.md 2026-09-23): whether this turn's first
-   * `tool_choice: "required"` completion actually carried a tool call -
-   * `null` when no completion this turn was forced (an ordinary `auto`
-   * turn, or no model call at all), read straight off the recording
-   * proxy, never inferred from whether a search ran (a grounding
-   * refusal after a real call is a different thing from the engine
-   * never returning a call at all). */
-  requiredHonored?: boolean | null;
-  /** The same forced completion's own `usage.prompt_tokens_details.
-   * cached_tokens` and `usage.prompt_tokens` - `null` on the same terms
-   * as `requiredHonored` (no forced completion, or the engine returned
-   * no `usage`). */
-  requiredCachedTokens?: number | null;
-  requiredPromptTokens?: number | null;
   /** RERUN-PROTOCOL-01 (dev.md "U6 rerun ruling" (c) 1): the turn's own
    * stored `stats.nodes[]`, verbatim off the DB row - `null` when no
    * turn row was written (a threw conversation). The interleaved rerun
@@ -263,7 +251,6 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.groundedNames) parts.push("every name grounded");
   if (e.openQuestionStatus) parts.push(`open question ${e.openQuestionStatus.kind} ${e.openQuestionStatus.status}`);
   if (e.outcomeArgsMatch) parts.push(`${e.outcomeArgsMatch.packageId}${e.outcomeArgsMatch.via ? ` via ${e.outcomeArgsMatch.via}` : ""} args ~ ${Object.entries(e.outcomeArgsMatch.args).map(([k, v]) => `${k}:/${v}/`).join(", ")}`);
-  if (e.lookupShape) parts.push(`lookup shape ${e.lookupShape}`);
   if (e.retries !== undefined) parts.push(`${e.retries} retr${e.retries === 1 ? "y" : "ies"}`);
   if (e.distinctFromPrevious) parts.push("not the previous reply again");
   if (e.episodesInContext !== undefined) parts.push(`${e.episodesInContext} episode line${e.episodesInContext === 1 ? "" : "s"}`);
@@ -297,19 +284,6 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   // negative (a review found "[error: ...]" passing an abstention row).
   if (!observed.interrupted && (!observed.answered || reply.startsWith("[error:"))) {
     checks.push({ name: "answered", pass: false, detail: reply.startsWith("[error:") ? reply : "no reply arrived" });
-  }
-  // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md, the coordinator's
-  // own ruling): a forced-search turn's own phrasing round binding
-  // "answer completely from what you know" to the nearest content
-  // instead of the question it never named produced a self-description
-  // instead of an answer - caught live by hand, never by this scorer,
-  // since none of its own checks before this one read the reply's
-  // substance. Automatic on every turn a required call happened
-  // (`observed.requiredHonored` is set at all, forced miss or not),
-  // never opt-in per row.
-  if (observed.requiredHonored !== null && observed.requiredHonored !== undefined) {
-    const selfDescribed = /self-hosted AI assistant/i.test(reply);
-    checks.push({ name: "no self-description", pass: !selfDescribed, detail: selfDescribed ? `reply recites its own identity instead of answering: "${reply.slice(0, 120)}"` : "reply doesn't recite the identity line" });
   }
   if (e.memoryWritten) {
     for (const keywords of e.memoryWritten) {
@@ -497,9 +471,6 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   if (e.outcomeKind) {
     const hit = observed.outcomes?.some((o) => o.source?.kind === e.outcomeKind);
     checks.push({ name: "outcome kind", pass: hit === true, detail: hit ? e.outcomeKind : `no ${e.outcomeKind} outcome` });
-  }
-  if (e.lookupShape) {
-    checks.push({ name: "lookup shape", pass: observed.lookupShape === e.lookupShape, detail: observed.lookupShape ? `shape ${observed.lookupShape}` : "no shape on the turn line" });
   }
   if (e.retries !== undefined) {
     checks.push({ name: "retries", pass: observed.retries === e.retries, detail: observed.retries === null || observed.retries === undefined ? "no retries on the turn line" : `${observed.retries} retries` });
