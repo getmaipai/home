@@ -35,13 +35,12 @@ import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import { buildTurnStats } from "@/lib/turnStats";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, stripTagQuestionTail, dropConjunctionLead, emptiedLine, splitIntoSentences, bannedPhraseRetryNote, objectionRetryNote, EXAMPLE_PARROT_RETRY_NOTE, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, shouldRetryAfterSkip, isStatementTurn, isBareSocialTurn, dropConjunctionLead, emptiedLine, splitIntoSentences, bannedPhraseRetryNote, objectionRetryNote, EXAMPLE_PARROT_RETRY_NOTE, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
 import { asBackchannelOnLiveSubject, classifyTurnSignal, fallbackSignal, freezeDirective, hasEligibleClause, shapeOf, type ProtocolAnswer } from "@/lib/turnSignal";
-/** REG-01: the system note on the one retry a statement turn gets when
- * every sentence of the reply was register or an action claim. */
+/** System note used when retryable guards skip every sentence. */
 export const STATEMENT_RETRY_NOTE = "Nothing was asked; respond to what they said.";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
@@ -216,8 +215,7 @@ function validateContinuationInput(continuation: TurnContinuation | undefined): 
 // genuinely malformed reply instead),
 // "no_tools_retry" (every proposed tool call failed, so the model tries
 // again without any offered), "composition" (a package's own answer
-// phrased by a second call), or `guard:<name>` (a guard's own retry,
-// REG-01's statement-turn regeneration today).
+// phrased by a second call), or `guard:<name>` (a guard's own retry).
 export type TurnGenerationReason = "initial" | "think_exhausted" | "fragment" | "no_tools_retry" | "composition" | `guard:${string}`;
 
 interface GenerationRecord {
@@ -4366,8 +4364,8 @@ async function runTurnHoldingLease(
   const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, false, opts.speakerEvidence ?? null, opts.present ?? null);
 
   let value: TurnValue;
-  // REG-01: set by answerWithSafetyAndGuards() when the guards emptied
-  // the reply (register or a statement's claim).
+  // Set by answerWithSafetyAndGuards() when retryable guards emptied
+  // the reply.
   let emptiedBySkips = false;
   // ACT-01: the blocking path has no first token; its `first_token_ms`
   // is the whole first completion, and `finalize_ms` runs from the last
@@ -4572,10 +4570,8 @@ async function runTurnHoldingLease(
     } else {
       let rawText = await shapeModelText(completion.value.text, true);
       value = answerWithSafetyAndGuards(rawText);
-        // REG-01, rule 1: every sentence of a reply to a statement was
-        // register or an action claim; one retry with the note (the
-        // turn's second generation), its own reply guarded the same way;
-        // a second empty result keeps the act's own line already set.
+        // Retry once when every sentence was skipped by a retryable
+        // guard; a second empty result keeps the existing fallback line.
         // The same fact the streaming path regenerates on: the guards
         // emptied the reply (never a narrated line, which stands).
         if (emptiedBySkips && prepared.timings.retries < 1) {
@@ -4934,11 +4930,9 @@ export async function* gateGuards(
   // `[turn]` log line's own `guard` array - this generator's per-sentence
   // internals have no other channel back to whoever is draining it.
   onGuardHit?: (reason: GuardReason, replaced: boolean) => void,
-  // REG-01: when every sentence was skipped on a statement turn, one
-  // regeneration with the engine's note ("Nothing was asked; respond to
-  // what they said"), gated the same way; null when the turn already
-  // spent its second generation. The regenerated stream never
-  // regenerates again.
+  // When every sentence was skipped by a retryable guard, allow one
+  // regeneration with the engine's note; the regenerated stream never
+  // retries.
   regenerate?: () => Promise<AsyncGenerator<string, StreamOutcome, void> | null>,
 ): AsyncGenerator<string, StreamOutcome, void> {
   const iterator = tokens[Symbol.asyncIterator]();
@@ -4949,9 +4943,6 @@ export async function* gateGuards(
   let justSkipped = false;
   const liveCtx = (): GuardContext => ({ ...(typeof ctx === "function" ? ctx() : ctx), personId });
   while (!step.done) {
-    // REG-01, rule 2: a register tail on a spoken span is cut before the
-    // span is judged (a span the chunker flushed at the comma arrives
-    // as its own sentence and is skipped whole below).
     // EXP-01's set: a span that followed a skipped one on a conjunction
     // ("But we can watch it together") loses the lead.
     // A whitespace-only span (a paragraph break) neither clears the flag
@@ -4959,11 +4950,7 @@ export async function* gateGuards(
     const lead = justSkipped && step.value.trim() ? /^\s*/.exec(step.value)![0] : "";
     const whole = justSkipped && step.value.trim() ? lead + dropConjunctionLead(step.value.trim()) + (/\s$/.test(step.value) ? " " : "") : step.value;
     if (step.value.trim()) justSkipped = false;
-    const registerStripped = whole.trim() ? stripRegisterTail(whole.trimEnd(), liveCtx()) : whole;
-    const tagStripped = registerStripped.trim() ? stripTagQuestionTail(registerStripped, !isFirstSentence) : registerStripped;
-    const rawSpan = tagStripped.trim() ? tagStripped + (/\s$/.test(whole) ? " " : "") : tagStripped;
-    if (registerStripped.trim() !== whole.trim()) onGuardHit?.("assistant_register", false);
-    if (tagStripped.trim() !== registerStripped.trim()) onGuardHit?.("tag_question", false);
+    const rawSpan = whole;
     const trimmed = rawSpan.trim();
     const reason = trimmed ? guardSentence(trimmed, liveCtx(), isFirstSentence) : null;
     if (trimmed) isFirstSentence = false;
@@ -4999,10 +4986,9 @@ export async function* gateGuards(
     step = await iterator.next();
   }
   if (skipped && !spokeAnything) {
-    // REG-01, rule 1: nothing remained of a reply to a statement; one
-    // retry with the note, then the act's own line (OUT-01's bound on
-    // generations).
-    if (isRegisterSkip(skipped.reason, liveCtx())) {
+    // Nothing remained after retryable guards skipped the reply; retry
+    // once with the note, then use the existing fallback line.
+    if (shouldRetryAfterSkip(skipped.reason, liveCtx())) {
       const again = regenerate ? await regenerate() : null;
       let spoke = false;
       if (again) {
@@ -5537,8 +5523,8 @@ async function runTurnStreamHoldingLease(
                 guardHits.push(reason);
               }
             },
-            // REG-01: the statement-turn retry, within the turn's two
-            // generations; thinking off, like OUT-01's hold.
+            // The guard retry stays within the turn's two generations;
+            // thinking is off, like OUT-01's hold.
             async () => {
               // CHAT-16: a composed package reply is never regenerated
               // from the model turn's own prompt (the answer is the

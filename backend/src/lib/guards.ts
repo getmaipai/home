@@ -56,10 +56,6 @@ export type GuardReason =
    * like an experience claim, with its own line when nothing else was
    * said. */
   | "claimed_statement"
-  /** #92: a sentence that is nothing but a bracketed system note ("[Knowledge
-   * could not answer.]"), the window's own description of an earlier
-   * non-model turn, echoed back as if it were a reply. */
-  | "placeholder_echo"
   /** OUT-01: the reply as produced was not a sentence (a lone token, an
    * empty reply, a fragment) and the one regeneration was not either;
    * the fixed line stands in. Never the honesty vocabulary: nothing
@@ -67,15 +63,6 @@ export type GuardReason =
    * (turnEngine.ts's finalizeReply and the streaming hold), not by
    * guardSentence(). */
   | "malformed"
-  /** REG-01: a sentence that is only the assistant register ("I've noted
-   * that", "Let me know if you need anything else", "I'm still
-   * learning"), skipped wherever it sits; a register tail on a real
-   * sentence is cut and the head kept. */
-  | "assistant_register"
-  /** REG-02 (dev.md section 16 part 9): a tag question on the end of a
-   * declarative reply ("Got it?", "Sound good?"), cut as a register
-   * tail. Never fires on a reply that is a question itself. */
-  | "tag_question"
   /** ASK-01 (dev.md section 3, part 5): a sentence that claims prior
    * knowledge ("that's right", "I remember", "as you mentioned") of a
    * name the turn resolved to nobody (`unknownNames`), with no memory
@@ -138,10 +125,8 @@ export interface GuardContext {
    * shape themselves with no openers, which can differ from the router
    * on a package-declared opener; the turn engine always passes it. */
   shape?: UtteranceShape;
-  /** ACT-01: the turn's primary act off the frozen signal (REG-01's
-   * statement rule reads it: an inform, a commissive, a greeting, a
-   * closing or a backchannel is a statement, and a statement takes no
-   * action claim). Absent, the shape decides. */
+  /** ACT-01: the turn's primary act off the frozen signal. Absent, the
+   * utterance shape decides whether it is statement-like. */
   act?: "inform" | "question" | "directive" | "commissive" | "greeting" | "closing" | "backchannel";
   // "computed" (SIGNAL-02: arithmetic, the clock, a conversion - a turn
   // the hub answers with no lookup) is a real TurnSignal["target"]
@@ -211,10 +196,8 @@ export interface Guarded {
    * reason only for the replaced case, so the episode store can tell a
    * canned line from an answer by the row alone. */
   replaced: boolean;
-  /** REG-01: true when every sentence was skipped as register or a
-   * statement's action claim and `reply` is the
-   * act's own line (emptiedLine()): the engine's cue for its one retry
-   * with the note. */
+  /** True when every sentence was skipped by a retryable guard and
+   * `reply` is the turn's own fallback line, prompting one guarded retry. */
   emptied?: boolean;
 }
 
@@ -236,11 +219,6 @@ const CANNOT_DO = [
 // the honesty vocabulary in the tests.
 const NOT_TOLD = ["I don't have that one yet.", "I don't have that yet, sorry.", "That's one I don't have yet."];
 const DONT_KNOW = ["I don't know that one.", "I'm not sure about that one.", "I don't know that one, sorry."];
-// #92: a placeholder echo on a statement (the model said a bracketed
-// note back after a disclosure) is replaced with the acknowledgment the
-// disclosure deserved, never "I don't know" about something the person
-// just said; on a question the DONT_KNOW line is the honest one.
-const ACKNOWLEDGE = ["Okay.", "Got it.", "Noted."];
 // Item 1b (#67): the hub cannot watch, visit or taste; said plainly,
 // never as "nobody's told me" (a world fact is not the household's to
 // tell it). The rest of the reply, what it knows about the film, stands.
@@ -249,11 +227,8 @@ const CANNOT_EXPERIENCE = [
   "I don't get to watch things or go places, so I can't say from experience.",
 ];
 const NO_RECORD_OF_SAYING = ["I don't have a record of saying that.", "I can't find that in what I said before."];
-// REG-01 (the coordinator's read of its set): when the register scrub
-// empties a reply, the line that stands reads the turn's act. A
-// closing or a greeting gets the reciprocal move, a question the
-// honest line, a statement a one-line acknowledgment; never "say that
-// again" to a person who said thanks.
+// A reply emptied by a skippable guard gets a short line matched to the
+// turn's act; a question gets an honest line, a statement an acknowledgment.
 export const EMPTIED_LINES: Record<"closing" | "greeting" | "statement", readonly string[]> = {
   closing: ["You're welcome.", "Anytime.", "Glad to help."],
   greeting: ["Hi there.", "Hello.", "Hey, good to hear from you."],
@@ -987,9 +962,9 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
  * about the subject ("Is there anything specific you need help with?",
  * "Let me know if you need anything else"). Never an unrelated-recall
  * candidate: the 8B reuses these across conversations and an 80
- * percent overlap with an earlier one is not a copied line; REG-01's
- * register scrub is what removes them. One definition, read by the
- * guard and by the bench's noCopiedEpisode check. */
+ * percent overlap with an earlier one is not a copied line. One
+ * definition, read by unrelated-recall and the bench's noCopiedEpisode
+ * check. */
 export const CLOSER_RE =
   /\b(?:anything (?:else|specific|more)|let me know|need (?:any )?help|help (?:you )?with|(?:how )?can i help|is there anything|what else|feel free|happy to help|hope (?:that|this) helps|enjoy (?:the|your)|have fun|take care|you'?re welcome|no problem|glad (?:to|i could) help|let me know if|just (?:ask|say)|i'?m here if|good luck(?: (?:with|for|on) (?:the|a|your|your)?[^.!?,]*)?|fingers crossed|keep the faith|best of luck(?: (?:with|for|on) (?:the|a|your|your)?[^.!?,]*)?|you'?ll love it|you'?re going to love it|can'?t wait for you to (?:see|hear|watch|meet|try) (?:it|that|this|them|those)[^.!?]*|hope it works out)\b/i;
 /** The connective words a closer is built from beside its phrases
@@ -1009,61 +984,6 @@ export function isCloserSentence(sentence: string): boolean {
   return tokenize(residual).size === 0;
 }
 
-// ==== REG-01: the assistant register, and a question said twice ====
-// One list beside the closers (CLOSER_RE above, the same definition
-// extended): the phrases an assistant says and a friend never does.
-// A sentence that is only these (their connective words and a
-// courtesy aside) is skipped; a tail of them behind a comma or a
-// dash on a real sentence is cut. "Got it, noted" on a statement is
-// the same register; "noted" as an acknowledgment of a request stays.
-const REGISTER_PHRASE_RE =
-  /\b(?:i'?ve (?:noted|got|made a note of) (?:that|it|this)|noted|remembered|i'?m (?:still )?learning|i'?m here (?:to help|for you|(?:if you (?:need|want|ever need)|whenever you need)[^.!?,]*)|as an ai(?: (?:assistant|model))?|as a language model|sorry (?:if|that) i (?:confused|misunderstood|missed)(?: you| that)?|let me know (?:what you need|how (?:i can|else i can) help|if (?:you need|there'?s|you'?d like|you want)[^.!?,]*|when you'?re ready[^.!?,]*)|happy to help(?: (?:with|out|if|when|whenever|any ?time)[^.!?,]*)?|glad (?:to|i could) help|i'?m happy to assist|how (?:else )?can i (?:help|assist)(?: you)?(?: today)?|is there anything else(?: i can (?:help|do)[^.!?,]*)?|anything else (?:you need|i can (?:help|do)[^.!?,]*)|feel free to (?:ask|reach out|let me know)[^.!?,]*|don'?t hesitate to (?:ask|reach out)[^.!?,]*|hope (?:that|this) helps|you'?re welcome|no problem(?: at all)?|got it,? noted|will do)\b/i;
-const REGISTER_FILLER_RE = /\b(?:okay|ok|sure|alright|great|of course|absolutely|certainly|just|so|and|or|but|then|now|also|too|again|anytime|always|please|thanks|thank you|though|at all|for now|for today|tonight|today)\b/gi;
-/** REG-02: a tag question at the end of a declarative reply, as a
- * separate anchored pattern (the existing TAG_QUESTION_RE above serves
- * the household-guess guard only and is not reused). A declarative head
- * must precede it: "Got it?", "Sound good?", "Make sense?", "Right?".
- * Never fires when the whole reply is a question. */
-function isRegisterSentence(sentence: string): boolean {
-  if (!REGISTER_PHRASE_RE.test(sentence) && !CLOSER_RE.test(sentence)) return false;
-  const residual = sentence
-    .replace(/’/g, "'")
-    .replace(new RegExp(REGISTER_PHRASE_RE.source, "gi"), " ")
-    .replace(new RegExp(CLOSER_RE.source, "gi"), " ")
-    .replace(/'(?:s|d|m|re|ll|ve|t)\b/gi, " ") // the contractions' tails are not subjects, once the phrases are out
-    .replace(CLOSER_FILLER_RE, " ")
-    .replace(REGISTER_FILLER_RE, " ")
-    .replace(ADDRESSEE_TAIL_RE, " "); // an addressee at the end
-  return tokenize(residual).size === 0;
-}
-// An addressee at the end of a sentence: a capitalized name, a group
-// word, or a lowercase term of address ("kiddo", "buddy").
-const ADDRESSEE_TAIL_RE = /[,\s]+(?:\p{Lu}\p{L}*|everyone|everybody|all|guys|folks|there|kiddo|kid|buddy|bud|friend|mate|pal|dear|love|hon|honey|sweetie|champ|sir|ma'am)(?=[\s!.,?]*$)/u;
-/** The reciprocal move a closing or a greeting gets ("You're welcome",
- * "No problem, happy to help!", "Good morning!"): register by nature,
- * and the right reply there. */
-const RECIPROCAL_RE = /^\W*(?:okay|ok|sure|alright|got it|aw+|oh)?[,.! ]*(?:you'?re (?:very |so |most )?welcome|no problem(?: at all)?|no worries|anytime|any time|my pleasure|of course|sure thing|happy to help|glad (?:to|i could) help|glad it helped|you got it|you'?ve got it|will do|noted|(?:good\s+)?(?:morning|afternoon|evening|night)|hello|hi|hey|howdy|hiya|bye|goodbye|see you|take care|sleep well|talk (?:later|soon)|later|cheers)\b[^.!?]{0,20}[.!?]*\s*$/i;
-// The acknowledgment half of the register ("Noted.", "Will do.", "No
-// problem.") is the right answer to a request and a thank-you; it is
-// register only on a statement, where nothing was asked.
-const ACK_REGISTER_RE = /^\W*(?:okay|ok|sure|alright|got it)?[,.! ]*(?:noted|remembered|saved|i'?ve (?:noted|got|made a note of) (?:that|it|this)|will do|you'?re welcome|no problem(?: at all)?|got it,? noted)\W*$/i;
-/** The register test with the acknowledgment exemption: "Noted." after
- * a request, a greeting or a thank-you is the answer. */
-function isRegisterFor(sentence: string, ctx: Pick<GuardContext, "act" | "shape" | "utterance">): boolean {
-  if (!isRegisterSentence(sentence)) return false;
-  if (ACK_REGISTER_RE.test(sentence) && (!isStatementTurn(ctx) || ctx.act === "closing" || ctx.act === "greeting")) return false;
-  return true;
-}
-function guardAssistantRegister(sentence: string, ctx: GuardContext, isFirstSentence: boolean): GuardReason | null {
-  // A closing or a greeting gets its reciprocal move, which is register
-  // by nature ("You're welcome, happy to help!"): a first sentence in a
-  // reciprocal form is the close and stands; what follows it is still
-  // scrubbed, and a first sentence that is only "I'm still learning" or
-  // "How can I help you today?" is not a close (a review). REG-01's set:
-  // an emptied "You're welcome—happy to help!" drew the malformed line.
-  if (isFirstSentence && (ctx.act === "closing" || ctx.act === "greeting") && RECIPROCAL_RE.test(sentence)) return null;
-  return isRegisterFor(sentence, ctx) ? "assistant_register" : null;
-}
 // ==== Objection handling ====
 
 /** REP-01, rule 3: the objection shapes beside the signal's own reading
@@ -1095,71 +1015,6 @@ export function objectionRetryNote(ctx: Pick<GuardContext, "utterance" | "target
  * said back: the examples show the voice, never the answer. */
 export const EXAMPLE_PARROT_RETRY_NOTE = "The example lines in your instructions show how you sound, never what to say; they are not answers. Respond to what the person actually said.";
 
-/** A register tail behind a comma, a semicolon, a colon or a spaced
- * dash ("Sounds fun, let me know if you need anything else.") is taken
- * off and the head kept, with its own stop. */
-export function stripRegisterTail(sentence: string, ctx: Pick<GuardContext, "act" | "shape" | "utterance">): string {
-  // A register lead behind a comma ("As an AI, I can't taste it",
-  // "Sorry if I confused you, the recital is Friday") goes the same way:
-  // the rest stands on its own, capitalized.
-  // The separators: a comma, a semicolon, a colon, a spaced hyphen, or
-  // an en or em dash with or without spaces ("You're welcome—let me
-  // know if you need anything else").
-  const lead = /^\s*([^,;:–—]+?)\s*(?:[,;:]|\s-\s|\s?[–—]\s?)\s*(\S.*)$/s.exec(sentence);
-  // A rest that is only an addressee ("Hope that helps, Sage!") makes
-  // the whole sentence register, left to the sentence rule (a review).
-  // A rest that is only an addressee ("kiddo.", "Sage!") is not content
-  // (the whole sentence is register); "I can't." is (a review).
-  if (lead && isRegisterFor(lead[1]!, ctx) && /\p{L}/u.test(lead[2]!.replace(ADDRESSEE_TAIL_RE, "").replace(/^\s*(?:\p{Lu}\p{L}*|kiddo|kid|buddy|bud|friend|mate|pal|dear|love|hon|honey|sweetie|champ|sir|ma'am|everyone|everybody|all|guys|folks|there)[\s!.,?]*$/u, ""))) {
-    const rest = lead[2]!;
-    return rest.charAt(0).toUpperCase() + rest.slice(1);
-  }
-  const m = /^(.*?[^\s,;:–—-])\s*(?:[,;:]|\s-\s|\s?[–—]\s?)\s*(?:and\s+|but\s+|so\s+)?([^,;:–—]+?)([.!?]*)\s*$/i.exec(sentence);
-  if (!m) return sentence;
-  const head = m[1]!;
-  const tail = m[2]!;
-  // A head that is only an acknowledgment ("Okay, I've noted that")
-  // leaves the whole sentence to the register rule.
-  const headContent = tokenize(head.replace(ACK_LEAD_RE, "").replace(REGISTER_FILLER_RE, " "));
-  if (headContent.size === 0) return sentence;
-  if (isRegisterFor(tail, ctx)) return /[.!?]$/.test(head) ? head : `${head}.`;
-  return sentence;
-}
-/** REG-02: a tag question at the end of a declarative reply ("Got it?",
- * "Sound good?") is cut the same way as a register tail, with its own
- * sub-reason. Called on the reply's LAST sentence only: a sentence that
- * is only the question has no head and is left whole; a genuine
- * question ending in a tag ("Do you mean the runtime, right?") is left
- * whole too, because the tag belongs to the question. */
-const STANDALONE_TAG_RE = /^(?:got it|ok|okay|alright|right|cool|sounds good|sound good|make sense|makes sense|is that right|understood|clear|agreed)\?$/i;
-export function stripTagQuestionTail(sentence: string, hasPrecedingSentences: boolean): string {
-  // Only the reply's LAST sentence is passed here: a tag question is a
-  // cut tail, never a mid-reply sentence. Two shapes: (1) a tag
-  // question split into its own sentence by splitIntoSentences
-  // ("Got it?" after "Those are the two options."), (2) a tag
-  // question at the end of a declarative sentence on the same line
-  // ("Those are the two options, right?").
-  if (!/[?]\s*$/.test(sentence)) return sentence;
-  if (STANDALONE_TAG_RE.test(sentence)) {
-    // The whole sentence is a tag question ("Got it?").
-    // Cut it only if there are preceding sentences to keep.
-    if (hasPrecedingSentences) return "";
-    return sentence;
-  }
-  const m = /^(.*?[^\s,;:–—-])\s*(?:[,.!]?|)\s*(?:got it\?|ok\?|okay\?|alright\?|right\?|cool\?|sounds good\?|sound good\?|make sense\?|makes sense\?|is that right\?|understood\?|clear\?|agreed\?)[\s.!?]*$/i.exec(sentence);
-  if (!m) return sentence;
-  const head = m[1]!;
-  if (tokenize(head).size === 0) return sentence;
-  // A genuine question ending in a tag ("Do you mean the runtime,
-  // right?", "I think you mean your dentist appointment, right?"):
-  // the tag belongs to the question and the question is the answer.
-  if (/[?]\s*$/.test(head)) return sentence;
-  // These are already handled by the household-guess/activity guards;
-  // their confirmation tag is part of the guarded claim, not padding.
-  // Keep the older grounded-guess and idiomatic-progressive cases intact.
-  if (/^(?:i think you mean|you(?:'re| are) asking)\b/i.test(head.trim())) return sentence;
-  return /[.!?]$/.test(head) ? head : `${head}.`;
-}
 /** The conjunction a sentence opened with when the sentence before it
  * was skipped ("But we can watch it together" after "I'm watching it"
  * went), taken off with the rest capitalized. */
@@ -1388,8 +1243,8 @@ const I_DID = "\\bi(?:'ve| have)?\\s+(?:just\\s+)?";
 const AND_DID = "\\b(?:and|then)\\s+(?:just\\s+)?";
 // A bare status at the sentence's own start, behind an acknowledgment
 // at most ("Timer set for ten minutes.", "Done, saved.").
-// REG-01's set: "You've got it, added to the list" is the same bare
-// status claim behind a longer acknowledgment.
+// "You've got it, added to the list" is the same bare status claim
+// behind a longer acknowledgment.
 const START = "^\\s*(?:okay|ok|sure|sure thing|done|alright|got it|you'?ve got it|you got it|will do|no problem|right|all set)?[,.! ]*";
 /** A family whose claim is written with I_DID gets the chained form for
  * free: the same body behind "and"/"then" instead of "I've". */
@@ -1607,11 +1462,9 @@ function familyOutcome(family: ActionFamily, ctx: GuardContext): "succeeded" | "
 
 /** CHAT-04: one decision, shared by both paths: the sentence claims a
  * completed action whose family has no succeeded outcome this turn. */
-// EXP-01's set (the coordinator's read): "Cool, I'll add that to the
-// list" on a statement is a promise to act that nobody asked for, the
-// same padding as "I've noted that"; on a statement with no outcome it
-// is skipped like a completed claim (statementActionSkip). After a
-// request the future tense is the acceptance CHAT-04 already allows.
+// EXP-01: a promise to perform an action with no matching request or
+// outcome is still an unsupported action claim. After a request, the
+// future tense is the acceptance CHAT-04 already allows.
 const FUTURE_ACTION_RE = /\bi(?:'ll| will|'m going to|'m gonna)(?: (?:just|also|go ahead and|make sure to|be sure to))? (?:add|put|note|save|remember|store|log|jot|write (?:it|that|this) down|set (?:a |the )?(?:timer|reminder)|remind|schedule|keep (?:that|it|this) (?:in mind|on file|noted))\b/i;
 
 function guardUnsupportedAction(sentence: string, ctx: GuardContext): GuardReason | null {
@@ -1715,29 +1568,13 @@ function guardExampleParrot(sentence: string, ctx: GuardContext): GuardReason | 
   return ctx.personaExamples.some((ex) => normalizeForCompare(ex) === normalized) ? "example_parrot" : null;
 }
 
-// #92: the window describes a non-model turn to the model as a bracketed
-// system note ("[Knowledge could not answer.]", "[The household was asked
-// to confirm before this action ran.]"); a model that says one back has
-// said nothing. Cuttable: the rest of a reply stands; alone, it is
-// replaced with the honest line.
-// The whole sentence is the note, or a piece of one: the splitters break
-// a multi-sentence note ("[Weather answered: "It's sunny. Tomorrow looks
-// clear."]") after the first period, so an opened-and-never-closed
-// bracket and a closed-and-never-opened one are its halves (a review).
-// Not a prefix with words after it: the stub model's own echo reply
-// opens with a bracketed tag and real words after it.
-const PLACEHOLDER_NOTE_RE = /^\s*\[[^\]]{3,}\]\s*$|^\s*\[[^\]]{3,}$|^[^[\]]{3,}\]\s*$/;
-function guardPlaceholderEcho(sentence: string): GuardReason | null {
-  return PLACEHOLDER_NOTE_RE.test(sentence) ? "placeholder_echo" : null;
-}
-
 // ==== Composition ====
 
 // Reasons that cut just the offending sentence, leaving an otherwise
 // honest reply's earlier sentences standing (bot-legacy's own
 // `_CUTTABLE`: the sentence was padding, not the answer). Everything
 // else replaces the whole reply - the sentence WAS the reply's thesis.
-const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_recall", "placeholder_echo", "false_familiarity"]);
+const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_recall", "false_familiarity"]);
 // Item 1b (#67): the honesty vocabulary ("nobody's told me", "I don't
 // know that one"), which the model must never read back as its own
 // words. conversationHistory.ts strips these lines from a guard-replaced
@@ -1764,7 +1601,7 @@ const HONESTY_VOCABULARY: ReadonlySet<string> = new Set([...NOT_TOLD, ...DONT_KN
  * carries the words Jesse ruled out ("told", "nobody"). */
 export function allReplacementLines(): string[] {
   const families = ACTION_FAMILIES.flatMap((f) => [f.none, f.failed, f.pending ?? ""]).filter(Boolean);
-  return [...new Set([...Object.values(REPLACEMENT_FOR).flat(), ...CANNOT_EXPERIENCE, ...NO_RECORD_OF_SAYING, ...ACKNOWLEDGE, ...Object.values(EMPTIED_LINES).flat(), NOTHING_RAN, WAITING, ...families])];
+  return [...new Set([...Object.values(REPLACEMENT_FOR).flat(), ...CANNOT_EXPERIENCE, ...NO_RECORD_OF_SAYING, ...Object.values(EMPTIED_LINES).flat(), NOTHING_RAN, WAITING, ...families])];
 }
 export function withoutHonestyLines(text: string): string {
   return splitIntoSentences(text)
@@ -1842,26 +1679,16 @@ export function bankLineNote(sentence: string): string | null {
 // LOOKUP-02: the deliverable denial is dropped wherever it sits (the
 // engine already ran the lookup or is about to); the honest line stands
 // in only when the denial was the whole reply.
-const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "assistant_register", "pronoun_mismatch", "false_capability", "banned_phrase", "self_assertion", "example_parrot"]);
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "pronoun_mismatch", "false_capability", "banned_phrase", "self_assertion", "example_parrot"]);
 
-/** REG-01: a statement (an inform, a commissive, a greeting, a closing
- * or a backchannel by the signal; a statement or first-person shape
- * without one) is not a request. */
+/** Whether the utterance has a statement-like act or shape. */
 export function isStatementTurn(ctx: Pick<GuardContext, "act" | "shape" | "utterance">): boolean {
   if (ctx.act) return ctx.act !== "question" && ctx.act !== "directive";
   const shape = shapeOf(ctx as GuardContext);
   return shape === "statement" || shape === "first_person";
 }
 
-/** REG-01, rule 1: on a statement turn with no outcome, an action claim
- * is padding the model added ("Okay, I've noted that"), skipped rather
- * than narrated, since the narrated line would name a package family
- * the person never mentioned. */
-function statementActionSkip(reason: GuardReason, ctx: GuardContext): boolean {
-  return reason === "unsupported_action" && isStatementTurn(ctx) && (ctx.outcomes ?? []).length === 0 && !REQUEST_RE.test(ctx.utterance);
-}
-
-/** The line that stands when REG-01's skips emptied a reply, by the
+/** The line that stands when skippable checks empty a reply, by the
  * turn's act (the engine retries once with its note before this). */
 export function emptiedLine(ctx: Pick<GuardContext, "act" | "shape" | "utterance" | "personId">, reason?: GuardReason | null): string {
   const shape = ctx.act ? null : shapeOf(ctx as GuardContext);
@@ -1870,13 +1697,8 @@ export function emptiedLine(ctx: Pick<GuardContext, "act" | "shape" | "utterance
   return pickVariant(ctx.personId, `emptied:${act}`, bank);
 }
 
-/** REG-01's own skips: the register, a statement's
- * action claim. When one of these emptied the reply, no honest line
- * about an action or an experience fits (nothing was asked), so the
- * act's own line stands and the engine retries once with its note;
- * `claimed_experience` keeps its own line and its own rule (item 1b). */
-export function isRegisterSkip(reason: GuardReason, ctx: GuardContext): boolean {
-  return reason === "assistant_register" || reason === "banned_phrase" || reason === "self_assertion" || reason === "example_parrot" || (reason === "claimed_experience" && !experienceTurn(ctx)) || statementActionSkip(reason, ctx);
+export function shouldRetryAfterSkip(reason: GuardReason, ctx: GuardContext): boolean {
+  return reason === "banned_phrase" || reason === "self_assertion" || reason === "example_parrot" || (reason === "claimed_experience" && !experienceTurn(ctx));
 }
 
 /** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
@@ -1887,10 +1709,9 @@ export function isCuttable(reason: GuardReason): boolean {
   return CUTTABLE.has(reason);
 }
 
-/** Exported for the streaming path for the same reason as isCuttable().
- * With the context, REG-01's statement rule applies too. */
+/** Exported for the streaming path for the same reason as isCuttable(). */
 export function isSkippable(reason: GuardReason, ctx?: GuardContext): boolean {
-  return SKIPPABLE.has(reason) || (ctx !== undefined && statementActionSkip(reason, ctx));
+  return SKIPPABLE.has(reason);
 }
 
 // Per-reason lines, not one generic fallback - bot-legacy's own
@@ -1906,15 +1727,9 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   unsupported_action: CANNOT_DO,
   like_i_said: DONT_KNOW,
   example_parrot: DONT_KNOW,
-  placeholder_echo: DONT_KNOW,
   claimed_experience: CANNOT_EXPERIENCE,
   claimed_statement: NO_RECORD_OF_SAYING,
   malformed: MALFORMED,
-  // REG-01: a reply that was only register has nothing left; the engine
-  // retries once with its note first, and the malformed line is what
-  // stands when that fails too (OUT-01's bound).
-  assistant_register: MALFORMED,
-  tag_question: MALFORMED,
   // ASK-01: the ask itself stands in (replacementFor() names the name);
   // a pronoun slip that emptied the reply is an output break.
   false_familiarity: DONT_KNOW,
@@ -1950,7 +1765,6 @@ export function replacementFor(reason: GuardReason, personId: string, flagged?: 
     const name = unknownNamedIn(flagged.sentence, flagged.ctx);
     if (name) return dontKnowYetLine(name);
   }
-  if (reason === "placeholder_echo" && flagged && shapeOf(flagged.ctx) !== "question") return honest(personId, reason, ACKNOWLEDGE);
   if (reason === "claimed_experience" && flagged && !experienceTurn(flagged.ctx)) return emptiedLine({ ...flagged.ctx, personId });
   return honest(personId, reason, REPLACEMENT_FOR[reason]);
 }
@@ -1980,9 +1794,7 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
   const s = sentence.trim();
   if (!s) return null;
   return (
-    guardPlaceholderEcho(s) ??
     (containsBannedPhrase(s, ctx.bannedPhrases ?? []) ? "banned_phrase" : null) ??
-    guardAssistantRegister(s, ctx, isFirstSentence) ??
     guardSelfAssertion(s, ctx) ??
     // The set of 2026-09-15 (pronoun-follow-up#1, household-location#2):
     // "Got it, added to the list." on a plain statement was the persona's
@@ -2030,21 +1842,13 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   const fullReplyCtx: GuardContext = { ...ctx, replyHasQuestion: (reply || "").includes("?") };
   const kept: string[] = [];
   let skipped: { reason: GuardReason; sentence: string } | null = null;
-  let tailCut: GuardReason | null = null;
   // EXP-01's set: a sentence that followed a skipped one on a
   // conjunction ("But we can watch it together") loses the lead.
   let justSkipped = false;
   for (let i = 0; i < sentences.length; i++) {
     const whole = justSkipped ? dropConjunctionLead(sentences[i]!) : sentences[i]!;
     justSkipped = false;
-    // REG-01 rule 2 / REG-02: a register tail or a tag question at the
-    // end of a declarative reply is cut and the head kept; recorded as
-    // a hit that replaced nothing.
-    const registerStripped = stripRegisterTail(whole, fullReplyCtx);
-    const sentence = stripTagQuestionTail(registerStripped, i > 0).trim();
-    if (sentence !== whole) {
-      tailCut ??= stripTagQuestionTail(registerStripped, i > 0) !== registerStripped ? "tag_question" : "assistant_register";
-    }
+    const sentence = whole.trim();
     const reason = sentence ? guardSentence(sentence, fullReplyCtx, i === 0) : null;
     if (reason === null) {
       if (sentence) kept.push(sentence);
@@ -2063,13 +1867,8 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   }
   if (skipped) {
     if (kept.length > 0) return { reply: kept.join(" "), reason: skipped.reason, replaced: false };
-    // REG-01: nothing was asked, so no honest line about an action
-    // fits; the act's own line stands (emptiedLine()) and the engine
-    // retries once with its note before accepting it. Item 1b's
-    // claimed_experience keeps its own line.
-    if (isRegisterSkip(skipped.reason, fullReplyCtx)) return { reply: emptiedLine(fullReplyCtx), reason: skipped.reason, replaced: true, emptied: true };
+    if (shouldRetryAfterSkip(skipped.reason, fullReplyCtx)) return { reply: emptiedLine(fullReplyCtx), reason: skipped.reason, replaced: true, emptied: true };
     return { reply: replacementFor(skipped.reason, ctx.personId, { sentence: skipped.sentence, ctx: fullReplyCtx }), reason: skipped.reason, replaced: true };
   }
-  if (tailCut) return { reply: kept.join(" "), reason: tailCut, replaced: false };
   return { reply, reason: null, replaced: false };
 }

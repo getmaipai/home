@@ -97,7 +97,7 @@ describe("OUT-01: the rule", () => {
   test("every guard replacement line and every malformed line passes the rule it enforces", async () => {
     const guards = await import("@/lib/guards");
     for (const line of MALFORMED) expect(isWellFormed(line)).toBe(true);
-    for (const reason of ["invention", "unrelated_recall", "near_echo", "medication_dose", "capability_claim", "like_i_said", "example_parrot", "placeholder_echo", "claimed_experience", "malformed"] as const) {
+    for (const reason of ["invention", "unrelated_recall", "near_echo", "medication_dose", "capability_claim", "like_i_said", "example_parrot", "claimed_experience", "malformed"] as const) {
       for (let i = 0; i < 6; i++) expect([reason, isWellFormed(guards.replacementFor(reason, `person-${i}`))]).toEqual([reason, true]);
     }
   });

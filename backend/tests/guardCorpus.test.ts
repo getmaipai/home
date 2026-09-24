@@ -25,8 +25,7 @@ interface CorpusRow {
   /** CHAT-04: the turn's tool outcomes, package id and status, for the
    * per-family action-claim match. */
   outcomes?: GuardContext["outcomes"];
-  /** REG-01: the turn's primary act (ACT-01's signal) for the statement
-   * rule. */
+  /** ACT-01: the turn's primary act. */
   act?: GuardContext["act"];
   previousReply?: string;
   /** ASK-01: the turn's unknown names, the subjects' pronouns and the
@@ -50,11 +49,14 @@ interface CorpusRow {
 }
 
 const corpus: CorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "guard-corpus.json"), "utf-8"));
-// The pinned shared corpus still carries expectations for guard families
-// retired by D4; keep every remaining shared row active without restoring
-// assertions for behavior the home engine no longer implements.
-const RETIRED_REPEAT_EXPECTATIONS: ReadonlySet<string> = new Set(["repeat_question", "repeat_sentence", "repeat_reply"]);
-const isRetiredRepeat = (row: CorpusRow) => RETIRED_REPEAT_EXPECTATIONS.has(row.expect ?? "");
+// The pinned shared corpus still carries expectations for retired guard
+// families. Keep unrelated rows active without restoring assertions for
+// behavior the home engine no longer implements.
+const RETIRED_EXPECTATIONS: ReadonlySet<string> = new Set([
+  "repeat_question", "repeat_sentence", "repeat_reply",
+  "placeholder_echo", "assistant_register", "tag_question",
+]);
+const isRetiredGuard = (row: CorpusRow) => RETIRED_EXPECTATIONS.has(row.expect ?? "");
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
   return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };
@@ -67,7 +69,7 @@ async function* sentenceStream(reply: string): AsyncGenerator<string, undefined,
 
 describe("guard corpus (guardReply, the non-streaming path)", () => {
   for (const row of corpus) {
-    if (isRetiredRepeat(row)) continue;
+    if (isRetiredGuard(row)) continue;
     test(row.id, () => {
       const result = guardReply(row.reply, { ...ctxFor(row), personId: "person-corpus" });
       expect(result.reason).toBe(row.expect);
@@ -87,7 +89,7 @@ describe("guard corpus (guardReply, the non-streaming path)", () => {
 // replaced by it.
 describe("guard corpus (gateGuards, the streaming path)", () => {
   for (const row of corpus) {
-    if (row.streamingSkip || isRetiredRepeat(row)) continue;
+    if (row.streamingSkip || isRetiredGuard(row)) continue;
     test(row.id, async () => {
       const gated = gateGuards(sentenceStream(row.reply), ctxFor(row), "person-corpus");
       const delivered: string[] = [];

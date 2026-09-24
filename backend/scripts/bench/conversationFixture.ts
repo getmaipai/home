@@ -1336,10 +1336,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
   {
     id: "sign-offs",
     category: "etiquette",
-    note: "REG-02 (dev.md section 16 part 9): wishes and tag questions are register; a wish sentence is skipped, a wish tail is cut, a tag question tail is cut with its own reason, and a wish naming its subject stands. The 'stop saying good luck' turn belongs to CONS-01, not here.",
+    note: "D6 retires the register and tag-question guards; this conversation row keeps its separate wording expectations without expecting guard rewrites. The 'stop saying good luck' turn belongs to CONS-01, not here.",
     turns: [
       { say: "fingers crossed the new card sorts the stutter", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|fingers crossed|hope it works out|you'?ll love", guard: null, humanVerdict: true } },
-      { say: "should be here Thursday", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|fingers crossed|hope it works out|you'?ll love", guard: "assistant_register", humanVerdict: true } },
+      { say: "should be here Thursday", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|fingers crossed|hope it works out|you'?ll love", guard: null, humanVerdict: true } },
       { say: "stop saying good luck", expect: { signal: { primary_act: "directive" }, mustNotContain: "good luck", minWords: 4, humanVerdict: true } },
       { say: "worth selling the old one if it does", expect: { signal: { primary_act: "inform" }, mustNotContain: "good luck|\\b(got it|okay|sound good|make sense|right)\\?\\s*$", toolRan: null, humanVerdict: true } },
     ],
