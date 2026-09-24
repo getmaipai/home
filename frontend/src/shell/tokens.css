@@ -19,6 +19,17 @@
 @import "@maipai/ui/src/dashboard/css/globals.css";
 @import "@maipai/ui/src/tokens.css";
 
+/* TOKENS-PRIMARY-01 (docs/BACKLOG.md): globals.css above declares its
+ * own competing `:root --primary` (shadcn's own near-black default) at
+ * the identical selector and specificity as the kit's own tokens.css
+ * and Home's own override below - a real risk on a tie, since a
+ * browser breaks it by source order alone. `bun run
+ * verify:tokens-cascade` (scripts/verifyTokensCascade.ts) renders this
+ * page for real, both themes, and asserts the computed `--primary`
+ * against Home's own declared value, not the kit's or the template's -
+ * run it after touching the import order above or Home's own
+ * `--primary`/`--sidebar-primary*` overrides below. */
+
 /* Tailwind v4's automatic content detection never scans node_modules
  * (its own documented default) - `@maipai/ui`'s own source (subpath-
  * imported directly, no dist build, so ITS OWN classNames need Home's

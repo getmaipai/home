@@ -24357,3 +24357,84 @@ whoever runs the acceptance measurement next - not part of this
 landing, which built and proved the harness, not the measurement
 itself. Review: low (a bench harness and one new file mirroring an
 existing one closely, no route, guard, or wire-shape change).
+
+## TOKENS-PRIMARY-01: tokens.css wins the cascade over the template's own preset, everywhere (2026-09-23, Session B)
+
+Traced the real import chain the row's own instruction asked for
+first: `frontend/src/main.tsx` imports `@/shell/tokens.css`, which
+`@import`s the kit's `dashboard/css/globals.css` (the vendored
+template, its own competing `:root --primary`) then the kit's own
+`tokens.css` (`#21a6ff`), then declares Home's own `:root`/`.dark`
+override for `--primary` (and `--primary-foreground`, `--ring`, the
+three `--sidebar-primary*` tokens) last, in the same file
+(`hsl(189 94% 26%)` light, `hsl(189 84% 55%)` dark - Home's brand
+cyan, `b2ca161e1`, 2026-09-20). All three are plain, unlayered `:root`
+rules at identical specificity; a browser breaks that tie by source
+order alone, and Home's own block is textually last.
+
+Built `scripts/verifyTokensCascade.ts` to check that for real rather
+than reasoning about source order from the file alone (the row's own
+"never a static grep" instruction): it runs `vite build`, serves the
+real `dist/` output, opens it in headless Chromium, and for both
+`.light` and `.dark` reads `getComputedStyle(document.documentElement)
+.getPropertyValue("--primary")`. Chromium's own computed-value
+serialization normalizes a stylesheet-declared `hsl()` custom property
+to hex (confirmed live: an inline `style.setProperty` with the
+identical literal comes back unnormalized, a real difference caught
+only by trying it, not assumed) - so the script's own `hslToHex()`
+converts Home's declared `hsl(189 94% 26%)`/`hsl(189 84% 55%)` with
+real HSL-to-RGB math (`verifyTokensCascade.test.ts` proves the
+function against known conversions: black, white, a pure hue, and
+Home's own two values) rather than a hand-typed hex constant that
+could silently drift from what a real render actually produces.
+
+**Result: the cascade already resolves correctly against `main` as it
+stands today.** `--primary` computed `#046e81` (light) / `#2cd0ed`
+(dark) in a real headless Chromium render of the real production
+build, both matching Home's own declared value exactly, never the
+kit's `#21a6ff` or the template's `oklch(0.205 0 0)`. Home's own
+override has carried this value since three days before this row was
+filed, so the cascade the row describes as broken was not broken at
+landing time in the build Home actually ships (`bun start`, per
+`AGENTS.md`'s own "a done report's 'what you see on reload' line is
+proven on 8787 itself" convention - `vite build`'s output is exactly
+that artifact). `vite dev` was tried too, since VOICE-LIVE-05's own
+iteration likely ran against it, but it hit an unrelated, pre-existing
+module-resolution crash in this fresh worktree's dependency-
+optimization cache (`classnames` CJS/ESM interop) before any CSS
+question could even be asked there - not chased further, since `vite
+dev`'s own CSS injection order is moot for what ships regardless.
+
+No code fix was made or needed: `globals.css` stays untouched (per the
+row's own rule), no `@layer` was introduced (the existing import order
+already carries the invariant, and wrapping `@import "tailwindcss"`
+itself in a named layer - the only way to make `tokens.css` beat
+`globals.css` deterministically regardless of source order - is real
+surgery on every page's cascade that nothing here could justify
+without a reproducible bug driving it). The general fix this row asked
+for landed as the regression guard instead: `bun run
+verify:tokens-cascade` (root `package.json`), captures saved to
+`data-scratch/tokens-cascade/` (gitignored), a short comment in
+`frontend/src/shell/tokens.css` after the two kit `@import`s pointing
+future editors at the script. The item's own "before/after capture"
+could not be produced honestly - there is no reproducible "before" -
+so both captures show today's correct state, opened and judged here:
+a real "Reload" button (the app's own error boundary, the only
+primary-colored element a backend-less build renders) in the correct
+cyan, both themes, no near-black, no electric blue.
+
+**Flag for the coordinator:** this row's own filed premise ("on a real
+light-theme render the template's own value can win") does not
+reproduce against `main` today. Worth a look whenever VOICE-LIVE-05's
+own history is next touched - the most likely explanation is that the
+live finding was made against a dev-mode render (a different CSS
+injection mechanism than what ships) rather than against
+`b2ca161e1`'s own override, which already existed at the time.
+
+Verification: `bash scripts/check.sh` (same `full` run as
+WRITTEN-PARITY-01's commit, per the coordinator's own "gate per push"
+rule - one gate covers this whole block) - `scripts: bun test` (3 new
+`hslToHex()` cases, 3 pass), the rest already green above.
+`verify:tokens-cascade` itself run and read by hand (both captures
+opened, both correct). Review: low (a new standalone verification
+script plus a comment, no application code changed).

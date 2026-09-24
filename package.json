@@ -10,6 +10,7 @@
     "restart": "bun run stop && bun run start",
     "screenshots": "bun run scripts/screenshot.ts",
     "a11y": "bun run scripts/screenshot.ts --a11y-only",
+    "verify:tokens-cascade": "bun run scripts/verifyTokensCascade.ts",
     "refresh-bundled-packages": "bun run scripts/refresh-bundled-packages.ts"
   },
   "devDependencies": {
