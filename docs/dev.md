@@ -26010,18 +26010,26 @@ ceiling**, no override needed, same resolution as both prior times
 this exact chunk crossed it (2026-09-06, 2026-09-21).
 
 **Verification**: `bash scripts/check.sh` (scope `full`, since `bun.
-lock`/`scripts/check.sh` changed) green: backend 4175/4175, frontend
+lock`/`scripts/check.sh` changed) green: backend 4177/4177, frontend
 726/726, build (at the restored 2 MiB default), a11y, docs and
-standards all clean. Live headless verification (Playwright, a short-
-lived session minted directly against the real data directory the
-same way real login creates one, deleted immediately after use - never
-a browser window, never the fake seeded instance `scripts/screenshot.
-ts` spawns, since this needs the real household's own 8787): a
-TypeScript code block, a mermaid diagram and an inline math expression
-each sent as a live turn and each rendered correctly, screenshots
-opened and judged. 390px light/dark pair retaken the same way,
-replacing the earlier interactive-browser captures (Chrome enforces a
-500px minimum window on this machine, which the coordinator's own
-verification rule rules out anyway - headless Playwright has no such
-floor). Low-effort review clean on both sides. Restarted 8787 onto
-this landing.
+standards all clean.
+
+Live headless verification (Playwright, never a browser window - Chrome
+enforces a 500px minimum window on this machine, which the coordinator's
+own verification rule rules out on its own terms anyway): a short-lived
+session minted directly against the real data directory the same
+insert real login uses, deleted immediately after use - never the fake
+seeded instance `scripts/screenshot.ts` spawns, since this needs the
+real household's own 8787. One real conversation, three live turns
+(a TypeScript code block, a mermaid flowchart, an inline-math quadratic
+formula), each rendered correctly; the theme toggle (`svg.lucide-moon`/
+`svg.lucide-sun` in the header, `ui.appearance`'s own person-scope
+setting, `useNextAppearance.ts`) clicked once to persist dark, then
+clicked back to light at the end so the household's own default is
+unchanged. Four screenshots (1512px and the genuine 390px Playwright
+alone can reach, light and dark), each opened and judged: the code
+block colored, the mermaid diagram rendered as boxes and an arrow, the
+quadratic formula properly typeset (fraction, radical, superscripts) -
+in both themes, both widths. Replaces CHAT-RICH-01's own interactive-
+browser 500px substitute in the record. Low-effort review clean on
+both sides. Restarted 8787 onto this landing.
