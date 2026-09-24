@@ -25303,6 +25303,14 @@ further.
 
 ## MEMORY-RELEVANCE-01: why a cosine floor cannot close LIVE-0923-01 (6) (2026-09-24)
 
+**Correction, same day, before this item's own commit landed:** the
+first cut of section (a) below misdiagnosed the leak's own mechanism.
+It is left in place with its raw numbers intact (they are real
+measurements and stay useful for (b)/(c)'s own point), but its
+conclusion was wrong - read "What actually leaked" below section (a)
+for the corrected account before relying on any sentence in (a) that
+mentions `forceInclude`.
+
 The coordinator's own ruling on MEMORY-FLOOR-01 (`a9416ffa`): its
 `MEMORY_CONTEXT_MIN_SCORE` floor (`turnMachine/nodes/context.ts:25`,
 0.1 on `recall()`'s composite `score`) does not actually close LIVE-
@@ -25350,19 +25358,47 @@ measurement time:
 | other candidate 4 | episodic | no | 0.4 | 0.426 | 0.62 | no | 0.447 |
 
 None of this person's 4 active records clear the 0.62 tier floor on
-this utterance. The three non-pinned candidates are therefore excluded
-from `recall()`'s own results outright (`memory.ts:717`, `forceInclude`
-false for all three - none is pinned, none carries a `subject_id`
-matching an entity the utterance names) - they could not have reached
-`context.ts` before or after MEMORY-FLOOR-01, on either path, at any
-floor value. The one pinned record is the only one of the four that
-`recall()` can ever return for this utterance, entirely independent of
-its cosine (0.438, well under the floor) or its composite (0.587, well
-over MEMORY_CONTEXT_MIN_SCORE) - it surfaces because `forceInclude`
-short-circuits both checks, not because either number said it was
-relevant. This is the leaked record: the only one of the four capable
-of reaching the prompt at all is the one no cosine-based floor, at any
-threshold, could have excluded.
+this utterance. The three non-pinned candidates are excluded from
+`recall()`'s own results outright (`memory.ts:717`, `forceInclude`
+false for all three). The "leaked (rank 1)" row above is this person's
+consolidated profile record (`memoryJudge.ts:1661-1671`, source
+`memory.consolidate:profile` - confirmed by id and source only, no
+text, per the coordinator's own instruction). Its cosine and composite
+numbers are real measurements, but the sentence this session first
+wrote about them was not: **`recall()` never returns this record at
+all, for any utterance, regardless of cosine, composite, or
+`forceInclude`** - `memory.ts:628` filters every `PROFILE_SOURCE` row
+out of its candidate list unconditionally, before scoring, before
+`forceInclude` is ever computed (landed `b25a49f1`, 2026-09-05, "the
+read-side twin of the dedupe-candidate bug `similarByVector()` below
+has the identical fix for" - already a passing regression test,
+`memory.test.ts:1605`). The scratch script this session wrote for
+section (a) queried `memory_records` directly and reimplemented
+`forceInclude` by hand (`row.pinned || isEntityMatch`) without first
+applying that same source filter - it modeled a candidate list
+`recall()` itself never produces. (b) and (c) below do not share this
+error: both call the real, unmodified `recall()`.
+
+**What actually leaked.** The leaked turn ran on `010e71fb`
+(2026-09-24T03:17Z), long after `b25a49f1` (2026-09-05) - not a stale-
+build question, this session's own first guess. The profile record
+reaches every turn's prompt through a completely different, always-on
+channel: `context.ts:217-219` calls `getProfileParagraph()`
+(`memory.ts:1462-1474`) directly, by `(person, source)`, outside
+`recall()` entirely - "unconditional context about who's speaking, not
+something that competes with other facts for a cosine-scored slot"
+(`memory.ts:1462-1466`, the same comment that documents `recall()`'s
+own exclusion at line 628). That channel carries no relevance floor of
+any kind, by design, on either path (`turnEngine.ts:1130,3530` calls
+the identical `getProfileParagraph()`) - a cosine or composite floor on
+`recall()`'s memory items was never going to touch it, not because
+`forceInclude` bypasses the floor (it does, for an ordinary pinned or
+entity-matched memory - see (b) and (c)), but because the profile line
+was never a `recall()` candidate to begin with. The open question
+MEMORY-RELEVANCE-01 actually narrows to is behavioral, not a floor:
+does the model volunteer a profile detail nobody asked about on a
+short, off-topic remark. The live replay row below this section
+measures exactly that.
 
 **(b) The 11 memory-eval probes** (`scripts/bench/memory-eval.ts`,
 same resident engine), wanted matches only (the 3 `absent` controls
@@ -25410,8 +25446,10 @@ The same one record tops every one of the eight probes tried - cosine
 never clears 0.62 (so a cosine floor at or above the measured null
 range would exclude it every time), yet composite is a stable ~0.59
 regardless of what was said, comfortably over `MEMORY_CONTEXT_MIN_
-SCORE` (0.1), because `forceInclude` (pinned) bypasses both checks
-identically to case (a). A pinned record's composite score tracks its
+SCORE` (0.1), because `forceInclude` (pinned) bypasses both checks -
+the same real mechanism (b)'s pinned-identity/entity rows demonstrate,
+for an ordinary (non-profile) memory. A pinned record's composite score
+tracks its
 own importance and recency almost entirely, not the query - which is
 exactly what a "the household said always surface this" design should
 do, and exactly why no per-turn relevance floor, cosine or composite,
@@ -25432,6 +25470,33 @@ non-pinned candidates in (a). This historical regression's own
 mechanism is already closed at the `recall()` floor level, independent
 of MEMORY-FLOOR-01/RELEVANCE-01.
 
+**The live replay row** (`control-profile-short-topic-free-remark`,
+`backend/scripts/bench/datasets/owner-replay.json`; `conversationFixture.
+ts`'s `BenchSeedRecord.asProfile` and `conversationRunner.ts:610-621`'s
+matching seed path are new in this same commit, so a profile-sourced
+record can be seeded by a replay row at all): a synthetic household
+whose only memory is a profile fact, probed with a bare "hi", 5 reps,
+new path (`turn.pipeline.next`), the resident 8B
+(`qwen3-8b-instruct-q4-k-m`), fake SearXNG (the real one is rate-
+limited tonight; this row never searches either way), `waitForHubQuiet`
+observed throughout. **5/5 reps did not volunteer the profile detail.**
+Against that, live evidence from the household's own real traffic
+tonight (`conv-19awhetzdf`, turns at 2026-09-24T08:02:47Z and
+08:03:55Z): a bare "wrong" and "you're wrong again" - real household
+turns, not this bench - each did volunteer the profile's own event
+fact. Read together: the model does not volunteer a profile detail on
+an ordinary greeting, but does on a short correction/pushback remark
+that shares no topic with the fact either - a narrower trigger than
+"any short, topic-free remark," and still a real one. Not a floor
+question (see "What actually leaked" above): the profile line has no
+relevance gate by design, so this is squarely a model-behavior finding.
+Routed to `PERSONA-STEER-01` per the coordinator's own ruling, no
+prompt-prose fix attempted here. Separately, also the coordinator's own
+note, recorded here rather than acted on: what `memoryJudge.ts`'s
+consolidation writes into the profile - an event-like fact sitting
+beside identity facts - is itself a candidate design question, not
+scoped to this item.
+
 **(d) Old path vs. new path, before each one's own `bumpUsage` call**:
 old path, `turnEngine.ts:3462` (`recall()` call, no floor beyond
 `recall()`'s own tier floor) then `turnEngine.ts:3533`
@@ -25448,5 +25513,8 @@ exempts `forceInclude`. **The old path has no equivalent of this floor
 at all, on either side of its own `bumpUsage` call** (confirms LIVE-
 0923-01 (6)'s own claim, checked again here at the exact lines); and
 where the new path's floor does exist, it structurally cannot bind on
-a `forceInclude` record on either path - exactly the mechanism (a),
-(b), and (c) above all measure.
+a `forceInclude` record on either path - the real, demonstrated
+mechanism (b) and (c) above measure for an ordinary pinned or entity-
+matched memory. Neither path's floor was ever going to touch (a)'s own
+leak either, but for the separate reason above: the profile line is
+not a `recall()` candidate on either path, floor or no floor.

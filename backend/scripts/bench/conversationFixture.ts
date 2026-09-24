@@ -386,6 +386,12 @@ export interface BenchSeedRecord {
   sensitive?: boolean;
   status?: "active" | "superseded" | "archived" | "retracted";
   subject?: string;
+  /** MEMORY-RELEVANCE-01: seed this as the consolidated profile record
+   * (memory.ts's own PROFILE_SOURCE) instead of an ordinary bench
+   * memory - the one way a replay row can test what the profile line
+   * itself (getProfileParagraph(), injected every turn) puts in front
+   * of the model, as distinct from an ordinary recalled memory. */
+  asProfile?: boolean;
 }
 
 export const CREDENTIAL_LINE = "Keep passwords and keys in Credentials, not in chat.";

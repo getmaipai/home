@@ -25,7 +25,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety } from "@/lib/safety";
 import { newConversationTurnId } from "@/lib/id";
 import { activeTurnCount } from "@/lib/turnActivity";
-import { remember } from "@/lib/memory";
+import { remember, PROFILE_SOURCE } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
@@ -612,9 +612,11 @@ function seedRecords(conv: BenchConversation, owner: PersonRow): void {
       category: record.category,
       tier: "durable",
       scope: record.scope,
+      person: record.scope === "person" ? owner.id : undefined,
       subject_id: subject,
-      source: `bench:${conv.id}`,
+      source: record.asProfile ? PROFILE_SOURCE : `bench:${conv.id}`,
       importance: 0.9,
+      pinned: record.asProfile ?? false,
       child_disclosure: record.disclosure ?? undefined,
       sensitive: record.sensitive ?? false,
     });

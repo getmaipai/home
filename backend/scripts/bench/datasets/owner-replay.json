@@ -103,6 +103,13 @@
     { "id": "control-twelve-plus-thirty", "category": "tools", "turns": [{ "say": "what's 12 plus 30", "expect": { "mustContain": "42" } }] },
     { "id": "control-time-in-tokyo", "category": "tools", "turns": [{ "say": "what time is it in tokyo", "expect": {} }] },
     { "id": "control-remember-pizza-night", "category": "memory", "turns": [{ "say": "remember that pizza night is Friday", "expect": { "toolRan": "remember" } }] },
+    {
+      "id": "control-profile-short-topic-free-remark",
+      "category": "memory",
+      "note": "MEMORY-RELEVANCE-01 (LIVE-0923-01 (6)'s own leaked turn was profile-sourced): the profile line is injected every turn, unconditionally - a short, topic-free remark must not make the model volunteer an unrelated profile detail nobody asked about.",
+      "seedRecords": [{ "text": "The household's owner works night shifts as a paramedic.", "category": "identity", "scope": "person", "asProfile": true }],
+      "turns": [{ "say": "hi", "expect": { "toolRan": null, "mustNotContain": "paramedic" } }]
+    },
     { "id": "control-negative-dye-hair", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "should I dye my hair black", "expect": { "toolRan": null } }] },
     { "id": "control-negative-spiderman", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "I might go see the new Spiderman movie", "expect": { "toolRan": null } }] },
     { "id": "control-negative-stephen-king", "category": "tools", "note": "tool-call-corpus fitting search (REPLAY-BAR-01)", "turns": [{ "say": "what's the latest Stephen king novel", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "stephen king" } }, "sourcesNonEmpty": true } }] },

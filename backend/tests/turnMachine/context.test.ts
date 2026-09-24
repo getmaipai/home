@@ -12,7 +12,7 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { resetDb } from "../reset-db";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
-import { remember, embedMemoryRecordSafely, recall } from "@/lib/memory";
+import { remember, embedMemoryRecordSafely, recall, PROFILE_SOURCE } from "@/lib/memory";
 import { contextNode, MEMORY_CONTEXT_MIN_SCORE } from "@/lib/turnMachine/nodes/context";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
@@ -65,6 +65,29 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
   // personalize, the same tier floor and frame as a question - nothing
   // here branches on primary_act, only the query vector's own cosine
   // against each candidate's stored vector.
+  // MEMORY-RELEVANCE-01 (getmaipai/home, LIVE-0923-01 (6)'s own leaked
+  // turn): the profile's own consolidated record is durable, pinned,
+  // and high-importance - forceInclude (memory.ts:706) would keep it
+  // in recall()'s results regardless of cosine, exactly the shape that
+  // leaked into a real household turn. `recall()` already excludes
+  // `PROFILE_SOURCE` unconditionally, before scoring, before
+  // `forceInclude` ever applies (memory.ts:628, landed 2026-09-05,
+  // `b25a49f1`) - shared by both this path and turnEngine.ts's old path
+  // since both call this same exported `recall()`. This test exercises
+  // that exclusion at contextNode's own layer (the profile record still
+  // reaches the prompt exactly once, via `getProfileParagraph()`'s
+  // separate "profile" item, never a second time as a "memory" item).
+  test("a person whose only memory is the profile yields no memory item and exactly one profile item", async () => {
+    const text = "the household's own profile paragraph text";
+    const seeded = remember(people.owner, { text, category: "identity", tier: "durable", scope: "person", person: people.owner.id, source: PROFILE_SOURCE, importance: 0.9, pinned: true });
+    if (!seeded.ok) throw new Error("setup failed");
+    await embedMemoryRecordSafely(seeded.value.id, text);
+
+    const { output } = await contextNode(stateFor(people.owner), { utterance: "how's it going" }, SIGNAL);
+    expect(output.items.filter((item) => item.source === "memory").length).toBe(0);
+    expect(output.items.filter((item) => item.source === "profile").length).toBe(1);
+  });
+
   test("caps at MAX_MEMORY_SNIPPETS (5) even when more than five records clear the floor", async () => {
     for (let i = 0; i < 7; i++) {
       const seeded = remember(people.owner, { text: `the household's spare key is hidden in spot number ${i}`, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5 });
