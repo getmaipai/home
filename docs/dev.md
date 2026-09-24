@@ -24616,15 +24616,14 @@ Regression test: `turnNext.test.ts`, a scripted websearch call carrying
 `category: "images"` on a plain text question, asserting the recorded
 `tool_call` event's own args never carry it.
 
-**Read_page, the same class of bug, not fixed here:** every one of the
-five forced calls also carried `read_page: true`, another argument the
-old path computes deterministically from the utterance
-(`turnEngine.ts:3966`, `pageReadRequested()` - "did the person actually
-ask to read/open the page") and the new path just passes through from
-the model's own choice, unfiltered, the identical pattern as (1). Named
-here since it directly affects (2)'s own numbers below, not fixed in
-this pass - the coordinator's own call whether it's folded into (1)'s
-fix shape or its own item.
+**Read_page, the same class of bug as (1), fixed separately as
+READ-PAGE-01 (below).** Every one of the five forced calls also
+carried `read_page: true`, another argument the old path computes
+deterministically from the utterance (`turnEngine.ts:3966`,
+`pageReadRequested()` - "did the person actually ask to read/open the
+page") and the new path just passed through from the model's own
+choice, unfiltered, the identical pattern as (1). Named here since it
+directly affects (2)'s own numbers below.
 
 ### (2) where the time goes on a forced-search turn
 
@@ -24753,3 +24752,54 @@ full suite). Review: low (a one-line scope guard on one tool, the
 model's own args untouched for every other tool - `tool.ts`'s own
 change is the smallest correct fix, not the design for (2)-(6) above,
 which the coordinator rules on next).
+
+## READ-PAGE-01: measured, shipped (2026-09-24)
+
+`scripts/bench/read-page-01.ts --live`, resident engine, seven
+roster-safe rows matching the real conversation's own seven
+forced-search shapes, each run twice (`read_page` off then on):
+
+| row | prompt_n off | prompt_n on | delta | total_ms off | total_ms on | delta |
+|---|---|---|---|---|---|---|
+| announcement | 498 | 508 | 10 | 6662 | 3426 | -3235 |
+| conceptual (benchmarking) | 530 | 530 | 0 | 8471 | 7885 | -586 |
+| poster | 1101 | 1101 | 0 | 5301 | 6341 | 1040 |
+| trailer | 1070 | 1076 | 6 | 4206 | 4266 | 59 |
+| release-date | 506 | 522 | 16 | 3482 | 3291 | -191 |
+| urgent-followup | n/a (no phrasing round) | n/a | - | 775 | 705 | -70 |
+| current-events | 517 | 517 | 0 | 1627 | 2272 | 646 |
+
+Reply parity against the bare model (the same judge WRITTEN-PARITY-01
+built): **6/7 rows carry every point either way, on and off** - the one
+miss (conceptual/benchmarking) fails the identical way both times (a
+pre-existing structure gap this item neither causes nor fixes, already
+named in WRITTEN-PARITY-01's own accepted-exception history). Verdict:
+parity holds, shipped - `read_page` is stripped by default now, the
+same unconditional shape as `category`.
+
+**The token-cost half of this table is honestly inconclusive, said
+plainly rather than overstated:** `startFakeSearxng()`'s own page-
+reader fixture returns the same short, fixed canned text on every
+call regardless of the query, so the measured `prompt_n` delta here
+(0-16 tokens) is the cost of that ONE fixed fixture's own page, not of
+a real fetched page, which varies wildly in length. The live
+conversation's own numbers (LIVE-0923-01's section above) are the real
+reference for what `read_page` actually costs in production: real
+forced-search `prompt_n` there ran 1598-3185 with `read_page` on
+throughout (never measured off, since it fixed to true every time) -
+this bench proves reply quality survives turning it off, not the exact
+production token savings, which needs a live conversation with the fix
+already shipped to measure for real.
+
+`total_ms`'s own delta is noisy in both directions (a live engine
+under whatever load happened to be on the box each run, this Mac's own
+load averaging 3-4 through this session) - not read as a real signal
+either way, only `prompt_n` and parity are.
+
+Verification: `bash scripts/check.sh` (scope `backend`) - scripts
+42/42 (`read-page-01.ts` typechecks and runs scripted clean), backend
+green (three new turnNext.test.ts cases: both args stripped by
+default, the bench's own `MAIPAI_BENCH_KEEP_READ_PAGE=1` toggle keeps
+`read_page` through with `category` still stripped). Review: low (the
+same one-line-per-arg scope guard as (1), plus a new bench script
+mirroring `written-set.ts`'s own shape closely).

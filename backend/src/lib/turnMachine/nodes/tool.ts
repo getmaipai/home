@@ -70,7 +70,26 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // here) - stripped unconditionally for now, the same "never trust
     // the model's own category" floor the old path already holds,
     // until a real picture-intent signal exists to set it deliberately.
-    const args = tool === "websearch" ? Object.fromEntries(Object.entries(proposal.request.args).filter(([k]) => k !== "category")) : proposal.request.args;
+    //
+    // READ-PAGE-01 (home/docs/dev.md, home/docs/BACKLOG.md): the same
+    // floor extends to `read_page` - the old path only ever sets it
+    // from `pageReadRequested(text)` (turnEngine.ts:3966, "did the
+    // person actually ask to read/open the page"), never from the
+    // model's own choice; this node passed it through unfiltered too,
+    // and it was `true` on every forced call in the same live
+    // conversation, the extra page-fetch-and-parse cost landing whether
+    // or not the question needed it. Not porting `pageReadRequested`
+    // itself (a text-pattern rule, the exact shape the org's own "no
+    // hacky rules" standard retires on sight) - stripped the same
+    // unconditional way as `category`, measured first
+    // (`scripts/bench/read-page-01.ts`) rather than assumed: read_page
+    // off must hold reply parity against the bare model on the written
+    // set before this becomes the shipped default. `MAIPAI_BENCH_
+    // KEEP_READ_PAGE=1` is that bench's own on/off toggle, the same
+    // shape `llm.ts`'s `MAIPAI_BENCH_CACHE_PROMPT_FALSE` already uses -
+    // never read outside a bench, never a real household setting.
+    const stripKeys = new Set(["category", ...(process.env.MAIPAI_BENCH_KEEP_READ_PAGE === "1" ? [] : ["read_page"])]);
+    const args = tool === "websearch" ? Object.fromEntries(Object.entries(proposal.request.args).filter(([k]) => !stripKeys.has(k))) : proposal.request.args;
     // The proposal is accepted the moment this node starts it - before
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.

@@ -163,8 +163,10 @@ describe("turnNext.ts: the interim rule", () => {
   // design (never checked against the utterance), so nothing else
   // caught it. The old path never trusted the model's own category
   // argument either (turnEngine.ts's resolveToolCalls() call); this
-  // proves the tool node now holds the same floor.
-  test("the model's own category argument on a websearch call is stripped before the package runs", async () => {
+  // proves the tool node now holds the same floor. READ-PAGE-01: the
+  // same conversation also had read_page:true on every forced call -
+  // stripped the identical way.
+  test("the model's own category and read_page arguments on a websearch call are stripped before the package runs", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     try {
@@ -172,7 +174,7 @@ describe("turnNext.ts: the interim rule", () => {
         {
           calls: (request) => {
             if (request.messages.some((m) => m.role === "tool")) return undefined;
-            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "berlin wall anniversary", category: "images" }) }];
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "berlin wall anniversary", category: "images", read_page: true }) }];
           },
           reply: (request) => (request.messages.some((m) => m.role === "tool") ? "Here's what I found." : "searching"),
         },
@@ -185,7 +187,38 @@ describe("turnNext.ts: the interim rule", () => {
       if (call.t !== "tool_call") throw new Error(`expected tool_call, got ${call.t}`);
       expect(call.args).toEqual({ expression: "berlin wall anniversary" });
       expect(call.args).not.toHaveProperty("category");
+      expect(call.args).not.toHaveProperty("read_page");
     } finally {
+      searxng.stop();
+    }
+  });
+
+  // READ-PAGE-01's own bench toggle: category stays stripped always
+  // (LIVE-0923-01 never gated it), only read_page's own removal is
+  // switchable, and only by this one env var.
+  test("MAIPAI_BENCH_KEEP_READ_PAGE=1 keeps read_page through (category still stripped) - the read-page-01 bench's own on/off toggle", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    process.env.MAIPAI_BENCH_KEEP_READ_PAGE = "1";
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "berlin wall anniversary", category: "images", read_page: true }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "Here's what I found." : "searching"),
+        },
+        () => runTurnNext(people.owner, "chat", "when did the berlin wall come down"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      const call = result.toolEvents![0]!;
+      if (call.t !== "tool_call") throw new Error(`expected tool_call, got ${call.t}`);
+      expect(call.args).toEqual({ expression: "berlin wall anniversary", read_page: true });
+      expect(call.args).not.toHaveProperty("category");
+    } finally {
+      delete process.env.MAIPAI_BENCH_KEEP_READ_PAGE;
       searxng.stop();
     }
   });
