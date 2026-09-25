@@ -1086,11 +1086,6 @@ export interface PendingAsk {
   /** CHAT-15: set once a confirmation has asked "yes or no?" after an
    * answer that was neither; a second unclear answer clears it. */
   clarified?: boolean;
-  /** Item 4a: the argument the engine withheld and is asking for; the
-   * answer binds to it by name, whatever the manifest's required list
-   * says (a review: binding through the one-required-string rule
-   * discarded the answer for an optional argument). */
-  argName?: string;
 }
 
 export function getPendingAsk(conversationId: string): PendingAsk | null {

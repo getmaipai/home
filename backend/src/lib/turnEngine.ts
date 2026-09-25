@@ -35,7 +35,6 @@ import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import { buildTurnStats } from "@/lib/turnStats";
 import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, shouldRetryAfterSkip, isStatementTurn, isBareSocialTurn, dropConjunctionLead, emptiedLine, splitIntoSentences, bannedPhraseRetryNote, objectionRetryNote, EXAMPLE_PARROT_RETRY_NOTE, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
-import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
 import { asBackchannelOnLiveSubject, classifyTurnSignal, fallbackSignal, freezeDirective, hasEligibleClause, shapeOf, type ProtocolAnswer } from "@/lib/turnSignal";
 /** System note used when retryable guards skip every sentence. */
@@ -1837,7 +1836,7 @@ type PreparedTurn =
 // CHAT-15: consent is the whole message, never a prefix; the
 // vocabularies live in consentVocab.ts (OUT-01 shares them with the
 // reply boundary's short-answer list).
-// Item 4a: the cancel of an ask is the whole utterance, never a prefix.
+// An ask cancellation is the whole utterance, never a prefix.
 /** A hesitation fragment the sentence splitter ends on its own dots
  * ("Hmm...", "Well.", "Okay, so..."): not the reply's first sentence. */
 const HESITATION_FRAGMENT_RE = /^\W*(?:h+m+|u+m+|u+h+|a+h+|o+h+|well|ok(?:ay)?|so|right|alright|let'?s see|sure)(?:[,\s]+(?:h+m+|u+m+|well|ok(?:ay)?|so|right|alright|let'?s see))*\W*$/i;
@@ -2088,7 +2087,7 @@ export async function resolvePendingAsk(
   // no wildcard capture needed" logic this needs, reused rather than a
   // second copy of it.
   setPendingAsk(conversation.id, null);
-  // Item 4a (A4's cancel rule): "never mind" on an ask clears it and
+  // "Never mind" on an ask clears it and
   // runs nothing, the same as on a confirmation; before this the
   // utterance was bound as the answer ("never mind" on the list). The
   // whole utterance has to be the cancel: an answer that merely opens
@@ -2103,15 +2102,13 @@ export async function resolvePendingAsk(
   // the value: a literal pattern match says so, and so does an
   // utterance that opens with one of the installed packages' own
   // command verbs ("add", "set", "remind"), since the live bench put
-  // the whole sentence "add eggs to the list" on the list (item 4a).
+  // the whole sentence "add eggs to the list" on the list.
   // "ten minutes" opens with neither and binds.
   const manifest = loaded.find((l) => l.id === pending.packageId)?.manifest;
   const opener = text.trim().replace(COURTESY_PREFIX, "").split(/\s+/)[0]?.toLowerCase().replace(/[^a-z']/g, "") ?? "";
   if (routeLiteral(text, actor, loaded)?.winner || commandOpeners(loaded).has(opener)) return null;
-  // The engine's own ask names the argument it withheld (item 4a) and
-  // the answer binds to it by name; a package's own ask binds through
-  // the one-required-string rule as before.
-  const boundArg = pending.argName ? { [pending.argName]: text.trim() } : manifest ? deterministicArgs(manifest.args, text) : null;
+  // A package's own ask binds through its one-required-string rule.
+  const boundArg = manifest ? deterministicArgs(manifest.args, text) : null;
   if (!boundArg) return null; // can't bind - fall through to normal routing rather than guess
   const boundArgs = { ...pending.args, ...boundArg };
   const result = await runPlugin(pending.packageId, actor, boundArgs, { id: turnId, conversationId: conversation.id });
@@ -2746,20 +2743,6 @@ async function prepareTurn(
   if (routed) {
     fired("route.pattern");
     logRoute(turnId, "pattern", shape, routed.id, ranked, []);
-    // Item 4a: a literal pattern's capture can be a bare pronoun ("add
-    // it to the shopping list" captured "it", and the list gained the
-    // word). The package never runs on it; the turn asks for the value
-    // through the ask path, and the next utterance binds it.
-    const routedManifest = effectiveLoaded.find((l) => l.id === routed.id)?.manifest;
-    const unspoken = routedManifest && isActionPackage(routedManifest) ? unspokenArgument(routed.args, text) : null;
-    if (unspoken) {
-      const { [unspoken.name]: _dropped, ...rest } = routed.args;
-      const prompt = askPromptFor(routed.id, unspoken.name, unspoken.reason);
-      setPendingAsk(conversation.id, { kind: "ask", prompt, packageId: routed.id, args: rest, argName: unspoken.name });
-      console.log(`[turn] plugin ${routed.id} not run: the ${unspoken.name} "${unspoken.value}" was not said (${unspoken.reason}); asking`);
-      directOutcomes.push(outcomeOf({ callId: `${turnId}:floor`, packageId: routed.id, status: "pending", args: rest, via: "pattern", userMessage: prompt }));
-      return immediate({ reply: { text: prompt }, source: "confirm", plugin_id: routed.id, safety, crisis_resources: crisisResources });
-    }
     const result = await runPlugin(routed.id, actor, routed.args, { id: turnId, conversationId: conversation.id });
     // CHAT-15: the floor's own outcome, the same shape the model's tool
     // call leaves: succeeded with the result, pending when the result
@@ -3152,7 +3135,6 @@ export async function resolveToolCalls(
   // before a companion runs).
   const startAt = outcomes.length;
   const order = new Map<ToolExecutionOutcome, number>();
-  const settleWithheld: { current: (() => void) | null } = { current: null };
   const sanitized = calls.map((c) => {
     if (c.tool !== "websearch" || !c.args || typeof c.args !== "object" || Array.isArray(c.args) || !("category" in c.args)) return c;
     onIgnoredModelArg?.("category");
@@ -3162,9 +3144,8 @@ export async function resolveToolCalls(
   });
   const shaped = sanitized;
   try {
-    return await resolveToolCallsInOrder(shaped, offeredIds, ranked, actor, conversationId, turnId, safety, crisisResources, outcomes, utterance, order, settleWithheld, "tool_call");
+    return await resolveToolCallsInOrder(shaped, offeredIds, ranked, actor, conversationId, turnId, safety, crisisResources, outcomes, utterance, order, "tool_call");
   } finally {
-    settleWithheld.current?.();
     const added = outcomes.splice(startAt);
     added.sort((a, b) => (order.get(a) ?? calls.length) - (order.get(b) ?? calls.length));
     outcomes.push(...added);
@@ -3216,12 +3197,10 @@ async function resolveToolCallsInOrder(
   // ran or parked on a confirmation; the guards' `outcomes` read them,
   // so an action claim counts as true only when its package really ran.
   outcomes: ToolExecutionOutcome[] = [],
-  // Item 4a: the person's own words, which every call's arguments are
-  // checked against before a package runs; absent (a caller that has
-  // none) the check is skipped, never run against an empty string.
+  // The person's words are used only for the package's page-read switch;
+  // argument grounding belongs to the turn policy.
   utterance?: string,
   order: Map<ToolExecutionOutcome, number> = new Map(),
-  settleWithheld: { current: (() => void) | null } = { current: null },
   via: "tool_call" | "forced" = "tool_call",
 ): Promise<TurnValue | null> {
   const rankedById = new Map(ranked.map((r) => [r.id, r]));
@@ -3306,65 +3285,11 @@ async function resolveToolCallsInOrder(
     return { reply: { text: prompt }, source: "confirm", plugin_id: consequential.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
   }
 
-  // Item 4a: a call whose argument the person did not say (a number or
-  // duration the model filled in, "ten minutes" for "set a timer"; a
-  // bare pronoun) never runs. The first such call is parked as an ask
-  // for its value (the next utterance binds it through the ask path);
-  // the calls whose arguments were said run as usual, and the question
-  // follows their reply the way a package's own ask does below.
-  // Action packages only: a lookup's argument is the model's own
-  // rephrasing of the question ("World War 2"), never a quantity the
-  // person had to say (a review).
-  const withheld =
-    utterance === undefined
-      ? []
-      : capped
-          .filter((c) => isActionPackage(rankedById.get(c.tool)!.manifest))
-          .map((c) => ({ call: c, unspoken: unspokenArgument((c.args ?? {}) as Record<string, unknown>, utterance) }))
-          .filter((x) => x.unspoken !== null);
-  const runnable = capped.filter((c) => !withheld.some((w) => w.call === c));
-  // CHAT-15: every withheld call is retained as pending the moment it
-  // is withheld, whatever the rest of the batch does (a sibling that
-  // fails used to leave it with no record); asking is a separate step.
-  const withheldOutcomes = new Map<ToolCall, ToolExecutionOutcome>();
-  for (const w of withheld) {
-    console.log(`[turn] plugin ${w.call.tool} not run: the ${w.unspoken!.name} "${w.unspoken!.value}" was not said (${w.unspoken!.reason})`);
-    const { [w.unspoken!.name]: _dropped, ...rest } = argsOf(w.call);
-    const o = outcomeOf({ callId: callId(w.call), packageId: w.call.tool, status: "pending", args: rest, via: "tool_call", userMessage: askPromptFor(w.call.tool, w.unspoken!.name, w.unspoken!.reason) });
-    retain(w.call, o);
-    withheldOutcomes.set(w.call, o);
-  }
-  // Only the first withheld call is ever asked about (one question at a
-  // time); a withheld call whose question is never put on this turn is
-  // settled as rejected/not_asked at the end (the wrapper's own finally
-  // runs `settleWithheld`), so the row never carries a "pending" no one
-  // will answer (the review of this diff).
-  let asked: ToolCall | null = null;
-  const askForWithheld = (): { prompt: string } | null => {
-    const first = withheld[0];
-    if (!first) return null;
-    const { [first.unspoken!.name]: _dropped, ...rest } = argsOf(first.call);
-    const prompt = askPromptFor(first.call.tool, first.unspoken!.name, first.unspoken!.reason);
-    setPendingAsk(conversationId, { kind: "ask", prompt, packageId: first.call.tool, args: rest, argName: first.unspoken!.name });
-    asked = first.call;
-    return { prompt };
-  };
-  settleWithheld.current = () => {
-    for (const [call, o] of withheldOutcomes) {
-      if (call === asked || o.status !== "pending") continue;
-      o.status = "rejected";
-      o.reason = "not_asked";
-    }
-  };
-  if (runnable.length === 0) {
-    const ask = askForWithheld();
-    if (ask) return { reply: { text: ask.prompt }, source: "confirm", plugin_id: withheld[0]!.call.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
-  }
 
   // Two independent calls, run in parallel - never chained (a result
   // feeding another is a recipe, not this step's job).
   const ran = await Promise.all(
-    runnable.map(async (c) => ({
+    capped.map(async (c) => ({
       call: c,
       result: await runPlugin(c.tool, actor, {
         ...((c.args ?? {}) as Record<string, unknown>),
@@ -3406,14 +3331,8 @@ async function resolveToolCallsInOrder(
   // the package's args schema before acting" - or a runtime error): "ask
   // again," never a silent drop, means null (a normal conversational
   // reply), not fabricating a plugin success or reporting a confusing
-  // tool-shaped error. A withheld call (item 4a) asks its question only
-  // when nothing else was attempted: a failed lookup beside it falls
-  // through to the model as before, so the question the person asked
-  // is not lost behind "For how long?" (a review).
+  // tool-shaped error.
   if (oks.length === 0) {
-    if (runnable.length > 0) return null;
-    const ask = askForWithheld();
-    if (ask) return { reply: { text: ask.prompt }, source: "confirm", plugin_id: withheld[0]!.call.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
     return null;
   }
 
@@ -3422,16 +3341,6 @@ async function resolveToolCallsInOrder(
     const args = (withPending.call.args ?? {}) as Record<string, unknown>;
     const pending = pendingAskFromPluginResult(withPending.call.tool, args, withPending.result.value as PluginResultWithConfirmAsk, conversationId);
     if (pending) {
-      // A withheld call (item 4a) beside a package's own ask: two asks
-      // cannot coexist, so the package's stands and is the one the next
-      // utterance answers; the withheld one is said here and is a
-      // pending outcome for the guards, and the person asks again for
-      // it (a review; unreachable with today's bundled recipes).
-      const first = withheld[0];
-      if (first) {
-        const prompt = askPromptFor(first.call.tool, first.unspoken!.name, first.unspoken!.reason);
-        pending.prompt = `${pending.prompt} And then: ${prompt.charAt(0).toLowerCase()}${prompt.slice(1)}`;
-      }
       // A code review (2026-09-06) found this discarding any OTHER
       // call's own reply text outright - two independent calls, one
       // that already ran with a real side effect and a real answer, the
@@ -3451,14 +3360,6 @@ async function resolveToolCallsInOrder(
   const pluginIds = oks.map((r) => r.call.tool).join("+");
   const bestScore = Math.max(...oks.map((r) => rankedById.get(r.call.tool)?.score ?? 0));
   const pluginSources = outcomes.filter((o) => o.status === "succeeded" && o.sources?.length).flatMap((o) => o.sources!);
-  // Item 4a, a mixed batch ("add milk to the list and set a timer" with
-  // no length): the calls that ran are reported and the withheld one's
-  // question follows, the shape a package's own ask takes above (a
-  // review found the withheld call dropped silently here).
-  const ask = askForWithheld();
-  if (ask) {
-    return { reply: { text: `${replyText} ${ask.prompt}` }, source: "confirm", plugin_id: withheld[0]!.call.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
-  }
   return {
     reply: { text: replyText },
     source: "plugin",

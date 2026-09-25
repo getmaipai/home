@@ -284,62 +284,6 @@ describe("CHAT-15: resolveToolCalls() retains every proposal, and refuses with a
     expect(memoryTexts().sort()).toEqual(["one", "two"]);
   });
 
-  test("a withheld argument (4a) is retained as pending even when its sibling fails, and both of two withheld calls are retained", async () => {
-    const { actor } = await owner();
-    const { loadAllManifests } = await import("@/lib/turnEngine");
-    const timer = loadAllManifests().find((l) => l.id === "timer")!;
-    const listAdd = loadAllManifests().find((l) => l.id === "list-add")!;
-    const TIMER: RankedCandidate = { id: "timer", score: 0.8, manifest: timer.manifest };
-    const LIST: RankedCandidate = { id: "list-add", score: 0.8, manifest: listAdd.manifest };
-    // A failing sibling: recall of nothing beside a timer with an unsaid length.
-    let outcomes: ToolExecutionOutcome[] = [];
-    let ranked = [TIMER, RECALL_CANDIDATE];
-    const value = await resolveToolCalls(
-      [
-        { id: "c1", tool: "recall", args: { topic: "atlantis" } },
-        { id: "c2", tool: "timer", args: { expression: "ten minutes" } },
-      ],
-      offeredFrom(ranked),
-      ranked,
-      actor,
-      "conv-1",
-      "turn-1",
-      SAFE,
-      undefined,
-      outcomes,
-      "look up atlantis and set a timer",
-    );
-    expect(value).toBeNull(); // the failed lookup falls through to the model (the 4a review's rule)
-    // Its question was never put, so it is not left parked forever.
-    expect(outcomes.map((o) => [o.callId, o.status, o.reason])).toEqual([
-      ["c1", "failed", undefined],
-      ["c2", "rejected", "not_asked"],
-    ]);
-    // Two withheld action calls: both retained, one asked.
-    outcomes = [];
-    ranked = [TIMER, LIST];
-    const asked = await resolveToolCalls(
-      [
-        { id: "c1", tool: "timer", args: { expression: "ten minutes" } },
-        { id: "c2", tool: "list-add", args: { item: "it" } },
-      ],
-      offeredFrom(ranked),
-      ranked,
-      actor,
-      "conv-1",
-      "turn-2",
-      SAFE,
-      undefined,
-      outcomes,
-      "set a timer and add it to the list",
-    );
-    expect(asked?.source).toBe("confirm");
-    expect(outcomes.map((o) => [o.callId, o.status, o.reason])).toEqual([
-      ["c1", "pending", undefined],
-      ["c2", "rejected", "not_asked"],
-    ]);
-  });
-
   test("a colliding wire id with a different call is not a duplicate; the same call again is", async () => {
     const { actor } = await owner();
     const outcomes: ToolExecutionOutcome[] = [];

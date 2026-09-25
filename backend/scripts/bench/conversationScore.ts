@@ -302,8 +302,8 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   }
   if (e.toolRan !== undefined) {
     // A Tier 2 turn that ran two calls stores "a+b" as its plugin id. A
-    // parked ask or confirmation (source "confirm") names the package
-    // it is waiting on and ran nothing (item 4a).
+    // package ask or confirmation (source "confirm") names the package
+    // it is waiting on and ran nothing.
     const ran = observed.pluginId && observed.source !== "confirm" ? observed.pluginId.split("+") : [];
     checks.push({ name: "tool", pass: e.toolRan === null ? ran.length === 0 : ran.includes(e.toolRan), detail: `ran ${ran.join("+") || "none"} (source ${observed.source ?? "none"})` });
   }

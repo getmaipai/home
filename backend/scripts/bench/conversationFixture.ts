@@ -766,16 +766,6 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     ],
   },
   {
-    id: "never-mind-on-an-ask",
-    category: "tools",
-    note: "A4: a request missing its one argument is answered with a question (a pending ask), 'never mind' clears it, and the argument said later starts nothing",
-    turns: [
-      { say: "set a timer", expect: { signal: { primary_act: "directive" }, pendingAsk: "ask", toolRan: null, mustContain: "how long|for how|what length|minutes\\?|\\?" } },
-      { say: "never mind", expect: { signal: { primary_act: "directive" }, pendingAsk: null, toolRan: null } },
-      { say: "ten minutes", expect: { signal: { primary_act: "inform" }, pendingAsk: null, toolRan: null, mustNotContain: "timer set|timer's set|set a timer|started" } },
-    ],
-  },
-  {
     id: "clarify-only-when-ambiguous",
     category: "tools",
     note: "A6 (TURN-01's rule): 'add it to the list' with nothing to point at asks what, and adds nothing; 'add eggs to the list' with one list never asks which",

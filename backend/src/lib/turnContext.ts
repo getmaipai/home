@@ -87,11 +87,8 @@ export interface TurnEvidence {
  * consequential proposal, which asks once and executes none of the
  * batch; `unconfirmed`: a confirmation dropped after two unclear
  * answers; `trailing`: a tool call a streamed reply proposed after it
- * had already spoken, which nothing runs (CHAT-17 owns the retry);
- * `not_asked`: a call withheld for an unsaid argument (4a) whose
- * question was never put, because the turn fell through to the model
- * or another ask stood, so the row never shows it parked forever. */
-export type RejectedReason = "not_offered" | "over_cap" | "duplicate" | "malformed" | "invalid_args" | "blocked_by_confirmation" | "unconfirmed" | "trailing" | "not_asked";
+ * had already spoken, which nothing runs (CHAT-17 owns the retry). */
+export type RejectedReason = "not_offered" | "over_cap" | "duplicate" | "malformed" | "invalid_args" | "blocked_by_confirmation" | "unconfirmed" | "trailing";
 
 /** What a spec Source record needs from a package result, kept on the
  * outcome so CHAT-16 emits `sources` straight from retained outcomes:

@@ -2734,7 +2734,7 @@ describe("CHAT-15: the direct paths retain the same outcome evidence, and the ro
     expect(kept?.map((o) => [o.packageId, o.status, o.via])).toEqual([[`command:${made.ok ? made.value.id : ""}`, "succeeded", "command"]]);
   });
 
-  test("an answered confirmation retains the run bound to the exact proposal, and a failing run a failed outcome; the answered ask the same", async () => {
+  test("an answered confirmation retains the run bound to the exact proposal, a failing run a failed outcome, and a package ask retains its answer", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
@@ -2755,8 +2755,8 @@ describe("CHAT-15: the direct paths retain the same outcome evidence, and the ro
     expect(failed?.map((o) => [o.status, o.via])).toEqual([["failed", "confirm"]]);
     expect(failed?.[0]?.userMessage).toBe("Sorry, I couldn't do that.");
     expect(failed?.[0]?.userMessage).not.toMatch(/validation|schema/i);
-    // The ask path: the answer binds by name and the run is retained via "ask".
-    setPendingAsk(conv.value.id, { kind: "ask", prompt: "Remember what?", packageId: "remember", args: {}, argName: "fact" });
+    // A package's own ask binds its one required string argument.
+    setPendingAsk(conv.value.id, { kind: "ask", prompt: "Remember what?", packageId: "remember", args: {} });
     const answered = await runTurn(actor, "chat", "the dentist is Tuesday", { conversationId: conv.value.id });
     expect(answered.ok && answered.value.source).toBe("plugin");
     const asked = retained(answered.ok ? answered.value.turn_id : "");
@@ -2769,16 +2769,9 @@ describe("CHAT-15: the direct paths retain the same outcome evidence, and the ro
     const signalOf = (turnId: string) => turnSignalOf(db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
     expect([signalOf(yes.ok ? yes.value.turn_id : "")?.source, signalOf(yes.ok ? yes.value.turn_id : "")?.primary_act]).toEqual(["protocol", "directive"]);
     expect(signalOf(answered.ok ? answered.value.turn_id : "")?.source).toBe("protocol");
-    // An ask whose bound run fails falls through to routing: the rule
-    // signal stands, never the protocol's (a review).
-    setPendingAsk(conv.value.id, { kind: "ask", prompt: "Remember what?", packageId: "remember", args: {}, argName: "fct" });
-    const fell = await runTurn(actor, "chat", "I prefer quiet films", { conversationId: conv.value.id });
-    expect(fell.ok && fell.value.source).not.toBe("plugin");
-    const fellSignal = signalOf(fell.ok ? fell.value.turn_id : "");
-    expect([fellSignal?.source, fellSignal?.primary_act]).toEqual(["rule", "inform"]);
   });
 
-  test("the streaming path retains the model's tool calls on the row, and a list-add's argument the person never said stays pending", async () => {
+  test("the streaming path retains the model's tool calls on the row, including an argument the person never said", async () => {
     const { actor } = await owner();
     offerOrdinaryTools(actor, ["list-add"]);
     __resetLlmSupervisorForTests();
@@ -2805,9 +2798,10 @@ describe("CHAT-15: the direct paths retain the same outcome evidence, and the ro
       const kept = retained(turnId);
       expect(kept?.map((o) => [o.packageId, o.status, o.via])).toEqual([
         ["list-add", "succeeded", "tool_call"],
-        ["list-add", "pending", "tool_call"],
+        ["list-add", "succeeded", "tool_call"],
       ]);
       expect(kept?.[0]?.args).toEqual({ item: "milk" });
+      expect(kept?.[1]?.args).toEqual({ item: "it" });
     } finally {
       stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
@@ -3234,227 +3228,6 @@ describe("item 4b: forget in conversation is honored or refused, never 'Got it.'
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   }
-});
-
-// Item 4a (docs/plans/baseline-fixes-2026-09-13.md): a tool never runs
-// on an argument the person did not say. The 47-conversation bench saw
-// "set a timer" run a ten-minute timer the model invented and "add it
-// to the list" add the word "it"; both now ask through the ask path.
-describe("item 4a: a tool never runs on an argument the person did not say", () => {
-  async function withCalls<T>(calls: (request: import("@maipai/spec/llm/ts/types.js").ChatCompletionRequest) => { name: string; args: Record<string, unknown> }[] | undefined, fn: () => Promise<T>): Promise<T> {
-    __resetLlmSupervisorForTests();
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0, {
-      scriptedChatReply: () => "Okay.",
-      scriptedToolCalls: (request) => calls(request)?.map((c, i) => ({ id: `call-${i}`, type: "function" as const, function: { name: c.name, arguments: JSON.stringify(c.args) } })),
-    });
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-    try {
-      return await fn();
-    } finally {
-      stub.stop();
-      delete process.env.MAIPAI_LLAMA_SERVER_URL;
-    }
-  }
-  const offers = (request: { tools?: { function: { name: string } }[] }, name: string) => request.tools?.some((t) => t.function.name === name) === true;
-
-  test("'set a timer' with no length: the model's invented ten minutes never runs; the turn asks how long, and the spoken answer runs it", async () => {
-    const { actor } = await owner();
-    offerOrdinaryTools(actor, ["timer"]);
-    const { listJobs } = await import("@/lib/scheduler");
-    await withCalls((request) => (offers(request, "timer") ? [{ name: "timer", args: { expression: "ten minutes" } }] : undefined), async () => {
-      const conv = resolveOrCreateConversation(actor, "chat");
-      if (!conv.ok) throw new Error(conv.error);
-      const asked = await runTurn(actor, "chat", "set a timer", { conversationId: conv.value.id });
-      expect(asked.ok).toBe(true);
-      if (!asked.ok) return;
-      expect(asked.value.source).toBe("confirm");
-      expect(asked.value.reply.text).toMatch(/how long|for how long/i);
-      expect(listJobs(actor).filter((j) => j.job === "timers.fire")).toEqual([]);
-      expect(getPendingAsk(conv.value.id)?.kind).toBe("ask");
-      const answered = await runTurn(actor, "chat", "ten minutes", { conversationId: conv.value.id });
-      expect(answered.ok).toBe(true);
-      if (!answered.ok) return;
-      expect(answered.value.source).toBe("plugin");
-      expect(answered.value.plugin_id).toBe("timer");
-      expect(listJobs(actor).filter((j) => j.job === "timers.fire").length).toBe(1);
-    });
-  });
-
-  test("'never mind' on a pending ask clears it and runs nothing", async () => {
-    const { actor } = await owner();
-    offerOrdinaryTools(actor, ["timer"]);
-    const { listJobs } = await import("@/lib/scheduler");
-    await withCalls((request) => (offers(request, "timer") ? [{ name: "timer", args: { expression: "five minutes" } }] : undefined), async () => {
-      const conv = resolveOrCreateConversation(actor, "chat");
-      if (!conv.ok) throw new Error(conv.error);
-      await runTurn(actor, "chat", "set a timer", { conversationId: conv.value.id });
-      expect(getPendingAsk(conv.value.id)?.kind).toBe("ask");
-      const cancelled = await runTurn(actor, "chat", "never mind", { conversationId: conv.value.id });
-      expect(cancelled.ok).toBe(true);
-      if (!cancelled.ok) return;
-      expect(cancelled.value.source).toBe("confirm");
-      expect(getPendingAsk(conv.value.id)).toBeNull();
-      expect(listJobs(actor).filter((j) => j.job === "timers.fire")).toEqual([]);
-    });
-  });
-
-  test("'add it to the shopping list' (the literal pattern) adds nothing and asks what; a spoken item still adds", async () => {
-    const { actor } = await owner();
-    const { sqlite } = await import("@/db");
-    const items = () => (sqlite.query("SELECT items FROM lists").all() as { items: string }[]).flatMap((r) => (JSON.parse(r.items) as { text: string }[]).map((i) => i.text));
-    await withCalls(() => undefined, async () => {
-      const conv = resolveOrCreateConversation(actor, "chat");
-      if (!conv.ok) throw new Error(conv.error);
-      const asked = await runTurn(actor, "chat", "add it to the shopping list", { conversationId: conv.value.id });
-      expect(asked.ok).toBe(true);
-      if (!asked.ok) return;
-      expect(asked.value.source).toBe("confirm");
-      expect(asked.value.reply.text).toMatch(/add what|what should i add|which item/i);
-      expect(items()).toEqual([]);
-      const spoken = await runTurn(actor, "chat", "add eggs to the shopping list", { conversationId: conv.value.id });
-      expect(spoken.ok).toBe(true);
-      if (!spoken.ok) return;
-      expect(spoken.value.plugin_id).toBe("list-add");
-      expect(items()).toEqual(["eggs"]);
-    });
-  });
-
-  test("a command said in place of the answer routes as itself: 'add eggs to the list' after 'Add what to the list?' adds eggs, not the sentence", async () => {
-    const { actor } = await owner();
-    offerOrdinaryTools(actor, ["list-add"]);
-    const { sqlite } = await import("@/db");
-    const items = () => (sqlite.query("SELECT items FROM lists").all() as { items: string }[]).flatMap((r) => (JSON.parse(r.items) as { text: string }[]).map((i) => i.text));
-    await withCalls((request) => (offers(request, "list-add") ? [{ name: "list-add", args: { item: "eggs" } }] : undefined), async () => {
-      const conv = resolveOrCreateConversation(actor, "chat");
-      if (!conv.ok) throw new Error(conv.error);
-      await runTurn(actor, "chat", "add it to the shopping list", { conversationId: conv.value.id });
-      expect(getPendingAsk(conv.value.id)?.kind).toBe("ask");
-      const again = await runTurn(actor, "chat", "can you add eggs to the list", { conversationId: conv.value.id }); // no literal pattern matches "the list", and the courtesy prefix hides the verb; the model is asked (a review)
-      expect(again.ok).toBe(true);
-      if (!again.ok) return;
-      expect(again.value.plugin_id).toBe("list-add");
-      expect(items()).toEqual(["eggs"]);
-      expect(getPendingAsk(conv.value.id)).toBeNull();
-    });
-  });
-
-  test("a timer with a spoken length still runs, digits and words alike, and a number the person said in words is not an invention when the model writes digits", async () => {
-    const { actor } = await owner();
-    offerOrdinaryTools(actor, ["timer"]);
-    const { listJobs } = await import("@/lib/scheduler");
-    await withCalls((request) => (offers(request, "timer") ? [{ name: "timer", args: { expression: "5 minutes" } }] : undefined), async () => {
-      const spoken = await runTurn(actor, "chat", "can you start a timer, five minutes please");
-      expect(spoken.ok).toBe(true);
-      if (!spoken.ok) return;
-      expect(spoken.value.source).toBe("plugin");
-      expect(listJobs(actor).filter((j) => j.job === "timers.fire").length).toBe(1);
-    });
-  });
-
-  test("a mixed batch: the call whose argument was said runs, the withheld one's question follows, and the answer runs it (a review)", async () => {
-    const { actor } = await owner();
-    offerOrdinaryTools(actor, ["timer", "list-add"]);
-    const { listJobs } = await import("@/lib/scheduler");
-    const { sqlite } = await import("@/db");
-    const items = () => (sqlite.query("SELECT items FROM lists").all() as { items: string }[]).flatMap((r) => (JSON.parse(r.items) as { text: string }[]).map((i) => i.text));
-    await withCalls(
-      (request) => (offers(request, "list-add") && offers(request, "timer") ? [{ name: "list-add", args: { item: "milk" } }, { name: "timer", args: { expression: "ten minutes" } }] : undefined),
-      async () => {
-        const conv = resolveOrCreateConversation(actor, "chat");
-        if (!conv.ok) throw new Error(conv.error);
-        const mixed = await runTurn(actor, "chat", "add milk to the list and start a timer", { conversationId: conv.value.id });
-        expect(mixed.ok).toBe(true);
-        if (!mixed.ok) return;
-        expect(items()).toEqual(["milk"]);
-        expect(listJobs(actor).filter((j) => j.job === "timers.fire")).toEqual([]);
-        expect(mixed.value.source).toBe("confirm");
-        expect(mixed.value.reply.text).toMatch(/milk.*For how long\?/s);
-        expect(getPendingAsk(conv.value.id)?.argName).toBe("expression");
-        const answered = await runTurn(actor, "chat", "ten minutes", { conversationId: conv.value.id });
-        expect(answered.ok).toBe(true);
-        if (!answered.ok) return;
-        expect(answered.value.plugin_id).toBe("timer");
-        expect(listJobs(actor).filter((j) => j.job === "timers.fire").length).toBe(1);
-      },
-    );
-  });
-
-  test("an answer that opens with 'no' is an answer, not a cancel: 'no-salt crackers' lands on the list (a review)", async () => {
-    const { actor } = await owner();
-    const { sqlite } = await import("@/db");
-    const items = () => (sqlite.query("SELECT items FROM lists").all() as { items: string }[]).flatMap((r) => (JSON.parse(r.items) as { text: string }[]).map((i) => i.text));
-    await withCalls(() => undefined, async () => {
-      const conv = resolveOrCreateConversation(actor, "chat");
-      if (!conv.ok) throw new Error(conv.error);
-      await runTurn(actor, "chat", "add it to the shopping list", { conversationId: conv.value.id });
-      const answered = await runTurn(actor, "chat", "no-salt crackers", { conversationId: conv.value.id });
-      expect(answered.ok).toBe(true);
-      if (!answered.ok) return;
-      expect(answered.value.plugin_id).toBe("list-add");
-      expect(items()).toEqual(["no-salt crackers"]);
-      for (const cancel of ["no thanks", "no, never mind", "never mind that", "actually, forget it", "don't worry about it"]) {
-        await runTurn(actor, "chat", "add that to the shopping list", { conversationId: conv.value.id });
-        const cancelled = await runTurn(actor, "chat", cancel, { conversationId: conv.value.id });
-        expect(cancelled.ok && cancelled.value.source).toBe("confirm");
-        expect(getPendingAsk(conv.value.id)).toBeNull();
-      }
-      expect(items()).toEqual(["no-salt crackers"]);
-    });
-  });
-
-  test("a lookup's argument is never withheld: the model's own rephrasing of a question is not an invented quantity (a review)", async () => {
-    const { actor } = await owner();
-    await withCalls((request) => (offers(request, "knowledge") ? [{ name: "knowledge", args: { topic: "World War 2" } }] : undefined), async () => {
-      const result = await runTurn(actor, "chat", "what year did the second world war end");
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value.source).not.toBe("confirm"); // knowledge ran (or failed on the network), never asked "which one"
-    });
-  });
-
-  test("the pure rule: unspokenArgument() names the argument the person did not say", async () => {
-    const { unspokenArgument } = await import("@/lib/unspokenArgs");
-    expect(unspokenArgument({ expression: "ten minutes" }, "set a timer")?.name).toBe("expression");
-    expect(unspokenArgument({ expression: "ten minutes" }, "set a timer for ten minutes")).toBeNull();
-    expect(unspokenArgument({ expression: "10 minutes" }, "set a timer for ten minutes")).toBeNull();
-    expect(unspokenArgument({ expression: "1 hour" }, "set a timer for an hour")).toBeNull();
-    expect(unspokenArgument({ expression: "2 hours" }, "set a timer for an hour")?.name).toBe("expression"); // the number is not what was said
-    expect(unspokenArgument({ expression: "10 hours" }, "set a timer for ten minutes")?.name).toBe("expression"); // the unit is not what was said
-    expect(unspokenArgument({ item: "it" }, "add it to the list")?.name).toBe("item");
-    expect(unspokenArgument({ item: "eggs" }, "add eggs to the list")).toBeNull();
-    expect(unspokenArgument({ expression: "at 6 to call Nadia" }, "remind me at 6 to call Nadia")).toBeNull();
-    expect(unspokenArgument({ expression: "6pm call Nadia" }, "remind me at 6 to call Nadia")).toBeNull(); // am/pm is not a number the rule reads
-    expect(unspokenArgument({ q: "weather in Lisbon" }, "what's the weather in Lisbon")).toBeNull();
-    // Compound numbers and durations in another unit are what was said (a review).
-    expect(unspokenArgument({ expression: "25 minutes" }, "set a timer for twenty five minutes")).toBeNull();
-    expect(unspokenArgument({ expression: "45 minutes" }, "forty-five minutes")).toBeNull();
-    expect(unspokenArgument({ expression: "120 / 4" }, "a hundred and twenty divided by four")).toBeNull();
-    expect(unspokenArgument({ expression: "1.5 hours" }, "one and a half hours")).toBeNull();
-    expect(unspokenArgument({ expression: "90 minutes" }, "set a timer for an hour and a half")).toBeNull();
-    expect(unspokenArgument({ expression: "30 minutes" }, "half an hour")).toBeNull();
-    expect(unspokenArgument({ expression: "305 minutes" }, "three hundred and five minutes")).toBeNull();
-    // A number is read only beside a duration unit: a clock time or a date the model normalized is not an invented quantity (a review).
-    expect(unspokenArgument({ expression: "6:30 call mom" }, "remind me at half past six to call mom")).toBeNull();
-    expect(unspokenArgument({ expression: "18:00 take out the trash" }, "remind me at 6pm to take out the trash")).toBeNull();
-    expect(unspokenArgument({ expression: "1 week" }, "remind me next week")).toBeNull(); // "next week" is the model's "1 week"
-    expect(unspokenArgument({ expression: "half an hour" }, "set a timer for 30 minutes")).toBeNull(); // the model's article is no number the person had to say
-    expect(unspokenArgument({ expression: "20 minutes" }, "set a timer for half an hour")?.reason).toBe("number");
-    // Sentence punctuation and two-unit renderings (a review).
-    expect(unspokenArgument({ expression: "10 minutes" }, "set a timer for 10 minutes.")).toBeNull();
-    expect(unspokenArgument({ expression: "10 minutes." }, "set a timer")?.reason).toBe("number");
-    expect(unspokenArgument({ expression: "1 hour 30 minutes" }, "an hour and a half")).toBeNull();
-    expect(unspokenArgument({ expression: "75 minutes" }, "an hour and fifteen minutes")).toBeNull();
-    expect(unspokenArgument({ expression: "1 minute 30 seconds" }, "ninety seconds")).toBeNull();
-    expect(unspokenArgument({ expression: "15 minutes" }, "a quarter of an hour")).toBeNull();
-    const { askPromptFor, isActionPackage } = await import("@/lib/unspokenArgs");
-    expect(askPromptFor("knowledge", "topic", "pronoun")).toBe("Which one do you mean?"); // never the argument's name
-    expect(askPromptFor("convert", "expression", "number")).toBe("How much, or for how long?");
-    expect(isActionPackage({ permissions: ["timers:write"] })).toBe(true);
-    expect(isActionPackage({ permissions: ["home:lock"], consequential: true })).toBe(true);
-    expect(isActionPackage({ permissions: ["net:en.wikipedia.org"] })).toBe(false);
-    expect(isActionPackage({ permissions: ["memory:write"] })).toBe(false);
-  });
 });
 
 // JOIN-01 (docs/BACKLOG.md's 2026-09-12 chat block, after both tracks
