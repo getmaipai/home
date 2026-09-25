@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/dashboard/components/ui/table";
 import { ROLE_LABELS } from "@/apps/people/roles";
 import { api, ApiError, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -15,9 +15,8 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * card, then GET /api/people (the same list `PeoplePage.tsx`'s own
  * `rosterQuery` reads, unscoped by design - "a plain directory,
  * readable by anyone signed in," `PeoplePage.tsx`'s own header
- * comment) through the shipped `DataTable`, same as SHELL-03's own
- * apps row: a real `data` prop, no gap-composition needed for the
- * table itself.
+ * comment) through a small table composed from the shipped Table
+ * primitives, same as SHELL-03's own apps row at the route level.
  *
  * The profile half is a genuine SHELL-01-style gap: the vendored
  * `UserProfile` (`@maipai/ui/src/dashboard/components/user-profile/
@@ -41,15 +40,6 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * person's own profile only) - `PersonProfilePage.tsx` keeps that job
  * until its own row moves it. */
 const PeopleIcon = getIcon("users");
-
-interface PersonRow extends Record<string, unknown> {
-  name: string;
-  role: string;
-}
-
-function toRow(p: PersonRosterEntry): PersonRow {
-  return { name: p.display_name, role: ROLE_LABELS[p.role] };
-}
 
 export function NextPeoplePage({ person }: { person: Roster }) {
   useDocumentTitle("People");
@@ -84,7 +74,32 @@ export function NextPeoplePage({ person }: { person: Roster }) {
                 People
               </CardTitle>
             </CardHeader>
-            <DataTable data={roster.map(toRow)} />
+            <Card className="flex flex-col gap-0!">
+              <CardContent className="px-0!">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="pl-4! px-4 py-3 h-auto text-sm font-normal text-muted-foreground">Name</TableHead>
+                      <TableHead className="pr-4! px-4 py-3 h-auto text-sm font-normal text-muted-foreground">Role</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {roster.length === 0 ? (
+                      <TableRow className="border-border">
+                        <TableCell colSpan={2} className="px-4 py-6 text-sm text-muted-foreground text-center">No people available.</TableCell>
+                      </TableRow>
+                    ) : (
+                      roster.map((entry) => (
+                        <TableRow key={entry.id} className="border-border hover:bg-muted/30">
+                          <TableCell className="pl-4! px-4 py-3 text-sm font-medium text-foreground">{entry.display_name}</TableCell>
+                          <TableCell className="pr-4! px-4 py-3 text-sm text-muted-foreground">{ROLE_LABELS[entry.role]}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
         )}
       </AsyncState>

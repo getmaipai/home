@@ -95,17 +95,19 @@ describe("NextPeoplePage", () => {
     }
   });
 
-  // The vendored DataTable's own header is a hardcoded "Employee Data
-  // Table" string with no title prop - this page's own real heading
-  // above it is the fix, and it must actually be there, not just
-  // documented as a plan.
-  test("a real 'People' heading, not just the vendored table's own hardcoded title", async () => {
+  test("the roster table has only Name and Role columns, with no demo title or Action column", async () => {
     const restore = mockPeopleFetch([makeRosterEntry()]);
     try {
       renderWithQueryClient(<NextPeoplePage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Nova"));
       const titles = Array.from(document.querySelectorAll('[data-slot="card-title"]')).map((el) => el.textContent);
       expect(titles.some((t) => t?.includes("People"))).toBe(true);
+      expect(document.body.textContent).not.toContain("Employee Data Table");
+      const rosterTable = document.querySelector('[data-slot="table"]');
+      expect(rosterTable).not.toBeNull();
+      const headers = Array.from(rosterTable!.querySelectorAll('[data-slot="table-head"]')).map((el) => el.textContent?.trim());
+      expect(headers).toEqual(["Name", "Role"]);
+      expect(headers).not.toContain("Action");
     } finally {
       restore();
     }
