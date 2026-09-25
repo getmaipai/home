@@ -51,39 +51,20 @@ import { findOverflowingPanels } from "./panelOverflow";
 // compile time and never read at runtime.
 type StubServerModule = typeof import("../../commons/spec/llm/ts/stubServer");
 import AxeBuilder from "@axe-core/playwright";
-import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
+import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
-// getmaipai/home#105, found live 2026-09-13 (four collisions between
-// Session A's gate runs and Session B's screenshot passes on the same
-// machine): both this backend's own port and REPAIR_SEED_PORT (below)
-// used to be fixed literals, so two runs started close together always
-// fought over the same two ports. `reserveFreePort()` (already proven
-// in backend/tests/fixtures for the fake llama servers) picks a real,
-// OS-assigned free port per run instead - but only assigned inside
-// `main()`, right before the backend actually spawns (a code review on
-// this same fix caught reserving it here, at module load, as its own
-// unsafe version of the identical bug: `reserveFreePort()` releases the
-// port the instant it checks it, and the frontend build a few hundred
-// lines below takes minutes - reserving here would leave that whole
-// window open for another process, including a second concurrently-
-// started run of this exact script, to take the same port first. The
-// fix: reserve immediately before use, the same pattern
-// REPAIR_SEED_PORT already gets right a few hundred lines down -
-// `Bun.listen` occupies that one the instant it's reserved). `DATA_DIR`
-// is derived from `PORT` (two runs sharing one `.demo-data` directory
-// raced on `main()`'s own `rmSync`+`mkdirSync(DATA_DIR, ...)` pair,
-// right before `seedHousehold()` - one run's `rmSync` could delete the
-// OTHER run's in-flight seeded household mid-seed; the port number is
-// already a real per-run-unique value, so it doubles as the directory
-// suffix rather than inventing a second one), so it's assigned at the
-// same place, for the same reason.
-let PORT: number;
+// getmaipai/home#114: each backend asks Bun.serve() to bind port 0 atomically and reports
+// the actual port on startup; each run also gets its own owner-marked
+// demo-data directory independent of its network port.
 let DATA_DIR: string;
 let BASE_URL: string;
+let DATA_OWNER: RunOwner;
 const ROOT = join(import.meta.dir, "..");
+const BUILD_LOCK = join(ROOT, ".screenshot-build.lock");
 const useWebkit = process.argv.includes("--webkit");
 // Live finding 2026-09-22: a reasoning-clipping report needed verifying
 // in the browser Jesse actually uses - headless only (this file's own
@@ -104,95 +85,12 @@ function resolveSpecWorktreeDir(): string {
   return join(ROOT, "backend", specDependency.slice("file:".length));
 }
 
-// #105's own code review found the trade this fix makes: `main()`'s own
-// `finally` block removes THIS run's DATA_DIR when it finishes, but a
-// run killed before that ever runs (SIGKILL under port contention - this
-// file's own documented case a bit further down; Ctrl-C; a crash) never
-// reaches it, and since every run's directory is now uniquely named
-// (immediately above), nothing else ever notices or reclaims that one
-// again - the single old fixed name got wiped by the very next run's own
-// `rmSync` no matter how the previous one ended; this fix traded that
-// away for concurrency safety. Swept here instead, before this run
-// creates its own.
-//
-// A second review pass caught the sweep's first version (a plain age
-// threshold - anything older than 2 hours) as its own smaller version of
-// the identical #105 bug: a run that's still genuinely alive but
-// abnormally slow (an unbounded `bun run build` hung on a bad network
-// fetch, unlike `waitForHealth()`'s own 15s cap) crosses that threshold
-// while still holding its directory, and a second run's sweep would
-// delete it out from under the first - gated by time instead of
-// eliminated. Fixed properly: each run writes its own PID into
-// `OWNER_PID_FILE` the moment it creates DATA_DIR; the sweep reads that
-// file and checks with `process.kill(pid, 0)` (throws ESRCH for a dead
-// process, no signal actually sent) whether the owner is still alive -
-// removed the instant it's confirmed dead, kept no matter how long it's
-// been running if it's confirmed alive. The age threshold survives only
-// as a fallback for a directory with no marker at all (a run started
-// before this fix, or one killed between `mkdirSync` and writing its own
-// marker - a window of one synchronous call, not two hours).
-const OWNER_PID_FILE = "owner-pid";
-const STALE_DEMO_DATA_MS = 2 * 60 * 60 * 1000; // 2 hours, marker-less fallback only
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    // A third code review caught this reading any non-ESRCH error as
-    // "alive," including Node's own TypeError{code:"ERR_INVALID_ARG_TYPE"}
-    // for a PID outside the valid range (confirmed live against this
-    // repo's Bun runtime) - a corrupted or garbled owner-pid marker, not
-    // just an empty one (already guarded by `ownerPid > 0` above), would
-    // read as permanently alive and never get swept. EPERM is the one
-    // real "still alive" case among the non-ESRCH errors (the process
-    // exists but is owned by someone else, so the signal isn't allowed);
-    // everything else - ESRCH included - means there is no live process
-    // to treat this directory as belonging to. A fourth code review
-    // re-raised the PID-reuse gap this still leaves open (a dead run's
-    // own PID handed to an unrelated later process reads as "alive"
-    // forever): already tracked as getmaipai/home#116, not fixed here -
-    // the real fix needs the recorded process's start time too, which
-    // Bun has no simple portable way to read today (issue's own text).
-    return (err as NodeJS.ErrnoException).code === "EPERM";
-  }
-}
+// Owner-marked demo-data directories are swept before this run creates
+// its own. Their marker includes process birth time plus a random token,
+// so stale cleanup can distinguish PID reuse and avoid deleting another
+// run's in-flight state.
 function sweepStaleDemoDataDirs(): void {
-  // A second code review caught a truncated/empty marker (a run killed
-  // mid-`writeFileSync`) parsing to pid 0 - `process.kill(0, 0)` signals
-  // this SCRIPT's own process group and never throws, so `isProcessAlive`
-  // read that as "alive" forever, permanently exempting the directory
-  // from every future sweep (the exact leak this fix exists to close, now
-  // guaranteed instead of merely possible). Real PIDs are always positive.
-  function ownerLooksAlive(ownerPidPath: string): boolean {
-    const ownerPid = Number(readFileSync(ownerPidPath, "utf8").trim());
-    return Number.isInteger(ownerPid) && ownerPid > 0 && isProcessAlive(ownerPid);
-  }
-  // A second code review also caught the original `.startsWith(".demo-
-  // data-")` never matching the bare `.demo-data` name every run before
-  // #105 used (no port suffix) - a leftover from before this fix landed
-  // would sit unswept forever. Matches both shapes now.
-  for (const name of readdirSync(ROOT).filter((n) => n === ".demo-data" || n.startsWith(".demo-data-"))) {
-    const path = join(ROOT, name);
-    if (path === DATA_DIR) continue;
-    try {
-      // A code review caught the real race this sweep runs into being
-      // exactly the concurrency it exists to tolerate: another run's own
-      // `finally` cleanup (or another sweep, started a moment earlier)
-      // can remove this same directory between the `readdirSync` above
-      // and any read/stat below - best-effort housekeeping, so a
-      // directory that's already gone by the time it's this one's turn
-      // is a success, not a crash.
-      const ownerPidPath = join(path, OWNER_PID_FILE);
-      if (existsSync(ownerPidPath)) {
-        if (ownerLooksAlive(ownerPidPath)) continue;
-      } else if (Date.now() - statSync(path).mtimeMs <= STALE_DEMO_DATA_MS) {
-        continue;
-      }
-      rmSync(path, { recursive: true, force: true });
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-    }
-  }
+  sweepOwnedDemoDataDirs(ROOT);
 }
 
 // Lane 3 item 5 (2026-09-13): the full matrix (4 viewports x 2 themes,
@@ -3675,41 +3573,22 @@ function writeScreenshotManifest(results: RunResult[], captureScript: string): v
 
 async function main() {
   console.log("Building the frontend so the backend has something to serve...");
-  const build = Bun.spawnSync({
-    cmd: ["bun", "run", "build"],
-    cwd: join(ROOT, "frontend"),
-    stdout: "inherit",
-    stderr: "inherit",
+  const buildOwner: RunOwner = { pid: process.pid, startedAt: processStartTime(process.pid) ?? null, token: crypto.randomUUID() };
+  await withScreenshotBuildLock(BUILD_LOCK, buildOwner, () => {
+    const build = Bun.spawnSync({
+      cmd: ["bun", "run", "build"],
+      cwd: join(ROOT, "frontend"),
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    if (build.exitCode !== 0) throw new Error("frontend build failed");
   });
-  if (build.exitCode !== 0) throw new Error("frontend build failed");
-
-  // Reserved here, not at module load (this file's own header comment
-  // on why), closer to the backend spawn that actually binds it than
-  // that alternative was. A fourth code review caught this comment's
-  // own earlier wording ("right before... the same gap REPAIR_SEED_PORT
-  // already keeps tiny") as overstating how tight this one actually is:
-  // the stale-directory sweep, the data directory's own mkdir/writeFile,
-  // seedWeatherCache(), starting the stub model server, and
-  // REPAIR_SEED_PORT's own reserve-then-bind all still run in between,
-  // a real, non-trivial window - a second run reserving its own PORT
-  // inside it could still be handed this exact number back before this
-  // run's backend binds it. Already tracked (getmaipai/home#114) as a
-  // known residual gap rather than fixed here; the real fix there is
-  // the backend binding port 0 itself and reporting back what it got,
-  // which is a bigger change than this issue's own scope.
-  PORT = reserveFreePort();
-  BASE_URL = `http://localhost:${PORT}`;
-  DATA_DIR = join(ROOT, `.demo-data-${PORT}`);
 
   sweepStaleDemoDataDirs();
-  if (existsSync(DATA_DIR)) rmSync(DATA_DIR, { recursive: true, force: true });
-  mkdirSync(DATA_DIR, { recursive: true });
-  // sweepStaleDemoDataDirs()'s own PID-liveness check reads this -
-  // written the instant the directory exists, so the only window this
-  // run's own directory could ever look marker-less to another run's
-  // sweep is the time between this line and `mkdirSync` just above.
-  writeFileSync(join(DATA_DIR, OWNER_PID_FILE), String(process.pid));
-  seedWeatherCache(DATA_DIR);
+  DATA_OWNER = { pid: process.pid, startedAt: processStartTime(process.pid) ?? null, token: crypto.randomUUID() };
+  DATA_DIR = createOwnedDemoDataDir(ROOT, DATA_OWNER);
+  try {
+    seedWeatherCache(DATA_DIR);
 
   console.log("Starting a throwaway backend on a temp data dir...");
   // Not gated on `chatReview` (it used to be) - Home's own WeatherCard
@@ -3837,56 +3716,10 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  // Occupies REPAIR_SEED_PORT ourselves before the backend starts, so its
-  // own Wyoming satellite server (backend/src/index.ts) fails to bind and
-  // raises a real Repairs issue ("The Wyoming satellite server failed to
-  // start") every run - the settings-repairs route otherwise renders an
-  // empty list, and its severity Badge (a real color-contrast bug, found
-  // live 2026-09-13 only because a DIFFERENT failure - an engine dying
-  // under port contention - happened to raise one) went unexercised by
-  // this matrix indefinitely. A real application failure, not a fake
-  // database row: nothing about the fix below depends on this being the
-  // SPECIFIC issue it happens to be, only that Repairs has at least one
-  // open, real, severity-carrying issue on every run.
-  // A third code review caught everything from here through the backend
-  // spawn as unprotected: it runs before the try/finally a few dozen
-  // lines down that stops `chatModel` and removes `DATA_DIR`, and this
-  // fix's own new throw points (two more reserveFreePort() calls, the
-  // retry loop above) sit right in that gap - a collision or a bad
-  // Bun.listen here would leave `chatModel` (already started above) as
-  // an orphaned process and `DATA_DIR` on disk with nothing to clean
-  // either up (the next run's own sweep would eventually reclaim
-  // `DATA_DIR` by its owner-pid marker, but not the leaked process).
-  // Caught explicitly and cleaned up before rethrowing, rather than
-  // widening the real try/finally this far up and changing what it
-  // means for every capture step already inside it.
-  let REPAIR_SEED_PORT: number;
-  let repairSeedListener: import("bun").TCPSocketListener<undefined> | undefined;
+  // Keep the HTTP listener independent; intentionally exercise the
+  // Repairs surface's real Wyoming bind-failure path via its fixture flag.
   let backend: ReturnType<typeof Bun.spawn>;
   try {
-    // #105: reserved per run, not the fixed 18799 two concurrent runs
-    // used to fight over (this file's own header comment on why). A
-    // third code review caught this reservation as its own copy of the
-    // very bug it fixes: PORT (above) was already released back to the
-    // OS the instant its own reserveFreePort() call finished, so this
-    // call - a completely independent bind-then-release - can legally
-    // be handed that exact same number back, and Bun.listen below would
-    // then occupy the port the backend a few lines down is about to try
-    // to bind, guaranteeing the collision this file exists to prevent.
-    // Retried until it differs from PORT; PORT itself is never bound
-    // until the backend spawns further down, so nothing here can bind
-    // out from under it either.
-    REPAIR_SEED_PORT = reserveFreePort();
-    while (REPAIR_SEED_PORT === PORT) REPAIR_SEED_PORT = reserveFreePort();
-    // `0.0.0.0`, matching wyomingServer.ts's own bind address exactly - a
-    // loopback-only listener here (127.0.0.1) does NOT collide with the
-    // backend's wildcard bind on the same port (confirmed live, macOS: the
-    // Wyoming server bound successfully anyway, "MaiPai Home Wyoming
-    // satellite server listening on tcp://0.0.0.0:18799", and no issue was
-    // raised - two listeners on the same port but different specific
-    // addresses coexist under BSD socket semantics unless both bind the
-    // same wildcard address).
-    repairSeedListener = Bun.listen({ hostname: "0.0.0.0", port: REPAIR_SEED_PORT, socket: { data() {}, open() {} } });
     backend = Bun.spawn({
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
@@ -3902,24 +3735,29 @@ async function main() {
       // depends on the box being empty." This matrix never needs real
       // speech, so the engine should never spawn at all, not just not
       // collide.
-      env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: String(REPAIR_SEED_PORT), MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
-      stdout: "ignore",
+      env: { ...process.env, PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
+      stdout: "pipe",
       stderr: "inherit",
     });
+    try {
+      const backendStdout = backend.stdout;
+      if (!backendStdout || typeof backendStdout === "number") throw new Error("Screenshot backend stdout pipe was not created");
+      const port = await waitForBackendPort(backendStdout);
+      BASE_URL = `http://localhost:${port}`;
+    } catch (startupError) {
+      backend.kill();
+      await backend.exited;
+      throw startupError;
+    }
   } catch (err) {
-    // A fourth code review caught this catch itself as incomplete two
-    // ways: it never stopped `repairSeedListener` when Bun.listen
-    // succeeded but the backend's own Bun.spawn then threw (a bound TCP
-    // socket leaking for the rest of the process's life), and its own
-    // cleanup calls were unguarded, so a throw from one of them (say,
-    // chatModel.stop() called on an already-torn-down server) would mask
+    // Keep cleanup steps independent and best-effort, so a throw from
+    // one of them (say, chatModel.stop() called on an already-torn-down server) would mask
     // the real error above and skip whatever cleanup came after it.
     // Every step is now independent and best-effort, and `err` - the
     // actual cause - is always what gets rethrown, never whatever a
     // cleanup step itself raised.
     try { chatModel.stop(); } catch { /* best effort */ }
-    try { repairSeedListener?.stop(true); } catch { /* best effort */ }
-    try { rmSync(DATA_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
+    try { removeOwnedDemoDataDir(DATA_DIR, DATA_OWNER.token); } catch { /* best effort */ }
     throw err;
   }
 
@@ -4275,12 +4113,15 @@ async function main() {
   } finally {
     await browser?.close();
     backend.kill();
-    chatModel.stop();
-    pictureSearchServer?.stop(true);
-    websearchFixture?.stop(true);
-    repairSeedListener.stop(true);
-    await backend.exited;
-    rmSync(DATA_DIR, { recursive: true, force: true });
+    try { chatModel.stop(); } catch { /* best effort */ }
+    try { pictureSearchServer?.stop(true); } catch { /* best effort */ }
+    try { websearchFixture?.stop(true); } catch { /* best effort */ }
+    try { await backend.exited; } catch { /* best effort */ }
+    removeOwnedDemoDataDir(DATA_DIR, DATA_OWNER.token);
+  }
+  } catch (startupError) {
+    try { removeOwnedDemoDataDir(DATA_DIR, DATA_OWNER.token); } catch { /* best effort */ }
+    throw startupError;
   }
 }
 

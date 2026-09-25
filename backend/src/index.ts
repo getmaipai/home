@@ -29,7 +29,7 @@ import { shutdownEngines } from "@/lib/hubShutdown";
 import { ensureSecretPepperReady } from "@/lib/secret";
 import { KeystoreProtectionFailedError } from "@/lib/keystore";
 
-const port = Number(process.env.PORT ?? 8787);
+const configuredPort = Number(process.env.PORT ?? 8787);
 installConsoleFileMirror();
 installFatalErrorHandlers(shutdownEngines);
 
@@ -306,7 +306,7 @@ const initialTls = hasHouseholdLeaf() ? getHouseholdLeafForServer() : null;
 // the connection before routes/host.ts's own 90s RESTART_TIMEOUT_MS ever
 // got a chance to respond. See that file's own header for the full story.
 let server = Bun.serve({
-  port,
+  port: configuredPort,
   fetch: app.fetch,
   // Session C step 5: routes/stt.ts's WS /api/stt/stream, hono/bun's own
   // adapter (upgradeWebSocket() calls server.upgrade() internally; this
@@ -334,7 +334,7 @@ printStartupUrls();
 // household on a network that filters multicast just doesn't get
 // auto-discovery, the same "never a false alarm, never a hard failure"
 // posture this step's other guards already take.
-void advertiseMdns({ port, tls: initialTls !== null });
+void advertiseMdns({ port: server.port!, tls: initialTls !== null });
 
 // Fires only when ensureHouseholdLeaf() actually regenerated a leaf
 // (never on every call) - rebinds the live server with the new
@@ -357,12 +357,12 @@ void advertiseMdns({ port, tls: initialTls !== null });
 // gap), but no longer a silent, uncaught exception either.
 onLeafRenewed((leaf) => {
   server.stop(true);
-  void rebindWithRetry(() => Bun.serve({ port, fetch: app.fetch, websocket, idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS, tls: { cert: leaf.certPem, key: leaf.keyPem } }))
+  void rebindWithRetry(() => Bun.serve({ port: server.port!, fetch: app.fetch, websocket, idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS, tls: { cert: leaf.certPem, key: leaf.keyPem } }))
     .then(({ server: newServer }) => {
       server = newServer;
       servingTls = true;
       printStartupUrls();
-      void advertiseMdns({ port, tls: true });
+      void advertiseMdns({ port: newServer.port!, tls: true });
     })
     .catch((err: unknown) => {
       const message = (err as Error).message;
@@ -398,10 +398,17 @@ onLeafRenewed((leaf) => {
 // rebind above uses: Wyoming is a secondary protocol for satellite
 // devices, not something a chat/embed/HTTP-serving hub should die over.
 let wyomingServer: ReturnType<typeof startWyomingServer> | null = null;
+let screenshotPortBlocker: import("bun").TCPSocketListener<undefined> | undefined;
 try {
-  wyomingServer = startWyomingServer(Number(process.env.MAIPAI_WYOMING_PORT ?? 10700));
+  const configuredWyomingPort = Number(process.env.MAIPAI_WYOMING_PORT ?? 10700);
+  if (process.env.MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE === "1") {
+    screenshotPortBlocker = Bun.listen({ hostname: "0.0.0.0", port: configuredWyomingPort, socket: { data() {}, open() {} } });
+    console.error("[index] screenshot fixture requested Wyoming bind failure");
+  }
+  wyomingServer = startWyomingServer(screenshotPortBlocker?.port ?? configuredWyomingPort);
   console.log(`MaiPai Home Wyoming satellite server listening on tcp://0.0.0.0:${wyomingServer.port}`);
 } catch (err) {
+  screenshotPortBlocker?.stop(true);
   const message = (err as Error).message;
   console.error(`[index] Wyoming satellite server failed to start, satellite devices (Home Assistant, a voice puck) won't be reachable: ${message}`);
   void raiseIssue({
