@@ -8819,9 +8819,9 @@ on a spec tag that was never cut.
       remaining parts of the original item, both genuinely Jesse's
       call, are split out below rather than folded back into one line.
 
-- [ ] **Jesse's call: commit the platform plan into `home/spec/design/`**
-      (S decision; asked 2026-09-25, answer: not yet - stays open, not
-      urgent) - `home/spec/` still does not exist (checked 2026-09-25);
+- [ ] **Commit the platform plan into `home/spec/design/`** (S; answered
+      by Jesse 2026-09-25: not yet - stays open, deliberately deferred,
+      not a pending question) - `home/spec/` still does not exist (checked 2026-09-25);
       the plan lives at `~/.claude/plans/purring-chasing-noodle.md`,
       outside every repo and unversioned. **The `home/agents.md` naming
       claim below is stale, already fixed**: the real file is
