@@ -153,6 +153,118 @@ the coordinator's own call, 2026-09-24.
 - [ ] **MEDIA-SEARCH-01: pictures and video, one merged item, approved 2026-09-24** (S, after `LOOKUP-FED-01`; merges `IMAGE-SEARCH-01`). Objective: `docs/plans/knowledge-sources-2026-09-24.md`'s "Video search" section. Results come from SearXNG's images/videos categories through the one `lookup()`, its limiter and its cache - the hub never downloads a video. Card: a thumbnail through Home's own image proxy, title, site, length and date; tapping plays on the viewer's own device (the site's privacy-enhanced embed or its page), never routed through the hub. A child or teen only ever gets `SEARCH-SAFE-01`'s own safe-search-capable engines, so no YouTube in results unless an adult allows it for that person. How a turn asks for media (the lookup returning media rows with the card shown vs. one dedicated "find media" tool) is decided by measurement on replay rows ("show me the trailer" vs. "who directed it"), the same discipline `#150`/`READ-PAGE-01` already use. `YOUTUBE-API-01` (optional, off by default, the household's own key) comes after this ships. Exit: the replay bench table in dev.md, then `bash scripts/check.sh`.
 - [ ] **LOOKUP-MEASURE-01: the replay set across sources and arms** (M, after `LOOKUP-FED-01`). Three row groups (evergreen facts, events after the snapshot, how-to) across four arms (today, federated, archive only, SearXNG down): correct and grounded, stale answers on recent rows, latency, outbound requests per turn. The baseline arm runs before `LOOKUP-FED-01` lands. Exit: the bench table in dev.md.
 
+## Incognito (2026-09-24, priority for Saturday's push)
+
+Design record: `docs/plans/privacy-mode-2026-09-24.md`, corrected
+2026-09-25 (session lock replaces a forced idle wipe, blank start
+confirmed, minors allowed by default). Three of five original open
+questions are now Jesse's own settled calls; two remain (named per
+row below). Genuinely L overall - chunked here into buildable pieces,
+in a sensible build order. `[x]` foundation pieces already exist per
+the design doc's own "What already exists" section.
+
+- [x] **The per-conversation temporary-session foundation** -
+      `backend/src/lib/conversationHistory.ts`'s `temporarySessions`
+      map, idle expiry (`TEMPORARY_SESSION_IDLE_MS`), process cap
+      (`TEMPORARY_SESSION_MAX`), `isTemporaryConversation()`,
+      `policy.ts`'s `memory:write` refusal for `state.temporary`.
+- [ ] **INCOGNITO-01: the session-level mode** (M). A shell/session
+      flag above the per-conversation one, read the same way an age
+      band or capability already is - not chat-specific plumbing.
+      Every new conversation opened while it's on is automatically
+      marked temporary; the thread list swaps to a separate Incognito
+      view (never merged with, never toggled from, the normal list).
+      Replaces `CHAT-WELCOME-01`'s per-chat toggle outright once this
+      ships. Files: the session/shell state where age band and
+      capability flags already live, `frontend/src/apps/chat/
+      ChatPage.tsx`'s thread-list rendering. Exit: `bash scripts/check.sh`.
+- [ ] **INCOGNITO-02: memory stays out on the read side too** (S,
+      after `INCOGNITO-01`). `policy.ts` already refuses `memory:write`
+      for a temporary conversation; nothing yet stops a normal `recall()`
+      read from surfacing the person's own accumulated memory during an
+      Incognito session. Fix the read side the same place the write
+      side is already gated. Exit: `bash scripts/check.sh`.
+- [ ] **INCOGNITO-03: the companion goes fully off, via bare mode** (S,
+      after `INCOGNITO-01`). Reuses `ADMIN-COMPARE-01`'s existing bare-
+      mode mechanism (`NextChatPage.tsx`) rather than a second way to
+      disable the persona/voice layer - Incognito on means bare mode
+      on, no new plumbing. Exit: `bash scripts/check.sh`.
+- [ ] **INCOGNITO-04: the per-package manifest behavior field** (M,
+      spec-first in `commons`, after `INCOGNITO-01`). A required
+      `incognito: blocked | ephemeral | unaffected` field on every
+      package manifest, enforced the same way `CAP-GATE-01` already
+      enforces capability requirements - a package that omits it fails
+      to install or fails CI, never a silent default. `blocked`:
+      unavailable while Incognito is on (sharing, `CHANNELS-01`,
+      anything that publishes for the family). `ephemeral`: works
+      normally, nothing it writes persists past the session (chat,
+      the Images app's generated-content tab). `unaffected`: no
+      personal data touched, nothing to gate. Files: `commons`'s
+      `spec/schemas/manifest.schema.json`, every existing package's
+      own manifest (a real audit, not a default value), the host's one
+      shared reader every route/install check calls (mirrors
+      `meetsMinRole`'s pattern). Exit: `bash scripts/check.sh` full
+      scope in `commons` and `home`.
+- [ ] **INCOGNITO-05: the sharing/social guard** (M, after
+      `INCOGNITO-04`). One shared check every sharing/social/
+      publishing route calls, the same shape `meetsMinRole` already
+      has - a new social feature is safe by construction the day it's
+      added. **Open question: the exact route inventory** - `STORE-
+      SHARE-01`'s share pointers and any route `INCOGNITO-04` marks
+      `blocked` are known now; `CHANNELS-01` and any future "publish
+      for the family" action get added to the guard's own coverage
+      list as each ships, not guessable today. Exit: `bash scripts/check.sh`.
+- [ ] **INCOGNITO-06: download-to-keep for generated content** (S,
+      after `INCOGNITO-01`). The Images app's (and any future
+      generation app's) "your generated content" tab works normally
+      during an Incognito session - browsable like any other time,
+      cleared only when the whole mode switches off. Downloading is
+      the one deliberate action that survives past that exit, moving
+      the file onto the person's own device, outside MaiPai's data
+      model. Exit: `bash scripts/check.sh`.
+- [ ] **INCOGNITO-07: session lock with PIN re-entry** (M, after
+      `INCOGNITO-01`; **open question: standalone capability or
+      Incognito-specific** - likely generally useful beyond Incognito,
+      e.g. locking a shared device regardless of mode, worth building
+      as its own primitive Incognito then adopts rather than
+      Incognito-only plumbing; decide before implementing). Replaces
+      the forced-wipe idle timeout an earlier design draft proposed
+      (Jesse's own correction, 2026-09-25): the session locks behind a
+      PIN after inactivity, content stays intact, unlocked only by
+      re-entering the PIN. **Admin-configurable per account** - a
+      household can require it for some people (an adult) and not
+      others (a child's own account). Exit: `bash scripts/check.sh`.
+- [ ] **INCOGNITO-08: visual design** (S, after `INCOGNITO-01`). Three
+      signals, never color alone: a colored border/frame around the
+      content area (not a full background recolor), a fixed
+      icon-plus-"Incognito" label, a distinct always-visible toggle
+      never buried in a menu. Purple accent (verify real contrast in
+      both themes before picking the token), a new `data-theme`
+      variant on the shell's existing theme-token mechanism. Entry: a
+      one-time explanation, never repeated. Exit: a state-aware
+      warning only when there's something live to lose, never fixed -
+      mirrors the unrestricted-mode entry/exit pattern
+      (`.github/docs/SAFETY.md`). Exit check: `bash scripts/check.sh`
+      plus captures opened and judged, both themes.
+- [ ] **INCOGNITO-09: minor access, resolve the inconsistency** (S,
+      after `INCOGNITO-01`). Minors are allowed in Incognito by
+      default (Jesse's own call, 2026-09-25) - a real change from
+      Temporary chat's current adult-only-by-role gate
+      (`canHaveTemporaryChatRole`, `NextChatPage.tsx`), which
+      `INCOGNITO-01` retires in favor of the session-level mode. Since
+      `CHAT-WELCOME-01`'s adult-only floor is going away with it,
+      confirm nothing else still assumes Incognito-capable implies
+      adult (the header menu entry gating named in the design doc, any
+      other call site) before landing `INCOGNITO-01`. Exit: `bash scripts/check.sh`.
+- [ ] **INCOGNITO-10: personalized suggestions follow the mode** (S,
+      after `INCOGNITO-01`; connects to the suggestions safety note,
+      `.github/docs/SAFETY.md`, same date). Incognito's own new-chat
+      suggestions may draw on the current visible turn, never on
+      memory, search history, or an inferred profile - the safety
+      note's hard floor, unchanged by the mode; normal mode's
+      suggestions stay generic always, unaffected by this item. Exit:
+      `bash scripts/check.sh`.
+
 ## Household storage (2026-09-23)
 
 - [ ] **PEOPLE-01: the People section as a household browser, pets included, profiles like a creator page** (L, design pass first; owner's ask 2026-09-23). Objective: the People section lists every household member including pets, browsed the way a short-video app browses creators (a grid of cards with picture and name, tap to open), and a member's profile reads like a creator page: their picture, a description in their own words or a parent's, and the images and videos they have shared (the household store's share pointers from `docs/plans/household-storage-2026-09-23.md`, so a profile shows only what its owner shared with the viewer or the household, never the owner's private files), with the existing person settings behind an edit action rather than on the page. Design questions for the record before any row is chunked: the terminology, decided once (Settings calls them "users" today; the owner's framing 2026-09-23: an account is the login of a specific person, and the People section is wider than accounts: the household's members, its pets, and the people the hub knows without an account, the delivery driver a camera recognises, a neighbour, a grandparent who never logs in); how the people without accounts are managed (remove, merge two records the hub thought were different, rename, forget everything about someone) and where that lives, the People section itself or Settings; whether a pet is a Person with a kind or its own spec record (the spec's Entity kinds already carry pets; decide which the profile reads and how consent and settings apply to a pet's page), what a child sees on an adult's page, what the page shows before anyone has shared anything, and how the shadcndashboard profile page (used as it ships) composes with the kit's media grid so nothing is hand-built. Files: `frontend/src/next/pages/` (the People page), the profile page from the vendored dashboard, the storage rows STORE-SHARE-01 and STORE-PAGE-01 this depends on. Mirror: the dashboard's profile page and card grid. Acceptance (after the design pass chunks it): the People page shows a seeded household with a pet as cards, opening a card shows the picture, the description and a grid of that member's shared images and videos, a child's view hides what was not shared with them, captured at 1440 and 390 light and dark. Out of scope until the storage rows land: uploads and sharing themselves. Exit: the design record, then per-row `bash scripts/check.sh`.
