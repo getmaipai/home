@@ -1566,13 +1566,9 @@ describe("turnNext.ts: COMMAND-FAIL-01, a failed pattern outcome continues the t
       const result = await withStub({ reply: () => "I couldn't look that up, but Radiohead is a British rock band." }, () => runTurnNext(people.owner, "chat", "look up the artist Radiohead"));
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      // buildTurnValue()'s own source label is derived from the LAST
-      // outcome's `via` alone (turnNext.ts ~303), never its `status` -
-      // a real, separate finding filed for the coordinator, out of
-      // this item's own files (commands.ts/answer.ts/outputGate.ts):
-      // a failed-but-continued pattern outcome reports `source:
-      // "plugin"` even though the reply text genuinely came from the
-      // model round below. The reply TEXT is this item's own contract.
+      // The failed pattern is recorded, but the delivered reply was
+      // composed by the model round that followed it.
+      expect(result.value.source).toBe("model");
       expect(result.value.reply.text).not.toContain("MCP error");
       expect(result.value.reply.text).not.toContain("musicbrainz");
       expect(result.value.reply.text).not.toBe(COMPOSE_FAILURE_LINE);

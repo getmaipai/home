@@ -384,7 +384,8 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // Both commands.ts vias reach `answer` the identical way, so only
     // the source label here needed correcting, not the machine.
     const lastVia = state.outcomes.at(-1)?.via;
-    const source: TurnValue["source"] = lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
+    const failedPattern = state.outcomes.some((outcome) => outcome.via === "pattern" && outcome.status === "failed");
+    const source: TurnValue["source"] = failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
   }
   return value;
