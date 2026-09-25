@@ -912,6 +912,41 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     }
   });
 
+  test("selecting an existing thread from the peeked rail collapses it", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations/conv-existing/turns")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/conversations/conv-existing")) return Promise.resolve(Response.json({ id: "conv-existing", surface: "chat", title: "Existing conversation", created_at: "2026-09-24T00:00:00.000Z" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([{ id: "conv-existing", surface: "chat", title: "Existing conversation", pinned: false, turn_count: 0, last_turn_at: null, created_at: "2026-09-24T00:00:00.000Z" }]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByText("Existing conversation");
+      const railNode = rail();
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
+      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("absolute");
+
+      fireEvent.click(within(rail()).getByText("Existing conversation"));
+
+      await waitFor(() => {
+        expect(classes(rail())).toContain("hidden");
+        expect(classes(rail())).not.toContain("absolute");
+        expect(classes(rail())).toContain("w-0");
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("a click that changes the rail's width animates it", async () => {
     const restore = stubFetch();
     try {

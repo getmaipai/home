@@ -1651,6 +1651,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // the same signal the phone/tablet Sheet already does.
   const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, toggleTemporary, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
+    setRailPeeked(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
   });
