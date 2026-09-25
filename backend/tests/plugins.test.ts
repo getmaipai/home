@@ -254,6 +254,14 @@ async function child(owner: TestClient) {
   return client;
 }
 
+async function teen(owner: TestClient) {
+  const created = await owner.post("/api/people", { displayName: "Nova", role: "teen" });
+  const person = (await created.json()) as { id: string };
+  const client = new TestClient();
+  await client.post("/api/auth/select", { personId: person.id });
+  return client;
+}
+
 describe("GET /api/plugins", () => {
   test("requires auth", async () => {
     const res = await new TestClient().get("/api/plugins");
@@ -265,6 +273,25 @@ describe("GET /api/plugins", () => {
     const res = await client.get("/api/plugins");
     const body = (await res.json()) as Array<{ id: string }>;
     expect(body.some((m) => m.id === "remember")).toBe(true);
+  });
+
+  test("filters packages by the signed-in person's minimum role", async () => {
+    const ownerClient = await owner();
+    const ownerResponse = await ownerClient.get("/api/plugins");
+    const ownerPackages = (await ownerResponse.json()) as Array<{ id: string }>;
+    const allIds = ownerPackages.map((manifest) => manifest.id).sort();
+    expect(allIds).toContain("lock-doors");
+
+    const childClient = await child(ownerClient);
+    const childResponse = await childClient.get("/api/plugins");
+    const childPackages = (await childResponse.json()) as Array<{ id: string }>;
+    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => id !== "lock-doors"));
+
+    const teenClient = await teen(ownerClient);
+    const teenResponse = await teenClient.get("/api/plugins");
+    const teenPackages = (await teenResponse.json()) as Array<{ id: string }>;
+    expect(teenPackages.map((manifest) => manifest.id).sort()).toEqual(allIds);
+    expect(teenPackages.map((manifest) => manifest.id)).toContain("lock-doors");
   });
 });
 
