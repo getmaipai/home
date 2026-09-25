@@ -28,7 +28,7 @@ import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import { promptSurfaceClassFor } from "@/lib/surfaceClass";
 import { buildStablePrefix } from "@/lib/turnEngine";
-import { planLine } from "@/lib/register";
+import { planLineForTurnMachine } from "@/lib/register";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
 // GROUND-01: "utterance" is excluded here too, same as "window" - it is
@@ -222,7 +222,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // in this function, before this record; drift over ten spoken turns
   // becomes a replay row (TRUEUP-01's own tests), never a line back in
   // the prompt.
-  messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}How to answer this one: ${planLine(plan, signal, promptSurfaceClass)}` });
+  messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}How to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass)}` });
   messages.push({ role: "user", content: utterance });
   return messages;
 }

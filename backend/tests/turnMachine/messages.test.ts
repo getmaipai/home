@@ -177,7 +177,16 @@ describe("contextToMessages(): U4b, the persona prefix, the reanchor and the pla
     const out = messages([], "what's the weather");
     const volatileMessage = out.find((m) => m.role === "system" && m.content.includes("How to answer this one:"));
     expect(volatileMessage).toBeDefined();
-    expect(volatileMessage?.content).toContain("a statement about themselves");
+    expect(volatileMessage?.content).toContain("a statement about the person asking");
+  });
+
+  test("the issue 145 world question is framed as an answer about the world", () => {
+    const worldSignal = { ...fallbackSignal("what is technical benchmarking and why do you need it", "adult"), primary_act: "question" as const, target: "world" as const };
+    const worldPlan = planFor({ ...planInput, signal: worldSignal });
+    const out = contextToMessages([], "what is technical benchmarking and why do you need it", DEFAULT_PERSONA, worldPlan, worldSignal, "spoken");
+    const volatileMessage = out.find((m) => m.role === "system" && m.content.includes("How to answer this one:"));
+    expect(volatileMessage?.content).toContain("a question about the world");
+    expect(volatileMessage?.content).not.toContain("about themselves");
   });
 
   // The written prompt on tier 1, decided (dev.md, the coordinator's

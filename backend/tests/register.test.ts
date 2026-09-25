@@ -65,6 +65,10 @@ describe("planFor", () => {
     const line = planLine(planFor(input(signal)), signal);
     expect(line).toContain("acknowledge the feeling first"); expect(line).toContain("no question");
   });
+  test("the frozen planLine keeps its legacy wording for a world target", () => {
+    const signal = { ...base("question"), target: "world" as const };
+    expect(planLine(planFor(input(signal)), signal)).toContain("a question about themselves");
+  });
 
   // U4/RESP-01: no surfaceClass pins today's exact numbers, so
   // turnEngine.ts's four call sites (none of which pass it) keep

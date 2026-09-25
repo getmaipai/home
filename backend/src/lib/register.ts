@@ -207,7 +207,7 @@ export function planFor(input: PlanInput): ReplyPlan {
  * model given permission to be short took it. Restated as the floor
  * itself, in instruction form: as complete as the bare model's own
  * answer, then in the companion's voice. */
-export function planLine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass = "spoken"): string {
+function planLineAbout(plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, about: string): string {
   const act = signal.primary_act === "inform" ? "a statement" : `a ${signal.primary_act}`;
   const emotion = signal.expressed_emotion === "neutral" ? "neutral" : signal.expressed_emotion;
   const required = Object.entries(plan.moves).filter(([, value]) => value === "required").map(([move]) => move.replace("_", " "));
@@ -216,5 +216,26 @@ export function planLine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: Surf
   const requirements = required.length ? required.join(", ") : "no required move";
   const bans = [forbidden.includes("ask_back") || required.includes("care") ? "no question" : "", forbidden.includes("point") ? "no tasks" : "", plan.playfulness === "forbidden" ? "no playfulness" : ""].filter(Boolean).join(", ");
   const lead = required.includes("care") ? "acknowledge the feeling first" : requirements;
-  return `${act} about themselves, ${emotion}, ${signal.emotion_intensity}: ${lead}, ${length}, ${bans || "no unnecessary follow-up"}.`;
+  return `${act} about ${about}, ${emotion}, ${signal.emotion_intensity}: ${lead}, ${length}, ${bans || "no unnecessary follow-up"}.`;
+}
+
+/** Frozen chat path: preserve its established wording until the platform
+ * flip. The turn-machine path uses planLineForTurnMachine() below, which
+ * reads the already-classified signal target. */
+export function planLine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass = "spoken"): string {
+  return planLineAbout(plan, signal, surfaceClass, "themselves");
+}
+
+/** New turn-machine path: name the subject the signal classifier chose,
+ * so a world question cannot be prompted as an answer about the speaker
+ * (or the companion). */
+export function planLineForTurnMachine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass = "spoken"): string {
+  const about = {
+    self: "the person asking",
+    other: "the other person",
+    hub: "this home",
+    world: "the world",
+    computed: "the calculation",
+  }[signal.target];
+  return planLineAbout(plan, signal, surfaceClass, about);
 }

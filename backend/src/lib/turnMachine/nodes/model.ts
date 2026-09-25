@@ -27,7 +27,7 @@ import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, new
 import { visibleReplyMaxTokens } from "@/lib/turnEngine";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
-import { planLine } from "@/lib/register";
+import { planLineForTurnMachine } from "@/lib/register";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages } from "../messages";
 import type { Node, TurnState, NodeOutcome } from "../contract";
@@ -608,7 +608,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
       return count + (Array.isArray(rows) ? rows.length : 0);
     }, 0);
     const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount);
-    const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? phrasing : `${planLine(state.plan, state.signal, promptSurfaceClass)} ${phrasing}` };
+    const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? phrasing : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${phrasing}` };
     messages = [...state.messages, assistantMessage, ...resultMessages, instruction];
     // The same tools block the forced/offered round itself sent -
     // reused verbatim (see contract.ts's own `lastTools` doc comment:
