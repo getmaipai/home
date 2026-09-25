@@ -265,6 +265,18 @@ export const pendingEpisodeEmbeddings = sqliteTable("pending_episode_embeddings"
   queuedAt: text("queued_at").notNull(),
 });
 
+// The weekly contradiction sweep is deliberately resumable across runs:
+// a busy household skips an LLM check but must not lose that pair, and
+// the scan itself has a separate visited-pair ceiling. This household-
+// wide cursor records the last pair visited in the current deterministic
+// group ordering; it is cleared only after the sweep reaches its end.
+export const memoryConsolidationCursor = sqliteTable("memory_consolidation_cursor", {
+  id: integer("id").primaryKey(),
+  groupKey: text("group_key").notNull(),
+  afterAId: text("after_a_id").notNull(),
+  afterBId: text("after_b_id").notNull(),
+});
+
 // Mirrors spec/schemas/setting-value.schema.json (4.6): one row per
 // (scope, key), scope holding the full spec string ("household",
 // "person:<id>", or "device:<id>") rather than a separate kind+id pair,

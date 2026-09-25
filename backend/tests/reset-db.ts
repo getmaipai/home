@@ -19,6 +19,7 @@ import {
   episodes,
   episodeEmbeddings,
   pendingEpisodeEmbeddings,
+  memoryConsolidationCursor,
   idSequences,
   settingsValues,
   scheduledJobs,
@@ -93,6 +94,7 @@ function assertDisposableTestDataDir(): void {
 export function resetDb(): void {
   assertDisposableTestDataDir();
   db.delete(approvals).run();
+  db.delete(memoryConsolidationCursor).run();
   db.delete(grants).run();
   db.delete(openQuestions).run(); // ASK-01: references people
   db.delete(replyConstraints).run(); // CONS-01: conversation-scoped constraints

@@ -1241,6 +1241,85 @@ describe("runJudgeBatch()", () => {
 });
 
 describe("runConsolidation()", () => {
+  async function largeContradictionGroup() {
+    const { actor } = await owner();
+    for (let i = 0; i < 34; i++) {
+      const created = remember(actor, {
+        text: `Marlow has durable test fact ${i}`,
+        category: "identity",
+        tier: "durable",
+        scope: "person",
+        person: actor.id,
+        source: "test",
+        importance: 0.8,
+      });
+      if (!created.ok) throw new Error("setup failed");
+    }
+
+    const { sqlite } = await import("@/db");
+    const ordered = sqlite
+      .query("SELECT id, text FROM memory_records WHERE status = 'active' AND tier = 'durable' AND scope = 'person' AND person = ? AND category = 'identity' AND source != ? ORDER BY created_at, id")
+      .all(actor.id, PROFILE_SOURCE) as Array<{ id: string; text: string }>;
+    for (let i = 0; i < ordered.length; i++) {
+      // Alternating vectors have cosine ~= 0.707 across unlike neighbors
+      // (eligible) and 1 across like neighbors (outside the range).
+      const vector = i % 2 === 0 ? [1, 1, 0, 0] : [1, 0, 0, 0];
+      sqlite
+        .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
+        .run(ordered[i]!.id, Buffer.from(new Float32Array(vector).buffer));
+    }
+    const pairs: Array<[typeof ordered[number], typeof ordered[number]]> = [];
+    for (let i = 0; i < ordered.length; i++) {
+      for (let j = i + 1; j < ordered.length; j++) pairs.push([ordered[i]!, ordered[j]!]);
+    }
+    return { pairs };
+  }
+
+  test("keeps busy-household pair visits under the scan ceiling", async () => {
+    await largeContradictionGroup();
+    const lease = acquireTurnLease();
+    try {
+      const result = await runConsolidation();
+      expect(result.contradictionPairsVisited).toBe(500);
+    } finally {
+      lease.release();
+    }
+  });
+
+  test("resumes after busy skipped pairs on the next run", async () => {
+    const { pairs } = await largeContradictionGroup();
+    const busySkippedPair = pairs[0]!;
+    const lease = acquireTurnLease();
+    try {
+      const busy = await runConsolidation();
+      expect(busy.contradictionPairsVisited).toBe(500);
+    } finally {
+      lease.release();
+      __resetTurnActivityForTests();
+    }
+
+    const { sqlite } = await import("@/db");
+    let drainRuns = 0;
+    while (sqlite.query("SELECT id FROM memory_consolidation_cursor WHERE id = 1").get() && drainRuns < 10) {
+      await withScriptedJudge(() => ({ contradicts: false }), () => runConsolidation());
+      drainRuns++;
+    }
+    expect(drainRuns).toBeLessThan(10);
+    expect(sqlite.query("SELECT id FROM memory_consolidation_cursor WHERE id = 1").get()).toBeNull();
+
+    // The first pair was inside the busy run's bounded slice, where the
+    // idle gate deliberately skipped its LLM call. After the cursor
+    // completes the rest of the sweep and wraps, the next run checks it.
+    const checkedPairs: string[] = [];
+    await withScriptedJudge((schemaName, request) => {
+      if (schemaName === "memory_contradiction") checkedPairs.push(request.messages.find((message) => message.role === "user")?.content ?? "");
+      return schemaName === "profile_paragraph" ? { text: "A profile." } : { contradicts: false };
+    }, () => runConsolidation());
+
+    expect(checkedPairs[0]).toContain(busySkippedPair[0]!.text);
+    expect(checkedPairs[0]).toContain(busySkippedPair[1]!.text);
+  });
+
   test("supersedes the older of a genuinely contradicting pair and links it to the newer, surviving record", async () => {
     const { actor } = await owner();
     const older = remember(actor, {

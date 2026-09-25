@@ -1552,6 +1552,10 @@ export async function runJudgeBatch(): Promise<JudgeBatchResult> {
 const CONTRA_COSINE_MIN = 0.55;
 const CONTRA_COSINE_MAX = 0.86;
 const MAX_CONTRA_CHECKS_PER_RUN = 15;
+// A busy household still bounds this scan's CPU cost even when every
+// eligible LLM check is skipped. Independent from the model-call budget:
+// cursor persistence below makes the remaining pairs next week's work.
+const MAX_CONTRA_PAIRS_VISITED_PER_RUN = 500;
 
 const CONTRA_SCHEMA = {
   name: "memory_contradiction",
@@ -1673,16 +1677,19 @@ async function rewriteProfileParagraph(personRow: PersonRow): Promise<boolean> {
 
 export interface ConsolidateResult {
   contradictionsSuperseded: number;
+  contradictionPairsVisited: number;
   demoted: number;
   profilesRewritten: number;
 }
 
 /** Groups active durable records by (scope, person, category) and checks
- * every mid-similarity pair (cosine in [0.55, 0.86) - related but not a
- * near-duplicate) for a real contradiction, bounded per run the same way
- * legacy's own pass was. Then demotes never-recalled durable records
- * separately (pure code, no LLM). No actor: this is a household-wide
- * sweep, same shape as runMaintenance(). */
+ * mid-similarity pairs (cosine in [0.55, 0.86) - related but not a
+ * near-duplicate) for a real contradiction. Both model calls and visited
+ * pairs have independent per-run ceilings; the persisted scan cursor
+ * resumes the next run rather than dropping busy-household coverage.
+ * Then demotes never-recalled durable records separately (pure code, no
+ * LLM). No actor: this is a household-wide sweep, same shape as
+ * runMaintenance(). */
 export async function runConsolidation(): Promise<ConsolidateResult> {
   // Raw rows, no actor/canRead filtering - a household-wide sweep has to
   // see every person's durable records, including scope=person ones no
@@ -1712,60 +1719,111 @@ export async function runConsolidation(): Promise<ConsolidateResult> {
     byGroup.set(key, bucket);
   }
 
+  // Cursor positions only make sense against stable ordering, including
+  // across process restarts and newly inserted records.
+  const orderedGroups = [...byGroup.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, group]) => ({
+      key,
+      records: group.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)),
+    }));
+
   let contraChecks = 0;
+  let contradictionPairsVisited = 0;
   let contradictionsSuperseded = 0;
   const superseded = new Set<string>();
 
-  for (const group of byGroup.values()) {
+  const savedCursor = sqlite
+    .query("SELECT group_key, after_a_id, after_b_id FROM memory_consolidation_cursor WHERE id = 1")
+    .get() as { group_key: string; after_a_id: string; after_b_id: string } | null;
+  let startGroupIndex = 0;
+  let resumeAfter: { i: number; j: number } | null = null;
+  if (savedCursor) {
+    const exactGroupIndex = orderedGroups.findIndex((group) => group.key === savedCursor.group_key);
+    if (exactGroupIndex >= 0) {
+      startGroupIndex = exactGroupIndex;
+      const records = orderedGroups[exactGroupIndex]!.records;
+      const i = records.findIndex((record) => record.id === savedCursor.after_a_id);
+      const j = records.findIndex((record) => record.id === savedCursor.after_b_id);
+      // If either record left the group, restart that group. This can
+      // repeat work, but cannot skip a still-active pair permanently.
+      if (i >= 0 && j > i) resumeAfter = { i, j };
+    } else {
+      // If the saved group disappeared, continue at the next group in
+      // this cycle; groups inserted before it are included next cycle.
+      const nextGroupIndex = orderedGroups.findIndex((group) => group.key > savedCursor.group_key);
+      startGroupIndex = nextGroupIndex < 0 ? orderedGroups.length : nextGroupIndex;
+    }
+  }
+
+  let stoppedAtCeiling = false;
+  let latestCursor: { groupKey: string; aId: string; bId: string } | null = null;
+  for (let groupIndex = startGroupIndex; groupIndex < orderedGroups.length && !stoppedAtCeiling; groupIndex++) {
+    const { key, records: group } = orderedGroups[groupIndex]!;
     const vectors = vectorsFor(group.map((r) => r.id));
-    for (let i = 0; i < group.length && contraChecks < MAX_CONTRA_CHECKS_PER_RUN; i++) {
+    const firstI = groupIndex === startGroupIndex && resumeAfter ? resumeAfter.i : 0;
+    for (let i = firstI; i < group.length && !stoppedAtCeiling; i++) {
       const a = group[i]!;
-      if (superseded.has(a.id)) continue;
-      const va = vectors.get(a.id);
-      if (!va) continue;
-      for (let j = i + 1; j < group.length && contraChecks < MAX_CONTRA_CHECKS_PER_RUN; j++) {
+      const firstJ = groupIndex === startGroupIndex && resumeAfter && i === resumeAfter.i ? resumeAfter.j + 1 : i + 1;
+      for (let j = firstJ; j < group.length; j++) {
         const b = group[j]!;
-        if (superseded.has(b.id)) continue;
-        const vb = vectors.get(b.id);
-        if (!vb) continue;
-        const cos = cosineSimilarity(va, vb);
-        if (cos < CONTRA_COSINE_MIN || cos >= CONTRA_COSINE_MAX) continue;
-        // A code review (2026-09-06) found this LLM call had no idle
-        // gate at all, unlike runJudgeBatch()'s own turnActiveWithin()
-        // check right above - the identical shared-chat-slot contention
-        // that check exists to prevent, just reachable through the
-        // weekly consolidate job instead of the per-minute judge one.
-        // Skipped (not counted against contraChecks - no LLM call was
-        // actually spent) rather than the whole run gated at the top:
-        // this is a once-a-week job, and scheduler.ts computes its NEXT
-        // fire from the recurrence interval, not from when this run
-        // finished, so gating the whole function could silently drop an
-        // entire week's contradiction pass instead of just this one
-        // pair; an undetected contradiction waits for the next weekly
-        // run either way, never a correctness problem.
-        if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) continue;
-        contraChecks++;
-        const older = a.createdAt <= b.createdAt ? a : b;
-        const newer = older.id === a.id ? b : a;
-        if (await checkContradiction(older.text, newer.text)) {
-          if (supersedeInFavorOfExisting(older.id, newer.id, newer.createdAt)) {
-            superseded.add(older.id);
-            contradictionsSuperseded++;
-            // `a` itself just got retired: a code review (2026-09-05)
-            // found the inner loop kept pairing this now-dead record
-            // against every remaining `b` in the group (only `b` was
-            // ever re-checked against `superseded`, never `a` again
-            // after the top of this outer iteration), which could
-            // supersede the same old record a second time against a
-            // DIFFERENT target - silently orphaning whichever one it
-            // was first pointed at. Breaking here is exact, not a
-            // heuristic: once `a` is superseded, every further pair
-            // this outer iteration would form is meaningless.
-            if (older.id === a.id) break;
+        contradictionPairsVisited++;
+        latestCursor = { groupKey: key, aId: a.id, bId: b.id };
+        if (!superseded.has(a.id) && !superseded.has(b.id)) {
+          const va = vectors.get(a.id);
+          const vb = vectors.get(b.id);
+          if (va && vb) {
+            const cos = cosineSimilarity(va, vb);
+            if (cos >= CONTRA_COSINE_MIN && cos < CONTRA_COSINE_MAX) {
+              // A code review (2026-09-06) found this LLM call had no
+              // idle gate at all, unlike runJudgeBatch()'s own check -
+              // the same shared-chat-slot contention, reached through
+              // the weekly job. Skip only this pair: scheduler.ts
+              // computes its next fire from the recurrence interval, not
+              // when this run finished, so a whole-function gate could
+              // silently drop a week's contradiction pass. The durable
+              // cursor below ensures a skipped pair remains in the sweep.
+              if (!turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) {
+                contraChecks++;
+                const older = a.createdAt <= b.createdAt ? a : b;
+                const newer = older.id === a.id ? b : a;
+                if (await checkContradiction(older.text, newer.text)) {
+                  if (supersedeInFavorOfExisting(older.id, newer.id, newer.createdAt)) {
+                    superseded.add(older.id);
+                    contradictionsSuperseded++;
+                    // Once `a` is superseded, its remaining pairs are
+                    // meaningless. They are still advanced past as a
+                    // finite part of this sweep on subsequent visits.
+                    if (older.id === a.id) {
+                      if (contradictionPairsVisited >= MAX_CONTRA_PAIRS_VISITED_PER_RUN || contraChecks >= MAX_CONTRA_CHECKS_PER_RUN) {
+                        stoppedAtCeiling = true;
+                      }
+                      break;
+                    }
+                  }
+                }
+              }
+            }
           }
+        }
+        if (contradictionPairsVisited >= MAX_CONTRA_PAIRS_VISITED_PER_RUN || contraChecks >= MAX_CONTRA_CHECKS_PER_RUN) {
+          stoppedAtCeiling = true;
+          break;
         }
       }
     }
+  }
+
+  if (stoppedAtCeiling && latestCursor) {
+    sqlite.query(`INSERT INTO memory_consolidation_cursor (id, group_key, after_a_id, after_b_id)
+      VALUES (1, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+      group_key = excluded.group_key, after_a_id = excluded.after_a_id, after_b_id = excluded.after_b_id`)
+      .run(latestCursor.groupKey, latestCursor.aId, latestCursor.bId);
+  } else {
+    // Reaching the end closes this sweep. The next weekly run begins at
+    // the top, so new records and pairs inserted behind the cursor also
+    // receive coverage.
+    sqlite.query("DELETE FROM memory_consolidation_cursor WHERE id = 1").run();
   }
 
   const demoted = demoteNeverRecalledDurables();
@@ -1816,5 +1874,5 @@ export async function runConsolidation(): Promise<ConsolidateResult> {
     if (await rewriteProfileParagraph(personRow)) profilesRewritten++;
   }
 
-  return { contradictionsSuperseded, demoted, profilesRewritten };
+  return { contradictionsSuperseded, contradictionPairsVisited, demoted, profilesRewritten };
 }
