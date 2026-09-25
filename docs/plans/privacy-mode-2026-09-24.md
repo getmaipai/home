@@ -114,15 +114,20 @@ asterisk.
   point, and the normal thread list is unavailable while Incognito is
   on - not merged, not toggled between within the same view.
 - **Stays on until manually switched off - no duration cap needed
-  anymore.** With nothing persisting by default, the earlier worry
-  (weeks of accumulated Incognito content sitting around) doesn't
-  apply - there is no accumulation to worry about. What remains is
-  purely the live-session risk: someone walks away mid-session with
-  the device still showing active Incognito content on screen. **One
-  idle timeout** covers this - force-exit (and wipe whatever is live)
-  after inactivity. No second "hard cap from creation" timer is needed
-  the way an earlier draft proposed; that timer existed only to solve
-  the accumulation problem this design no longer has.
+  anymore, and no forced wipe on idle either (corrected 2026-09-25,
+  Jesse's own call).** With nothing persisting by default, the earlier
+  worry (weeks of accumulated Incognito content sitting around)
+  doesn't apply - there is no accumulation to worry about. The
+  live-session risk (someone walks away mid-session with active
+  Incognito content on screen) is covered by a **session lock with PIN
+  re-entry**, not a timeout that force-exits and wipes: the session
+  stays live and its content stays intact, just locked behind the PIN
+  until the right person re-enters it. **Admin-configurable per
+  account** - a household can require the lock for some people and not
+  others (an adult, yes; a child's own account, not required). This
+  replaces the single-idle-timeout mechanism an earlier draft of this
+  doc proposed; no second "hard cap from creation" timer either, same
+  as before.
 - **Visual design: three signals, never color alone.** A small badge
   is easy to miss from across a room; the real requirement (someone
   glancing at the screen who isn't the one holding it) needs something
@@ -175,27 +180,39 @@ refuses `memory:write` when `state.temporary` is set.
 
 Missing: a session-level mode above the per-conversation flag (marks
 every new conversation temporary automatically, drives the UI into a
-separate view, force-exits and wipes on the idle timer); the memory
-*read* half (new); the download-to-keep flow for generated content
-(new); the shared sharing/social guard (new, mirrors `meetsMinRole`).
+separate view, drives locking on a session-lock event rather than an
+idle wipe); the memory *read* half (new); the download-to-keep flow
+for generated content (new); the shared sharing/social guard (new,
+mirrors `meetsMinRole`); **the session lock + PIN re-entry mechanism
+itself (new) and its per-account admin setting** - likely a generally
+useful primitive beyond Incognito (a household may want session
+locking on a shared device regardless of mode), worth checking whether
+it should be built as a standalone capability Incognito adopts rather
+than Incognito-specific plumbing.
+
+## Settled since the first draft (2026-09-25)
+
+Three of the original five open questions below are now answered,
+Jesse's own calls: **no forced wipe on idle** - a session lock with
+PIN re-entry instead, admin-configurable per account (see "The model,
+settled" above); **entering Incognito mid-conversation always starts
+blank**, no offer to continue context privately; **minors are allowed
+by default**, no adult-only floor inherited from Temporary chat (a
+real change from today's behavior - this needs its own look at
+`NextChatPage.tsx`'s existing role-vs-birthdate gating gap, since
+"allowed by default" for Incognito while chat itself still gates
+Temporary chat to non-minors is a real inconsistency to resolve, not
+just leave standing).
 
 ## Open questions for the design pass
 
-1. Idle timeout duration - a real UX call, not an engineering one.
-2. Does entering Incognito from an existing normal conversation offer
-   to continue that context privately, or does it always start blank?
-   Browsers don't carry a normal tab into a private window; MaiPai's
-   own answer may differ given how central conversational continuity
-   already is here.
-3. Minor-role handling: Temporary chat today is adult-only by role
-   (a known role-vs-birthdate gating gap already flagged in
-   `NextChatPage.tsx`, not fixed here). Incognito inherits that floor
-   unless the design pass decides otherwise.
-4. Whether `TEMPORARY_SESSION_MAX` (200, process-wide) needs its own
+1. Whether the session-lock + PIN mechanism is Incognito-specific or a
+   standalone capability Incognito adopts (see above).
+2. Whether `TEMPORARY_SESSION_MAX` (200, process-wide) needs its own
    accounting once Incognito can hold several threads per person -
    likely fine at household scale, worth a sanity check rather than
    assumed.
-5. The exact list of routes the sharing/social guard must cover
+3. The exact list of routes the sharing/social guard must cover
    (`STORE-SHARE-01`'s share pointers, `CHANNELS-01` once it exists,
    any future "publish for the family" action) - an inventory to build
    as each of those features itself gets designed, not guessable now
