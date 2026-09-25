@@ -579,7 +579,7 @@ describe("summarizeBeforeDelete()", () => {
     try {
       await summarizeBeforeDelete(rows);
     } finally {
-      stub.stop();
+      await stub.stop();
     }
 
     const episodes = db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all();
@@ -632,7 +632,7 @@ describe("summarizeBeforeDelete()", () => {
     try {
       await summarizeBeforeDelete(rows);
     } finally {
-      stub.stop();
+      await stub.stop();
     }
 
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all().length).toBe(0);
@@ -803,7 +803,7 @@ describe("runRetention()", () => {
       }
       expect(episodes.length).toBe(1);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_BACKGROUND_URL;
     }
   });
@@ -1073,7 +1073,7 @@ describe("#88: retention never summarizes a replaced turn into a durable memory"
       runRetention();
       await new Promise((r) => setTimeout(r, 300)); // the summary batch is fire-and-forget
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_BACKGROUND_URL;
     }
     expect(seen.join("")).toContain("Tuesday"); // the batch was summarized
@@ -1126,7 +1126,7 @@ describe("CHAT-03 (#89): a stored summary is redacted on every read", () => {
     try {
       await maybeRefreshConversationSummary(conv.value.id);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_BACKGROUND_URL;
     }
     expect(seen.join("")).not.toContain(value);
@@ -1473,7 +1473,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     try {
       await maybeRefreshConversationSummary(conv.value.id);
     } finally {
-      stub.stop();
+      await stub.stop();
     }
 
     const row = getConversation(actor, conv.value.id);
@@ -1537,7 +1537,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
       expect(summary.split("first batch msg 2").length - 1).toBe(1);
       expect(summary).toContain("edited anchor message");
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 
@@ -1599,7 +1599,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
       expect(row.value.summary).not.toBeNull();
     } finally {
       __setSummaryRefreshDelayForTests(null);
-      stub.stop();
+      await stub.stop();
     }
   });
 

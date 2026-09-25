@@ -82,7 +82,7 @@ async function withStub<T>(
     return await fn();
   } finally {
     proxy.stop();
-    stub.stop();
+    await stub.stop();
   }
 }
 
@@ -1426,7 +1426,7 @@ describe("turnNext.ts: DEADLINE-01, a failed generation never delivers an empty 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0, {});
     const url = stub.url;
-    stub.stop();
+    await stub.stop();
     return url;
   }
 

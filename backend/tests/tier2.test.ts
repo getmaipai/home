@@ -93,7 +93,7 @@ async function withScriptedToolCalls<T>(
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
   }
 }
 
@@ -122,7 +122,7 @@ async function withScriptedGuessThenForcedTool<T>(guessText: string, forcedCalls
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
   }
 }
 
@@ -1031,7 +1031,7 @@ describe("CHAT-04: a failed tool call inside the stream reaches the action-claim
     try {
       return await fn();
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }

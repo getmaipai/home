@@ -15,12 +15,12 @@ import { finishBench } from "../scripts/bench/finish";
 const BACKEND = join(import.meta.dir, "..");
 const ENTRY_POINTS = ["routing.ts", "tool-calling.ts", "naturalness.ts", "persona-eval.ts", "memory-eval.ts", "memory/run.ts", "judge-eval.ts", "parity-bisect.ts", "parity-bisect2.ts", "parity-bisect3.ts", "parity-bisect4.ts", "prefix-class-01-verify.ts"];
 
-let stub: { url: string; stop: () => void };
+let stub: { url: string; stop: () => Promise<void> };
 beforeAll(() => {
   stub = startStubLlmServer(0);
 });
-afterAll(() => {
-  stub.stop();
+afterAll(async () => {
+  await stub.stop();
 });
 
 async function runBench(entry: string, env: Record<string, string | undefined>): Promise<{ code: number; out: string }> {

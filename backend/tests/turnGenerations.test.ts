@@ -87,7 +87,7 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
       expect(generations![0]!.request_sent_ms).toBeGreaterThanOrEqual(0);
       expect(generations![1]!.request_sent_ms).toBeGreaterThan(generations![0]!.request_sent_ms);
     } finally {
-      stub.stop();
+      await stub.stop();
       __resetLlmSupervisorForTests();
     }
   });
@@ -113,7 +113,7 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
       expect(generations![0]!.reason).toBe("initial");
       expect(generations![0]!.first_delta_ms).not.toBeNull();
     } finally {
-      stub.stop();
+      await stub.stop();
       __resetLlmSupervisorForTests();
     }
   });
@@ -139,7 +139,7 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
       expect(typeof withoutThinking).toBe("number");
       expect(withThinking).toBe(withoutThinking! + 512);
     } finally {
-      stub.stop();
+      await stub.stop();
       __resetLlmSupervisorForTests();
     }
   });
@@ -157,7 +157,7 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
       const stats = row?.stats ? (JSON.parse(row.stats) as { generations?: unknown[] }) : null;
       expect(stats?.generations).toHaveLength(1);
     } finally {
-      stub.stop();
+      await stub.stop();
       __resetLlmSupervisorForTests();
     }
   });

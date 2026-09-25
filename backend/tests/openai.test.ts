@@ -122,7 +122,7 @@ describe("POST /v1/chat/completions", () => {
       try {
         return await fn();
       } finally {
-        stub.stop();
+        await stub.stop();
         delete process.env.MAIPAI_LLAMA_SERVER_URL;
       }
     }

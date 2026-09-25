@@ -78,7 +78,7 @@ async function withScriptedToolCalls<T>(calls: string[], fn: () => Promise<T>): 
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
   }
 }
 

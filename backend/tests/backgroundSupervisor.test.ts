@@ -33,7 +33,7 @@ describe("backgroundSupervisor getBackgroundClient()", () => {
       expect(getBackgroundBackendKind()).toBe("url");
       expect(await client.health()).toBe(true);
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 
@@ -87,7 +87,7 @@ describe("backgroundSupervisor completeBackground()", () => {
       expect(seen).toEqual([undefined, 7]);
     } finally {
       __setSamplingSeedForBench(null);
-      stub.stop();
+      await stub.stop();
     }
   });
 

@@ -62,7 +62,7 @@ async function withScriptedJudge<T>(reply: (schemaName: string | undefined, requ
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
   }
 }
 

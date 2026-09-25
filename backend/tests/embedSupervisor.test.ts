@@ -53,7 +53,7 @@ describe("embedSupervisor getEmbedClient()", () => {
       expect(getEmbedBackendKind()).toBe("url");
       expect(await client.health()).toBe(true);
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 
