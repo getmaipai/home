@@ -1,12 +1,14 @@
 import { describe, test, expect } from "bun:test";
-import { findOverflowingPanels } from "./panelOverflow";
+import { findClippedStrips, findOverflowingPanels } from "./panelOverflow";
 
 // Stands in for happy-dom's own always-zeroed getBoundingClientRect()
 // (this codebase's established reason real layout checks like this one
 // live here, exercised against a mocked rect, rather than trusting
 // happy-dom to lay anything out for real).
-function mockRect(el: Element, rect: { left: number; right: number }): void {
-  el.getBoundingClientRect = () => ({ ...rect, top: 0, bottom: 0, width: rect.right - rect.left, height: 0, x: rect.left, y: 0, toJSON() { return this; } });
+function mockRect(el: Element, rect: { left: number; right: number; top?: number; bottom?: number }): void {
+  const top = rect.top ?? 0;
+  const bottom = rect.bottom ?? top;
+  el.getBoundingClientRect = () => ({ ...rect, top, bottom, width: rect.right - rect.left, height: bottom - top, x: rect.left, y: top, toJSON() { return this; } });
   // `findOverflowingPanels`'s own `el.clientWidth === 0` guard (skip
   // hidden/not-yet-laid-out elements) reads happy-dom's real property,
   // not the mocked rect above - zero by default, which would skip
@@ -120,5 +122,29 @@ describe("findOverflowingPanels", () => {
     mockRect(document.getElementById("column")!, { left: 0, right: 900 });
 
     expect(findOverflowingPanels()).toEqual([]);
+  });
+
+  test("does not mistake the chat thread viewport's intentional vertical scroll for a clipped horizontal shelf", () => {
+    document.body.innerHTML = `
+      <div class="overflow-x-auto overflow-y-scroll" data-slot="aui_thread-viewport" id="thread">
+        <div id="messages">a long conversation</div>
+      </div>
+    `;
+    mockRect(document.getElementById("thread")!, { left: 0, right: 300, top: 0, bottom: 200 });
+    mockRect(document.getElementById("messages")!, { left: 0, right: 300, top: 0, bottom: 900 });
+
+    expect(findClippedStrips()).toBe(0);
+  });
+
+  test("still catches a horizontal shelf whose content extends below its own box", () => {
+    document.body.innerHTML = `
+      <div class="overflow-x-auto" id="shelf">
+        <div id="column">a clipped shelf row</div>
+      </div>
+    `;
+    mockRect(document.getElementById("shelf")!, { left: 0, right: 300, top: 0, bottom: 200 });
+    mockRect(document.getElementById("column")!, { left: 0, right: 300, top: 0, bottom: 260 });
+
+    expect(findClippedStrips()).toBe(1);
   });
 });

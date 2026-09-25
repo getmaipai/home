@@ -36,7 +36,7 @@
 // advanced reply-details popover open, plus the normal chat accessibility
 // checks; it is intentionally separate from the ordinary matrix shots.
 import { chromium, firefox, webkit, type Browser, type BrowserContext, type Locator, type Page } from "playwright";
-import { findOverflowingPanels } from "./panelOverflow";
+import { findClippedStrips, findOverflowingPanels } from "./panelOverflow";
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
 // spec-v0.1.0 moved this file to the sibling getmaipai/shared checkout
@@ -684,15 +684,7 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     // mid-transition).
     await settleAnimations(page);
 
-    const clippedStrips = await page.evaluate(() => {
-      const strips = document.querySelectorAll(".overflow-x-auto");
-      let clipped = 0;
-      for (const strip of strips) {
-        const stripBottom = strip.getBoundingClientRect().bottom;
-        if (Array.from(strip.children).some((column) => column.getBoundingClientRect().bottom > stripBottom + 1)) clipped++;
-      }
-      return clipped;
-    });
+    const clippedStrips = await page.evaluate(findClippedStrips);
     if (clippedStrips > 0) throw new Error(`${clippedStrips} horizontally-scrollable row(s) are shorter than their own content, clipping what they hold (the WhoIsHere/MediaShelf 'overflow-x-auto computes overflow-y too' quirk)`);
 
     // Owner finding, 2026-09-20 ("The phone composition"): this used to
