@@ -541,7 +541,7 @@ describe("the engine composes a two-outcome turn in one call", () => {
     try {
       return await fn(stub);
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   }
 
@@ -668,7 +668,7 @@ describe("the engine composes a two-outcome turn in one call", () => {
       expect(turnLine(log.lines)).toMatchObject({ composed: "composition calls=1 ids=synthetic" });
     } finally {
       log.restore();
-      stub.stop();
+      await stub.stop();
       searxng.stop(true);
     }
   });
@@ -695,7 +695,7 @@ describe("the engine composes a two-outcome turn in one call", () => {
       expect(log.lines.some((line) => line.includes('"composed":"grounded_fallback calls=1') && line.includes('"ungrounded":"Invented Meadow"'))).toBe(true);
     } finally {
       log.restore();
-      stub.stop();
+      await stub.stop();
       searxng.stop(true);
     }
   });
@@ -727,7 +727,7 @@ describe("the engine composes a two-outcome turn in one call", () => {
       expect(turnLine(log.lines)).toMatchObject({ composed: "direct calls=0" });
     } finally {
       log.restore();
-      stub.stop();
+      await stub.stop();
     }
   });
 });

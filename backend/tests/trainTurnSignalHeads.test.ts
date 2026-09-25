@@ -392,7 +392,7 @@ describe("labelActStanceCorpus (against the real stub engine)", () => {
       expect(afterSecond).toHaveLength(6);
     } finally {
       rmSync(dir, { recursive: true, force: true });
-      stub.stop();
+      await stub.stop();
     }
   });
 
@@ -420,7 +420,7 @@ describe("labelActStanceCorpus (against the real stub engine)", () => {
       expect(rows.every((r) => r.act === "question")).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
-      stub.stop();
+      await stub.stop();
     }
   });
 });

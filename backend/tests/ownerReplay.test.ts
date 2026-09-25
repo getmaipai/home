@@ -58,7 +58,7 @@ async function withStubBench<T>(opts: { reply?: (request: ChatCompletionRequest)
     homeAssistant.stop();
     searxng.stop();
     proxy.stop();
-    stub.stop();
+    await stub.stop();
   }
 }
 

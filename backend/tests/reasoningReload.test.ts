@@ -61,7 +61,7 @@ async function withStubReply<T>(reply: string, fn: (seen: { requests: ChatComple
   try {
     return await fn(seen);
   } finally {
-    stub.stop();
+    await stub.stop();
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     __resetLlmSupervisorForTests();
   }

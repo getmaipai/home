@@ -94,7 +94,7 @@ async function withReplies<T>(reply: (request: ChatCompletionRequest, noted: str
   try {
     return await fn(seen);
   } finally {
-    stub.stop();
+    await stub.stop();
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     __resetLlmSupervisorForTests();
   }

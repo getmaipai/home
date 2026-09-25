@@ -220,7 +220,7 @@ async function withChat<T>(reply: string, fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     __resetLlmSupervisorForTests();
   }
@@ -395,7 +395,7 @@ describe("lib/turnEngine.ts runTurn()", () => {
       expect(result.value.source).toBe("model");
       expect(result.value.reply.text).toBe("I want to kill myself.");
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   });
@@ -587,7 +587,7 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
       expect(continuation.continued_from_turn_id).toBe(original.turn_id);
       expect(stub.requests()).toHaveLength(2); // no retry or third composer call
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -614,7 +614,7 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
       expect(String(thrown)).toContain("safety classifier");
       expect(stub.requests()).toHaveLength(1);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -744,7 +744,7 @@ describe("CHAT-18: the turn lease on every exit path", () => {
     try {
       return await fn(stub);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -793,7 +793,7 @@ describe("CHAT-18: the turn lease on every exit path", () => {
   test("runTurn(): an engine that fails during generation releases (the finally, not a matched call)", async () => {
     const { actor } = await owner();
     await withStub({}, async (stub) => {
-      stub.stop(); // the engine goes away between validation and the completion call
+      await stub.stop(); // the engine goes away between validation and the completion call
       const result = await runTurn(actor, "chat", "good morning");
       expect(result.ok).toBe(false); // an engine failure is a typed 503, never a leak
       if (!result.ok) expect(result.code).toBe("unavailable");
@@ -807,7 +807,7 @@ describe("CHAT-18: the turn lease on every exit path", () => {
       const result = await runTurnStream(actor, "chat", "good morning");
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "stream") return;
-      stub.stop(); // the engine goes away before the first token is read
+      await stub.stop(); // the engine goes away before the first token is read
       let threw: unknown;
       try {
         for await (const _ of result.tokens) void _;
@@ -950,7 +950,7 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
       const result = await runTurn(actor, opts.speakerEvidence ? "robot" : "chat", utterance, opts);
       return { result, contextMessage, offeredNames };
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -1057,7 +1057,7 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
       expect(constraintsFor(conv.value.id)).toMatchObject([{ kind: "banned_phrase", value: "good luck" }]);
       if (second.ok) expect(second.value.reply.text.toLowerCase()).not.toContain("good luck");
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -1107,7 +1107,7 @@ describe("CHAT-02: one output safety boundary", () => {
     try {
       return await fn();
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -1339,7 +1339,7 @@ describe("CHAT-03: a chat capture request with a credential", () => {
       expect(result.value.source).toBe("policy");
       expect(result.value.reply.text).toBe(CREDENTIAL_SAFE_MESSAGE);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -1413,7 +1413,7 @@ describe("lib/turnEngine.ts runTurnStream() output-safety gate (step 9)", () => 
     try {
       return await fn();
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   }
@@ -2128,7 +2128,7 @@ describe("CHAT-08 (c): turn recall uses the frozen clock", () => {
       expect(after.ok).toBe(true);
       expect(context).toContain("the blue telescope is in the attic");
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   });
@@ -2559,7 +2559,7 @@ describe("plugin-vs-skill priority (2026-09-05, a real live-found bug)", () => {
       expect(result.value.source).toBe("model");
       expect(result.value.source).not.toBe("plugin");
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -2681,7 +2681,7 @@ describe("getmaipai/home#77: a fact followed by 'please remember' is remembered,
         expect(matches.some((m) => m.record.text.includes(expected))).toBe(true);
         expect(matches.some((m) => m.record.text.includes("please remember"))).toBe(false); // the trailing request is not part of the fact
       } finally {
-        stub.stop();
+        await stub.stop();
         delete process.env.MAIPAI_LLAMA_SERVER_URL;
       }
     });
@@ -2803,7 +2803,7 @@ describe("CHAT-15: the direct paths retain the same outcome evidence, and the ro
       expect(kept?.[0]?.args).toEqual({ item: "milk" });
       expect(kept?.[1]?.args).toEqual({ item: "it" });
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -3224,7 +3224,7 @@ describe("item 4b: forget in conversation is honored or refused, never 'Got it.'
     try {
       return await fn();
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   }
@@ -3257,7 +3257,7 @@ describe("RECALL-02b: the prompt the model sees", () => {
       const context = captured!.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
       return { context, value: result.value };
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -3413,7 +3413,7 @@ describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {
       expect(guardReply("My guess is your dentist is Thursday.", { utterance: "what day is my dentist appointment", personId: actor.id }).reason).toBe("invention");
       expect(guardReply("My guess is your dentist is Thursday.", { utterance: "what day is my dentist appointment", personId: actor.id, episodes: ["my dentist is on Thursday"] }).reason).toBeNull();
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   });
@@ -3963,7 +3963,7 @@ describe("POST /api/turn/stream", () => {
       expect(resumedEvents.filter((event) => event.type === "done")).toHaveLength(1);
       expect(stub.requests()).toHaveLength(1);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -4017,7 +4017,7 @@ describe("POST /api/turn/stream", () => {
       const gate = new Promise<void>((resolve) => { release = resolve; });
       const stub = startStubLlmServer(0, { scriptedChatReply: async () => { await gate; return "A delayed answer."; } });
       process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-      return { stub, release, cleanup: () => { stub.stop(); delete process.env.MAIPAI_LLAMA_SERVER_URL; __resetLlmSupervisorForTests(); } };
+      return { stub, release, cleanup: async () => { await stub.stop(); delete process.env.MAIPAI_LLAMA_SERVER_URL; __resetLlmSupervisorForTests(); } };
     }
 
     test("cancels an in-flight stream and aborts the upstream request", async () => {
@@ -4053,11 +4053,11 @@ describe("POST /api/turn/stream", () => {
         expect(events.at(-1)).toMatchObject({ type: "error", code: "turn_cancelled" });
         const deadline = Date.now() + 5_000;
         while (stub.aborted() === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
-        stub.stop();
+        await stub.stop();
         expect(stub.aborted()).toBeGreaterThan(0);
       } finally {
         releaseModel();
-        stub.stop();
+        await stub.stop();
         delete process.env.MAIPAI_LLAMA_SERVER_URL;
         __resetLlmSupervisorForTests();
       }
@@ -4071,7 +4071,7 @@ describe("POST /api/turn/stream", () => {
         const turnId = await firstTurnId(first);
         expect(await (await client.post(`/api/turn/${turnId}/cancel`, {})).json()).toEqual({ cancelled: true });
         expect(await (await client.post(`/api/turn/${turnId}/cancel`, {})).json()).toEqual({ cancelled: false });
-      } finally { slow.release(); slow.cleanup(); }
+      } finally { slow.release(); await slow.cleanup(); }
     });
 
     test("a turn owned by another person cannot be cancelled", async () => {
@@ -4085,7 +4085,7 @@ describe("POST /api/turn/stream", () => {
         const stream = await childClient.post("/api/turn/stream", { text: "this is mine" });
         const turnId = await firstTurnId(stream);
         expect((await client.post(`/api/turn/${turnId}/cancel`, {})).status).toBe(403);
-      } finally { slow.release(); slow.cleanup(); }
+      } finally { slow.release(); await slow.cleanup(); }
     });
 
     test("an unknown turn cannot be cancelled", async () => {
@@ -4158,7 +4158,7 @@ describe("POST /api/turn/stream", () => {
         for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
         expect((await client.post("/api/turn/stream", { text: "remember that the wifi password is on the fridge", ephemeral: true })).status).toBe(429);
       } finally {
-        stub.stop();
+        await stub.stop();
         delete process.env.MAIPAI_LLAMA_SERVER_URL;
         __resetLlmSupervisorForTests();
         __resetRateLimiterForTests(); // the clock too, whatever threw above
@@ -4578,7 +4578,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     try {
       return await fn(stub);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   }
@@ -4778,7 +4778,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
       const warm = await client.post("/api/turn/stream", { text: "good morning, how is it going" });
       expect(warm.status).toBe(200);
       await readNdjson(warm);
-      stub.stop();
+      await stub.stop();
       const res = await client.post("/api/turn/stream", { text: "good morning, how is it going" });
       expect(res.status).toBe(200);
       const events = await readNdjson(res);
@@ -4946,7 +4946,7 @@ describe("CHAT-04: acknowledgments pass, action claims need their outcome, opene
     try {
       return await fn();
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -5034,7 +5034,7 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
     try {
       return await fn();
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -5144,7 +5144,7 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
       expect(sawTools).toContain("websearch"); // the ordinary Tier 2 offer, as on any model turn
     } finally {
       spy.mockRestore();
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -5236,7 +5236,7 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
       expect(context).toContain("Pippa is allergic to peanuts");
     } finally {
       spy.mockRestore();
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -5263,7 +5263,7 @@ describe("OUT-01: the well-formed reply boundary", () => {
     try {
       return await fn(() => calls);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
     }
@@ -5427,7 +5427,7 @@ describe("CHAT-13 chunk C2: the last succeeded lookup is a stack source", () => 
     try {
       return await fn(seen);
     } finally {
-      stub.stop();
+      await stub.stop();
       searxng?.stop(true);
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();

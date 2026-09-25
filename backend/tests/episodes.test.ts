@@ -507,7 +507,7 @@ describe("getmaipai/home#78: guard lines and plugin errors are never recalled as
       expect(block).not.toContain(cut.value.reply.text);
       expect(block).not.toContain(failed.value.reply.text);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   });
@@ -533,7 +533,7 @@ describe("getmaipai/home#78: guard lines and plugin errors are never recalled as
       const assistantSides = db.select().from(episodes).where(eq(episodes.personId, actor.id)).all().filter((r) => r.speaker === "assistant");
       expect(assistantSides.map((r) => r.text)).toEqual(["Try a mushroom risotto, it feeds six."]);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   });

@@ -31,7 +31,7 @@ async function withScriptedJudge<T>(reply: (request: ChatCompletionRequest) => u
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
   }
 }
 

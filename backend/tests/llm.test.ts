@@ -77,7 +77,7 @@ async function withScriptedReasoning<T>(
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
   }
 }
 
@@ -166,7 +166,7 @@ async function withScriptedToolCalls<T>(
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
   }
 }
 
@@ -265,7 +265,7 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
       // reads from - never a second copy that could drift.
       expect(capturedRequest!.stream_options).toEqual({ include_usage: true });
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 });
@@ -338,7 +338,7 @@ describe("lib/llm.ts chat sampling (FAST-06)", () => {
     try {
       await run();
     } finally {
-      stub.stop();
+      await stub.stop();
     }
     expect(capturedRequest).not.toBeNull();
     return capturedRequest!;
@@ -505,7 +505,7 @@ describe("lib/llm.ts startCompleteStream()", () => {
       // cached_tokens stayed blank on every streamed row.
       expect(capturedRequest!.stream_options).toEqual({ include_usage: true });
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 
@@ -964,7 +964,7 @@ describe("lib/llm.ts routed through a configured Stack", () => {
       expect(completed.ok).toBe(true);
       if (completed.ok) expect(completed.value.text).toBe("hello from the local stub, not the stack");
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 
@@ -987,7 +987,7 @@ describe("lib/llm.ts routed through a configured Stack", () => {
       for await (const delta of started.tokens) text += delta;
       expect(text).toBe("hello from the local stub, not the stack");
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 
@@ -1010,7 +1010,7 @@ describe("lib/llm.ts routed through a configured Stack", () => {
       const result = await embed(["hi"]);
       expect(result.ok).toBe(true);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_EMBED_URL;
     }
   });

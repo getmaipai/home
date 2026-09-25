@@ -77,7 +77,7 @@ async function withEngines<T>(reply: string, fn: (seen: { requests: ChatCompleti
   try {
     return await fn(seen);
   } finally {
-    stub.stop();
+    await stub.stop();
     searxng.stop(true);
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     __resetLlmSupervisorForTests();

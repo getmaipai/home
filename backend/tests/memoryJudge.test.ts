@@ -90,7 +90,7 @@ async function withScriptedJudge<T>(reply: (schemaName: string | undefined, requ
   try {
     return await fn();
   } finally {
-    stub.stop();
+    await stub.stop();
   }
 }
 
@@ -1602,7 +1602,7 @@ describe("#88: the judge and an edited turn", () => {
       const result = await runTurn(actor, "chat", "I love anchovies, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });
       expect(result.ok).toBe(true);
     } finally {
-      stub.stop();
+      await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
     expect(promptSeen).not.toContain("I hate anchovies"); // the replaced user line is not in the window
@@ -1662,7 +1662,7 @@ describe("#88: the judge and an edited turn", () => {
     // A model failure on the edited run: no row is written, and the memory must still be active afterwards.
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0);
-    stub.stop();
+    await stub.stop();
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
       const result = await runTurn(actor, "chat", "I love anchovies, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });

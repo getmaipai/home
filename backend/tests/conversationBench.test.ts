@@ -93,7 +93,7 @@ async function withStubBench<T>(
     cleanupBenchPeople(people);
     homeAssistant.stop();
     proxy.stop();
-    stub.stop();
+    await stub.stop();
   }
 }
 

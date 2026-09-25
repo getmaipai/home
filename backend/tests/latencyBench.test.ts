@@ -145,7 +145,7 @@ describe("scripts/bench/latency.ts wire path", () => {
       expect(t.promptN).toBe(0);
       expect(t.cacheN).toBe(0);
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 
@@ -157,7 +157,7 @@ describe("scripts/bench/latency.ts wire path", () => {
       expect(s.firstDeltaP50).toBeGreaterThan(0);
       expect(s.meanCacheRatio).toBe(0);
     } finally {
-      stub.stop();
+      await stub.stop();
     }
   });
 });
