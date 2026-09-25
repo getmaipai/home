@@ -255,6 +255,40 @@
                             "alive"
                           ]
                         },
+                        "background": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "url",
+                                "override",
+                                "selection",
+                                "stub",
+                                "stopped",
+                                "starting",
+                                "none",
+                                "spawned",
+                                "restarting",
+                                "failed",
+                                "blocked"
+                              ]
+                            },
+                            "pid": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "alive": {
+                              "type": "boolean",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "pid",
+                            "alive"
+                          ]
+                        },
                         "voice": {
                           "type": "object",
                           "properties": {
@@ -293,6 +327,7 @@
                       "required": [
                         "chat",
                         "embed",
+                        "background",
                         "voice"
                       ]
                     },

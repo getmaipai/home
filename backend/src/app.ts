@@ -95,7 +95,7 @@ const HealthResponseSchema = z.object({
   /** False when any engine that should be up is not answering, or any
    * registered sidecar is unhealthy/crashed. The Health page's headline. */
   ok: z.boolean(),
-  engines: z.object({ chat: EngineHealthSchema, embed: EngineHealthSchema, voice: EngineHealthSchema }),
+  engines: z.object({ chat: EngineHealthSchema, embed: EngineHealthSchema, background: EngineHealthSchema, voice: EngineHealthSchema }),
   // Settings -> Household -> Health (2026-09-07): the plainest single
   // signal of "is the app actually up," next to which that page puts the
   // restart control (routes/host.ts's POST /api/host/restart).

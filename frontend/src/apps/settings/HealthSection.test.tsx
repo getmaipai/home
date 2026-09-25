@@ -99,6 +99,20 @@ describe("HealthSection", () => {
     }
   });
 
+  test("a failed background engine has its own named row", async () => {
+    const restore = stubHealth(
+      health({ ok: false, engines: { ...health().engines, background: { kind: "failed", pid: null, alive: null } } }),
+    );
+    try {
+      const { findByText, getByText } = renderWithQuery(<HealthSection person={makePerson("adult")} />);
+      expect(await findByText("Something is not answering.")).toBeInTheDocument();
+      expect(getByText("Memory")).toBeInTheDocument();
+      expect(getByText("Keeps stopping")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
   test("the auto-heal's own states are named, not hidden behind 'starts when needed'", async () => {
     const restore = stubHealth(
       health({

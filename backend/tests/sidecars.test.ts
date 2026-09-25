@@ -352,6 +352,24 @@ describe("GET /api/health", () => {
     // and nothing wrong: `alive` is null (not false) and the page reads ok.
     expect(body.ok).toBe(true);
     expect(body.engines.chat!.alive).toBeNull();
+    expect(body.engines.background).toBeDefined();
+
+    // The OpenAPI response is the public contract for this route. Keep its
+    // engine list aligned with the real payload so generated clients can
+    // see the background engine too.
+    const openapi = await (await client.get("/api/openapi.json")).json() as {
+      paths: Record<string, {
+        get?: {
+          responses: Record<string, {
+            content?: Record<string, {
+              schema?: { properties?: Record<string, { properties?: Record<string, unknown> }> };
+            }>;
+          }>;
+        };
+      }>;
+    };
+    const healthSchema = openapi.paths["/api/health"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
+    expect(healthSchema?.properties?.engines?.properties).toHaveProperty("background");
   });
 
   // The Health page kept saying fine while the chat engine was dead
