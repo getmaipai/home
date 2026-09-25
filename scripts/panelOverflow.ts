@@ -96,3 +96,21 @@ export function findOverflowingPanels(): string[] {
     return `${el.tagName.toLowerCase()}${id}${cls}`;
   });
 }
+
+/** The screenshot pipeline's `clippedStrips` check, evaluated in the
+ * browser with the same zero-argument serialization constraint as
+ * `findOverflowingPanels`. The assistant-ui thread viewport carries
+ * `overflow-x-auto` for historic layout reasons but is an intentional
+ * vertical scroller; its messages are expected to extend below its
+ * visible box. Keep this one exact slot out of the horizontal-shelf
+ * check. */
+export function findClippedStrips(): number {
+  const strips = document.querySelectorAll(".overflow-x-auto");
+  let clipped = 0;
+  for (const strip of strips) {
+    if (strip.matches('[data-slot="aui_thread-viewport"]')) continue;
+    const stripBottom = strip.getBoundingClientRect().bottom;
+    if (Array.from(strip.children).some((column) => column.getBoundingClientRect().bottom > stripBottom + 1)) clipped++;
+  }
+  return clipped;
+}
