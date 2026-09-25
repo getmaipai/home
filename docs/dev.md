@@ -27667,3 +27667,46 @@ docs](https://docs.openwebui.com/features/extensibility/plugin/),
 [Channels docs](https://docs.openwebui.com/features/channels/), [Memory
 & Personalization
 docs](https://docs.openwebui.com/features/chat-conversations/memory/).
+
+## #156: the measured search-list budget
+
+The failure's 360-word plan gave the new path's post-search phrasing
+round `ceil(360 * 1.6) + 32 = 608` output tokens. Before changing the
+formula, representative replies were measured with the resident
+`qwen3-8b-instruct-q4-k-m.gguf` (llama-server b10797, `/tokenize`, no
+household data). Five completed numbered search-result summaries used
+1,719 tokens across 871 whitespace-delimited words, 1.975 tokens/word.
+Three plain-prose answers of similar size used 488 tokens across 395
+words, 1.235 tokens/word. The list overhead is real: applying the
+measured list average to a 360-word answer projects about 711 tokens,
+103 above the existing cap; the highest sample ratio (2.145) projects
+about 772. The initial 360-token list sample hit the measurement
+request's own cap and was discarded; the same prompt rerun at 600
+finished at 429 tokens / 200 words.
+
+| Shape | Words | Output tokens | Tokens per word |
+|---|---:|---:|---:|
+| Numbered search results, five samples | 149, 173, 181, 168, 200 | 278, 315, 354, 343, 429 | 1.866, 1.821, 1.956, 2.042, 2.145 |
+| Plain prose, three samples | 128, 125, 142 | 158, 155, 175 | 1.234, 1.240, 1.232 |
+
+**Fix decision and direct reproduction.** The post-search prompt now
+budgets a result list explicitly: at most the lesser of seven and the
+actual row count, one short sentence of at most 15 words per item, and
+at most 140 words overall. With a matched detailed prompt and seven
+synthetic poster results, the old unrestricted instruction produced
+466 words, exactly 608 output tokens, `finish_reason: length`, and ended
+inside item four (another run reached 460 words and also stopped at the
+cap). A matched live A/B with the same detailed question, rows, cached
+prefix (859 tokens), and 608-token cap: unrestricted took 15,161 ms,
+returned 608 tokens and `length`; the bounded instruction took 3,453 ms,
+returned 130 tokens / 95 words and `stop`. The new instruction adds 68
+input tokens; `prompt_ms` increased by 82 ms (167 to 249), while total
+time fell because the answer completed instead of decoding to the cap.
+Across the prompt change, all six bounded repeats stopped at 157, 142,
+143, 129, 128, and 130 tokens. The model did not always meet the
+15-word-per-item request exactly, but complete answers stayed far below
+the hard cap and under 140 total words in the measured final runs. No
+multiplier, thinking allowance, reply ceiling, or LAT-01/U4 budget
+changed. The new scripted turnNext regression asserts the
+search-specific instruction, unchanged 608-token request, and complete
+final answer; the transcript fixture is seven results.

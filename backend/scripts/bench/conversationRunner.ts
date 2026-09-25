@@ -177,6 +177,16 @@ export function startFakeSearxng(): FakeSearxng {
           ],
         });
       }
+      if (/reply truncation seven rows fixture/i.test(q)) {
+        return Response.json({
+          query: q,
+          results: Array.from({ length: 7 }, (_, index) => ({
+            title: `Museum poster collection result ${index + 1}`,
+            url: `https://example.com/poster-${index + 1}`,
+            content: `Collection record ${index + 1} describes a distinct historic travel poster, its artist, printing method, and exhibit history.`,
+          })),
+        });
+      }
       // The fixture's own world subject gets real canned facts; every
       // other query gets a result that says nothing, so the rows that
       // check a real fact fail as they did with no search at all.

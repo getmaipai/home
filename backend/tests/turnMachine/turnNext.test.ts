@@ -1211,6 +1211,57 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
   });
 });
 
+describe("turnNext.ts: #156, search-result lists get a measured answer budget", () => {
+  test("a seven-result answer gets a per-item limit and completes under the unchanged 608-token cap", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    const completeReply = [
+      "1. The first record describes a historic travel poster and its printing method.",
+      "2. The second record documents an artist and the poster's exhibit history.",
+      "3. The third record identifies a collection and its conservation notes.",
+      "4. The fourth record summarizes a poster's design and archive provenance.",
+      "5. The fifth record describes another poster and its printing method.",
+      "6. The sixth record documents an artist and the poster's exhibit history.",
+      "7. The seventh record identifies a collection and its conservation notes.",
+    ].join("\n");
+    // The production tokenizer measurement in docs/dev.md shows this
+    // incident-shaped, markdown-heavy list family costs about 1.975
+    // tokens per word. Its old 360-word budget therefore asked for
+    // about 711 tokens against 608; this is the representative cutoff.
+    const oldCapReply = "1. **Museum poster collection result 1** - The archive describes a historic travel poster, its artist, printing method, exhibit history, and conservation record.\n2. **Museum poster collection result 2** - The archive describes a different historic travel poster, its artist, printing method, exhibit history, and conservation record.\n3. **Museum poster collection result 3** - The archive describes another historic travel poster, its artist, printing method, exhibit history, and conservation record.\n4. **Museum poster collection result 4** - This collection includes various posters from the";
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((message) => message.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "reply truncation seven rows fixture" }) }];
+          },
+          reply: (request) => {
+            if (!request.messages.some((message) => message.role === "tool")) return "Searching.";
+            phrasingRequest = request;
+            const instruction = request.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+            return instruction.includes("at most 7 numbered items") && instruction.includes("under 140 words") && instruction.includes("at most 15 words total per item") ? completeReply : oldCapReply;
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "what do the seven museum poster search results say?"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(phrasingRequest?.max_tokens).toBe(608);
+      const instruction = phrasingRequest?.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+      expect(instruction).toContain("at most 7 numbered items");
+      expect(instruction).toContain("under 140 words");
+      expect(instruction).toContain("at most 15 words total per item");
+      expect(result.value.reply.text).toBe(completeReply);
+      expect(result.value.reply.text).not.toMatch(/from the$/u);
+      expect(searxng.queries).toContain("reply truncation seven rows fixture");
+    } finally {
+      searxng.stop();
+    }
+  });
+});
+
 // SEARCH-MIXED-01: an independent review of SEARCH-EMPTY-01 (2026-09-24)
 // found `toolAllFailed` (machine.ts) only catches a round where EVERY
 // outcome failed - a round that mixes a failed websearch with a

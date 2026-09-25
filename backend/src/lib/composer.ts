@@ -916,15 +916,20 @@ export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[]): L
 // description. compositionInstruction() above always carried its own
 // referent ("Answer this question of mine ... : '<question>'");
 // phrasingInstruction's own first cut dropped it. This one doesn't.
-export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: string): string {
+export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: string, searchResultCount = 0): string {
   const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences";
   const quotedUtterance = quoteForPrompt(utterance);
-  return [
+  const lines = [
     `Answer this question of mine completely from what you know, ${lengthClause}; use the results above as support: "${quotedUtterance}".`,
     "Any specific current fact - who holds an office, a date, a number, a price, a score, what is latest - comes from the results or is left out.",
     "Where the results contradict what you know, the results win.",
     "Where the results do not bear on the question, answer from what you know and say nothing about searching.",
-  ].join(" ");
+  ];
+  if (searchResultCount > 0) {
+    const itemLimit = Math.min(searchResultCount, 7);
+    lines.push(`For a search-results list, show at most ${itemLimit} numbered items, choosing the most relevant. Keep the whole list under 140 words. Use one concise sentence of at most 15 words total per item, counting its number and any title. Prioritize each result's key point over extra detail, and omit raw URLs.`);
+  }
+  return lines.join(" ");
 }
 
 /** The decision. Pure: no model call, no clock. */

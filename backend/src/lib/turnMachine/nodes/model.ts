@@ -602,7 +602,12 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     const phrasedOutcomes = state.outcomes.filter((o) => o.status !== "failed");
     const assistantMessage = toolCallAssistantMessage(phrasedOutcomes);
     const resultMessages = toolResultMessages(phrasedOutcomes);
-    const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance);
+    const searchResultCount = phrasedOutcomes.reduce((count, outcome) => {
+      if (outcome.status !== "succeeded" || outcome.packageId !== "websearch") return count;
+      const rows = (outcome.result?.data as { rows?: unknown[] } | undefined)?.rows;
+      return count + (Array.isArray(rows) ? rows.length : 0);
+    }, 0);
+    const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount);
     const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? phrasing : `${planLine(state.plan, state.signal, promptSurfaceClass)} ${phrasing}` };
     messages = [...state.messages, assistantMessage, ...resultMessages, instruction];
     // The same tools block the forced/offered round itself sent -
