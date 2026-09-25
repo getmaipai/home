@@ -4,9 +4,7 @@
 // prompt assembly, tier 2 native tool calling, remote candidates,
 // `ask`-continuation) is documented in docs/dev.md as too large for one
 // slice, the same judgment 4.11 made; this is the narrow real slice: one
-// surface (`chat`), safety-first routing, a deterministic Tier 0 plugin
-// floor (pattern match, or a keyword-overlap stand-in for routing.examples
-// the same way memory.ts stands in for real embeddings), and a
+// surface (`chat`), safety-first routing, literal package patterns, and a
 // stable-first prompt handed to the real `chat` role as the fallback.
 //
 // What's deferred, and why, is repeated at the point it matters below;
@@ -15,7 +13,7 @@ import { evaluateSafety, evaluateReply, forOutput, carriesCrisisSignal } from "@
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE, redactCredentials } from "@/lib/memoryContentPolicy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin, safeFailureMessage, validatePackageArgs } from "@/lib/plugins";
-import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, commandOpenersFrom, type UtteranceShape, type UtteranceVector } from "@/lib/routing";
+import { embedUtterance, commandOpenersFrom, type UtteranceShape, type UtteranceVector } from "@/lib/routing";
 import { COMPUTED_WILDCARD_RESOLVERS } from "@/lib/manifestLint";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
@@ -46,7 +44,7 @@ import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { parseReplyConstraint, setReplyConstraint, bannedPhrasesFor, constraintsFor } from "@/lib/replyConstraints";
 import { planFor, planLine } from "@/lib/register";
-import { rungOf, rulesFired, isTypedSourcePackage, type Rung, type RuleName } from "@/lib/ruleNames";
+import { rungOf, rulesFired, type Rung, type RuleName } from "@/lib/ruleNames";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import { buildDocument, projectDocument, planComposition, composedText, composedLog, groundedIn, renderLookupRows, emptyLookupLine, needsComposition, questionOf, TurnMachine, COMPOSING_STATUS_TEXT, COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, structuredPartForOutcomes, artifactForOutcomes, type ComposedTurn, type ComposerInput, type DocumentBuildInput } from "@/lib/composer";
 import { promptNow } from "@/lib/benchSampling";
@@ -828,20 +826,9 @@ export function capSection(text: string, maxChars: number): string {
 // entry), not tuned against real household use yet.
 const MAX_MATCHING_SKILLS = 3;
 
-// Skills compose into context by the SAME relevance mechanism plugins use
-// to route deterministically (exampleScore/EXAMPLE_MATCH_THRESHOLD,
-// below) - reused, not reinvented, since the underlying question is
-// identical ("does this utterance look like what this package's
-// routing.examples describe"). The real difference is what happens next:
-// a plugin match runs a recipe and answers the turn outright; a skill
-// match only ever ADDS its instruction body to the model's system
-// prompt - it never fires on its own, never short-circuits the turn, and
-// carries no permissions to do anything but shape phrasing. `text` here
-// is the raw utterance, the same one route() scores plugins against.
-// Shared by skillsSection() (below) and prepareTurn()'s plugin-vs-skill
-// priority check: both need the same "which skills are relevant, most
-// confident first" answer, just for different purposes (composing text
-// vs. comparing the top score against a fuzzy-matched plugin's own).
+// Skills compose into context by a relevance mechanism (exampleScore /
+// EXAMPLE_MATCH_THRESHOLD below). A skill adds its instruction body to
+// the model prompt; it never fires on its own or short-circuits the turn.
 // Uncapped and unsliced here on purpose - MAX_MATCHING_SKILLS is a
 // composition-budget concern, not part of what "relevant" means, and the
 // priority check only ever needs the single best score regardless of how
@@ -1180,15 +1167,8 @@ export function buildSystemPrompt(
   return parts.stablePrefix + parts.context;
 }
 
-// Tier 1 of the deterministic plugin floor's FALLBACK (session-c-brain-
-// and-voice.md step 1): route() below now scores Tier 1 by real cosine
-// similarity through lib/routing.ts, falling back to this keyword-overlap
-// function only when the embed backend is down (or a candidate has no
-// stored embedding yet). Kept as a real, separate scoring path rather
-// than deleted: `EXAMPLE_MATCH_THRESHOLD` was tuned for this scale
-// specifically, and skillsSection()'s own composition retrieval below
-// still uses it directly (a softer "which skills are worth composing in"
-// signal, not the hard Tier 1 routing decision route() makes). Coverage
+// Skill composition uses keyword overlap as a relevance signal, not as a
+// package-routing decision. Coverage
 // of the *example*'s words (not Jaccard) since examples are short
 // template sentences and the live utterance is often longer or shorter;
 // a 0..1 score, not a claim of semantic matching.
@@ -1305,21 +1285,8 @@ interface RoutedPlugin {
   id: string;
   args: Record<string, unknown>;
   score: number;
-  /** True only for a real `routing.patterns` match - an unambiguous,
-   * deliberately-set-up trigger phrase, never a guess. Tracked as its own
-   * flag rather than inferred from `score === 1`, since a fuzzy
-   * `exampleScore` could in principle also reach 1.0 on total word
-   * overlap; a pattern match's "always wins, no exceptions" guarantee
-   * (2026-09-05, prepareTurn()'s skill-vs-plugin priority check) must
-   * never depend on that coincidence. */
+  /** True only for a real `routing.patterns` match. */
   viaPattern: boolean;
-  /** Session C step 1: which Tier 1 scoring actually produced `score`
-   * when `viaPattern` is false - real cosine ("embedding") or the
-   * keyword-overlap fallback ("embedding" candidate had no stored rows
-   * yet, or the embed backend is down this turn). Meaningless when
-   * `viaPattern` is true (always "embedding" by construction, never
-   * read). */
-  viaEmbedding: boolean;
 }
 
 // The deterministic plugin floor (4.5). A `consequential` package (4.9's
@@ -1328,10 +1295,7 @@ interface RoutedPlugin {
 // between two pattern matches goes to whichever package sorts first by
 // id (loadAllManifests()'s deterministic order), a deliberately simple
 // tie-break, not a claim of ranking by pattern specificity. A literal
-// `routing.patterns` match always wins outright over the fuzzy example/
-// embedding score below, checked first and returned immediately - a
-// real, deliberately-authored trigger phrase never competes with a
-// fuzzy score, however confident. This is NOT a Tier 0/Tier 1 split:
+// `routing.patterns` match wins immediately. This is NOT a Tier 0/Tier 1 split:
 // `loadAllManifests()` reads every package's manifest regardless of
 // tier (session-d-packages-and-store.md step 7 fix - it used to call a
 // Tier-0-only loader, so a Tier 1 package's own `routing.patterns`
@@ -1339,26 +1303,8 @@ interface RoutedPlugin {
 // pattern (almanac-time's exact "what time is it") hits this identical
 // immediate-win branch too, same as any Tier 0 plugin's.
 //
-// Tier 1 (session-c-brain-and-voice.md step 1) is a real embedding
-// ranking now, not a single package's own score against a fixed bar: the
-// live-found bug this step's own goal names ("'bedtime story' reaches
-// the storytime skill, not the joke plugin") came from two candidates
-// landing close together purely from shared filler words ("tell me a"),
-// which a bare per-candidate threshold cannot tell apart from a genuine
-// match - lib/routing.ts's `pickTier1Winner()` requires the best
-// candidate to also clear the runner-up by a real margin, not just its
-// own bar. A candidate with no stored embedding yet (a package just
-// added, or the embed backend down) falls back to `exampleScore()` for
-// itself alone; the ranking runs on whatever mix of real and fallback
-// scores the turn actually has, never all-or-nothing.
-// Session C step 2's own pre-filter sizes: "offer only the top few Tier 1
-// candidates as tools" (a small, tunable number of candidates shown to
-// the model, not the whole catalog) and "capped at two calls per turn"
-// (the model's own decision - native tool calling, Fix E, has no
-// grammar-side limit to lean on anymore, so resolveToolCalls()'s own
-// `.slice(0, MAX_TIER2_CALLS_PER_TURN)` is the one place this is
-// actually enforced).
-const MAX_TIER2_TOOLS_OFFERED = 3;
+// Native tool-call batches are bounded independently of how many tools
+// are offered to the model.
 const MAX_TIER2_CALLS_PER_TURN = 2;
 
 // ROUTE-02 (docs/dev/session-a.md): the ordinary tool set, the block
@@ -1453,164 +1399,13 @@ export function ordinaryToolSpecs(loaded: readonly LoadedManifest[] = loadAllMan
     .map((l) => ({ id: l.id, description: l.manifest.description, args: l.manifest.args }));
 }
 
-/** ROUTE-01 and ROUTE-02: the Tier 2 offer. The ordinary set first, in
- * id order, on every turn (ROUTE-02); then, appended so the common
- * prefix survives, what the turn's shape earns: a command-shaped turn
- * the top MAX_TIER2_TOOLS_OFFERED of `ranked` (best first, no
- * similarity floor: the floor hid every paraphrase that drifted from a
- * package's examples, getmaipai/home#80); a question, first-person or
- * statement turn is the bot's shape guard's case (routing.ts's
- * utteranceShape()), "a question no deterministic tier could place goes
- * to conversation", so only the one candidate Tier 1 DID place when
- * there is one: a package that cleared TIER1_THRESHOLD with the margin
- * (pickTier1Winner over `ranked`) but could not fire because its
- * required arg binds only from a literal pattern (`recall` on "what
- * have I told you to remember about the weather", 0.77 on the real
- * scorer) is a deterministic placement that only lacks its argument,
- * which is exactly what the model's tool call supplies. Never the top
- * three by mere rank on a question: that is the guess the guard exists
- * to stop. `ranked` is already role-filtered for the actor, so the
- * ordinary set is too. Exported for the tool-calling bench's routed
- * pass, so its numbers come from this exact rule. */
-export function selectOfferedTools(ranked: readonly RankedCandidate[], shape: UtteranceShape, ordinaryIds: readonly string[]): ToolSpec[] {
+/** D7: all model turns use the same ordinary offer, independent of
+ * utterance shape or candidate scores. `ranked` is the role-eligible
+ * manifest set used to resolve tool calls, not a semantic ranking. */
+export function selectOfferedTools(ranked: readonly RankedCandidate[], _shape: UtteranceShape, ordinaryIds: readonly string[]): ToolSpec[] {
   const ordinarySet = new Set(ordinaryIds);
   const ordinary = ranked.filter((r) => ordinarySet.has(r.id)).sort((a, b) => a.id.localeCompare(b.id));
-  const placed = shape === "command" ? null : pickTier1Winner(ranked);
-  const earned = shape === "command" ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED) : placed ? ranked.filter((r) => r.id === placed.id) : [];
-  const extras = earned.filter((r) => !ordinarySet.has(r.id));
-  return [...ordinary, ...extras].map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
-}
-
-// LAT-02 (docs/plans/simple-turn-pipeline-2026-09-22.md, unit U1, "a
-// cache-stable prompt"): the offered tool set stays stable within a
-// conversation, so the prompt cache survives. Qwen3's template renders
-// `tools` inside the first system message, ahead of the whole
-// conversation history, so any change to the offered set invalidates
-// the cached prefix for everything behind it - measured live,
-// 2026-09-22: 9 of 12 turns pinned `cache_reuse_tokens` at 567 because
-// selectOfferedTools()'s own per-turn "earned" extra changed turn to
-// turn (the same conversation re-sent with two tools reordered cached
-// exactly 567). Monotonic per conversation, not a floor change: once a
-// candidate is earned, it stays offered for the rest of that
-// conversation - the ordinary set is untouched (already cache-stable,
-// ROUTE-02), sorted, and only grows. selectOfferedTools() itself keeps
-// deciding what ONE turn's own utterance would earn on its own -
-// scripts/bench/tool-calling.ts's routed pass and every existing
-// tier2.test.ts case still exercise exactly that function, unchanged -
-// this wraps it one level up.
-//
-// Bounded and pruned, the same shape as conversationHistory.ts's own
-// `temporarySessions` (a code review, 2026-09-22, caught an earlier
-// version of this comment claiming that precedent without actually
-// following it: `resumeSessions`/`inFlightTurns` are deleted per turn,
-// which this map cannot be - it exists to persist ACROSS turns - and
-// an un-evicted map keyed by every conversation a household ever has
-// grows without bound over a long-running process). A conversation
-// idle past STICKY_OFFERED_IDLE_MS is pruned (losing only cache warmth,
-// never correctness: the next turn re-earns from scratch); the map
-// never grows past STICKY_OFFERED_MAX, evicting the least recently
-// touched conversation first.
-const STICKY_OFFERED_MAX = 2000;
-const STICKY_OFFERED_IDLE_MS = 24 * 60 * 60 * 1000;
-interface StickyOffered {
-  ids: Set<string>;
-  lastActivityAt: number;
-}
-const stickyOfferedIds = new Map<string, StickyOffered>();
-
-function pruneStickyOffered(now: number): void {
-  for (const [id, entry] of stickyOfferedIds) {
-    if (now - entry.lastActivityAt > STICKY_OFFERED_IDLE_MS) stickyOfferedIds.delete(id);
-  }
-}
-
-function evictOldestStickyOfferedIfFull(): void {
-  if (stickyOfferedIds.size < STICKY_OFFERED_MAX) return;
-  let oldestId: string | null = null;
-  let oldestAt = Infinity;
-  for (const [id, entry] of stickyOfferedIds) {
-    if (entry.lastActivityAt < oldestAt) {
-      oldestAt = entry.lastActivityAt;
-      oldestId = id;
-    }
-  }
-  if (oldestId) stickyOfferedIds.delete(oldestId);
-}
-
-export function __resetStickyOfferedToolsForTests(): void {
-  stickyOfferedIds.clear();
-}
-
-/** Whether a package is safe to keep offered after the turn that
- * earned it, without re-reading the utterance: a pure typed-source
- * lookup (ruleNames.ts's own `isTypedSourcePackage`, plus websearch)
- * answers a question and changes nothing, so a stale or irrelevant
- * argument on a later turn costs an unhelpful answer, never a wrong
- * real-world effect. Everything else - `remember` (a write), `timer`/
- * `remind` (schedule something real), `lock-doors`/`lights-on` (a
- * device), `list-add` (a durable edit) - keeps deciding fresh every
- * turn, the same as before this item. Found live by this item's own
- * tests: with `timer` or `lock-doors` persisted from an earlier turn,
- * a later, unrelated turn (a cancelled ask's stray "ten minutes," a
- * plain "did you lock it") could still fire it - a real behavior
- * regression (a stale argument or an unasked-for action reachable long
- * after the turn that asked for it), not a synthetic-stub artifact:
- * `consequential` alone (lock-doors) was not a wide enough gate, since
- * `timer` triggers the identical class of bug without being
- * consequential itself. */
-function isStickyEligible(packageId: string, consequential: boolean | undefined): boolean {
-  return !consequential && (packageId === "websearch" || isTypedSourcePackage(packageId));
-}
-
-/** The turn's actual offered set: this turn's own earned candidates
- * (selectOfferedTools(), unchanged) unioned into the conversation's
- * sticky set and returned whole, ordinary first in id order then every
- * earned-so-far extra in id order - the same shape selectOfferedTools()
- * itself returns, just monotonic across turns instead of live per
- * turn for the packages isStickyEligible() allows. `ranked` already
- * carries every role-eligible package each turn (routeSemantic()'s own
- * `eligible` list), so a candidate earned on an earlier turn always
- * resolves to a real ToolSpec even on a turn whose own utterance would
- * not have earned it.
- *
- * A sticky id that has since joined the ordinary set (an install or an
- * update changed `ordinaryToolIdsForInstalled()`'s own memoized key
- * mid-conversation - rare, but the ordinary set is real per-installed-
- * set state, not immutable) is dropped from the extras and from the
- * sticky set itself here, never offered twice (a code review,
- * 2026-09-22: the first version only skipped ADDING an ordinary id to
- * `sticky`, never removed one already there from an earlier turn). */
-export function stickyOfferedTools(conversationId: string, ranked: readonly RankedCandidate[], shape: UtteranceShape, ordinaryIds: readonly string[]): ToolSpec[] {
-  const now = Date.now();
-  pruneStickyOffered(now);
-  const earnedThisTurn = selectOfferedTools(ranked, shape, ordinaryIds);
-  const ordinarySet = new Set(ordinaryIds);
-  let entry = stickyOfferedIds.get(conversationId);
-  if (!entry) {
-    evictOldestStickyOfferedIfFull();
-    entry = { ids: new Set<string>(), lastActivityAt: now };
-    stickyOfferedIds.set(conversationId, entry);
-  }
-  entry.lastActivityAt = now;
-  const sticky = entry.ids;
-  for (const id of ordinarySet) sticky.delete(id); // no longer an "extra" - promoted to ordinary
-  const byId = new Map(ranked.map((r) => [r.id, r] as const));
-  const liveOnlyIds = new Set<string>();
-  for (const t of earnedThisTurn) {
-    if (ordinarySet.has(t.id)) continue;
-    if (isStickyEligible(t.id, byId.get(t.id)?.manifest.consequential)) {
-      sticky.add(t.id);
-    } else {
-      liveOnlyIds.add(t.id);
-    }
-  }
-  const ordinary = earnedThisTurn.filter((t) => ordinarySet.has(t.id));
-  const extraIds = [...new Set([...sticky, ...liveOnlyIds])].filter((id) => !ordinarySet.has(id)).sort((a, b) => a.localeCompare(b));
-  const extras = extraIds
-    .map((id) => byId.get(id))
-    .filter((r): r is RankedCandidate => r !== undefined)
-    .map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
-  return [...ordinary, ...extras];
+  return ordinary.map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
 }
 
 /** ROUTE-01: one `[route]` line per routing decision, the bot's router
@@ -1621,15 +1416,11 @@ export function stickyOfferedTools(conversationId: string, ranked: readonly Rank
  * never the utterance (the `[turn]` line's own rule). */
 function logRoute(
   turnId: string,
-  tier: "pattern" | "embedding" | "keyword" | "tier2",
+  tier: "pattern" | "tier2",
   shape: UtteranceShape,
   winner: string | null,
   ranked: readonly RankedCandidate[],
   offered: string[],
-  /** A fuzzy Tier 1 winner a stronger skill match displaced (the
-   * bedtime-story rule above): still a placement, traced so the
-   * fallthrough arithmetic does not count it as "nothing placed". */
-  outscoredBySkill: string | null = null,
   /** #92: a literal pattern that yielded (a household subject or an
    * arithmetic capture), and a Tier 0 winner whose run found nothing,
    * both traced so the fallthrough reads as what it was. */
@@ -1637,11 +1428,12 @@ function logRoute(
   tier0Miss: string | null = null,
 ): void {
   const round = (n: number) => Math.round(n * 1000) / 1000;
-  const top = ranked[0] ? { id: ranked[0].id, score: round(ranked[0].score) } : null;
-  const runnerUp = ranked[1] ? { id: ranked[1].id, score: round(ranked[1].score) } : null;
-  const margin = ranked[0] && ranked[1] ? round(ranked[0].score - ranked[1].score) : null;
+  const scored = ranked.filter((candidate) => candidate.score > 0);
+  const top = scored[0] ? { id: scored[0].id, score: round(scored[0].score) } : null;
+  const runnerUp = scored[1] ? { id: scored[1].id, score: round(scored[1].score) } : null;
+  const margin = scored[0] && scored[1] ? round(scored[0].score - scored[1].score) : null;
   console.log(
-    `[route] ${JSON.stringify({ turn_id: turnId, tier, shape, winner, top, runner_up: runnerUp, margin, offered, ...(outscoredBySkill ? { outscored_by_skill: outscoredBySkill } : {}), ...(yielded ? { yielded: yielded.id, yield_reason: yielded.reason } : {}), ...(tier0Miss ? { tier0_miss: tier0Miss } : {}) })}`,
+    `[route] ${JSON.stringify({ turn_id: turnId, tier, shape, winner, top, runner_up: runnerUp, margin, offered, ...(yielded ? { yielded: yielded.id, yield_reason: yielded.reason } : {}), ...(tier0Miss ? { tier0_miss: tier0Miss } : {}) })}`,
   );
 }
 
@@ -1686,32 +1478,15 @@ export interface RankedCandidate {
 }
 
 export interface RouteResult {
-  /** Tier 0 or Tier 1's own firing decision - unchanged meaning from
-   * before this step. */
+  /** A literal package-pattern match; examples never make a winner. */
   winner: RoutedPlugin | null;
-  /** Every candidate Tier 1 scored (never populated when a Tier 0
-   * pattern already fired - `winner` is returned immediately in that
-   * case, `ranked` stays empty), best score first. Session C step 2's
-   * own Tier 2 pre-filter reads this when `winner` is null: "offer only
-   * the top few Tier 1 candidates as tools." Deliberately includes
-   * `consequential` packages (excluded from ever WINNING Tier 1 by
-   * `canFire` below, but still real candidates to OFFER - the model may
-   * PROPOSE one, gated on confirmation before it runs). */
+  /** Role-eligible plugin manifests used only to resolve offered tool
+   * calls. On a literal winner no model tool call is needed. */
   ranked: RankedCandidate[];
 }
 
-// `utteranceVector`: the caller's already-embedded utterance (prepareTurn
-// computes it once and reuses it for both this and recall() - a review,
-// 2026-09-06, found the utterance embedded twice per model turn, one HTTP
-// round trip each, for the identical text). Optional and still embedded
-// here when omitted, so routingCorpus.test.ts's direct call keeps working
-// unchanged.
-/** FAST-04: the literal half of routing, run BEFORE the utterance is
- * embedded so a `routing.patterns` winner ("remember that I like tea")
- * never pays the embed round trip. Household commands stay where they
- * are (prepareTurn()'s matchCommand(), ahead of this). Returns null when
- * no pattern binds; the caller then embeds once and calls
- * routeSemantic(). */
+/** FAST-04: the literal router runs before the recall embed, so a
+ * `routing.patterns` winner never pays that round trip. */
 // #92: a literal pattern of a package that looks OUTSIDE the house (a
 // `net:` permission) yields when the utterance names a household member
 // or its capture is arithmetic: the world knows nothing about Pippa,
@@ -1836,34 +1611,17 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
     // "a `skill` is plain instructions... composed into the chat model's
     // system prompt when relevant, never runs on its own." `loaded` (from
     // loadAllManifests()) is every installed package regardless of kind,
-    // and until this check `eligible` was too - so a skill with a strong
-    // embedding match against its own `routing.examples` (the exact
-    // relevance signal skillsSection()/matchingSkills() use it for) could
-    // WIN route() outright and get handed to runPlugin(), which then
-    // fails: a skill ships no recipe.json (skills aren't Tier 0/1
-    // handlers) so this always came back a plugin_error. The `bestSkillScore
-    // > routed.score` check below only guards a DIFFERENT package winning
-    // with a weaker score than a skill sitting on the side - it does
-    // nothing when the skill itself is what `route()` picked, which is
-    // exactly what "a weak, fuzzy-matched plugin no longer preempts a more
-    // confident skill match" (this file's own test) needs: the skill winning
-    // that comparison was never the fix, keeping skills out of this pool
-    // entirely is.
+    // and until this check `eligible` was too. Skills have no recipe and
+    // remain outside the plugin candidate pool.
     if (manifest.kind !== "plugin") continue;
 
     // A real gap found building `lock-doors` (session-d-packages-and-
     // store.md step 9): `manifest.consequential` was never checked here
-    // at all, only inside `canFire` below - a consequential package that
-    // ALSO declared a literal `routing.patterns` entry would fire
+    // at all. A consequential package with a `routing.patterns` entry
+    // would otherwise fire
     // immediately on that pattern match, bypassing the confirm gate
-    // `canFire`/Tier 2's own proposal-and-confirm flow exist specifically
-    // to enforce. Skipping a consequential manifest's own patterns here
-    // (never a "no patterns declared" package, since a manifest bug
-    // shouldn't be the only thing between a security domain and skipping
-    // confirmation) means it can only ever be discovered through the
-    // fuzzy/Tier 2 path below, which already refuses to let it WIN
-    // outright (`canFire`) - the model may still propose it, gated on
-    // confirmation, same as before.
+    // confirmation flow exists specifically to enforce. Consequential
+    // packages must be proposed by the model and confirmed.
     if (!manifest.consequential) {
       for (const pattern of manifest.routing?.patterns ?? []) {
         const captured = matchPattern(text, pattern) ?? (bare !== text && anchoredPattern(pattern) ? politeCapture(matchPattern(bare, pattern)) : null);
@@ -1887,7 +1645,7 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
         if (REFERENCE_PACKAGES.has(id) && argName && typeof argValue === "string" && isReference(argValue)) {
           if (stack?.[0]?.type === "world") {
             args[argName] = stack[0]!.display_name;
-            return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
+            return { winner: { id, args, score: 1, viaPattern: true }, ranked: [] };
           }
           onYield?.({ id, reason: "unresolved_reference" });
           // ROUTE-FIND-03: an unresolved reference is final for this
@@ -1904,7 +1662,7 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
         // A literal pattern match always wins, immediately - no ranking
         // to report - regardless of which tier this package is (see
         // this function's own header comment above).
-        return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
+        return { winner: { id, args, score: 1, viaPattern: true }, ranked: [] };
       }
     }
   }
@@ -1983,69 +1741,18 @@ export function answersAllow(manifest: PackageManifest, kinds: readonly AnswerKi
   return kinds.every((k) => answers.includes(k));
 }
 
-/** FAST-04: the fuzzy half of routing (embedding scores with the
- * keyword-overlap fallback, the Tier 1 threshold and margin, and the
- * full `ranked` list Tier 2 offers from). Only called once routeLiteral()
- * has returned null. Never embeds on its own: `utteranceVector` is the
- * one embed the caller already made, and `undefined` means that embed
- * failed and every candidate falls back to keyword overlap (a code
- * review, 2026-09-12, caught a `?? embedUtterance()` here that would
- * have paid a second 30 s timeout on a down sidecar). */
-export async function routeSemantic(
-  text: string,
-  actor: PersonRow,
-  loaded: LoadedManifest[],
-  utteranceVector: UtteranceVector | undefined,
-): Promise<RouteResult> {
-  const eligible: LoadedManifest[] = [];
-  for (const { id, manifest } of loaded) {
-    if (!meetsMinRole(actor.role, manifest.min_role)) continue;
-    if (manifest.kind !== "plugin") continue;
-
-    eligible.push({ id, manifest });
-  }
-  if (eligible.length === 0) return { winner: null, ranked: [] };
-
-  await ensureRoutingEmbeddings(eligible.map(({ id, manifest }) => ({ id, examples: manifest.routing?.examples })));
-  const embeddingScores = utteranceVector ? scoreByEmbedding(utteranceVector, eligible.map(({ id }) => id)) : new Map<string, number>();
-
-  const scored = eligible.map(({ id, manifest }) => ({
-    id,
-    score: embeddingScores.get(id) ?? exampleScore(text, manifest.routing?.examples),
-    viaEmbedding: embeddingScores.has(id),
-  }));
-  const ranked: RankedCandidate[] = [...scored]
-    .sort((a, b) => b.score - a.score)
-    .map((s) => ({ id: s.id, score: s.score, manifest: eligible.find((e) => e.id === s.id)!.manifest }));
-
-  // A consequential package never WINS Tier 1 (examples alone never
-  // clear its raised bar) - folded into canFire alongside the existing
-  // arg-binding check, rather than excluded from `eligible`/`scored`
-  // outright, so it still appears in `ranked` for Tier 2 to offer.
-  const capturedKinds = capturedEntityKinds(text);
-  const canFire = (id: string) => {
-    const manifest = eligible.find((e) => e.id === id)!.manifest;
-    if (manifest.consequential) return false;
-    if (!answersAllow(manifest, capturedKinds)) return false;
-    return deterministicArgs(manifest.args, null) !== null;
-  };
-  const tier1Winner = pickTier1WinnerAmong(scored, canFire);
-  if (!tier1Winner) return { winner: null, ranked };
-
-  const manifest = eligible.find((e) => e.id === tier1Winner.id)!.manifest;
-  const args = deterministicArgs(manifest.args, null)!; // canFire already proved this binds
-  const viaEmbedding = scored.find((s) => s.id === tier1Winner.id)!.viaEmbedding;
-  return { winner: { id: tier1Winner.id, args, score: tier1Winner.score, viaPattern: false, viaEmbedding }, ranked };
+/** Literal patterns remain the only deterministic route. On a miss, the
+ * role-eligible package set is supplied to native tool calling without
+ * semantic ranking; the model decides whether any tool fits. */
+function toolCandidatesFor(actor: PersonRow, loaded: readonly LoadedManifest[]): RankedCandidate[] {
+  return loaded
+    .filter(({ id, manifest }) => manifest.kind === "plugin" && meetsMinRole(actor.role, manifest.min_role))
+    .map(({ id, manifest }) => ({ id, score: 0, manifest }));
 }
 
-/** The two halves in order, for callers that do not care about the embed
- * timing (routingCorpus.test.ts's direct call); prepareTurn() calls them
- * separately so the embed only happens when the literal half missed.
- * Embeds here when the caller did not, exactly once. */
-export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[], utteranceVector?: UtteranceVector): Promise<RouteResult> {
+export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Promise<RouteResult> {
   const literal = routeLiteral(text, actor, loaded);
-  if (literal) return literal;
-  return routeSemantic(text, actor, loaded, utteranceVector ?? (await embedUtterance(text)));
+  return literal ?? { winner: null, ranked: toolCandidatesFor(actor, loaded) };
 }
 
 type PreparedTurn =
@@ -2086,26 +1793,11 @@ type PreparedTurn =
        * `guardContext` after a review found the streaming path reading
        * empty outcomes through it). */
       turnContext: TurnContext;
-      /** Fix E (docs/dev.md's "Chat reliability" - native tool calling,
-       * one round trip): offered to the SAME completion call that
-       * answers the turn (runTurn()/runTurnStream()), replacing the
-       * deleted attemptTier2Tools()'s own separate, up-front `complete()`
-       * call. ROUTE-01: selectOfferedTools() builds it with no floor: a
-       * command-shaped turn carries the top three ranked packages plus
-       * every `routing.always_offer` package (websearch is the first); a
-       * question or first-person turn carries the always-offer set
-       * alone, so the common conversational case keeps one identical,
-       * prompt-cacheable set while a command's own three vary per turn
-       * (the named prompt-cache cost in docs/dev/session-a.md). Empty
-       * (never sent as `[]` - llm.ts's own `offering` check) only when
-       * nothing is ranked and no always-offer package is installed. */
+      /** Stable ordinary tools offered to the same completion that
+       * answers the turn; empty only for continuations or crisis turns. */
       tools: ToolSpec[];
-      /** The exact candidates `tools` was built from - resolveToolCalls()
-       * needs each call's own manifest (a `consequential` check) and
-       * score (the routing field on a real answer), the same `ranked`
-       * route() already computed; kept alongside `tools` rather than
-       * re-derived from it, since `ToolSpec` itself has no score or
-       * manifest left in it once flattened. */
+      /** Role-eligible manifests used to validate and execute proposed
+       * tool calls. `ToolSpec` has no manifest once flattened. */
       ranked: RankedCandidate[];
       /** ASK-01: the name the engine asks about at the end of this
        * reply ("Who's Clover?"), the first household-framed unknown of
@@ -2938,18 +2630,14 @@ async function prepareTurn(
   // conservative about the judge's timing costs far less than the
   // per-call precision would).
   lease.engage();
-  // FAST-04: literal patterns before the embed round trip. A pattern
-  // winner returns from the plugin branch below without ever calling
-  // the embed engine (tests/turnEngine.test.ts asserts zero embed calls
-  // for "remember that I like tea"); only a miss pays for the embed,
-  // which is then made exactly once here (a review, 2026-09-06, found
-  // route() and recall() each embedding the identical utterance
-  // separately) and reused below as recall()'s own queryVector -
+  // FAST-04: literal patterns before the recall embed round trip. A
+  // pattern winner returns without embedding; only a miss pays once,
+  // then reuses the vector below as recall()'s own queryVector -
   // embedQueryForRecall() stays in memory.ts for its other real caller
   // (packageHost.ts's Host.memory.recall).
   let utteranceVector: UtteranceVector | undefined;
-  // #92: the roster (read above, with the signal) feeds routing, so a
-  // literal pattern of an outside-looking package can yield on a
+  // #92: the roster (read above, with the signal) feeds literal routing,
+  // so a pattern of an outside-looking package can yield on a
   // household name; the same list feeds the prompt and the guards below.
   const routingStart = performance.now();
   // CHAT-13 (chunk B): the subject stack is computed BEFORE the literal
@@ -3032,7 +2720,9 @@ async function prepareTurn(
   // embed still runs for recall.
   const shortComment = !continuation && !inCrisis && !composeDirect && isShortCommentOnLiveSubject(text, subjects, signal);
   if (shortComment) { fired("signal.backchannel_on_subject"); signal = asBackchannelOnLiveSubject(signal); }
-  let { winner: routed, ranked }: RouteResult = continuation || inCrisis || shortComment || composeDirect ? { winner: null, ranked: [] } : (routeLiteral(text, actor, effectiveLoaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: [] });
+  let { winner: routed, ranked }: RouteResult = continuation || inCrisis || shortComment || composeDirect
+    ? { winner: null, ranked: [] }
+    : (routeLiteral(text, actor, effectiveLoaded, rosterNames, (y) => (literalYielded = y), subjects) ?? { winner: null, ranked: toolCandidatesFor(actor, effectiveLoaded) });
   // ACT-01: a literal-pattern win is a directive by construction, frozen
   // on the signal before the package runs.
   if (routed?.viaPattern) { fired("signal.directive_freeze"); signal = freezeDirective(signal); }
@@ -3040,38 +2730,22 @@ async function prepareTurn(
     utteranceVector = await embedUtterance(text);
   } else if (!routed && !inCrisis && !shortComment && !composeDirect) {
     utteranceVector = await embedUtterance(text);
-    ({ winner: routed, ranked } = await routeSemantic(text, actor, effectiveLoaded, utteranceVector));
   }
   if (inCrisis) {
     utteranceVector = await embedUtterance(text);
     console.log(`[safety] turn ${turnId} in the crisis state: no package routed, no tool offered`);
   }
-  // A real trigger phrase always wins outright (see RoutedPlugin's own
-  // comment on why `viaPattern`, not `score === 1`, is the real signal).
-  // Only a FUZZY plugin match is subject to being outscored - found live
-  // (2026-09-05, docs/dev.md's "The real skill kind, shipped" entry):
-  // "tell me a bedtime story about a fox" hijacked by the `joke` plugin's
-  // own keyword-overlap placeholder scoring "tell me a dad joke" at
-  // exactly the match threshold, purely from the shared filler words
-  // "tell me a" - with a much more confident, genuinely relevant skill
-  // match sitting right there unused. A weak, accidental plugin match
-  // should not get to preempt a stronger, more specific skill match for
-  // the identical turn; a household member's own deliberately-authored
-  // trigger phrase always still can.
-  const routedViaFuzzyMatch = routed && !routed.viaPattern;
-  const bestSkillScore = routedViaFuzzyMatch ? (matchingSkills(text, skills)[0]?.score ?? 0) : 0;
   // The router's reading is the signal's projection: one classification.
   const shape = shapeOf(signal, text);
-  const outscoredBySkill = routed && routedViaFuzzyMatch && bestSkillScore > routed.score ? routed.id : null;
   // #92: a Tier 0 pattern winner that reports the typed "not found"
   // (a summary 404, a page with nothing to say, a recipe's not_found)
   // is not a reply: the turn goes on down the model path as if nothing
   // had matched, and the miss rides on the TurnContext as a failed
   // outcome so the guards and the [turn] line see it.
   let tier0Miss: { packageId: string; error: string } | null = null;
-  if (routed && !outscoredBySkill) {
-    fired(routed.viaPattern ? "route.pattern" : routed.viaEmbedding ? "route.embedding" : "route.keyword");
-    logRoute(turnId, routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", shape, routed.id, ranked, []);
+  if (routed) {
+    fired("route.pattern");
+    logRoute(turnId, "pattern", shape, routed.id, ranked, []);
     // Item 4a: a literal pattern's capture can be a bare pronoun ("add
     // it to the shopping list" captured "it", and the list gained the
     // word). The package never runs on it; the turn asks for the value
@@ -3124,7 +2798,7 @@ async function prepareTurn(
         plugin_id: routed.id,
         safety,
         crisis_resources: crisisResources,
-        routing: { tier: routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", score: routed.score },
+        routing: { tier: "pattern", score: routed.score },
         ...(floorOutcome.sources?.length ? { sources: floorOutcome.sources } : {}),
       }, subjects);
       // CHAT-16 (K2): a floor winner whose result needs the composer (the
@@ -3165,11 +2839,10 @@ async function prepareTurn(
     }
   }
   if (tier0Miss && !utteranceVector) {
-    // The literal winner skipped the embed; the model path needs it for
-    // recall and the Tier 2 ranking, exactly as a miss would have. The
-    // package that just missed is not offered again on the same turn.
+    // The literal winner skipped the embed; the model path still needs it
+    // for recall. The package that just missed is not offered again.
     utteranceVector = await embedUtterance(text);
-    ({ ranked } = await routeSemantic(text, actor, effectiveLoaded, utteranceVector));
+    ranked = toolCandidatesFor(actor, effectiveLoaded);
     ranked = ranked.filter((r) => r.id !== tier0Miss?.packageId);
   }
   timings.routing_ms = Math.round(performance.now() - routingStart);
@@ -3329,62 +3002,10 @@ async function prepareTurn(
       { role: "user" as const, content: CONTINUATION_INSTRUCTION },
     ] : []),
   ];
-  // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
-  // round trip): `ranked` (route()'s own Tier 1 scoring) below
-  // TIER2_AMBIGUOUS_FLOOR means nothing plausible enough to ask the
-  // model about at all - offered to the SAME completion call that
-  // answers the turn either way (no separate, up-front `complete()` call
-  // anymore - attemptTier2Tools()'s own deleted one, a whole extra model
-  // round trip on every turn that reached here); the model's own
-  // tool_calls decision (or lack of one) is read back from that one call
-  // by runTurn()/runTurnStream() and handed to resolveToolCalls() below.
-  // ROUTE-01 (docs/dev/session-a.md, getmaipai/home#80): no floor on the
-  // offer any more; the shape guard picks between the top three plus
-  // always-offer (a command) and always-offer alone (a question or a
-  // first-person statement no deterministic tier placed). The long
-  // comment below is the history of the always-offer set, kept because
-  // its reasoning (the offer costs prompt tokens, not a round trip; the
-  // model's own judgment is the gate) is what ROUTE-01 generalized.
-  const tools = continuation || inCrisis ? [] : stickyOfferedTools(conversation.id, ranked, shape, ordinaryToolIdsForInstalled(effectiveLoaded));
-  logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), outscoredBySkill, literalYielded, tier0Miss?.packageId ?? null);
-  // manifest.routing.always_offer (spec/schemas/manifest.schema.json,
-  // Fix E's own addition - a code review, 2026-09-07, found the first
-  // cut of this hardcoded a `Set(["websearch"])` in this file instead of
-  // a real manifest field, the same "declared once" asymmetry
-  // `consequential` already solved for the opposite case): a genuinely
-  // open-ended fallback package (websearch is the first) is offered on
-  // EVERY turn, never gated by TIER2_AMBIGUOUS_FLOOR at all - Jesse,
-  // 2026-09-07, live-found: "what's the latest stephen king novel"
-  // never cleared the floor (0.66 against 0.68) even after broadening
-  // websearch's own routing.examples, and a natural rephrasing of the
-  // identical question would always be one keyword away from the next
-  // miss (the exact whack-a-mole Fix D's own paraphrase-corpus reversion
-  // already learned to distrust). Sound specifically because of Fix E:
-  // the floor's whole reason to exist was to skip a COSTLY separate
-  // round trip on turns where nothing plausible was in contention;
-  // native tool calling folded offering into the one completion that
-  // answers the turn regardless, so a small, curated set of always-
-  // offered fallback tools costs a few hundred extra (cacheable) prompt
-  // tokens, not a second model call - the model's own native judgment,
-  // measured at a 0% false-call rate across the real corpus (docs/dev.md's
-  // Fix E writeup), is the real gate now. This DOES mean `tools` is no
-  // longer empty on an ordinary "good morning"-shaped turn whenever an
-  // always-offer package is installed - a real, honest change from Fix
-  // E's own original "an ordinary turn's prompt-cache hit rate is
-  // unaffected" framing, not something to pretend away: the offered set
-  // is IDENTICAL (and so still cacheable) across every ordinary turn,
-  // just no longer empty. Deliberately NOT a general floor change -
-  // lowering TIER2_AMBIGUOUS_FLOOR itself would need the whole routing
-  // corpus re-measured for noisier offers on every OTHER candidate too
-  // (Fix D's own precedent for what a threshold change costs to do
-  // safely); this stays scoped to whichever packages a package author
-  // explicitly opts in. MAX_TIER2_TOOLS_OFFERED still bounds `topRanked`
-  // - always-offered packages are added ON TOP of that cap (a package
-  // author's own explicit choice to always show up costs one more slot
-  // deliberately, not an unbounded one).
-  // getmaipai/home#67: the FULL always-offer set (unlike `alwaysOffered`
-  // just above, which deliberately excludes a candidate already counted
-  // via `topRanked` to avoid offering it twice in `tools`).
+  // Native tool calls use the stable ordinary set; no semantic score
+  // or utterance shape gates which tools the model can consider.
+      const tools = continuation || inCrisis ? [] : selectOfferedTools(ranked, shape, ordinaryToolIdsForInstalled(effectiveLoaded));
+  logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), literalYielded, tier0Miss?.packageId ?? null);
 
   turnContext.offeredToolIds = tools.map((t) => t.id);
   // CHAT-01: the guards' context is derived from the included evidence
@@ -3489,59 +3110,6 @@ function subjectsSectionFor(actor: PersonRow, subjects: readonly SubjectRef[]): 
 }
 
 
-// This floor's own gate now lives in prepareTurn() (Fix E moved the
-// tool-offering decision there, ahead of the single completion call that
-// answers the turn either way) - kept here, with the constant, since the
-// tuning history below is unchanged by where the gate itself executes.
-// A latency review (2026-09-06) found this step running its full,
-// non-streaming, grammar-constrained `complete()` call before EVERY
-// streamed turn that reaches here, because `ranked.length > 0` is true
-// whenever any eligible package declares routing.examples - which, with
-// the bundled catalog, is nearly every turn. That is a whole extra LLM
-// round trip (150 to 600 ms measured this way in the review) for turns
-// where nothing plausible was ever in contention. Gated instead on
-// `ranked`'s own top score (already sorted descending by route()):
-// below this floor there is nothing worth asking the model to consider,
-// so the call is skipped and this always falls through to null (the
-// ordinary conversational reply) exactly as if Tier 2 had run and found
-// nothing. The floor sits below TIER1_THRESHOLD on purpose - a
-// `consequential` candidate that scored well past the Tier 1 bar never
-// WINS Tier 1 by design (route()'s own `canFire`) and still needs to
-// reach here, and a candidate that lost only on Tier 1's margin check
-// (a close runner-up) is exactly the "ambiguous" case worth a real model
-// look.
-//
-// Fix D (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
-// the five fixes"): measured, not a start value anymore
-// (`bun run scripts/bench/routing.ts`, docs/dev/session-c.md). At 0.45,
-// every genuinely ordinary conversational corpus row AND all 8 live
-// incident probe phrases cleared this floor, meaning Tier 2's own
-// grammar-forced model call ran on nearly every real turn regardless of
-// whether anything plausible was ever in contention - exactly the
-// review comment above this constant was trying to prevent, just set
-// too low to actually prevent it. Raised to sit above the measured
-// ordinary-negative noise floor (31 rows excluding the corpus's own
-// `noiseFloorExempt` rows - a code review on this fix caught the first
-// measurement including those and so overstating the real floor;
-// p90=0.659, p95=0.705) while staying
-// comfortably below every case that genuinely needs to reach Tier 2: a
-// `consequential` package (routes.ts's own `lock-doors`, 1.00 in the
-// corpus - it can never WIN Tier 1 by design, but must still be
-// OFFERED) and a real near-miss meant for Tier 2 ("what have I told you
-// to remember about pizza night", 1.00 against `recall` - a genuine
-// runner-up Tier 1 can't bind, not ordinary chat) both score far above
-// this floor either way, so raising it costs neither case anything.
-//
-// ROUTE-01 (docs/dev/session-a.md, getmaipai/home#80): no longer gates
-// the offer. The floor's reason to exist was the separate round trip,
-// which Fix E removed; what it did afterwards was hide every package
-// whose examples a paraphrase drifted from, and the model never got to
-// see the candidate the household meant. selectOfferedTools() offers
-// the top three without it (the shape guard in front decides who gets
-// them). Kept exported as the measured ordinary-negative noise ceiling
-// the routing bench reports against, nothing else.
-export const TIER2_AMBIGUOUS_FLOOR = 0.68;
-
 /** Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
  * round trip): given the model's OWN already-decided `calls` (read off
  * the SAME completion call that would otherwise have answered the turn
@@ -3561,8 +3129,8 @@ export const TIER2_AMBIGUOUS_FLOOR = 0.68;
  * own response is identical: fall through to a second completion
  * without tools, never fabricate a plugin success. `ranked` is only
  * used to resolve each call's own manifest (the `consequential` check)
- * and score (the routing field on a real answer) - which tools to call
- * and with what args is the model's native decision now, never
+ * which tools to call and with what args is the model's native decision,
+ * never
  * re-derived here. A call naming a tool that wasn't actually offered
  * (not present in `ranked`) is silently dropped rather than trusted -
  * the one thing this function still doesn't take on faith. */
@@ -3635,15 +3203,8 @@ function pageSource(page: unknown): ReturnType<typeof sourcesFromRows> {
 
 async function resolveToolCallsInOrder(
   calls: ToolCall[],
-  // The exact candidates actually SENT to the model as `tools`
-  // (prepared.tools, ToolSpec.id) - a code review (2026-09-07) found
-  // this function used to validate a call's id against `ranked` (every
-  // Tier 1 candidate, only the top MAX_TIER2_TOOLS_OFFERED of which is
-  // ever offered), so a call naming a real but UN-offered candidate
-  // (the 4th-ranked one, say) passed this check and ran - including,
-  // for a `consequential` package, reaching the confirm gate as if it
-  // had genuinely been offered. `ranked` is still needed too (for each
-  // ACCEPTED call's own manifest/score), so both are taken now.
+  // Exact tool ids sent to the model. `ranked` carries the corresponding
+  // manifests used for validation and execution.
   offeredIds: ReadonlySet<string>,
   ranked: RankedCandidate[],
   actor: PersonRow,
@@ -3906,8 +3467,7 @@ async function resolveToolCallsInOrder(
     crisis_resources: crisisResources,
     // Fix E: "tool" (additive to the wire enum, TurnValue.routing.tier)
     // - a real Tier 2 native tool call is its own routing kind now,
-    // distinct from "embedding" (a Tier 0/1 winner scored via cosine
-    // similarity, never a model decision at all).
+    // distinct from "pattern" (a literal manifest trigger).
     routing: { tier: "tool", score: bestScore },
     conversation_id: conversationId,
     turn_id: turnId,
@@ -4507,13 +4067,9 @@ async function runTurnHoldingLease(
     };
 
 
-    // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
-    // round trip): `tools` rides on the SAME completion call that would
-    // otherwise answer in plain text - no separate up-front call, unlike
-    // the deleted attemptTier2Tools(). `prepared.tools` is empty
-    // whenever nothing cleared TIER2_AMBIGUOUS_FLOOR, so this sends no
-    // `tools` field at all on an ordinary turn (llm.ts's own `offering`
-    // check).
+    // Native tool calls ride on the same completion call that would
+    // otherwise answer in plain text. Empty tools are omitted by the
+    // llm client's own `offering` check.
     const offeringTools = prepared.tools.length > 0;
     const offeredIds = new Set(prepared.tools.map((t) => t.id));
     prepared.modelCalls++;

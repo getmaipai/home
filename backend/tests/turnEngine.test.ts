@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { offerOrdinaryTools } from "./ordinaryToolFixture";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import {
@@ -27,7 +28,6 @@ import {
   matchPattern,
   capSection,
   route,
-  routeSemantic,
   loadAllManifests,
   capturedEntityKinds,
   isShortCommentOnLiveSubject,
@@ -2780,6 +2780,7 @@ describe("CHAT-15: the direct paths retain the same outcome evidence, and the ro
 
   test("the streaming path retains the model's tool calls on the row, and a list-add's argument the person never said stays pending", async () => {
     const { actor } = await owner();
+    offerOrdinaryTools(actor, ["list-add"]);
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0, {
@@ -3259,6 +3260,7 @@ describe("item 4a: a tool never runs on an argument the person did not say", () 
 
   test("'set a timer' with no length: the model's invented ten minutes never runs; the turn asks how long, and the spoken answer runs it", async () => {
     const { actor } = await owner();
+    offerOrdinaryTools(actor, ["timer"]);
     const { listJobs } = await import("@/lib/scheduler");
     await withCalls((request) => (offers(request, "timer") ? [{ name: "timer", args: { expression: "ten minutes" } }] : undefined), async () => {
       const conv = resolveOrCreateConversation(actor, "chat");
@@ -3281,6 +3283,7 @@ describe("item 4a: a tool never runs on an argument the person did not say", () 
 
   test("'never mind' on a pending ask clears it and runs nothing", async () => {
     const { actor } = await owner();
+    offerOrdinaryTools(actor, ["timer"]);
     const { listJobs } = await import("@/lib/scheduler");
     await withCalls((request) => (offers(request, "timer") ? [{ name: "timer", args: { expression: "five minutes" } }] : undefined), async () => {
       const conv = resolveOrCreateConversation(actor, "chat");
@@ -3319,6 +3322,7 @@ describe("item 4a: a tool never runs on an argument the person did not say", () 
 
   test("a command said in place of the answer routes as itself: 'add eggs to the list' after 'Add what to the list?' adds eggs, not the sentence", async () => {
     const { actor } = await owner();
+    offerOrdinaryTools(actor, ["list-add"]);
     const { sqlite } = await import("@/db");
     const items = () => (sqlite.query("SELECT items FROM lists").all() as { items: string }[]).flatMap((r) => (JSON.parse(r.items) as { text: string }[]).map((i) => i.text));
     await withCalls((request) => (offers(request, "list-add") ? [{ name: "list-add", args: { item: "eggs" } }] : undefined), async () => {
@@ -3337,6 +3341,7 @@ describe("item 4a: a tool never runs on an argument the person did not say", () 
 
   test("a timer with a spoken length still runs, digits and words alike, and a number the person said in words is not an invention when the model writes digits", async () => {
     const { actor } = await owner();
+    offerOrdinaryTools(actor, ["timer"]);
     const { listJobs } = await import("@/lib/scheduler");
     await withCalls((request) => (offers(request, "timer") ? [{ name: "timer", args: { expression: "5 minutes" } }] : undefined), async () => {
       const spoken = await runTurn(actor, "chat", "can you start a timer, five minutes please");
@@ -3349,6 +3354,7 @@ describe("item 4a: a tool never runs on an argument the person did not say", () 
 
   test("a mixed batch: the call whose argument was said runs, the withheld one's question follows, and the answer runs it (a review)", async () => {
     const { actor } = await owner();
+    offerOrdinaryTools(actor, ["timer", "list-add"]);
     const { listJobs } = await import("@/lib/scheduler");
     const { sqlite } = await import("@/db");
     const items = () => (sqlite.query("SELECT items FROM lists").all() as { items: string }[]).flatMap((r) => (JSON.parse(r.items) as { text: string }[]).map((i) => i.text));
@@ -3860,18 +3866,17 @@ describe("CHAT-13 chunk D: routing.answers", () => {
     expect(answersAllow(manifest, [])).toBe(true);
   });
 
-  test("routeSemantic refuses a manifest that declares [] when a weekday is captured", async () => {
+  test("an example alone never routes a package even when it declares an answer kind", async () => {
     const actor = fakeActor({ role: "adult" });
     const loaded = [makeManifest([])];
-    const { winner } = await routeSemantic("what date is next Friday", actor, loaded, undefined);
+    const { winner } = await route("what date is next Friday", actor, loaded);
     expect(winner).toBeNull();
   });
 
-  test("routeSemantic allows a manifest that declares the captured kind", async () => {
+  test("an example-only package is available to model tool calling, never a fuzzy winner", async () => {
     const actor = fakeActor({ role: "adult" });
-    // Add an example that scores high against "what day of the week is Friday"
-    // so the Tier 1 threshold clears; "Friday" is a weekday, declared in
-    // routing.answers, so answersAllow passes.
+    // The example is deliberately an exact text match: D7 requires a
+    // model decision unless the manifest declares a literal pattern.
     const m = PackageManifest.parse({
       id: "test-almanac",
       version: "0.1.0",
@@ -3911,8 +3916,9 @@ describe("CHAT-13 chunk D: routing.answers", () => {
       smoke: { kind: "deno_test" },
     });
     const loaded = [{ id: "test-almanac", manifest: m }];
-    const { winner } = await routeSemantic("what day of the week is Friday", actor, loaded, undefined);
-    expect(winner?.id).toBe("test-almanac");
+    const { winner, ranked } = await route("what day of the week is Friday", actor, loaded);
+    expect(winner).toBeNull();
+    expect(ranked.map((candidate) => candidate.id)).toContain("test-almanac");
   });
 
   test("capturedEntityKinds() extracts relative_date from 'tonight', 'next week', 'next month', 'this year', 'in 3 days'", () => {
@@ -3943,7 +3949,7 @@ describe("CHAT-13 chunk D: routing.answers", () => {
     expect(kinds).toContain("relative_date");
   });
 
-  test("routeSemantic: almanac packages with relative_date answers win on 'what's the date tomorrow'", () => {
+  test("the old routing.answers contract remains data only, not an embedding decision", () => {
     const loaded = loadAllManifests();
     const dateManifest = loaded.find((l) => l.id === "almanac-date")!;
     expect(dateManifest.manifest.routing?.answers).toContain("relative_date");

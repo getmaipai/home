@@ -8,6 +8,7 @@
 // run on demand (`bun run scripts/bench/conversation.ts --live`).
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { resetDb } from "./reset-db";
+import { offerOrdinaryTools } from "./ordinaryToolFixture";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -59,6 +60,11 @@ const byId = (id: string): BenchConversation => {
   const c = CONVERSATIONS.find((x) => x.id === id);
   if (!c) throw new Error(`no fixture conversation ${id}`);
   return c;
+};
+
+const lastUserText = (request: ChatCompletionRequest): string => {
+  const message = [...request.messages].reverse().find((m) => m.role === "user");
+  return typeof message?.content === "string" ? message.content : "";
 };
 
 /** The stub behind the bench's own recording proxy, the way the live
@@ -127,7 +133,13 @@ describe("the fixture", () => {
   });
 
   test("ALM-01: the runner passes the declared clock through the almanac path", async () => {
-    await withStubBench({ reply: () => "Okay." }, async (deps) => {
+    await withStubBench({
+      reply: () => "Okay.",
+      calls: (request) => /what's the date today/i.test(lastUserText(request)) && request.tools?.some((t) => t.function.name === "almanac-date")
+        ? [{ id: "call-date", name: "almanac-date", args: "{}" }]
+        : undefined,
+    }, async (deps) => {
+      offerOrdinaryTools(deps.people.owner, ["almanac-date"]);
       const { scores } = await runConversation(byId("derived-dates"), deps);
       expect(scores[0]?.pass).toBe(true);
       expect(scores[1]?.pass).toBe(true);
@@ -551,9 +563,10 @@ describe("the runner against the stub (control-flow rows)", () => {
     await withStubBench(
       {
         reply: () => "Sure.",
-        calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
+        calls: (request) => (/^lock the front door[.!?]*$/i.test(lastUserText(request)) && request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
       },
       async (deps) => {
+        offerOrdinaryTools(deps.people.owner, ["lock-doors"]);
         const { scores } = await runConversation(byId("consequential-once"), deps);
         expect(scores[0]?.observed.attempts["lock-doors"] ?? 0).toBe(0);
         expect(scores[0]?.observed.source).toBe("confirm");
@@ -594,9 +607,10 @@ describe("the runner against the stub (control-flow rows)", () => {
     await withStubBench(
       {
         reply: () => "Sure.",
-        calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
+        calls: (request) => (/^lock the front door[.!?]*$/i.test(lastUserText(request)) && request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
       },
       async (deps) => {
+        offerOrdinaryTools(deps.people.owner, ["lock-doors"]);
         const { scores } = await runConversation(byId("consequential-once"), deps);
         expect(scores.map((s) => s.observed.pendingAsk)).toEqual(["confirm", null, null]);
         expect(scores.map((s) => s.observed.homeCalls["lock.lock"] ?? 0)).toEqual([0, 1, 1]);
@@ -610,9 +624,10 @@ describe("the runner against the stub (control-flow rows)", () => {
     await withStubBench(
       {
         reply: () => "Sure.",
-        calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
+        calls: (request) => (/^lock the front door[.!?]*$/i.test(lastUserText(request)) && request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
       },
       async (deps) => {
+        offerOrdinaryTools(deps.people.owner, ["lock-doors"]);
         await runConversation(byId("consequential-once"), deps); // one real lock call before this conversation starts
         expect(deps.homeAssistant?.calls["lock.lock"]).toBe(1);
         const { scores } = await runConversation(byId("never-mind-cancels"), deps);
@@ -636,6 +651,7 @@ describe("the runner against the stub (control-flow rows)", () => {
             : undefined,
       },
       async (deps) => {
+        offerOrdinaryTools(deps.people.owner, ["timer", "list-add"]);
         const { scores } = await runConversation(byId("compound-request"), deps);
         expect(scores[0]?.observed.pluginId?.split("+").sort()).toEqual(["list-add", "timer"]);
         expect(scores[0]?.observed.listItems).toContain("eggs");
@@ -761,9 +777,10 @@ describe("the runner against the stub (control-flow rows)", () => {
     await withStubBench(
       {
         reply: () => "Okay.",
-        calls: (request) => (request.tools?.some((t) => t.function.name === "timer") ? [{ id: "call-1", name: "timer", args: JSON.stringify({ expression: "ten minutes" }) }] : undefined),
+        calls: (request) => (/^set a timer[.!?]*$/i.test(lastUserText(request)) && request.tools?.some((t) => t.function.name === "timer") ? [{ id: "call-1", name: "timer", args: JSON.stringify({ expression: "ten minutes" }) }] : undefined),
       },
       async (deps) => {
+        offerOrdinaryTools(deps.people.owner, ["timer"]);
         const { scores } = await runConversation(byId("never-mind-on-an-ask"), deps);
         expect(scores[0]?.observed.source).toBe("confirm");
         expect(scores[0]?.observed.pendingAsk).toBe("ask");

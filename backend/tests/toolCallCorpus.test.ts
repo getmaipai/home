@@ -48,11 +48,8 @@ const corpus: ToolCallCorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm"
 // those need a real model instead (scripts/bench/tool-calling.ts).
 const positiveRows = corpus.filter((row) => row.expect_calls.length > 0);
 
-// Every bundled package this corpus names, offered as a tool - the
-// pre-filter turnEngine.ts's own prepareTurn() applies in production
-// (TIER2_AMBIGUOUS_FLOOR, MAX_TIER2_TOOLS_OFFERED) is a real turn's Tier
-// 1 ranking, not relevant to proving the wire plumbing itself handles
-// two independent, unrelated calls in one reply.
+// Every bundled package this corpus names, offered as a tool. This test
+// proves the wire plumbing handles independent calls in one reply.
 const TOOLS: ToolSpec[] = [
   { id: "remember", description: "remember a fact", args: { type: "object", required: ["fact"], properties: { fact: { type: "string" } } } },
   { id: "recall", description: "recall what's known about a topic", args: { type: "object", required: ["topic"], properties: { topic: { type: "string" } } } },

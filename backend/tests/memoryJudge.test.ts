@@ -1069,27 +1069,17 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
     expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, closing.id)).get()!.judgeStatus).toBe("skipped");
   });
 
-  // ROUTE-FIND-03: a search/look-up/google command is a directive, the
-  // same as any other everyday imperative - never an inform the judge
-  // could mistake for a fact about the household. websearch/manifest.json's
-  // own routing.patterns ("search *", "look up *", "google *") feed
-  // turnEngine.ts's commandOpeners() (routing.ts's commandOpenersFrom())
-  // the real way a running hub builds this set, not a hand-picked one.
-  test("a search/look-up/google command is a directive, never a fact for the judge", async () => {
+  // ROUTE-FIND-03: the retained authored search command stays a directive,
+  // never an inform the judge could mistake for a fact. D7 removed the
+  // broad look-up/google wildcard patterns; this fixture tests only the
+  // command opener the package still declares.
+  test("a search command is a directive, never a fact for the judge", async () => {
     const { actor } = await owner();
     const openers = commandOpenersFromManifests(loadAllManifests());
     expect(openers.has("search")).toBe(true);
-    expect(openers.has("look")).toBe(true);
-    expect(openers.has("google")).toBe(true);
     const search = makeSignalledTurn(actor, "search who won the Seattle Mariners game yesterday", "Searching now.", "plugin", openers);
-    const lookUp = makeSignalledTurn(actor, "look up the score of last night's Mariners game", "Searching now.", "plugin", openers);
-    const google = makeSignalledTurn(actor, "google how the stock market did today", "Searching now.", "plugin", openers);
     expect(turnSignalOf(search)?.clauses.map((c) => c.act)).toEqual(["directive"]);
-    expect(turnSignalOf(lookUp)?.clauses.map((c) => c.act)).toEqual(["directive"]);
-    expect(turnSignalOf(google)?.clauses.map((c) => c.act)).toEqual(["directive"]);
     expect(search.judgeStatus).toBe("skipped");
-    expect(lookUp.judgeStatus).toBe("skipped");
-    expect(google.judgeStatus).toBe("skipped");
   });
 
   test("a refusal and a credential turn are never the judge's; a row from before the signal keeps the model-source rule", async () => {

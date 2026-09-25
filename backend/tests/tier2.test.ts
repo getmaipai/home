@@ -21,7 +21,6 @@ import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { embedUtterance } from "@/lib/routing";
 import { TestClient } from "./client";
 import {
   resolveToolCalls,
@@ -30,12 +29,9 @@ import {
   runTurn,
   runTurnStream,
   selectOfferedTools,
-  stickyOfferedTools,
-  __resetStickyOfferedToolsForTests,
   ordinaryToolIds,
-  routeSemantic,
+  route,
   loadAllManifests,
-  TIER2_AMBIGUOUS_FLOOR,
   type RankedCandidate,
   type PluginResultWithConfirmAsk,
 } from "@/lib/turnEngine";
@@ -176,11 +172,8 @@ const CONSEQUENTIAL_CANDIDATE: RankedCandidate = {
   manifest: { id: "lock-front-door", version: "0.1.0", kind: "plugin", category: "home", display: "Lock the front door", description: "Lock the front door.", consequential: true, args: {} } as never,
 };
 
-/** Every test below offers exactly the candidates it ranks, matching
- * real production behavior when the ranked list is no longer than
- * MAX_TIER2_TOOLS_OFFERED - the one test that deliberately does NOT do
- * this (a real 4th+ candidate that's ranked but never offered) builds
- * its own narrower `offeredIds` explicitly. */
+/** Every test below offers exactly the candidates it ranks unless it
+ * explicitly tests that an unoffered id is refused. */
 function offeredFrom(ranked: RankedCandidate[]): Set<string> {
   return new Set(ranked.map((r) => r.id));
 }
@@ -443,10 +436,9 @@ describe("resolveToolCalls() (Fix E: the model's own native tool_calls decision,
     expect(value).toBeNull();
   });
 
-  // A code review (2026-09-07) found the first cut of this function
-  // validated a call's id against the FULL `ranked` list (every Tier 1
-  // candidate), not the actually-offered subset (prepareTurn()'s own
-  // `tools`, capped at MAX_TIER2_TOOLS_OFFERED) - a call naming a real,
+  // A code review found the first cut of this function
+  // validated a call's id against the FULL `ranked` list, not the
+  // actually-offered subset (prepareTurn()'s own `tools`) - a real,
   // ranked-but-unoffered candidate (the 4th-ranked one, say) passed the
   // old check and ran anyway, including reaching the confirm gate for a
   // `consequential` package that was never actually shown to the model.
@@ -880,12 +872,10 @@ describe("pendingAskFromPluginResult()", () => {
   });
 });
 
-// ROUTE-01 (docs/dev/session-a.md, getmaipai/home#80): the Tier 2 offer
-// has no similarity floor any more; the bot's shape guard decides
-// between the top three plus always-offer (a command) and always-offer
-// alone (a question or first-person statement no deterministic tier
-// placed).
-describe("ROUTE-01: the offer without a floor, and the shape guard in front of it", () => {
+// D7: native tool calling receives the stable ordinary set only. Literal
+// matches have already been handled before the model path; embeddings no
+// longer add per-turn candidates.
+describe("D7: stable ordinary tools without per-turn semantic candidates", () => {
   const manifest = (id: string, always_offer = false) => ({ id, description: id, args: {}, routing: always_offer ? { always_offer: true } : {} }) as unknown as RankedCandidate["manifest"];
   const ranked: RankedCandidate[] = [
     { id: "remember", score: 0.41, manifest: manifest("remember") },
@@ -899,42 +889,31 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
   // minimum a household can have), so ROUTE-01's own rules show plainly.
   const alwaysOnly = ["websearch"];
 
-  test("selectOfferedTools(): a command-shaped turn offers the top three plus always-offer, with every score under the old floor", () => {
-    expect(ranked[0]!.score).toBeLessThan(TIER2_AMBIGUOUS_FLOOR);
-    expect(selectOfferedTools(ranked, "command", alwaysOnly).map((t) => t.id)).toEqual(["websearch", "remember", "recall", "define"]);
-  });
-
-  test("selectOfferedTools(): a question or first-person turn no tier placed offers the always-offer set alone, never the top three by rank", () => {
+  test("shape and candidate scores never add tools beyond the ordinary set", () => {
+    expect(selectOfferedTools(ranked, "command", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
     expect(selectOfferedTools(ranked, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
     expect(selectOfferedTools(ranked, "first_person", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
     expect(selectOfferedTools(ranked, "statement", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
   });
 
-  test("selectOfferedTools(): a question Tier 1 placed (threshold and margin) but could not fire still offers that one candidate", () => {
+  test("a high or ambiguous score does not affect the stable offer", () => {
     const placed: RankedCandidate[] = [{ id: "recall", score: 0.8, manifest: manifest("recall") }, ...ranked.filter((r) => r.id !== "recall")];
-    expect(selectOfferedTools(placed, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch", "recall"]);
-    // Two close scores are ambiguity, not a placement: the margin rule holds here too.
+    expect(selectOfferedTools(placed, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
     const close: RankedCandidate[] = [{ id: "recall", score: 0.8, manifest: manifest("recall") }, { id: "remember", score: 0.76, manifest: manifest("remember") }, ...ranked.filter((r) => r.id !== "recall" && r.id !== "remember")];
     expect(selectOfferedTools(close, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
   });
 
-  test("selectOfferedTools(): a package already in the ordinary set is offered once, in the set's place", () => {
+  test("a package already in the ordinary set appears once", () => {
     const top: RankedCandidate[] = [{ id: "websearch", score: 0.9, manifest: manifest("websearch", true) }, ...ranked.filter((r) => r.id !== "websearch")];
-    expect(selectOfferedTools(top, "command", alwaysOnly).map((t) => t.id)).toEqual(["websearch", "remember", "recall"]);
+    expect(selectOfferedTools(top, "command", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
   });
 
-  // #80's own shape, with a wording no Tier 0 pattern catches (147cd28
-  // covers the "please remember" endings) and, under the stub's
-  // bag-of-words scorer, a top score under the old floor: before this
-  // item the offered set was websearch alone and the model could not
-  // have chosen remember however clear the sentence was.
-  test("runTurn(): an utterance under the old floor now reaches the remember package when the model chooses it", async () => {
+  test("runTurn(): a model can choose remember from the stable ordinary set", async () => {
     const { actor } = await owner();
     const text = "Friday is pizza night, keep that in mind";
-    const { winner, ranked: real } = await routeSemantic(text, actor, loadAllManifests(), await embedUtterance(text));
+    const { winner, ranked: real } = await route(text, actor, loadAllManifests());
     expect(winner).toBeNull();
-    expect(real[0]!.score).toBeLessThan(TIER2_AMBIGUOUS_FLOOR);
-    expect(real.slice(0, 3).map((r) => r.id)).toContain("remember");
+    expect(real.map((r) => r.id)).toContain("remember");
     let offered: string[] = [];
     const result = await withScriptedToolCalls(
       (request) => {
@@ -950,7 +929,7 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
     expect(result.value.plugin_id).toBe("remember");
   });
 
-  test("runTurn(): a question no tier placed is offered the ordinary set alone, never a guessed package", async () => {
+  test("runTurn(): a question is offered the ordinary set, never semantic guesses", async () => {
     const { actor } = await owner();
     let offered: string[] | undefined;
     await withScriptedToolCalls(
@@ -960,13 +939,12 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
       },
       () => runTurn(actor, "chat", "who won the 1998 world cup"),
     );
-    // ROUTE-02: the ordinary set (a household with no usage yet: the
-    // default order plus always-offer), and nothing by rank.
+    // A household with no usage: the default order plus always-offer.
     expect(offered).toEqual(ordinaryToolIds(loadAllManifests(), { byPlugin: [] }));
     expect(offered).toContain("websearch");
   });
 
-  test("a [route] trace line is printed once per decision with tier, shape, top, runner-up, margin and the offered ids", async () => {
+  test("a [route] trace does not invent rank scores for the model path", async () => {
     const { actor } = await owner();
     const lines: string[] = [];
     const original = console.log;
@@ -988,119 +966,11 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
     expect(record.tier).toBe("tier2");
     expect(record.shape).toBe("statement");
     expect(record.winner).toBeNull();
-    expect((record.top as { id: string; score: number }).id).toBeString();
-    expect(typeof (record.top as { score: number }).score).toBe("number");
-    expect(record.runner_up).toBeDefined();
-    expect(typeof record.margin).toBe("number");
+    expect(record.top).toBeNull();
+    expect(record.runner_up).toBeNull();
+    expect(record.margin).toBeNull();
     expect(record.offered).toContain("websearch");
     expect(JSON.stringify(record)).not.toContain("plumber"); // ids and numbers, never the utterance
-  });
-});
-
-// LAT-02/U1 (docs/plans/simple-turn-pipeline-2026-09-22.md): the
-// offered set stays stable within a conversation, so the prompt cache
-// survives. selectOfferedTools() itself, and every test above, is
-// unchanged - stickyOfferedTools() wraps it with a per-conversation
-// union.
-describe("LAT-02/U1: the sticky per-conversation offered set", () => {
-  const manifest = (id: string, always_offer = false) => ({ id, description: id, args: {}, routing: always_offer ? { always_offer: true } : {} }) as unknown as RankedCandidate["manifest"];
-  const ranked: RankedCandidate[] = [
-    { id: "remember", score: 0.41, manifest: manifest("remember") },
-    { id: "recall", score: 0.33, manifest: manifest("recall") },
-    { id: "define", score: 0.2, manifest: manifest("define") },
-    { id: "trivia", score: 0.1, manifest: manifest("trivia") },
-    { id: "websearch", score: 0.05, manifest: manifest("websearch", true) },
-  ];
-  const alwaysOnly = ["websearch"];
-
-  beforeEach(() => __resetStickyOfferedToolsForTests());
-
-  test("two consecutive command-shaped turns in the same conversation earning the same candidate produce the identical tools block", () => {
-    const first = stickyOfferedTools("conv-a", ranked, "command", alwaysOnly);
-    const second = stickyOfferedTools("conv-a", ranked, "command", alwaysOnly);
-    expect(first.map((t) => t.id)).toEqual(second.map((t) => t.id));
-    expect(first).toEqual(second);
-  });
-
-  test("a lookup candidate earned on turn 1 stays offered on turn 2, even when turn 2's own utterance would not have earned it", () => {
-    // Turn 1: a command shape earns the top three plus always-offer -
-    // "remember" and "recall" are earned live this turn too (returned
-    // below), but only "define" (a typed-source lookup, isStickyEligible())
-    // carries into a later turn; stickyOfferedTools() sorts the sticky
-    // extras by id (never by score), the same stability convention the
-    // ordinary set already uses, so this is not selectOfferedTools()'s
-    // own score order.
-    const turn1 = stickyOfferedTools("conv-b", ranked, "command", alwaysOnly);
-    expect(turn1.map((t) => t.id)).toEqual(["websearch", "define", "recall", "remember"]);
-    // Turn 2: a question shape that Tier 1 placed nothing for would, on
-    // its own, offer only the always-offer set (selectOfferedTools()'s
-    // own rule, proven in ROUTE-01 above) - the sticky set keeps the
-    // one lookup candidate turn 1 earned, a superset of the always-offer
-    // set, but "remember" and "recall" are gone: they were never sticky.
-    const turn2 = stickyOfferedTools("conv-b", ranked, "question", alwaysOnly);
-    expect(turn2.map((t) => t.id)).toEqual(["websearch", "define"]);
-    expect(selectOfferedTools(ranked, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]); // the un-wrapped function is unaffected
-  });
-
-  test("a later turn earning one more lookup candidate only grows the set, in id order after the ordinary prefix", () => {
-    const turn1 = stickyOfferedTools("conv-c", ranked, "question", alwaysOnly); // earns nothing beyond always-offer
-    expect(turn1.map((t) => t.id)).toEqual(["websearch"]);
-    const placed: RankedCandidate[] = [{ id: "define", score: 0.8, manifest: manifest("define") }, ...ranked.filter((r) => r.id !== "define")];
-    const turn2 = stickyOfferedTools("conv-c", placed, "question", alwaysOnly); // Tier 1 placed "define" this turn
-    expect(turn2.map((t) => t.id)).toEqual(["websearch", "define"]);
-    const turn3 = stickyOfferedTools("conv-c", ranked, "question", alwaysOnly); // back to earning nothing new - "define" stays
-    expect(turn3.map((t) => t.id)).toEqual(["websearch", "define"]);
-  });
-
-  // Found live by this item's own gate run (conversationBench.test.ts's
-  // "consequential-once" and "never-mind-on-an-ask" rows): a package
-  // that WRITES or ACTS (remember, timer, lock-doors) must never stay
-  // reachable past the turn that earned it, or a later, unrelated turn
-  // can fire it with a stale or absent argument - `consequential` alone
-  // was not a wide enough gate (`timer` is not consequential and still
-  // triggers the identical class of bug), so isStickyEligible() allows
-  // only a typed-source lookup (websearch, or ruleNames.ts's own
-  // isTypedSourcePackage: define/convert/math/trivia/weather/news/
-  // sports/currency/knowledge/media-lookup/almanac*), never a write or
-  // an action.
-  test("a write package (remember, earned but not a lookup) is offered live but never made sticky", () => {
-    const writeHeavy: RankedCandidate[] = [
-      { id: "remember", score: 0.9, manifest: manifest("remember") },
-      { id: "websearch", score: 0.05, manifest: manifest("websearch", true) },
-    ];
-    const turn1 = stickyOfferedTools("conv-g", writeHeavy, "command", alwaysOnly);
-    expect(turn1.map((t) => t.id)).toEqual(["websearch", "remember"]); // earned live this turn
-    const turn2 = stickyOfferedTools("conv-g", ranked, "question", alwaysOnly); // an unrelated later turn
-    expect(turn2.map((t) => t.id)).toEqual(["websearch"]); // "remember" did not persist
-  });
-
-  test("two different conversations never share a sticky set", () => {
-    stickyOfferedTools("conv-d", ranked, "command", alwaysOnly);
-    const other = stickyOfferedTools("conv-e", ranked, "question", alwaysOnly);
-    expect(other.map((t) => t.id)).toEqual(["websearch"]);
-  });
-
-  // A code review (2026-09-22) on this item: a sticky id that later
-  // joins the ordinary set (an install changed ordinaryToolIdsForInstalled()'s
-  // own memoized key mid-conversation) must never be offered twice.
-  test("a sticky candidate that later joins the ordinary set is never offered twice", () => {
-    const turn1 = stickyOfferedTools("conv-h", ranked, "command", alwaysOnly); // earns "define" (sticky)
-    expect(turn1.map((t) => t.id)).toContain("define");
-    // A later turn's ordinary set now includes "define" too (as if a
-    // usage-stats change promoted it - ROUTE-02's own mechanism).
-    const widerOrdinary = ["define", "websearch"];
-    const turn2 = stickyOfferedTools("conv-h", ranked, "question", widerOrdinary);
-    const ids = turn2.map((t) => t.id);
-    expect(ids.filter((id) => id === "define").length).toBe(1);
-    expect(ids).toEqual(["define", "websearch"]);
-  });
-
-  test("a candidate already in the ordinary set is never duplicated into the sticky extras", () => {
-    const top: RankedCandidate[] = [{ id: "websearch", score: 0.9, manifest: manifest("websearch", true) }, ...ranked.filter((r) => r.id !== "websearch")];
-    const turn1 = stickyOfferedTools("conv-f", top, "command", alwaysOnly);
-    expect(turn1.map((t) => t.id)).toEqual(["websearch", "recall", "remember"]); // extras sorted by id
-    const turn2 = stickyOfferedTools("conv-f", ranked, "question", alwaysOnly);
-    expect(turn2.map((t) => t.id).filter((id) => id === "websearch").length).toBe(1);
   });
 });
 
@@ -1142,7 +1012,7 @@ describe("ROUTE-02: a stable ordinary tool set", () => {
     expect(ordinaryToolIds(installed, { byPlugin: [{ pluginId: "gone", count: 99, tier: tool(99) }] })).toEqual(["recall", "remember", "websearch"]);
   });
 
-  test("selectOfferedTools(): the ordinary set comes first in id order, a command's extras after it, nothing twice", () => {
+  test("selectOfferedTools(): each shape uses only the ordinary set", () => {
     const ranked: RankedCandidate[] = [
       { id: "joke", score: 0.5, manifest: manifest("joke") },
       { id: "remember", score: 0.4, manifest: manifest("remember") },
@@ -1151,12 +1021,12 @@ describe("ROUTE-02: a stable ordinary tool set", () => {
       { id: "websearch", score: 0.1, manifest: manifest("websearch", true) },
     ];
     const ordinary = ["recall", "remember", "websearch"];
-    expect(selectOfferedTools(ranked, "command", ordinary).map((t) => t.id)).toEqual(["recall", "remember", "websearch", "joke", "trivia"]);
+    expect(selectOfferedTools(ranked, "command", ordinary).map((t) => t.id)).toEqual(["recall", "remember", "websearch"]);
     expect(selectOfferedTools(ranked, "statement", ordinary).map((t) => t.id)).toEqual(["recall", "remember", "websearch"]);
     expect(selectOfferedTools(ranked, "question", ordinary).map((t) => t.id)).toEqual(["recall", "remember", "websearch"]);
   });
 
-  test("runTurn(): a command turn's request renders the ordinary base first, in its fixed order, then the extras", async () => {
+  test("runTurn(): a command turn offers the same ordinary base", async () => {
     const { actor } = await owner();
     let names: string[] = [];
     await withScriptedToolCalls(
@@ -1168,7 +1038,7 @@ describe("ROUTE-02: a stable ordinary tool set", () => {
     );
     const base = ordinaryToolIds(loadAllManifests(), { byPlugin: [] });
     expect(names.slice(0, base.length)).toEqual(base); // the cached prefix
-    expect(names.length).toBeGreaterThan(base.length); // "tell" is a command opener: extras follow
+    expect(names).toEqual(base);
     expect(new Set(names).size).toBe(names.length);
   });
 

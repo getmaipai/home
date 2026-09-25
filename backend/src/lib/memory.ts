@@ -538,15 +538,13 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  *
  * Still no nomic query/passage instruction prefix here, deliberately
  * (Fix D, docs/dev.md's "Chat reliability: the 2026-09-07 incident and
- * the five fixes" - routing.ts's own `ensureRoutingEmbeddings()` now
- * prefixes its OWN store, `routingEmbeddings`, a real measured win
- * there). Prefixing this file's own writes would need every ALREADY-
+ * the five fixes" - routing previously prefixed its own examples. That
+ * path is retired. Prefixing this file's own writes would need every ALREADY-
  * STORED `memoryEmbeddings` row re-embedded to match - a real migration
  * over a household's actual memories, not a hash-bump-and-forget the
- * way routing.ts's own store (freely rebuildable from each package's
- * `routing.examples`) could take. `turnEngine.ts`'s prepareTurn() also
- * reuses the IDENTICAL utterance vector for `route()`'s own scoring
- * (avoiding a second HTTP round trip, a 2026-09-06 review fix), so a
+ * way package examples could take. `turnEngine.ts`'s prepareTurn() also
+ * reuses the IDENTICAL utterance vector for recall (avoiding a second
+ * HTTP round trip, a 2026-09-06 review fix), so a
  * query prefix here would silently mismatch routing.ts's own document
  * side too, not just this file's. Filed as its own follow-up
  * (docs/BACKLOG.md, "Chat, memory and persona"), not done here: the raw

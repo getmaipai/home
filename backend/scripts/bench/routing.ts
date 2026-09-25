@@ -1,28 +1,14 @@
-// Routing corpus bench (session-c-brain-and-voice.md step 1): runs
-// spec/llm/routing-corpus.json through the real Tier 1 embedding path -
-// backend/tests/routingCorpus.test.ts runs the identical corpus against
-// the stub embedder as part of scripts/check.sh; this is the same
-// exercise against whatever real embed backend the machine resolves
-// (MAIPAI_EMBED_URL, or a spawned llama-server once a chat model has been
-// downloaded - see docs/dev/session-c.md's step 0 for exactly how to
-// point one at this). Prints precision and recall per package, not just
-// a pass count: this step's own text says "measure on the corpus before
-// trusting" TIER1_THRESHOLD/TIER1_MARGIN, and a single pass/fail number
-// can't say which package (or which direction - false fire vs missed
-// fire) is actually driving a bad number.
+// Routing corpus bench: reports literal-pattern behavior separately from
+// the model's semantic tool choice. Only exact-pattern positives are
+// deterministic routing expectations after D7.
 //
 // Usage: bun run scripts/bench/routing.ts
-import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadAllManifests, route, matchingSkills } from "@/lib/turnEngine";
-import { loadAllSkills } from "@/lib/skills";
-import { getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
-import { embedUtterance } from "@/lib/routing";
+import { loadAllManifests, route, matchPattern } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
-import { percentile } from "./stats";
 import { SPEC_DIR } from "@/lib/specDir";
 
 interface CorpusRow {
@@ -30,16 +16,6 @@ interface CorpusRow {
   expect: string | null;
   args?: Record<string, unknown>;
   must_not: string[];
-  /** Fix D (docs/dev.md's 2026-09-07 incident note; a code review on
-   * that same fix caught this file's own first cut computing the
-   * null-row noise floor over EVERY `expect: null` row, including a
-   * handful the corpus's own notes already document as deliberately
-   * scoring near 1.0 by design - a consequential package's own trigger
-   * phrase, a real Tier 2 near-miss) - true excludes a row from
-   * `nullTopScores` below, so the printed p50/p90/p95/max actually
-   * matches what routing.ts's/turnEngine.ts's own threshold comments
-   * cite, not a different, uncomputed number. */
-  noiseFloorExempt?: boolean;
   note?: string;
 }
 
@@ -67,102 +43,30 @@ function benchActor(): PersonRow {
   };
 }
 
-interface PackageStats {
-  truePositives: number; // corpus rows expecting this package, correctly routed here
-  falseNegatives: number; // corpus rows expecting this package, routed elsewhere or null
-  falsePositives: number; // corpus rows expecting something else, wrongly routed here
-}
-
 async function main(): Promise<{ executed: number; engine: string }> {
   await startBench();
   const actor = benchActor();
   const loaded = loadAllManifests();
-  const skills = loadAllSkills();
-
-  // Same reason memory-eval.ts's own bench warms the embed backend
-  // before reporting which one is active: right after the first
-  // ensureRoutingEmbeddings() call inside route(), getEmbedBackendKind()
-  // might still read "starting."
-  await embedUtterance("warm the embed backend");
-  console.log(`Embed backend: ${getEmbedBackendKind()}`);
-  // Read here, before the finally block below resets the supervisor and
-  // the kind reads "none" (a code review on CHAT-22).
-  const engine = `embed ${getEmbedBackendKind()} at ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)}`;
   console.log(`Running ${corpus.length} routing-corpus rows...\n`);
-
-  const stats = new Map<string, PackageStats>();
-  function statsFor(id: string): PackageStats {
-    let s = stats.get(id);
-    if (!s) {
-      s = { truePositives: 0, falseNegatives: 0, falsePositives: 0 };
-      stats.set(id, s);
-    }
-    return s;
-  }
-
-  // Fix D (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
-  // the five fixes"): TIER1_THRESHOLD/TIER2_AMBIGUOUS_FLOOR were both
-  // start values, never measured against a real embedder - this is that
-  // measurement. `nullTopScores` is the number that actually matters for
-  // setting them: for every corpus row that should route NOWHERE, how
-  // close did the single best-scoring (wrong) candidate come to firing
-  // anyway. A threshold below this distribution's own p95 fires on
-  // ordinary conversation; one above every positive row's own score
-  // never fires on anything real either.
-  const nullTopScores: number[] = [];
+  const exactRows = corpus.filter((row) => !!row.expect && loaded
+    .find((candidate) => candidate.id === row.expect)?.manifest.routing?.patterns
+    ?.some((pattern) => matchPattern(row.utterance, pattern)));
   let pass = 0;
-  for (const row of corpus) {
-    const { winner: routed, ranked } = await route(row.utterance, actor, loaded);
-    const skillMatches = matchingSkills(row.utterance, skills);
-    const routedId = routed ? routed.id : (skillMatches[0]?.skill.manifest.id ?? null);
-
+  for (const row of exactRows) {
+    const { winner } = await route(row.utterance, actor, loaded);
+    const routedId = winner?.id ?? null;
     const ok = routedId === row.expect && !row.must_not.includes(routedId ?? "");
     if (ok) pass++;
-
-    if (row.expect) {
-      if (routedId === row.expect) statsFor(row.expect).truePositives++;
-      else statsFor(row.expect).falseNegatives++;
-    }
-    if (routedId && routedId !== row.expect) statsFor(routedId).falsePositives++;
-
-    const top3 = ranked
-      .slice(0, 3)
-      .map((r) => `${r.id}:${r.score.toFixed(2)}`)
-      .join(" ");
-    if (row.expect === null && !row.noiseFloorExempt && ranked[0]) nullTopScores.push(ranked[0].score);
-    console.log(`${ok ? "PASS" : "FAIL"}  "${row.utterance}" -> expected ${row.expect ?? "null"}, got ${routedId ?? "null"}${top3 ? `  [${top3}]` : ""}`);
+    console.log(`${ok ? "PASS" : "FAIL"}  "${row.utterance}" -> expected ${row.expect}, got ${routedId ?? "null"}`);
   }
-
-  console.log(`\n${pass}/${corpus.length} passed\n`);
-  const executed = corpus.length;
-  console.log("Per-package precision/recall:");
-  for (const [id, s] of [...stats.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const precision = s.truePositives + s.falsePositives === 0 ? null : s.truePositives / (s.truePositives + s.falsePositives);
-    const recall = s.truePositives + s.falseNegatives === 0 ? null : s.truePositives / (s.truePositives + s.falseNegatives);
-    console.log(
-      `  ${id.padEnd(20)} precision=${precision === null ? "n/a" : precision.toFixed(2)}  recall=${recall === null ? "n/a" : recall.toFixed(2)}  (tp=${s.truePositives} fp=${s.falsePositives} fn=${s.falseNegatives})`,
-    );
-  }
-
-  if (nullTopScores.length > 0) {
-    const sorted = [...nullTopScores].sort((a, b) => a - b);
-    // One nearest-rank quantile for every bench (scripts/bench/stats.ts).
-    const quantile = (p: number) => percentile(sorted, p * 100).toFixed(3);
-    console.log(`\nNull-row noise floor (${sorted.length} rows, top wrong-package score):`);
-    console.log(`  p50=${quantile(0.5)} p90=${quantile(0.9)} p95=${quantile(0.95)} max=${sorted[sorted.length - 1]!.toFixed(3)}`);
-    console.log(`  TIER1_THRESHOLD/TIER2_AMBIGUOUS_FLOOR should sit at or above p95 of this distribution.`);
-  }
-  return { executed, engine };
+  console.log(`\n${pass}/${exactRows.length} exact-pattern rows passed; ${corpus.length - exactRows.length} semantic/null rows excluded.\n`);
+  return { executed: exactRows.length, engine: `literal-pattern corpus ${exactRows.length}/${exactRows.length}` };
 }
 
 let summary = { executed: 0, engine: "not run" };
 try {
   summary = await main();
 } finally {
-  // memory-eval.ts's own found-live lesson: nothing else stops a real
-  // spawned/stub embed backend on its own, so this script never exits
-  // without calling this itself (the URL tier's stop is a no-op, so a
-  // shared engine is never touched).
-  __resetEmbedSupervisorForTests();
+  // No external embedder is started by this literal-pattern bench.
 }
 finishBench(summary);

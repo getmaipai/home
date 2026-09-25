@@ -1,20 +1,11 @@
-// Session C step 1 (session-c-brain-and-voice.md): runs
-// spec/llm/routing-corpus.json against the real bundled packages and
-// skills through the stub embedder - the deterministic-suite half of
-// this step's own required test ("A test runs the corpus against the
-// stub embedder with fixed vectors"; the real-embedder half is
-// backend/scripts/bench/routing.ts, run on demand, never part of this
-// suite). `expect: null` covers both "nothing should route" and "a
-// SKILL should compose, not a plugin fire" - `route()` only ever
-// returns a plugin, so a corpus row whose `expect` names a skill id
-// (storytime-style) is checked against `matchingSkills()`'s own top
-// pick instead.
+// D7 retains only corpus positives supported by a literal manifest
+// pattern. Semantic examples and null/no-route rows no longer describe
+// a deterministic package router and stay out of this exact-match gate.
 import { describe, test, expect, beforeEach } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
-import { route, matchingSkills, loadAllManifests } from "@/lib/turnEngine";
-import { loadAllSkills } from "@/lib/skills";
+import { route, matchPattern, loadAllManifests } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
 import { SPEC_DIR } from "@/lib/specDir";
 
@@ -31,6 +22,12 @@ interface CorpusRow {
 }
 
 const corpus: CorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "routing-corpus.json"), "utf-8"));
+const manifests = loadAllManifests();
+const exactMatchCorpus = corpus.filter((row) => {
+  if (!row.expect) return false;
+  const manifest = manifests.find((candidate) => candidate.id === row.expect)?.manifest;
+  return (manifest?.routing?.patterns ?? []).some((pattern) => matchPattern(row.utterance, pattern) !== null);
+});
 
 function fakeActor(): PersonRow {
   return {
@@ -52,32 +49,24 @@ function fakeActor(): PersonRow {
   };
 }
 
-/** The one combined "what did this utterance actually route to" answer,
- * across both mechanisms a real turn checks (route()'s plugin floor,
- * matchingSkills()'s skill relevance) - mirrors prepareTurn()'s own
- * shape without the safety/command/model machinery a routing-only test
- * has no need to exercise. */
-async function resolve(utterance: string, actor: PersonRow): Promise<{ routedId: string | null; args?: Record<string, unknown>; candidates: string[] }> {
-  const loaded = loadAllManifests();
-  const skills = loadAllSkills();
-  const { winner: routed } = await route(utterance, actor, loaded);
-  const skillMatches = matchingSkills(utterance, skills);
-  const candidates = [...(routed ? [routed.id] : []), ...skillMatches.map((m) => m.skill.manifest.id)];
-  if (routed) return { routedId: routed.id, args: routed.args, candidates };
-  if (skillMatches[0]) return { routedId: skillMatches[0].skill.manifest.id, candidates };
-  return { routedId: null, candidates };
-}
-
-describe("routing corpus (stub embedder, deterministic suite)", () => {
+describe("routing corpus (literal exact-match subset)", () => {
   const actor = fakeActor();
 
-  for (const row of corpus) {
+  test("the trimmed set is non-empty and every retained row is an authored literal match", () => {
+    expect(exactMatchCorpus.length).toBeGreaterThan(0);
+    for (const row of exactMatchCorpus) {
+      const manifest = manifests.find((candidate) => candidate.id === row.expect)!.manifest;
+      expect((manifest.routing?.patterns ?? []).some((pattern) => matchPattern(row.utterance, pattern) !== null)).toBe(true);
+    }
+  });
+
+  for (const row of exactMatchCorpus) {
     test(row.utterance, async () => {
-      const { routedId, args, candidates } = await resolve(row.utterance, actor);
-      expect(routedId).toBe(row.expect);
-      if (row.args) expect(args).toMatchObject(row.args);
+      const { winner } = await route(row.utterance, actor, manifests);
+      expect(winner?.id ?? null).toBe(row.expect);
+      if (row.args) expect(winner?.args).toMatchObject(row.args);
       for (const forbidden of row.must_not) {
-        expect(candidates).not.toContain(forbidden);
+        expect(winner?.id).not.toBe(forbidden);
       }
     });
   }
