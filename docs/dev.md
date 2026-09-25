@@ -27710,3 +27710,90 @@ multiplier, thinking allowance, reply ceiling, or LAT-01/U4 budget
 changed. The new scripted turnNext regression asserts the
 search-specific instruction, unchanged 608-token request, and complete
 final answer; the transcript fixture is seven results.
+
+## Jesse's calls, 2026-09-25: four open decisions resolved
+
+Four items sat in `docs/BACKLOG.md`'s "People, relationships and
+permissions" and "Portability and the link" sections marked "Jesse's
+call," found and surfaced by the coordinator during tonight's backlog
+review. Asked directly; answers below.
+
+**Age drops out of authorization; roles rename from age words to
+privilege words.** Resolves both "Resolve the unrestricted-mode age
+collision" and "Do roles keep age-flavoured names?" (`docs/BACKLOG.md`,
+People section), and folds into the wider "Roles versus grants" item in
+the same section. Age is no longer checked anywhere in authorization,
+including the adult-mode unlock - the grant model is the one
+authorization mechanism, full stop. The `Person.role` enum's three
+age-shaped values (`adult`/`teen`/`child`, sitting under the existing
+`owner`/`admin` pair per `backend/src/wire.ts:540-553`) rename to
+values that describe restriction level, not age. Coordinator's proposed
+names, not yet built or spec'd: `unrestricted` / `limited` /
+`supervised` - each describes what a person can do, not how old they
+are, and a household can still default the label by age at person-
+creation time without the code ever reading age again. This is a real
+spec-first migration (the enum is in `spec`'s Person shape, referenced
+by settings, UI copy, `min_role` on every package manifest, and
+`ENGINEERING.md`/`UI.md`'s kid presets) - sized M or L, not built
+tonight; needs its own BACKLOG item before a session picks it up.
+Safety's own age-band check (`lib/ageBand.ts`, birthdate-derived) is
+unaffected - it already lives outside role/authorization and keeps
+working exactly as it does today.
+
+**People directory stays account-holders-only for now.** "Does the
+People directory grow beyond account holders?" - no, not yet. Browsing
+non-account entities (a grandparent who visits, a pet, a delivery
+driver) needs its own design pass before it ships, per the section's
+own note on the risk (a household member browsing an inferred
+connection nobody confirmed). Filed as a new backlog row below rather
+than left as an open question with no next step.
+
+**Bot's hub/local fallback: connection health, not per-call retries.**
+"Verdict: robot fallback order" - no inline retry-and-wait on a hub
+call; that reads as slow. Instead the robot keeps a standing read on
+whether its hub connection is healthy (a heartbeat or equivalent, not
+built yet, `bot` is still a docs-only skeleton). Healthy connection:
+use the hub. Unhealthy connection: use local, no hub attempt at all.
+Healthy connection but a specific hub call fails anyway: fall back to
+local for that one turn. This replaces the plan's original "sub-second
+connect timeout, no hedging" framing with a standing health signal the
+dialogue loop reads instead of timing each call. Recorded for whoever
+builds the robot's dialogue loop; no code exists yet to apply it to.
+
+**Commit the platform plan into the repo: not yet.** Stays as a file
+outside every repo for now, per Jesse's own answer. Revisit when it
+becomes a live blocker rather than a standing gap.
+
+**Tier-ladder naming, resolved by a design-resolver pass.** "Tier"
+meaning both chat-routing tiers 0/1/2 and package/hardware tiers 0/1
+was delegated to research rather than decided directly ("use wording
+common in the community"). Verdict: hardware keeps "tier" - it is the
+only one of the ladders that is genuinely a ranked capacity scale, and
+the newest, most active usage (Jesse's own 2026-09-23 ruling, the
+"Hardware tiers" section, `SETUP-SIZE-01`/`FLOOR-ACCEPT-01`,
+`ENGINE-SPLASH-01`'s "tier 3 only"). The backlog item as written was
+also missing a ladder - a third one, hardware, only appeared on
+2026-09-23, after the item was written on 2026-09-13.
+
+Routing "tiers 0/1/2" rename in prose only: the code already stores
+named values, not numbers (`wire.ts:238`, `routing.tier`:
+`"pattern" | "embedding" | "keyword" | "tool"`), and industry usage
+agrees - "fast path" and "tool calling," never "routing tier 2." No
+code change, just stop writing tier numbers in docs going forward.
+
+Package tier renames in the spec: manifest field `tier: "0" | "1"`
+(declarative vs. Deno code, plan 5.2) becomes `runtime: "recipe" |
+"deno"`, matching the plan's own reserved third value (`runtime: wasm`)
+and the common declarative-vs-code split elsewhere (GitHub Actions'
+`runs.using`, Home Assistant's blueprints vs. integrations). Real
+spec-first work - `PACKAGE-RUNTIME-RENAME-01`, `docs/BACKLOG.md`,
+People section - not built tonight.
+
+Flagged, not decided: the routing "tier" ladder may be worth retiring
+as a concept rather than renaming - after D7, all that's left is a
+pattern fast path in front of the model's own tool call, which is how
+a turn works, not a ladder; `turnMachine/contract.ts` already only uses
+"tier" for hardware. Separately, `wire.ts`'s `routing.tier` field and
+`routingStats` still list `embedding`/`keyword` values that can no
+longer occur post-D7 - additive-API rule says keep the field, stop
+emitting those values. Neither is sized or scheduled here.

@@ -6863,19 +6863,36 @@ approvals are still real, unstarted work for a future session.
       `ctx.allowance`/package gating below), a manifest's `min_role`
       should become the *default* grant a package's install seeds,
       overridable per person the same way `packages.use_all` already is.
-- [ ] **Resolve the unrestricted-mode age collision** (S, Jesse's call) -
-      the org's Safety invariants unlock unrestricted chat and generation
-      "per-user by an adult" and restrict child profiles by default, both
-      age-shaped; the grant model removes age from authorization
-      entirely, so nothing can check a grantee is an adult. The Grant
-      record enforces what it can (the acknowledgment is signed and must
-      be by the person it is about) and documents what it cannot. Two
-      correct rules in genuine conflict, not an oversight.
-- [ ] **Do roles keep age-flavoured names?** (S, Jesse's call) - once
-      roles are authorization-only, `adult`/`teen`/`child` either become
-      labels that seed a default grant set and mean nothing afterward, or
-      go entirely. The second is the only one where nobody can mistake a
-      label for a rule.
+- [x] **Resolve the unrestricted-mode age collision** (S, Jesse's call:
+      resolved 2026-09-25, `docs/dev.md` "Jesse's calls, 2026-09-25") -
+      age drops out of authorization entirely, including the adult-mode
+      unlock; the grant model is the one authorization mechanism. Safety's
+      own age-band check (`lib/ageBand.ts`) is unaffected, it already
+      lives outside authorization.
+- [x] **Do roles keep age-flavoured names?** (S, Jesse's call: resolved
+      2026-09-25, `docs/dev.md` "Jesse's calls, 2026-09-25") - no, they
+      go. `adult`/`teen`/`child` rename to privilege-shaped names
+      (coordinator's proposal, not yet built: `unrestricted`/`limited`/
+      `supervised`). Real spec-first work, not built tonight - needs its
+      own BACKLOG item (the enum touches `spec`, settings, UI copy,
+      every manifest's `min_role`, and `ENGINEERING.md`/`UI.md`'s kid
+      presets) before a session picks it up.
+- [ ] **ROLE-RENAME-01: rename the age-flavoured role values** (M or L,
+      spec-first, after the decision above) - `Person.role`'s
+      `adult`/`teen`/`child` become privilege-shaped names
+      (coordinator's proposal: `unrestricted`/`limited`/`supervised` -
+      open to a better name, not load-bearing which exact word wins).
+      `owner`/`admin` (the top two) are unaffected, they're already
+      privilege-shaped. Touches: the `spec` enum and a migration for
+      existing rows, `backend/src/wire.ts:540-553`'s role checks and
+      every other read site, settings copy, UI labels wherever a role
+      shows (person pickers, the roster in Settings -> Household ->
+      Users), every package manifest's `min_role` field, and
+      `ENGINEERING.md`/`UI.md`'s kid presets. A household can still
+      default the label by the person's age at creation time - the
+      code just never reads age for it again afterward. Exit:
+      `bash scripts/check.sh` full scope (crosses `commons` and `home`);
+      the round-trip spec fixtures catch a missed read site.
 - [ ] **Relationship inference** (L, and its own design pass first) -
       the storage model is useful without it and safe on its own. Two
       questions to answer before any code: does inference ship at all in
@@ -6963,27 +6980,25 @@ approvals are still real, unstarted work for a future session.
 - [ ] **The Python half of `spec/records/ts/validate.ts`** (S) - lands
       when the robot writes one of these records, the same split
       `spec/safety/` takes today.
-- [ ] **Does the People directory grow beyond account holders?** (open
-      question, Jesse's call, 2026-09-06) - `/people` was split from
-      account management on 2026-09-06 (roster add/edit/remove moved to
-      Settings -> Household -> Users, `UsersSection.tsx`) and today only
-      ever lists people with a real account (`GET /api/people`). Jesse's
-      own framing when asking for the split: "anyone with a user account
-      should be able to browse people that are users - open question if
-      we let users browse all people" - naming a non-account entity
-      (an ex-partner, a delivery driver, a lunch lady) as his own example
-      of what a broader "people" concept could include. This is exactly
-      the Entity/Person-vs-User split "The hub half of entities and
-      relationships" (above) would introduce - PeoplePage.tsx cannot
-      answer this on its own since there is no Entity storage yet. When
-      that work starts, this needs a real design pass before code, not
-      just "show everything": the spec's own "Inference is the dangerous
-      half" section is exactly this risk (a household member browsing an
-      entry for someone else's relationship, an inferred connection
-      nobody confirmed) - same shape as the already-recorded open
-      question above ("may a parent see a relationship inferred from
-      their teen's conversation") but for browsing rather than
-      inference specifically.
+- [x] **Does the People directory grow beyond account holders?**
+      (Jesse's call: resolved 2026-09-25, `docs/dev.md` "Jesse's calls,
+      2026-09-25") - not now. `/people` stays account-holders-only
+      (`GET /api/people`). Filed as PEOPLE-EXPAND-01 below for the
+      future case, with Jesse's own examples on the record.
+- [ ] **PEOPLE-EXPAND-01: People directory beyond account holders** (L,
+      needs its own design pass first, unstarted) - a future expansion
+      of `/people` to non-account entities the assistant knows about:
+      pets, an "People I Know" grouping, people the household knows of
+      but who aren't members (Jesse's own examples, 2026-09-25). Needs
+      the Entity/Person-vs-User split ("The hub half of entities and
+      relationships," above) as a prerequisite - `PeoplePage.tsx` can't
+      answer this without Entity storage - and a real design pass before
+      code, per the spec's own "Inference is the dangerous half" risk
+      (a household member browsing an entry for someone else's
+      relationship, an inferred connection nobody confirmed). Same
+      shape as the already-recorded open question ("may a parent see a
+      relationship inferred from their teen's conversation") but for
+      browsing rather than inference specifically.
 - [x] **A self-service way to change your own display name** (S) - a
       real, deliberate regression from the 2026-09-06 People/Users split:
       the old PeoplePage.tsx let anyone edit their own row (`canManagePerson`
@@ -8592,10 +8607,15 @@ on a spec tag that was never cut.
       its own separate flow, not this one - `lib/quickConnect.ts`, rate
       limited from the start (`code + poll_token`, 5-minute expiry).
       This item now covers only the robot/pod pairing flow.
-- [ ] **Verdict: robot fallback order** (Jesse's call) - the legacy bot's
-      `FallbackLanguageModel` is local-first; the plan is hub-as-brain
-      with a sub-second connect timeout and no hedging. Decide before
-      the robot's dialogue loop is rebuilt.
+- [x] **Verdict: robot fallback order** (Jesse's call: resolved
+      2026-09-25, `docs/dev.md` "Jesse's calls, 2026-09-25") - not a
+      per-call timeout/retry (reads as slow). The robot keeps a standing
+      health read on its hub connection: healthy -> use the hub;
+      unhealthy -> use local, no hub attempt; healthy but a specific
+      call fails anyway -> fall back to local for that turn. Replaces
+      the plan's original "sub-second connect timeout, no hedging"
+      framing. Nothing to build yet - `bot` is still a docs-only
+      skeleton; applies whenever the dialogue loop is built.
 - [ ] **Python ports of the shared floor** (M, required for Robot v0.1)
       - the safety classifier, `normalizeForSpeech` and
       `records/ts/validate.ts` are TS-only; plan 4.3 says the floor runs
@@ -8800,33 +8820,70 @@ on a spec tag that was never cut.
       call, are split out below rather than folded back into one line.
 
 - [ ] **Jesse's call: commit the platform plan into `home/spec/design/`**
-      (S decision) - `.github/CLAUDE.md` says the rebuild follows
-      `home/spec/design/`, which does not exist; the plan lives at
-      `~/.claude/plans/purring-chasing-noodle.md`, outside every repo
-      and unversioned. `.github/STACK.md` and the global `CLAUDE.md`
-      point at a `home/agents.md` that does not exist either (the real
-      file is `home/AGENTS.md`, capitalized). Committing the plan needs
-      a PII pass first (it names Jesse's machines), and once it's in a
-      real, editable file, its own stale terminology can finally be
-      fixed too: plan 5.1/5.6 still say `skill` for what shipped as
-      `plugin`.
+      (S decision; asked 2026-09-25, answer: not yet - stays open, not
+      urgent) - `home/spec/` still does not exist (checked 2026-09-25);
+      the plan lives at `~/.claude/plans/purring-chasing-noodle.md`,
+      outside every repo and unversioned. **The `home/agents.md` naming
+      claim below is stale, already fixed**: the real file is
+      `home/AGENTS.md` (capitalized), and `home/CLAUDE.md` already
+      points at it correctly. Committing the plan (when it happens)
+      still needs a PII pass first (it names Jesse's machines), and once
+      it's in a real, editable file, its own stale terminology can
+      finally be fixed too: plan 5.1/5.6 still say `skill` for what
+      shipped as `plugin`, and plan 4.5/5.2 need the tier-ladder rename
+      below applied.
 
-- [ ] **Jesse's call: rename the tier ladder** (S decision) - "tier"
-      means both routing tiers 0/1/2 (plan 4.5) and package tiers 0/1
-      (plan 5.2), often in adjacent sentences across the docs; one
-      ladder should be renamed so the word means one thing.
-- [ ] **Roles versus grants is a wider conflict than the one item under
-      People** (S decision) - the Grant spec removes age and role from
-      authorization while `Person.role` stays required, `min_role` is on
-      every manifest, and ENGINEERING.md, UI.md's kid presets and plan
-      4.2/4.3/5.7 are all age-shaped. Safety's own half of this is done
-      (Session C step 7, 2026-09-06: `lib/ageBand.ts`, birthdate-derived,
-      shared by both the prompt and `evaluateSafety()`) - the wider
-      roles-vs-grants decision itself is still Jesse's call, unchanged.
-      `age_range` in a package's own `ctx` is still real, deferred work:
-      it needs session-f-platform-and-trust.md step 7's package-host
-      `ctx` mechanism, which does not exist yet (F is at step 5 as of
-      2026-09-06).
+- [x] **Jesse's call: rename the tier ladder** (S decision: resolved
+      2026-09-25 by a design-resolver pass, `docs/dev.md` "Jesse's
+      calls, 2026-09-25" - Jesse delegated the actual wording,
+      "use wording common in the community") - **hardware keeps
+      "tier"** (the newest, most active usage - Jesse's own 2026-09-23
+      ruling, the "Hardware tiers" section, SETUP-SIZE-01/
+      FLOOR-ACCEPT-01, ENGINE-SPLASH-01's "tier 3 only"). **Routing
+      "tiers 0/1/2" rename in prose only** - the code already stores
+      named values (`"pattern" | "embedding" | "keyword" | "tool"`,
+      `wire.ts:238`), so this is a docs-wording fix (say "pattern fast
+      path" and "tool calling," never a tier number), not a code
+      change. **Package tier renames in the spec**: the field `tier`
+      (`"0" | "1"`, declarative vs. Deno code) becomes `runtime:
+      "recipe" | "deno"` - real spec-first work (touches `commons`'s
+      manifest schema and both fixtures, 34 manifests in `home`, 7 in
+      `catalog`, `smoke.ts`, `packageHost.ts:1865`), not built tonight;
+      needs its own scheduled item, `PACKAGE-RUNTIME-RENAME-01` below.
+      **Flag, low confidence, not blocking**: the routing "tier" ladder
+      itself may be worth retiring as a concept rather than renaming -
+      after D7 all that's left is a pattern fast path in front of the
+      model's own tool call, which is just how a turn works, not a
+      ladder; the new pipeline's `turnMachine/contract.ts` already only
+      uses "tier" for hardware. Also real: `wire.ts`'s `routing.tier`
+      field and `routingStats` still list `embedding`/`keyword` values
+      that can no longer happen post-D7 - under the additive-API rule,
+      keep the field, just stop emitting those values (small follow-up,
+      not sized here). Section headings to update when next touched:
+      "Advanced tool calling (Tier 2)" (~5579) -> "Advanced tool
+      calling"; "Skills (Tier 0 catalog)" (~5169) -> "Skills
+      (declarative catalog)".
+- [ ] **PACKAGE-RUNTIME-RENAME-01: manifest `tier` field becomes
+      `runtime`** (M, spec-first, after the decision above) - rename the
+      manifest schema field `tier: "0" | "1"` to `runtime: "recipe" |
+      "deno"` across `commons`'s `spec/schemas/manifest.schema.json`
+      and both fixtures, every manifest in `home/backend/packages/`
+      (23 at tier 0, 11 at tier 1) and `catalog`, `smoke.ts`, and
+      `packageHost.ts:1865`. Cut a new spec tag, bump the pin in both
+      consumers. Exit: `bash scripts/check.sh` full scope in `commons`,
+      `home`, and `catalog`.
+- [x] **Roles versus grants is a wider conflict than the one item under
+      People** (S decision: resolved 2026-09-25 by the same ruling as
+      the People-section item, `docs/dev.md` "Jesse's calls,
+      2026-09-25") - grants are the one authorization mechanism; age
+      drops out everywhere, `Person.role`'s age-shaped values rename to
+      privilege-shaped ones (`ROLE-RENAME-01`, People section, above).
+      `min_role` on every manifest and ENGINEERING.md/UI.md's kid
+      presets update as part of that same item, not separately. Safety's
+      own half (`lib/ageBand.ts`) is unaffected, unchanged from
+      2026-09-06. `age_range` in a package's own `ctx` stays deferred,
+      still blocked on session-f-platform-and-trust.md step 7's
+      package-host `ctx` mechanism, unrelated to this decision.
 - [x] **Content ceiling record and dials** (M) - shipped, Session C step
       7 (2026-09-06): `spec/schemas/content-ceiling.schema.json` (per
       band: the 8 legacy-endorsed dial categories, a `floor` field
