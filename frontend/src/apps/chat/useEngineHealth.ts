@@ -49,6 +49,7 @@ export function useEngineHealth(): EngineHealth | undefined {
 // regression than the one being fixed.
 export function brainBlockReason(kind: string | undefined): string | undefined {
   if (kind === "starting") return "MaiPai's AI is starting up. This can take a moment.";
+  if (kind === "stalled") return "MaiPai's AI is stuck starting. An admin can retry it in Settings → AI models; see Repairs for details.";
   if (kind === "stopped") return "MaiPai's AI is stopped. An admin can restart it in Settings → AI models.";
   return undefined;
 }

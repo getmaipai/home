@@ -3,8 +3,9 @@ import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, ge
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
-import { listIssues } from "@/lib/issues";
+import { listIssues, resolveIssue } from "@/lib/issues";
 import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly } from "@/lib/sidecars";
+import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
@@ -24,6 +25,28 @@ afterEach(() => {
 });
 
 describe("llmSupervisor getChatClient()", () => {
+  test("an orphaned startup becomes stalled once, raises Repairs, then clears after retry succeeds", async () => {
+    const state = (globalThis as typeof globalThis & {
+      __maipai_llmSupervisor?: { startingPromise: Promise<never> | null; startingStartedAtMs: number | null; startupStalled: boolean };
+    }).__maipai_llmSupervisor!;
+    const source = "chat-engine";
+    const key = "startup_stalled";
+    state.startingPromise = new Promise<never>(() => {});
+    state.startingStartedAtMs = Date.now() - ENGINE_START_STALL_TIMEOUT_MS - 1;
+    state.startupStalled = false;
+    try {
+      expect(getEngineStatus().kind).toBe("stalled");
+      expect(getEngineStatus().kind).toBe("stalled");
+      expect(listIssues().filter((issue) => issue.source === source && issue.key === key)).toHaveLength(1);
+      const client = await getChatClient();
+      expect(await client.health()).toBe(true);
+      expect(getEngineStatus().kind).toBe("stub");
+      expect(listIssues().filter((issue) => issue.source === source && issue.key === key)).toHaveLength(0);
+    } finally {
+      resolveIssue(source, key);
+    }
+  });
+
   // A code review (2026-09-04) found the original version left a
   // rejected startingPromise cached forever: once a spawn failed, every
   // later call replayed the same stale rejection instead of retrying,

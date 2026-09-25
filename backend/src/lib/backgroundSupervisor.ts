@@ -16,7 +16,7 @@
 //      chosen, and every test run) - start the in-process stub server.
 import { detectHardware } from "@/lib/hardware";
 import { engineBinaryPath } from "@/lib/llmSupervisor";
-import { spawnAndWaitHealthy, watchEngine, probeAlive, engineHealthKind, cancelEngineRespawn, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, watchEngine, probeAlive, engineHealthKind, expireStalledStart, cancelEngineRespawn, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { backgroundModelPath, ensureBackgroundModel } from "@/lib/backgroundAssets";
@@ -25,6 +25,7 @@ import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type Engi
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import type { ChatMessage } from "@maipai/spec/llm/ts/types.js";
 import { seedFields } from "@/lib/benchSampling";
+import { resolveIssue } from "@/lib/issues";
 
 export type BackgroundBackendKind = "url" | "spawned" | "stub";
 
@@ -46,12 +47,16 @@ interface BackgroundBackend {
 interface BackgroundSupervisorState {
   backgroundBackend: BackgroundBackend | null;
   startingPromise: Promise<BackgroundBackend> | null;
+  startingStartedAtMs: number | null;
+  startupStalled: boolean;
   generation: number;
 }
 
 const state = hotReloadState<BackgroundSupervisorState>("backgroundSupervisor", () => ({
   backgroundBackend: null,
   startingPromise: null,
+  startingStartedAtMs: null,
+  startupStalled: false,
   generation: 0,
 }));
 
@@ -121,6 +126,7 @@ export async function restartBackgroundBackend(): Promise<void> {
   const previous = state.backgroundBackend;
   state.backgroundBackend = null;
   state.startingPromise = null;
+  state.startingStartedAtMs = null;
   await previous?.stop();
 }
 
@@ -156,8 +162,10 @@ async function startBackgroundBackend(): Promise<BackgroundBackend> {
 
 export async function getBackgroundClient(): Promise<LlamaServerClient> {
   if (state.backgroundBackend) return state.backgroundBackend.client;
+  expireStalledBackgroundStart();
   if (!state.startingPromise) {
     const myGeneration = state.generation;
+    state.startingStartedAtMs = Date.now();
     state.startingPromise = startBackgroundBackend()
       .then(async (backend): Promise<BackgroundBackend> => {
         if (myGeneration !== state.generation) {
@@ -165,19 +173,37 @@ export async function getBackgroundClient(): Promise<LlamaServerClient> {
           return { ...backend, client: await getBackgroundClient() };
         }
         state.backgroundBackend = backend;
+        state.startingPromise = null;
+        state.startingStartedAtMs = null;
+        state.startupStalled = false;
+        resolveIssue("background-engine", "startup_stalled");
         return backend;
       })
       .catch((err) => {
-        if (myGeneration === state.generation) state.startingPromise = null;
+        if (myGeneration === state.generation) {
+          state.startingPromise = null;
+          state.startingStartedAtMs = null;
+        }
         throw err;
       });
   }
   return (await state.startingPromise).client;
 }
 
-export function getBackgroundBackendKind(): BackgroundBackendKind | "starting" | "none" {
+function expireStalledBackgroundStart(): boolean {
+  return expireStalledStart(state, {
+    source: "background-engine",
+    key: "startup_stalled",
+    severity: "error",
+    title: "MaiPai's memory engine is taking too long to start",
+    detail: "The background engine startup has not completed after two minutes. A new request can retry the start; check the engine logs if it remains stuck.",
+  });
+}
+
+export function getBackgroundBackendKind(): BackgroundBackendKind | "starting" | "stalled" | "none" {
   if (state.backgroundBackend) return state.backgroundBackend.kind;
-  if (state.startingPromise) return "starting";
+  if (state.startingPromise) return expireStalledBackgroundStart() ? "stalled" : "starting";
+  if (state.startupStalled) return "stalled";
   return "none";
 }
 
@@ -207,6 +233,7 @@ export function getBackgroundLivePid(): number | null {
 
 export function __resetBackgroundSupervisorForTests(): void {
   void restartBackgroundBackend();
+  state.startupStalled = false;
 }
 
 export async function completeBackground(

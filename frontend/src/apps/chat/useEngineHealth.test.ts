@@ -23,8 +23,9 @@ test("reports the raw kind from a successful health check", async () => {
   await waitFor(() => expect(result.current?.brain).toBe("starting"));
 });
 
-test("blocks sending while the model is starting or the engine is stopped, not otherwise", () => {
+test("blocks sending while the model is starting, stalled, or stopped, not otherwise", () => {
   expect(brainBlockReason("starting")).toBeDefined();
+  expect(brainBlockReason("stalled")).toMatch(/stuck starting/);
   expect(brainBlockReason("stopped")).toBeDefined();
   for (const kind of ["llama-server", "stub", "none", "unreachable", undefined]) {
     expect(brainBlockReason(kind)).toBeUndefined();

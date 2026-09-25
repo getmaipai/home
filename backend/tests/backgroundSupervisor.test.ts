@@ -1,6 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { getBackgroundClient, getBackgroundBackendKind, getBackgroundEngineIdentity, backgroundLaunchArgs, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
+import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
+import { listIssues, resolveIssue } from "@/lib/issues";
 
 beforeEach(() => {
   __resetBackgroundSupervisorForTests();
@@ -12,6 +14,28 @@ afterEach(() => {
 });
 
 describe("backgroundSupervisor getBackgroundClient()", () => {
+  test("an orphaned startup becomes stalled once, raises Repairs, then clears after retry succeeds", async () => {
+    const state = (globalThis as typeof globalThis & {
+      __maipai_backgroundSupervisor?: { startingPromise: Promise<never> | null; startingStartedAtMs: number | null; startupStalled: boolean };
+    }).__maipai_backgroundSupervisor!;
+    const source = "background-engine";
+    const key = "startup_stalled";
+    state.startingPromise = new Promise<never>(() => {});
+    state.startingStartedAtMs = Date.now() - ENGINE_START_STALL_TIMEOUT_MS - 1;
+    state.startupStalled = false;
+    try {
+      expect(getBackgroundBackendKind()).toBe("stalled");
+      expect(getBackgroundBackendKind()).toBe("stalled");
+      expect(listIssues().filter((issue) => issue.source === source && issue.key === key)).toHaveLength(1);
+      const client = await getBackgroundClient();
+      expect(await client.health()).toBe(true);
+      expect(getBackgroundBackendKind()).toBe("stub");
+      expect(listIssues().filter((issue) => issue.source === source && issue.key === key)).toHaveLength(0);
+    } finally {
+      resolveIssue(source, key);
+    }
+  });
+
   test("reports no backend until the first call", () => {
     expect(getBackgroundBackendKind()).toBe("none");
   });

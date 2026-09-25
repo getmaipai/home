@@ -1,6 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { getEmbedClient, getEmbedBackendKind, getEmbedEngineIdentity, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
+import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
+import { listIssues, resolveIssue } from "@/lib/issues";
 
 // beforeEach too, not just afterEach (step 5, session-a-intelligence.md:
 // found when memory.ts's remember() started firing a real, if fire-and-
@@ -19,6 +21,28 @@ afterEach(() => {
 });
 
 describe("embedSupervisor getEmbedClient()", () => {
+  test("an orphaned startup becomes stalled once, raises Repairs, then clears after retry succeeds", async () => {
+    const state = (globalThis as typeof globalThis & {
+      __maipai_embedSupervisor?: { startingPromise: Promise<never> | null; startingStartedAtMs: number | null; startupStalled: boolean };
+    }).__maipai_embedSupervisor!;
+    const source = "embed-engine";
+    const key = "startup_stalled";
+    state.startingPromise = new Promise<never>(() => {});
+    state.startingStartedAtMs = Date.now() - ENGINE_START_STALL_TIMEOUT_MS - 1;
+    state.startupStalled = false;
+    try {
+      expect(getEmbedBackendKind()).toBe("stalled");
+      expect(getEmbedBackendKind()).toBe("stalled");
+      expect(listIssues().filter((issue) => issue.source === source && issue.key === key)).toHaveLength(1);
+      const client = await getEmbedClient();
+      expect(await client.health()).toBe(true);
+      expect(getEmbedBackendKind()).toBe("stub");
+      expect(listIssues().filter((issue) => issue.source === source && issue.key === key)).toHaveLength(0);
+    } finally {
+      resolveIssue(source, key);
+    }
+  });
+
   test("reports no backend until the first call", () => {
     expect(getEmbedBackendKind()).toBe("none");
   });

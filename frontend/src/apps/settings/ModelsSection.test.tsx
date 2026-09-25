@@ -186,6 +186,24 @@ describe("ModelsSection", () => {
     }
   });
 
+  test("a stalled start names the problem and offers a retry", async () => {
+    const restore = stubFetch({
+      "/api/host/hardware": HARDWARE,
+      "role=chat": [chatFit({ fits: true })],
+      "role=image": [],
+      "role=video": [],
+      "/models/selection": { modelId: "qwen3-8b-instruct-q4-k-m" },
+      "/engine/status": { kind: "stalled", modelId: null, pid: null, startedAt: null },
+    });
+    try {
+      const { findByText } = render(<ModelsSection />);
+      await findByText("Start is stuck");
+      await findByText("Retry start");
+    } finally {
+      restore();
+    }
+  });
+
   test("a planned role (image/video) with no real backend yet is one honest line, not a pros/cons dump", async () => {
     const restore = stubFetch({
       "/api/host/hardware": HARDWARE,

@@ -451,7 +451,7 @@ export interface ModelJob {
 // Mirrors llmSupervisor.ts's EngineStatus/BackendKind and
 // engineStats.ts's EngineStatsSample (hand-copied, same reason as
 // ModelFit/BackupInfo above).
-export type EngineKind = "url" | "override" | "selection" | "stub" | "stopped" | "starting" | "none";
+export type EngineKind = "url" | "override" | "selection" | "stub" | "stopped" | "starting" | "stalled" | "none";
 
 /** The three kinds an engine's Repairs-page auto-heal can add on top of
  * a supervisor's own EngineKind - "spawned" is ttsSupervisor.ts's/

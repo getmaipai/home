@@ -83,7 +83,7 @@ const SidecarStatusSchema = z.enum(["stopped", "starting", "running", "unhealthy
 // stopped). `brain`/`voice` below stay exactly what they were (a kind
 // label; the chat page's ready-to-send gate reads them) - additive, per
 // the org's API compatibility rule.
-const ENGINE_HEALTH_KINDS = ["url", "override", "selection", "stub", "stopped", "starting", "none", "spawned", "restarting", "failed", "blocked"] as const;
+const ENGINE_HEALTH_KINDS = ["url", "override", "selection", "stub", "stopped", "starting", "stalled", "none", "spawned", "restarting", "failed", "blocked"] as const;
 const EngineHealthSchema = z.object({
   kind: z.enum(ENGINE_HEALTH_KINDS),
   pid: z.number().nullable(),
@@ -132,7 +132,7 @@ app.openapi(healthRoute, async (c) => {
   const [chat, embed, background, voice] = await Promise.all([probeChatEngine(), probeEmbedEngine(), probeBackgroundEngine(), probeTtsEngine()]);
   const sidecars = listSidecars();
   const ok =
-    [chat, embed, background, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting" && e.kind !== "blocked") &&
+    [chat, embed, background, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting" && e.kind !== "blocked" && e.kind !== "stalled") &&
     sidecars.every((s) => s.status !== "unhealthy" && s.status !== "crashed");
   return c.json({ sidecars, brain: getEngineStatus().kind, voice: getTtsBackendKind(), ok, engines: { chat, embed, background, voice }, uptimeSeconds: process.uptime() }, 200);
 });

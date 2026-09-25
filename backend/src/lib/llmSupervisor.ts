@@ -39,7 +39,7 @@ import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFla
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
-import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, expireStalledStart, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
@@ -77,7 +77,7 @@ export interface EngineStatus {
    * (unlike every other non-running state). "starting": a spawn is
    * in-flight. "none": nothing has ever been requested yet (a fresh
    * process before the first chat message). */
-  kind: BackendKind | "stopped" | "starting" | "none";
+  kind: BackendKind | "stopped" | "starting" | "stalled" | "none";
   modelId: string | null;
   pid: number | null;
   startedAt: string | null;
@@ -102,6 +102,8 @@ export interface EngineStatus {
 interface LlmSupervisorState {
   chatBackend: ChatBackend | null;
   startingPromise: Promise<ChatBackend> | null;
+  startingStartedAtMs: number | null;
+  startupStalled: boolean;
   lastPostLoadCheck: (PostLoadCheckResult & { modelId: string }) | null;
   // COR-1 (code review, 2026-09-06): embedSupervisor.ts's identical shape
   // already carried this generation guard "from the start" (its own
@@ -125,6 +127,8 @@ interface LlmSupervisorState {
 const state = hotReloadState<LlmSupervisorState>("llmSupervisor", () => ({
   chatBackend: null,
   startingPromise: null,
+  startingStartedAtMs: null,
+  startupStalled: false,
   lastPostLoadCheck: null,
   generation: 0,
   manuallyStopped: false,
@@ -476,8 +480,10 @@ export async function getChatClient(): Promise<LlamaServerClient> {
     throw new Error("the chat engine is stopped - restart it from Household → AI models");
   }
   if (state.chatBackend) return state.chatBackend.client;
+  expireStalledChatStart();
   if (!state.startingPromise) {
     const myGeneration = state.generation;
+    state.startingStartedAtMs = Date.now();
     state.startingPromise = startChatBackend()
       .then(async (backend): Promise<ChatBackend> => {
         if (myGeneration !== state.generation) {
@@ -508,15 +514,22 @@ export async function getChatClient(): Promise<LlamaServerClient> {
           return { ...backend, client: await getChatClient() };
         }
         state.chatBackend = backend;
+        state.startingPromise = null;
+        state.startingStartedAtMs = null;
+        state.startupStalled = false;
         // A genuinely healthy spawn closes out any earlier failure -
         // same "a fresh success clears a prior fault" posture
         // resourceGovernor's own resolveIssue("resource-governor", "chat")
         // call already has just above.
         resolveIssue("chat-engine", "spawn");
+        resolveIssue("chat-engine", "startup_stalled");
         return backend;
       })
       .catch((err) => {
-        if (myGeneration === state.generation) state.startingPromise = null;
+        if (myGeneration === state.generation) {
+          state.startingPromise = null;
+          state.startingStartedAtMs = null;
+        }
         // Found live 2026-09-07: a genuine chat-engine spawn failure had
         // no Repairs-page visibility at all - only found by a household
         // member happening to check Settings -> AI models themselves.
@@ -551,6 +564,20 @@ export async function getChatClient(): Promise<LlamaServerClient> {
   return (await state.startingPromise).client;
 }
 
+/** Invalidates an orphaned startup so a later caller can retry. The
+ * generation bump makes any old promise that eventually settles discard
+ * its backend instead of resurrecting it; the latched status and one
+ * Repairs row stay visible until a newer start succeeds. */
+function expireStalledChatStart(): boolean {
+  return expireStalledStart(state, {
+    source: "chat-engine",
+    key: "startup_stalled",
+    severity: "error",
+    title: "MaiPai's AI is taking too long to start",
+    detail: "The chat engine startup has not completed after two minutes. A new request can retry the start; check the engine logs if it remains stuck.",
+  });
+}
+
 /** Stops whatever backend is currently running (if any) and clears the
  * cache, so the next getChatClient() call re-resolves from scratch -
  * tier 3 picks up a freshly-downloaded model instead of staying pinned to
@@ -567,6 +594,7 @@ export async function restartChatBackend(): Promise<void> {
   const previous = state.chatBackend;
   state.chatBackend = null;
   state.startingPromise = null;
+  state.startingStartedAtMs = null;
   await previous?.stop();
 }
 
@@ -582,6 +610,7 @@ export async function stopChatBackend(): Promise<void> {
   const previous = state.chatBackend;
   state.chatBackend = null;
   state.startingPromise = null;
+  state.startingStartedAtMs = null;
   await previous?.stop();
 }
 
@@ -596,7 +625,11 @@ export function getEngineStatus(): EngineStatus {
   if (state.chatBackend) {
     return { kind: state.chatBackend.kind, modelId: state.chatBackend.modelId ?? null, pid: state.chatBackend.pid ?? null, startedAt: state.chatBackend.startedAt };
   }
-  if (state.startingPromise) return { kind: "starting", modelId: null, pid: null, startedAt: null };
+  if (state.startingPromise) {
+    if (expireStalledChatStart()) return { kind: "stalled", modelId: null, pid: null, startedAt: null };
+    return { kind: "starting", modelId: null, pid: null, startedAt: null };
+  }
+  if (state.startupStalled) return { kind: "stalled", modelId: null, pid: null, startedAt: null };
   return { kind: "none", modelId: null, pid: null, startedAt: null };
 }
 
@@ -648,6 +681,8 @@ export function __resetLlmSupervisorForTests(): void {
   state.chatBackend?.stop();
   state.chatBackend = null;
   state.startingPromise = null;
+  state.startingStartedAtMs = null;
+  state.startupStalled = false;
   state.lastPostLoadCheck = null;
   state.manuallyStopped = false;
 }

@@ -113,6 +113,19 @@ describe("HealthSection", () => {
     }
   });
 
+  test("a stalled startup has a clear failed state", async () => {
+    const restore = stubHealth(
+      health({ ok: false, engines: { ...health().engines, chat: { kind: "stalled", pid: null, alive: null } } }),
+    );
+    try {
+      const { findByText } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
+      expect(await findByText("Something is not answering.")).toBeInTheDocument();
+      expect(await findByText("Start is stuck")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
   test("the auto-heal's own states are named, not hidden behind 'starts when needed'", async () => {
     const restore = stubHealth(
       health({

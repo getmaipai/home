@@ -191,6 +191,7 @@ function deriveEngineState(
   return {
     isRunning,
     isStarting: isSelected && engineStatus?.kind === "starting",
+    isStalled: isSelected && engineStatus?.kind === "stalled",
     isStopped: isSelected && engineStatus?.kind === "stopped",
   };
 }
@@ -324,7 +325,7 @@ function ChatModelCard({
   const failedJob = job && job.status === "failed" ? job : null;
   const primary = implementedFits.find((f) => f.model.id === (activeJob?.modelId ?? failedJob?.modelId ?? selectedModelId)) ?? implementedFits[0]!;
   const isSelected = selectedModelId === primary.model.id && !activeJob;
-  const { isRunning, isStarting, isStopped } = deriveEngineState(isSelected, engineStatus, primary.model.id);
+  const { isRunning, isStarting, isStopped, isStalled } = deriveEngineState(isSelected, engineStatus, primary.model.id);
   const others = implementedFits.filter((f) => f.model.id !== primary.model.id);
 
   return (
@@ -340,10 +341,12 @@ function ChatModelCard({
             <span className="text-base text-[var(--muted-foreground)]">Stopped</span>
           ) : isStarting ? (
             <span className="text-base text-[var(--muted-foreground)]">Starting…</span>
+          ) : isStalled ? (
+            <span className="text-base text-[var(--destructive)]">Start is stuck</span>
           ) : null}
         </div>
 
-        {isSelected && (isRunning || isStopped || isStarting) ? (
+        {isSelected && (isRunning || isStopped || isStarting || isStalled) ? (
           <div className="flex items-center gap-2">
             {isRunning ? (
               <>
@@ -352,6 +355,8 @@ function ChatModelCard({
               </>
             ) : isStopped ? (
               <Button variant="secondary" onClick={onRestart}>Start</Button>
+            ) : isStalled ? (
+              <Button variant="secondary" onClick={onRestart}>Retry start</Button>
             ) : (
               // Found live 2026-09-06: "starting" had no way out - a
               // household member watching a spinner with no escape hatch

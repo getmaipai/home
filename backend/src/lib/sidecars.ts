@@ -22,7 +22,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
+import { raiseIssue, resolveIssue, registerFixHandler, type RaiseIssueInput } from "@/lib/issues";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { createLogger } from "@maipai/core/src/log";
@@ -922,6 +922,31 @@ export async function probeAlive(
  * is the supervisor's own kind, or "restarting" while the auto-heal is
  * between a death and the next spawn, or "failed" once it gave up. */
 export type EngineHealth = EngineHealthEntry;
+
+/** A real cold model load can take a while, but an abandoned supervisor
+ * start should become visible well before a household waits an hour. */
+export const ENGINE_START_STALL_TIMEOUT_MS = 120_000;
+
+export interface EngineStartupState<T> {
+  startingPromise: Promise<T> | null;
+  startingStartedAtMs: number | null;
+  startupStalled: boolean;
+  generation: number;
+}
+
+/** Drops one abandoned start exactly once, raises its Repairs row, and
+ * bumps the generation so a late completion cannot replace a retry. */
+export function expireStalledStart<T>(state: EngineStartupState<T>, issue: RaiseIssueInput): boolean {
+  if (!state.startingPromise) return state.startupStalled;
+  state.startingStartedAtMs ??= Date.now(); // tolerate state from a pre-fix hot-reload instance
+  if (Date.now() - state.startingStartedAtMs < ENGINE_START_STALL_TIMEOUT_MS) return false;
+  state.generation++;
+  state.startingPromise = null;
+  state.startingStartedAtMs = null;
+  state.startupStalled = true;
+  void raiseIssue(issue);
+  return true;
+}
 
 /** Folds the auto-heal's own state into a supervisor's kind for
  * GET /api/health, so the page never says "starts when needed" about an

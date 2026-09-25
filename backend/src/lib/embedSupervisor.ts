@@ -24,13 +24,14 @@
 //      server. Real code path, canned deterministic vectors.
 import { detectHardware } from "@/lib/hardware";
 import { engineBinaryPath } from "@/lib/llmSupervisor";
-import { spawnAndWaitHealthy, watchEngine, probeAlive, engineHealthKind, cancelEngineRespawn, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, watchEngine, probeAlive, engineHealthKind, expireStalledStart, cancelEngineRespawn, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { embedModelPath, ensureEmbedModel } from "@/lib/embedAssets";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
+import { resolveIssue } from "@/lib/issues";
 
 export type EmbedBackendKind = "url" | "spawned" | "stub";
 
@@ -60,6 +61,8 @@ interface EmbedBackend {
 interface EmbedSupervisorState {
   embedBackend: EmbedBackend | null;
   startingPromise: Promise<EmbedBackend> | null;
+  startingStartedAtMs: number | null;
+  startupStalled: boolean;
   // Bumped on every restart/reset - guards the exact race a code review
   // (2026-09-04) found and fixed in ttsSupervisor.ts's identical shape: a
   // spawn already in flight when a restart lands must never re-populate
@@ -71,6 +74,8 @@ interface EmbedSupervisorState {
 const state = hotReloadState<EmbedSupervisorState>("embedSupervisor", () => ({
   embedBackend: null,
   startingPromise: null,
+  startingStartedAtMs: null,
+  startupStalled: false,
   generation: 0,
 }));
 
@@ -119,6 +124,7 @@ export async function restartEmbedBackend(): Promise<void> {
   const previous = state.embedBackend;
   state.embedBackend = null;
   state.startingPromise = null;
+  state.startingStartedAtMs = null;
   await previous?.stop();
 }
 
@@ -159,8 +165,10 @@ async function startEmbedBackend(): Promise<EmbedBackend> {
  * getTtsClient() already carry. */
 export async function getEmbedClient(): Promise<LlamaServerClient> {
   if (state.embedBackend) return state.embedBackend.client;
+  expireStalledEmbedStart();
   if (!state.startingPromise) {
     const myGeneration = state.generation;
+    state.startingStartedAtMs = Date.now();
     state.startingPromise = startEmbedBackend()
       .then(async (backend): Promise<EmbedBackend> => {
         if (myGeneration !== state.generation) {
@@ -180,21 +188,39 @@ export async function getEmbedClient(): Promise<LlamaServerClient> {
           return { ...backend, client: await getEmbedClient() };
         }
         state.embedBackend = backend;
+        state.startingPromise = null;
+        state.startingStartedAtMs = null;
+        state.startupStalled = false;
+        resolveIssue("embed-engine", "startup_stalled");
         return backend;
       })
       .catch((err) => {
-        if (myGeneration === state.generation) state.startingPromise = null;
+        if (myGeneration === state.generation) {
+          state.startingPromise = null;
+          state.startingStartedAtMs = null;
+        }
         throw err;
       });
   }
   return (await state.startingPromise).client;
 }
 
+function expireStalledEmbedStart(): boolean {
+  return expireStalledStart(state, {
+    source: "embed-engine",
+    key: "startup_stalled",
+    severity: "error",
+    title: "MaiPai's understanding engine is taking too long to start",
+    detail: "The embedding engine startup has not completed after two minutes. A new request can retry the start; check the engine logs if it remains stuck.",
+  });
+}
+
 /** Which backend (if any) is currently serving `embed` - "none" before
  * the first embed call in this process's lifetime. */
-export function getEmbedBackendKind(): EmbedBackendKind | "starting" | "none" {
+export function getEmbedBackendKind(): EmbedBackendKind | "starting" | "stalled" | "none" {
   if (state.embedBackend) return state.embedBackend.kind;
-  if (state.startingPromise) return "starting";
+  if (state.startingPromise) return expireStalledEmbedStart() ? "stalled" : "starting";
+  if (state.startupStalled) return "stalled";
   return "none";
 }
 
@@ -233,4 +259,5 @@ export function getEmbedLivePid(): number | null {
  * __resetTtsSupervisorForTests. */
 export function __resetEmbedSupervisorForTests(): void {
   void restartEmbedBackend();
+  state.startupStalled = false;
 }

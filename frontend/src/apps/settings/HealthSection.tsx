@@ -40,6 +40,7 @@ function engineState(engine: EngineHealthEntry): { label: string; variant: "seco
   if (engine.alive === false) return { label: "Not answering", variant: "destructive" };
   if (engine.kind === "restarting") return { label: "Restarting", variant: "destructive" };
   if (engine.kind === "failed") return { label: "Keeps stopping", variant: "destructive" };
+  if (engine.kind === "stalled") return { label: "Start is stuck", variant: "destructive" };
   if (engine.kind === "starting") return { label: "Starting", variant: "outline" };
   if (engine.kind === "stopped") return { label: "Stopped", variant: "outline" };
   return { label: "Starts when needed", variant: "outline" };
