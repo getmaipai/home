@@ -16,12 +16,12 @@ import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import { StackError } from "@/lib/stack/errors";
 import { getStackUpdatesState, checkStackUpdates, applyStackEngineUpdate, rollbackStackEngine } from "@/lib/stackUpdates";
+import { ROLE_IDS } from "@/lib/stack/types";
 
 export const enginesRoutes = apiRouter();
 
 // ---- Schemas, one per stack/types.ts shape --------------------------
 
-const ROLE_IDS = ["chat", "coding", "judge", "router", "embed", "rerank", "vision", "stt", "tts", "wakeword", "image", "video", "music"] as const;
 const RoleIdSchema = z.enum(ROLE_IDS);
 
 const RoleInfoSchema = z.object({

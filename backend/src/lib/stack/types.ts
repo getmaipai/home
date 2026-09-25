@@ -100,6 +100,24 @@ export interface StackSetting {
 }
 
 // GET /stack/v1/roles
+export const ROLE_IDS = [
+  "chat",
+  "coding",
+  "judge",
+  "router",
+  "embed",
+  "rerank",
+  "vision",
+  "stt",
+  "tts",
+  "wakeword",
+  "image",
+  "video",
+  "music",
+] as const;
+
+export type RoleId = (typeof ROLE_IDS)[number];
+
 export interface RoleState {
   state: "notInstalled" | "installed" | "loaded" | "ready" | "offline";
   since: string;
@@ -108,40 +126,13 @@ export interface RoleState {
 }
 
 export interface RoleInfo {
-  id:
-    | "chat"
-    | "coding"
-    | "judge"
-    | "router"
-    | "embed"
-    | "rerank"
-    | "vision"
-    | "stt"
-    | "tts"
-    | "wakeword"
-    | "image"
-    | "video"
-    | "music";
+  id: RoleId;
   label: string;
   wire: "chat" | "embeddings" | "rerank" | "transcription" | "speech" | "job";
   residency: "resident" | "jit" | "installed";
   endpoints: string[];
   quality: Array<"fast" | "everyday" | "best">;
-  sharesModelWith:
-    | "chat"
-    | "coding"
-    | "judge"
-    | "router"
-    | "embed"
-    | "rerank"
-    | "vision"
-    | "stt"
-    | "tts"
-    | "wakeword"
-    | "image"
-    | "video"
-    | "music"
-    | null;
+  sharesModelWith: RoleId | null;
   state: RoleState;
   reason: string | null;
   model: {
