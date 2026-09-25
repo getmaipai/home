@@ -39,6 +39,8 @@ function makeProjection(overrides: Partial<UpdateProjection> = {}): UpdateProjec
     error: null,
     stack: null,
     stackError: null,
+    reference: null,
+    referenceError: null,
     ...overrides,
   } as UpdateProjection;
 }

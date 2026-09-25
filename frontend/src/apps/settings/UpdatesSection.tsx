@@ -23,7 +23,7 @@ import { api, ApiError, type UpdateProjection } from "@/lib/api";
 // "does this row have a real update" rule rather than a second
 // definition of either.
 export interface UpdateRow {
-  kind: "app" | "engine" | "model";
+  kind: "app" | "engine" | "model" | "reference";
   id: string;
   name: string;
   installed: string | null;
@@ -44,12 +44,17 @@ export function rowsFrom(projection: UpdateProjection): UpdateRow[] {
       rows.push({ kind: "model", id: `model:${model.id}`, name: model.id, installed: model.installed, available: model.available, lastChecked: projection.stack.models.lastChecked, notes: null });
     }
   }
+  if (projection.reference) {
+    for (const reference of projection.reference.entries) {
+      rows.push({ kind: "reference", id: `reference:${reference.id}`, name: reference.name, installed: reference.installed, available: reference.available, lastChecked: reference.lastChecked, notes: reference.notes });
+    }
+  }
   return rows;
 }
 
 // Matches the DetailsPane icon choice below - one definition, not two.
 function rowIcon(kind: UpdateRow["kind"]): IconName {
-  return kind === "app" ? "home" : kind === "engine" ? "cpu" : "package";
+  return kind === "app" ? "home" : kind === "engine" ? "cpu" : kind === "reference" ? "archive" : "package";
 }
 
 export function hasUpdate(row: UpdateRow): boolean {
@@ -232,6 +237,11 @@ export function UpdatesSection() {
       {query.data?.stackError && (
         <p className="shrink-0 border-t p-4 text-base text-[var(--destructive)]">
           Couldn't reach the Stack for engine and model updates: {query.data.stackError}
+        </p>
+      )}
+      {query.data?.referenceError && (
+        <p className="shrink-0 border-t p-4 text-base text-[var(--destructive)]">
+          Couldn't read installed reference sets for updates: {query.data.referenceError}
         </p>
       )}
     </Page>

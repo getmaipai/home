@@ -79,6 +79,9 @@ export function NextUpdatesPage({ person }: { person: Roster }) {
           {(projection: UpdateProjection) => <DataTable data={rowsFrom(projection).map(toRow)} />}
         </AsyncState>
       )}
+      {canManage && query.data?.referenceError && (
+        <p className="text-sm text-destructive">Couldn't read installed reference sets for updates: {query.data.referenceError}</p>
+      )}
     </div>
   );
 }

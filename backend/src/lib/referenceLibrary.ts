@@ -17,7 +17,7 @@
 // services: we are the user), and trusts whatever that catalog and its
 // `.meta4` currently say.
 import { DOMParser } from "linkedom";
-import { existsSync, mkdirSync, renameSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { downloadUrl, type DownloadProgress } from "@/lib/modelDownload";
 import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
@@ -42,9 +42,46 @@ export interface ResolvedFlavour {
   flavour: string;
   language: string;
   zimFileName: string;
+  /** The date suffix in Kiwix's own snapshot filename, when published. */
+  snapshotDate: string | null;
   zimUrl: string;
   sha256: string;
   sizeBytes: number;
+}
+
+export interface InstalledReferenceFlavour {
+  id: string;
+  name: string;
+  book: string;
+  language: string;
+  flavour: string;
+  snapshotDate: string | null;
+}
+
+export interface ReferenceUpdate {
+  id: string;
+  name: string;
+  installed: string | null;
+  available: string | null;
+  lastChecked: string;
+  notes: string | null;
+}
+
+export interface ReferenceUpdates {
+  lastChecked: string;
+  entries: ReferenceUpdate[];
+}
+
+function snapshotDateFromFileName(fileName: string): string | null {
+  const match = /(?:^|_)(20\d{2}-\d{2}(?:-\d{2})?|20\d{6})\.zim$/u.exec(fileName);
+  if (!match) return null;
+  const date = match[1]!;
+  if (/^\d{8}$/u.test(date)) return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+  return date;
+}
+
+function metadataPath(zimPath: string): string {
+  return `${zimPath}.reference.json`;
 }
 
 function textOf(el: { textContent?: string | null } | undefined | null): string | undefined {
@@ -108,6 +145,7 @@ export async function resolveReferenceFlavour(
     flavour,
     language,
     zimFileName,
+    snapshotDate: snapshotDateFromFileName(zimFileName),
     // The .meta4 sidecar and the real .zim it describes sit at the same
     // path, one suffix apart - confirmed live against Kiwix's own
     // download servers (docs/dev.md's REFERENCE-LIBRARY-01 entry).
@@ -197,11 +235,69 @@ export async function installReferenceFlavour(
         `"${resolved.name}" (${resolved.flavour}) failed to install: ${message}${replacedPrevious ? " - the previous copy is untouched." : ""}`,
       );
     }
+    const metadata = {
+      id: slotKey(book, language, flavour),
+      name: resolved.name,
+      book,
+      language,
+      flavour,
+      snapshotDate: resolved.snapshotDate,
+    } satisfies InstalledReferenceFlavour;
+    const metadataIncomingPath = `${metadataPath(stablePath)}.incoming`;
+    writeFileSync(metadataIncomingPath, JSON.stringify(metadata), { mode: 0o600 });
+    // Prepare the record before the stable ZIM swap, so a metadata-write
+    // failure cannot leave a newly installed snapshot without its date.
     renameSync(incomingPath, stablePath);
+    renameSync(metadataIncomingPath, metadataPath(stablePath));
     return { resolved, path: stablePath, replacedPrevious };
   } finally {
     inFlightInstalls.delete(key);
   }
+}
+
+/** Lists installed book/flavour slots using their on-disk install records.
+ * ZIM filenames themselves are stable across updates, so the adjacent
+ * record preserves the exact Kiwix snapshot that the slot currently holds. */
+export function listInstalledReferenceFlavours(): InstalledReferenceFlavour[] {
+  const libraryDir = referenceLibraryDir();
+  if (!existsSync(libraryDir)) return [];
+  return readdirSync(libraryDir)
+    .filter((file) => file.endsWith(".zim"))
+    .flatMap((file) => {
+      const recordPath = metadataPath(join(libraryDir, file));
+      if (!existsSync(recordPath)) return [];
+      try {
+        const record = JSON.parse(readFileSync(recordPath, "utf-8")) as Partial<InstalledReferenceFlavour>;
+        if (
+          typeof record.id !== "string" ||
+          typeof record.name !== "string" ||
+          typeof record.book !== "string" ||
+          typeof record.language !== "string" ||
+          typeof record.flavour !== "string" ||
+          !(record.snapshotDate === null || typeof record.snapshotDate === "string")
+        ) return [];
+        return [{ id: record.id, name: record.name, book: record.book, language: record.language, flavour: record.flavour, snapshotDate: record.snapshotDate }];
+      } catch {
+        return [];
+      }
+    });
+}
+
+/** Live update projection for only the reference slots actually installed.
+ * No catalog call is made when the library has no installed records. */
+export async function getReferenceUpdates(catalogUrl?: string): Promise<ReferenceUpdates | null> {
+  const installed = listInstalledReferenceFlavours();
+  if (installed.length === 0) return null;
+  const lastChecked = new Date().toISOString();
+  const entries = await Promise.all(installed.map(async (set): Promise<ReferenceUpdate> => {
+    try {
+      const latest = await resolveReferenceFlavour(set.book, set.language, set.flavour, catalogUrl);
+      return { id: set.id, name: set.name, installed: set.snapshotDate, available: latest.snapshotDate, lastChecked, notes: null };
+    } catch (err) {
+      return { id: set.id, name: set.name, installed: set.snapshotDate, available: null, lastChecked, notes: err instanceof Error ? err.message : String(err) };
+    }
+  }));
+  return { lastChecked, entries };
 }
 
 /** The real entry point: installs (or updates) a book/flavour, then

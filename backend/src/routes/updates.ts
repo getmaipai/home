@@ -6,6 +6,7 @@ import { requireAuth, requireRoleOrGrant } from "@/middleware/auth";
 import { cachedUpdateProjection, checkForAppUpdate } from "@/lib/updates";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { getStackUpdatesState, checkStackUpdates, applyStackEngineUpdate, rollbackStackEngine, sweepStackStorage, runStackReadinessCheck } from "@/lib/stackUpdates";
+import { getReferenceUpdates, type ReferenceUpdates } from "@/lib/referenceLibrary";
 
 export const updatesRoutes = apiRouter();
 
@@ -34,6 +35,8 @@ const StackUpdatesSchema = z.object({
   engines: z.array(StackEngineUpdateSchema),
   models: z.object({ lastChecked: z.string().nullable(), entries: z.array(StackModelUpdateSchema) }),
 });
+const ReferenceUpdateSchema = z.object({ id: z.string(), name: z.string(), installed: z.string().nullable(), available: z.string().nullable(), lastChecked: z.string(), notes: z.string().nullable() });
+const ReferenceUpdatesSchema = z.object({ lastChecked: z.string(), entries: z.array(ReferenceUpdateSchema).min(1) });
 // Additive to the existing flat UpdateProjectionSchema shape (org
 // CLAUDE.md > Compatibility: never repurpose a field a client relies
 // on) - every pre-existing field stays exactly where it was; `stack` is
@@ -43,7 +46,12 @@ const StackUpdatesSchema = z.object({
 // or when there's simply no Stack configured; set only when a Stack IS
 // configured but the read failed, so the page can say why the section
 // is missing instead of looking like there was never a Stack at all.
-const UpdatesResponseSchema = UpdateProjectionSchema.extend({ stack: StackUpdatesSchema.nullable(), stackError: z.string().nullable() });
+const UpdatesResponseSchema = UpdateProjectionSchema.extend({
+  stack: StackUpdatesSchema.nullable(),
+  stackError: z.string().nullable(),
+  reference: ReferenceUpdatesSchema.nullable(),
+  referenceError: z.string().nullable(),
+});
 
 // Every signed-in person can see whether an update is available -
 // informational, the same reach GET /api/health already has.
@@ -60,10 +68,17 @@ const getRoute = createRoute({
 });
 updatesRoutes.openapi(getRoute, async (c) => {
   const app = cachedUpdateProjection();
-  if (!isStackConfigured()) return c.json({ ...app, stack: null, stackError: null }, 200);
+  let reference: ReferenceUpdates | null = null;
+  let referenceError: string | null = null;
+  try {
+    reference = await getReferenceUpdates();
+  } catch (err) {
+    referenceError = err instanceof Error ? err.message : String(err);
+  }
+  if (!isStackConfigured()) return c.json({ ...app, stack: null, stackError: null, reference, referenceError }, 200);
   const stack = await getStackUpdatesState();
-  if (!stack.ok) return c.json({ ...app, stack: null, stackError: stack.error }, 200);
-  return c.json({ ...app, stack: { checksEnabled: stack.value.checksEnabled, engines: stack.value.engines, models: stack.value.models }, stackError: null }, 200);
+  if (!stack.ok) return c.json({ ...app, stack: null, stackError: stack.error, reference, referenceError }, 200);
+  return c.json({ ...app, stack: { checksEnabled: stack.value.checksEnabled, engines: stack.value.engines, models: stack.value.models }, stackError: null, reference, referenceError }, 200);
 });
 
 // Owner/admin (or a backups.run grant, the closest existing action to

@@ -161,7 +161,7 @@ export interface SessionInfo {
 // tsconfig has no mapping for.
 // HOME-STACK-05: additive to the app's own flat fields above (org
 // CLAUDE.md > Compatibility) - null for every household without a
-// Stack, which is every household today.
+// Stack. Reference sets have a separate nullable projection below.
 export interface StackEngineUpdate {
   name: string;
   installed: string | null;
@@ -183,15 +183,34 @@ export interface StackUpdatesProjection {
   models: { lastChecked: string | null; entries: StackModelUpdate[] };
 }
 
-export interface UpdateProjection {
+export interface ReferenceUpdate {
+  id: string;
+  name: string;
+  installed: string | null;
+  available: string | null;
+  lastChecked: string;
+  notes: string | null;
+}
+
+export interface ReferenceUpdatesProjection {
+  lastChecked: string;
+  entries: ReferenceUpdate[];
+}
+
+export interface AppUpdateProjection {
   installed: string;
   latest: string | null;
   summary: string | null;
   url: string | null;
   checkedAt: string | null;
   error: string | null;
+}
+
+export interface UpdateProjection extends AppUpdateProjection {
   stack: StackUpdatesProjection | null;
   stackError: string | null;
+  reference: ReferenceUpdatesProjection | null;
+  referenceError: string | null;
 }
 
 // GET /api/plugins's real row shape (backend/src/routes/plugins.ts):
@@ -689,13 +708,12 @@ export const api = {
   // field but `id`.
   fixIssue: (id: string) => request<Issue>(`/api/repairs/${encodeURIComponent(id)}/fix`, { method: "POST" }),
   dismissIssue: (id: string) => request<{ id: string }>(`/api/repairs/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
-  // GET /api/updates (backend/src/routes/updates.ts): the app's own
-  // cached update check, app-only scope (no package/model/sidecar
-  // update system exists yet - that file's own header). checkForUpdate()
-  // forces a fresh GitHub check; owner/admin (or a backups.run grant)
-  // only, the route's own 403 on anyone else.
+  // GET /api/updates (backend/src/routes/updates.ts): app, configured
+  // Stack, and installed reference-set updates. checkForUpdate() forces
+  // a fresh GitHub check for the app only; owner/admin (or a
+  // backups.run grant) only, the route's own 403 on anyone else.
   updates: () => request<UpdateProjection>("/api/updates"),
-  checkForUpdate: () => request<UpdateProjection>("/api/updates/check", { method: "POST" }),
+  checkForUpdate: () => request<AppUpdateProjection>("/api/updates/check", { method: "POST" }),
   // HOME-STACK-05: the Stack's own maintenance actions - each a real
   // network call through the Stack, owner/admin (or backups.run) only,
   // same as checkForUpdate() above.

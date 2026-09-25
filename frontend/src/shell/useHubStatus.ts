@@ -26,7 +26,7 @@ export function useHubStatus(role: Roster["role"]) {
   return { hardware: hardware.data, health: health.data, repairs: repairs.data, updates: updates.data, canManage };
 }
 
-export function updateAvailable(updates: UpdateProjection | undefined): boolean {
+export function updateAvailable(updates: Pick<UpdateProjection, "installed" | "latest"> | undefined): boolean {
   return !!updates?.latest && updates.latest !== updates.installed;
 }
 

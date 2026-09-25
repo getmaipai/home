@@ -19120,6 +19120,61 @@
                     "stackError": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "reference": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "lastChecked": {
+                          "type": "string"
+                        },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "installed": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "available": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "lastChecked": {
+                                "type": "string"
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "installed",
+                              "available",
+                              "lastChecked",
+                              "notes"
+                            ]
+                          },
+                          "minItems": 1
+                        }
+                      },
+                      "required": [
+                        "lastChecked",
+                        "entries"
+                      ]
+                    },
+                    "referenceError": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -19135,7 +19190,9 @@
                     "checkedAt",
                     "error",
                     "stack",
-                    "stackError"
+                    "stackError",
+                    "reference",
+                    "referenceError"
                   ]
                 }
               }

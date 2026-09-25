@@ -306,7 +306,7 @@ describe("next Manage routes", () => {
     "/next/backups": "/api/backups",
   };
   const routeToBody: Record<string, unknown> = {
-    "/next/updates": { installed: "1.0.0", latest: "1.0.1", summary: null, url: null, checkedAt: "2026-09-01T00:00:00Z", error: null, stack: null, stackError: null },
+    "/next/updates": { installed: "1.0.0", latest: "1.0.1", summary: null, url: null, checkedAt: "2026-09-01T00:00:00Z", error: null, stack: null, stackError: null, reference: null, referenceError: null },
     "/next/repairs": [{
       id: "issue-abc123",
       source: "backup",

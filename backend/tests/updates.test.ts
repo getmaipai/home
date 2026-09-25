@@ -6,6 +6,8 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { checkForAppUpdate, cachedUpdateProjection, isNewerVersion } from "@/lib/updates";
 import { listPending } from "@/lib/notifications";
 import { sqlite } from "@/db";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 import type { PersonRow } from "@/types";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
@@ -290,8 +292,13 @@ describe("GET /api/updates, with a configured Stack", () => {
   test("stack is null with no Stack configured", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const body = (await (await owner.get("/api/updates")).json()) as { stack: unknown };
+    const emptyLibraryDir = join(process.env.MAIPAI_DATA_DIR!, "updates-empty-reference");
+    mkdirSync(emptyLibraryDir, { recursive: true });
+    setHouseholdSettingValue("reference.library_dir", emptyLibraryDir);
+    const body = (await (await owner.get("/api/updates")).json()) as { stack: unknown; reference: unknown; referenceError: string | null };
     expect(body.stack).toBeNull();
+    expect(body.reference).toBeNull();
+    expect(body.referenceError).toBeNull();
   });
 
   test("a fixture engine index makes an update row appear", async () => {

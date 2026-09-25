@@ -13,6 +13,8 @@ import {
   resolveReferenceFlavour,
   installReferenceFlavour,
   installAndPublishReferenceFlavour,
+  getReferenceUpdates,
+  listInstalledReferenceFlavours,
 } from "@/lib/referenceLibrary";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { listIssues } from "@/lib/issues";
@@ -94,6 +96,7 @@ describe("resolveReferenceFlavour()", () => {
       expect(resolved.sha256).toBe(sha256Of("hello vikidia"));
       expect(resolved.sizeBytes).toBe("hello vikidia".length);
       expect(resolved.zimUrl.endsWith(".zim")).toBe(true);
+      expect(resolved.snapshotDate).toBe("2026-09");
     } finally {
       server.stop(true);
     }
@@ -108,6 +111,35 @@ describe("resolveReferenceFlavour()", () => {
     } finally {
       server.stop(true);
     }
+  });
+});
+
+describe("getReferenceUpdates()", () => {
+  test("an installed set reports its own snapshot beside the newer catalog snapshot", async () => {
+    const libraryDir = join(process.env.MAIPAI_DATA_DIR!, "reference-updates");
+    setHouseholdSettingValue("reference.library_dir", libraryDir);
+    const entries = [{ name: "vikidia_en_all", flavour: "nopic", zimBody: "old snapshot", zimFileName: "vikidia_en_all_nopic_2026-08.zim" }];
+    const server = startFakeKiwixCatalog(entries);
+    try {
+      await installReferenceFlavour("vikidia", "eng", "nopic", { catalogUrl: `http://127.0.0.1:${server.port}/catalog/v2/entries` });
+      expect(listInstalledReferenceFlavours()).toEqual([{ id: "vikidia:eng:nopic", name: "vikidia_en_all", book: "vikidia", language: "eng", flavour: "nopic", snapshotDate: "2026-08" }]);
+
+      entries[0] = { name: "vikidia_en_all", flavour: "nopic", zimBody: "new snapshot", zimFileName: "vikidia_en_all_nopic_2026-09.zim" };
+      const updates = await getReferenceUpdates(`http://127.0.0.1:${server.port}/catalog/v2/entries`);
+      expect(updates?.entries).toEqual([
+        expect.objectContaining({ id: "vikidia:eng:nopic", name: "vikidia_en_all", installed: "2026-08", available: "2026-09", notes: null }),
+      ]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("no installed sets means null and makes no catalog request", async () => {
+    const libraryDir = join(process.env.MAIPAI_DATA_DIR!, "reference-updates-empty");
+    mkdirSync(libraryDir, { recursive: true });
+    setHouseholdSettingValue("reference.library_dir", libraryDir);
+    await expect(getReferenceUpdates("http://127.0.0.1:1/catalog/v2/entries")).resolves.toBeNull();
+    expect(listInstalledReferenceFlavours()).toEqual([]);
   });
 });
 
