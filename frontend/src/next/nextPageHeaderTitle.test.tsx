@@ -32,7 +32,7 @@ describe("NextPageHeaderTitle", () => {
     // answer for it, and a future regression there should fail a test,
     // not just look right by accident.
     ["/next/chat", "Chat", "lucide-message-circle"],
-    ["/next/apps", "Apps", "lucide-layout-grid"],
+    ["/next/tools", "Tools", "lucide-layout-grid"],
     ["/next/people", "People", "lucide-users"],
     ["/next/settings", "Settings", "lucide-settings"],
     ["/next/engines", "Engines", "lucide-cpu"],

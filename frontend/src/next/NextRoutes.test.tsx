@@ -208,6 +208,52 @@ describe("NextRoutes sign-in redirect (SHELL-FLAG-01)", () => {
   });
 });
 
+describe("NextRoutes tools path", () => {
+  function renderNextRoute(path: string) {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/settings")) {
+        return Promise.resolve(Response.json([
+          { scope: "person:person-abc123", key: "ui.appearance", value: "dark" },
+          { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
+        ]));
+      }
+      if (url.includes("/api/plugins")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    const view = renderWithQueryClient(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/next/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    return { view, restore: () => { globalThis.fetch = originalFetch; } };
+  }
+
+  test("/next/tools mounts the tools page and the sidebar points to it", async () => {
+    const { view, restore } = renderNextRoute("/next/tools");
+    try {
+      await waitFor(() => expect(document.title).toBe("Tools · MaiPai Home"));
+      expect(view.container.querySelector('[data-slot="card-title"]')?.textContent).toContain("Tools");
+      expect(view.getByRole("link", { name: "Tools" }).getAttribute("href")).toBe("/next/tools");
+    } finally {
+      restore();
+    }
+  });
+
+  test("/next/apps no longer mounts the tools page", async () => {
+    const { view, restore } = renderNextRoute("/next/apps");
+    try {
+      expect(view.container.querySelector('[data-slot="card-title"]')).toBeNull();
+      expect(view.queryByRole("table")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe("NextRoutes loading (HOME-UI-04g)", () => {
   // HOME-UI-04g: `readShellNextCache` (called from `useShellNext`, which
   // `NextRoutes` calls on every render) is the whole loading-decision,

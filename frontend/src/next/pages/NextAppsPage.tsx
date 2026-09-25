@@ -7,7 +7,7 @@ import { kindStyle, packageState } from "@/apps/library/AppsPage";
 import { api, ApiError, type InstalledPackage } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
-/** /next/apps: SHELL-03's own row (docs/plans/shell-on-shadcndashboard-
+/** /next/tools: SHELL-03's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - GET /api/plugins (the same real listing
  * `AppsPage.tsx`'s own `pluginsQuery` reads), rendered with Home's
  * shared read-only table. `kindStyle()` and `packageState()` are
@@ -36,7 +36,7 @@ function toRow(pkg: InstalledPackage): AppRow {
 }
 
 export function NextAppsPage() {
-  useDocumentTitle("Apps");
+  useDocumentTitle("Tools");
   const query = useQuery<InstalledPackage[]>({ queryKey: ["plugins"], queryFn: () => api.plugins() });
 
   return (
@@ -53,7 +53,7 @@ export function NextAppsPage() {
           <CardHeader className="p-0">
             <CardTitle className="flex items-center gap-2">
               <AppsIcon size={16} className="text-muted-foreground" />
-              Apps
+              Tools
             </CardTitle>
           </CardHeader>
           <NextDataTable data={rows.map(toRow)} />

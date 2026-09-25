@@ -29,13 +29,13 @@ const KIND_STYLES: Record<string, KindStyle> = {
   skill: { label: "Skill", hue: "--hue-orange", icon: "sparkles" },
 };
 
-// Exported: SHELL-03's `/next/apps` reuses this same kind-to-label rule
+// Exported: SHELL-03's `/next/tools` reuses this same kind-to-label rule
 // rather than a second copy of the same three-entry map.
 export function kindStyle(kind: string): KindStyle {
   return KIND_STYLES[kind] ?? { label: kind.charAt(0).toUpperCase() + kind.slice(1), hue: "--hue-blue", icon: "package" };
 }
 
-// Exported: SHELL-03's `/next/apps` reuses this same real-status rule
+// Exported: SHELL-03's `/next/tools` reuses this same real-status rule
 // (enabled and its last smoke run didn't fail) rather than a second
 // definition of "Ready" vs. "Attention" against the identical fields.
 export function packageState(row: InstalledPackage): "Ready" | "Attention" {

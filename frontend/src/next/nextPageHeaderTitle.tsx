@@ -5,7 +5,7 @@
 // every /next page, drawn from the one definition the sidebar already
 // reads - never a second icon table. `SidebarContent` (commons
 // `sidebaritems.ts`) is that definition for the four pages it lists
-// (Home, Chat, Apps, People). The five "Manage" pages plus Settings
+// (Home, Chat, Tools, People). The five "Manage" pages plus Settings
 // (`sidebaritems.ts`'s own comment: ui-v0.5.23's ruling moved them off
 // the rail entirely; Settings lives in `NavUser.tsx`'s bottom-of-rail
 // slot instead, an inline array with no exported constant) have no

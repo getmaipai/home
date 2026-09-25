@@ -2094,7 +2094,7 @@ async function captureNextStandup(browser: Browser, sessionValue: string): Promi
 
   const pages: Array<{ slug: string; path: string; waitFor: string }> = [
     { slug: "dashboard", path: "/next", waitFor: "text=Stay informed with today's activity" },
-    { slug: "apps", path: "/next/apps", waitFor: "table" },
+    { slug: "tools", path: "/next/tools", waitFor: "table" },
     { slug: "people", path: "/next/people", waitFor: "table" },
     { slug: "settings", path: "/next/settings", waitFor: "text=Default Inputs" },
     { slug: "sign-in", path: "/next/sign-in", waitFor: "form" },
@@ -2194,7 +2194,7 @@ async function flagTurnsAsMarlow(sessionValue: string, texts: readonly string[],
 // text findings: a throwaway review set (data-scratch, not the stand-
 // up's own committed acceptance captures), expanded vs. collapsed, both
 // themes, desktop only (the owner's own findings were both desktop-
-// only), plus one dark-only shot of /next/apps (the Employee Data
+// only), plus one dark-only shot of /next/tools (the Employee Data
 // Table row the owner's own third capture flagged).
 async function captureNextSidebarReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
@@ -2224,11 +2224,11 @@ async function captureNextSidebarReview(browser: Browser, sessionValue: string):
       console.log(`Wrote ${join(outDir, `next-sidebar-collapsed-desktop-${theme}.png`)}`);
 
       if (theme === "dark") {
-        await page.goto(`${BASE_URL}/next/apps`);
+        await page.goto(`${BASE_URL}/next/tools`);
         await page.locator("text=Employee Data Table").first().waitFor({ timeout: 15000 });
         await settleAnimations(page);
-        await page.screenshot({ path: join(outDir, `next-apps-table-desktop-${theme}.png`) });
-        console.log(`Wrote ${join(outDir, `next-apps-table-desktop-${theme}.png`)}`);
+        await page.screenshot({ path: join(outDir, `next-tools-table-desktop-${theme}.png`) });
+        console.log(`Wrote ${join(outDir, `next-tools-table-desktop-${theme}.png`)}`);
       }
       await page.close();
     } finally {
@@ -2457,8 +2457,8 @@ async function captureNextProfileSheetReview(browser: Browser, sessionValue: str
 }
 
 /** SHELL-03's own acceptance ("1440 and 390... judged, report what
- * Jesse sees at /next/apps"): both viewports, both themes, of `/next/
- * apps` - the same permanent-capture shape `captureNextDashboardReview`
+ * Jesse sees at /next/tools"): both viewports, both themes, of that
+ * route - the same permanent-capture shape `captureNextDashboardReview`
  * above already established for the dashboard row. Waits on a real
  * table row rather than any one package's own display name: GET
  * /api/plugins's own row order isn't alphabetical (readdirSync's
@@ -2482,11 +2482,11 @@ async function captureNextAppsReview(browser: Browser, sessionValue: string): Pr
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/apps`);
+        await page.goto(`${BASE_URL}/next/tools`);
         await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
-        await assertNoLegacyDataTableChrome(page, "Apps");
+        await assertNoLegacyDataTableChrome(page, "Tools");
         await settleAnimations(page);
-        const path = join(outDir, `next-apps-${viewport.width}-${theme}.png`);
+        const path = join(outDir, `next-tools-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
         console.log(`Wrote ${path}`);
         await page.close();

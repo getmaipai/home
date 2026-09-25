@@ -90,12 +90,13 @@ describe("NextAppsPage", () => {
     }
   });
 
-  test("a real Apps heading and a read-only table without the demo title or Action column", async () => {
+  test("a real Tools heading and a read-only table without the demo title or Action column", async () => {
     const restore = mockPluginsFetch([makePackage()]);
     try {
       renderWithQueryClient(<NextAppsPage />);
       await waitFor(() => expect(document.body.textContent).toContain("Weather"));
-      expect(document.querySelectorAll('[data-slot="card-title"]')[0]?.textContent).toContain("Apps");
+      expect(document.querySelectorAll('[data-slot="card-title"]')[0]?.textContent).toContain("Tools");
+      expect(document.title).toBe("Tools · MaiPai Home");
       expect(document.body.textContent).not.toContain("Employee Data Table");
       const table = document.querySelector('[data-slot="table"]');
       expect(table).not.toBeNull();
