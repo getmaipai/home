@@ -238,6 +238,7 @@ const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mi
 const nextPeopleReview = process.argv.includes("--next-people-review");
 const nextDashboardReview = process.argv.includes("--next-dashboard-review");
 const nextAppsReview = process.argv.includes("--next-apps-review");
+const nextProfileSheetReview = process.argv.includes("--next-profile-sheet-review");
 const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
@@ -2415,6 +2416,46 @@ async function captureNextDashboardReview(browser: Browser, sessionValue: string
   }
 }
 
+/** PROFILE-SHEET-01's live acceptance: open the real Home-owned account
+ * sheet at the phone viewport, assert the seeded signed-in person and
+ * Home destinations, reject every shipped demo identity/link, then
+ * save the open sheet for visual review. */
+async function captureNextProfileSheetReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextProfileSheetReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "phone")!;
+  const context = await newContext(browser, viewport, "dark", sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/next`);
+    await page.getByText("Stay informed with today's activity").waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Open account menu for Sage" }).click();
+    const sheet = page.getByRole("dialog");
+    await sheet.getByRole("heading", { name: "Sage" }).waitFor();
+    await sheet.getByRole("link", { name: "Settings" }).waitFor();
+    await sheet.getByRole("link", { name: "Help" }).waitFor();
+    const text = await sheet.innerText();
+    if (/Cameron|shadcndashboard\.com|Invoice|Subscription|Account Settings|Log Out/.test(text)) {
+      throw new Error(`captureNextProfileSheetReview: template content remains in the account sheet: ${text}`);
+    }
+    await settleAnimations(page);
+    const path = join(outDir, `next-profile-sheet-${viewport.width}-dark.png`);
+    await page.screenshot({ path, fullPage: true });
+    console.log(`Wrote ${path}`);
+    await page.close();
+  } finally {
+    await context.close();
+  }
+}
+
 /** SHELL-03's own acceptance ("1440 and 390... judged, report what
  * Jesse sees at /next/apps"): both viewports, both themes, of `/next/
  * apps` - the same permanent-capture shape `captureNextDashboardReview`
@@ -3808,6 +3849,11 @@ async function main() {
 
     const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
+    if (nextProfileSheetReview) {
+      await captureNextProfileSheetReview(browser, sessionValue);
+      console.log("completed named review: --next-profile-sheet-review");
+      return;
+    }
     if (nextTableRolloutReview) {
       await captureNextAppsReview(browser, sessionValue);
       await captureNextPeopleReview(browser, sessionValue);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
@@ -197,6 +197,11 @@ describe("NextRoutes sign-in redirect (SHELL-FLAG-01)", () => {
       // group heading is a second, unrelated match otherwise.
       expect(await view.findByRole("navigation")).toHaveTextContent("Home");
       expect(view.queryByPlaceholderText("PIN or password")).toBeNull();
+      fireEvent.click(await view.findByRole("button", { name: "Open account menu for Nova" }));
+      expect(await view.findByRole("heading", { name: "Nova" })).toBeTruthy();
+      expect(view.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/next/settings");
+      expect(view.getByRole("link", { name: "Help" }).getAttribute("href")).toContain("docs/user/README.md");
+      expect(view.queryByText(/Cameron|shadcndashboard\.com|Invoice|Subscription/)).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
     }

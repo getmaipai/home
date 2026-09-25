@@ -101,7 +101,7 @@ function NextRoutesInner({ person }: { person: Roster }) {
             kit's HeaderSearch remote prop (FullLayout -> Header ->
             HeaderSearch, a plain prop threaded down since FullLayout is
             the one component this file actually instantiates itself). */}
-        <Route element={<FullLayout headerSearchRemote={api.search} />}>
+        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
