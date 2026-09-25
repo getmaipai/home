@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useAui, type RemoteThreadListAdapter } from "@assistant-ui/react";
 import { createAssistantStream } from "assistant-stream";
+import { toast } from "sonner";
 import { createChatHistoryAdapter } from "@/apps/chat/chatHistoryAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { api } from "@/lib/api";
@@ -44,10 +45,17 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       if (!custom || typeof custom.pinned !== "boolean") return;
       await api.setConversationPinned(remoteId, custom.pinned);
     },
-    // The shared record has no archive state. Do not expose an action
-    // that silently deletes a conversation or disappears on reload.
-    async archive() { throw new Error("Archiving conversations is not supported."); },
-    async unarchive() { throw new Error("Archiving conversations is not supported."); },
+    // The shared record has no archive state. The shipped Elements menu
+    // still offers Archive, so explain the unsupported action before
+    // rejecting it; the runtime rolls back its own optimistic status.
+    async archive() {
+      toast.error("Archiving isn't available yet.");
+      throw new Error("Archiving conversations is not supported.");
+    },
+    async unarchive() {
+      toast.error("Archiving isn't available yet.");
+      throw new Error("Archiving conversations is not supported.");
+    },
     async delete(remoteId) { await api.deleteConversation(remoteId); },
     async initialize() {
       const row = await api.createConversation();

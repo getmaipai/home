@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { toast } from "sonner";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { api } from "@/lib/api";
 import type { ThreadMessage } from "@assistant-ui/react";
@@ -55,6 +56,23 @@ describe("saved conversations", () => {
     const adapter = createChatThreadListAdapter("Nova");
     await expect(adapter.rename("conv-example123", "Garden")).rejects.toThrow();
     await expect(adapter.delete("conv-example123")).rejects.toThrow();
+  });
+
+  test("unsupported archive is explained and remains a rejected, non-persistent operation", async () => {
+    const errorToast = spyOn(toast, "error");
+    try {
+      const rows = [{ id: "conv-archive", title: "Keep this chat", surface: "chat", created_at: "2026-09-07T00:00:00Z", pinned: false }];
+      globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+        expect(String(input)).toBe("/api/conversations");
+        return Response.json(rows);
+      }) as unknown as typeof fetch;
+      const adapter = createChatThreadListAdapter("Nova");
+      await expect(adapter.archive("conv-archive")).rejects.toThrow("Archiving conversations is not supported.");
+      expect(errorToast).toHaveBeenCalledWith("Archiving isn't available yet.");
+      expect((await adapter.list()).threads).toMatchObject([{ remoteId: "conv-archive", title: "Keep this chat", status: "regular" }]);
+    } finally {
+      errorToast.mockRestore();
+    }
   });
 });
 
