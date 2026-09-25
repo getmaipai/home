@@ -41,8 +41,7 @@ export type SubjectRef =
 
 /** A name the turn could not resolve, with what the utterance said
  * about it. `ask` is true when the utterance frames the name as
- * household (the coherence review's amendment: a relation phrase, "my"
- * or "our" in its clause, a pronoun for it in the same turn, or the
+ * household (a relation phrase, "my" or "our" in its clause, or the
  * roster's own shape) and no noun settled its kind: the engine asks.
  * A bare proper noun with no frame is unresolved with no ask (a film,
  * a band, a place in the world); the judge's open question catches a
@@ -51,9 +50,6 @@ export interface UnknownName {
   name: string;
   hintedKinds: EntityKind[];
   ask: boolean;
-  /** The third-person pronoun the person used for it this turn, when
-   * one did ("Nadia ... her marathon"). */
-  pronoun: "he" | "she" | "they" | null;
 }
 
 export interface ResolvedNames {
@@ -70,27 +66,10 @@ export interface KnownNames {
   /** The entity id a known name resolves to, or null (a member with no
    * entity yet resolves through the caller's own ensure path). */
   resolveEntity: (name: string) => string | null;
-  /** ASK-02 (section 16 part 7, rule 3): the names the hub itself
-   * introduced, from its last two replies and any retained outcome's
-   * result text. A candidate among them (or inside one, "Serena" for
-   * "Serena Vale") is a world subject with that provenance, never an
-   * unresolved one, never asked back. */
-  hubNames?: readonly HubName[];
   /** ASK-02 (rule 1): the last three turns' text, for the common-word
    * check (a capitalized token whose lowercase form was an ordinary
    * word a turn ago is that word, not a name). */
   recent?: readonly string[];
-}
-
-export interface HubName {
-  name: string;
-  /** `reply` for the hub's own reply text, else the outcome's package id. */
-  provenance: string;
-  sourceKind: "web" | "wikidata" | "wikipedia" | "weather" | "package" | null;
-  /** The tagger read the span as a person's name: a first name the
-   * person says later resolves to it as a part ("Serena" to "Serena
-   * Vale"); a place or a title never ("Nova" is not "Nova Scotia"). */
-  person?: boolean;
 }
 
 // A sentence-initial capitalized word compromise leaves as a plain
@@ -149,7 +128,7 @@ function pronounFamily(word: string): "he" | "she" | "they" | null {
 }
 
 /** The pronoun families the person used in this text ("he", "she",
- * "they"), for the guards' pronoun check and the unknown's own hint. */
+ * "they"), for the guards' pronoun check and household answer parser. */
 export function pronounFamiliesIn(text: string): Set<"he" | "she" | "they"> {
   const found = new Set<"he" | "she" | "they">();
   for (const m of text.matchAll(THIRD_PERSON_PRONOUN_RE)) {
@@ -266,82 +245,11 @@ function rosterShapeAround(text: string, name: string, knownInText: readonly str
   return new RegExp(`(?<![\\p{L}])${n}\\s+and\\s+${withMe}(?![\\p{L}])|(?<![\\p{L}])${withMe}\\s+and\\s+${n}(?![\\p{L}])`, "iu").test(text);
 }
 
-// A kind noun in front of a name says it is the world's ("the band
-// Tempo", "the film Cobra"): never a household unknown, whatever else
-// the sentence carries.
-const WORLD_KIND_RE = /(?<![\p{L}])(?:the|a|an|that|this)\s+(?:(?:new|latest|upcoming|next|old|classic|original|first)\s+)?(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon|trailer|teaser|episode|season|clip|soundtrack|sequel|remake)\s+$/iu;
-// The kind noun right after a titled name: "the new Marsh Lantern film",
-// "the film Marsh Lantern" (a kind noun in front).
-const KIND_NOUN_AFTER_RE = /^\s*(?:film|movie|show|series|game|album|song|track|book|novel|cartoon|podcast|band|restaurant|cafe|trailer|teaser|episode|season|clip|soundtrack|sequel|remake)(?![\p{L}])/iu;
-function kindOf(noun: string): string {
-  const n = noun.toLowerCase();
-  if (n === "film" || n === "movie") return "film";
-  if (n === "show" || n === "series" || n === "cartoon") return "show";
-  if (n === "song" || n === "track") return "song";
-  if (n === "book" || n === "novel") return "book";
-  if (n === "cafe" || n === "restaurant") return "restaurant";
-  if (["trailer", "teaser", "clip"].includes(n)) return "trailer";
-  if (["episode", "season"].includes(n)) return "show";
-  if (n === "soundtrack") return "album";
-  if (["sequel", "remake"].includes(n)) return "film";
-  return n;
-}
-/** CHAT-13: the recency a titled work carries, read from the words
- * before its name (the determiner-to-name slot). */
-function recencyOf(determinerPhrase: string): "current" | "dated" | "unknown" {
-  const year = determinerPhrase.match(/\b(?:19|20)\d{2}\b/);
-  if (year) return "dated";
-  if (/(?:new|latest|upcoming|next)\b/iu.test(determinerPhrase)) return "current";
-  if (/(?:old|classic|original|first)\b/iu.test(determinerPhrase)) return "dated";
-  return "unknown";
-}
-function worldFramed(text: string, at: number): boolean {
-  return WORLD_KIND_RE.test(text.slice(0, at));
-}
-
-const LOWER_TITLE_STOP_WORDS = new Set(["a", "an", "and", "for", "in", "of", "on", "the", "to"]);
-const LOWER_TITLE_RE = /(?<![\p{L}])(?:the|a|an)\s+(?:(?:new|latest|upcoming|next|old|classic|original|first)\s+)?(?<title>[a-z]+(?:\s+[a-z]+)?)\s+(?<kind>trailer|teaser|episode|season|clip|soundtrack|sequel|remake|film|movie|show|series|game|album|song|track|book|novel|cartoon|podcast|band|restaurant|cafe)(?![\p{L}])/iu;
-const LOWER_TITLE_FOR_RE = /(?<![\p{L}])(?<kind>trailer|teaser|episode|season|clip|soundtrack|sequel|remake)\s+for\s+(?<title>[a-z]+)(?![\p{L}])/iu;
-function lowerTitleCandidates(text: string, existing: readonly Candidate[], known: ReadonlySet<string>): Candidate[] {
-  const out: Candidate[] = [];
-  for (const re of [LOWER_TITLE_RE, LOWER_TITLE_FOR_RE]) {
-    for (const match of text.matchAll(new RegExp(re.source, re.flags.replace("g", "") + "g"))) {
-      const title = match.groups?.title ?? "";
-      const kind = match.groups?.kind ?? "";
-      const words = title.split(/\s+/u);
-      if (!title || words.some((word) => LOWER_TITLE_STOP_WORDS.has(word.toLowerCase())) || ["new", "latest", "upcoming", "next", "old", "classic", "original", "first"].includes(title.toLowerCase()) || kind.toLowerCase() === title.toLowerCase()) continue;
-      const display = words.map((word) => `${word[0]!.toUpperCase()}${word.slice(1)}`).join(" ");
-      if (known.has(display.toLowerCase()) || existing.some((c) => c.name.toLowerCase() === display.toLowerCase())) continue;
-      const at = (match.index ?? 0) + match[0].indexOf(title);
-      out.push({ name: display, at, tokens: words.length, tags: new Set() });
-    }
-  }
-  return out;
-}
-function lowerTitleKindAt(text: string, at: number): { noun: string; phrase: string } | null {
-  const before = text.slice(0, at);
-  const after = text.slice(at);
-  const forMatch = /(?<kind>trailer|teaser|episode|season|clip|soundtrack|sequel|remake)\s+for\s*$/iu.exec(before);
-  if (forMatch) return { noun: forMatch.groups?.kind ?? "", phrase: before };
-  const afterMatch = /^\s*(?<kind>trailer|teaser|episode|season|clip|soundtrack|sequel|remake|film|movie|show|series|game|album|song|track|book|novel|cartoon|podcast|band|restaurant|cafe)\b/iu.exec(after);
-  return afterMatch ? { noun: afterMatch.groups?.kind ?? "", phrase: before } : null;
-}
-
-// ASK-02 (rule 2): a brand or a service is the world's, kind
-// organization, never asked. The tagger's own #Organization tag, a
-// model number or a product noun after the name ("the Cosmo 7 card",
-// "my Asus laptop"), or "the" before it and a product noun after.
-const PRODUCT_NOUN_RE = /^\s+(?:\d+[a-z]?(?![\p{L}\p{N}])|(?:card|phone|laptop|tablet|edition|model|console|tv|television|speaker|router|camera|headphones|earbuds|printer|monitor|keyboard|mouse|charger|drive|watch|app|service|site|website|store|brand|maker|update|firmware|account|subscription|channel|feed|player|device|gadget)s?(?![\p{L}\p{N}]))/iu;
-function productFramed(text: string, c: Candidate, tags: ReadonlySet<string>): boolean {
-  if (tags.has("Organization")) return true;
-  return PRODUCT_NOUN_RE.test(text.slice(c.at + c.name.length));
-}
-
 interface Candidate {
   name: string;
   at: number;
   tokens: number;
-  /** The tagger's tags over the span, for the world frames (rule 2). */
+  /** The tagger's tags over the span, for candidate hygiene. */
   tags: Set<string>;
   /** The span so far ends in a hyphen the tagger split on ("Mary-"
    * then "Jane"): the next token joins with the hyphen, not a space. */
@@ -404,7 +312,7 @@ function notAName(text: string, word: string, at: number, tags: ReadonlySet<stri
   const lowercaseWord = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(lower)}(?![\\p{L}\\p{N}])`, "u");
   if (ordinary && (recent.some((t) => lowercaseWord.test(t)) || lowercaseWord.test(text))) return true;
   const before = text.slice(0, at);
-  if (ordinary && DETERMINER_BEFORE_RE.test(before) && !PRODUCT_NOUN_RE.test(text.slice(at + word.length))) return true;
+  if (ordinary && DETERMINER_BEFORE_RE.test(before)) return true;
   // The typo slot is the interjection's alone: sentence-initial before
   // punctuation ("Wong, that's not it"). Never a copula's complement
   // ("his name is Rover", "this is Clover" introduce a name; a review)
@@ -482,18 +390,7 @@ function candidatesIn(text: string, known: ReadonlySet<string> = new Set(), rece
   return out;
 }
 
-/** ASK-02 (rule 3): the proper nouns a text carries (the hub's own
- * reply, an outcome's result), the household's names out. */
-export function namesIn(text: string, known: readonly string[] = [], opts: { properOnly?: boolean } = {}): string[] {
-  const knownLower = new Set(known.map((n) => n.trim().toLowerCase()).filter((n) => n.length > 1));
-  // `properOnly` for the hub's own text: a sentence-initial plain noun
-  // in a reply ("Traffic looks clear tonight") is no name the hub gave
-  // (a review); the person's turns keep the resolver's full read, so a
-  // name they said first ("Clover borrowed our tent") stays theirs.
-  return properNounsIn(text, known, opts).map((c) => c.name);
-}
-
-/** The same, with whether the tagger read each span as a person. */
+/** Proper-noun spans, used to name a completed lookup subject. */
 export function properNounsIn(text: string, known: readonly string[] = [], opts: { properOnly?: boolean } = {}): { name: string; person: boolean }[] {
   const knownLower = new Set(known.map((n) => n.trim().toLowerCase()).filter((n) => n.length > 1));
   return candidatesIn(text, knownLower)
@@ -509,9 +406,7 @@ export function resolveNames(text: string, signal: TurnSignal | undefined, known
   const seen = new Set<string>();
   const knownLower = new Map(known.names.filter((n) => n.trim().length > 1).map((n) => [n.trim().toLowerCase(), n.trim()]));
   const frames = relationFramesIn(text);
-  const pronouns = pronounFamiliesIn(text);
   const candidates = candidatesIn(text, new Set(knownLower.keys()), known.recent ?? [], new Set(frames.map((f) => f.name.toLowerCase())));
-  candidates.push(...lowerTitleCandidates(text, candidates, new Set(knownLower.keys())));
   // The signal's own named subjects (a relation phrase's name, a
   // report's source) join the tagger's, so "my sister Nadia says" is
   // never missed at the start of a sentence.
@@ -521,17 +416,8 @@ export function resolveNames(text: string, signal: TurnSignal | undefined, known
       if (at >= 0 && !NOT_A_NAME.has(clause.subject.name.toLowerCase())) candidates.push({ name: clause.subject.name, at, tokens: clause.subject.name.split(/\s+/).length, tags: new Set() });
     }
   }
-  // ASK-02 (rule 3): a name the hub introduced, matched whole or as a
-  // part ("Serena" after the hub said "Serena Vale").
-  const hubNameFor = (name: string): HubName | undefined => {
-    const lower = name.toLowerCase();
-    return (known.hubNames ?? []).find((h) => h.name.toLowerCase() === lower) ?? (known.hubNames ?? []).find((h) => h.person === true && h.name.toLowerCase().startsWith(`${lower} `));
-  };
   // A known name anywhere in the text (a member's nickname the tagger
-  // never saw as a name, a lowercase pet), for the household refs and
-  // the pronoun frame: a pronoun beside a known name is theirs.
-  // A roster name inside a longer proper noun is not the household
-  // ("the new Marsh Lantern album"; asksAboutHousehold()'s rule).
+  // never saw as a name, a lowercase pet), for household refs.
   const insideLonger = (n: string) => candidates.some((c) => c.tokens > 1 && namePattern(n).test(c.name) && c.name.toLowerCase() !== n.toLowerCase());
   const knownInText = [...knownLower.values()].filter((n) => namePattern(n).test(text) && !insideLonger(n));
   for (const c of candidates) {
@@ -544,76 +430,13 @@ export function resolveNames(text: string, signal: TurnSignal | undefined, known
       if (id) subjects.push({ type: "household", entity_id: id, carried_question: null });
       continue;
     }
-    // A relation frame on the person's own turn wins over a hub name
-    // ("my brother Vincent" after the cast row named Vincent Marlow is
-    // the brother; a review).
-    const framedByRelation = frames.some((f) => f.name.toLowerCase() === key);
-    const hub = framedByRelation ? undefined : hubNameFor(c.name);
-    if (hub) {
-      subjects.push({ type: "world", kind: "mention", display_name: hub.name, year: null, source_kind: hub.sourceKind, stable_key: null, recency: "unknown", carried_question: null });
-      continue;
-    }
-    // ASK-02 (rule 2): a brand or a service is the world's, kind
-    // organization, no frame and no ask.
-    if (!framedByRelation && productFramed(text, c, c.tags)) {
-      subjects.push({ type: "unresolved", surface_form: c.name, candidate_kinds: ["organization"], provenance, confidence: 0.4, carried_question: null });
-      unknown.push({ name: c.name, hintedKinds: ["organization"], ask: false, pronoun: null });
-      continue;
-    }
-    // CHAT-13: a kind noun beside the name, in front ("the film Marsh
-    // Lantern") or after ("the new Marsh Lantern film"), makes it the
-    // world's, kind read off the noun, recency read off the words before
-    // the name; a titled work is the world's, never a household unknown,
-    // never asked about.
-    const afterSlice = text.slice(c.at + c.name.length);
-    const beforeSlice = text.slice(0, c.at);
-    const lowerTitleFrame = lowerTitleKindAt(text, c.at);
-    if (!framedByRelation && (worldFramed(text, c.at) || KIND_NOUN_AFTER_RE.test(afterSlice) || lowerTitleFrame)) {
-      const after = KIND_NOUN_AFTER_RE.test(afterSlice);
-      // The kind noun: the one right after the name (after-shape) or the
-      // one in front of it (before-shape).
-      const kindNoun = lowerTitleFrame
-        ? lowerTitleFrame.noun
-        : after
-        ? (afterSlice.match(KIND_NOUN_AFTER_RE) ?? [""])[0]!.trim()
-        : (beforeSlice.match(/(?:band|film|movie|show|series|game|album|song|track|book|novel|author|artist|singer|actor|actress|director|team|club|brand|maker|model|card|phone|console|service|site|app|podcast|channel|company|store|chain|restaurant|city|town|country|place|character|hero|villain|comic|cartoon|trailer|teaser|episode|season|clip|soundtrack|sequel|remake)\s+$/iu) ?? [""])[0]!.trim();
-      // The determiner-to-name slot where the recency word lives: for the
-      // after-shape it is the words before the name ("the new Marsh
-      // Lantern film" -> "the new"); for the before-shape it is the slot
-      // before the kind noun ("the new Marsh Lantern" -> "the new").
-      const recencyPhrase = lowerTitleFrame ? lowerTitleFrame.phrase : after ? beforeSlice : beforeSlice.replace(kindNoun, "").trim();
-      const year = (recencyPhrase.match(/\b(?:19|20)\d{2}\b/) ?? [null])[0] ?? null;
-      subjects.push({
-        type: "world",
-        kind: kindOf(kindNoun),
-        display_name: c.name,
-        year: year === null ? null : Number(year),
-        source_kind: null,
-        stable_key: null,
-        recency: recencyOf(recencyPhrase),
-        carried_question: null,
-      });
-      continue;
-    }
-    // A roster name inside a longer proper noun is the world's
-    // ("the new Marsh Lantern album"), never a household unknown.
     const frame = frames.find((f) => f.name.toLowerCase() === key);
     const hinted = frame?.kind ? [frame.kind] : [];
-    // A personal pronoun ("he", "she") for it in the same turn frames
-    // it as household when no known name could be what the pronoun
-    // refers to; "they" does not (a band, a company, a crowd).
-    // Only on a statement: a question about a public figure carries
-    // a pronoun too ("what did Shakespeare write before he died"), and
-    // is the world's (a review).
-    const personal = [...pronouns].filter((p) => p !== "they");
-    const clauseAct = signal?.clauses.find((cl) => c.at >= cl.range.start && c.at < cl.range.end)?.act ?? signal?.primary_act;
-    const statement = clauseAct !== "question" && clauseAct !== "directive";
     const framed =
       frame !== undefined ||
-      (c.tokens === 1 && !worldFramed(text, c.at) && (possessiveInClause(text, c.at, signal) || rosterShapeAround(text, c.name, knownInText) || (statement && personal.length > 0 && knownInText.length === 0)));
+      (c.tokens === 1 && (possessiveInClause(text, c.at, signal) || rosterShapeAround(text, c.name, knownInText)));
     subjects.push({ type: "unresolved", surface_form: c.name, candidate_kinds: hinted, provenance, confidence: framed ? 0.8 : 0.4, carried_question: null });
-    const pronoun = personal.length === 1 && knownInText.length === 0 ? personal[0]! : null;
-    unknown.push({ name: c.name, hintedKinds: hinted, ask: framed && c.tokens === 1 && hinted.length === 0, pronoun });
+    unknown.push({ name: c.name, hintedKinds: hinted, ask: framed && c.tokens === 1 && hinted.length === 0 });
   }
   for (const knownName of knownInText) {
     if (seen.has(knownName.toLowerCase())) continue;
@@ -761,11 +584,6 @@ const ANSWER_LEAD_FULL_RE = /^(?:(?:oh|well|ok(?:ay)?|hmm|no|nope|nah|yes|yeah|a
 
 export interface WhoAnswer {
   kind: EntityKind | undefined;
-  /** ASK-02 (rule 4): the answer said the name is the world's ("the
-   * actress, Serena Vale", "a public figure", "she's famous", or a
-   * full name to a first-name ask): no household entity, a world
-   * subject of that kind, and the carried question runs as a lookup. */
-  world?: { kind: string; name: string };
   /** The relationship type the answer stated from the speaker's side
    * ("my cousin": relative_of), or null. */
   relationType: string | null;
@@ -795,8 +613,6 @@ export function parseWhoAnswer(text: string, name?: string, opts: { relationAske
   if (YES_RE.test(plain)) return opts.relationAsked ? { kind: undefined, relationType: null, noun: null, pronouns: null, description: null, verdict: "yes" } : null;
   const pronounSet = pronounFamiliesIn(plain);
   const pronouns = pronounSet.size === 1 ? [...pronounSet][0]! : null;
-  const world = worldAnswer(plain, name);
-  if (world) return { kind: undefined, relationType: null, noun: null, pronouns, description: null, verdict: null, world };
   // "my cousin", "our rabbit", "a friend from work", "the neighbor's dog".
   const alternatives = [...relationNouns().keys()].sort((a, b) => b.length - a.length).map(escapeRe).join("|");
   const phrase = new RegExp(`(?<![\\p{L}])(my|our|a|an|the|one of my|one of our)\\s+(?:[a-z-]+\\s+)?(${alternatives})(?:'s\\s+(${alternatives}))?(?![\\p{L}])`, "iu").exec(plain);
@@ -837,63 +653,6 @@ export function parseWhoAnswer(text: string, name?: string, opts: { relationAske
   return { kind: info.kind, relationType, noun, pronouns, description, verdict };
 }
 
-// ASK-02 (rule 4): the world kinds an answer can name. The noun is the
-// subject's kind; "famous", "in the news" and "a public figure" are
-// people with no finer kind. A full name given to a first-name ask
-// ("Serena Vale" for "Serena") is the world's too, with the answer's
-// own noun when one came, else a person.
-const WORLD_KIND_NOUN_RE = /(?<![\p{L}])(?:(?:a|an|the)\s+)?(?:(?:famous|well[- ]known|celebrity|big|huge)\s+)?(public figure|celebrity|celeb|actress|actor|singer|musician|rapper|band|politician|senator|president|player|athlete|footballer|youtuber|streamer|influencer|character|superhero|villain|brand|company|show|film|movie|series|podcast)(?![\p{L}])/iu;
-const WORLD_MARK_RE = /(?<![\p{L}])(?:famous|in the news|on the news|from the news|not (?:someone|anyone) i know|nobody i know|no one i know|(?:from|on|in) (?:a|the|that) (?:show|film|movie|series|book|game|band|podcast)|off the telly|on tv|on the telly)(?![\p{L}])/iu;
-// A private person's whereabouts ("she lives next door", "from
-// school", "at work") is the household's answer whatever else it
-// carries (a review): never a name to search.
-const LOCALITY_RE = /(?<![\p{L}])(?:next door|down the (?:road|street|hall)|across the (?:road|street)|from (?:school|work|church|uni|college|the gym|the office|next door)|at (?:school|work|church|the gym|the office)|in my (?:class|year|team|office)|on my (?:team|floor)|lives? (?:near|with|round|around|by) )(?![\p{L}])/iu;
-function worldAnswer(plain: string, name?: string): { kind: string; name: string } | null {
-  // A household relation noun in the answer is the household's ("my
-  // cousin, she's an actress", "Serena Vale, a friend from work", "the
-  // neighbour"): the household parser reads it, whatever else the
-  // answer carries (a review: a private person's full name is never
-  // searched on the web).
-  // The people and pets nouns and the relationship phrases; a kind
-  // noun for an organization or a thing ("the band", "a company") is
-  // the world's here, as the design lists it.
-  const householdNouns = [...relationNouns().entries()].filter(([, info]) => info.type !== null || info.kind === "person" || info.kind === "pet").map(([noun]) => noun);
-  const household = new RegExp(`(?<![\\p{L}])(?:my|our|one of my|one of our|a|an|the)\\s+(?:[a-z-]+\\s+)?(?:${householdNouns.map(escapeRe).join("|")})(?![\\p{L}])`, "iu").test(plain) || LOCALITY_RE.test(plain);
-  if (household) return null;
-  // The sentence that carries the answer is what is read ("an actress.
-  // Do you know her?" answers first; "Nova? the actress from that show"
-  // echoes the name and answers; a review).
-  // An echo of the name with a question mark leads nothing ("Nova?",
-  // "Nova Reyes?", "nova?" in a transcript): the answer follows it.
-  const echo = name ? new RegExp(`^\\W*${escapeRe(name)}(?:\\s+\\p{L}[\\p{L}'-]*){0,2}\\?\\s*`, "iu") : /^\W*\p{Lu}[\p{L}'-]*(?:\s+\p{Lu}[\p{L}'-]*)?\?\s*/u;
-  const echoed = echo.exec(plain)?.[0] ?? "";
-  const body = plain.slice(echoed.length);
-  const sentences = body.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter((x) => x.length > 0);
-  const answerSentence = sentences.find((x) => WORLD_KIND_NOUN_RE.test(x) || WORLD_MARK_RE.test(x) || (name !== undefined && namePattern(name).test(x))) ?? sentences[0] ?? body;
-  const answerShaped = !/\?/.test(answerSentence) && !/,?\s*(?:wasn'?t|isn'?t|didn'?t|doesn'?t|right)\s*(?:he|she|they|it)?\s*[.!]?$/i.test(answerSentence) && !/^\W*(?:isn'?t|aren'?t|wasn'?t|is|are|was|were|does|doesn'?t|did|didn'?t|who|what|which|when|where|why|how)\b/i.test(answerSentence);
-  if (!answerShaped) return null;
-  // The noun sits where an answer puts it (first, or after a lead-in
-  // and a pronoun with its copula), as the household parser's does.
-  const nounMatch = WORLD_KIND_NOUN_RE.exec(body);
-  const noun = nounMatch && ANSWER_LEAD_FULL_RE.test(body.slice(0, nounMatch.index)) ? nounMatch[1]!.toLowerCase() : null;
-  // A mark alone ("famous", "on that show") counts in an answer's shape
-  // only: a statement with no question and no tag question in it (a
-  // length cap sent an honest longer answer down the old path; a
-  // review). "She was in that show for years, wasn't she" is a remark
-  // about the person, not the answer to who they are (the set of
-  // 2026-09-15, comment-not-definition#2 said "Got it, Clover" to it).
-  // Every path: a remark with a tag question ("she was an actress on
-  // that show for years, wasn't she") and a question without its mark
-  // ("isn't she famous") are no answer, whatever they name (a review).
-  const marked = WORLD_MARK_RE.test(body);
-  // The full name the answer gives: a proper-noun span that contains
-  // the asked name and is longer than it.
-  const spans = name ? candidatesIn(plain).filter((c) => c.tokens > 1 && namePattern(name).test(c.name)) : [];
-  const fullName = spans[0]?.name ?? null;
-  if (!noun && !marked && !fullName) return null;
-  const kind = noun === "public figure" || noun === "celebrity" || noun === "celeb" || noun === null ? "person" : noun;
-  return { kind, name: fullName ?? displayName(name ?? "") };
-}
 
 export interface WhoAnswerOutcome {
   entity: Entity | null;

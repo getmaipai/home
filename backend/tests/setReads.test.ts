@@ -13,7 +13,6 @@ import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { runTurn } from "@/lib/turnEngine";
 import { guardReply, EXAMPLE_PARROT_RETRY_NOTE, type GuardContext } from "@/lib/guards";
-import { parseWhoAnswer } from "@/lib/unknownNames";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -78,26 +77,6 @@ describe("a child's asserted state", () => {
   });
 });
 
-describe("a remark is not the answer", () => {
-  test("a world mark counts in an answer's shape only: no question, no tag question, an answer's length", () => {
-    expect(parseWhoAnswer("she was on that show for years, wasn't she", "Nova")).toBeNull();
-    // A tag question with no comma (a voice transcript) is a remark too.
-    expect(parseWhoAnswer("she was on that show for years wasn't she", "Nova")).toBeNull();
-    expect((parseWhoAnswer("she's on that show", "Nova") as { world?: unknown }).world).toEqual({ kind: "person", name: "Nova" });
-    // Real answers run longer than a phrase (a review).
-    expect((parseWhoAnswer("not someone I know, she's famous, from that baking show", "Nova") as { world?: unknown }).world).toEqual({ kind: "person", name: "Nova" });
-    expect((parseWhoAnswer("famous, no", "Nova") as { world?: unknown }).world).toEqual({ kind: "person", name: "Nova" });
-    expect((parseWhoAnswer("no, she's not someone I know, she's the one from that baking show on the telly", "Nova") as { world?: unknown }).world).toEqual({ kind: "person", name: "Nova" });
-    // Every path: a remark with a kind noun and a tag, or a question with no mark, is no answer either.
-    expect(parseWhoAnswer("she was an actress on that show for years, wasn't she", "Nova")).toBeNull();
-    expect(parseWhoAnswer("isn't she famous", "Nova")).toBeNull();
-    // The sentence that carries the answer is what is read.
-    expect((parseWhoAnswer("an actress. Do you know her?", "Nova") as { world?: unknown }).world).toEqual({ kind: "actress", name: "Nova" });
-    expect((parseWhoAnswer("Nova? the actress from that show", "Nova") as { world?: unknown }).world).toEqual({ kind: "actress", name: "Nova" });
-    expect((parseWhoAnswer("Nova Reyes? the actress from that show", "Nova") as { world?: unknown }).world).toEqual({ kind: "actress", name: "Nova Reyes" });
-    expect((parseWhoAnswer("nova? the actress from that show", "Nova") as { world?: unknown }).world).toEqual({ kind: "actress", name: "Nova" });
-  });
-});
 
 async function withReplies<T>(reply: (request: ChatCompletionRequest, noted: string | null) => string, fn: (seen: { notes: (string | null)[] }) => Promise<T>): Promise<T> {
   __resetLlmSupervisorForTests();

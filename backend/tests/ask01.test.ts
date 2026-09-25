@@ -129,16 +129,6 @@ describe("the engine's ask about a name it has never heard", () => {
     });
   });
 
-  test("a false-familiarity claim is replaced by the ask, and no second question follows it", async () => {
-    const { actor } = await owner();
-    await withChat("That's right, Nadia ran her marathon last spring.", async () => {
-      const result = await runTurn(actor, "chat", "Nadia just got back from her first marathon");
-      if (!result.ok) throw new Error(result.error);
-      expect(result.value.reply.text).toBe("I don't know Nadia yet, who's that?");
-      expect(getPendingAsk(result.value.conversation_id)).toMatchObject({ kind: "who", name: "Nadia" });
-    });
-  });
-
   test("a name with a relation noun beside it, a bare proper noun, or a roster name is never asked about", async () => {
     const { actor } = await owner();
     await withChat("Nice.", async () => {
@@ -280,11 +270,11 @@ describe("the answer to the ask", () => {
 
   test("an answer the parser cannot read falls through to the model with the ask cleared; the carried unknown keeps the line and asks nothing again (unknown-name-marathon)", async () => {
     const { actor } = await owner();
-    await withChat((request) => (request.messages.some((m) => m.role === "user" && typeof m.content === "string" && m.content.includes("how would you know")) ? "I don't, you just told me. Sounds like a big day for her." : "That's right, Nadia ran her marathon last spring."), async (seen) => {
-      const first = await runTurn(actor, "chat", "Nadia just got back from her first marathon");
+    await withChat((request) => (request.messages.some((m) => m.role === "user" && typeof m.content === "string" && m.content.includes("how would you know")) ? "I don't, you just told me. Sounds like a big day for her." : "Sounds like a big day."), async (seen) => {
+      const first = await runTurn(actor, "chat", "Nadia and I ran a marathon this weekend");
       if (!first.ok) throw new Error(first.error);
       const conversationId = first.value.conversation_id;
-      expect(first.value.reply.text).toBe("I don't know Nadia yet, who's that?");
+      expect(first.value.reply.text).toBe("Sounds like a big day. Who's Nadia?");
       const second = await runTurn(actor, "chat", "wait, how would you know that?", { conversationId });
       if (!second.ok) throw new Error(second.error);
       expect(second.value.source).toBe("model");
@@ -388,7 +378,7 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     });
     // The same kind: the candidate is confirmed in place.
     await withChat("Sounds like a fun weekend.", async () => {
-      const first = await runTurn(actor, "chat", "Nadia just got back from her first marathon");
+      const first = await runTurn(actor, "chat", "Nadia and I ran a marathon this weekend");
       if (!first.ok) throw new Error(first.error);
       const guessed = candidate(actor, "Nadia", "person");
       queueOpenQuestion({ person: actor.id, kind: "who", text: "Who's Nadia?", subjectId: guessed.id, source: "turn-judge" });

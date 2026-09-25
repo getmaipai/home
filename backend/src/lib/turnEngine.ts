@@ -21,8 +21,7 @@ import { notifyIfFlagged, trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameById, registryNamesFor, subjectLabel, subjectRosterFor } from "@/lib/subjects";
-import { deleteEntity } from "@/lib/entities";
-import { applyWhoAnswer, candidateByName, framedName, namesIn, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type HubName, type ResolvedNames, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
+import { applyWhoAnswer, candidateByName, framedName, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type ResolvedNames, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP, feedThinkSplit, newThinkSplitState, extractReasoningText } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
@@ -1930,7 +1929,7 @@ export async function resolvePendingAsk(
   // protocol layer of the signal; left unset when the turn was neither
   // a yes nor a no (the re-ask) or fell through to routing.
   // ASK-01: the entity a `who` answer created or confirmed, for the
-  // turn's subject; ASK-02: the world subject a `who` answer named.
+  // turn's subject.
   protocol: { answer?: ProtocolAnswer; subjectId?: string; subject?: SubjectRef } = {},
 ): Promise<TurnValue | null> {
   const pending = getPendingAsk(conversation.id);
@@ -1974,21 +1973,6 @@ export async function resolvePendingAsk(
     if (parsed === null) {
       if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "declined");
       return null;
-    }
-    // ASK-02: keep the answered name as a world subject without guessing
-    // that the engine has verified facts about it.
-    if (parsed.world) {
-      if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "answered");
-      const twin = name ? candidateByName(actor, name) : null;
-      if (twin) {
-        resolveOpenQuestionsAbout(actor.id, twin.id, "answered");
-        deleteEntity(actor, twin.id);
-      }
-      const subject: SubjectRef = { type: "world", kind: parsed.world.kind, display_name: parsed.world.name, year: null, source_kind: null, stable_key: null, recency: "unknown", carried_question: pending.carriedQuestion ?? null };
-      protocol.subject = subject;
-      protocol.answer = { kind: "who", answer: "value" };
-      console.log(`[ask] the answer about a name made it the world's on turn ${turnId} (${parsed.world.kind})`);
-      return { reply: { text: `Got it, ${subject.display_name}.` }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
     }
     const outcome = applyWhoAnswer(actor, { name, subjectId: pending.subjectId ?? null }, parsed, turnId);
     if (pending.openQuestionId) resolveOpenQuestion(pending.openQuestionId, "answered");
@@ -2171,40 +2155,7 @@ function resolveTurnSubjects(input: {
   // re-ask. The unknown line goes in the context ahead of the memory
   // section; the ask is appended to the reply by the caller.
   const registry = registryNamesFor(actor);
-  // ASK-02 (rule 3): the names the hub itself introduced, from its last
-  // two replies in the window and the conversation's retained
-  // outcomes' result text, are the world's with that provenance; the
-  // last three turns' text feeds the common-word check (rule 1).
-  // A name the person said first is theirs, whatever the hub echoed
-  // or asked back ("Who's Clover?" introduces nothing); a longer name
-  // the hub's lookup resolved it to ("Serena Vale" for their "Serena")
-  // is the hub's.
   const knownForHub = [...rosterNames, ...registry.map((r) => r.name)];
-  const personSaid = new Set(window.messages.filter((m) => m.role === "user").flatMap((m) => namesIn(m.content, knownForHub)).map((n) => n.toLowerCase()));
-  const saidByPerson = (n: string) => personSaid.has(n.toLowerCase());
-  const hubNames: HubName[] = [];
-  for (const m of window.messages.filter((m) => m.role === "assistant").slice(-2)) {
-    for (const n of properNounsIn(m.content, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: "reply", sourceKind: null, person: n.person });
-  }
-  // CHAT-16: a result the composer phrased binds no reply of its own;
-  // the names the person heard are in the composed reply on the turn
-  // row (a plugin-source turn enters the window as a note, never as an
-  // assistant message), read here beside a package's own reply, and
-  // never from rows the person never heard.
-  const outcomeRows = outcomesForConversation(conversationId, 10);
-  const pluginReplies = new Map(turnRowsById(outcomeRows.map((r) => r.turnId)).filter((t) => t.source === "plugin").map((t) => [t.id, t.replyText]));
-  for (const row of outcomeRows) {
-    const replyText = pluginReplies.get(row.turnId);
-    if (!replyText) continue;
-    // What the person heard on that turn, once: the delivered text (a
-    // package's own reply, or the composition of several), attributed to
-    // the turn's succeeded packages, the search first.
-    const packages = row.outcomes.filter((o) => o.status === "succeeded").map((o) => o.packageId);
-    const packageId = packages.find((id) => id === "websearch") ?? packages[0];
-    if (!packageId) continue;
-    const sourceKind = packageId === "websearch" ? "web" : packageId === "weather" ? "weather" : packageId === "knowledge" ? "wikipedia" : "package";
-    for (const n of properNounsIn(replyText, knownForHub, { properOnly: true })) if (!saidByPerson(n.name)) hubNames.push({ name: n.name, provenance: packageId, sourceKind, person: n.person });
-  }
   const recent = window.messages.filter((m) => m.role === "user").slice(-3).map((m) => m.content);
   const resolved = resolveNames(
     text,
@@ -2216,7 +2167,6 @@ function resolveTurnSubjects(input: {
         if (member) return ensurePersonEntity(member).value?.id ?? null;
         return registry.find((r) => r.name.toLowerCase() === name.toLowerCase())?.id ?? null;
       },
-      hubNames,
       recent,
     },
     turnId,
@@ -2301,7 +2251,7 @@ function resolveTurnSubjects(input: {
     return true;
   }).slice(0, 3);
   const unknownAsk = resolved.unknown.find((u) => u.ask)?.name ?? null;
-  const subjectPronouns = subjectPronounsFor(actor, subjects, resolved.unknown);
+  const subjectPronouns = subjectPronounsFor(actor, subjects);
   const { section: subjectsSection, about: aboutEntries } = subjectsSectionFor(actor, subjects);
   return { subjects, resolved, unknownAsk, subjectPronouns, subjectsSection, aboutEntries, carried };
 }
@@ -3047,17 +2997,14 @@ function nextOpenQuestionInPlay(personId: string, utterance: string, ctx: { hist
   return pending.find(inPlay) ?? pending.find((q) => !(q.subjectId ?? "").startsWith("rel-")) ?? null;
 }
 
-/** ASK-01: the pronoun family each subject takes: an entity's stored
- * pronouns, or the pronoun the person used for an unknown name this
- * turn ("Nadia ... her marathon"). */
-function subjectPronounsFor(actor: PersonRow, subjects: readonly SubjectRef[], unknown: readonly UnknownName[]): { name: string; pronouns: string }[] {
+/** The stored pronoun family for each known household subject. */
+function subjectPronounsFor(actor: PersonRow, subjects: readonly SubjectRef[]): { name: string; pronouns: string }[] {
   const out: { name: string; pronouns: string }[] = [];
   for (const ref of subjects) {
     if (ref.type !== "household") continue;
     const entity = entityForSpeaker(actor, ref.entity_id);
     if (entity?.pronouns) out.push({ name: entity.name, pronouns: entity.pronouns });
   }
-  for (const u of unknown) if (u.pronoun) out.push({ name: u.name, pronouns: u.pronoun });
   return out;
 }
 
