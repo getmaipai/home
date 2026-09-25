@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -12,8 +12,7 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * API has ever had: `docs/BACKLOG.md`'s own "Old file it retires: none
  * (new)" for this row, and a grep of the whole frontend for `/api/
  * engines` before writing this file came back empty. Three real
- * tables through the same `DataTable` pattern `/next/apps` and `/next/
- * people` already established: roles by address (`endpoints`), engine
+ * tables through Home's shared read-only table: roles by address (`endpoints`), engine
  * state, and Stack health severities - the exact three things this
  * row asks for, nothing invented.
  *
@@ -138,7 +137,7 @@ export function NextEnginesPage() {
                     Roles
                   </CardTitle>
                 </CardHeader>
-                <DataTable data={overview.roles.map(toRoleRow)} />
+                <NextDataTable data={overview.roles.map(toRoleRow)} />
               </div>
 
               <div className="flex flex-col gap-4">
@@ -148,7 +147,7 @@ export function NextEnginesPage() {
                     Installed engines
                   </CardTitle>
                 </CardHeader>
-                <DataTable data={overview.engines.map(toEngineRow)} />
+                <NextDataTable data={overview.engines.map(toEngineRow)} />
               </div>
 
               <div className="flex flex-col gap-4">
@@ -158,7 +157,7 @@ export function NextEnginesPage() {
                     Health
                   </CardTitle>
                 </CardHeader>
-                <DataTable data={health.health.map(toHealthRow)} />
+                <NextDataTable data={health.health.map(toHealthRow)} />
               </div>
             </>
           )

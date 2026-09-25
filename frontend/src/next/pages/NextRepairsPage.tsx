@@ -1,21 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError, isOwnerOrAdminRole, type Issue, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/repairs: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
- * 2026-09-21.md's plan row) - `GET /api/repairs` through the template's
- * `DataTable`: severity, title, detail and the fix's own label, the
+ * 2026-09-21.md's plan row) - `GET /api/repairs` through Home's
+ * shared table: severity, title, detail and the fix's own label, the
  * same fields `RepairsSection.tsx` shows.
  *
  * Named gap: running a fix or dismissing an issue are real actions on
  * the old page (`RepairsSection.tsx`'s own `Button` per row, a real
- * `onClick`) - the vendored `DataTable`'s Action column has no click
- * handler wired to either icon, the same gap every `/next` data-table
- * has found, so those stay on the old route. Gated to owner/admin like
+ * `onClick`) - Home's shared table is deliberately read-only, so running fixes and
+ * dismissing issues stay on the old route. Gated to owner/admin like
  * the old page and the backend both agree on here (`GET /api/repairs`
  * itself is `requireRole("owner", "admin")`, unlike Updates' looser
  * read gate). */
@@ -69,7 +68,7 @@ export function NextRepairsPage({ person }: { person: Roster }) {
           errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load repairs."}
           loadingLabel="Loading repairs"
         >
-          {(issues: Issue[]) => <DataTable data={issues.map(toRow)} />}
+          {(issues: Issue[]) => <NextDataTable data={issues.map(toRow)} />}
         </AsyncState>
       )}
     </div>

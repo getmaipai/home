@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { NextPerformancePage } from "@/next/pages/NextPerformancePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { expectHomeTablesWithoutDemoOrActions } from "@/tests/expectHomeTables";
 import type { Performance } from "@/lib/api";
 
 afterEach(() => {
@@ -37,7 +39,7 @@ describe("NextPerformancePage", () => {
   test("no traced turns yet: the Layers panel's own honest empty state", async () => {
     const restore = mockPerformanceFetch(makePerformance());
     try {
-      renderWithQueryClient(<NextPerformancePage />);
+      renderWithQueryClient(<MemoryRouter><NextPerformancePage /></MemoryRouter>);
       await waitFor(() => expect(document.body.textContent).toContain("No traced turns yet"));
       expect(document.body.textContent).toContain("No Stack configured");
     } finally {
@@ -70,12 +72,23 @@ describe("NextPerformancePage", () => {
           by_engine: [{ engine: "local b1 qwen3-8b-instruct-q4-k-m", count: 3, median_ttft_ms: 400, p95_ttft_ms: 600, median_total_ms: 2000, p95_total_ms: 3000, median_tokens_per_second: 25 }],
           by_route: [{ route: "model", count: 3 }],
         },
+        labels: { window_days: 30, turns: 3, guard_hits: [{ key: "limit", count: 2 }], rule_hits: [], rungs: [], retire_eligible: [] },
+        layers: { window_days: 30, turns_with_trace: 3, nodes: [{ node: "model", count: 3, median_ms: 210, p95_ms: 400 }] },
+        engines: {
+          configured: true,
+          roles: [],
+          engines: [],
+          budget: null,
+          recent_issues: [{ source: "engine", key: "engine.restart", severity: "warning", createdAt: "2026-09-22T00:00:00Z", resolvedAt: null }],
+        },
+        disk: { total_bytes: 2 * 1024 ** 3, free_bytes: 1 * 1024 ** 3, areas: [{ area: "database", bytes: 512 * 1024 ** 2 }] },
       }),
     );
     try {
-      renderWithQueryClient(<NextPerformancePage />);
+      renderWithQueryClient(<MemoryRouter><NextPerformancePage /></MemoryRouter>);
       await waitFor(() => expect(document.body.textContent).toContain("qwen3-8b-instruct-q4-k-m"));
       expect(document.body.textContent).toContain("model");
+      expectHomeTablesWithoutDemoOrActions(6);
     } finally {
       restore();
     }

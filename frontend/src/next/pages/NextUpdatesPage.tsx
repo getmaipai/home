@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { rowsFrom, hasUpdate, type UpdateRow } from "@/apps/settings/UpdatesSection";
 import { api, ApiError, isOwnerOrAdminRole, type UpdateProjection, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
- * 2026-09-21.md's plan row) - `GET /api/updates` through the template's
- * `DataTable`, reusing `UpdatesSection.tsx`'s own `rowsFrom()`/
+ * 2026-09-21.md's plan row) - `GET /api/updates` through Home's
+ * shared table, reusing `UpdatesSection.tsx`'s own `rowsFrom()`/
  * `hasUpdate()` (exported, pure data logic) rather than a second
  * definition of "does this row have a real update" - one row for Home
  * itself, one per Stack engine and model when a Stack is configured,
@@ -17,10 +17,8 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  *
  * Named gap: applying an engine update and rolling one back are real
  * actions on the old page (`UpdatesSection.tsx`'s own `ThingsTable`
- * `rowActions`, a kit block with a real callback surface) - the
- * vendored `DataTable`'s own Action column has no click handler wired
- * to either icon, the same gap every `/next` data-table has found, so
- * those stay on the old route. Gated to owner/admin like the old page
+ * `rowActions`, a kit block with a real callback surface) - Home's shared table is deliberately read-only, so applying updates
+ * and rolling them back stay on the old route. Gated to owner/admin like the old page
  * (`UpdatesPage.tsx`'s own `AdminGatedContent`) even though `GET /api/
  * updates` itself is `requireAuth` only - matching the old page's own
  * visible gate is the parity this row asks for, not a new rule. */
@@ -76,7 +74,7 @@ export function NextUpdatesPage({ person }: { person: Roster }) {
           errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load updates."}
           loadingLabel="Loading updates"
         >
-          {(projection: UpdateProjection) => <DataTable data={rowsFrom(projection).map(toRow)} />}
+          {(projection: UpdateProjection) => <NextDataTable data={rowsFrom(projection).map(toRow)} />}
         </AsyncState>
       )}
       {canManage && query.data?.referenceError && (

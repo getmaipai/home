@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { expectHomeTablesWithoutDemoOrActions } from "@/tests/expectHomeTables";
 import type { BackupInfo, PendingRestore, Roster } from "@/lib/api";
 
 afterEach(() => {
@@ -59,12 +60,13 @@ describe("NextBackupsPage", () => {
       renderWithQueryClient(<NextBackupsPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("50 MB"));
       expect(document.body.textContent).not.toContain("No data available.");
+      expectHomeTablesWithoutDemoOrActions();
     } finally {
       restore();
     }
   });
 
-  test("no backups yet: the shipped table's own empty message", async () => {
+  test("no backups yet: the shared table's empty message", async () => {
     const restore = mockBackupsFetch([]);
     try {
       renderWithQueryClient(<NextBackupsPage person={makePerson()} />);

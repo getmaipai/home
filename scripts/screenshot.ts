@@ -238,6 +238,7 @@ const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mi
 const nextPeopleReview = process.argv.includes("--next-people-review");
 const nextDashboardReview = process.argv.includes("--next-dashboard-review");
 const nextAppsReview = process.argv.includes("--next-apps-review");
+const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
@@ -339,6 +340,17 @@ async function waitForHealth(timeoutMs = 15000): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
   throw new Error("backend did not become healthy within " + timeoutMs + "ms");
+}
+
+async function assertNoLegacyDataTableChrome(page: Page, route: string): Promise<void> {
+  const body = await page.locator("body").innerText();
+  if (body.includes("Employee Data Table")) {
+    throw new Error(`${route} still renders the vendored Employee Data Table title`);
+  }
+  const headers = await page.locator('[data-slot="table-head"]').allTextContents();
+  if (headers.some((header) => header.trim() === "Action")) {
+    throw new Error(`${route} still renders a dead Action column`);
+  }
 }
 
 // The Home page's weather widget - "Your packages > Weather" (the
@@ -2350,6 +2362,7 @@ async function captureNextPeopleReview(browser: Browser, sessionValue: string): 
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/next/people`);
         await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "People");
         await settleAnimations(page);
         const path = join(outDir, `next-people-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -2430,6 +2443,7 @@ async function captureNextAppsReview(browser: Browser, sessionValue: string): Pr
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/next/apps`);
         await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "Apps");
         await settleAnimations(page);
         const path = join(outDir, `next-apps-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -2976,6 +2990,7 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/next/engines`);
         await page.locator("text=No Stack configured").first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "Engines");
         await settleAnimations(page);
         const path = join(outDir, `next-engines-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -3017,6 +3032,7 @@ async function captureNextUpdatesReview(browser: Browser, sessionValue: string):
         // the first version of this capture fired on that skeleton
         // instead of the real row.
         await page.getByText("MaiPai Home", { exact: true }).first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "Updates");
         await settleAnimations(page);
         const path = join(outDir, `next-updates-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -3059,6 +3075,7 @@ async function captureNextRepairsReview(browser: Browser, sessionValue: string):
         // capture), so a real table row is the honest wait condition
         // here, not the empty state this function first assumed.
         await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "Repairs");
         await settleAnimations(page);
         const path = join(outDir, `next-repairs-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -3098,6 +3115,7 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/next/performance`);
         await page.locator("text=No traced turns yet").first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "Performance");
         await settleAnimations(page);
         const path = join(outDir, `next-performance-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -3134,6 +3152,7 @@ async function captureNextBackupsReview(browser: Browser, sessionValue: string):
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/next/backups`);
         await page.locator("text=No data available.").first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "Backups");
         await settleAnimations(page);
         const path = join(outDir, `next-backups-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -3789,6 +3808,17 @@ async function main() {
 
     const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
+    if (nextTableRolloutReview) {
+      await captureNextAppsReview(browser, sessionValue);
+      await captureNextPeopleReview(browser, sessionValue);
+      await captureNextEnginesReview(browser, sessionValue);
+      await captureNextUpdatesReview(browser, sessionValue);
+      await captureNextRepairsReview(browser, sessionValue);
+      await captureNextBackupsReview(browser, sessionValue);
+      await captureNextPerformanceReview(browser, sessionValue);
+      console.log("completed named review: --next-table-rollout-review (all 12 importing files; 14 table instances)");
+      return;
+    }
     if (!a11yOnly && pictureReview) {
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
       await capturePictureReview(browser, sessionValue, desktop, "light");

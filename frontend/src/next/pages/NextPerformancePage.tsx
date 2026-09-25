@@ -14,7 +14,7 @@ import { DiskHardwareCard } from "@/next/pages/performance/DiskHardwareCard";
 
 /** /next/performance (ADMIN-PERF-01, docs/dev.md's own design note): how
  * the hub is doing over time, composed entirely from the template's
- * shipped chart wrapper, `DataTable` and `Card` - the same one-query,
+ * shipped chart wrapper, Home's shared table and the kit's `Card` - the same one-query,
  * `AsyncState`-wrapped shape `NextDashboardPage.tsx` and
  * `NextEnginesPage.tsx` already use, `GET /api/performance` through one
  * `useQuery`. No card registry yet (DASH-CARDS-01 hasn't landed): each

@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/backups: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
- * 2026-09-21.md's plan row) - `GET /api/backups` through the template's
- * `DataTable`: date and size, the same two fields `BackupsSection.tsx`
+ * 2026-09-21.md's plan row) - `GET /api/backups` through Home's
+ * shared table: date and size, the same two fields `BackupsSection.tsx`
  * shows per row, plus the real "ready to restore" banner
  * (`GET /api/backups/restore/pending`) when one is staged.
  *
@@ -26,9 +26,8 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  *
  * Named gap: running a backup now and restoring one are real actions on
  * the old page (`BackupsSection.tsx`'s own `Button`s, with a real
- * confirm step) - the vendored `DataTable`'s Action column has no click
- * handler wired to either icon, the same gap every `/next` data-table
- * has found, so those stay on the old route. Gated to owner/admin like
+ * confirm step) - Home's shared table is deliberately read-only, so running a backup
+ * and restoring one stay on the old route. Gated to owner/admin like
  * the old page (`BackupsPage.tsx`'s own `AdminGatedContent`); reading
  * the pending-restore state is owner-or-admin on the backend too
  * (`routes/backups.ts`), the same "someone who can restart the hub
@@ -90,7 +89,7 @@ export function NextBackupsPage({ person }: { person: Roster }) {
                   </CardContent>
                 </Card>
               ) : null}
-              <DataTable data={backups.map(toRow)} />
+              <NextDataTable data={backups.map(toRow)} />
             </>
           )}
         </AsyncState>

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
 import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { expectHomeTablesWithoutDemoOrActions } from "@/tests/expectHomeTables";
 import type { EnginesOverview, EnginesHealth, StackRoleInfo, StackEngineInfo, StackHealthItem } from "@/lib/api";
 
 afterEach(() => {
@@ -108,12 +109,13 @@ describe("NextEnginesPage", () => {
       expect(document.body.textContent).toContain("The chat engine crashed");
       expect(document.body.textContent).toContain("Critical");
       expect(document.body.textContent).not.toContain("No Stack configured");
+      expectHomeTablesWithoutDemoOrActions(3);
     } finally {
       restore();
     }
   });
 
-  test("a configured Stack with no health issues: the shipped table's own empty message", async () => {
+  test("a configured Stack with no health issues: the shared table's empty message", async () => {
     const restore = mockEnginesFetch(
       { configured: true, roles: [makeRole()], engines: [makeEngine()], budget: { totalMemoryBytes: 1, capBytes: 1, freeMemoryBytes: 1, availablePercent: 90, pressure: "normal", memoryReadingDegraded: false, loaded: [], queue: [] } },
       { configured: true, health: [] },

@@ -1,5 +1,5 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceLabels } from "@/lib/api";
 
@@ -16,7 +16,7 @@ interface HitRow extends Record<string, unknown> {
  * export file - see docs/dev.md and `lib/performance.ts`'s own header
  * for why. Guard hits, rule hits and rungs share one table (a "kind"
  * column) rather than three - the same numbers `formatReport()`
- * prints as three sections, composed here from one `DataTable` instead
+ * prints as three sections, composed here from one shared table instead
  * of three. `retire_eligible` (the org rule: a rule with zero hits over
  * the window is a candidate to retire) is a plain list underneath,
  * since it names rules, not counts. */
@@ -35,7 +35,7 @@ export function LabelsCard({ labels }: { labels: PerformanceLabels }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="px-0! flex flex-col gap-4">
-        <DataTable data={rows} />
+        <NextDataTable data={rows} />
         {labels.retire_eligible.length > 0 && (
           <p className="px-4 pb-4 text-sm text-muted-foreground">Zero hits this window, retire-eligible: {labels.retire_eligible.join(", ")}</p>
         )}

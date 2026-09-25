@@ -1,5 +1,5 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceEngineStats } from "@/lib/api";
 
@@ -26,8 +26,8 @@ function toRow(e: PerformanceEngineStats): EngineRow {
 /** ADMIN-PERF-01: `stats.engine` (host, build, model file joined) is
  * the closest thing to "per model" a turn's own record carries - see
  * docs/dev.md's design note for why nothing here parses a model id out
- * of it. `DataTable`'s own auto-derived columns (`NextEnginesPage.tsx`'s
- * pattern), same as every other row-of-plain-objects table in `/next`. */
+ * of it. Home's shared table derives its columns from these plain rows,
+ * the same way it does for every table in `/next`. */
 export function TurnsByEngineTable({ byEngine }: { byEngine: readonly PerformanceEngineStats[] }) {
   return (
     <Card className="flex flex-col gap-0!">
@@ -38,7 +38,7 @@ export function TurnsByEngineTable({ byEngine }: { byEngine: readonly Performanc
         </CardTitle>
       </CardHeader>
       <CardContent className="px-0!">
-        <DataTable data={byEngine.map(toRow)} />
+        <NextDataTable data={byEngine.map(toRow)} />
       </CardContent>
     </Card>
   );

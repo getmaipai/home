@@ -1,5 +1,5 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 
 const HistoryIcon = getIcon("history");
@@ -23,7 +23,7 @@ export function RoutesCard({ byRoute }: { byRoute: readonly { route: string; cou
         </CardTitle>
       </CardHeader>
       <CardContent className="px-0!">
-        <DataTable data={byRoute.map((r): RouteRow => ({ route: r.route, turns: r.count }))} />
+        <NextDataTable data={byRoute.map((r): RouteRow => ({ route: r.route, turns: r.count }))} />
       </CardContent>
     </Card>
   );

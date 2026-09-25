@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { expectHomeTablesWithoutDemoOrActions } from "@/tests/expectHomeTables";
 import type { Issue, Roster } from "@/lib/api";
 
 afterEach(() => {
@@ -79,12 +80,13 @@ describe("NextRepairsPage", () => {
       expect(document.body.textContent).toContain("Retry now");
       expect(document.body.textContent).toContain("Storage is nearly full");
       expect(document.body.textContent).toContain("Warning");
+      expectHomeTablesWithoutDemoOrActions();
     } finally {
       restore();
     }
   });
 
-  test("no open issues: the shipped table's own empty message", async () => {
+  test("no open issues: the shared table's empty message", async () => {
     const restore = mockRepairsFetch([]);
     try {
       renderWithQueryClient(<NextRepairsPage person={makePerson()} />);

@@ -1,6 +1,6 @@
 import { getIcon } from "@maipai/ui/src/icons";
 import { Link } from "react-router-dom";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceEngines } from "@/lib/api";
 
@@ -47,7 +47,7 @@ export function EnginesHealthCard({ engines }: { engines: PerformanceEngines }) 
                 see the live roster
               </Link>
             </p>
-            <DataTable
+            <NextDataTable
               data={engines.recent_issues.map(
                 (i): IssueRow => ({
                   issue: i.key,

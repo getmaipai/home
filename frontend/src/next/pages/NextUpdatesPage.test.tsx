@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { expectHomeTablesWithoutDemoOrActions } from "@/tests/expectHomeTables";
 import type { UpdateProjection, Roster } from "@/lib/api";
 
 afterEach(() => {
@@ -75,6 +76,7 @@ describe("NextUpdatesPage", () => {
       await waitFor(() => expect(document.body.textContent).toContain("MaiPai Home"));
       expect(document.body.textContent).toContain("0.2.0");
       expect(document.body.textContent).toContain("Up to date");
+      expectHomeTablesWithoutDemoOrActions();
     } finally {
       restore();
     }
@@ -94,6 +96,7 @@ describe("NextUpdatesPage", () => {
       renderWithQueryClient(<NextUpdatesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("llama-server"));
       expect(document.body.textContent).toContain("Update available");
+      expectHomeTablesWithoutDemoOrActions();
     } finally {
       restore();
     }

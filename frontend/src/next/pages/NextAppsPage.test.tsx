@@ -90,22 +90,24 @@ describe("NextAppsPage", () => {
     }
   });
 
-  // The vendored DataTable's own header is a hardcoded "Employee Data
-  // Table" string with no title prop - this page's own real heading
-  // above it is the fix, and it must actually be there, not just
-  // documented as a plan.
-  test("a real 'Apps' heading, not just the vendored table's own hardcoded title", async () => {
+  test("a real Apps heading and a read-only table without the demo title or Action column", async () => {
     const restore = mockPluginsFetch([makePackage()]);
     try {
       renderWithQueryClient(<NextAppsPage />);
       await waitFor(() => expect(document.body.textContent).toContain("Weather"));
       expect(document.querySelectorAll('[data-slot="card-title"]')[0]?.textContent).toContain("Apps");
+      expect(document.body.textContent).not.toContain("Employee Data Table");
+      const table = document.querySelector('[data-slot="table"]');
+      expect(table).not.toBeNull();
+      expect(Array.from(table!.querySelectorAll('[data-slot="table-head"]')).map((head) => head.textContent?.trim())).toEqual([
+        "Name", "Category", "Type", "Version", "Status",
+      ]);
     } finally {
       restore();
     }
   });
 
-  test("no packages installed: the shipped table's own empty message, not a blank grid", async () => {
+  test("no packages installed: the shared table's empty message, not a blank grid", async () => {
     const restore = mockPluginsFetch([]);
     try {
       renderWithQueryClient(<NextAppsPage />);

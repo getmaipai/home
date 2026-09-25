@@ -1,5 +1,5 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceDisk, PerformanceHardware } from "@/lib/api";
 
@@ -35,7 +35,7 @@ export function DiskHardwareCard({ disk, hardware }: { disk: PerformanceDisk; ha
         <p className="text-sm text-muted-foreground">
           {toGb(disk.free_bytes)} free of {toGb(disk.total_bytes)}
         </p>
-        <DataTable data={disk.areas.map((a): AreaRow => ({ area: a.area, gb: toGb(a.bytes) }))} />
+        <NextDataTable data={disk.areas.map((a): AreaRow => ({ area: a.area, gb: toGb(a.bytes) }))} />
         <p className="text-sm text-muted-foreground">Hardware reading: {hardware.configured ? (hardware.hardware ? "available" : "Stack configured, no reading yet") : "no Stack configured"}</p>
       </CardContent>
     </Card>

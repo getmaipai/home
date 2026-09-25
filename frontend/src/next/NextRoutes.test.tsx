@@ -297,7 +297,7 @@ describe("next Manage routes", () => {
   // /next/engines moved off this shared "still a stub" check once
   // SHELL-06 gave it real data and its own dedicated test file
   // (NextEnginesPage.test.tsx). These three are real data pages now
-  // (SHELL-07): each renders a template DataTable fed by its own
+  // (SHELL-07): each renders Home's shared table fed by its own
   // useQuery, so they need a QueryClientProvider and a mocked API
   // response to reach the loaded state.
   const routeToApi: Record<string, string> = {
@@ -328,7 +328,7 @@ describe("next Manage routes", () => {
     ["/next/updates", NextUpdatesPage],
     ["/next/repairs", NextRepairsPage],
     ["/next/backups", NextBackupsPage],
-  ])("%s renders the template tables view", async (route, Page) => {
+  ])("%s renders the shared tables view", async (route, Page) => {
     const originalFetch = globalThis.fetch;
     const endpoint = routeToApi[route]!;
     const body = routeToBody[route]!;

@@ -1,5 +1,5 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import DataTable from "@maipai/ui/src/dashboard/components/tables/data-table/DataTable";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceLayers } from "@/lib/api";
 
@@ -15,7 +15,7 @@ interface NodeRow extends Record<string, unknown> {
 /** The coordinator's 2026-09-22 addition to ADMIN-PERF-01, a preview of
  * ADMIN-LAYERS-01's own fuller Layers panel: median and p95 per node of
  * U2's per-node trace (`stats.nodes[]`, only on rows made with
- * `turn.pipeline.next` on). Same `DataTable` shape as every other table
+ * `turn.pipeline.next` on). Same shared-table shape as every other table
  * here. The empty state below is the honest one - not an error, and
  * not a table with a "no data" row - the same `AsyncState` `isEmpty`
  * pattern would render if this whole page's query failed; here it's
@@ -44,7 +44,7 @@ export function LayersCard({ layers }: { layers: PerformanceLayers }) {
         ) : (
           <>
             <p className="px-4 pt-3 text-sm text-muted-foreground">{layers.turns_with_trace} traced turn(s) in this window</p>
-            <DataTable
+            <NextDataTable
               data={layers.nodes.map(
                 (n): NodeRow => ({
                   node: n.node,

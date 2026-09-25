@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
-import { getIcon } from "@maipai/ui/src/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/dashboard/components/ui/table";
+import { NextDataTable } from "@/next/components/NextDataTable";
 import { ROLE_LABELS } from "@/apps/people/roles";
 import { api, ApiError, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -39,8 +38,6 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * tab, are out of scope for this row (this page shows the SIGNED-IN
  * person's own profile only) - `PersonProfilePage.tsx` keeps that job
  * until its own row moves it. */
-const PeopleIcon = getIcon("users");
-
 export function NextPeoplePage({ person }: { person: Roster }) {
   useDocumentTitle("People");
   const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
@@ -69,37 +66,12 @@ export function NextPeoplePage({ person }: { person: Roster }) {
         {(roster: PersonRosterEntry[]) => (
           <div className="flex flex-col gap-4">
             <CardHeader className="p-0">
-              <CardTitle className="flex items-center gap-2">
-                <PeopleIcon size={16} className="text-muted-foreground" />
-                People
-              </CardTitle>
+              <CardTitle>People</CardTitle>
             </CardHeader>
-            <Card className="flex flex-col gap-0!">
-              <CardContent className="px-0!">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border hover:bg-transparent">
-                      <TableHead className="pl-4! px-4 py-3 h-auto text-sm font-normal text-muted-foreground">Name</TableHead>
-                      <TableHead className="pr-4! px-4 py-3 h-auto text-sm font-normal text-muted-foreground">Role</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {roster.length === 0 ? (
-                      <TableRow className="border-border">
-                        <TableCell colSpan={2} className="px-4 py-6 text-sm text-muted-foreground text-center">No people available.</TableCell>
-                      </TableRow>
-                    ) : (
-                      roster.map((entry) => (
-                        <TableRow key={entry.id} className="border-border hover:bg-muted/30">
-                          <TableCell className="pl-4! px-4 py-3 text-sm font-medium text-foreground">{entry.display_name}</TableCell>
-                          <TableCell className="pr-4! px-4 py-3 text-sm text-muted-foreground">{ROLE_LABELS[entry.role]}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <NextDataTable
+              data={roster.map((entry) => ({ name: entry.display_name, role: ROLE_LABELS[entry.role] }))}
+              emptyMessage="No people available."
+            />
           </div>
         )}
       </AsyncState>
