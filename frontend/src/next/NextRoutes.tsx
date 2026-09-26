@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
@@ -99,7 +100,34 @@ function NextRoutesWithIncognito({ person }: { person: Roster }) {
 
   const onIncognitoChange = (on: boolean) => {
     if (on === incognito) return;
-    setIncognito(on);
+    // Mirrors the header's own Light-Dark.tsx toggle (commons ui package):
+    // wrap the state flip in a View Transition so Incognito cross-fades
+    // the same way light/dark does, instead of the instant repaint every
+    // html.incognito-scoped rule in tokens.css would otherwise produce.
+    // Falls back to a plain, unanimated flip where the API is unsupported.
+    // (TS's DOM lib already types this, unlike Light-Dark.tsx's older
+    // `as any` cast for the same call - no cast needed here.) flushSync
+    // forces the state update, IncognitoProvider's class-toggling effect,
+    // and the commit all the way through before the callback returns -
+    // without it, React's async batching can leave the transition's
+    // "before" and "after" DOM snapshots identical (a review, twice,
+    // caught this: a bare setter call has no such guarantee).
+    if (typeof document.startViewTransition === "function") {
+      const transition = document.startViewTransition(() => flushSync(() => setIncognito(on)));
+      void transition.ready.then(() => {
+        document.documentElement.animate(
+          { clipPath: ["inset(0 0 100% 0)", "inset(0)"] },
+          { duration: 800, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" },
+        );
+      }).catch(() => {
+        // A skipped/aborted transition (e.g. another toggle mid-flight,
+        // or a browser honoring reduced-motion) rejects `ready` - the
+        // state flip above already applied either way, so there is
+        // nothing to recover, just nothing left to animate.
+      });
+    } else {
+      setIncognito(on);
+    }
     if (!on) {
       // The state switches the chat adapter immediately; after temporary
       // sessions are discarded, tell the mounted chat runtime to reload
