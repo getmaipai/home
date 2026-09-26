@@ -45,6 +45,7 @@ import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { turnActiveWithin, activeTurnCount, acquireTurnLease, __setTurnActivityClockForTests, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import { forgetByIds, remember, recall, PROFILE_SOURCE } from "@/lib/memory";
+import * as memoryModule from "@/lib/memory";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { __resetDenoHostForTests } from "@/lib/denoHost";
 import { __setPromptClockForBench } from "@/lib/benchSampling";
@@ -2130,6 +2131,54 @@ describe("CHAT-08 (c): turn recall uses the frozen clock", () => {
     } finally {
       await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+  });
+});
+
+describe("INCOGNITO-02 old-path memory read gate", () => {
+  test("temporary turns skip recall while ordinary turns still receive recalled memory", async () => {
+    const { actor } = await owner();
+    const stored = remember(actor, {
+      text: "the blue telescope is in the attic",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+      valid_from: "2026-09-15T00:00:00.000Z",
+    });
+    expect(stored.ok).toBe(true);
+
+    let promptContext = "";
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        promptContext = request.messages.map((message) => String(message.content ?? "")).join("\n");
+        return "I don't know.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    const recallSpy = spyOn(memoryModule, "recall");
+    try {
+      const ordinary = await runTurn(actor, "chat", "where is the blue telescope");
+      expect(ordinary.ok).toBe(true);
+      expect(recallSpy).toHaveBeenCalledTimes(1);
+      expect(promptContext).toContain("the blue telescope is in the attic");
+
+      const temporary = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+      expect(temporary.ok).toBe(true);
+      if (!temporary.ok) return;
+
+      promptContext = "";
+      const incognito = await runTurn(actor, "chat", "where is the blue telescope", { conversationId: temporary.value.id });
+      expect(incognito.ok).toBe(true);
+      expect(recallSpy).toHaveBeenCalledTimes(1);
+      expect(promptContext).not.toContain("the blue telescope is in the attic");
+    } finally {
+      recallSpy.mockRestore();
+      await stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
     }
   });
 });

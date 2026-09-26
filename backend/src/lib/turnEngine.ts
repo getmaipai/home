@@ -19,7 +19,7 @@ import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged, trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
-import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
+import { recall, bumpUsage, getProfileParagraph, type RecallMatch, type RecallResult } from "@/lib/memory";
 import { findEntityByName, ensurePersonEntity, entityForSpeaker, registryNameById, registryNamesFor, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { applyWhoAnswer, candidateByName, framedName, properNounsIn, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, looksLikeWhoAnswer, type ResolvedNames, type SubjectRef, type UnknownName } from "@/lib/unknownNames";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
@@ -2792,7 +2792,9 @@ async function prepareTurn(
   // as "fall back to keyword overlap" - no separate handling needed here.
   const withholdSensitive = !sensitiveAllowed(surface, speakerEvidence, present, actor.id) || ageBand === "child" || ageBand === "teen";
   const anonymous = ageBandBasis === "unknown_speaker_default";
-  const memoryMatches = recall(actor, text, { selfOnly: true, asOf: frozen.now, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive, anonymous, withheldSubjectIds: subjects.filter((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household").map((subject) => subject.entity_id) });
+  const memoryMatches: RecallResult = conversation.mode === "temporary"
+    ? Object.assign([] as RecallMatch[], { withheldForBand: 0 })
+    : recall(actor, text, { selfOnly: true, asOf: frozen.now, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined, withholdSensitive, anonymous, withheldSubjectIds: subjects.filter((subject): subject is Extract<SubjectRef, { type: "household" }> => subject.type === "household").map((subject) => subject.entity_id) });
   // JOIN-01: what was actually said in earlier conversations (MEM-03's
   // verbatim episodes, MEM-04's hybrid recall), beside the extracted
   // facts. This conversation is excluded whole: its turns are the
