@@ -1710,6 +1710,42 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
 });
 
 describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
+  test.each([
+    ["light", "rgb(244, 225, 255)"],
+    ["dark", "rgb(74, 45, 96)"],
+  ])("the rendered thread root uses the %s Incognito background despite the body look palette", async (theme, expectedBackground) => {
+    const restore = stubFetch();
+    const style = document.createElement("style");
+    style.textContent = `
+      .style-neutral { --card: rgb(255, 255, 255); --background: rgb(255, 255, 255); }
+      .dark .style-neutral { --card: rgb(46, 46, 46); --background: oklch(0.145 0 0); }
+      html.incognito body[class*="style-"] { --background: rgb(244, 225, 255); }
+      html.dark.incognito body[class*="style-"] { --background: rgb(74, 45, 96); }
+      .bg-background { background-color: var(--background); }
+    `;
+    document.head.append(style);
+    document.documentElement.classList.add(theme, "incognito");
+    document.body.classList.add("style-neutral");
+    localStorage.setItem("maipai.incognito-explanation-seen", "true");
+    writeIncognitoCache(true);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const threadRoot = view.container.querySelector(".aui-root.aui-thread-root.bg-background");
+      expect(threadRoot).not.toBeNull();
+      await waitFor(() => expect(getComputedStyle(threadRoot!).backgroundColor).toBe(expectedBackground));
+    } finally {
+      restore();
+      style.remove();
+      document.documentElement.classList.remove("dark", "light", "incognito");
+      document.body.classList.remove("style-neutral");
+    }
+  });
+
   test("the global header toggle controls whether the chat turn is temporary", async () => {
     const restore = stubMultiTurnFetch();
     try {
