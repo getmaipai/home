@@ -19,6 +19,30 @@
 @import "@maipai/ui/src/dashboard/css/globals.css";
 @import "@maipai/ui/src/tokens.css";
 
+/* INCOGNITO-08 slice 2: the mode keeps the chosen light/dark palette and
+ * adds a restrained violet wash to the /next content canvas. The first
+ * radial layer leaves the center close to the existing page surface;
+ * the second adds a deeper edge tint without changing text or panel
+ * tokens. */
+html.incognito {
+  --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 9%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 7%, var(--surface-page)), transparent 72%);
+  --incognito-input-border: color-mix(in srgb, var(--hue-violet) 48%, var(--input));
+}
+
+html.dark.incognito {
+  --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 10%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 9%, var(--surface-page)), transparent 72%);
+  --incognito-input-border: color-mix(in srgb, var(--hue-violet) 72%, var(--input));
+}
+
+html.incognito [data-slot="sidebar-inset"] {
+  background: var(--incognito-background);
+}
+
+html.incognito [data-slot="input"],
+html.incognito input:not([type="checkbox"]):not([type="radio"]) {
+  border-color: var(--incognito-input-border);
+}
+
 /* TOKENS-PRIMARY-01 (docs/BACKLOG.md): globals.css above declares its
  * own competing `:root --primary` (shadcn's own near-black default) at
  * the identical selector and specificity as the kit's own tokens.css

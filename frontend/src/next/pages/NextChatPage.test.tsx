@@ -56,6 +56,7 @@ afterEach(() => {
   // own initial-state assumption, the same isolation risk `matchMedia`
   // and `AudioContext` above are already reset for.
   localStorage.removeItem("maipai.chat.rail-collapsed");
+  localStorage.removeItem("maipai.incognito-explanation-seen");
   sessionStorage.removeItem("maipai.incognito");
 });
 
@@ -1712,6 +1713,9 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
   test("the global header toggle controls whether the chat turn is temporary", async () => {
     const restore = stubMultiTurnFetch();
     try {
+      // This test covers the shared toggle-to-chat wiring; first-use
+      // explanation behavior is exercised by incognitoContext.test.tsx.
+      localStorage.setItem("maipai.incognito-explanation-seen", "true");
       writeIncognitoCache(false);
       const view = renderPage(
         <>
@@ -1737,6 +1741,7 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
   test("Incognito stays on across separate new threads and marks each first turn temporary", async () => {
     const restore = stubMultiTurnFetch();
     try {
+      localStorage.setItem("maipai.incognito-explanation-seen", "true");
       writeIncognitoCache(true);
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
