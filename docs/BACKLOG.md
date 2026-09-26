@@ -293,6 +293,17 @@ the design doc's own "What already exists" section.
       household can require it for some people (an adult) and not
       others (a child's own account). Exit: `bash scripts/check.sh`.
 - [ ] **INCOGNITO-08: visual design** (S, after `INCOGNITO-01`).
+      **Slice 1 landed 2026-09-25, `3e609fd1` (home) + `a07c6f3`
+      (commons `ui-v0.5.63`):** the toggle placement/architecture piece
+      below - Incognito promoted to a shared `IncognitoProvider`
+      spanning the whole `/next` shell (`incognitoContext.tsx`), a new
+      `IncognitoToggle` in the vendored `Header.tsx` beside `LightDark`
+      (violet icon color when on, violet hover/focus ring - the "toggle
+      itself carries purple" line below), `ChatHeaderBar`'s own
+      chat-only toggle removed, the discard-on-toggle-off flow moved up
+      to the shell level with a `window` event so a mounted chat page
+      still reloads its list. **Still open, slice 2**: the app-wide
+      gradient wash and the first-activation modal, both below.
       **Settled 2026-09-25 evening, Jesse's own direction plus a
       reference screenshot (Firefox Private Browsing) - the earlier
       draft of this row said "a colored border/frame... not a full
