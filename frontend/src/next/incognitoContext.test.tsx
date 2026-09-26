@@ -27,7 +27,7 @@ describe("IncognitoProvider", () => {
 
     fireEvent.click(first.getByRole("button", { name: "Incognito Off" }));
     expect(await first.findByRole("dialog", { name: "What Incognito does" })).toBeVisible();
-    expect(first.getByText(/not saved to memory/i)).toBeVisible();
+    expect(first.getByText(/turns off memory and personalization across MaiPai/i)).toBeVisible();
     await waitFor(() => expect(document.documentElement.classList.contains("incognito")).toBe(true));
 
     fireEvent.click(first.getByRole("button", { name: "Got it" }));

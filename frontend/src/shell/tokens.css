@@ -19,37 +19,76 @@
 @import "@maipai/ui/src/dashboard/css/globals.css";
 @import "@maipai/ui/src/tokens.css";
 
-/* INCOGNITO-08 slice 2: the mode keeps the chosen light/dark palette and
- * adds a restrained violet wash to the /next content canvas. The first
- * radial layer leaves the center close to the existing page surface;
- * the second adds a deeper edge tint without changing text or panel
- * tokens. */
+/* INCOGNITO-08: keep the chosen light/dark palette, while giving the
+ * canvas, cards, raised panes, message bubbles and sidebar related violet
+ * tones. Foreground tokens stay with the selected look for legible text. */
 html.incognito {
   --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 9%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 7%, var(--surface-page)), transparent 72%);
+  --incognito-canvas-color: color-mix(in srgb, var(--hue-violet) 10%, var(--surface-page));
+  --incognito-card: color-mix(in srgb, var(--hue-violet) 19%, var(--surface-card));
+  --incognito-pane: color-mix(in srgb, var(--hue-violet) 22%, var(--surface-pane));
+  --incognito-muted: color-mix(in srgb, var(--hue-violet-deep) 16%, var(--surface-pane));
+  --incognito-accent: color-mix(in srgb, var(--hue-violet) 28%, var(--surface-pane));
+  --incognito-sidebar: color-mix(in srgb, var(--hue-violet) 18%, var(--surface-sidebar));
+  --incognito-border: color-mix(in srgb, var(--hue-violet-deep) 32%, var(--border));
   --incognito-input-border: color-mix(in srgb, var(--hue-violet) 78%, var(--input));
 }
 
 html.dark.incognito {
-  --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 10%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 9%, var(--surface-page)), transparent 72%);
+  --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 22%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 18%, var(--surface-page)), transparent 72%);
+  --incognito-canvas-color: color-mix(in srgb, var(--hue-violet) 22%, var(--surface-page));
+  --incognito-card: color-mix(in srgb, var(--hue-violet) 38%, var(--surface-card));
+  --incognito-pane: color-mix(in srgb, var(--hue-violet) 45%, var(--surface-pane));
+  --incognito-muted: color-mix(in srgb, var(--hue-violet-deep) 28%, var(--surface-pane));
+  --incognito-accent: color-mix(in srgb, var(--hue-violet) 40%, var(--surface-pane));
+  --incognito-sidebar: color-mix(in srgb, var(--hue-violet-deep) 38%, var(--surface-sidebar));
+  --incognito-border: color-mix(in srgb, var(--hue-violet-deep) 38%, var(--border));
   --incognito-input-border: color-mix(in srgb, var(--hue-violet) 82%, var(--input));
 }
 
-/* useNextLook applies `.style-*` to body, where the kit's palette rules
- * also set `--background` (for dark neutral, `.dark .style-neutral`).
- * An override on html is inherited only when body has no value of its
- * own, so set the token on the palette-bearing element. `--card` is the
- * selected look's own surface color and avoids a circular reference to
- * the `--background` value being replaced. */
-html.incognito body[class*="style-"] {
-  --background: color-mix(in srgb, var(--hue-violet) 12%, var(--card));
-}
-
-html.dark.incognito body[class*="style-"] {
-  --background: color-mix(in srgb, var(--hue-violet) 18%, var(--card));
-}
-
-html.incognito [data-slot="sidebar-inset"] {
+/* Put one viewport-sized wash behind both the dashboard and chat canvas.
+ * The canvas surfaces below let this layer show through; raised surfaces
+ * keep their own lighter violet tones above it. */
+html.incognito body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background: var(--incognito-background);
+}
+
+html.incognito body[class*="style-"] {
+  position: relative;
+  z-index: 0;
+  background: transparent;
+  --background: var(--incognito-canvas-color);
+  --card: var(--incognito-card);
+  --surface-card: var(--incognito-card);
+  --popover: var(--incognito-pane);
+  --surface-pane: var(--incognito-pane);
+  --secondary: var(--incognito-pane);
+  --muted: var(--incognito-muted);
+  --accent: var(--incognito-accent);
+  --sidebar: var(--incognito-sidebar);
+  --surface-sidebar: var(--incognito-sidebar);
+  --sidebar-accent: var(--incognito-accent);
+  --border: var(--incognito-border);
+  --sidebar-border: var(--incognito-border);
+  --input: var(--incognito-input-border);
+}
+
+html.incognito body[class*="style-"] [data-slot="sidebar-inset"],
+html.incognito body[class*="style-"] .aui-root.aui-thread-root,
+html.incognito body[class*="style-"] .aui-thread-viewport-footer,
+html.incognito body[class*="style-"] [data-slot="next-chat-rail"] {
+  background: transparent;
+}
+
+/* The kit's Thread sets --composer-bg inline for temporary chats. Incognito
+ * gives that control its own raised surface, using Home's tinted card token. */
+html.incognito body[class*="style-"] .aui-root.aui-thread-root {
+  --composer-bg: var(--card) !important;
 }
 
 html.incognito [data-slot="input"],

@@ -1951,6 +1951,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                 left this element altogether. */}
             <div
               id="next-chat-rail"
+              data-slot="next-chat-rail"
               // CHAT-UI-03 (1): ChatGPT eases both the column and the
               // chat pane during collapse/expand; this used to jump-cut
               // (`hidden` <-> `block`, a `display` swap CSS can't

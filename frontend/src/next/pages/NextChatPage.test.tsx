@@ -1711,17 +1711,27 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
 
 describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
   test.each([
-    ["light", "rgb(244, 225, 255)"],
-    ["dark", "rgb(74, 45, 96)"],
-  ])("the rendered thread root uses the %s Incognito background despite the body look palette", async (theme, expectedBackground) => {
+    ["light"],
+    ["dark"],
+  ])("the %s Incognito canvas shows the viewport gradient while chat surfaces stay opaque", async (theme) => {
     const restore = stubFetch();
     const style = document.createElement("style");
     style.textContent = `
-      .style-neutral { --card: rgb(255, 255, 255); --background: rgb(255, 255, 255); }
+      .style-neutral { --card: rgb(255, 255, 255); --color-card: rgb(255, 255, 255); --background: rgb(255, 255, 255); }
       .dark .style-neutral { --card: rgb(46, 46, 46); --background: oklch(0.145 0 0); }
-      html.incognito body[class*="style-"] { --background: rgb(244, 225, 255); }
-      html.dark.incognito body[class*="style-"] { --background: rgb(74, 45, 96); }
+      html.incognito { --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, rgb(244, 225, 255), rgb(255, 255, 255)); }
+      html.dark.incognito { --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, rgb(74, 45, 96), rgb(20, 20, 20)); }
+      html.incognito body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: var(--incognito-background); }
+      html.incognito { --incognito-card: rgb(247, 233, 255); --incognito-pane: rgb(230, 220, 248); --incognito-muted: rgb(224, 213, 244); --incognito-accent: rgb(219, 205, 242); --incognito-sidebar: rgb(236, 229, 250); --incognito-border: rgb(190, 163, 218); --incognito-canvas-color: rgb(244, 239, 250); }
+      html.dark.incognito { --incognito-card: rgb(67, 40, 124); --incognito-pane: rgb(82, 35, 101); --incognito-muted: rgb(48, 35, 97); --incognito-accent: rgb(76, 34, 120); --incognito-sidebar: rgb(37, 27, 84); --incognito-border: rgb(77, 44, 137); --incognito-canvas-color: rgb(36, 23, 50); }
+      html.incognito body[class*="style-"] { position: relative; z-index: 0; background: transparent; --background: var(--incognito-canvas-color); --card: var(--incognito-card); --surface-card: var(--incognito-card); --popover: var(--incognito-pane); --surface-pane: var(--incognito-pane); --secondary: var(--incognito-pane); --muted: var(--incognito-muted); --accent: var(--incognito-accent); --sidebar: var(--incognito-sidebar); --surface-sidebar: var(--incognito-sidebar); --sidebar-accent: var(--incognito-accent); --border: var(--incognito-border); --sidebar-border: var(--incognito-border); --input: var(--incognito-border); }
+      html.incognito body[class*="style-"] [data-slot="sidebar-inset"],
+      html.incognito body[class*="style-"] .aui-root.aui-thread-root,
+      html.incognito body[class*="style-"] .aui-thread-viewport-footer,
+      html.incognito body[class*="style-"] [data-slot="next-chat-rail"] { background: transparent; }
+      html.incognito body[class*="style-"] .aui-root.aui-thread-root { --composer-bg: var(--card) !important; }
       .bg-background { background-color: var(--background); }
+      .bg-card { background-color: var(--card); }
     `;
     document.head.append(style);
     document.documentElement.classList.add(theme, "incognito");
@@ -1735,9 +1745,24 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
+      const backdropRule = Array.from(style.sheet!.cssRules)
+        .map((rule) => rule as CSSStyleRule)
+        .find((rule) => rule.selectorText === "html.incognito body::before");
       const threadRoot = view.container.querySelector(".aui-root.aui-thread-root.bg-background");
       expect(threadRoot).not.toBeNull();
-      await waitFor(() => expect(getComputedStyle(threadRoot!).backgroundColor).toBe(expectedBackground));
+      const footer = view.container.querySelector(".aui-thread-viewport-footer");
+      const rail = view.container.querySelector('[data-slot="next-chat-rail"]');
+      const composer = view.container.querySelector('[data-slot="aui_composer-shell"]');
+      expect(backdropRule).toBeDefined();
+      expect(backdropRule!.style.position).toBe("fixed");
+      expect(backdropRule!.style.background).toBe("var(--incognito-background)");
+      expect(getComputedStyle(threadRoot!).backgroundColor).toBe("transparent");
+      expect(getComputedStyle(footer!).backgroundColor).toBe("transparent");
+      expect(getComputedStyle(rail!).backgroundColor).toBe("transparent");
+      expect(getComputedStyle(document.body).getPropertyValue("--card").trim()).toBe(theme === "dark" ? "rgb(67, 40, 124)" : "rgb(247, 233, 255)");
+      expect(getComputedStyle(document.body).getPropertyValue("--muted").trim()).toBe(theme === "dark" ? "rgb(48, 35, 97)" : "rgb(224, 213, 244)");
+      expect(composer).not.toBeNull();
+      expect(getComputedStyle(threadRoot!).getPropertyValue("--composer-bg").trim()).toBe(theme === "dark" ? "rgb(67, 40, 124)" : "rgb(247, 233, 255)");
     } finally {
       restore();
       style.remove();
