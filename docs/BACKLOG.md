@@ -292,77 +292,28 @@ the design doc's own "What already exists" section.
       re-entering the PIN. **Admin-configurable per account** - a
       household can require it for some people (an adult) and not
       others (a child's own account). Exit: `bash scripts/check.sh`.
-- [x] **INCOGNITO-08: visual design** (S) - landed 2026-09-25/26 across
-      four commits, fully live-verified by the coordinator (screenshots,
-      both themes, dashboard and chat): `3e609fd1`/`ui-v0.5.63` (the
-      toggle moved to the global header beside `LightDark`, a shared
-      `IncognitoProvider` spanning the whole `/next` shell), `52768b3d`
-      (the first-activation modal and the first gradient attempt),
-      `39c3b5b2` (fixed the gradient not reaching `/next/chat`, see
-      `INCOGNITO-12`), `37c7def8` (the real design pass: one continuous
-      fixed-viewport gradient behind the whole canvas via `body::before`,
-      cards/panes/composer/sidebar all shifted into the violet family
-      at a lighter tone than the background rather than staying white -
-      Jesse's own reference, an "Anti-spy setup" app screenshot, settled
-      this). The modal copy also corrected to describe Incognito as a
-      site-wide mode, not a chat feature (a future app like Videos works
-      the same way) - connects to `INCOGNITO-04`'s own per-package
-      `incognito` manifest field, not yet built. A state-aware exit
-      warning (only when there's something live to lose) is not yet
-      built - flag if wanted, not blocking.
-      **Reopened and fixed again, `50a3ea9c`:** Jesse's own screenshot
-      at real desktop width caught a real gap the coordinator's own
-      narrower test viewport missed - the global left nav sidebar
-      (Home/Chat/Tools/People/Settings/Help) stayed plain white. Root
-      cause: `@maipai/ui`'s `FullLayout` sidebar carries its own
-      high-specificity `bg-background` rule on `[data-slot="sidebar-
-      inner"]`, repainting over the intended `--sidebar` tint. Fixed
-      with a targeted override plus a real test rendering the actual
-      vendored `SidebarLayout` component at a forced 1440px width
-      (`frontend/src/shell/incognitoSidebar.test.tsx`) - not just a
-      CSS-declaration check, the same lesson `INCOGNITO-12` already
-      taught twice. Also strengthened the light-theme mix percentages
-      (canvas/gradient 9%→18%, cards 19%→30%, panes 22%→34%, accent
-      28%→36%, sidebar 18%→30%) since the first pass read "dark and
-      drab" against the two reference images. **That strengthening was
-      wrong - Jesse's own verdict live on his screen: "awful."** Pushing
-      every surface's percentage up together didn't add richness, it
-      washed out the differences between the light theme's already-
-      similar base surface colors into one flat, uniform lavender.
-      **Corrected again, `91a623c9`, asked and confirmed directly with
-      Jesse**: light mode stays restrained (canvas 6%, sidebar 12%,
-      cards 18%, panes 22% - a real, deliberate gap between the barely-
-      tinted canvas and the more-present card/pane surfaces, not
-      everything pushed to the same saturation); dark mode's own block
-      is untouched, already correct. **Verification note, still
-      standing**: the coordinator's own browser tooling only renders a
-      narrow, fixed viewport tonight (confirmed twice, can't reproduce
-      desktop width) - every light-mode iteration here was judged by
-      Jesse live on his own screen, not the coordinator's own look.
-      Confirm with him before trusting this fully closed.
-      **Light-mode direction changed again, codex-380 (2026-09-26):**
-      Jesse replaced the diffuse-violet approach with a mostly neutral
-      light theme and one bold violet band in the global header. The
-      canvas, sidebar, cards and panes now use their normal light-theme
-      surfaces; white header controls keep contrast against the violet
-      band. The composer border and the toggle's violet icon/hover
-      treatment remain. The actual vendored `FullLayout` header and
-      ordinary surfaces have computed-style and contrast coverage in
-      `frontend/src/shell/incognitoHeader.test.tsx`.
-      **Dark-mode direction, codex-381 (2026-09-26):** Jesse confirmed
-      the same plain-background-plus-bold-header-band pattern for dark
-      mode. Its canvas, sidebar, cards and panes now use their ordinary
-      dark-theme surfaces too; both themes share the same violet band
-      and white foreground treatment. The dark header has its own real
-      `FullLayout` contrast and computed-surface coverage. Jesse's live
-      desktop judgment of this update is still pending.
-      **Active sidebar accent, codex-383 (2026-09-26):** the active
-      nav pill now uses the same violet, with white text measured at
-      4.5:1 or better. The override is scoped to the vendored sidebar's
-      active `NavItem` only: the Home-wide `--primary` token also colors
-      action links, selections and chat controls, which keep the cyan
-      brand accent. A real `SidebarLayout` test checks computed active
-      and inactive colors in both themes; Jesse's live check is pending.
+- [x] **INCOGNITO-08: visual design** (S) - landed and live-verified
+      2026-09-25/26, final design settled after several real corrections
+      along the way (the dev.md-worthy history is in git log for
+      `frontend/src/shell/tokens.css`, not repeated here). **The settled
+      design, confirmed against Jesse's own finished-mockup reference and
+      live-checked by the coordinator in both themes**: ordinary surfaces
+      (canvas, sidebar, cards, panes) stay completely plain/normal - no
+      wash, no tint, identical to the non-Incognito theme. Violet is
+      concentrated into three deliberate, bold signals instead: (1) the
+      global header becomes a solid violet band with white
+      text/icons (real contrast measured, both themes), (2) the
+      Incognito toggle itself uses a mask icon (`VenetianMask`, not
+      `EyeOff`) with a persistent violet ring, (3) the active sidebar
+      nav item gets a solid violet pill (scoped to just that element -
+      `--primary` elsewhere stays Home's own cyan brand accent). The
+      first-activation modal describes Incognito as a site-wide mode,
+      not a chat feature - connects to `INCOGNITO-04`'s own per-package
+      `incognito` manifest field, not yet built. Landed across commons
+      `ui-v0.5.63` through `ui-v0.5.65` and home commits `3e609fd1`
+      through `31180acc` (full range in git log, both repos). A
+      state-aware exit warning (only when there's something live to
+      lose) is not yet built - flag if wanted, not blocking.
 - [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
       confirmed 2026-09-25. `canHaveTemporaryChatRole`'s only remaining
       call site is the unrelated "Thinking" mode toggle's own,
