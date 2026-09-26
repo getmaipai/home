@@ -50,6 +50,8 @@ export function UsersSection({ person }: UsersSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState<Role>("adult");
+  const [editSessionLockRequired, setEditSessionLockRequired] = useState(false);
+  const [editSessionLockTimeoutMinutes, setEditSessionLockTimeoutMinutes] = useState(5);
 
   const [confirmingDelete, setConfirmingDelete] = useState<"batch" | string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -106,6 +108,13 @@ export function UsersSection({ person }: UsersSectionProps) {
         // change from anyone but the owner, and sending an unchanged role
         // would turn a rename by an admin into a 403.
         role: target && editRole !== target.role ? editRole : undefined,
+        // INCOGNITO-07: same "only send what changed" reasoning, though
+        // here it's not an authorization concern (UsersSection only ever
+        // renders for an owner/admin actor, and the backend re-checks
+        // regardless) - just avoids a no-op write on every edit.
+        sessionLockRequired: target && editSessionLockRequired !== target.sessionLockRequired ? editSessionLockRequired : undefined,
+        sessionLockTimeoutMinutes:
+          target && editSessionLockTimeoutMinutes !== target.sessionLockTimeoutMinutes ? editSessionLockTimeoutMinutes : undefined,
       });
       setEditingId(null);
       await invalidateRoster();
@@ -225,6 +234,30 @@ export function UsersSection({ person }: UsersSectionProps) {
                         aria-label={`Role for ${p.display_name}`}
                       />
                     ) : null}
+                    {/* INCOGNITO-07: admin-configurable per account, any
+                        role (assertCanSetSessionLock's own wider reach
+                        than the generic person-scope gate) - shown for
+                        every row here since UsersSection only ever
+                        renders for an owner/admin actor. */}
+                    <span className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                      <Checkbox
+                        checked={editSessionLockRequired}
+                        onCheckedChange={(checked) => setEditSessionLockRequired(checked === true)}
+                        aria-label={`Require session lock for ${p.display_name}`}
+                      />
+                      Require PIN lock
+                    </span>
+                    {editSessionLockRequired ? (
+                      <Input
+                        type="number"
+                        min={1}
+                        max={120}
+                        value={editSessionLockTimeoutMinutes}
+                        onChange={(e) => setEditSessionLockTimeoutMinutes(Number(e.target.value))}
+                        aria-label={`Session lock timeout, minutes, for ${p.display_name}`}
+                        className="w-20"
+                      />
+                    ) : null}
                   </div>
                 );
               }
@@ -302,6 +335,8 @@ export function UsersSection({ person }: UsersSectionProps) {
                         setEditingId(p.id);
                         setEditName(p.display_name);
                         setEditRole(p.role as Role);
+                        setEditSessionLockRequired(p.sessionLockRequired);
+                        setEditSessionLockTimeoutMinutes(p.sessionLockTimeoutMinutes);
                       }}
                     >
                       Edit

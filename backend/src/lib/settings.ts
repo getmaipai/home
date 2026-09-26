@@ -261,6 +261,55 @@ function writeValue(
 // never folded into the shared predicate.
 const SAFE_SEARCH_KEY = "search.safe_search";
 
+// INCOGNITO-07: session lock is admin-configurable for ANY account
+// (backlog's own wording - "any account can be configured (by an admin)
+// to require it"), unlike the generic person-scope gate above, which
+// lets everyone edit their own person-scope settings with no ladder
+// check at all. A plain adult must not be able to switch off a lock an
+// admin required for them, so both keys need an owner/admin gate
+// regardless of who the target is - but a code review (medium effort,
+// before commit) caught the first version of this checking only
+// isOwnerOrAdmin(actor) with no target-role check at all, which let an
+// admin force the lock onto the OWNER's own account through this
+// route's generic PUT /api/settings path, even though the sibling
+// PATCH /api/people/:id path already refuses that (canManage()'s own
+// MANAGEABLE_BY.admin ladder excludes "owner" and "admin"). The same
+// setValue()-backed operation enforcing two different policies
+// depending only on which HTTP route reached it is exactly the "one
+// definition, one enforcement" bug this file's other bespoke gates
+// (assertCanSetSafeSearch) are already careful not to introduce. Fixed
+// by mirroring that ladder here rather than importing it -
+// personLifecycle.ts already imports invalidateScopeCache from this
+// file, so importing MANAGEABLE_BY back would cycle; if that table's
+// own admin row ever changes, this needs the matching edit.
+// Read is unrestricted (the generic person-scope gate already lets a
+// person read their own; routes/people.ts's roster response is what
+// surfaces another person's value to an admin, via
+// getSettingValueForPerson()).
+// Exported: routes/people.ts reads both keys via getSettingValueForPerson()
+// to merge them onto the roster response, and writes them via setValue()
+// after its own canManage() check, rather than a duplicated string literal.
+export const SESSION_LOCK_REQUIRED_KEY = "security.session_lock_required";
+export const SESSION_LOCK_TIMEOUT_KEY = "security.session_lock_timeout_minutes";
+
+function assertCanSetSessionLock(actor: PersonRow, targetPersonId: string): SettingsOpResult<true> {
+  if (actor.role === "owner") return { ok: true, value: true };
+  if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "only owner or admin may change session lock settings" };
+  // A second review pass (low effort, before commit) caught the first
+  // version of this fix refusing an admin setting THEIR OWN session lock
+  // - getPersonRole(targetPersonId) resolved to "admin" for a self-edit
+  // too, since the ladder check didn't exempt self first. Self is always
+  // fine for owner/admin (birthdate/localOnly's own precedent in
+  // routes/people.ts: "owner/admin editing themselves is unaffected");
+  // the ladder only binds acting on someone ELSE.
+  if (actor.id === targetPersonId) return { ok: true, value: true };
+  const targetRole = getPersonRole(targetPersonId);
+  if (targetRole === "owner" || targetRole === "admin") {
+    return { ok: false, status: 403, error: "only owner or admin may change session lock settings" };
+  }
+  return { ok: true, value: true };
+}
+
 function assertCanSetSafeSearch(actor: PersonRow, targetPersonId: string, newValue: unknown): SettingsOpResult<true> {
   const targetIsSelf = actor.id === targetPersonId;
   if (!targetIsSelf) {
@@ -304,7 +353,12 @@ export function setValue(
     return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
   }
 
-  const auth = key === SAFE_SEARCH_KEY && parsed.kind === "person" ? assertCanSetSafeSearch(actor, parsed.id!, value) : assertCanAccessScope(actor, parsed, "write");
+  const auth =
+    key === SAFE_SEARCH_KEY && parsed.kind === "person"
+      ? assertCanSetSafeSearch(actor, parsed.id!, value)
+      : key === SESSION_LOCK_REQUIRED_KEY || key === SESSION_LOCK_TIMEOUT_KEY
+        ? assertCanSetSessionLock(actor, parsed.id!)
+        : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
   return writeValue(scope, keyDef, value);

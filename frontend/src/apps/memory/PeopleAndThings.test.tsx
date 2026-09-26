@@ -75,6 +75,8 @@ function person(overrides: Partial<PersonRosterEntry> = {}): PersonRosterEntry {
     guest_expires_at: null,
     memorialized_at: null,
     hlc: "1788000000000:0:test",
+    sessionLockRequired: false,
+    sessionLockTimeoutMinutes: 5,
     ...overrides,
   };
 }

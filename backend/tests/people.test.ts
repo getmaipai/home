@@ -423,6 +423,132 @@ describe("PATCH /api/people/:id", () => {
   });
 });
 
+// INCOGNITO-07: session lock's two fields ride the roster/PATCH shape
+// (routes/people.ts's withSessionLock()/RosterWithSecuritySchema), not a
+// person-table column - these tests exercise the route, not settings.ts
+// directly, since the route's own canManage()/isOwnerOrAdmin() pre-check
+// is what actually decides who may flip it.
+describe("session lock (INCOGNITO-07)", () => {
+  test("defaults to off with a 5-minute timeout, visible on the roster", async () => {
+    const ownerClient = await ownerSession();
+    const child = await addPerson(ownerClient, "Bramble", "child");
+
+    const roster = (await (await ownerClient.get("/api/people")).json()) as Array<{
+      id: string;
+      sessionLockRequired: boolean;
+      sessionLockTimeoutMinutes: number;
+    }>;
+    const row = roster.find((p) => p.id === child.id);
+    expect(row?.sessionLockRequired).toBe(false);
+    expect(row?.sessionLockTimeoutMinutes).toBe(5);
+  });
+
+  // A second code review pass (low effort, before commit) caught this
+  // exact gap: assertCanSetSessionLock()'s first fix refused an admin
+  // setting THEIR OWN lock (getPersonRole() resolved their own id to
+  // "admin", tripping the same ladder meant only for acting on someone
+  // ELSE) - and routes/people.ts discarded setValue()'s result, so the
+  // request returned 200 with the field silently unchanged instead of a
+  // real error. Both are fixed; this proves the actual, correct behavior.
+  test("an admin can set their own session lock through self-edit", async () => {
+    const ownerClient = await ownerSession();
+    const admin = await addPerson(ownerClient, "Marlow", "admin", "correcthorse");
+    const adminClient = await sessionFor(admin.id, "correcthorse");
+
+    const res = await adminClient.request(`/api/people/${admin.id}`, {
+      method: "PATCH",
+      body: { sessionLockRequired: true, sessionLockTimeoutMinutes: 10 },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sessionLockRequired: boolean; sessionLockTimeoutMinutes: number };
+    expect(body.sessionLockRequired).toBe(true);
+    expect(body.sessionLockTimeoutMinutes).toBe(10);
+  });
+
+  test("an owner can require it for an adult, not just a child - wider reach than the generic person-scope gate", async () => {
+    const ownerClient = await ownerSession();
+    const adult = await addPerson(ownerClient, "Marlow", "adult", "correcthorse");
+
+    const res = await ownerClient.request(`/api/people/${adult.id}`, {
+      method: "PATCH",
+      body: { sessionLockRequired: true, sessionLockTimeoutMinutes: 15 },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sessionLockRequired: boolean; sessionLockTimeoutMinutes: number };
+    expect(body.sessionLockRequired).toBe(true);
+    expect(body.sessionLockTimeoutMinutes).toBe(15);
+
+    const roster = (await (await ownerClient.get("/api/people")).json()) as Array<{
+      id: string;
+      sessionLockRequired: boolean;
+      sessionLockTimeoutMinutes: number;
+    }>;
+    const row = roster.find((p) => p.id === adult.id);
+    expect(row?.sessionLockRequired).toBe(true);
+    expect(row?.sessionLockTimeoutMinutes).toBe(15);
+  });
+
+  test("an admin may require it for a child", async () => {
+    const ownerClient = await ownerSession();
+    const admin = await addPerson(ownerClient, "Sage", "admin", "correcthorse");
+    const adminClient = await sessionFor(admin.id, "correcthorse");
+    const child = await addPerson(ownerClient, "Bramble", "child");
+
+    const res = await adminClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { sessionLockRequired: true },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("an adult cannot switch off a lock an admin required for them - self-edit isn't enough here", async () => {
+    const ownerClient = await ownerSession();
+    const adult = await addPerson(ownerClient, "Marlow", "adult", "correcthorse");
+    await ownerClient.request(`/api/people/${adult.id}`, {
+      method: "PATCH",
+      body: { sessionLockRequired: true },
+    });
+    const adultClient = await sessionFor(adult.id, "correcthorse");
+
+    const res = await adultClient.request(`/api/people/${adult.id}`, {
+      method: "PATCH",
+      body: { sessionLockRequired: false },
+    });
+    expect(res.status).toBe(403);
+
+    const roster = (await (await ownerClient.get("/api/people")).json()) as Array<{ id: string; sessionLockRequired: boolean }>;
+    expect(roster.find((p) => p.id === adult.id)?.sessionLockRequired).toBe(true);
+  });
+
+  test("a refused session-lock change does not quietly carry the rest of the request", async () => {
+    const ownerClient = await ownerSession();
+    const adult = await addPerson(ownerClient, "Marlow", "adult", "correcthorse");
+    const adultClient = await sessionFor(adult.id, "correcthorse");
+
+    const res = await adultClient.request(`/api/people/${adult.id}`, {
+      method: "PATCH",
+      body: { displayName: "Renamed", sessionLockRequired: true },
+    });
+    expect(res.status).toBe(403);
+
+    const roster = (await (await ownerClient.get("/api/people")).json()) as Array<{ id: string; display_name: string; sessionLockRequired: boolean }>;
+    const row = roster.find((p) => p.id === adult.id);
+    expect(row?.display_name).toBe("Marlow");
+    expect(row?.sessionLockRequired).toBe(false);
+  });
+
+  test("an out-of-range timeout is refused", async () => {
+    const ownerClient = await ownerSession();
+    const adult = await addPerson(ownerClient, "Marlow", "adult", "correcthorse");
+
+    const res = await ownerClient.request(`/api/people/${adult.id}`, {
+      method: "PATCH",
+      body: { sessionLockTimeoutMinutes: 0 },
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("DELETE /api/people/:id", () => {
   test("an owner can delete a child, and they leave the roster", async () => {
     const owner = await ownerSession();

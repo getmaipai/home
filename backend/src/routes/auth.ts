@@ -25,6 +25,7 @@ import { nextHlc } from "@/lib/hlc";
 import { requireAuth, invalidateSessionCache } from "@/middleware/auth";
 import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
+import { getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
 
 export const auth = apiRouter();
 
@@ -305,6 +306,17 @@ auth.openapi(verifySecretRoute, async (c) => {
   return c.json({ success: true as const, totpRequired: false }, 200);
 });
 
+// INCOGNITO-07: own schema, not the shared RosterSchema above - that one
+// also backs /profiles, reachable signed OUT (the picker), and whether an
+// account requires a session lock is not something to hand to an
+// unauthenticated request. The frontend's idle-lock provider (App.tsx)
+// reads these off its own api.me() call, the same place it already gets
+// everything else about the signed-in person.
+const MeRosterSchema = RosterSchema.extend({
+  sessionLockRequired: z.boolean(),
+  sessionLockTimeoutMinutes: z.number(),
+});
+
 const meRoute = createRoute({
   method: "get",
   path: "/me",
@@ -312,13 +324,15 @@ const meRoute = createRoute({
   summary: "My own profile",
   middleware: [requireAuth] as const,
   responses: {
-    200: { content: { "application/json": { schema: RosterSchema } }, description: "The signed-in person." },
+    200: { content: { "application/json": { schema: MeRosterSchema } }, description: "The signed-in person." },
   },
 });
 auth.openapi(meRoute, (c) => {
   const person = c.get("person");
   const { hasSecret, hasPasskeys } = getAuthMethods(person.id);
-  return c.json({ ...toRoster(person), hasSecret, hasPasskeys }, 200);
+  const sessionLockRequired = getSettingValueForPerson(person.id, SESSION_LOCK_REQUIRED_KEY) as boolean;
+  const sessionLockTimeoutMinutes = getSettingValueForPerson(person.id, SESSION_LOCK_TIMEOUT_KEY) as number;
+  return c.json({ ...toRoster(person), hasSecret, hasPasskeys, sessionLockRequired, sessionLockTimeoutMinutes }, 200);
 });
 
 // A person changing (or, for a PIN-free profile, first setting) their own

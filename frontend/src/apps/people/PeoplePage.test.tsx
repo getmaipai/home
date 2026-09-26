@@ -22,6 +22,8 @@ function member(id: string, name: string, role: PersonRosterEntry["role"]): Pers
     enabled: true,
     guest_expires_at: null,
     memorialized_at: null,
+    sessionLockRequired: false,
+    sessionLockTimeoutMinutes: 5,
     hlc: "1788000000000:0:test",
   };
 }

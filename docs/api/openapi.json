@@ -437,6 +437,74 @@
                         ],
                         "description": "What a companion calls this person, if different from display_name."
                       },
+                      "bio": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 160,
+                            "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                      },
+                      "accent": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "blue"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "violet"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "teal"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "orange"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "pink"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "red"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "description": "A named profile color accent."
+                      },
                       "role": {
                         "type": "string",
                         "enum": [
@@ -625,6 +693,74 @@
                             }
                           ],
                           "description": "What a companion calls this person, if different from display_name."
+                        },
+                        "bio": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 160,
+                              "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                        },
+                        "accent": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "blue"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "violet"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "teal"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "orange"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "pink"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "red"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "nullable": true,
+                              "enum": [
+                                null
+                              ]
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "description": "A named profile color accent."
                         },
                         "birthdate": {
                           "anyOf": [
@@ -989,6 +1125,74 @@
                       ],
                       "description": "What a companion calls this person, if different from display_name."
                     },
+                    "bio": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 160,
+                          "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                    },
+                    "accent": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "blue"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "violet"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "teal"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "orange"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pink"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "red"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "A named profile color accent."
+                    },
                     "role": {
                       "type": "string",
                       "enum": [
@@ -1090,6 +1294,12 @@
                     },
                     "hasPasskeys": {
                       "type": "boolean"
+                    },
+                    "sessionLockRequired": {
+                      "type": "boolean"
+                    },
+                    "sessionLockTimeoutMinutes": {
+                      "type": "number"
                     }
                   },
                   "required": [
@@ -1102,7 +1312,9 @@
                     "updated_at",
                     "hlc",
                     "hasSecret",
-                    "hasPasskeys"
+                    "hasPasskeys",
+                    "sessionLockRequired",
+                    "sessionLockTimeoutMinutes"
                   ],
                   "additionalProperties": false
                 }
@@ -1267,6 +1479,74 @@
                         ],
                         "description": "What a companion calls this person, if different from display_name."
                       },
+                      "bio": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 160,
+                            "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                      },
+                      "accent": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "blue"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "violet"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "teal"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "orange"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "pink"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "red"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "description": "A named profile color accent."
+                      },
                       "role": {
                         "type": "string",
                         "enum": [
@@ -1362,6 +1642,12 @@
                         "type": "string",
                         "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                         "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                      },
+                      "sessionLockRequired": {
+                        "type": "boolean"
+                      },
+                      "sessionLockTimeoutMinutes": {
+                        "type": "number"
                       }
                     },
                     "required": [
@@ -1372,7 +1658,9 @@
                       "source",
                       "created_at",
                       "updated_at",
-                      "hlc"
+                      "hlc",
+                      "sessionLockRequired",
+                      "sessionLockTimeoutMinutes"
                     ],
                     "additionalProperties": false
                   }
@@ -1469,6 +1757,74 @@
                         }
                       ],
                       "description": "What a companion calls this person, if different from display_name."
+                    },
+                    "bio": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 160,
+                          "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                    },
+                    "accent": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "blue"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "violet"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "teal"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "orange"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pink"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "red"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "A named profile color accent."
                     },
                     "role": {
                       "type": "string",
@@ -1663,6 +2019,14 @@
                   "guestExpiresAt": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "sessionLockRequired": {
+                    "type": "boolean"
+                  },
+                  "sessionLockTimeoutMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120
                   }
                 }
               }
@@ -1703,6 +2067,74 @@
                         }
                       ],
                       "description": "What a companion calls this person, if different from display_name."
+                    },
+                    "bio": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 160,
+                          "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "The line under the person's name on their profile page, in their own words or a parent's."
+                    },
+                    "accent": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "blue"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "violet"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "teal"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "orange"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pink"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "red"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "A named profile color accent."
                     },
                     "role": {
                       "type": "string",
@@ -1799,6 +2231,12 @@
                       "type": "string",
                       "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                       "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "sessionLockRequired": {
+                      "type": "boolean"
+                    },
+                    "sessionLockTimeoutMinutes": {
+                      "type": "number"
                     }
                   },
                   "required": [
@@ -1809,7 +2247,9 @@
                     "source",
                     "created_at",
                     "updated_at",
-                    "hlc"
+                    "hlc",
+                    "sessionLockRequired",
+                    "sessionLockTimeoutMinutes"
                   ],
                   "additionalProperties": false
                 }

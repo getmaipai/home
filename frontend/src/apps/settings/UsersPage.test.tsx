@@ -56,6 +56,8 @@ function member(id: string, name: string, role: PersonRosterEntry["role"]): Pers
     guest_expires_at: null,
     memorialized_at: null,
     hlc: "1788000000000:0:test",
+    sessionLockRequired: false,
+    sessionLockTimeoutMinutes: 5,
   };
 }
 

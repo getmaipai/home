@@ -72,7 +72,26 @@ import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 // Roster's own hasSecret (that field only exists on /api/auth/profiles'
 // response, added by that route, not toRoster() itself). Derived from
 // the real spec type rather than hand-listing fields again.
-export type PersonRosterEntry = Omit<Person, "birthdate">;
+//
+// sessionLockRequired/sessionLockTimeoutMinutes (INCOGNITO-07): derived,
+// settings-backed fields routes/people.ts merges onto every roster entry
+// (withSessionLock()) - visible to every signed-in household member the
+// same as role already is, editable only by owner/admin (routes/
+// people.ts's own pre-check, settings.ts's assertCanSetSessionLock()).
+export type PersonRosterEntry = Omit<Person, "birthdate"> & {
+  sessionLockRequired: boolean;
+  sessionLockTimeoutMinutes: number;
+};
+
+// The signed-in person's own roster entry, as /api/auth/me actually
+// returns it - Roster (wire.ts) also backs /api/auth/profiles, reachable
+// signed OUT (the picker), so the two session-lock fields are added here
+// rather than on Roster itself: a structural superset, so this still
+// satisfies every existing `person: Roster` prop unchanged.
+export type SignedInPerson = Roster & {
+  sessionLockRequired: boolean;
+  sessionLockTimeoutMinutes: number;
+};
 export type Role = Person["role"];
 
 // Real backend types, imported from @/wire (not hand-duplicated): a code
@@ -427,7 +446,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ currentSecret, newSecret }),
     }),
-  me: () => request<Roster>("/api/auth/me"),
+  me: () => request<SignedInPerson>("/api/auth/me"),
   logout: () => request<{ success: true }>("/api/auth/logout", { method: "POST" }),
   // Session E step 6: "sessions and devices with revoke" - both scoped
   // to the caller's own profile (devices.ts's own comment: "not a
@@ -612,7 +631,13 @@ export const api = {
   cancelRestore: () => request<{ cancelled: boolean }>("/api/backups/restore/cancel", { method: "POST" }),
   updatePerson: (
     id: string,
-    edit: { displayName?: string; nickname?: string | null; role?: string },
+    edit: {
+      displayName?: string;
+      nickname?: string | null;
+      role?: string;
+      sessionLockRequired?: boolean;
+      sessionLockTimeoutMinutes?: number;
+    },
   ) =>
     request<PersonRosterEntry>(`/api/people/${encodeURIComponent(id)}`, {
       method: "PATCH",

@@ -17,7 +17,8 @@ import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
-import { api, type Roster } from "@/lib/api";
+import { api, type Roster, type SignedInPerson } from "@/lib/api";
+import { SessionLockGate } from "@/shell/sessionLockContext";
 
 // A small helper for a named export, since `lazy()` itself only takes a
 // promise of `{ default }` - every page below is a named export, not a
@@ -268,7 +269,7 @@ const queryClient = createQueryClient();
 // docs/UI.md's "don't invent ahead of need" is why it wasn't added for
 // Chat alone.
 export function App() {
-  const [person, setPerson] = useState<Roster | null | undefined>(undefined);
+  const [person, setPerson] = useState<SignedInPerson | null | undefined>(undefined);
 
   // Fail-closed: used only where "we don't yet know who's signed in" is
   // the real question (first load, right after sign-in) - api.me()
@@ -310,57 +311,59 @@ export function App() {
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
             <TooltipProvider>
-              <BrowserRouter>
-                <Routes>
-                  <Route
-                    path="/setup"
-                    element={
-                      <Suspense fallback={<RouteSkeleton />}>
-                        <SetupWizard onDone={loadPerson} />
-                      </Suspense>
-                    }
-                  />
-                  {/* The shell-on-shadcndashboard stand-up (docs/plans/
-                      shell-on-shadcndashboard-2026-09-21.md, step 1): a
-                      second route tree behind ui.shell.next. SHELL-08:
-                      reachable signed out too, not only once a person
-                      is signed in - NextRoutes itself now renders its
-                      own sign-in screen for a null person (the flag
-                      check still works for the realistic case, a real
-                      sign-out from within an already-open /next, since
-                      no reload happens and the settings query stays
-                      warm; a cold, never-authenticated load is its own
-                      named gap, see NextRoutes.tsx's own header).
-                      NextRoutes redirects to "/" when the flag is off. */}
-                  <Route
-                    path="/next/*"
-                    element={
-                      person === undefined ? (
-                        LOADING_PERSON
-                      ) : (
+              <SessionLockGate person={person ?? null}>
+                <BrowserRouter>
+                  <Routes>
+                    <Route
+                      path="/setup"
+                      element={
                         <Suspense fallback={<RouteSkeleton />}>
-                          <NextRoutes person={person} onSignedIn={loadPerson} />
+                          <SetupWizard onDone={loadPerson} />
                         </Suspense>
-                      )
-                    }
-                  />
-                  <Route
-                    path="/*"
-                    element={
-                      person === undefined ? (
-                        LOADING_PERSON
-                      ) : (
-                        <OldShellRoutes
-                          person={person}
-                          loadPerson={loadPerson}
-                          revalidatePerson={revalidatePerson}
-                          onSignedOut={() => setPerson(null)}
-                        />
-                      )
-                    }
-                  />
-                </Routes>
-              </BrowserRouter>
+                      }
+                    />
+                    {/* The shell-on-shadcndashboard stand-up (docs/plans/
+                        shell-on-shadcndashboard-2026-09-21.md, step 1): a
+                        second route tree behind ui.shell.next. SHELL-08:
+                        reachable signed out too, not only once a person
+                        is signed in - NextRoutes itself now renders its
+                        own sign-in screen for a null person (the flag
+                        check still works for the realistic case, a real
+                        sign-out from within an already-open /next, since
+                        no reload happens and the settings query stays
+                        warm; a cold, never-authenticated load is its own
+                        named gap, see NextRoutes.tsx's own header).
+                        NextRoutes redirects to "/" when the flag is off. */}
+                    <Route
+                      path="/next/*"
+                      element={
+                        person === undefined ? (
+                          LOADING_PERSON
+                        ) : (
+                          <Suspense fallback={<RouteSkeleton />}>
+                            <NextRoutes person={person} onSignedIn={loadPerson} />
+                          </Suspense>
+                        )
+                      }
+                    />
+                    <Route
+                      path="/*"
+                      element={
+                        person === undefined ? (
+                          LOADING_PERSON
+                        ) : (
+                          <OldShellRoutes
+                            person={person}
+                            loadPerson={loadPerson}
+                            revalidatePerson={revalidatePerson}
+                            onSignedOut={() => setPerson(null)}
+                          />
+                        )
+                      }
+                    />
+                  </Routes>
+                </BrowserRouter>
+              </SessionLockGate>
             </TooltipProvider>
           </ToastProvider>
         </QueryClientProvider>

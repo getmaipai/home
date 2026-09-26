@@ -14,6 +14,8 @@ import { requiresCredential, roleRequiresCredential } from "@/lib/personAuthMeth
 import { effectivePermissions } from "@/lib/permissions";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Person } from "@maipai/spec/gen/ts/person.js";
+import { setValue, getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
+import { isOwnerOrAdmin } from "@/lib/access";
 
 export const peopleRoutes = apiRouter();
 
@@ -23,6 +25,28 @@ export const peopleRoutes = apiRouter();
 // hand, the same "one definition" reasoning lib/personShape.ts's own
 // toRoster() already applies at the lib layer.
 const RosterSchema = Person.omit({ birthdate: true });
+
+// INCOGNITO-07: session lock's two settings-backed fields, merged onto
+// the roster shape the same way auth.ts's own RosterSchema adds
+// hasSecret/hasPasskeys - derived values, not part of the Person spec
+// itself, so this extends the LOCAL schema rather than touching
+// commons's person.schema.json. Visible to everyone on the roster the
+// same as role already is (both are account-level facts, not private
+// content like memories or conversations), which is what lets an
+// admin's Users list show and edit another person's value with no
+// separate, admin-only read route.
+const RosterWithSecuritySchema = RosterSchema.extend({
+  sessionLockRequired: z.boolean(),
+  sessionLockTimeoutMinutes: z.number(),
+});
+
+function withSessionLock<T extends { id: string }>(roster: T): T & { sessionLockRequired: boolean; sessionLockTimeoutMinutes: number } {
+  return {
+    ...roster,
+    sessionLockRequired: getSettingValueForPerson(roster.id, SESSION_LOCK_REQUIRED_KEY) as boolean,
+    sessionLockTimeoutMinutes: getSettingValueForPerson(roster.id, SESSION_LOCK_TIMEOUT_KEY) as number,
+  };
+}
 
 // Every signed-in person can see the household roster (who's who, not
 // management). Full admin views (birthdate, credential status per person)
@@ -34,11 +58,11 @@ const listRoute = createRoute({
   summary: "The household roster",
   middleware: [requireAuth] as const,
   responses: {
-    200: { content: { "application/json": { schema: z.array(RosterSchema) } }, description: "Every active person." },
+    200: { content: { "application/json": { schema: z.array(RosterWithSecuritySchema) } }, description: "Every active person." },
     ...errorResponses({ 401: "Not signed in" }),
   },
 });
-peopleRoutes.openapi(listRoute, (c) => c.json(listActivePeople().map(toRoster), 200));
+peopleRoutes.openapi(listRoute, (c) => c.json(listActivePeople().map(toRoster).map(withSessionLock), 200));
 
 // Who may create which role. Not spelled out verbatim in platform plan 4.2
 // (capability grants for "manage people" land with a later release); this
@@ -201,13 +225,19 @@ const patchRoute = createRoute({
             localOnly: z.boolean().optional(),
             enabled: z.boolean().optional(),
             guestExpiresAt: z.string().nullable().optional(),
+            // INCOGNITO-07: routed through settings.ts's setValue(), not a
+            // person-table column - assertCanSetSessionLock() there is the
+            // actual authorization (owner/admin only, any target), checked
+            // before any other field on this request is written.
+            sessionLockRequired: z.boolean().optional(),
+            sessionLockTimeoutMinutes: z.number().int().min(1).max(120).optional(),
           }),
         },
       },
     },
   },
   responses: {
-    200: { content: { "application/json": { schema: RosterSchema } }, description: "Updated." },
+    200: { content: { "application/json": { schema: RosterWithSecuritySchema } }, description: "Updated." },
     ...errorResponses({ 400: "Invalid role/displayName/birthdate/guestExpiresAt", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
   },
 });
@@ -225,7 +255,21 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     return c.json({ error: `${actor.role} cannot edit a ${target.role} profile` }, 403);
   }
 
-  const body = c.req.valid("json") as PersonEdit;
+  const rawBody = c.req.valid("json");
+  const body = rawBody as PersonEdit;
+
+  // INCOGNITO-07: checked before anything on this request is written
+  // (same "whole request refused together" reasoning as the role check
+  // below) - settings.ts's setValue() is the actual enforcement, called
+  // once the rest of this edit has committed, but its own gate is a pure
+  // actor check with no value-dependent branch (the boolean/1-120-range
+  // shape is already guaranteed by this route's own Zod body schema), so
+  // pre-checking it here costs nothing and keeps a refused session-lock
+  // change from applying alongside an otherwise-successful rename/role
+  // change.
+  if ((rawBody.sessionLockRequired !== undefined || rawBody.sessionLockTimeoutMinutes !== undefined) && !isOwnerOrAdmin(actor)) {
+    return c.json({ error: "only owner or admin may change session lock settings" }, 403);
+  }
 
   // canManage() lets everyone edit their OWN profile (name, nickname,
   // avatar) with no ladder check at all - birthdate and localOnly are
@@ -335,8 +379,28 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   if (nextRole !== target.role || candidateEnabled !== target.enabled || candidate.data.birthdate !== target.birthdate) {
     invalidateSessionCacheForPerson(id);
   }
+
+  // The pre-check above already proved this actor may set these, for
+  // this target, and settings.ts's own assertCanSetSessionLock() is kept
+  // in sync with it - but a code review (low effort, before commit)
+  // found the first version of this discarded setValue()'s own
+  // SettingsOpResult, so a refusal there (the two checks drifting again,
+  // some future edit to one and not the other) would have silently
+  // returned 200 with the person's field left unchanged, never the 403
+  // the code implied was already handled. Checked properly now, the
+  // same "return the error, don't swallow it" shape commitPersonUpdate's
+  // own result gets above.
+  if (rawBody.sessionLockRequired !== undefined) {
+    const result = setValue(actor, `person:${id}`, SESSION_LOCK_REQUIRED_KEY, rawBody.sessionLockRequired);
+    if (!result.ok) return c.json({ error: result.error }, result.status);
+  }
+  if (rawBody.sessionLockTimeoutMinutes !== undefined) {
+    const result = setValue(actor, `person:${id}`, SESSION_LOCK_TIMEOUT_KEY, rawBody.sessionLockTimeoutMinutes);
+    if (!result.ok) return c.json({ error: result.error }, result.status);
+  }
+
   const { birthdate: _birthdate, ...roster } = candidate.data;
-  return c.json(roster, 200);
+  return c.json(withSessionLock(roster), 200);
 });
 
 // Batch delete (docs/UI.md > Batch actions). Registered before the

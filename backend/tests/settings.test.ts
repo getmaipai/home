@@ -324,6 +324,104 @@ describe("PUT /api/settings for search.safe_search (a wider AND narrower person-
   });
 });
 
+// INCOGNITO-07: the generic PUT /api/settings route reaches the same
+// setValue() routes/people.ts's own PATCH calls, so this proves the gate
+// holds even bypassing that route entirely - defense in depth, not a
+// duplicate of people.test.ts's "session lock" block, which exercises
+// the real admin surface (PATCH /api/people/:id) end to end.
+describe("PUT /api/settings for security.session_lock_required/timeout (owner/admin only, any target)", () => {
+  test("owner can set it for an adult directly through the generic route", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Rover", role: "adult" });
+    const { id: adultId } = (await created.json()) as { id: string };
+    const res = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${adultId}`, key: "security.session_lock_required", value: true },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  // A code review (medium effort, before commit) caught the first
+  // version of assertCanSetSessionLock() checking only isOwnerOrAdmin(),
+  // no target-role check at all - an admin could force this onto the
+  // OWNER's own account through this generic route, even though
+  // canManage()'s own MANAGEABLE_BY.admin ladder already refuses the
+  // identical write on PATCH /api/people/:id. Same operation, two
+  // policies depending only on which route reached it - fixed to match
+  // the ladder.
+  test("an admin cannot force it onto the owner's account, matching PATCH /api/people/:id's own ladder", async () => {
+    const owner = new TestClient();
+    const { person: ownerPerson } = (await (
+      await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })
+    ).json()) as { person: { id: string } };
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "admin", secret: "correcthorse2" });
+    const { id: adminId } = (await created.json()) as { id: string };
+    const adminClient = new TestClient();
+    await adminClient.post("/api/auth/verify-secret", { personId: adminId, secret: "correcthorse2" });
+
+    const res = await adminClient.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${ownerPerson.id}`, key: "security.session_lock_required", value: true },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test("an admin cannot set it for another admin either", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created1 = await owner.post("/api/people", { displayName: "Marlow", role: "admin", secret: "correcthorse2" });
+    const { id: admin1Id } = (await created1.json()) as { id: string };
+    const created2 = await owner.post("/api/people", { displayName: "Rover", role: "admin", secret: "correcthorse3" });
+    const { id: admin2Id } = (await created2.json()) as { id: string };
+    const admin1Client = new TestClient();
+    await admin1Client.post("/api/auth/verify-secret", { personId: admin1Id, secret: "correcthorse2" });
+
+    const res = await admin1Client.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${admin2Id}`, key: "security.session_lock_required", value: true },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test("the owner CAN set it for an admin - only admin-on-admin/owner is refused", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "admin", secret: "correcthorse2" });
+    const { id: adminId } = (await created.json()) as { id: string };
+    const res = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${adminId}`, key: "security.session_lock_required", value: true },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("a non-admin cannot set it even for themselves", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Rover", role: "adult", secret: "correcthorse" });
+    const { id: adultId } = (await created.json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adultId, secret: "correcthorse" });
+    const res = await adultClient.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${adultId}`, key: "security.session_lock_required", value: true },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test("an out-of-range timeout is a clean 400", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const me = (await (await owner.get("/api/auth/me")).json()) as { id: string };
+    const res = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${me.id}`, key: "security.session_lock_timeout_minutes", value: 500 },
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("lib/settings.ts getPersonSettingValue()", () => {
   test("resolves the registry default when nothing is stored", async () => {
     const { childPerson } = await ownerAndChild();
