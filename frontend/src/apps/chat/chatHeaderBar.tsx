@@ -161,15 +161,6 @@ export function ChatHeaderBar() {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
       <ChatIcon className="text-muted-foreground size-4 shrink-0" />
-      <Button
-        type="button"
-        variant={data.incognito ? "secondary" : "ghost"}
-        size="sm"
-        aria-pressed={data.incognito}
-        onClick={() => data.onIncognitoChange(!data.incognito)}
-      >
-        Incognito {data.incognito ? "On" : "Off"}
-      </Button>
       {renaming ? (
         <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
       ) : (

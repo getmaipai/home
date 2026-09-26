@@ -58,7 +58,7 @@ import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assist
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { readRailCollapsePreference, writeRailCollapsePreference } from "@/next/railCollapsePreference";
-import { useIncognito } from "@/next/useIncognito";
+import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 
 const HistoryIcon = getIcon("history");
 // CHAT-UI-03 (3): the app rail's own toggle (sidebar.tsx's
@@ -445,8 +445,8 @@ function ChatThinkingIndicator() {
   );
 }
 
-// The Incognito toggle now lives in the persistent chat header; keep the
-// welcome slot's ordinary prompt so there is only one control.
+// Incognito is controlled from the global /next header; this welcome
+// slot only reflects the shared state and does not add a second toggle.
 function NextChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
   return (
@@ -1314,25 +1314,16 @@ function ChatDocumentTitle() {
  * pushes it into the data context. Same side-effect-mount shape as
  * ArtifactCacheInvalidator/ChatDocumentTitle above, just carrying data
  * instead of a DOM/browser-API side effect. */
-function ChatHeaderDataBridge({ incognito, setIncognito }: { incognito: boolean; setIncognito: (on: boolean) => void }) {
+function ChatHeaderDataBridge() {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
-  const changeIncognito = (on: boolean) => {
-    if (on === incognito) return;
-    setIncognito(on);
-    if (!on) {
-      // State swaps the remote adapter back to durable threads immediately;
-      // after the server discards sessions, reload that list once more so
-      // the runtime has no stale Incognito rows cached.
-      void api.discardIncognitoConversations().then(async () => {
-        await aui.threads.reload();
-      }).catch(() => toast.error("Could not discard Incognito chats. Try again."));
-    }
-  };
+  useEffect(() => {
+    const reloadThreads = () => void aui.threads.reload();
+    window.addEventListener(INCOGNITO_DISCARDED_EVENT, reloadThreads);
+    return () => window.removeEventListener(INCOGNITO_DISCARDED_EVENT, reloadThreads);
+  }, [aui]);
   useSetChatHeaderData({
     title,
-    incognito,
-    onIncognitoChange: changeIncognito,
     // A code review caught this: the vendored thread-list.aui.tsx's own
     // rename/delete already toast on failure (`toast.error("Could not
     // rename/delete this chat. Try again.")`) - this header's own
@@ -1370,7 +1361,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // shell header's own slot (ui-v0.5.35) mounts and unmounts it, never
   // re-created per render.
   useHeaderExtra(ChatHeaderBar);
-  const [temporaryNext, setTemporaryNext] = useIncognito();
+  const { on: temporaryNext } = useIncognitoContext();
   // VOICE-LIVE-02: owned here (not inside useNextChatRuntime) since both
   // the composer's own waveform button (via VoiceSessionProvider,
   // composerVoiceControls.tsx's zero-prop slot needs a context to reach
@@ -1876,7 +1867,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />
         <ChatDocumentTitle />
-        <ChatHeaderDataBridge incognito={temporaryNext} setIncognito={setTemporaryNext} />
+        <ChatHeaderDataBridge />
         <LiveVoiceSession
           open={voiceOpen}
           onOpenChange={setVoiceOpen}

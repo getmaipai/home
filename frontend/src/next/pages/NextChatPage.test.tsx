@@ -4,8 +4,10 @@ import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-libra
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
+import { IncognitoToggle } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/Header";
 import { NextChatPage } from "@/next/pages/NextChatPage";
 import { writeIncognitoCache } from "@/next/incognitoCache";
+import { IncognitoProvider, useIncognitoContext } from "@/next/incognitoContext";
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
 import type { Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
@@ -67,9 +69,16 @@ function renderPage(ui: ReactElement) {
   // toggle's own tooltip (CHAT-UI-03) needs it too, or Radix throws.
   return render(
     <QueryClientProvider client={client}>
-      <TooltipProvider>{ui}</TooltipProvider>
+      <IncognitoProvider>
+        <TooltipProvider>{ui}</TooltipProvider>
+      </IncognitoProvider>
     </QueryClientProvider>,
   );
+}
+
+function GlobalIncognitoToggle() {
+  const { on, setOn } = useIncognitoContext();
+  return <IncognitoToggle on={on} onChange={setOn} />;
 }
 
 function makePerson(overrides: Partial<Roster> = {}): Roster {
@@ -1700,6 +1709,31 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
 });
 
 describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
+  test("the global header toggle controls whether the chat turn is temporary", async () => {
+    const restore = stubMultiTurnFetch();
+    try {
+      writeIncognitoCache(false);
+      const view = renderPage(
+        <>
+          <GlobalIncognitoToggle />
+          <MemoryRouter initialEntries={["/next/chat"]}>
+            <NextChatPage person={makePerson()} />
+          </MemoryRouter>
+        </>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(await view.findByRole("button", { name: "Incognito Off" }));
+      await view.findByRole("button", { name: "Incognito On" });
+      await sendMessage(view, "a private question");
+      await view.findByText("Reply 1.");
+
+      expect(turnRequestBodies()[0]!.temporary).toBe(true);
+      expect(sessionStorage.getItem("maipai.incognito")).toBe("1");
+    } finally {
+      restore();
+    }
+  });
+
   test("Incognito stays on across separate new threads and marks each first turn temporary", async () => {
     const restore = stubMultiTurnFetch();
     try {

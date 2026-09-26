@@ -23,6 +23,8 @@ import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { api, type Roster } from "@/lib/api";
+import { toast } from "sonner";
+import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 
 /** The `/next/*` route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): behind `ui.shell.next`, mounts the template's
@@ -86,6 +88,29 @@ function NextRoutesInner({ person }: { person: Roster }) {
   useNextLook(person.id);
 
   return (
+    <IncognitoProvider>
+      <NextRoutesWithIncognito person={person} />
+    </IncognitoProvider>
+  );
+}
+
+function NextRoutesWithIncognito({ person }: { person: Roster }) {
+  const { on: incognito, setOn: setIncognito } = useIncognitoContext();
+
+  const onIncognitoChange = (on: boolean) => {
+    if (on === incognito) return;
+    setIncognito(on);
+    if (!on) {
+      // The state switches the chat adapter immediately; after temporary
+      // sessions are discarded, tell the mounted chat runtime to reload
+      // once more so its list cannot retain stale Incognito rows.
+      void api.discardIncognitoConversations().then(() => {
+        window.dispatchEvent(new Event(INCOGNITO_DISCARDED_EVENT));
+      }).catch(() => toast.error("Could not discard Incognito chats. Try again."));
+    }
+  };
+
+  return (
     // CHAT-HEADER-01: wraps every /next page (a Route element, never a
     // per-page one) since FullLayout's own Header - where ChatHeaderBar
     // actually renders (a sibling of this Outlet, not a descendant) -
@@ -101,7 +126,7 @@ function NextRoutesInner({ person }: { person: Roster }) {
             kit's HeaderSearch remote prop (FullLayout -> Header ->
             HeaderSearch, a plain prop threaded down since FullLayout is
             the one component this file actually instantiates itself). */}
-        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} />}>
+        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
