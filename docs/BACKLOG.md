@@ -356,6 +356,13 @@ the design doc's own "What already exists" section.
       and white foreground treatment. The dark header has its own real
       `FullLayout` contrast and computed-surface coverage. Jesse's live
       desktop judgment of this update is still pending.
+      **Active sidebar accent, codex-383 (2026-09-26):** the active
+      nav pill now uses the same violet, with white text measured at
+      4.5:1 or better. The override is scoped to the vendored sidebar's
+      active `NavItem` only: the Home-wide `--primary` token also colors
+      action links, selections and chat controls, which keep the cyan
+      brand accent. A real `SidebarLayout` test checks computed active
+      and inactive colors in both themes; Jesse's live check is pending.
 - [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
       confirmed 2026-09-25. `canHaveTemporaryChatRole`'s only remaining
       call site is the unrelated "Thinking" mode toggle's own,

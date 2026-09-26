@@ -89,6 +89,15 @@ html.incognito body[class*="style-"] [data-slot="sidebar-inner"] {
   background-color: var(--incognito-sidebar);
 }
 
+/* Keep Home's primary cyan for links, actions and selected controls.
+ * Only the vendored sidebar's active navigation pill joins Incognito's
+ * violet highlights; its shipped NavItem renders as a Link > div with
+ * both bg-primary and text-background classes when active. */
+html.incognito body[class*="style-"] [data-slot="sidebar-inner"] a > div.bg-primary.text-background {
+  background-color: var(--hue-violet);
+  color: white;
+}
+
 html.incognito body[class*="style-"] [data-slot="sidebar-inset"],
 html.incognito body[class*="style-"] .aui-root.aui-thread-root,
 html.incognito body[class*="style-"] .aui-thread-viewport-footer,
