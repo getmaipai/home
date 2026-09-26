@@ -26,12 +26,16 @@
  * tokens. */
 html.incognito {
   --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 9%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 7%, var(--surface-page)), transparent 72%);
-  --incognito-input-border: color-mix(in srgb, var(--hue-violet) 48%, var(--input));
+  /* Tailwind's bg-background utilities use background-color, so use the
+   * gradient's central tint as a solid value for nested surfaces. */
+  --background: color-mix(in srgb, var(--hue-violet) 9%, var(--surface-page));
+  --incognito-input-border: color-mix(in srgb, var(--hue-violet) 78%, var(--input));
 }
 
 html.dark.incognito {
   --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 10%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 9%, var(--surface-page)), transparent 72%);
-  --incognito-input-border: color-mix(in srgb, var(--hue-violet) 72%, var(--input));
+  --background: color-mix(in srgb, var(--hue-violet) 10%, var(--surface-page));
+  --incognito-input-border: color-mix(in srgb, var(--hue-violet) 82%, var(--input));
 }
 
 html.incognito [data-slot="sidebar-inset"] {
