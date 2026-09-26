@@ -11,7 +11,7 @@ import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeople, type FakeSearxng } from "../../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { StreamSafetyRefusal, type StreamOutcome } from "@/lib/turnEngine";
@@ -26,7 +26,9 @@ import { eq } from "drizzle-orm";
 import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
-import { remember, embedMemoryRecordSafely } from "@/lib/memory";
+import { remember, embedMemoryRecordSafely, PROFILE_SOURCE } from "@/lib/memory";
+import { DEFAULT_PERSONA, resolvePersona } from "@/lib/persona";
+import { identityLine } from "@/lib/turnEngine";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 let people: BenchPeople;
@@ -559,6 +561,70 @@ describe("turnNext.ts: temporary chat", () => {
     );
     expect(second.ok).toBe(true);
     expect(sawFirstTurn).toBe(true);
+  });
+
+  test("temporary turns use the default persona, withhold the profile, and keep tool availability", async () => {
+    expect(setValue(people.owner, `person:${people.owner.id}`, "persona.active_id", "tutor").ok).toBe(true);
+    const profileText = "Sage is a night-shift paramedic who loves hiking.";
+    const profile = remember(people.owner, {
+      text: profileText,
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: people.owner.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    expect(profile.ok).toBe(true);
+
+    const seen: ChatCompletionRequest[] = [];
+    const reply = (request: ChatCompletionRequest) => {
+      seen.push(request);
+      return "Okay.";
+    };
+    const previous = await withStub({ reply }, () => runTurnNext(people.owner, "chat", "my dentist appointment is on Thursday"));
+    expect(previous.ok).toBe(true);
+
+    const ordinary = await withStub({ reply }, () => runTurnNext(people.owner, "chat", "what day is my dentist appointment"));
+    expect(ordinary.ok).toBe(true);
+    const ordinaryPrompt = seen[1]!.messages.map((message) => String(message.content ?? "")).join("\n");
+    expect(ordinaryPrompt).toContain(identityLine(resolvePersona("tutor")));
+    expect(ordinaryPrompt).toContain(profileText);
+
+    const incognito = await withStub({ reply }, () => runTurnNext(people.owner, "chat", "what day is my dentist appointment", { temporary: true }));
+    expect(incognito.ok).toBe(true);
+    const temporaryPrompt = seen[2]!.messages.map((message) => String(message.content ?? "")).join("\n");
+    expect(temporaryPrompt).toContain(identityLine(DEFAULT_PERSONA));
+    expect(temporaryPrompt).not.toContain(identityLine(resolvePersona("tutor")));
+    expect(temporaryPrompt).not.toContain(profileText);
+    expect(seen[1]!.tools?.map((tool) => tool.function.name)).toContain("websearch");
+    expect(seen[2]!.tools?.map((tool) => tool.function.name)).toContain("websearch");
+
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      for (const temporary of [false, true]) {
+        const result = await withStub(
+          {
+            calls: (request) => request.messages.some((message) => message.role === "tool")
+              ? undefined
+              : [{ id: "call-incognito-parity", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }],
+            reply: (request) => request.messages.some((message) => message.role === "tool") ? "The current president of Chile answers the question." : "Searching.",
+          },
+          () => runTurnNext(people.owner, "chat", "who is the president of chile", temporary ? { temporary: true } : {}),
+        );
+        expect(result.ok).toBe(true);
+        if (!result.ok || result.kind !== "immediate") throw new Error("expected a completed tool turn");
+        expect(result.value.plugin_id).toBe("websearch");
+        expect(result.toolEvents?.some((event) => event.t === "tool_call" && event.package_id === "websearch")).toBe(true);
+      }
+      // Both turns completed a real websearch tool call. The package's
+      // result cache may serve the second identical query locally.
+      expect(searxng.queries.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      searxng.stop();
+    }
   });
 });
 

@@ -2181,6 +2181,72 @@ describe("INCOGNITO-02 old-path memory read gate", () => {
       __resetLlmSupervisorForTests();
     }
   });
+
+  test("temporary turns use the default persona and omit profile/old episodes without changing normal context or routing", async () => {
+    const { client, actor } = await owner();
+    const personaResponse = await client.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${actor.id}`, key: "persona.active_id", value: "tutor" },
+    });
+    expect(personaResponse.status).toBe(200);
+    const profile = remember(actor, {
+      text: "Sage is a night-shift paramedic who loves hiking.",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    expect(profile.ok).toBe(true);
+
+    const seen: { prompt: string; tools: string[] }[] = [];
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        seen.push({
+          prompt: request.messages.map((message) => String(message.content ?? "")).join("\n"),
+          tools: (request.tools ?? []).map((tool) => tool.function.name),
+        });
+        return "Okay.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const { createConversation } = await import("@/lib/conversationHistory");
+      const sourceConversation = createConversation(actor, { surface: "chat" });
+      expect(sourceConversation.ok).toBe(true);
+      if (!sourceConversation.ok) return;
+      const source = await runTurn(actor, "chat", "my dentist appointment is on Thursday", { conversationId: sourceConversation.value.id });
+      expect(source.ok).toBe(true);
+
+      const ordinaryConversation = createConversation(actor, { surface: "chat" });
+      expect(ordinaryConversation.ok).toBe(true);
+      if (!ordinaryConversation.ok) return;
+      const ordinary = await runTurn(actor, "chat", "what day is my dentist appointment", { conversationId: ordinaryConversation.value.id });
+      expect(ordinary.ok).toBe(true);
+      expect(seen[1]!.prompt).toContain(buildOldPathStablePrefix(resolvePersona("tutor")));
+      expect(seen[1]!.prompt).toContain("night-shift paramedic");
+      expect(seen[1]!.prompt).toContain('said: "my dentist appointment is on Thursday"');
+
+      const temporary = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+      expect(temporary.ok).toBe(true);
+      if (!temporary.ok) return;
+      const incognito = await runTurn(actor, "chat", "what day is my dentist appointment", { conversationId: temporary.value.id });
+      expect(incognito.ok).toBe(true);
+      expect(seen[2]!.prompt).toContain(buildOldPathStablePrefix(DEFAULT_PERSONA));
+      expect(seen[2]!.prompt).not.toContain(buildOldPathStablePrefix(resolvePersona("tutor")));
+      expect(seen[2]!.prompt).not.toContain("night-shift paramedic");
+      expect(seen[2]!.prompt).not.toContain('said: "my dentist appointment is on Thursday"');
+      expect(seen[1]!.tools).toContain("websearch");
+      expect(seen[2]!.tools).toContain("websearch");
+    } finally {
+      await stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
 });
 
 describe("buildSystemPrompt() speaker and household (step 1)", () => {

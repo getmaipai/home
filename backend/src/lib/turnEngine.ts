@@ -1095,7 +1095,7 @@ export function buildPromptParts(
   // registry's own lines about the subjects), ahead of the memory
   // section so the trust reminder never reads as knowing a new name.
   subjectsSection: string = "",
-  speakerContext: { band: string; basis: string } = { band: speakerAgeBand(actor, frozenClock().now), basis: "identified_profile" },
+  speakerContext: { band: string; basis: string; temporary?: boolean } = { band: speakerAgeBand(actor, frozenClock().now), basis: "identified_profile" },
   plan?: ReplyPlan,
   signal?: TurnSignal,
 ): { stablePrefix: string; context: string } {
@@ -1104,7 +1104,7 @@ export function buildPromptParts(
   const { now, locale } = frozen;
 
   const anonymous = speakerContext.basis === "unknown_speaker_default";
-  const profile = anonymous ? undefined : getProfileParagraph(actor);
+  const profile = anonymous || speakerContext.temporary ? undefined : getProfileParagraph(actor);
   let memorySection = "";
   if (profile || memoryMatches.length > 0) {
     const profileLine = profile ? `${profile.text}\n` : "";
@@ -2805,7 +2805,7 @@ async function prepareTurn(
   // conversation, recalls no episodes (the window is its evidence); the
   // person's own side only, unless the question asks what the hub said,
   // and then the hub's side comes as a reported note, never a line.
-  const episodeMatches = episodeQueryEligible(text)
+  const episodeMatches = conversation.mode !== "temporary" && episodeQueryEligible(text)
     ? recallEpisodes(actor, text, utteranceVector, { now: frozen.now, excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, withholdSensitive, anonymous, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
     : [];
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
@@ -2835,7 +2835,7 @@ async function prepareTurn(
   }
   timings.recall_ms = Math.round(performance.now() - recallStart);
   const promptStart = performance.now();
-  const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
+  const persona = conversation.mode === "temporary" ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
   const basePlan = planFor({ signal, surface, brevity: constraintsFor(conversation.id).some((c) => c.kind === "length" && /short|brief|one line/i.test(c.value)) || /\b(?:just the number(?:s)?|short answer|one line)\b/i.test(text), evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: persona.engagement, complexity: persona.complexity }, band: ageBand, deferred: false, disclosureWithheld: memoryMatches.withheldForBand > 0 || Boolean(window.summaryLine) });
   // COMP-02: research keeps the article in the details document, so the
@@ -2844,7 +2844,7 @@ async function prepareTurn(
   // word ceiling for the per-conversation research presentation.
   const plan = conversation.mode === "research" ? { ...basePlan, max_words: Math.min(basePlan.max_words, 30) } : basePlan;
   if (memoryMatches.withheldForBand > 0) fired("disclosure.withheld");
-  const promptParts = buildPromptParts(actor, text, memoryMatches, effectiveLoaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis }, plan, signal);
+  const promptParts = buildPromptParts(actor, text, memoryMatches, effectiveLoaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches, subjectsSection, { band: ageBand, basis: ageBandBasis, temporary: conversation.mode === "temporary" }, plan, signal);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -2862,7 +2862,7 @@ async function prepareTurn(
   // (the rule `actuallyInjected` applied to memory bullets alone before
   // this item, now to every kind); the usage bump and the guard input
   // both read the included set.
-  const profile = anonymous ? undefined : getProfileParagraph(actor, { withholdSensitive });
+  const profile = anonymous || conversation.mode === "temporary" ? undefined : getProfileParagraph(actor, { withholdSensitive });
   const evidence: TurnEvidence[] = [
     { id: `user:${turnId}`, kind: "user_assertion", text, rendered: text, entityIds: [] },
     ...memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map(
@@ -3681,7 +3681,7 @@ function composedRecordOf(prepared: PreparedTurn): ComposedRecord | undefined {
   return { ...prepared.composed, phase: prepared.machine?.phase ?? prepared.composed.phase };
 }
 
-function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface = "chat", trace?: ReplyTrace): TurnValue {
+function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface = "chat", trace?: ReplyTrace, temporary = false): TurnValue {
   const value = enforceWellFormed(actor, applyOutputBoundary(actor, rawValue), trace);
   const { text, speech } = value.reply;
   // An explicit speech text that differs from the visible text is kept
@@ -3705,7 +3705,7 @@ function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface =
   // race requires the same person to change their own setting mid-turn,
   // and its worst outcome is one word choice sounding like the wrong
   // companion for one reply.
-  const personaId = resolvePersona(getPersonSettingValue(actor, "persona.active_id")).id;
+  const personaId = (temporary ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"))).id;
   const variedText =
     value.source === "safety_refuse"
       ? pickRefusalVariant(actor.id)
@@ -4011,7 +4011,7 @@ async function runTurnHoldingLease(
   // person's open question, at the end of the reply.
   const ask = prepared.kind === "model" && value.source === "model" ? appendedAsk(prepared, actor, conversation.id, value.reply.text, text, conversation.mode === "temporary") : NO_ASK;
   if (ask.append) value = { ...value, reply: { ...value.reply, text: `${value.reply.text.trimEnd()}${ask.append}` } };
-  value = finalizeReply(actor, value, prepared.surface, trace);
+  value = finalizeReply(actor, value, prepared.surface, trace, conversation.mode === "temporary");
   // Committed only when the delivered text still carries the question
   // (the boundary can replace the whole reply).
   if (value.source === "model") ask.commitIf(value.reply.text);
@@ -4583,7 +4583,7 @@ async function runTurnStreamHoldingLease(
 
   if (prepared.kind === "immediate") {
     const trace: ReplyTrace = { hits: [], replaced: false };
-    const value = finalizeReply(actor, prepared.value, prepared.surface, trace);
+    const value = finalizeReply(actor, prepared.value, prepared.surface, trace, conversation.mode === "temporary");
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
     logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.subjects, inputSafety: prepared.value.safety, rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present });
     return { ok: true, kind: "immediate", value, signal: prepared.signal };
@@ -4628,7 +4628,7 @@ async function runTurnStreamHoldingLease(
   // finalize() builds the value from the resolution and the text.
   // The deliverable line is never composed.
   async function* composeOrResolve(resolved: TurnValue, resolutionOutcomes: readonly ToolExecutionOutcome[], direct = false): AsyncGenerator<string, { resolved: TurnValue } | undefined, void> {
-    if (resolved.source !== "plugin") return { resolved: finalizeReply(actor, resolved, modelTurn.surface, resolvedTrace) };
+    if (resolved.source !== "plugin") return { resolved: finalizeReply(actor, resolved, modelTurn.surface, resolvedTrace, conversation.mode === "temporary") };
     const machine = modelTurn.machine!;
     const plan = planComposition(composerInputFor(modelTurn, conversation.id, resolutionOutcomes, direct));
     const sources = plan.sources.length > 0 ? plan.sources : resolved.sources;
@@ -4636,7 +4636,7 @@ async function runTurnStreamHoldingLease(
     if (plan.mode !== "composition") {
       if (plan.mode === "empty_rows") ruleFired(modelTurn, "composition.empty_rows");
       modelTurn.composed = { mode: plan.mode, model_calls: 0, ...(plan.budget_spent ? { budget_spent: true } : {}), phase: machine.phase };
-      return { resolved: finalizeReply(actor, { ...withSources, reply: plan.reply }, modelTurn.surface, resolvedTrace) };
+      return { resolved: finalizeReply(actor, { ...withSources, reply: plan.reply }, modelTurn.surface, resolvedTrace, conversation.mode === "temporary") };
     }
     machine.enter("composing");
     status.emit({ type: "status", text: COMPOSING_STATUS_TEXT, stage: "composing" });
@@ -4987,7 +4987,7 @@ async function runTurnStreamHoldingLease(
         // output-safety cut is the model turn's own case below.
         if (composedFrom && !(outcome?.action === "refuse")) {
           const trace: ReplyTrace = { hits: guardHits, replaced: guardReplaced, delivered: true };
-          const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace);
+          const composedValue = finalizeReply(actor, { ...composedFrom, reply: { text: guardHits.length > 0 ? closeDanglingClause(replyText) : replyText }, ...(outcome?.flagged ? { safety: outcome, crisis_resources: deriveCrisisResources(outcome) ?? prepared.crisisResources } : {}) }, modelTurn.surface, trace, conversation.mode === "temporary");
           finalized = composedValue;
           prepared.timings.finalize_ms = Date.now() - finalizeStart;
           logTurnSafely(actor, surface, text, composedValue, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, branchFrom: continuation?.fromTurnId, ephemeral: opts.ephemeral, temporary: conversation.mode === "temporary", outcomes: prepared.turnContext.outcomes, signal: prepared.signal, plan: prepared.plan, timings: prepared.timings, subjects: prepared.turnContext.subjects, inputSafety: prepared.safety, composed: composedRecordOf(prepared), rules: prepared.rules, speakerEvidence: opts.speakerEvidence, present: opts.present, generations: modelTurn.generations, thinking: opts.thinking });
@@ -5062,6 +5062,7 @@ async function runTurnStreamHoldingLease(
           },
           modelTurn.surface,
           trace,
+          conversation.mode === "temporary",
         );
         // CHAT-18: the lease was released above (or by the generator's
         // own exhaustion or abort before this ran); a disconnect before

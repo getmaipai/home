@@ -18,9 +18,9 @@ import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { resolvePersona } from "@/lib/persona";
+import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
@@ -185,7 +185,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // of world, so the interim rule stops forcing a search for it.
   const loaded = loadAllManifests();
   const signal = classifyTurnSignal({ text, ageBand: band, commandOpeners: commandOpeners(loaded), computedPatternMatch: (t) => computedPatternMatch(loaded, t) });
-  const persona = resolvePersona(getHouseholdSettingValue("persona.active_id"));
+  const persona = temporary ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything
