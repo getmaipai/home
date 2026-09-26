@@ -1085,7 +1085,10 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const [packageScope, setPackageScope] = useState<InstalledPackage | null>(null);
   const packageScopeRef = useRef<InstalledPackage | null>(null);
   packageScopeRef.current = packageScope;
-  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
+  // The remote-thread runtime reloads its list when this adapter changes.
+  // Incognito is an exclusive data source: its sessions never merge with
+  // durable conversation rows.
+  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext }), [person.display_name, temporaryNext]);
   // SHELL-02 slice 6: the same real adapters ChatPage.tsx's composer
   // already uses - images plus, new here, text/Markdown files through
   // the shipped `SimpleTextAttachmentAdapter` (client-side only, no
@@ -1314,10 +1317,22 @@ function ChatDocumentTitle() {
 function ChatHeaderDataBridge({ incognito, setIncognito }: { incognito: boolean; setIncognito: (on: boolean) => void }) {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
+  const changeIncognito = (on: boolean) => {
+    if (on === incognito) return;
+    setIncognito(on);
+    if (!on) {
+      // State swaps the remote adapter back to durable threads immediately;
+      // after the server discards sessions, reload that list once more so
+      // the runtime has no stale Incognito rows cached.
+      void api.discardIncognitoConversations().then(async () => {
+        await aui.threads.reload();
+      }).catch(() => toast.error("Could not discard Incognito chats. Try again."));
+    }
+  };
   useSetChatHeaderData({
     title,
     incognito,
-    onIncognitoChange: setIncognito,
+    onIncognitoChange: changeIncognito,
     // A code review caught this: the vendored thread-list.aui.tsx's own
     // rename/delete already toast on failure (`toast.error("Could not
     // rename/delete this chat. Try again.")`) - this header's own

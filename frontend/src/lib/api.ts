@@ -459,6 +459,14 @@ export const api = {
     const suffix = params.toString();
     return request<ConversationSummary[]>(`/api/conversations${suffix ? `?${suffix}` : ""}`);
   },
+  incognitoConversationList: (person?: string) => {
+    const suffix = person ? `?person=${encodeURIComponent(person)}` : "";
+    return request<ConversationSummary[]>(`/api/conversations/incognito${suffix}`);
+  },
+  discardIncognitoConversations: (person?: string) => {
+    const suffix = person ? `?person=${encodeURIComponent(person)}` : "";
+    return request<{ discarded: number }>(`/api/conversations/incognito/discard${suffix}`, { method: "POST" });
+  },
   createConversation: (mode?: Conversation["mode"]) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}) }) }),
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),

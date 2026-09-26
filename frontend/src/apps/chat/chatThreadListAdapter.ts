@@ -19,13 +19,15 @@ export interface ChatThreadListOptions {
    * message-body-only match isn't hidden again on the way to the screen
    * (thread-list.aui.tsx's own `skipFilter`). */
   query?: string;
+  /** When true, list the live session-only Incognito conversations. */
+  incognito?: boolean;
 }
 
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
-  const { personId, query } = options;
+  const { personId, query, incognito = false } = options;
   return {
     async list() {
-      const rows = await api.conversationList(personId, query);
+      const rows = incognito ? await api.incognitoConversationList(personId) : await api.conversationList(personId, query);
       return { threads: rows.filter((row) => row.surface === "chat").map((row) => ({
         status: "regular" as const,
         remoteId: row.id,

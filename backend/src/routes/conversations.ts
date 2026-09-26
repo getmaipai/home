@@ -17,6 +17,8 @@ import {
   list,
   exportPerson,
   listConversations,
+  listTemporaryConversations,
+  discardTemporarySessions,
   resumeConversation,
   createConversation,
   getConversation,
@@ -73,6 +75,18 @@ conversationsRoutes.get("/", requireAuth, async (c) => {
   // actor.id`, conversationHistory.ts), so there was never a reason to
   // drop it here.
   return c.json(listConversations(actor, person, query));
+});
+
+conversationsRoutes.get("/incognito", requireAuth, async (c) => {
+  const actor = c.get("person");
+  return c.json(listTemporaryConversations(actor, c.req.query("person")));
+});
+
+conversationsRoutes.post("/incognito/discard", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const target = c.req.query("person") ?? actor.id;
+  if (!canAccessPerson(actor, target)) return c.json({ error: "Person not found" }, 404);
+  return c.json({ discarded: discardTemporarySessions(target) });
 });
 
 conversationsRoutes.get("/turns", requireAuth, async (c) => {

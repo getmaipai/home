@@ -154,4 +154,15 @@ describe("HOME-UI-02e: restored Conversations functions", () => {
     expect(requestedPath).toContain("q=compost");
     expect(result.threads.map((t) => t.remoteId)).toEqual(["conv-body-match"]);
   });
+
+  test("Incognito uses the dedicated session list and does not fetch the durable list", async () => {
+    let requestedPath = "";
+    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+      requestedPath = String(input);
+      return Response.json([{ id: "conv-live-incognito", title: null, surface: "chat", created_at: "2026-09-25T00:00:00Z", last_turn_at: null, pinned: false }]);
+    }) as unknown as typeof fetch;
+    const result = await createChatThreadListAdapter("Nova", { incognito: true }).list();
+    expect(requestedPath).toBe("/api/conversations/incognito");
+    expect(result.threads.map((thread) => thread.remoteId)).toEqual(["conv-live-incognito"]);
+  });
 });

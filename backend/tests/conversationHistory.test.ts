@@ -8,6 +8,9 @@ import { runTurn, __setSummaryRefreshDelayForTests } from "@/lib/turnEngine";
 import {
   list,
   listConversations,
+  listTemporaryConversations,
+  discardTemporarySessions,
+  isTemporaryConversation,
   exportPerson,
   runRetention,
   routingStats,
@@ -985,6 +988,50 @@ describe("GET /api/conversations (step 3: now lists conversation THREADS, not tu
     const res = await client.get(`/api/conversations?q=${encodeURIComponent("not sure")}`);
     const rows = (await res.json()) as Array<{ id: string }>;
     expect(rows.map((row) => row.id)).toEqual([matching.value.id]);
+  });
+});
+
+describe("Incognito conversation sessions", () => {
+  test("the Incognito endpoint lists only this person's live sessions, with spec-record summary fields", async () => {
+    const { client, actor } = await owner();
+    const first = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    const second = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    if (!first.ok || !second.ok) throw new Error("failed to create test sessions");
+
+    const res = await client.get("/api/conversations/incognito");
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Array<{ id: string; surface: string; companion_id: string | null; pinned: boolean; turn_count: number; last_turn_at: string | null; created_at: string }>;
+    expect(rows.map((row) => row.id)).toContain(first.value.id);
+    expect(rows.map((row) => row.id)).toContain(second.value.id);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.id === first.value.id)).toMatchObject({ surface: "chat", companion_id: first.value.companion_id, pinned: false, turn_count: 0, last_turn_at: null, created_at: first.value.created_at });
+    expect(await (await client.get("/api/conversations")).json()).toEqual([]);
+    discardTemporarySessions(actor.id);
+  });
+
+  test("discard removes all of one person's sessions and leaves another person's sessions intact", async () => {
+    const { client, actor } = await owner();
+    const other = await addPerson(client, "Robin", "adult");
+    const ownA = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    const ownB = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    const otherSession = resolveOrCreateConversation(other, "chat", undefined, { temporary: true });
+    if (!ownA.ok || !ownB.ok || !otherSession.ok) throw new Error("failed to create test sessions");
+
+    expect(discardTemporarySessions(actor.id)).toBe(2);
+    expect(listTemporaryConversations(actor).map((row) => row.id)).toEqual([]);
+    expect(isTemporaryConversation(otherSession.value.id)).toBe(true);
+    discardTemporarySessions(other.id);
+  });
+
+  test("the discard route clears this person's sessions immediately", async () => {
+    const { client, actor } = await owner();
+    const first = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    const second = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    if (!first.ok || !second.ok) throw new Error("failed to create test sessions");
+    const response = await client.post("/api/conversations/incognito/discard");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ discarded: 2 });
+    expect(listTemporaryConversations(actor)).toEqual([]);
   });
 });
 

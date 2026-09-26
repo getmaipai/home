@@ -613,6 +613,40 @@ export function isTemporaryConversation(conversationId: string): boolean {
   return temporarySessions.has(conversationId);
 }
 
+/** Live temporary conversations for one visible person. These sessions
+ * have no database row, so their summaries come from the spec record and
+ * their in-memory turn window. */
+export function listTemporaryConversations(actor: PersonRow, personId?: string): ConversationSummary[] {
+  const target = personId ?? actor.id;
+  if (!canAccessPerson(actor, target)) return [];
+  pruneTemporarySessions(Date.now());
+  return [...temporarySessions.values()]
+    .filter(({ conversation }) => conversation.person === target)
+    .map(({ conversation, turns }) => ({
+      id: conversation.id,
+      surface: conversation.surface,
+      companion_id: conversation.companion_id,
+      title: conversation.title,
+      pinned: conversation.pinned,
+      turn_count: turns.length,
+      last_turn_at: turns.at(-1)?.createdAt ?? null,
+      created_at: conversation.created_at,
+    }))
+    .sort((a, b) => (b.last_turn_at ?? b.created_at).localeCompare(a.last_turn_at ?? a.created_at));
+}
+
+/** Immediately forget every live temporary chat for this person. */
+export function discardTemporarySessions(personId: string): number {
+  let discarded = 0;
+  for (const [id, session] of temporarySessions) {
+    if (session.conversation.person === personId) {
+      temporarySessions.delete(id);
+      discarded++;
+    }
+  }
+  return discarded;
+}
+
 function createTemporaryConversation(actor: PersonRow, surface: Surface, companionId?: string | null): Conversation {
   pruneTemporarySessions(Date.now());
   evictOldestTemporarySessionIfFull();
