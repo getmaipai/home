@@ -211,12 +211,18 @@ the design doc's own "What already exists" section.
       Exit: `bash scripts/check.sh` plus a live end-to-end check (an
       Incognito chat sent, then confirmed absent from `conversations`
       and present only in the Incognito thread list).
-- [ ] **INCOGNITO-02: memory stays out on the read side too** (S,
-      after `INCOGNITO-01`). `policy.ts` already refuses `memory:write`
-      for a temporary conversation; nothing yet stops a normal `recall()`
-      read from surfacing the person's own accumulated memory during an
-      Incognito session. Fix the read side the same place the write
-      side is already gated. Exit: `bash scripts/check.sh`.
+- [x] **INCOGNITO-02: memory stays out on the read side too** (S) -
+      landed 2026-09-25, `37c59ea9`. The new pipeline
+      (`turnMachine/nodes/context.ts:118`) already gated this; the old
+      path (`turnEngine.ts`) didn't - its `recall()` call now short-
+      circuits to an empty result when `conversation.mode ===
+      "temporary"`, mirroring the sibling `effectiveLoaded` write-side
+      gate a few lines above. Proven end-to-end with a real turn (a
+      remembered fact reaches an ordinary turn's prompt, never a
+      temporary one's), not just a unit-level shape check - the test
+      builds the temporary conversation directly via
+      `resolveOrCreateConversation(..., { temporary: true })`, sidestepping
+      `INCOGNITO-11`/#163's live-reachability gap on purpose.
 - [ ] **INCOGNITO-03: the companion goes fully off, via bare mode** (S,
       after `INCOGNITO-01`). Reuses `ADMIN-COMPARE-01`'s existing bare-
       mode mechanism (`NextChatPage.tsx`) rather than a second way to
