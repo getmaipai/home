@@ -27643,11 +27643,13 @@ Home has to be, and it is the only part Open WebUI actually provides.
   MaiPai's own SSE implementation before building anything - a claim to
   verify in the installed source, per the org's own rule on library
   claims, not a number to copy.
-- **Tool-call approval UI, and their `ask_user` builtin: not a gap.**
+- **Tool-call approval UI, and their `ask_user` builtin: not a
+  capability gap, but a surface gap** (amended 2026-09-26 by DSH-01).
   MaiPai's `policy.ts` consent/confirm gate and CONFIRM-01's parked-ask
   mechanism already do the functional equivalent, independently arrived
-  at. Worth a look at how Open WebUI surfaces a pending call in the
-  transcript for a UI-polish idea only, never a new capability.
+  at. What is missing is the surface: the ask is answered only by
+  typing or saying "yes", and the kit's shipped `approval-card.tsx`
+  goes unused. APPROVE-CARD-01 closes that.
 - Two smaller notes, not standalone items: their terminal-style file
   previewer (hands a document's content back into the reply) is worth a
   glance before `REFERENCE-LAYOUTS-01` designs the citation reader;
@@ -27667,6 +27669,131 @@ docs](https://docs.openwebui.com/features/extensibility/plugin/),
 [Channels docs](https://docs.openwebui.com/features/channels/), [Memory
 & Personalization
 docs](https://docs.openwebui.com/features/chat-conversations/memory/).
+
+## DSH-01: what DeepSeek Harness does, and what Home takes from it (2026-09-26)
+
+The owner asked, after OPENWEBUI-01, whether DeepSeek Harness (`dsh`)
+was a better base, then for a full audit of its features and UI. The
+audit read the repo at `477b4f4` (2026-09-24, `0.1.7-rc.2`) and ran
+npm's `@deepseek-ai/dsh 0.1.5-rc.3` Web UI headless on a spare port
+with a scratch data directory, removed afterwards.
+
+**What it is.** An MIT agent runtime on Node, built on Cordis (the
+plugin framework from the Koishi chatbot project): the model adapter,
+tool registry, sandbox, session log, agent loop and UI are all plugins,
+composed into profiles by YAML patch layers. A turn is a sequence of
+steps (one model request plus its tool calls). Every session is an
+append-only JSONL log from which history, fork, resume, search and
+telemetry are derived, and a runtime check enforces that anything the
+model sees can be rebuilt from the log. It ships shell, file edit,
+grep, web search and fetch, todo, goals, plan mode, skills
+(`SKILL.md`), subagents, model-written workflow scripts, cron-style
+scheduling delivered back into the session, context compaction, and
+experimental browser-use and computer-use. It is a developer preview
+with "THERE WILL BE COMPATIBILITY-BREAKING CHANGES" in its README.
+
+**The Web UI** is React 18 with its own component kit, CSS Modules and
+its own icons (its styling doc forbids adding a component library or
+Tailwind), on `127.0.0.1:3080`. Three columns: sessions grouped by
+workspace, the chat, and a docking right sidebar (file tree, a
+document preview for PDF, Word, PowerPoint, spreadsheets, code and
+images, a terminal, a diff review, plans, subagent chats). Tool calls
+render as typed cards; an approval replaces the composer with Reject
+and Allow once; the Trajectory view is a per-turn ledger of steps,
+tool calls, time to first token, decode spans and tokens. Missing:
+editing a sent message, regenerate, deleting a session, a mobile
+layout (390 px collapses to an icon rail), languages beyond Chinese
+and English, any notion of more than one user. Auth is a one-time URL
+token swapped for a signed cookie, loopback only.
+
+**Why not a base for Home, on four grounds.**
+
+1. **One operator, no people.** The only identity is one anonymous
+   UUID per install. No accounts, roles, age bands or per-person data;
+   the People model and the child-safety invariants would all be a
+   retrofit, the same objection as OPENWEBUI-01's identity ground.
+2. **The trust model runs the other way.** Installed plugins run in
+   the host process outside the sandbox, MCP stdio servers start
+   unsandboxed, and the sandbox confines file writes by shell and code
+   tools only ("network and process visibility are outside this
+   vocabulary", `docs/subsystems/sandbox.md`). Its `SAFETY.md` says it
+   has had no security audit. The catalog's signed, one-call-at-a-time
+   packages are the opposite.
+3. **Its defaults send data out.** On every official DeepSeek API
+   request it uploads the session log (`dsh_session_log`, on by
+   default) and the active plugin list, with a stable install id
+   header; any feedback releases the session history to a DeepSeek
+   telemetry host whichever provider is in use, with an environment
+   variable as the only opt-out; web search defaults to a DeepSeek
+   model call. Every one of these fails PRIVACY.md.
+4. **The UI is hand-built.** Nothing in it can be taken under the
+   no-hand-built-UI rule, and the chat is already on assistant-ui
+   Elements.
+
+Local models work only as a custom `openai-completions` provider with
+a base URL (no llama.cpp or Ollama adapter); reviewers report agents
+stopping mid-task and runs reporting success on broken output.
+
+**What Home takes, each as a BACKLOG row under "From DeepSeek Harness
+research (2026-09-26)":**
+
+- **TRACE-VIEW-01**, the per-turn trace viewer (their Trajectory view).
+  Home already records a per-node trace per turn (`trace.ts`, stored in
+  `TurnStats.nodes`) and shows it only in aggregate on
+  `/next/performance`; the missing piece is the page, plus a replay of
+  one turn through the bench's replay path.
+- **APPROVE-CARD-01**, tap-to-approve for a parked confirm, from the
+  kit's shipped `approval-card.tsx`, beside the spoken or typed yes;
+  and a page for the household approval queue that has a route and no
+  frontend.
+- **CONV-STATE-01**, conversation list marks for "waiting on your
+  answer" (from `conversations.pending_ask`), unread and scheduled.
+- **ROUTINES-01**, a catalog package for a scheduled prompt delivered
+  into its conversation (their schedule tools: cron with a time zone,
+  only the latest missed run delivered, survives restart), on the
+  existing `scheduler.ts`.
+- **ATTACH-PREVIEW-01**, preview of an uploaded document beside the
+  chat, after COMPOSER-DOC-ATTACH-01; the viewer is named as a gap in
+  the design record before anything is built.
+- **CONV-EXPORT-01**, download one conversation, on top of EXPORT-01's
+  per-person export.
+- **SHORTCUTS-01**, a shortcut reference on Cmd+/ (low priority).
+
+**Design principles for ARCH-AGENT-01**, recorded here so the loop's
+design record picks them up: everything the model sees is rebuildable
+from the turn's log (what makes replay trustworthy); an oversized tool
+result spills to storage with a pointer instead of entering context;
+the same tool called with the same arguments again gets a short
+reminder, not a second run. None applies while the new path runs one
+tool round per turn.
+
+**Home defects the audit surfaced**, recorded against existing rows:
+INCOGNITO-11 (temporary chats still written to the database) is the
+priority; `/next` drops edit branches (`NextChatPage.tsx` passes
+`consumeSupersedes: () => undefined`), which is NEXT-BRANCH-01; the
+"Consequential packages need a confirmation at run time" row was stale
+(the policy node returns `confirm_needed` for a consequential manifest,
+`nodes/policy.ts:252`) and is ticked.
+
+**Skipped:** the coding-workbench tools (shell, file edit, terminal,
+LSP, code execution, browser and computer use); subagents, agent teams,
+goal loops and plan mode until ARCH-AGENT-01's design says otherwise;
+plugin install from npm or git; arbitrary cloud provider keys (fails
+"nothing leaves the home"); workspaces as disk folders (Projects stays
+CHAT-PARITY-10).
+
+Not verified at the source, from coverage only: the critical web-auth
+CVE fixed in 0.1.2 and the star counts. Two Home questions the audit did
+not answer: whether a message sent mid-reply queues or steers, and
+whether a long conversation is compacted or only trimmed (ARCH-MEM-01's
+gap 2 says trimmed).
+
+Sources: [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness),
+[DeepSeek Harness developer preview](https://deepseek.com/harness/en/),
+[InfoQ](https://www.infoq.com/news/2026/08/deep-seek-harness/),
+[DataCamp tutorial](https://www.datacamp.com/tutorial/deepseek-harness),
+[DeepakNess review](https://deepakness.com/blog/deepseek-harness/),
+[dshfind chat-ui plugins](https://dshfind.com/en/plugins/t/chat-ui).
 
 ## #156: the measured search-list budget
 
