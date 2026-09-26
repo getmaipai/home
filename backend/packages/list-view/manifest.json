@@ -18,6 +18,7 @@
     ],
     "patterns": ["what's on my shopping list", "what's on the shopping list", "what do i need to buy"]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home"],

@@ -18,6 +18,7 @@
     ],
     "patterns": ["what's the news", "what's in the news today"]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home"],

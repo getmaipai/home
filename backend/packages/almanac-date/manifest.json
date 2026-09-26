@@ -19,6 +19,7 @@
     "patterns": ["what's today's date", "what day is it", "what day of the week is it"],
     "answers": ["relative_date"]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home"],

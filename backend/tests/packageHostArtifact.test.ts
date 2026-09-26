@@ -49,6 +49,7 @@ function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
     license: "AGPL-3.0",
     platforms: ["home"],
     min_role: "child",
+    incognito: "unaffected",
     consequential: false,
     offline: "full",
     min_app: "0.1.0",

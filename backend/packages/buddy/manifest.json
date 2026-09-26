@@ -25,6 +25,7 @@
       "Ooh, good question. Let's figure it out together."
     ]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home", "bot"],

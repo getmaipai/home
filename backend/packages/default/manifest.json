@@ -22,6 +22,7 @@
       "Nice, tell me how it goes on Saturday."
     ]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home", "bot"],

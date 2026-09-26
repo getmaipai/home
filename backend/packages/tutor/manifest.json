@@ -25,6 +25,7 @@
       "That's a well-formed question. Here is the clearest way to think about it."
     ]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home", "bot"],

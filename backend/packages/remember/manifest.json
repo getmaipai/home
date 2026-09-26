@@ -34,6 +34,7 @@
       "fact": { "type": "string", "minLength": 1 }
     }
   },
+  "incognito": "ephemeral",
   "requires": [],
   "optional": [],
   "platforms": ["home", "bot"],

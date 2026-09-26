@@ -25,6 +25,7 @@
       "expression": { "type": "string", "minLength": 1 }
     }
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home"],

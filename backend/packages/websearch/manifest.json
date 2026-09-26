@@ -33,6 +33,7 @@
       "read_page": { "type": "boolean" }
     }
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home"],

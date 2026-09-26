@@ -1,36 +1,36 @@
 {
   "define": {
-    "sha256": "8ad180e88a2fc96ba1cb2536b60438661e92e480f36bd3f751eb31f4b23f2135",
+    "sha256": "4a3ae365e151137374ecf4a0a04fb8fc0f1a33401bbfca9f34fd69aaa1a8ccb1",
     "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
     "catalog_path": "plugins/utilities/define"
   },
   "joke": {
-    "sha256": "71a18c0d1b3bbfec37b39a7f092a43a06592c7ea5b9c3a98250535ad5c027723",
+    "sha256": "83338bfc7cd18798eab177b79e8ae797402e6580e8ee9a3a1ce4f2faee5d89e6",
     "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
     "catalog_path": "plugins/fun/joke"
   },
   "knowledge": {
-    "sha256": "525e3c874f7b71ec6743e4fd3ad7b204f4540ee2fadc68cb326473a897fb3057",
+    "sha256": "dcb3b18b0b306414f06d9fc707142f9716af0d79c07dcdefb6005f238ce91b77",
     "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
     "catalog_path": "plugins/info/knowledge"
   },
   "media-lookup": {
-    "sha256": "0941731906d761ffa06ffae9b2a77294b3da0dd6e14f677a45f68de02609246d",
+    "sha256": "ca5261b9b81744abb88a1090187b66978d57404b2860739e85d86256432e34b9",
     "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
     "catalog_path": "plugins/info/media-lookup"
   },
   "storytime-style": {
-    "sha256": "bce7a0989afa3233275c31f074e7d8149fa1744a7fe3b813aa784662bafb00aa",
+    "sha256": "a4ac07f0711f0663712837e222c9c1ff79972673b9656c40467e0424d6811bb0",
     "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
     "catalog_path": "skills/family/storytime-style"
   },
   "trivia": {
-    "sha256": "a5111a133a53e1a8d8be2ed2c64518862c05f99f2fbd13780e74b613405c3819",
+    "sha256": "43f6878d3024c1659a186c82eaf3f56d94e87261ef466bd7682bc49acb8346d2",
     "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
     "catalog_path": "plugins/fun/trivia"
   },
   "weather": {
-    "sha256": "88166c39e8f8c152d78ced3d5174edea636b7a853a859047068bb2eaf728f97b",
+    "sha256": "79422e9907aa905d1b0447e84ce461445e93eee0d2509769d11e30604541bfb6",
     "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
     "catalog_path": "plugins/utilities/weather"
   }

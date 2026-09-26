@@ -18,6 +18,7 @@
     ],
     "patterns": ["tell me a joke", "tell me a dad joke", "got any jokes"]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home", "bot"],

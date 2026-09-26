@@ -18,6 +18,7 @@
     ],
     "patterns": ["give me a trivia question", "ask me a trivia question", "tell me some trivia", "quiz me"]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home", "bot"],

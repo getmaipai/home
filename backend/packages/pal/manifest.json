@@ -25,6 +25,7 @@
       "Like, it's basically that but simpler."
     ]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home", "bot"],

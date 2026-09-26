@@ -17,6 +17,7 @@
       "can you lock the front door"
     ]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home"],

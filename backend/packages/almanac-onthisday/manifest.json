@@ -19,6 +19,7 @@
     "patterns": ["what happened on this day in history", "what happened today in history", "this day in history"],
     "answers": ["relative_date"]
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home"],

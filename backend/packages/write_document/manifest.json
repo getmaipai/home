@@ -28,6 +28,7 @@
       "artifact_id": { "type": "string", "minLength": 1, "description": "The id of the version being edited. Present only when the model is updating a document it already wrote earlier in this conversation." }
     }
   },
+  "incognito": "ephemeral",
   "requires": [],
   "optional": [],
   "platforms": ["home"],

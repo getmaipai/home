@@ -19,6 +19,7 @@
     "patterns": ["what's the next holiday", "is there a holiday coming up"],
     "answers": []
   },
+  "incognito": "unaffected",
   "requires": [],
   "optional": [],
   "platforms": ["home"],
