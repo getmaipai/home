@@ -18,7 +18,7 @@ afterEach(() => {
 
 test.each([
   ["light", "rgb(234, 240, 247)", "rgb(244, 247, 251)"],
-  ["dark", "rgb(53, 28, 110)", "rgb(36, 23, 50)"],
+  ["dark", "rgb(10, 26, 46)", "rgb(7, 17, 31)"],
 ] as const)("the rendered global sidebar uses the expected %s surface color", (theme, sidebarColor, canvasColor) => {
   expect(sidebarTintRule).toBeDefined();
   const originalWidth = window.innerWidth;

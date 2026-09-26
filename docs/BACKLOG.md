@@ -346,10 +346,16 @@ the design doc's own "What already exists" section.
       canvas, sidebar, cards and panes now use their normal light-theme
       surfaces; white header controls keep contrast against the violet
       band. The composer border and the toggle's violet icon/hover
-      treatment remain. Dark mode is unchanged. The actual vendored
-      `FullLayout` header and ordinary surfaces have computed-style and
-      contrast coverage in `frontend/src/shell/incognitoHeader.test.tsx`.
-      Jesse still needs to judge the live desktop result.
+      treatment remain. The actual vendored `FullLayout` header and
+      ordinary surfaces have computed-style and contrast coverage in
+      `frontend/src/shell/incognitoHeader.test.tsx`.
+      **Dark-mode direction, codex-381 (2026-09-26):** Jesse confirmed
+      the same plain-background-plus-bold-header-band pattern for dark
+      mode. Its canvas, sidebar, cards and panes now use their ordinary
+      dark-theme surfaces too; both themes share the same violet band
+      and white foreground treatment. The dark header has its own real
+      `FullLayout` contrast and computed-surface coverage. Jesse's live
+      desktop judgment of this update is still pending.
 - [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
       confirmed 2026-09-25. `canHaveTemporaryChatRole`'s only remaining
       call site is the unrelated "Thinking" mode toggle's own,

@@ -19,9 +19,8 @@
 @import "@maipai/ui/src/dashboard/css/globals.css";
 @import "@maipai/ui/src/tokens.css";
 
-/* INCOGNITO-08: the light theme keeps ordinary surfaces neutral and
- * concentrates violet in the global header band. Dark mode has its own
- * bold surface palette below. */
+/* INCOGNITO-08: both themes keep ordinary surfaces neutral and
+ * concentrate violet in the global header band. */
 html.incognito {
   --incognito-background: none;
   --incognito-canvas-color: var(--surface-page);
@@ -39,14 +38,14 @@ html.incognito {
 }
 
 html.dark.incognito {
-  --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 22%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 18%, var(--surface-page)), transparent 72%);
-  --incognito-canvas-color: color-mix(in srgb, var(--hue-violet) 22%, var(--surface-page));
-  --incognito-card: color-mix(in srgb, var(--hue-violet) 38%, var(--surface-card));
-  --incognito-pane: color-mix(in srgb, var(--hue-violet) 45%, var(--surface-pane));
-  --incognito-muted: color-mix(in srgb, var(--hue-violet-deep) 28%, var(--surface-pane));
-  --incognito-accent: color-mix(in srgb, var(--hue-violet) 40%, var(--surface-pane));
-  --incognito-sidebar: color-mix(in srgb, var(--hue-violet-deep) 38%, var(--surface-sidebar));
-  --incognito-border: color-mix(in srgb, var(--hue-violet-deep) 38%, var(--border));
+  --incognito-background: none;
+  --incognito-canvas-color: var(--surface-page);
+  --incognito-card: var(--surface-card);
+  --incognito-pane: var(--surface-pane);
+  --incognito-muted: var(--muted);
+  --incognito-accent: var(--accent);
+  --incognito-sidebar: var(--surface-sidebar);
+  --incognito-border: var(--border);
   --incognito-input-border: color-mix(in srgb, var(--hue-violet) 82%, var(--input));
 }
 
@@ -97,11 +96,10 @@ html.incognito body[class*="style-"] [data-slot="next-chat-rail"] {
   background: transparent;
 }
 
-/* The light-mode reference concentrates color in one bold navigation
- * band. Scope its foreground tokens to the actual FullLayout header so
- * its shipped controls inherit a readable white treatment without
- * changing the page's ordinary neutral surfaces or dark mode. */
-html.incognito:not(.dark) body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky {
+/* Both themes concentrate color in one bold navigation band. Scope its
+ * foreground tokens to the actual FullLayout header so shipped controls
+ * inherit a readable white treatment without changing ordinary surfaces. */
+html.incognito body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky {
   --background: var(--incognito-header-background);
   --foreground: var(--incognito-header-foreground);
   --muted-foreground: var(--incognito-header-foreground);
@@ -119,12 +117,12 @@ html.incognito:not(.dark) body[class*="style-"] [data-slot="sidebar-inset"] > he
  * treatment. A white resting backing keeps that icon legible against the
  * new band; :not(:hover) lets the component's existing hover utility win. */
 @layer utilities {
-  html.incognito:not(.dark) body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky [aria-label^="Incognito "]:not(:hover) {
+  html.incognito body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky [aria-label^="Incognito "]:not(:hover) {
     background-color: white;
   }
 }
 
-html.incognito:not(.dark) body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky [data-slot="avatar-fallback"] {
+html.incognito body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky [data-slot="avatar-fallback"] {
   background-color: white;
   color: var(--hue-violet-deep);
 }
