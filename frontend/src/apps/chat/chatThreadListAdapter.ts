@@ -60,7 +60,17 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
     },
     async delete(remoteId) { await api.deleteConversation(remoteId); },
     async initialize() {
-      const row = await api.createConversation();
+      // Issue #163 / the persistence-boundary design (docs/plans/
+      // privacy-mode-2026-09-24.md, 2026-09-26): this used to mint a
+      // durable row unconditionally, before a single message existed -
+      // by the time the first turn went out with `temporary: true`,
+      // resolveOrCreateConversation() was handed a real id and never
+      // read the flag. `incognito` is this adapter's own option
+      // (already threaded into `list()`, NextChatPage.tsx's own
+      // `{ incognito: temporaryNext }`); reading it here is the fix -
+      // the in-memory session the backend's own createConversation()
+      // already builds for `mode: "temporary"`, now actually asked for.
+      const row = await api.createConversation(incognito ? "temporary" : undefined);
       return { remoteId: row.id };
     },
     async fetch(remoteId) {

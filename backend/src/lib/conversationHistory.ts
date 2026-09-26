@@ -95,7 +95,7 @@ export function turnOwnerId(turnId: string): string | null {
 
 export type ConversationOpResult<T> =
   | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+  | { ok: false; status: 400 | 403 | 404; error: string; code?: "temporary_mismatch" };
 
 /** How large one outcome's JSON may be on the row. A result's actions
  * never go on the row (the composer never reads them); past the budget
@@ -1054,6 +1054,16 @@ export function resolveOrCreateConversation(
     if (!row || row.personId !== actor.id || row.status !== "open" || row.surface !== surface) {
       return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
     }
+    // The persistence-boundary design (docs/plans/privacy-mode-2026-09-24.md,
+    // 2026-09-26, issue #163): a durable row is never silently accepted
+    // for a caller that asked for `temporary` - that mismatch is exactly
+    // how a real conversation got minted before "make this temporary" was
+    // ever read (the eager `initialize()` call INCOGNITO-01's own tick
+    // and #163 both trace). A mismatch is refused loudly, never downgraded
+    // into using the durable row anyway.
+    if (opts.temporary) {
+      return { ok: false, status: 400, code: "temporary_mismatch", error: `conversation ${conversationId} is a durable conversation, not temporary` };
+    }
     return { ok: true, value: toConversationRecord(row) };
   }
 
@@ -1335,8 +1345,24 @@ export function createConversation(
 }
 
 /** Explicitly continue an owned saved conversation. Reading a thread does
- * not call this. Preserve the stale-ID guard in resolveOrCreateConversation. */
+ * not call this. Preserve the stale-ID guard in resolveOrCreateConversation.
+ *
+ * Issue #163 inventory item 8: `getConversationId()`
+ * (NextChatPage.tsx) calls this right after `initialize()` mints an id,
+ * for every conversation including a temporary one - a temporary
+ * session's id was never a `conversations` row, so it must be recognized
+ * and returned as-is here the same way resolveOrCreateConversation()'s
+ * own given-id branch already does, never fall through to the durable
+ * lookup below (which would 404 it) or write anything durable for it. */
 export const resumeConversation = sqlite.transaction((actor: PersonRow, id: string): ConversationOpResult<Conversation> => {
+  const session = temporarySessions.get(id);
+  if (session) {
+    if (session.conversation.person !== actor.id) {
+      return { ok: false, status: 404, error: "conversation not found" };
+    }
+    session.lastActivityAt = Date.now();
+    return { ok: true, value: session.conversation };
+  }
   const row = db.select().from(conversations).where(eq(conversations.id, id)).get();
   if (!row || row.personId !== actor.id || row.status === "deleted") {
     return { ok: false, status: 404, error: "conversation not found" };

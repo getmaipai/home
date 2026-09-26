@@ -165,4 +165,30 @@ describe("HOME-UI-02e: restored Conversations functions", () => {
     expect(requestedPath).toBe("/api/conversations/incognito");
     expect(result.threads.map((thread) => thread.remoteId)).toEqual(["conv-live-incognito"]);
   });
+
+  // Issue #163: initialize() used to call POST /api/conversations with no
+  // mode at all, whatever `incognito` this adapter was built with - a real,
+  // durable conversation minted before the first message (carrying
+  // `temporary: true`) ever went out. The fix is this one request body.
+  test("a temporary-chat adapter's initialize() asks the server for a temporary conversation, not a durable one", async () => {
+    let requestedBody: unknown;
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe("/api/conversations");
+      requestedBody = JSON.parse(String(init?.body));
+      return Response.json({ id: "conv-temp-1", title: null, surface: "chat", mode: "temporary", created_at: "2026-09-26T00:00:00Z", pinned: false }, { status: 201 });
+    }) as unknown as typeof fetch;
+    const { remoteId } = await createChatThreadListAdapter("Nova", { incognito: true }).initialize("local-temp");
+    expect(requestedBody).toEqual({ surface: "chat", mode: "temporary" });
+    expect(remoteId).toBe("conv-temp-1");
+  });
+
+  test("an ordinary adapter's initialize() sends no mode at all", async () => {
+    let requestedBody: unknown;
+    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestedBody = JSON.parse(String(init?.body));
+      return Response.json({ id: "conv-regular-1", title: null, surface: "chat", mode: "chat", created_at: "2026-09-26T00:00:00Z", pinned: false }, { status: 201 });
+    }) as unknown as typeof fetch;
+    await createChatThreadListAdapter("Nova").initialize("local-regular");
+    expect(requestedBody).toEqual({ surface: "chat" });
+  });
 });

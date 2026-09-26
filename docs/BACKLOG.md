@@ -204,7 +204,7 @@ the design doc's own "What already exists" section.
       for a stronger model, not a quick patch. Follow-up:
       `INCOGNITO-11` below. Exit: `bash scripts/check.sh` (both slices
       green save the one accepted mDNS exception).
-- [ ] **INCOGNITO-11: fix the temporary-conversation creation defect,
+- [x] **INCOGNITO-11: fix the temporary-conversation creation defect,
       issue #163** (M or L, needs a real design pass first - not a quick
       patch). The root cause and exact file/line citations are in
       `INCOGNITO-01`'s own tick above and in #163 itself. Every
@@ -222,6 +222,59 @@ the design doc's own "What already exists" section.
       enumerated durable-writer inventory tests, the mismatch test,
       and re-running INCOGNITO-02/03's tests through the real
       `initialize()` path.
+      **Landed 2026-09-26 (Sonnet):** `chatThreadListAdapter.ts`'s
+      `initialize()` now sends `mode: "temporary"` when built with
+      `incognito: true`, the one-line fix the design named.
+      `resolveOrCreateConversation()`'s given-id branch refuses a
+      durable id passed with `temporary: true` (`code:
+      "temporary_mismatch"`, propagated through both turn paths and the
+      new turn machine), rather than silently returning the durable
+      row. `resumeConversation()` recognizes a temporary session id and
+      touches only the in-memory map, never the durable table (the
+      resume call `getConversationId()` always makes was 404ing or
+      would have written a row for exactly this id). New tests:
+      `conversationHistory.test.ts`'s "the persistence boundary" block
+      (the mismatch refusal, the real create-then-resume-then-turn
+      flow, a foreign person's resume still 404s), `chatThreadListAdapter.test.ts`'s
+      two `initialize()` request-body tests, and
+      `NextChatPage.test.tsx`'s Incognito tests now also assert the
+      conversation's own creation body (`conversationCreateBodies()`),
+      which is what the old tests never checked - a hand-built fetch
+      mock returned a conversation regardless of the request body, so
+      the defect was invisible to them. The rest of the durable-writer
+      inventory (`conversation_turns`, `episodes`, `reply_constraints`,
+      the memory judge's scan, `pending_ask`) was already correctly
+      gated on `conversation.mode === "temporary"` -
+      `temporaryChat.test.ts`'s existing suite covers it and stayed
+      green throughout; the one-wrong-write-at-creation framing in the
+      design record holds.
+      A medium code review (before commit) caught a real gap this fix
+      opens: the global Incognito header toggle can flip on mid-chat,
+      on an already-open durable thread, with nothing forcing a switch
+      to a fresh thread - the next turn then hits the new
+      `temporary_mismatch` refusal and, unfixed, would have shown the
+      backend's raw, id-bearing error string. `chatModelAdapter.ts` now
+      gives that case its own actionable message ("Incognito can't turn
+      on partway through a chat. Start a new chat to go incognito."),
+      tested directly; making the toggle itself switch threads (or
+      disabling it mid-chat) is a real UX fix left for later, not done
+      here. Chasing a stricter test for "each New Thread mints its own
+      conversation" surfaced a separate, pre-existing flake, unrelated
+      to this fix: under the full suite (never in isolation) the
+      existing "stays on across separate new threads" test can show two
+      turns sharing one conversation. Neither a longer settle wait nor
+      scoping the click to the render's own container fixed it, so the
+      stricter assertion was not kept (the test is unchanged from
+      before this item) and the finding is filed as getmaipai/home#165
+      for its own investigation.
+      Backend `bash scripts/check.sh` core (4081 tests) and frontend
+      (757 tests) both green, frontend run six times clean to confirm;
+      `tsc --noEmit` and `eslint` clean on both sides; verified live by
+      restarting the local app (`bun restart`) onto this change and
+      confirming it boots clean on 8787 - a full manual click-through
+      was skipped to avoid touching the real household's own login on
+      the shared dev instance, so the end-to-end proof is the
+      real-route test coverage above rather than a browser session.
 - [x] **INCOGNITO-02: memory stays out on the read side too** (S) -
       fully landed 2026-09-25, `37c59ea9` then `7b843009`. The new
       pipeline (`turnMachine/nodes/context.ts:118`) already gated

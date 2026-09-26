@@ -164,7 +164,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   if (invalid) return { ok: false, result: invalid };
 
   const resolved = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary });
-  if (!resolved.ok) return { ok: false, result: { ok: false, status: resolved.status as 400 | 503, code: "invalid_input", error: resolved.error } };
+  if (!resolved.ok) return { ok: false, result: { ok: false, status: resolved.status as 400 | 503, code: resolved.code ?? "invalid_input", error: resolved.error } };
   const conversation = resolved.value;
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
 

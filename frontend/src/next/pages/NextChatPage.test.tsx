@@ -156,6 +156,21 @@ function turnRequestBodies(): Array<Record<string, unknown>> {
     .map((c: unknown[]) => JSON.parse((c[1] as RequestInit).body as string));
 }
 
+// Issue #163: the request initialize() actually sends to POST
+// /api/conversations, not just the turn's own `temporary` flag - the
+// live defect was invisible to a test that only checked the turn body,
+// because the fake `POST /api/conversations` handler above returns a
+// conversation regardless of what mode (or no mode) was asked for.
+function conversationCreateBodies(): Array<Record<string, unknown>> {
+  return (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
+    .filter((c: unknown[]) => {
+      const url = typeof c[0] === "string" ? c[0] : (c[0] as URL | Request).toString();
+      const init = c[1] as RequestInit | undefined;
+      return url.includes("/api/conversations") && !url.includes("/resume") && init?.method === "POST";
+    })
+    .map((c: unknown[]) => JSON.parse((c[1] as RequestInit).body as string));
+}
+
 async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
   fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
   const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
@@ -1794,6 +1809,11 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
 
       expect(turnRequestBodies()[0]!.temporary).toBe(true);
       expect(sessionStorage.getItem("maipai.incognito")).toBe("1");
+      // Issue #163: the conversation's OWN creation must ask for
+      // mode: "temporary" too - a turn marked temporary against a
+      // conversation minted with no mode is exactly the durable-id
+      // mismatch the backend now refuses.
+      expect(conversationCreateBodies()[0]).toEqual({ surface: "chat", mode: "temporary" });
     } finally {
       restore();
     }
@@ -1841,6 +1861,10 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
       expect(bodies).toHaveLength(1);
       expect(bodies[0]!.temporary).toBeUndefined();
       expect(sessionStorage.getItem("maipai.incognito")).toBeNull();
+      // A regular thread's own creation must never claim mode:
+      // "temporary" - the reverse mismatch this design deliberately
+      // leaves alone (a real conversation, correctly minted).
+      expect(conversationCreateBodies()[0]).toEqual({ surface: "chat" });
     } finally {
       restore();
     }

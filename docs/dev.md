@@ -28054,3 +28054,108 @@ RULES-AND-LEARNED-COMPONENTS.md. Its zero-shot is below the
 majority-class baseline, so it is a fine-tune-or-nothing component;
 its 512-token window and ~20-option ceiling fit the router slot and
 nothing wider.
+
+## INCOGNITO-11 landed: the persistence boundary, built (2026-09-26)
+
+Issue #163, designed the same day in "The persistence boundary"
+(`docs/plans/privacy-mode-2026-09-24.md`), built immediately after.
+The defect was concentrated at conversation creation, not scattered:
+`chatThreadListAdapter.ts`'s `initialize()` minted a durable
+`conversations` row via `POST /api/conversations` with no mode,
+before a single message existed; by the time the first turn's own
+`temporary: true` went out, `resolveOrCreateConversation()`'s
+given-id branch already had a real id in hand and never read the
+flag. Two changes close it: `initialize()` now sends `mode:
+"temporary"` when its adapter was built `{ incognito: true }` (the
+option was already threaded into `list()`, never into `initialize()`
+- one line, once it's read); and `resolveOrCreateConversation()`
+refuses the mismatch outright when a durable id arrives with
+`temporary: true` (`code: "temporary_mismatch"`, a new
+`ConversationOpResult`/`TurnFailure` code, propagated through
+`runTurn()`, `runTurnStream()`, and the turn-machine's own
+`beginTurn()` - all three called the identical
+`resolveOrCreateConversation()`, all three previously flattened every
+failure to `"invalid_input"`). `resumeConversation()`, the second
+call `getConversationId()` always makes right after `initialize()`,
+had the mirror bug: it only ever queried the durable table, so a
+temporary session's own id (never a row) 404'd there - fixed by
+checking `temporarySessions` first, the same order
+`resolveOrCreateConversation()`'s given-id branch already uses.
+
+The rest of the design's durable-writer inventory needed no code at
+all: `logTurnSafely()` already routed a temporary turn to
+`appendTemporaryTurn()` (never `logTurn()`, so `conversation_turns`
+and the episodes `logTurn()` runs inside of were already closed),
+`reply_constraints` and the provisional-turn row already gated on
+`conversation.mode === "temporary"`, and the memory judge's queue is
+itself a `conversation_turns` scan, structurally never eligible - all
+already covered by `temporaryChat.test.ts`'s existing suite (stayed
+green throughout, unmodified). One wrong write at creation really was
+defeating a stack of gates that were each individually correct.
+
+New tests, matching the design's acceptance addendum:
+`conversationHistory.test.ts` gets "the persistence boundary" block
+(the mismatch refused at both `resolveOrCreateConversation()` and a
+real `runTurn()`, `POST /api/conversations` with `mode: "temporary"`
+leaving no row, `resumeConversation()` on a temporary id touching
+only the map and still 404ing a foreign person, and the real
+create-then-resume-then-turn client flow end to end).
+`chatThreadListAdapter.test.ts` gets two direct tests of
+`initialize()`'s own request body. `NextChatPage.test.tsx`'s existing
+Incognito tests now also assert the conversation-creation request
+body via a new `conversationCreateBodies()` helper - the gap the
+design called out by name ("invisible to any test that built its
+session correctly"): the file's own `stubMultiTurnFetch()` returns a
+conversation regardless of what `mode` was asked for, so nothing had
+ever checked that `initialize()` asked for the right one.
+
+A medium code review before commit caught a real gap the fix opens:
+the global Incognito header toggle can flip on mid-chat, on an
+already-open durable thread, with nothing forcing a switch to a fresh
+thread first - `getConversationId()` keeps returning the same durable
+id (`aui.threadListItem().initialize()` is idempotent for an
+already-initialized thread) while `consumeTemporary()` now reads the
+live toggle state independently, so the next turn arrives as exactly
+the durable-id-plus-`temporary: true` mismatch the new guard refuses.
+Before this, that same action silently used the durable conversation
+and dropped the flag - the bug #163 is about, just reached from a
+second entry point the design record's own inventory didn't name.
+Refusing it is still the right call (a loud failure over a silent
+downgrade, same as the rest of this design), but `chatModelAdapter.ts`
+had no case for the new `temporary_mismatch` code, so the person would
+have seen the backend's raw, id-bearing error string. Given an
+actionable message instead ("Incognito can't turn on partway through a
+chat. Start a new chat to go incognito."), tested directly. Making the
+toggle itself switch threads, or disabling it while a durable
+conversation is open, is a real UX fix and is left for later.
+
+Chasing a stricter assertion ("each New Thread click mints its own
+conversation", `conversationCreateBodies().toHaveLength(2)`) down a
+full-suite run (`bun test`, all 104 frontend files) surfaced a
+separate, real, pre-existing flake in the "stays on across separate
+new threads" test, unrelated to this fix: under full-suite load
+(never once in 10+ isolated runs via `-t`) the second `sendMessage()`
+after clicking New Thread can end up on the outgoing thread instead of
+a fresh one, so two "temporary" turns sometimes share one conversation
+- invisible before because nothing checked the two turns used
+different ids. Neither a longer settle wait nor scoping the click to
+the render's own container (instead of `document.getElementById`,
+ruling out simple cross-test DOM leakage on the page-singleton
+`next-chat-rail` id) changed the failure rate, so this is a genuine,
+unresolved timing question in the app's own New Thread flow, not a
+test-isolation bug with an easy fix. The stricter assertion was
+dropped rather than land a flaky test - the "stays on across separate
+new threads" test is byte-identical to before this item - and the
+finding is filed as getmaipai/home#165 for its own investigation.
+
+Verified: backend `bun test` (4081 tests) and frontend `bun test`
+(757 tests, run six times clean after the revert) both green; `tsc
+--noEmit` and `eslint` clean on both sides. Live check: `bun restart`
+from this tree onto 8787, confirmed booting clean twice (once after
+the initial fix, once after the review-driven message fix). A manual
+click-through was skipped rather than sign in to the real household
+on the shared dev instance for a check the route-level
+and component-level tests already prove; if a from-scratch UI replay
+is wanted later, `scripts/screenshot.ts`'s own isolated-instance setup
+(`/api/auth/setup` against a scratch data dir, never the shared
+`hub.db`) is the pattern to reuse.

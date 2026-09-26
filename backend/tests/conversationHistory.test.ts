@@ -991,6 +991,84 @@ describe("GET /api/conversations (step 3: now lists conversation THREADS, not tu
   });
 });
 
+// Issue #163 / the persistence-boundary design (docs/plans/
+// privacy-mode-2026-09-24.md, 2026-09-26): the eager `initialize()` step
+// used to mint a real, durable conversation before a single message
+// existed, so the first turn's own `temporary: true` always arrived with
+// a durable id already in hand - resolveOrCreateConversation()'s
+// given-id branch trusted that id and never read the flag. These tests
+// drive the real client flow the frontend uses (create, resume, then
+// turn) and prove a mismatch is refused loudly rather than silently
+// downgraded into using the durable conversation.
+describe("the persistence boundary: a durable id can never be claimed temporary (issue #163)", () => {
+  test("resolveOrCreateConversation() refuses a durable id passed with temporary: true, with a typed error", async () => {
+    const { actor } = await owner();
+    const durable = createConversation(actor, { surface: "chat" });
+    if (!durable.ok) throw new Error(durable.error);
+
+    const result = resolveOrCreateConversation(actor, "chat", durable.value.id, { temporary: true });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(400);
+    expect(result.code).toBe("temporary_mismatch");
+    expect(db.select().from(conversations).where(eq(conversations.id, durable.value.id)).get()!.mode).toBe("chat"); // never silently flipped
+  });
+
+  test("the mismatch reaches a real turn as the same typed code, nothing written", async () => {
+    const { actor } = await owner();
+    const durable = createConversation(actor, { surface: "chat" });
+    if (!durable.ok) throw new Error(durable.error);
+
+    const result = await runTurn(actor, "chat", "hello", { conversationId: durable.value.id, temporary: true });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(400);
+    expect(result.code).toBe("temporary_mismatch");
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, durable.value.id)).all().length).toBe(0);
+  });
+
+  test("POST /api/conversations with mode: temporary never creates a conversations row, unlike an ordinary create", async () => {
+    const { client } = await owner();
+    const created = await client.post("/api/conversations", { mode: "temporary" });
+    expect(created.status).toBe(201);
+    const { id, mode } = (await created.json()) as { id: string; mode: string };
+    expect(mode).toBe("temporary");
+    expect(isTemporaryConversation(id)).toBe(true);
+    expect(db.select().from(conversations).where(eq(conversations.id, id)).get()).toBeUndefined();
+  });
+
+  test("resuming a temporary conversation touches only the in-memory session, never the durable table", async () => {
+    const { client, actor } = await owner();
+    const created = (await (await client.post("/api/conversations", { mode: "temporary" })).json()) as { id: string };
+    expect(isTemporaryConversation(created.id)).toBe(true);
+
+    const resumed = await client.post(`/api/conversations/${created.id}/resume`, {});
+    expect(resumed.status).toBe(200); // the old, DB-only resumeConversation() 404'd a session id that was never a row
+    expect(await resumed.json()).toMatchObject({ id: created.id, mode: "temporary" });
+    expect(db.select().from(conversations).where(eq(conversations.id, created.id)).get()).toBeUndefined();
+
+    // A foreign person's temporary session still resolves the same "not
+    // found" a foreign durable id already gets from this route (line
+    // ~2146's own test, mirrored here for the in-memory branch).
+    const other = await addPerson(client, "Robin", "adult");
+    const otherClient = new TestClient();
+    await otherClient.post("/api/auth/verify-secret", { personId: other.id, secret: "0000" });
+    expect((await otherClient.post(`/api/conversations/${created.id}/resume`, {})).status).toBe(404);
+  });
+
+  test("the real client flow - create as temporary, resume, then send a turn - leaves no durable row or turn", async () => {
+    const { client, actor } = await owner();
+    const created = (await (await client.post("/api/conversations", { mode: "temporary" })).json()) as { id: string };
+    await client.post(`/api/conversations/${created.id}/resume`, {});
+    const result = await runTurn(actor, "chat", "remember that trash day is Tuesday", { conversationId: created.id, temporary: true });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.conversation_id).toBe(created.id);
+    expect(db.select().from(conversations).where(eq(conversations.id, created.id)).get()).toBeUndefined();
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, created.id)).all().length).toBe(0);
+  });
+});
+
 describe("Incognito conversation sessions", () => {
   test("the Incognito endpoint lists only this person's live sessions, with spec-record summary fields", async () => {
     const { client, actor } = await owner();

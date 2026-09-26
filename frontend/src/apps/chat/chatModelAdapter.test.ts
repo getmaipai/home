@@ -1161,6 +1161,26 @@ describe("createChatModelAdapter errors", () => {
       env.restore();
     }
   });
+
+  // Issue #163, found by a code review of that fix: turning Incognito on
+  // via the header toggle mid-chat (not New Thread) still sends the
+  // existing durable conversation id, which the backend now refuses with
+  // `code: "temporary_mismatch"` (a plain 400 before any stream event, not
+  // a mid-stream one - rawStreamPost's own non-ok branch, api.ts). Without
+  // this case the person would see the backend's raw, id-bearing error
+  // string instead of something they can act on.
+  test("a temporary_mismatch error (Incognito turned on mid-chat) gives an actionable message, not the raw backend string", async () => {
+    const env = stubEnvironment(
+      (() => Promise.resolve(new Response(JSON.stringify({ error: "conversation conv-existing123 is a durable conversation, not temporary", code: "temporary_mismatch" }), { status: 400 }))) as unknown as () => Promise<never>,
+    );
+    try {
+      const { error } = await collect([fakeUserMessage("hi")]);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe("Incognito can't turn on partway through a chat. Start a new chat to go incognito.");
+    } finally {
+      env.restore();
+    }
+  });
 });
 
 // getmaipai/home#60: an edited message survives a history reload.

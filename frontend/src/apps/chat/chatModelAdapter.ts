@@ -724,12 +724,24 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         scheduler.finish(); // a genuine failure, not a user stop - let whatever already started speaking finish naturally, enqueue nothing more
         // Show the generic banner for generic "unavailable" code; pass backend's
         // message for specific codes (e.g., "safety_refused" from the safety layer).
+        //
+        // Issue #163's own new refusal: turning Incognito on mid-chat
+        // (the header toggle, not New Thread) still sends the existing,
+        // already-durable conversation id, which the backend now
+        // refuses outright rather than silently ignoring the flag - a
+        // real gap a code review found live, since nothing here forces
+        // a fresh thread when the toggle flips. Until that's fixed
+        // properly (filed as a follow-up), this at least tells the
+        // person what to do instead of surfacing the backend's raw,
+        // id-bearing error string.
         throw new Error(
           e instanceof ApiError && e.code === "unavailable"
             ? "MaiPai's AI isn't answering right now. If you just picked a new AI model it may still be getting ready - check Household → AI models, then try again."
-            : e instanceof ApiError
-              ? e.message
-              : "Could not reach the hub. Try again.",
+            : e instanceof ApiError && e.code === "temporary_mismatch"
+              ? "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
+              : e instanceof ApiError
+                ? e.message
+                : "Could not reach the hub. Try again.",
         );
       }
     },

@@ -136,7 +136,7 @@ export function projectDocumentForAudience(document: TurnArtifactValue, ageBand:
  * (2026-09-04) found the two had drifted into independently-hand-typed
  * copies of the same union, one bad refactor away from silently
  * reporting different codes for what should be the same failure. */
-export type TurnFailure = { ok: false; status: 400 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable"; error: string };
+export type TurnFailure = { ok: false; status: 400 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable" | "temporary_mismatch"; error: string };
 
 export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
 
@@ -3746,7 +3746,7 @@ export async function runTurn(
   // function's own surface/text checks above already establish.
   const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary === true });
   if (!conversationResult.ok) {
-    return { ok: false, status: 400, code: "invalid_input", error: conversationResult.error };
+    return { ok: false, status: 400, code: conversationResult.code ?? "invalid_input", error: conversationResult.error };
   }
   const conversation = conversationResult.value;
 
@@ -4543,7 +4543,7 @@ export async function runTurnStream(
 
   const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary === true });
   if (!conversationResult.ok) {
-    return { ok: false, status: 400, code: "invalid_input", error: conversationResult.error };
+    return { ok: false, status: 400, code: conversationResult.code ?? "invalid_input", error: conversationResult.error };
   }
   const conversation = conversationResult.value;
 
