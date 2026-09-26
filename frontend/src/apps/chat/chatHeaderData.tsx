@@ -21,6 +21,8 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
  * pages that have nothing to do with chat. */
 export interface ChatHeaderData {
   title: string;
+  incognito: boolean;
+  onIncognitoChange: (on: boolean) => void;
   onRename: (title: string) => Promise<void>;
   onDelete: () => Promise<void>;
 }
@@ -69,9 +71,10 @@ export function useSetChatHeaderData(data: ChatHeaderData | null): void {
   const dataRef = useRef(data);
   dataRef.current = data;
   const title = data?.title;
+  const incognito = data?.incognito;
   useEffect(() => {
     setData(dataRef.current);
     return () => setData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately narrower than `data` itself; see this function's own comment above.
-  }, [data === null, title, setData]);
+  }, [data === null, title, incognito, setData]);
 }

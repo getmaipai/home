@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { NextChatPage } from "@/next/pages/NextChatPage";
+import { writeIncognitoCache } from "@/next/incognitoCache";
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
 import type { Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
@@ -53,6 +54,7 @@ afterEach(() => {
   // own initial-state assumption, the same isolation risk `matchMedia`
   // and `AudioContext` above are already reset for.
   localStorage.removeItem("maipai.chat.rail-collapsed");
+  sessionStorage.removeItem("maipai.incognito");
 });
 
 // SHELL-02 slice 4: the artifact-card/canvas-split Elements both use
@@ -1697,88 +1699,36 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
   });
 });
 
-describe("NextChatPage (CHAT-WELCOME-01: the welcome screen's own temporary-chat toggle)", () => {
-  test("appears on the empty new-chat screen for a role that can have a temporary chat", async () => {
-    const restore = stubFetch();
-    try {
-      const { findByRole } = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      expect(await findByRole("button", { name: "Temporary chat" })).toBeVisible();
-    } finally {
-      restore();
-    }
-  });
-
-  // RESP-04 (f): a control a child profile can't use renders nothing,
-  // never a disabled one - the same rule CHAT-LIST-01's own sidebar
-  // button (this replaced) followed.
-  test("renders nothing for a child", async () => {
-    const restore = stubFetch();
-    try {
-      const { findByLabelText, queryByRole } = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
-          <NextChatPage person={makePerson({ role: "child" })} />
-        </MemoryRouter>,
-      );
-      await findByLabelText("Message input");
-      expect(queryByRole("button", { name: "Temporary chat" })).toBeNull();
-    } finally {
-      restore();
-    }
-  });
-
-  test("toggling swaps the heading, and toggling again swaps it back", async () => {
-    const restore = stubFetch();
-    try {
-      const { findByRole, findByText, queryByText } = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      expect(await findByText("How can I help you today?")).toBeVisible();
-      fireEvent.click(await findByRole("button", { name: "Temporary chat" }));
-      expect(await findByText("This chat won't be saved to your history.")).toBeVisible();
-      expect(queryByText("How can I help you today?")).toBeNull();
-      fireEvent.click(await findByRole("button", { name: "Temporary chat" }));
-      expect(await findByText("How can I help you today?")).toBeVisible();
-    } finally {
-      restore();
-    }
-  });
-
-  // The toggle lives only on the CURRENT (already blank) thread now, so
-  // arming it never involves a thread switch the way CHAT-LIST-01's own
-  // sidebar button did (it reused ThreadListNew, composing the click
-  // with a real switchToNewThread) - this proves the simpler flow
-  // (armed, then sent, on the one thread) marks the turn, replacing that
-  // test's own switch-away scenario, which the new UI has no path to
-  // any more.
-  test("marks the turn temporary once armed on the blank thread and sent", async () => {
+describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
+  test("Incognito stays on across separate new threads and marks each first turn temporary", async () => {
     const restore = stubMultiTurnFetch();
     try {
+      writeIncognitoCache(true);
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
-      fireEvent.click(await view.findByRole("button", { name: "Temporary chat" }));
+      await view.findByLabelText("Message input");
       await sendMessage(view, "a private question");
       await view.findByText("Reply 1.");
+      fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New Thread" }));
+      await sendMessage(view, "another private question");
+      await view.findByText("Reply 2.");
 
       const bodies = turnRequestBodies();
-      expect(bodies).toHaveLength(1);
+      expect(bodies).toHaveLength(2);
       expect(bodies[0]!.temporary).toBe(true);
+      expect(bodies[1]!.temporary).toBe(true);
     } finally {
       restore();
     }
   });
 
-  test("a real conversation's own first send never carries it", async () => {
+  test("Incognito off sends normal turns, and a fresh session starts off", async () => {
     const restore = stubMultiTurnFetch();
     try {
+      writeIncognitoCache(false);
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
@@ -1790,6 +1740,7 @@ describe("NextChatPage (CHAT-WELCOME-01: the welcome screen's own temporary-chat
       const bodies = turnRequestBodies();
       expect(bodies).toHaveLength(1);
       expect(bodies[0]!.temporary).toBeUndefined();
+      expect(sessionStorage.getItem("maipai.incognito")).toBeNull();
     } finally {
       restore();
     }

@@ -36,6 +36,8 @@ function renderBar(data: ChatHeaderData | null) {
 function baseData(overrides: Partial<ChatHeaderData> = {}): ChatHeaderData {
   return {
     title: "What's 2 plus 2?",
+    incognito: false,
+    onIncognitoChange: () => {},
     onRename: async () => {},
     onDelete: async () => {},
     ...overrides,
@@ -54,6 +56,15 @@ describe("ChatHeaderBar", () => {
   test("renders the conversation's own title", async () => {
     const view = renderBar(baseData({ title: "What's 2 plus 2?" }));
     expect(await view.findByText("What's 2 plus 2?")).toBeVisible();
+  });
+
+  test("the Incognito control reflects state and writes the changed value", async () => {
+    const onIncognitoChange = mock(() => {});
+    const view = renderBar(baseData({ incognito: false, onIncognitoChange }));
+    const toggle = await view.findByRole("button", { name: "Incognito Off" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle);
+    expect(onIncognitoChange).toHaveBeenCalledWith(true);
   });
 
   // CHAT-HEADER-03: the title used to cap at a fixed max-w-64 no matter
