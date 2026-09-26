@@ -345,16 +345,15 @@ the design doc's own "What already exists" section.
         pattern (`.github/docs/SAFETY.md`).
       Exit check: `bash scripts/check.sh` plus captures opened and
       judged, both themes.
-- [ ] **INCOGNITO-09: minor access, resolve the inconsistency** (S,
-      after `INCOGNITO-01`). Minors are allowed in Incognito by
-      default (Jesse's own call, 2026-09-25) - a real change from
-      Temporary chat's current adult-only-by-role gate
-      (`canHaveTemporaryChatRole`, `NextChatPage.tsx`), which
-      `INCOGNITO-01` retires in favor of the session-level mode. Since
-      `CHAT-WELCOME-01`'s adult-only floor is going away with it,
-      confirm nothing else still assumes Incognito-capable implies
-      adult (the header menu entry gating named in the design doc, any
-      other call site) before landing `INCOGNITO-01`. Exit: `bash scripts/check.sh`.
+- [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
+      confirmed 2026-09-25. `canHaveTemporaryChatRole`'s only remaining
+      call site is the unrelated "Thinking" mode toggle's own,
+      deliberate adult-only gate (`NextChatPage.tsx`, `thinkingAllowed`)
+      - a separate, already-known, already-flagged gap (that comment's
+      own note on a missing computed age-band), not an Incognito
+      assumption. Nothing else in the Incognito flag/hook/toggle
+      (`useIncognito`, `incognitoCache.ts`, `ChatHeaderBar`) reads role
+      or age at all - minors get Incognito the same as anyone.
 - [ ] **INCOGNITO-10: personalized suggestions follow the mode** (S,
       after `INCOGNITO-01`; connects to the suggestions safety note,
       `.github/docs/SAFETY.md`, same date). Incognito's own new-chat
