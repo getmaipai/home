@@ -396,6 +396,21 @@ the design doc's own "What already exists" section.
       note's hard floor, unchanged by the mode; normal mode's
       suggestions stay generic always, unaffected by this item. Exit:
       `bash scripts/check.sh`.
+      **Not yet buildable (checked 2026-09-26, Codex + verified):**
+      `/next/chat` wires no suggestion adapter at all -
+      `NextChatPage.tsx`'s own comment: "Suggestions... [is its] own
+      follow-up slice (the wiring table's remaining rows)." The kit's
+      `ThreadPrimitive.Suggestions` renders `s.thread.suggestions`, but
+      nothing feeds it (same gap `docs/dev.md`'s Chat-section review
+      already found and filed separately). The pre-chat
+      `chatSuggestionAdapter.ts` reads only installed packages' static
+      `routing.examples`, never memory/search/profile, so it needs no
+      gate either. This item is real work only once suggestions are
+      actually wired up; revisit then. Also found: the "suggestions
+      safety note" this item and `docs/plans/privacy-mode-2026-09-24.md`
+      both cite in `.github/docs/SAFETY.md` was never actually written
+      there - the file has no suggestions section. The hard floor is
+      still correct policy, just not on record where it's cited from.
 - [x] **INCOGNITO-12: the gradient wash didn't reach `/next/chat`'s
       own message area** (S) - fixed 2026-09-25, `39c3b5b2`, live-
       verified by the coordinator (screenshots, both themes, chat and
