@@ -676,6 +676,35 @@ export const modelDownloadJobs = sqliteTable("model_download_jobs", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// PROJECT-RUN-01 (docs/plans/harness-turns-and-projects-2026-09-26.md, "The
+// project record and the runner"): a durable row per background project a
+// turn started, the same "flatten the nested spec shape into JSON text
+// columns" style modelDownloadJobs above uses. Every read and write crosses
+// @maipai/spec's generated Project validator (lib/projects/store.ts) so a
+// row is always the spec shape, never a second, drifting definition here.
+// `person` is denormalized off `provenance.person` (mirrors
+// conversationTurns.personId) so a future per-person listing never has to
+// parse the provenance JSON to filter - `title` isn't itself a JSON column
+// but is still spec-required text, so it gets its own plain column the
+// same way `type`/`state` do.
+export const projects = sqliteTable("projects", {
+  id: text("id").primaryKey(),
+  person: text("person")
+    .notNull()
+    .references(() => people.id),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  state: text("state").notNull(), // planned|running|done|failed|cancelled
+  plan: text("plan").notNull(), // JSON: ProjectPlan
+  steps: text("steps").notNull(), // JSON: StepState[]
+  artifacts: text("artifacts").notNull(), // JSON: ProjectArtifact[]
+  provenance: text("provenance").notNull(), // JSON: Project["provenance"]
+  error: text("error"),
+  hlc: text("hlc").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // Cloned voices (2026-09-04, voice cloning): a household member's own
 // uploaded audio sample, usable as `tts.voice_id` the same way a preset
 // or community-catalog voice is - Pocket TTS's own `/tts` route accepts

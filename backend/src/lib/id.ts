@@ -157,3 +157,17 @@ export function newArtifactId(): string {
 export function newArtifactKey(): string {
   return `artk-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/project.schema.json's `id` (a non-empty string,
+ * no fixed pattern - the schema names no prefix requirement). */
+export function newProjectId(): string {
+  return `project-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/project.schema.json's `$defs.ProjectArtifact.id`
+ * (also just a non-empty string). Distinct prefix from newArtifactId()
+ * above: that one mints the chat program's own artifacts.schema.json
+ * records, a different spec shape entirely. */
+export function newProjectArtifactId(): string {
+  return `projart-${randomSuffix(10)}`;
+}

@@ -54,6 +54,7 @@ import {
   receivedBackups,
   nasMounts,
   appUpdateState,
+  projects,
 } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
@@ -126,6 +127,7 @@ export function resetDb(): void {
   db.delete(pendingEpisodeEmbeddings).run();
   db.delete(episodeEmbeddings).run();
   db.delete(episodes).run();
+  db.delete(projects).run(); // PROJECT-RUN-01: references people
   db.delete(attachments).run();
   db.delete(artifacts).run(); // the chat program's generated-document versions, reference conversations and conversation_turns
   db.delete(conversationTurns).run();

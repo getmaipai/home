@@ -119,6 +119,14 @@ export const wakewordDir = resolve(dataDir, "voice", "wakewords");
 // (transcription, lib/stt.ts). Same shape as wakewordDir above.
 export const sttDir = resolve(dataDir, "voice", "stt");
 
+// PROJECT-RUN-01: each project's own artifact files, one subdirectory per
+// project id under here. Never synced/backed up on its own - the artifact
+// content lives here as plain files, but the durable RECORD (path, gate
+// verdict) is the projects table row; per-project subdirectories mean a
+// cancelled or failed project's partial files stay isolated from every
+// other project's.
+export const projectsDir = resolve(dataDir, "projects");
+
 // A package's own cached fetch responses (session-d-packages-and-store.md
 // step 3, `lib/packageCache.ts`): one subdirectory per package id under
 // here, never a spec-shaped record and never synced or backed up - a cache
