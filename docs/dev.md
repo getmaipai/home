@@ -27924,3 +27924,111 @@ a turn works, not a ladder; `turnMachine/contract.ts` already only uses
 `routingStats` still list `embedding`/`keyword` values that can no
 longer occur post-D7 - additive-API rule says keep the field, stop
 emitting those values. Neither is sized or scheduled here.
+
+## Design pass over the reserved items (Fable, 2026-09-26)
+
+Jesse asked for the pending design reviews in one pass, plus the
+harness design. Three new records came out of it:
+`docs/plans/harness-turns-and-projects-2026-09-26.md` (turns and
+projects, the prompt-to-dynamic-workflow shape),
+`docs/plans/household-memory-permissions-2026-09-26.md` (issue #57),
+and "The persistence boundary" appended to
+`docs/plans/privacy-mode-2026-09-24.md` (INCOGNITO-11 / issue #163).
+The two chat-quality items reserved for a stronger model's pass are
+designed below; PEOPLE-01 and the lower tiers get verdicts.
+
+**CORRECTION-01, designed: recognition is the model's, the backstop
+is grounding, memory repair is provenance-led.** The two live turns
+(LIVE-0923-01 items 4 and 5) failed twice over: `CORRECTION_RE`
+missed both phrasings, and even a perfect match changes nothing
+because `signal.repair` is consumed only for `target === "hub"`
+(`turnEngine.ts:441`); no world-correction handler exists. The design
+refuses the regex extension (the rule is frozen; understanding
+language is the model's job) and places the behavior where the new
+pipeline already puts judgment: the model call. Three parts. First,
+the behavior contract, stated once in the frozen turn context: when
+the person disputes a factual claim the assistant made, the assistant
+re-searches now or asks, and never promises future work it cannot do;
+this is a one-line contract, not personality prose, and it is
+measured, not trusted - items 4/5 become replay rows with a
+bare-parity column, and the row passes only on a grounded reply or an
+honest question, never on "I'll look it up." Second, the interim
+always-search rule's successor owns recognition: LOOKUP-HEAD-01's
+learned router takes "disputed prior claim" as one of its labels
+(roster-synthetic training data per the org standard, never household
+transcripts), which is exactly the classifier-candidate path the
+no-hacky-rules doc prescribes instead of a fourth regex; until that
+head exists, the interim target-world rule already forces search on
+these turns once the signal's target is right, and the replay rows
+tell us whether it is. Third, memory repair: when a disputed claim
+was fed by a context item, the item's provenance already names the
+memory record; a correction the re-search grounds proposes
+`supersede()` on that record through the existing permission rules
+(the person's own record: superseded directly; a household record:
+it becomes a proposal per the household-memory design above). No new
+machinery - the supersede API exists and is simply never called
+today. Chunked: CORRECTION-02 (M): the contract line, the replay
+rows, the answer-node check that a reply promising lookup without a
+tool call counts as a failing row in the bench (a bench scorer, not
+a live gate); CORRECTION-03 (M, after LOOKUP-FED-01): provenance-led
+supersede proposals. The dead `repair`/`target` plumbing is left
+untouched until D-series deletion reaches it.
+
+**MEMORY-RELEVANCE-01, designed: eligibility before similarity, and
+no bypass without eligibility.** The floor could never work: any
+cosine-path survivor of the 0.62 tier floor scores at least 0.434
+composite while genuinely wanted matches can sit far below, so no
+single composite threshold separates them; and the measured leak
+vector in the (c) table was `forceInclude` skipping both gates, a
+pinned identity record scoring ~0.59 against "okay" and "thanks."
+The discriminating signal recall lacks is not a better threshold, it
+is whether the query has anything to recall about. Design: a query
+eligibility gate, the same shape `episodeQueryEligible()` already
+gives episodes - a turn whose text carries no content words (after
+the existing stopword set; a closed, counted property, which the
+rules standard explicitly permits) runs no cosine recall at all, and
+`forceInclude` no longer bypasses it: pinned and entity-matched
+records force-include only on an eligible query (an entity match
+already implies eligibility, since an entity name is a content word;
+the change bites only pinned records against topic-free remarks,
+exactly the measured leak). The profile paragraph is explicitly out
+of scope here: it is an always-on channel by design, its live leak
+(conv-19awhetzdf) is model behavior over that channel and stays with
+EVAL-03. Acceptance is measured, not asserted: the LIVE-0923-01 (6)
+replay rows plus the eight topic-free remarks from the (c) table
+recall nothing, while the recall bench's wanted-match rows hold their
+current pass rate; both suites in the same run, numbers in this file.
+Chunked: MEM-ELIG-01 (M). The old path gets nothing (frozen).
+
+**PEOPLE-01: the trigger is met, the scope is phased.** The flip is
+live (U6 done, `turn.pipeline.next` defaults true, D1-D9 landed), so
+"after the flip settles" no longer holds this back; the remaining
+flip debt (GATE-SPEED-02's voice latency, the structured-part gap)
+does not touch People. But the item as written now conflicts with
+Jesse's own 2026-09-25 ruling that the directory stays
+account-holders-only until the entity design pass: PEOPLE-01 asks for
+pets and non-account people in the same breath. Reconciled by
+phasing, not by reopening his call: phase one is the browsing and
+profile redesign for account holders - the creator grid, the profile
+page composed from the vendored dashboard profile plus the kit media
+grid, manage actions, the child-view rule for an adult's page - and
+carries the real prerequisite chain (STORE-SHARE-01/STORE-PAGE-01
+for the shared-media grid). Phase two is pets and known-people, and
+is PEOPLE-EXPAND-01's design pass, unchanged. The full phase-one
+design pass is startable now and is its own session's work (it is an
+L with UX judgment in it); this entry records the verdict and the
+phasing so that session starts from a clean brief, and the BACKLOG
+row now says so.
+
+**Lower tiers, dispositions only.** IMAGE-SEARCH-01/MEDIA-SEARCH-01:
+correctly held on LOOKUP-FED-01; steps 1-3 of the knowledge-sources
+order are shipped, so LOOKUP-FED-01 is the next build item in that
+chain and needs no new design. EVAL-03 (persona steering): not
+blocking, the bare-answer-plus-identity stopgap stands; it now also
+holds the profile-paragraph leak question per the
+MEMORY-RELEVANCE-01 entry above. CHANNELS-01, NOTES-01, ROUTINES-01,
+ATTACH-PREVIEW-01: unstarted L features with nothing waiting on
+them; no design owed yet. commons TV-focus nav and settings-registry
+inversion: tech debt, no urgency signal, stay parked. bot SAFE-02:
+deferred past v0.1 by its own design record; bot issue #31 remains
+unassignable while bot's main is a docs skeleton.

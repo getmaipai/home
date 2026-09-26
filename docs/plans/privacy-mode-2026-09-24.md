@@ -225,3 +225,90 @@ owner's answers, sized realistically (genuinely L: touches conversation
 storage, the turn machine's memory read/write gating, the thread-list
 UI, a new download flow, and a new cross-cutting guard every
 sharing-shaped feature must adopt). Not chunked into rows yet.
+
+## The persistence boundary (design, 2026-09-26)
+
+This section is the design pass INCOGNITO-11 (issue #163) was waiting
+on. It postdates and supersedes nothing above; it defines where the
+"nothing persisted" promise is actually enforced, because today it is
+enforced nowhere: the thread-list adapter's `initialize()`
+(`chatThreadListAdapter.ts:62`) mints a durable conversation row with
+no mode before any message exists, `resolveOrCreateConversation()`'s
+given-id branch (`conversationHistory.ts:1022`) then trusts the id and
+never reads `opts.temporary`, and every downstream gate that was
+already shipped (INCOGNITO-02's memory read gate, INCOGNITO-03's
+persona swap, the reply-constraint and provisional-turn skips) keys on
+the same `conversation.mode` value the mis-minted row corrupts. One
+wrong write at creation defeats the whole stack.
+
+### Why the boundary is server-side
+
+A privacy invariant the frontend can break is not an invariant. The
+client's Incognito state is a request parameter, never the
+enforcement point. The design therefore has two halves, and the
+second is the guarantee:
+
+1. **The client asks correctly.** `initialize()` reads the
+   `incognito` option it already receives (`chatThreadListAdapter.ts:23`,
+   threaded into `list()` but never into `initialize()`) and sends
+   `mode: "temporary"` on `POST /api/conversations`. The backend half
+   of that endpoint already does the right thing with it
+   (`createConversation()` routes to the in-memory
+   `createTemporaryConversation()` and no row is written). This fixes
+   the live behavior.
+2. **The server refuses the mismatch.** In
+   `resolveOrCreateConversation()`'s given-id branch, when the caller
+   asks for `temporary` and the id resolves to a durable row, the turn
+   is refused with a typed error (the client is holding a durable id
+   it believes is private; continuing would silently persist). The
+   reverse mismatch (no `temporary` flag, but the id names an
+   in-memory session) already resolves safely to the session and
+   stays as is. A mismatch is a bug made loud, never a silent
+   downgrade in either direction.
+
+`conversation.mode === "temporary"` (with `isTemporaryConversation()`
+for the in-memory map) remains the one signal, per the one-definition
+rule. This design fixes how the signal is minted and makes mis-minting
+impossible to pass silently; it deliberately does not add a second
+parallel flag for writers to consult.
+
+### The inventory the fix must test
+
+The org standard says a universal claim needs an inventory. The
+durable writers the promise covers, each needing a regression test
+that drives a temporary turn end to end and proves no row:
+
+1. `conversations` (`insertNewConversation`, `conversationHistory.ts:994`)
+2. `conversation_turns` (`logTurn` → `insertTurnAndBumpConversation`)
+3. `episodes` + pending episode embeddings (`recordEpisodes`, called
+   from `logTurn`; never reached when 2 holds, tested anyway)
+4. `memory_records` via the judge's background scan
+   (`memoryJudge.ts` `pendingTurnWhere`): scans `conversation_turns`,
+   so it is closed by 2; the test seeds a stray temporary-marked row
+   and proves the scan skips it, so a future writer bug cannot be
+   harvested into memory hours later
+5. `notification_deliveries` from `memory.updated` (downstream of 4)
+6. `reply_constraints` (`turnEngine.ts:2601`, gate already present,
+   keyed on the now-trustworthy mode)
+7. provisional turn rows (`insertProvisionalTurn`, gate already present)
+8. resume state written by `POST /conversations/:id/resume` (the
+   second durable write in today's broken flow; a temporary session
+   resume must touch only the in-memory session)
+
+Recorded exceptions, intentional and stated on the privacy page:
+the `[turn]` operational log line stays, metadata only, never message
+text (its content is audited as part of this item, not assumed); and
+safety/crisis notifications are never suppressed by Incognito
+(persistence and memory are removed, safety never is).
+
+### Acceptance addendum for INCOGNITO-11
+
+The live check in the existing row stands (an Incognito chat absent
+from `conversations`, present only in the Incognito list). Added by
+this design: the mismatch refusal has its own test (durable id +
+`temporary: true` → typed error, nothing written); the inventory above
+lands as an enumerated test block in the same commit, one assertion
+per writer; and INCOGNITO-02/03's existing tests are re-run against a
+thread created through the real `initialize()` path, not a hand-built
+temporary session, since the defect was invisible to any test that
+built its session correctly.
