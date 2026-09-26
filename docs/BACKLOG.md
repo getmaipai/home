@@ -211,68 +211,42 @@ the design doc's own "What already exists" section.
       Exit: `bash scripts/check.sh` plus a live end-to-end check (an
       Incognito chat sent, then confirmed absent from `conversations`
       and present only in the Incognito thread list).
-- [ ] **INCOGNITO-02: memory stays out on the read side too** (S) -
-      **first slice landed 2026-09-25, `37c59ea9`; reopened same night,
-      two more leaks found (design-resolver).** The new pipeline
-      (`turnMachine/nodes/context.ts:118`) already gated this; the old
-      path (`turnEngine.ts`) didn't - its `recall()` call now short-
-      circuits to an empty result when `conversation.mode ===
-      "temporary"`, mirroring the sibling `effectiveLoaded` write-side
-      gate a few lines above. Proven end-to-end with a real turn (a
-      remembered fact reaches an ordinary turn's prompt, never a
-      temporary one's), not just a unit-level shape check - the test
-      builds the temporary conversation directly via
-      `resolveOrCreateConversation(..., { temporary: true })`, sidestepping
-      `INCOGNITO-11`/#163's live-reachability gap on purpose.
-      **Still open, old path only** (the new pipeline already gates
-      both): the profile paragraph (`turnEngine.ts:1107` and `:2865`)
-      and past-conversation episode recall (`turnEngine.ts:2808`) are
-      both currently gated only on `anonymous`, never on `temporary` -
-      a real personalization leak distinct from the `memoryMatches`
-      gate this row already fixed. Same fix shape: skip both, or treat
-      their result as empty, when `conversation.mode === "temporary"`.
-- [ ] **INCOGNITO-03: the companion's own voice/identity, not bare
-      mode** (S, after `INCOGNITO-01`). **Corrected 2026-09-25 evening
-      - the original premise below was wrong and nearly shipped a real
-      bug: `bare: true` (`backend/src/routes/turn.ts:625-627`) is
-      hard-gated to owner/admin AND adult, 403ing any minor - it would
-      have broken Incognito for every child/teen `INCOGNITO-09` just
-      decided should have it by default - and it strips routing/
-      packages entirely, not just persona. Jesse's own three-layer
-      framing: the bare model, "our smarts" (routing/tools/packages -
-      keep this fully on), and personalization (turn this off).
-      Incognito is the MIDDLE layer, never the bare one.**
-      The real fix (design-resolver, confirmed against the code): swap
-      to `DEFAULT_PERSONA` in place of the person's own chosen persona,
-      at exactly the point each turn path already resolves one - three
-      sites, not one:
-      1. `turnEngine.ts:2838`: `const persona = conversation.mode ===
-         "temporary" ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor,
-         "persona.active_id"));` (`DEFAULT_PERSONA` already imported,
-         line 88).
-      2. `turnMachine/turnNext.ts:188`: same ternary on the `temporary`
-         variable already in scope (line 169), importing
-         `DEFAULT_PERSONA`.
-      3. `turnEngine.ts:3708`: the `personaId` used for refusal and
-         plugin reply wording - same ternary, verify what temporary-
-         mode variable is actually in scope at this exact line before
-         writing it.
-      Nothing else changes - routing, packages, tool calls, thinking
-      mode all read from variables this doesn't touch. The speaker's
-      own name/roster/age-band line (`turnEngine.ts:909-921`) stays -
-      that's resolution "smarts" (grammar, pronouns), not
-      personalization; medium-confidence call, flag if this reads
-      wrong once built. Cache-cost note (checked, not a blocker): one
-      cold prefill entering and one leaving Incognito, when the
-      person's own persona isn't already the default - the same cost
-      as switching to a different real conversation, not a new
-      regression class.
-      Acceptance: a test per path (old and new) confirming a temporary
-      turn's system prompt carries the default persona's identity line,
-      not the person's own chosen one, while a normal turn is
-      unaffected - and confirming routing/tool-calling behavior is
-      identical whether or not Incognito is on (the "smarts" claim,
-      not just the persona swap). Exit: `bash scripts/check.sh`.
+- [x] **INCOGNITO-02: memory stays out on the read side too** (S) -
+      fully landed 2026-09-25, `37c59ea9` then `7b843009`. The new
+      pipeline (`turnMachine/nodes/context.ts:118`) already gated
+      `recall()`; the old path's own `recall()` call, profile paragraph
+      (`turnEngine.ts:1107`, `:2865`), and past-conversation episode
+      recall (`:2808`) all now short-circuit to empty when
+      `conversation.mode === "temporary"`, closing the two leaks
+      design-resolver found the same night this row first landed.
+- [x] **INCOGNITO-03: the companion's own voice/identity, not bare
+      mode** (S) - landed 2026-09-25, `7b843009`. **Corrected same
+      evening before landing** - the original premise (reuse
+      `ADMIN-COMPARE-01`'s bare mode) was wrong and nearly shipped a
+      real bug: `bare: true` is hard-gated to owner/admin AND adult
+      (`backend/src/routes/turn.ts:625-627`), which would have 403'd
+      every child/teen `INCOGNITO-09` decided should have Incognito by
+      default, and it strips routing/packages entirely, not just
+      persona. Jesse's own three-layer framing: the bare model, "our
+      smarts" (routing/tools/packages, kept fully on), and
+      personalization (turned off). Incognito is the middle layer,
+      never the bare one. Real fix: swap to `DEFAULT_PERSONA` at all
+      three points a turn resolves a persona (`turnEngine.ts:2838` and
+      `:3708`, `turnMachine/turnNext.ts:188`) when `conversation.mode
+      === "temporary"` - routing, packages, tool calls, and thinking
+      mode are all untouched. **Side finding, fixed in the same
+      commit**: `turnNext.ts:188` was reading `persona.active_id` at
+      HOUSEHOLD scope (`getHouseholdSettingValue`) when the spec
+      declares it person-scoped (`commons/spec/settings/keys.json:528`,
+      `"scope": "person"`) - a real, pre-existing bug where the new
+      pipeline silently ignored a person's own chosen persona; now
+      reads `getPersonSettingValue(actor, ...)`, matching the old
+      path's own (already-correct) behavior. Proven end-to-end: a real
+      turn's prompt carries the default persona's identity line for a
+      temporary conversation and the person's own chosen one otherwise,
+      with `websearch` tool availability and a real tool call proven
+      identical on and off Incognito (the "smarts stay on" half of the
+      claim, not just the persona swap).
 - [ ] **INCOGNITO-04: the per-package manifest behavior field** (M,
       spec-first in `commons`, after `INCOGNITO-01`). A required
       `incognito: blocked | ephemeral | unaffected` field on every
