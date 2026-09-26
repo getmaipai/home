@@ -193,3 +193,104 @@ Dependencies to name honestly: PROJECT-MEDIA-01 needs the Stack image role
 proven (a stack item, not ours); nothing else here waits on it, and
 PROJECT-PACK-01 can prove the runner with a text-only project (a bedtime
 storybook without pictures) if imaging lags.
+
+## Owner direction, 2026-09-26: one loop, the modern shape
+
+Jesse's read, same day: the person types a normal prompt and the
+harness does the rest, up to "find me the best laptop tray and add it
+to my cart" and "a fully illustrated coloring book about forgiveness";
+nothing hacky, the modern shape people currently use. Folded in. The
+mechanics above stand; three framings change.
+
+**The target is the agent loop, said plainly.** What the current
+products people actually use ship (the agent modes, deep research,
+the coding agents) is one model in a bounded loop with tools, keeping
+its own plan, plus packaged procedures those same products call
+skills or playbooks that make the loop reliable on known jobs. This
+design is that pattern, not a hedge against it: the recipe is the
+skill half, the model-authored plan is the loop half, and both run on
+the same substrate (the project record, the runner, the mandatory
+gate). Where the "Recipes first" section misled: PROJECT-PLAN-01 read
+as an afterthought. It is the target. The only thing gating it is
+measurement, because a plan the resident model writes badly is worse
+than a recipe: a model earns `plan_authoring` on a bench the way it
+already earns rounds and tools. On a Studio-class machine the loop
+leads and recipes cover the known jobs; on the smallest machine the
+recipes lead. Same code, one pipeline, and the person cannot tell the
+two apart except by what their hardware can do.
+
+**The person never chooses.** No project button, no mode, no
+vocabulary to learn. The model decides answer-now versus project by
+calling `start_project` or not, and that decision's quality is a
+measured replay row like any other behavior. Where the resident model
+mis-decides, the remedy is the decision layer below, never a phrase
+list.
+
+**Two named capabilities the substrate must not close doors on**,
+filed as rows, both out of scope for the first build:
+
+- Web actions (PROJECT-WEB-01, design pass first). The laptop-tray
+  ask is research steps plus browser-action steps on the person's own
+  logged-in session, through a catalog package. Every browser step
+  that changes state (adding to a cart, anything money-adjacent) is a
+  consequential action behind the policy node's confirm, and a
+  purchase is never auto-confirmed; the shipped computer-use agents
+  draw exactly this line. Third-party services rules apply in full
+  (the person's pace, the front door, back off on the first signal).
+- Hard questions (PROJECT-DEEP-01). Deep research is a project type:
+  search, read and synthesize steps over the federated lookup, the
+  thinking budget owned by the person's setting and the model's
+  budget record exactly as today. No new machinery, one recipe that
+  a plan-authoring model may also compose freely.
+
+## The decision layer: Laya, evaluated 2026-09-26
+
+The harness needs many small typed decisions (does this turn need a
+lookup, is this a correction, is this request project-shaped), and
+the org standard already says those go to a learned component, never
+a fourth regex. The stack's jev note (2026-09-20) rejected TypeSafe's
+Jev for exactly one reason, hosted-only, and said revisit when an
+open reproduction appears. Laya is that reproduction: Convai
+Innovations, announced 2026-09-18, Apache-2.0 per the announcement,
+weights on Hugging Face (`convaiinnovations/laya`, 421M
+ModernBERT-large, ~808 MB; a 322M multilingual and a typed-decisions
+checkpoint beside it; verified present and actively updated
+2026-09-26, license to be confirmed on the model card before any
+pin). It is not a harness and does not orchestrate anything; it
+returns a typed choice, score or boolean with a calibrated
+probability in one forward pass, tens of milliseconds on modest
+hardware.
+
+Verdict: the first concrete candidate for LOOKUP-HEAD-01 and, later,
+the `start_project` recognition check, on the org's own adoption
+path and not before: fine-tuned on labeled roster-synthetic rows
+(its zero-shot is unusable, 0.362 against a 0.461 majority-class
+baseline, so out of the box it is worse than guessing), a
+calibration study against human labels, shadow mode beside the
+interim rule before it decides anything live, and never in the
+safety, consent or privacy path. Its published limits shape the
+slot: it degrades past roughly 20 options (0.425 on a 77-label set
+where Jev holds 0.870) and the English checkpoint reads 512 tokens,
+so it decides from the utterance and a short window over a handful
+of labels, never from the full context over an open set. Nothing in
+this design waits on it; it is how the routing decisions get cheap
+and honest once the labeled rows exist.
+
+## The runner's machinery: XState v5, already decided
+
+Asked directly (Jesse, 2026-09-26): were we not supposed to use
+LangGraph, and did a design not already exist? The design that exists
+is ARCH-BUILD-01's buy-or-build verdict (dev.md, 2026-09-22): LangGraph
+JS, XState v5 and an in-house TurnGraph were spiked and measured, and
+LangGraph was rejected on the numbers, not on taste. It did not delete
+enough of our orchestration, its tool primitives call tools directly,
+so the design's "side effects only through a typed action plan and a
+deterministic executor" would have been hand-built beside it, and the
+dependency arrives with 48 packages including a LangSmith client stub,
+a phone-home surface the privacy architecture forbids. XState v5 won,
+runs the shipping turn machine, and ships per-node tracing and
+deadlines as ordinary statechart features. That verdict carries over
+here unchanged: the project runner is an XState v5 machine the way the
+turn machine is, one orchestration library in the tree, and
+PROJECT-RUN-01 names it so nobody hand-rolls a dependency walker or
+adds a second framework beside the first.

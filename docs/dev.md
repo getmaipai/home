@@ -28032,3 +28032,25 @@ them; no design owed yet. commons TV-focus nav and settings-registry
 inversion: tech debt, no urgency signal, stay parked. bot SAFE-02:
 deferred past v0.1 by its own design record; bot issue #31 remains
 unassignable while bot's main is a docs skeleton.
+
+## Harness direction and Laya (2026-09-26, follow-up to the design pass)
+
+Jesse's read of the harness record, same day: a normal prompt in, the
+harness does the rest ("best laptop tray into my cart", the
+illustrated coloring book, hard questions); nothing hacky, the modern
+shape people currently use; and evaluate Laya (flowtivity.ai's
+"open-source Jev alternative" post). Both folded into the design
+record as two new sections ("Owner direction, 2026-09-26" and "The
+decision layer: Laya"): the agent loop is stated as the target with
+recipes as the skills half of the same substrate, `plan_authoring`
+gated by measurement only; PROJECT-WEB-01 (browser actions,
+purchases always confirmed) and PROJECT-DEEP-01 (deep research as a
+project type) filed; and Laya (Apache-2.0 open reproduction of the
+typed-decision model the stack's jev-and-yue note rejected as
+hosted-only) recorded as the first concrete LOOKUP-HEAD-01 candidate,
+weights verified on Hugging Face, adoption only via labeled
+roster-synthetic fine-tune, a calibration study and shadow mode, per
+RULES-AND-LEARNED-COMPONENTS.md. Its zero-shot is below the
+majority-class baseline, so it is a fine-tune-or-nothing component;
+its 512-token window and ~20-option ceiling fit the router slot and
+nothing wider.
