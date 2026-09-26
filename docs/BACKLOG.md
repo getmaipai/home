@@ -211,8 +211,9 @@ the design doc's own "What already exists" section.
       Exit: `bash scripts/check.sh` plus a live end-to-end check (an
       Incognito chat sent, then confirmed absent from `conversations`
       and present only in the Incognito thread list).
-- [x] **INCOGNITO-02: memory stays out on the read side too** (S) -
-      landed 2026-09-25, `37c59ea9`. The new pipeline
+- [ ] **INCOGNITO-02: memory stays out on the read side too** (S) -
+      **first slice landed 2026-09-25, `37c59ea9`; reopened same night,
+      two more leaks found (design-resolver).** The new pipeline
       (`turnMachine/nodes/context.ts:118`) already gated this; the old
       path (`turnEngine.ts`) didn't - its `recall()` call now short-
       circuits to an empty result when `conversation.mode ===
@@ -223,11 +224,55 @@ the design doc's own "What already exists" section.
       builds the temporary conversation directly via
       `resolveOrCreateConversation(..., { temporary: true })`, sidestepping
       `INCOGNITO-11`/#163's live-reachability gap on purpose.
-- [ ] **INCOGNITO-03: the companion goes fully off, via bare mode** (S,
-      after `INCOGNITO-01`). Reuses `ADMIN-COMPARE-01`'s existing bare-
-      mode mechanism (`NextChatPage.tsx`) rather than a second way to
-      disable the persona/voice layer - Incognito on means bare mode
-      on, no new plumbing. Exit: `bash scripts/check.sh`.
+      **Still open, old path only** (the new pipeline already gates
+      both): the profile paragraph (`turnEngine.ts:1107` and `:2865`)
+      and past-conversation episode recall (`turnEngine.ts:2808`) are
+      both currently gated only on `anonymous`, never on `temporary` -
+      a real personalization leak distinct from the `memoryMatches`
+      gate this row already fixed. Same fix shape: skip both, or treat
+      their result as empty, when `conversation.mode === "temporary"`.
+- [ ] **INCOGNITO-03: the companion's own voice/identity, not bare
+      mode** (S, after `INCOGNITO-01`). **Corrected 2026-09-25 evening
+      - the original premise below was wrong and nearly shipped a real
+      bug: `bare: true` (`backend/src/routes/turn.ts:625-627`) is
+      hard-gated to owner/admin AND adult, 403ing any minor - it would
+      have broken Incognito for every child/teen `INCOGNITO-09` just
+      decided should have it by default - and it strips routing/
+      packages entirely, not just persona. Jesse's own three-layer
+      framing: the bare model, "our smarts" (routing/tools/packages -
+      keep this fully on), and personalization (turn this off).
+      Incognito is the MIDDLE layer, never the bare one.**
+      The real fix (design-resolver, confirmed against the code): swap
+      to `DEFAULT_PERSONA` in place of the person's own chosen persona,
+      at exactly the point each turn path already resolves one - three
+      sites, not one:
+      1. `turnEngine.ts:2838`: `const persona = conversation.mode ===
+         "temporary" ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor,
+         "persona.active_id"));` (`DEFAULT_PERSONA` already imported,
+         line 88).
+      2. `turnMachine/turnNext.ts:188`: same ternary on the `temporary`
+         variable already in scope (line 169), importing
+         `DEFAULT_PERSONA`.
+      3. `turnEngine.ts:3708`: the `personaId` used for refusal and
+         plugin reply wording - same ternary, verify what temporary-
+         mode variable is actually in scope at this exact line before
+         writing it.
+      Nothing else changes - routing, packages, tool calls, thinking
+      mode all read from variables this doesn't touch. The speaker's
+      own name/roster/age-band line (`turnEngine.ts:909-921`) stays -
+      that's resolution "smarts" (grammar, pronouns), not
+      personalization; medium-confidence call, flag if this reads
+      wrong once built. Cache-cost note (checked, not a blocker): one
+      cold prefill entering and one leaving Incognito, when the
+      person's own persona isn't already the default - the same cost
+      as switching to a different real conversation, not a new
+      regression class.
+      Acceptance: a test per path (old and new) confirming a temporary
+      turn's system prompt carries the default persona's identity line,
+      not the person's own chosen one, while a normal turn is
+      unaffected - and confirming routing/tool-calling behavior is
+      identical whether or not Incognito is on (the "smarts" claim,
+      not just the persona swap). Exit: `bash scripts/check.sh`.
 - [ ] **INCOGNITO-04: the per-package manifest behavior field** (M,
       spec-first in `commons`, after `INCOGNITO-01`). A required
       `incognito: blocked | ephemeral | unaffected` field on every
@@ -273,18 +318,39 @@ the design doc's own "What already exists" section.
       re-entering the PIN. **Admin-configurable per account** - a
       household can require it for some people (an adult) and not
       others (a child's own account). Exit: `bash scripts/check.sh`.
-- [ ] **INCOGNITO-08: visual design** (S, after `INCOGNITO-01`). Three
-      signals, never color alone: a colored border/frame around the
-      content area (not a full background recolor), a fixed
-      icon-plus-"Incognito" label, a distinct always-visible toggle
-      never buried in a menu. Purple accent (verify real contrast in
-      both themes before picking the token), a new `data-theme`
-      variant on the shell's existing theme-token mechanism. Entry: a
-      one-time explanation, never repeated. Exit: a state-aware
-      warning only when there's something live to lose, never fixed -
-      mirrors the unrestricted-mode entry/exit pattern
-      (`.github/docs/SAFETY.md`). Exit check: `bash scripts/check.sh`
-      plus captures opened and judged, both themes.
+- [ ] **INCOGNITO-08: visual design** (S, after `INCOGNITO-01`).
+      **Refined 2026-09-25 evening, Jesse's own direction, supersedes
+      the toggle-placement and recolor-scope lines below where they
+      conflict:**
+      - **Toggle placement: same spot the light/dark theme toggle
+        lives** (`Light-Dark.tsx`, rendered in the global app header,
+        `@maipai/ui`'s `Header.tsx` ~line 129 - the site-wide `/next/*`
+        header every page shares, not a chat-only control), not a
+        second always-visible control sitting out permanently - his own
+        comparison: "I don't think spotify or tiktok leave that out"
+        either. **This corrects `INCOGNITO-01`'s own landed toggle**,
+        which is currently `ChatHeaderBar`-only (chat-page-scoped, from
+        `b1bc90f3`) - it needs to move to the global header so
+        Incognito reads as the site-wide mode it actually is, not a
+        chat feature. Follow-up item, not yet filed as its own row -
+        file before building this one.
+      - **First activation: a real modal**, not just an inline
+        explanation - shown once, ever, explaining what Incognito does.
+      - **When on, the whole app looks visibly different** - Jesse's
+        own words, stronger than the entry below's older "not a full
+        background recolor" line; reconcile which is right (a strong
+        purple-accented shift across the whole shell vs. a bordered
+        content area) with him before building, don't assume the older
+        line still wins.
+      - Everything else below not contradicted by the above still
+        applies: three signals never color alone, a fixed icon-plus-
+        "Incognito" label, purple accent (verify real contrast in both
+        themes), a new `data-theme` variant on the shell's existing
+        theme-token mechanism, a state-aware exit warning only when
+        there's something live to lose (mirrors the unrestricted-mode
+        entry/exit pattern, `.github/docs/SAFETY.md`).
+      Exit check: `bash scripts/check.sh` plus captures opened and
+      judged, both themes.
 - [ ] **INCOGNITO-09: minor access, resolve the inconsistency** (S,
       after `INCOGNITO-01`). Minors are allowed in Incognito by
       default (Jesse's own call, 2026-09-25) - a real change from
