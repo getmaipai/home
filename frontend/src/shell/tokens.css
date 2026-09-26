@@ -19,19 +19,23 @@
 @import "@maipai/ui/src/dashboard/css/globals.css";
 @import "@maipai/ui/src/tokens.css";
 
-/* INCOGNITO-08: keep the chosen light/dark palette, while giving the
- * canvas, cards, raised panes, message bubbles and sidebar related violet
- * tones. Foreground tokens stay with the selected look for legible text. */
+/* INCOGNITO-08: the light theme keeps ordinary surfaces neutral and
+ * concentrates violet in the global header band. Dark mode has its own
+ * bold surface palette below. */
 html.incognito {
-  --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 7%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 4%, var(--surface-page)), transparent 72%);
-  --incognito-canvas-color: color-mix(in srgb, var(--hue-violet) 6%, var(--surface-page));
-  --incognito-card: color-mix(in srgb, var(--hue-violet) 18%, var(--surface-card));
-  --incognito-pane: color-mix(in srgb, var(--hue-violet) 22%, var(--surface-pane));
-  --incognito-muted: color-mix(in srgb, var(--hue-violet-deep) 16%, var(--surface-pane));
-  --incognito-accent: color-mix(in srgb, var(--hue-violet) 28%, var(--surface-pane));
-  --incognito-sidebar: color-mix(in srgb, var(--hue-violet) 12%, var(--surface-sidebar));
-  --incognito-border: color-mix(in srgb, var(--hue-violet-deep) 32%, var(--border));
+  --incognito-background: none;
+  --incognito-canvas-color: var(--surface-page);
+  --incognito-card: var(--surface-card);
+  --incognito-pane: var(--surface-pane);
+  --incognito-muted: var(--muted);
+  --incognito-accent: var(--accent);
+  --incognito-sidebar: var(--surface-sidebar);
+  --incognito-border: var(--border);
   --incognito-input-border: color-mix(in srgb, var(--hue-violet) 78%, var(--input));
+  --incognito-header-background: var(--hue-violet);
+  --incognito-header-foreground: white;
+  --incognito-header-border: color-mix(in srgb, white 36%, var(--hue-violet));
+  --incognito-header-hover: color-mix(in srgb, var(--hue-violet) 10%, white);
 }
 
 html.dark.incognito {
@@ -81,8 +85,7 @@ html.incognito body[class*="style-"] {
 /* The vendored FullLayout sidebar adds its own high-specificity
  * `**:data-[slot=sidebar-inner]:bg-background` rule, so this one surface
  * resolves to the canvas token instead of the sidebar token above. Keep
- * the actual sidebar-inner surface on its intended, stronger violet
- * tint in both themes. */
+ * its actual surface aligned with the active Incognito sidebar token. */
 html.incognito body[class*="style-"] [data-slot="sidebar-inner"] {
   background-color: var(--incognito-sidebar);
 }
@@ -92,6 +95,38 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root,
 html.incognito body[class*="style-"] .aui-thread-viewport-footer,
 html.incognito body[class*="style-"] [data-slot="next-chat-rail"] {
   background: transparent;
+}
+
+/* The light-mode reference concentrates color in one bold navigation
+ * band. Scope its foreground tokens to the actual FullLayout header so
+ * its shipped controls inherit a readable white treatment without
+ * changing the page's ordinary neutral surfaces or dark mode. */
+html.incognito:not(.dark) body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky {
+  --background: var(--incognito-header-background);
+  --foreground: var(--incognito-header-foreground);
+  --muted-foreground: var(--incognito-header-foreground);
+  --border: var(--incognito-header-border);
+  --muted: var(--incognito-header-hover);
+  --primary: var(--incognito-header-foreground);
+  --primary-foreground: var(--hue-violet-deep);
+  --ring: var(--incognito-header-foreground);
+  background-color: var(--incognito-header-background);
+  border-color: var(--incognito-header-border);
+  color: var(--incognito-header-foreground);
+}
+
+/* The toggle keeps its violet icon and its own shipped violet hover
+ * treatment. A white resting backing keeps that icon legible against the
+ * new band; :not(:hover) lets the component's existing hover utility win. */
+@layer utilities {
+  html.incognito:not(.dark) body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky [aria-label^="Incognito "]:not(:hover) {
+    background-color: white;
+  }
+}
+
+html.incognito:not(.dark) body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky [data-slot="avatar-fallback"] {
+  background-color: white;
+  color: var(--hue-violet-deep);
 }
 
 /* The kit's Thread sets --composer-bg inline for temporary chats. Incognito

@@ -340,6 +340,16 @@ the design doc's own "What already exists" section.
       desktop width) - every light-mode iteration here was judged by
       Jesse live on his own screen, not the coordinator's own look.
       Confirm with him before trusting this fully closed.
+      **Light-mode direction changed again, codex-380 (2026-09-26):**
+      Jesse replaced the diffuse-violet approach with a mostly neutral
+      light theme and one bold violet band in the global header. The
+      canvas, sidebar, cards and panes now use their normal light-theme
+      surfaces; white header controls keep contrast against the violet
+      band. The composer border and the toggle's violet icon/hover
+      treatment remain. Dark mode is unchanged. The actual vendored
+      `FullLayout` header and ordinary surfaces have computed-style and
+      contrast coverage in `frontend/src/shell/incognitoHeader.test.tsx`.
+      Jesse still needs to judge the live desktop result.
 - [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
       confirmed 2026-09-25. `canHaveTemporaryChatRole`'s only remaining
       call site is the unrelated "Thinking" mode toggle's own,
