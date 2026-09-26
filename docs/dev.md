@@ -28159,3 +28159,103 @@ and component-level tests already prove; if a from-scratch UI replay
 is wanted later, `scripts/screenshot.ts`'s own isolated-instance setup
 (`/api/auth/setup` against a scratch data dir, never the shared
 `hub.db`) is the pattern to reuse.
+
+## PROJECT-RUN-01: the runner, `text` and `assemble` steps, resumable (2026-09-26)
+
+Landed the code home-6a (a prior session whose terminal closed before
+it could commit) had already written in the `home-run01` worktree,
+rebased onto main and taken through a full gate and a review before
+landing, per `docs/plans/harness-turns-and-projects-2026-09-26.md`
+("The project record and the runner", "The runner's machinery: XState
+v5, already decided"). A durable `projects` table (mirroring
+`modelDownloadJobs`'s "flatten the spec shape into JSON text columns"
+style) plus a runner built as an XState v5 machine the same way
+`turnMachine` is (ARCH-BUILD-01's verdict, carried over - no second
+orchestration library): one `batch` state that runs every currently
+dependency-ready step, an `idle` state in between driven through a
+real event-loop tick rather than a synchronous self-loop (so a crash,
+or a test simulating one, can land between two steps of a chain), and
+terminal `done`/`failed`/`cancelled` states. Every `text`/`assemble`
+step's artifact crosses the same output-safety gate a turn's own reply
+does (`lib/safety.ts`'s `evaluateReply()`), unconditionally, whether or
+not the plan itself declares a `gate` step (SAFETY.md's non-removable
+architecture). `media` and `tool` steps are refused at plan validation
+with a plain-words error and nothing executed - PROJECT-MEDIA-01 and
+`start_project` (PROJECT-START-01) are separate, later items. A
+restart resumes an unfinished project from its last completed step (a
+step still `running` in the persisted row was cut off mid-execution,
+never trusted as done, and re-runs); a failing step ends the project
+`failed` with its dependents `skipped`, never left silently pending.
+
+Two real defects surfaced taking this from "committed" to "landed",
+neither present in home-6a's own type-check-clean report (which
+predates the spec-v0.1.41 fix and never got as far as a real test
+run):
+
+1. **The machine crashed on construction.** `machine.ts`'s root-level
+   `on: { CANCEL: { target: "cancelled", ... } }` used an unprefixed
+   sibling name; XState v5 resolves an unprefixed target at the root
+   against the root node itself, not its children, so `createMachine()`
+   threw "not a valid target from the root node" the moment the module
+   loaded - failing all five of `runner.test.ts`'s tests at once, not
+   just a cancel path. Fixed to `.cancelled`. Caught running the gate
+   for the first time on this item, before any review.
+2. **The runner's own subscribe handler broke its documented "mutate in
+   place" invariant.** `runner.ts`'s `actor.subscribe()` callback did
+   `Object.assign(snapshot.context.project, saved)`, where `saved` is
+   `saveProject()`'s return - a brand-new object from `Project.parse()`
+   with brand-new `steps`/`artifacts` arrays. That swap replaced the
+   exact array the batch runner and `steps.ts` were mid-mutation on,
+   orphaning any in-flight `StepState` write (a step flipping to
+   "running" then "done" was writing onto an object nothing read
+   anymore) - every multi-step plan stalled, reproduced with a small
+   debug script logging each snapshot's step states. Fixed to copy back
+   only the two fields `saveProject()` actually re-stamps (`hlc`,
+   `updatedAt`), never the whole object.
+
+With both of those fixed, a medium code review (one pass, the diff
+`main...HEAD`) found two further real gaps, both confirmed against the
+source before being reported:
+
+3. `machine.ts`'s `withTimeout()` only races a step's promise against
+   its deadline; it never cancels the underlying `complete()` call, so
+   a text step that times out keeps running in the background and can
+   still call `writeAndGateArtifact()` after its own project has
+   already been marked failed/skipped and saved - an artifact file and
+   an in-memory mutation with no matching database row. Fixed with a
+   staleness guard in `writeAndGateArtifact()`: it checks the step's
+   own current state immediately before mutating and no-ops unless
+   still `"running"` (the only two ways a step's own record leaves
+   `"running"` are the timeout/skip paths this guards against; there is
+   no real retry path that would still read `"running"` from an
+   unrelated attempt). True cancellation of the underlying model call
+   would need an `AbortSignal` threaded through `lib/llm.ts`'s
+   `complete()`, shared by the turn machine too - out of this item's
+   scope, left as a smaller possible follow-up if it's ever needed.
+4. `runBatch()` ran every ready step in one `Promise.all`, ignoring the
+   plan's own `ceilings.maxGeneratorJobs` (required on every plan by
+   `project.schema.json`) entirely. Fixed with `runLimited()`, a small
+   worker-pool helper (workers pull from a shared queue, capped at
+   `Math.min(maxGeneratorJobs, readyCount)`) - the batch's own
+   dependency-order and all-settle guarantees are unchanged, only the
+   in-flight count is now bounded.
+
+Both fixes got their own regression tests in `runner.test.ts`: the
+concurrency cap is proven by an externally-controlled `complete()` stub
+that never resolves until the test releases it, so the observed
+concurrency is real rather than an artifact of how fast the stub
+happens to run; the staleness guard is proven directly at the
+`steps.ts` level (mark a step `"failed"` as the timeout path would,
+then drive `executeStep()` again and confirm nothing is mutated) rather
+than waiting out the real 120s step deadline. A re-review of just the
+fix hunks (low effort) found nothing further.
+
+Verified: backend `bash scripts/check.sh` (scope: backend, since the
+`@maipai/spec` pin bump to v0.1.41 - later fast-forwarded to v0.1.43
+during the rebase onto `main` - left no other shared-config diff)
+green twice, most recently 4140 tests, 0 failures, after the final
+rebase onto `main` (which had picked up two unrelated docs commits,
+INCOGNITO-04/07 and PEOPLE-01, while this item was in flight). No live
+`bun restart` check: this is host machinery with no route or UI surface
+yet (`start_project` is PROJECT-START-01), so nothing exists on 8787 to
+exercise until that item lands.
