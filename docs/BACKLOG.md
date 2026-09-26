@@ -302,8 +302,30 @@ the design doc's own "What already exists" section.
       itself carries purple" line below), `ChatHeaderBar`'s own
       chat-only toggle removed, the discard-on-toggle-off flow moved up
       to the shell level with a `window` event so a mounted chat page
-      still reloads its list. **Still open, slice 2**: the app-wide
-      gradient wash and the first-activation modal, both below.
+      still reloads its list. **Slice 2 landed 2026-09-25, `52768b3d`:**
+      the first-activation modal (real copy, shows once via a
+      `localStorage` flag, proven by a real test) and the gradient wash
+      (`--incognito-background`, composed from `--hue-violet`/`--hue-
+      violet-deep` mirroring `--canvas-background`'s own precedent),
+      applied to `[data-slot="sidebar-inset"]`. **Live-verified by the
+      coordinator (screenshots, both themes) - real gap found, not yet
+      fixed**: the gradient shows correctly on the dashboard and every
+      plain `/next/*` page, but NOT inside `/next/chat`'s own message
+      area - `.aui-root.aui-thread-root` (assistant-ui's own vendored
+      Thread component), the thread-list rail, and the composer footer
+      all carry their own `bg-background` Tailwind utility, which
+      paints an opaque solid color over the gradient (confirmed via
+      computed styles: the gradient IS present as `sidebar-inset`'s own
+      `background-image`, painted UNDER these descendants' own opaque
+      `background-color`). **The right fix, not yet built**: override
+      the `--background` token itself under `.incognito` (not
+      `[data-slot="sidebar-inset"]`'s own `background` shorthand) -
+      `--background` is what every `bg-background` consumer app-wide
+      reads, including assistant-ui's own Thread root, so a token-level
+      override cascades everywhere automatically instead of chasing
+      each component (and never touches a shipped component's own
+      source, matching the "kit wraps and composes, never forks"
+      rule). Follow-up: `INCOGNITO-12` below.
       **Settled 2026-09-25 evening, Jesse's own direction plus a
       reference screenshot (Firefox Private Browsing) - the earlier
       draft of this row said "a colored border/frame... not a full
@@ -373,6 +395,29 @@ the design doc's own "What already exists" section.
       note's hard floor, unchanged by the mode; normal mode's
       suggestions stay generic always, unaffected by this item. Exit:
       `bash scripts/check.sh`.
+- [ ] **INCOGNITO-12: the gradient wash doesn't reach `/next/chat`'s
+      own message area** (S, after `INCOGNITO-08` slice 2). Found live
+      by the coordinator, 2026-09-25 (screenshots, both themes): the
+      gradient shows correctly on the dashboard and every plain
+      `/next/*` page, but assistant-ui's own vendored Thread component
+      (`.aui-root.aui-thread-root`), the thread-list rail, and the
+      composer footer all carry their own `bg-background` Tailwind
+      utility, painting an opaque solid color over
+      `[data-slot="sidebar-inset"]`'s gradient - confirmed via computed
+      styles, not a guess. Fix: override the `--background` token
+      itself under `.incognito` (`frontend/src/shell/tokens.css`,
+      alongside `--incognito-background`/`--incognito-input-border`
+      from slice 2), not the `sidebar-inset` selector - `--background`
+      is what every `bg-background` consumer reads app-wide, including
+      assistant-ui's own Thread root, so this cascades everywhere
+      automatically and never touches a shipped component's own
+      source. Verify real text/control contrast against the new
+      `--background` value in both themes (the chat message bubbles
+      and composer read text on this token directly). Acceptance: a
+      live capture of `/next/chat` with Incognito on, both themes,
+      showing the gradient behind the message area, not a flat black/
+      white panel. Exit: `bash scripts/check.sh` plus the capture,
+      opened and judged.
 
 ## Household storage (2026-09-23)
 
