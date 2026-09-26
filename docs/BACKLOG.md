@@ -396,8 +396,20 @@ the design doc's own "What already exists" section.
       suggestions stay generic always, unaffected by this item. Exit:
       `bash scripts/check.sh`.
 - [ ] **INCOGNITO-12: the gradient wash doesn't reach `/next/chat`'s
-      own message area** (S, after `INCOGNITO-08` slice 2). Found live
-      by the coordinator, 2026-09-25 (screenshots, both themes): the
+      own message area** (S, after `INCOGNITO-08` slice 2). **First fix
+      attempt landed but doesn't work, verified live 2026-09-25 -
+      `d0d5877d` overrides `--background`/`--color-background` under
+      `.incognito`, and both correctly show the tinted value at
+      `document.documentElement` (`getComputedStyle` confirms it), but
+      `.aui-root.aui-thread-root`'s own ACTUAL rendered
+      `background-color` is unchanged - still the flat, untinted value,
+      same screenshot as before the fix. Something about how the
+      vendored assistant-ui component's `bg-background` utility
+      compiles isn't reading the live CSS variable the way assumed (a
+      baked-in literal value, a more specific rule, or a separately-
+      scoped stylesheet - not yet diagnosed). Re-investigation in
+      progress, same item, no new row.** Found live by the coordinator,
+      2026-09-25 (screenshots, both themes): the
       gradient shows correctly on the dashboard and every plain
       `/next/*` page, but assistant-ui's own vendored Thread component
       (`.aui-root.aui-thread-root`), the thread-list rail, and the
