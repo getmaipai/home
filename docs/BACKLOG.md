@@ -319,9 +319,24 @@ the design doc's own "What already exists" section.
       household can require it for some people (an adult) and not
       others (a child's own account). Exit: `bash scripts/check.sh`.
 - [ ] **INCOGNITO-08: visual design** (S, after `INCOGNITO-01`).
-      **Refined 2026-09-25 evening, Jesse's own direction, supersedes
-      the toggle-placement and recolor-scope lines below where they
-      conflict:**
+      **Settled 2026-09-25 evening, Jesse's own direction plus a
+      reference screenshot (Firefox Private Browsing) - the earlier
+      draft of this row said "a colored border/frame... not a full
+      background recolor"; that's wrong, replaced below.**
+      - **The recolor is real and app-wide, not a border accent**:
+        a soft purple gradient wash across the WHOLE content
+        background (Firefox's own private-window reference: a
+        gradient from a deep violet at the edges toward a lighter
+        purple-pink center, not a flat fill), the search/input fields
+        carrying a visible purple-accented border, obvious at a glance
+        that the whole app is in a different mode - "obvious... just
+        not obnoxious" (soft/gradient, not a harsh saturated flat
+        purple). Apply it to the shell's actual content background
+        (the `/next` shell's main surface, not literally the OS
+        chrome), both light and dark base themes, as a `data-theme`
+        variant on the existing theme-token mechanism - verify real
+        contrast for text and controls against the gradient in both
+        cases before picking exact tokens.
       - **Toggle placement: same spot the light/dark theme toggle
         lives** (`Light-Dark.tsx`, rendered in the global app header,
         `@maipai/ui`'s `Header.tsx` ~line 129 - the site-wide `/next/*`
@@ -336,19 +351,20 @@ the design doc's own "What already exists" section.
         file before building this one.
       - **First activation: a real modal**, not just an inline
         explanation - shown once, ever, explaining what Incognito does.
-      - **When on, the whole app looks visibly different** - Jesse's
-        own words, stronger than the entry below's older "not a full
-        background recolor" line; reconcile which is right (a strong
-        purple-accented shift across the whole shell vs. a bordered
-        content area) with him before building, don't assume the older
-        line still wins.
-      - Everything else below not contradicted by the above still
-        applies: three signals never color alone, a fixed icon-plus-
-        "Incognito" label, purple accent (verify real contrast in both
-        themes), a new `data-theme` variant on the shell's existing
-        theme-token mechanism, a state-aware exit warning only when
-        there's something live to lose (mirrors the unrestricted-mode
-        entry/exit pattern, `.github/docs/SAFETY.md`).
+        Firefox's own reference card ("Leave no traces on this device"
+        plus a "who might be able to see my activity?" link) is a
+        reasonable shape to mirror for tone, not to copy verbatim -
+        MaiPai's own explanation names what's actually true here
+        (memory, personalization, and the thread list, not literally
+        "no traces on this device" - the conversation still lives
+        in-memory until the session ends or Incognito turns off).
+      - A fixed icon-plus-"Incognito" label stays somewhere visible
+        while it's on (Firefox's own tab favicon/title is the same
+        pattern) - exact placement is part of this same design pass,
+        not prescribed further here.
+      - A state-aware exit warning only when there's something live to
+        lose, never fixed - mirrors the unrestricted-mode entry/exit
+        pattern (`.github/docs/SAFETY.md`).
       Exit check: `bash scripts/check.sh` plus captures opened and
       judged, both themes.
 - [ ] **INCOGNITO-09: minor access, resolve the inconsistency** (S,
