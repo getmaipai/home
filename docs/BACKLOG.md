@@ -311,22 +311,20 @@ the design doc's own "What already exists" section.
       with `websearch` tool availability and a real tool call proven
       identical on and off Incognito (the "smarts stay on" half of the
       claim, not just the persona swap).
-- [ ] **INCOGNITO-04: the per-package manifest behavior field** (M,
-      spec-first in `commons`, after `INCOGNITO-01`). A required
-      `incognito: blocked | ephemeral | unaffected` field on every
-      package manifest, enforced the same way `CAP-GATE-01` already
-      enforces capability requirements - a package that omits it fails
-      to install or fails CI, never a silent default. `blocked`:
-      unavailable while Incognito is on (sharing, `CHANNELS-01`,
-      anything that publishes for the family). `ephemeral`: works
-      normally, nothing it writes persists past the session (chat,
-      the Images app's generated-content tab). `unaffected`: no
-      personal data touched, nothing to gate. Files: `commons`'s
-      `spec/schemas/manifest.schema.json`, every existing package's
-      own manifest (a real audit, not a default value), the host's one
-      shared reader every route/install check calls (mirrors
-      `meetsMinRole`'s pattern). Exit: `bash scripts/check.sh` full
-      scope in `commons` and `home`.
+- [x] **INCOGNITO-04: the per-package manifest behavior field** - landed
+      2026-09-26, commons `60d2145` (spec-v0.1.41) and home `0887c077`.
+      The required `incognito` field enforcement turned out to be the
+      existing `PackageManifest.safeParse()` gate (`loadManifestOnly()`/
+      `loadPackage()`) already used for every other required field - no
+      new host code needed, just the schema's own `required[]` array.
+      All 34 of home's bundled manifests audited and set (not 37 as
+      first scoped - the other 3 `manifest.json` files in the repo are
+      an unrelated bench fixture and two screenshot-pipeline manifests):
+      `remember` and `write_document` are `ephemeral` (write something
+      that shouldn't outlive the session); every other package is
+      `unaffected` (no shared-record write, no personal data touched);
+      none of the bundled set is `blocked` (none of them publish or
+      share for the family). New `backend/tests/manifestIncognito.test.ts`.
 - [ ] **INCOGNITO-05: the sharing/social guard** (M, after
       `INCOGNITO-04`). One shared check every sharing/social/
       publishing route calls, the same shape `meetsMinRole` already
@@ -344,18 +342,23 @@ the design doc's own "What already exists" section.
       the one deliberate action that survives past that exit, moving
       the file onto the person's own device, outside MaiPai's data
       model. Exit: `bash scripts/check.sh`.
-- [ ] **INCOGNITO-07: session lock with PIN re-entry** (M, after
-      `INCOGNITO-01`; **open question: standalone capability or
-      Incognito-specific** - likely generally useful beyond Incognito,
-      e.g. locking a shared device regardless of mode, worth building
-      as its own primitive Incognito then adopts rather than
-      Incognito-only plumbing; decide before implementing). Replaces
-      the forced-wipe idle timeout an earlier design draft proposed
-      (Jesse's own correction, 2026-09-25): the session locks behind a
-      PIN after inactivity, content stays intact, unlocked only by
-      re-entering the PIN. **Admin-configurable per account** - a
-      household can require it for some people (an adult) and not
-      others (a child's own account). Exit: `bash scripts/check.sh`.
+- [x] **INCOGNITO-07: session lock with PIN re-entry** - landed
+      2026-09-26, home `e772aa60`; the settings keys are commons
+      `spec-v0.1.43` (supersedes a hand-edited `spec-v0.1.42`, see its
+      own CHANGELOG entry). Built as its own standalone primitive per
+      the open question's own lean, not Incognito-specific plumbing -
+      `security.session_lock_required`/`security.session_lock_timeout_minutes`
+      (person-scope, `level: "expert"`, no generic self-service settings
+      UI), read onto the roster and `/api/auth/me`, written through
+      `PATCH /api/people/:id` (`UsersSection.tsx`'s existing edit row),
+      gated by owner/admin for any target with self always allowed
+      (mirrors `personLifecycle.ts`'s `MANAGEABLE_BY` ladder for
+      anyone else). Frontend: `useIdleTimer` + `SessionLockGate`
+      (`frontend/src/shell/`), mounted once in `App.tsx`, reusing
+      `/api/auth/verify-secret` for unlock - no second PIN-check
+      implementation, no forced wipe, content stays mounted underneath.
+      Verified live (a throwaway backend, idled past a real 1-minute
+      timeout, screenshotted locked and unlocked), not just by test.
 - [x] **INCOGNITO-08: visual design** (S) - landed and live-verified
       2026-09-25/26, redesigned again 2026-09-26 against Jesse's own
       ChatGPT-style reference mockup (the dev.md-worthy history is in git
