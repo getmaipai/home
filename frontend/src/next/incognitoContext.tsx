@@ -56,7 +56,7 @@ export function IncognitoProvider({ children }: { children: ReactNode }) {
           <DialogHeader>
             <DialogTitle>What Incognito does</DialogTitle>
             <DialogDescription>
-              Incognito conversations are not saved to memory, and MaiPai sets aside its usual personalization while you chat. They stay in a separate list until you turn Incognito off, then they are discarded.
+              Incognito turns off memory and personalization across MaiPai. What you do while it is on stays out of your history and is forgotten when you turn it off.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
