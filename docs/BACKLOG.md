@@ -292,90 +292,24 @@ the design doc's own "What already exists" section.
       re-entering the PIN. **Admin-configurable per account** - a
       household can require it for some people (an adult) and not
       others (a child's own account). Exit: `bash scripts/check.sh`.
-- [ ] **INCOGNITO-08: visual design** (S, after `INCOGNITO-01`).
-      **Slice 1 landed 2026-09-25, `3e609fd1` (home) + `a07c6f3`
-      (commons `ui-v0.5.63`):** the toggle placement/architecture piece
-      below - Incognito promoted to a shared `IncognitoProvider`
-      spanning the whole `/next` shell (`incognitoContext.tsx`), a new
-      `IncognitoToggle` in the vendored `Header.tsx` beside `LightDark`
-      (violet icon color when on, violet hover/focus ring - the "toggle
-      itself carries purple" line below), `ChatHeaderBar`'s own
-      chat-only toggle removed, the discard-on-toggle-off flow moved up
-      to the shell level with a `window` event so a mounted chat page
-      still reloads its list. **Slice 2 landed 2026-09-25, `52768b3d`:**
-      the first-activation modal (real copy, shows once via a
-      `localStorage` flag, proven by a real test) and the gradient wash
-      (`--incognito-background`, composed from `--hue-violet`/`--hue-
-      violet-deep` mirroring `--canvas-background`'s own precedent),
-      applied to `[data-slot="sidebar-inset"]`. **Live-verified by the
-      coordinator (screenshots, both themes) - real gap found, not yet
-      fixed**: the gradient shows correctly on the dashboard and every
-      plain `/next/*` page, but NOT inside `/next/chat`'s own message
-      area - `.aui-root.aui-thread-root` (assistant-ui's own vendored
-      Thread component), the thread-list rail, and the composer footer
-      all carry their own `bg-background` Tailwind utility, which
-      paints an opaque solid color over the gradient (confirmed via
-      computed styles: the gradient IS present as `sidebar-inset`'s own
-      `background-image`, painted UNDER these descendants' own opaque
-      `background-color`). **The right fix, not yet built**: override
-      the `--background` token itself under `.incognito` (not
-      `[data-slot="sidebar-inset"]`'s own `background` shorthand) -
-      `--background` is what every `bg-background` consumer app-wide
-      reads, including assistant-ui's own Thread root, so a token-level
-      override cascades everywhere automatically instead of chasing
-      each component (and never touches a shipped component's own
-      source, matching the "kit wraps and composes, never forks"
-      rule). Follow-up: `INCOGNITO-12` below.
-      **Settled 2026-09-25 evening, Jesse's own direction plus a
-      reference screenshot (Firefox Private Browsing) - the earlier
-      draft of this row said "a colored border/frame... not a full
-      background recolor"; that's wrong, replaced below.**
-      - **The recolor is real and app-wide, not a border accent**:
-        a soft purple gradient wash across the WHOLE content
-        background (Firefox's own private-window reference: a
-        gradient from a deep violet at the edges toward a lighter
-        purple-pink center, not a flat fill), the search/input fields
-        carrying a visible purple-accented border, obvious at a glance
-        that the whole app is in a different mode - "obvious... just
-        not obnoxious" (soft/gradient, not a harsh saturated flat
-        purple). Apply it to the shell's actual content background
-        (the `/next` shell's main surface, not literally the OS
-        chrome), both light and dark base themes, as a `data-theme`
-        variant on the existing theme-token mechanism - verify real
-        contrast for text and controls against the gradient in both
-        cases before picking exact tokens.
-      - **Toggle placement: same spot the light/dark theme toggle
-        lives** (`Light-Dark.tsx`, rendered in the global app header,
-        `@maipai/ui`'s `Header.tsx` ~line 129 - the site-wide `/next/*`
-        header every page shares, not a chat-only control), not a
-        second always-visible control sitting out permanently - his own
-        comparison: "I don't think spotify or tiktok leave that out"
-        either. **This corrects `INCOGNITO-01`'s own landed toggle**,
-        which is currently `ChatHeaderBar`-only (chat-page-scoped, from
-        `b1bc90f3`) - it needs to move to the global header so
-        Incognito reads as the site-wide mode it actually is, not a
-        chat feature. Follow-up item, not yet filed as its own row -
-        file before building this one.
-      - **First activation: a real modal**, not just an inline
-        explanation - shown once, ever, explaining what Incognito does.
-        Firefox's own reference card ("Leave no traces on this device"
-        plus a "who might be able to see my activity?" link) is a
-        reasonable shape to mirror for tone, not to copy verbatim -
-        MaiPai's own explanation names what's actually true here
-        (memory, personalization, and the thread list, not literally
-        "no traces on this device" - the conversation still lives
-        in-memory until the session ends or Incognito turns off).
-      - A fixed icon-plus-"Incognito" label stays somewhere visible
-        while it's on (Firefox's own tab favicon/title is the same
-        pattern) - exact placement is part of this same design pass,
-        not prescribed further here.
-      - **The toggle button itself carries purple too**, not just the
-        app-wide wash once it's on - some purple in its off, on, and/or
-        hover states (Jesse's own addition), so the control reads as
-        "this is the Incognito switch" even before it's flipped.
-      - A state-aware exit warning only when there's something live to
-        lose, never fixed - mirrors the unrestricted-mode entry/exit
-        pattern (`.github/docs/SAFETY.md`).
+- [x] **INCOGNITO-08: visual design** (S) - landed 2026-09-25/26 across
+      four commits, fully live-verified by the coordinator (screenshots,
+      both themes, dashboard and chat): `3e609fd1`/`ui-v0.5.63` (the
+      toggle moved to the global header beside `LightDark`, a shared
+      `IncognitoProvider` spanning the whole `/next` shell), `52768b3d`
+      (the first-activation modal and the first gradient attempt),
+      `39c3b5b2` (fixed the gradient not reaching `/next/chat`, see
+      `INCOGNITO-12`), `37c7def8` (the real design pass: one continuous
+      fixed-viewport gradient behind the whole canvas via `body::before`,
+      cards/panes/composer/sidebar all shifted into the violet family
+      at a lighter tone than the background rather than staying white -
+      Jesse's own reference, an "Anti-spy setup" app screenshot, settled
+      this). The modal copy also corrected to describe Incognito as a
+      site-wide mode, not a chat feature (a future app like Videos works
+      the same way) - connects to `INCOGNITO-04`'s own per-package
+      `incognito` manifest field, not yet built. A state-aware exit
+      warning (only when there's something live to lose) is not yet
+      built - flag if wanted, not blocking.
       Exit check: `bash scripts/check.sh` plus captures opened and
       judged, both themes.
 - [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
