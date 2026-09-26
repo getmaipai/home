@@ -9,21 +9,8 @@ import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/h
 
 const tokensCss = readFileSync(new URL("./tokens.css", import.meta.url), "utf8");
 
-function requiredRule(pattern: RegExp): string {
-  const rule = tokensCss.match(pattern)?.[0];
-  if (!rule) throw new Error(`Could not find Incognito rule matching ${pattern}`);
-  return rule;
-}
-
-const lightPaletteRule = requiredRule(/html\.incognito\s*\{[^}]*\}/);
-const darkPaletteRule = requiredRule(/html\.dark\.incognito\s*\{[^}]*\}/);
-const sidebarSurfaceRule = requiredRule(/html\.incognito body\[class\*="style-"\] \[data-slot="sidebar-inner"\]\s*\{[^}]*\}/);
-const headerBandRule = requiredRule(/html\.incognito body\[class\*="style-"\] \[data-slot="sidebar-inset"\] > header\.sticky\s*\{[^}]*\}/);
-const incognitoControlRule = requiredRule(/html\.incognito body\[class\*="style-"\] \[data-slot="sidebar-inset"\] > header\.sticky \[aria-label\^="Incognito "\]:not\(:hover\)\s*\{[^}]*\}/);
-const avatarRule = requiredRule(/html\.incognito body\[class\*="style-"\] \[data-slot="sidebar-inset"\] > header\.sticky \[data-slot="avatar-fallback"\]\s*\{[^}]*\}/);
-
 const styleTestId = "incognito-header-test-styles";
-const violet = "rgb(164, 52, 255)";
+const violetPill = "rgb(124, 58, 237)";
 const white = "rgb(255, 255, 255)";
 
 function rgb(color: string): [number, number, number] {
@@ -68,147 +55,40 @@ afterEach(() => {
   localStorage.removeItem("vite-ui-theme");
 });
 
-test("light Incognito uses one high-contrast violet header band and leaves the ordinary surfaces neutral", async () => {
-  expect(lightPaletteRule).toContain("--incognito-background: none");
-  expect(lightPaletteRule).toContain("--incognito-canvas-color: var(--surface-page)");
-  expect(lightPaletteRule).toContain("--incognito-card: var(--surface-card)");
-  expect(lightPaletteRule).toContain("--incognito-sidebar: var(--surface-sidebar)");
-
-  const originalWidth = window.innerWidth;
-  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
-
-  const style = document.createElement("style");
-  style.dataset.testid = styleTestId;
-  style.textContent = `
-    :root {
-      --hue-violet: ${violet}; --hue-violet-deep: rgb(122, 31, 214);
-      --surface-page: rgb(244, 247, 251); --surface-card: ${white};
-      --surface-pane: rgb(227, 234, 243); --surface-sidebar: rgb(234, 240, 247);
-      --background: var(--surface-page); --card: var(--surface-card);
-      --popover: var(--surface-pane); --muted: var(--surface-pane);
-      --accent: var(--surface-pane); --sidebar: var(--surface-sidebar);
-      --border: rgb(201, 214, 230); --input: rgb(201, 214, 230);
-      --foreground: rgb(11, 23, 48); --muted-foreground: rgb(74, 95, 122);
-      --primary: rgb(33, 166, 255); --primary-foreground: rgb(7, 17, 31);
-    }
-    .bg-background { background-color: var(--background); }
-    .bg-sidebar { background-color: var(--sidebar); }
-    .bg-card { background-color: var(--card); }
-    .bg-popover { background-color: var(--popover); }
-    .text-foreground { color: var(--foreground); }
-    .text-muted-foreground { color: var(--muted-foreground); }
-    .text-violet-600 { color: rgb(124, 58, 237); }
-    .border-border { border-color: var(--border); }
-    .sidebar-box [data-slot="sidebar-inner"] { background-color: var(--background); }
-    ${lightPaletteRule}
-    html.incognito {
-      --incognito-canvas-color: rgb(244, 247, 251);
-      --incognito-card: ${white}; --incognito-pane: rgb(227, 234, 243);
-      --incognito-muted: rgb(227, 234, 243); --incognito-accent: rgb(227, 234, 243);
-      --incognito-sidebar: rgb(234, 240, 247); --incognito-border: rgb(201, 214, 230);
-      --incognito-input-border: ${violet};
-      --incognito-header-background: ${violet}; --incognito-header-foreground: ${white};
-      --incognito-header-border: rgb(197, 123, 255);
-      --incognito-header-hover: rgb(246, 235, 255);
-    }
-    html.incognito body[class*="style-"] {
-      --background: rgb(244, 247, 251); --card: ${white}; --surface-card: ${white};
-      --popover: rgb(227, 234, 243); --surface-pane: rgb(227, 234, 243);
-      --secondary: rgb(227, 234, 243); --muted: rgb(227, 234, 243); --accent: rgb(227, 234, 243);
-      --sidebar: rgb(234, 240, 247); --surface-sidebar: rgb(234, 240, 247);
-      --sidebar-accent: rgb(227, 234, 243); --border: rgb(201, 214, 230);
-      --sidebar-border: rgb(201, 214, 230); --input: ${violet};
-    }
-    ${sidebarSurfaceRule}
-    ${headerBandRule}
-    ${incognitoControlRule}
-    ${avatarRule}
-  `;
-  document.head.append(style);
-  document.documentElement.classList.add("light", "incognito");
-  document.body.classList.add("style-neutral");
-
-  try {
-    const view = render(
-      <MemoryRouter initialEntries={["/next"]}>
-        <ThemeProvider defaultTheme="light">
-          <TooltipProvider>
-            <Routes>
-              <Route path="/next" element={<FullLayout profileDisplayName="Jesse" incognito onIncognitoChange={() => {}} />}>
-                <Route index element={<HeaderFixturePage />} />
-              </Route>
-            </Routes>
-          </TooltipProvider>
-        </ThemeProvider>
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => expect(view.getByTestId("header-page-title")).toBeTruthy());
-    const header = view.container.querySelector('[data-slot="sidebar-inset"] > header.sticky');
-    const canvas = view.container.querySelector('[data-slot="sidebar-inset"]');
-    const sidebar = view.container.querySelector('[data-slot="sidebar-inner"]');
-    const card = view.getByTestId("ordinary-card");
-    const pane = view.getByTestId("ordinary-pane");
-    const title = view.getByTestId("header-page-title");
-    expect(header).not.toBeNull();
-    expect(header!.className).toContain("bg-background");
-
-    const headerStyle = getComputedStyle(header!);
-    expect(headerStyle.backgroundColor).toBe(violet);
-    expect(headerStyle.color).toBe(white);
-    expect(contrast(headerStyle.color, headerStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-    expect(getComputedStyle(title).color).toBe(white);
-    expect(contrast(getComputedStyle(title).color, headerStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-
-    const incognitoButton = header!.querySelector<HTMLButtonElement>('[aria-label="Incognito On"]');
-    expect(incognitoButton).not.toBeNull();
-    const incognitoColor = getComputedStyle(incognitoButton!).color;
-    const incognitoBacking = getComputedStyle(incognitoButton!).backgroundColor;
-    expect(incognitoButton!.className).toContain("hover:bg-violet-500/10");
-    expect(incognitoBacking).toBe("white");
-    expect(contrast(incognitoColor, incognitoBacking)).toBeGreaterThanOrEqual(4.5);
-
-    const headerButtons = Array.from(header!.querySelectorAll("button")).filter((button) => button !== incognitoButton);
-    expect(headerButtons.length).toBeGreaterThanOrEqual(4);
-    for (const button of headerButtons) {
-      expect(contrast(getComputedStyle(button).color, headerStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-    }
-
-    const accountInitial = header!.querySelector<HTMLElement>('[data-slot="avatar-fallback"]');
-    expect(accountInitial).not.toBeNull();
-    expect(contrast(getComputedStyle(accountInitial!).color, getComputedStyle(accountInitial!).backgroundColor)).toBeGreaterThanOrEqual(4.5);
-
-    expect(getComputedStyle(canvas!).backgroundColor).toBe("rgb(244, 247, 251)");
-    expect(getComputedStyle(sidebar!).backgroundColor).toBe("rgb(234, 240, 247)");
-    expect(getComputedStyle(card).backgroundColor).toBe(white);
-    expect(getComputedStyle(pane).backgroundColor).toBe("rgb(227, 234, 243)");
-  } finally {
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
-  }
+test("tokens.css no longer paints the header band violet (redesigned 2026-09-26)", () => {
+  expect(tokensCss).not.toMatch(/\[data-slot="sidebar-inset"\] > header\.sticky\s*\{/);
+  expect(tokensCss).not.toContain("--incognito-header-background");
+  expect(tokensCss).not.toContain("--incognito-header-foreground");
 });
 
-test("dark Incognito uses the same high-contrast violet header band and leaves dark surfaces neutral", async () => {
-  expect(darkPaletteRule).toContain("--incognito-background: none");
-  expect(darkPaletteRule).toContain("--incognito-canvas-color: var(--surface-page)");
-  expect(darkPaletteRule).toContain("--incognito-card: var(--surface-card)");
-  expect(darkPaletteRule).toContain("--incognito-sidebar: var(--surface-sidebar)");
-
+test.each([
+  ["light", "rgb(244, 247, 251)", "rgb(11, 23, 48)"],
+  ["dark", "rgb(7, 17, 31)", "rgb(244, 248, 255)"],
+] as const)("%s Incognito leaves the header on the ordinary theme background and shows a violet pill badge instead", async (theme, headerBackground, headerForeground) => {
   const originalWidth = window.innerWidth;
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
 
+  // This fixture deliberately does not inject the real
+  // html.incognito/body[class*="style-"] rules from tokens.css: their
+  // --background chain (--background -> --incognito-canvas-color ->
+  // --surface-page) resolves to the exact same value with or without
+  // Incognito active, and layering them here trips a happy-dom bug
+  // (infinite recursion resolving chained var()/color-mix() custom
+  // properties across elements - not reproducible in a real browser).
+  // The neutral-surface cascade itself is covered by
+  // incognitoActiveNav.test.tsx and incognitoSidebar.test.tsx.
   const style = document.createElement("style");
   style.dataset.testid = styleTestId;
   style.textContent = `
     :root {
-      --hue-violet: ${violet}; --hue-violet-deep: rgb(122, 31, 214);
-      --surface-page: rgb(244, 247, 251); --surface-card: ${white};
+      --hue-violet: rgb(164, 52, 255);
+      --surface-page: rgb(244, 247, 251); --surface-card: white;
       --surface-pane: rgb(227, 234, 243); --surface-sidebar: rgb(234, 240, 247);
       --background: var(--surface-page); --card: var(--surface-card);
       --popover: var(--surface-pane); --muted: var(--surface-pane);
       --accent: var(--surface-pane); --sidebar: var(--surface-sidebar);
       --border: rgb(201, 214, 230); --input: rgb(201, 214, 230);
-      --foreground: rgb(11, 23, 48); --muted-foreground: rgb(74, 95, 122);
-      --primary: rgb(33, 166, 255); --primary-foreground: rgb(7, 17, 31);
+      --foreground: rgb(11, 23, 48);
     }
     .dark {
       --surface-page: rgb(7, 17, 31); --surface-card: rgb(16, 34, 56);
@@ -217,51 +97,24 @@ test("dark Incognito uses the same high-contrast violet header band and leaves d
       --popover: var(--surface-pane); --muted: var(--surface-pane);
       --accent: var(--surface-pane); --sidebar: var(--surface-sidebar);
       --border: rgb(41, 69, 99); --input: rgb(41, 69, 99);
-      --foreground: rgb(244, 248, 255); --muted-foreground: rgb(169, 190, 215);
-      --primary: rgb(33, 166, 255); --primary-foreground: rgb(7, 17, 31);
+      --foreground: rgb(244, 248, 255);
     }
     .bg-background { background-color: var(--background); }
-    .bg-sidebar { background-color: var(--sidebar); }
     .bg-card { background-color: var(--card); }
     .bg-popover { background-color: var(--popover); }
     .text-foreground { color: var(--foreground); }
-    .text-muted-foreground { color: var(--muted-foreground); }
-    .text-violet-600 { color: rgb(124, 58, 237); }
     .border-border { border-color: var(--border); }
-    .sidebar-box [data-slot="sidebar-inner"] { background-color: var(--background); }
-    ${lightPaletteRule}
-    ${darkPaletteRule}
-    html.dark.incognito {
-      --incognito-background: none; --incognito-canvas-color: rgb(7, 17, 31);
-      --incognito-card: rgb(16, 34, 56); --incognito-pane: rgb(20, 42, 67);
-      --incognito-muted: rgb(20, 42, 67); --incognito-accent: rgb(20, 42, 67);
-      --incognito-sidebar: rgb(10, 26, 46); --incognito-border: rgb(41, 69, 99);
-      --incognito-input-border: ${violet};
-      --incognito-header-background: ${violet}; --incognito-header-foreground: ${white};
-      --incognito-header-border: rgb(197, 123, 255);
-      --incognito-header-hover: rgb(246, 235, 255);
-    }
-    html.incognito body[class*="style-"] {
-      --background: rgb(7, 17, 31); --card: rgb(16, 34, 56); --surface-card: rgb(16, 34, 56);
-      --popover: rgb(20, 42, 67); --surface-pane: rgb(20, 42, 67);
-      --secondary: rgb(20, 42, 67); --muted: rgb(20, 42, 67); --accent: rgb(20, 42, 67);
-      --sidebar: rgb(10, 26, 46); --surface-sidebar: rgb(10, 26, 46);
-      --sidebar-accent: rgb(20, 42, 67); --border: rgb(41, 69, 99);
-      --sidebar-border: rgb(41, 69, 99); --input: ${violet};
-    }
-    ${sidebarSurfaceRule}
-    ${headerBandRule}
-    ${incognitoControlRule}
-    ${avatarRule}
+    .bg-violet-600 { background-color: ${violetPill}; }
+    .text-white { color: ${white}; }
   `;
   document.head.append(style);
-  document.documentElement.classList.add("dark", "incognito");
+  document.documentElement.classList.add(theme, "incognito");
   document.body.classList.add("style-neutral");
 
   try {
     const view = render(
       <MemoryRouter initialEntries={["/next"]}>
-        <ThemeProvider defaultTheme="dark">
+        <ThemeProvider defaultTheme={theme}>
           <TooltipProvider>
             <Routes>
               <Route path="/next" element={<FullLayout profileDisplayName="Jesse" incognito onIncognitoChange={() => {}} />}>
@@ -275,42 +128,23 @@ test("dark Incognito uses the same high-contrast violet header band and leaves d
 
     await waitFor(() => expect(view.getByTestId("header-page-title")).toBeTruthy());
     const header = view.container.querySelector('[data-slot="sidebar-inset"] > header.sticky');
-    const canvas = view.container.querySelector('[data-slot="sidebar-inset"]');
-    const sidebar = view.container.querySelector('[data-slot="sidebar-inner"]');
-    const card = view.getByTestId("ordinary-card");
-    const pane = view.getByTestId("ordinary-pane");
     const title = view.getByTestId("header-page-title");
     expect(header).not.toBeNull();
+    expect(header!.className).toContain("bg-background");
 
     const headerStyle = getComputedStyle(header!);
-    expect(headerStyle.backgroundColor).toBe(violet);
-    expect(headerStyle.color).toBe(white);
-    expect(contrast(headerStyle.color, headerStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-    expect(getComputedStyle(title).color).toBe(white);
-    expect(contrast(getComputedStyle(title).color, headerStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
+    expect(headerStyle.backgroundColor).toBe(headerBackground);
+    expect(getComputedStyle(title).color).not.toBe(white);
 
-    const incognitoButton = header!.querySelector<HTMLButtonElement>('[aria-label="Incognito On"]');
-    expect(incognitoButton).not.toBeNull();
-    const incognitoColor = getComputedStyle(incognitoButton!).color;
-    const incognitoBacking = getComputedStyle(incognitoButton!).backgroundColor;
-    expect(incognitoButton!.className).toContain("hover:bg-violet-500/10");
-    expect(incognitoBacking).toBe("white");
-    expect(contrast(incognitoColor, incognitoBacking)).toBeGreaterThanOrEqual(4.5);
-
-    const headerButtons = Array.from(header!.querySelectorAll("button")).filter((button) => button !== incognitoButton);
-    expect(headerButtons.length).toBeGreaterThanOrEqual(4);
-    for (const button of headerButtons) {
-      expect(contrast(getComputedStyle(button).color, headerStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-    }
-
-    const accountInitial = header!.querySelector<HTMLElement>('[data-slot="avatar-fallback"]');
-    expect(accountInitial).not.toBeNull();
-    expect(contrast(getComputedStyle(accountInitial!).color, getComputedStyle(accountInitial!).backgroundColor)).toBeGreaterThanOrEqual(4.5);
-
-    expect(getComputedStyle(canvas!).backgroundColor).toBe("rgb(7, 17, 31)");
-    expect(getComputedStyle(sidebar!).backgroundColor).toBe("rgb(10, 26, 46)");
-    expect(getComputedStyle(card).backgroundColor).toBe("rgb(16, 34, 56)");
-    expect(getComputedStyle(pane).backgroundColor).toBe("rgb(20, 42, 67)");
+    const pill = header!.querySelector<HTMLButtonElement>('[aria-label="Incognito On"]');
+    expect(pill).not.toBeNull();
+    expect(pill!.className).toContain("rounded-full");
+    expect(pill!.textContent).toContain("Incognito");
+    const pillStyle = getComputedStyle(pill!);
+    expect(pillStyle.backgroundColor).toBe(violetPill);
+    expect(pillStyle.color).toBe(white);
+    expect(contrast(pillStyle.color, pillStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(headerForeground, headerBackground)).toBeGreaterThanOrEqual(4.5);
   } finally {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
   }

@@ -19,8 +19,13 @@
 @import "@maipai/ui/src/dashboard/css/globals.css";
 @import "@maipai/ui/src/tokens.css";
 
-/* INCOGNITO-08: both themes keep ordinary surfaces neutral and
- * concentrate violet in the global header band. */
+/* INCOGNITO-08 (redesigned 2026-09-26, Jesse's own ChatGPT-style
+ * reference): both themes keep ordinary surfaces AND the global header
+ * neutral, identical to the non-Incognito theme. Violet is concentrated
+ * into the Incognito pill badge itself (Header.tsx's own IncognitoToggle,
+ * commons ui-v0.5.66) and the active sidebar nav item below, not a
+ * full-width band - matching how ChatGPT signals its own Incognito mode
+ * with a small corner badge rather than repainting its chrome. */
 html.incognito {
   --incognito-background: none;
   --incognito-canvas-color: var(--surface-page);
@@ -31,10 +36,6 @@ html.incognito {
   --incognito-sidebar: var(--surface-sidebar);
   --incognito-border: var(--border);
   --incognito-input-border: color-mix(in srgb, var(--hue-violet) 78%, var(--input));
-  --incognito-header-background: var(--hue-violet);
-  --incognito-header-foreground: white;
-  --incognito-header-border: color-mix(in srgb, white 36%, var(--hue-violet));
-  --incognito-header-hover: color-mix(in srgb, var(--hue-violet) 10%, white);
 }
 
 html.dark.incognito {
@@ -103,37 +104,6 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root,
 html.incognito body[class*="style-"] .aui-thread-viewport-footer,
 html.incognito body[class*="style-"] [data-slot="next-chat-rail"] {
   background: transparent;
-}
-
-/* Both themes concentrate color in one bold navigation band. Scope its
- * foreground tokens to the actual FullLayout header so shipped controls
- * inherit a readable white treatment without changing ordinary surfaces. */
-html.incognito body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky {
-  --background: var(--incognito-header-background);
-  --foreground: var(--incognito-header-foreground);
-  --muted-foreground: var(--incognito-header-foreground);
-  --border: var(--incognito-header-border);
-  --muted: var(--incognito-header-hover);
-  --primary: var(--incognito-header-foreground);
-  --primary-foreground: var(--hue-violet-deep);
-  --ring: var(--incognito-header-foreground);
-  background-color: var(--incognito-header-background);
-  border-color: var(--incognito-header-border);
-  color: var(--incognito-header-foreground);
-}
-
-/* The toggle keeps its violet icon and its own shipped violet hover
- * treatment. A white resting backing keeps that icon legible against the
- * new band; :not(:hover) lets the component's existing hover utility win. */
-@layer utilities {
-  html.incognito body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky [aria-label^="Incognito "]:not(:hover) {
-    background-color: white;
-  }
-}
-
-html.incognito body[class*="style-"] [data-slot="sidebar-inset"] > header.sticky [data-slot="avatar-fallback"] {
-  background-color: white;
-  color: var(--hue-violet-deep);
 }
 
 /* The kit's Thread sets --composer-bg inline for temporary chats. Incognito

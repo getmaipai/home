@@ -293,25 +293,26 @@ the design doc's own "What already exists" section.
       household can require it for some people (an adult) and not
       others (a child's own account). Exit: `bash scripts/check.sh`.
 - [x] **INCOGNITO-08: visual design** (S) - landed and live-verified
-      2026-09-25/26, final design settled after several real corrections
-      along the way (the dev.md-worthy history is in git log for
-      `frontend/src/shell/tokens.css`, not repeated here). **The settled
-      design, confirmed against Jesse's own finished-mockup reference and
-      live-checked by the coordinator in both themes**: ordinary surfaces
-      (canvas, sidebar, cards, panes) stay completely plain/normal - no
-      wash, no tint, identical to the non-Incognito theme. Violet is
-      concentrated into three deliberate, bold signals instead: (1) the
-      global header becomes a solid violet band with white
-      text/icons (real contrast measured, both themes), (2) the
-      Incognito toggle itself uses a mask icon (`VenetianMask`, not
-      `EyeOff`) with a persistent violet ring, (3) the active sidebar
-      nav item gets a solid violet pill (scoped to just that element -
-      `--primary` elsewhere stays Home's own cyan brand accent). The
-      first-activation modal describes Incognito as a site-wide mode,
-      not a chat feature - connects to `INCOGNITO-04`'s own per-package
-      `incognito` manifest field, not yet built. Landed across commons
-      `ui-v0.5.63` through `ui-v0.5.65` and home commits `3e609fd1`
-      through `31180acc` (full range in git log, both repos). A
+      2026-09-25/26, redesigned again 2026-09-26 against Jesse's own
+      ChatGPT-style reference mockup (the dev.md-worthy history is in git
+      log for `frontend/src/shell/tokens.css`, not repeated here). **The
+      current design**: ordinary surfaces (canvas, sidebar, cards, panes)
+      AND the global header all stay completely plain/normal - no wash,
+      no tint, identical to the non-Incognito theme (the 2026-09-25 solid
+      violet header band is retired: it read as an app-wide mode switch
+      rather than a corner badge, and didn't match how ChatGPT itself
+      signals the mode). Violet is concentrated into two signals instead:
+      (1) the Incognito toggle becomes a solid violet pill badge with the
+      mask icon (`VenetianMask`, not `EyeOff`) and an "Incognito" text
+      label, sitting in its ordinary header-icon slot (contrast measured,
+      both themes), (2) the active sidebar nav item keeps its solid
+      violet pill (scoped to just that element - `--primary` elsewhere
+      stays Home's own cyan brand accent). The first-activation modal
+      describes Incognito as a site-wide mode, not a chat feature -
+      connects to `INCOGNITO-04`'s own per-package `incognito` manifest
+      field, not yet built. Landed across commons `ui-v0.5.63` through
+      `ui-v0.5.66` and home commits `3e609fd1` through the header-band
+      retirement on 2026-09-26 (full range in git log, both repos). A
       state-aware exit warning (only when there's something live to
       lose) is not yet built - flag if wanted, not blocking.
 - [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
