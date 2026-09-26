@@ -310,8 +310,27 @@ the design doc's own "What already exists" section.
       `incognito` manifest field, not yet built. A state-aware exit
       warning (only when there's something live to lose) is not yet
       built - flag if wanted, not blocking.
-      Exit check: `bash scripts/check.sh` plus captures opened and
-      judged, both themes.
+      **Reopened and fixed again, `50a3ea9c`:** Jesse's own screenshot
+      at real desktop width caught a real gap the coordinator's own
+      narrower test viewport missed - the global left nav sidebar
+      (Home/Chat/Tools/People/Settings/Help) stayed plain white. Root
+      cause: `@maipai/ui`'s `FullLayout` sidebar carries its own
+      high-specificity `bg-background` rule on `[data-slot="sidebar-
+      inner"]`, repainting over the intended `--sidebar` tint. Fixed
+      with a targeted override plus a real test rendering the actual
+      vendored `SidebarLayout` component at a forced 1440px width
+      (`frontend/src/shell/incognitoSidebar.test.tsx`) - not just a
+      CSS-declaration check, the same lesson `INCOGNITO-12` already
+      taught twice. Also strengthened the light-theme mix percentages
+      (canvas/gradient 9%→18%, cards 19%→30%, panes 22%→34%, accent
+      28%→36%, sidebar 18%→30%) since the first pass read "dark and
+      drab" against the two reference images. **Verification note**:
+      the coordinator's own browser tooling only renders a narrow,
+      fixed viewport tonight (confirmed twice, can't reproduce desktop
+      width) - this fix is verified by Codex's own real-component test
+      at a forced 1440px width, not by the coordinator's live look the
+      way every other slice was. Ask Jesse to confirm on his own screen
+      before trusting this one fully closed.
 - [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
       confirmed 2026-09-25. `canHaveTemporaryChatRole`'s only remaining
       call site is the unrelated "Thinking" mode toggle's own,
