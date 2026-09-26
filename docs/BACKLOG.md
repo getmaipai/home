@@ -324,13 +324,22 @@ the design doc's own "What already exists" section.
       taught twice. Also strengthened the light-theme mix percentages
       (canvas/gradient 9%→18%, cards 19%→30%, panes 22%→34%, accent
       28%→36%, sidebar 18%→30%) since the first pass read "dark and
-      drab" against the two reference images. **Verification note**:
-      the coordinator's own browser tooling only renders a narrow,
-      fixed viewport tonight (confirmed twice, can't reproduce desktop
-      width) - this fix is verified by Codex's own real-component test
-      at a forced 1440px width, not by the coordinator's live look the
-      way every other slice was. Ask Jesse to confirm on his own screen
-      before trusting this one fully closed.
+      drab" against the two reference images. **That strengthening was
+      wrong - Jesse's own verdict live on his screen: "awful."** Pushing
+      every surface's percentage up together didn't add richness, it
+      washed out the differences between the light theme's already-
+      similar base surface colors into one flat, uniform lavender.
+      **Corrected again, `91a623c9`, asked and confirmed directly with
+      Jesse**: light mode stays restrained (canvas 6%, sidebar 12%,
+      cards 18%, panes 22% - a real, deliberate gap between the barely-
+      tinted canvas and the more-present card/pane surfaces, not
+      everything pushed to the same saturation); dark mode's own block
+      is untouched, already correct. **Verification note, still
+      standing**: the coordinator's own browser tooling only renders a
+      narrow, fixed viewport tonight (confirmed twice, can't reproduce
+      desktop width) - every light-mode iteration here was judged by
+      Jesse live on his own screen, not the coordinator's own look.
+      Confirm with him before trusting this fully closed.
 - [x] **INCOGNITO-09: minor access, resolve the inconsistency** (S) -
       confirmed 2026-09-25. `canHaveTemporaryChatRole`'s only remaining
       call site is the unrelated "Thinking" mode toggle's own,
