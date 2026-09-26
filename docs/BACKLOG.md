@@ -168,16 +168,49 @@ the design doc's own "What already exists" section.
       map, idle expiry (`TEMPORARY_SESSION_IDLE_MS`), process cap
       (`TEMPORARY_SESSION_MAX`), `isTemporaryConversation()`,
       `policy.ts`'s `memory:write` refusal for `state.temporary`.
-- [ ] **INCOGNITO-01: the session-level mode** (M). A shell/session
-      flag above the per-conversation one, read the same way an age
-      band or capability already is - not chat-specific plumbing.
-      Every new conversation opened while it's on is automatically
-      marked temporary; the thread list swaps to a separate Incognito
-      view (never merged with, never toggled from, the normal list).
-      Replaces `CHAT-WELCOME-01`'s per-chat toggle outright once this
-      ships. Files: the session/shell state where age band and
-      capability flags already live, `frontend/src/apps/chat/
-      ChatPage.tsx`'s thread-list rendering. Exit: `bash scripts/check.sh`.
+- [x] **INCOGNITO-01: the session-level mode** (M) - landed 2026-09-25
+      in two slices. **Slice 1, `b1bc90f3`:** the `sessionStorage` flag
+      (`incognitoCache.ts`, `useIncognito.ts`, mirrors
+      `shellNextCache.ts`/`useShellNext.ts`'s own shape), wired into
+      `NextChatPage.tsx`'s `consumeTemporary` as a standing value (every
+      new thread opened while it's on is temporary, not just the
+      first), a functional toggle in `ChatHeaderBar`, `CHAT-WELCOME-01`'s
+      old one-shot welcome-screen toggle and its adult-only role gate
+      removed outright. **Slice 2, `18d32e60`:** `listTemporaryConversations()`
+      and `discardTemporarySessions()` (`conversationHistory.ts`), `GET/
+      POST /api/conversations/incognito(/discard)`, and the thread-list
+      adapter's exclusive Incognito-mode data source (`chatThreadListAdapter.ts`,
+      `NextChatPage.tsx`) - Incognito's thread list never merges with the
+      normal one, and turning the toggle off discards live sessions
+      immediately rather than waiting for the idle timeout.
+      **Accepted exception: the live end-to-end demo (a real Incognito
+      chat actually appearing in the list) is unverified** - blocked on
+      a real, separate, pre-existing defect found while building slice 2
+      and filed as issue #163: a "temporary" conversation is never
+      actually kept out of the database, on ANY path (not just
+      Incognito), because the thread-list adapter's `initialize()`
+      (`chatThreadListAdapter.ts:60-63`) eagerly creates a real, durable
+      conversation row before any message is sent, and
+      `resolveOrCreateConversation()`'s existing-id branch
+      (`conversationHistory.ts:994-1011`) then returns that durable row
+      directly, never consulting `opts.temporary`. This predates
+      tonight - the same mechanism the old `CHAT-WELCOME-01` toggle
+      used - so the privacy promise itself has likely never held.
+      Needs a real design pass on the turn-creation flow (deciding a
+      thread is temporary before its id is minted, not after), flagged
+      for a stronger model, not a quick patch. Follow-up:
+      `INCOGNITO-11` below. Exit: `bash scripts/check.sh` (both slices
+      green save the one accepted mDNS exception).
+- [ ] **INCOGNITO-11: fix the temporary-conversation creation defect,
+      issue #163** (M or L, needs a real design pass first - not a quick
+      patch). The root cause and exact file/line citations are in
+      `INCOGNITO-01`'s own tick above and in #163 itself. Every
+      Incognito/temporary-chat acceptance in `INCOGNITO-01` through
+      `INCOGNITO-10` implicitly assumes this is fixed; none of them can
+      be considered to deliver a real privacy guarantee until it is.
+      Exit: `bash scripts/check.sh` plus a live end-to-end check (an
+      Incognito chat sent, then confirmed absent from `conversations`
+      and present only in the Incognito thread list).
 - [ ] **INCOGNITO-02: memory stays out on the read side too** (S,
       after `INCOGNITO-01`). `policy.ts` already refuses `memory:write`
       for a temporary conversation; nothing yet stops a normal `recall()`
