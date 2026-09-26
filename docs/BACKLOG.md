@@ -362,6 +362,10 @@ the design doc's own "What already exists" section.
         while it's on (Firefox's own tab favicon/title is the same
         pattern) - exact placement is part of this same design pass,
         not prescribed further here.
+      - **The toggle button itself carries purple too**, not just the
+        app-wide wash once it's on - some purple in its off, on, and/or
+        hover states (Jesse's own addition), so the control reads as
+        "this is the Incognito switch" even before it's flipped.
       - A state-aware exit warning only when there's something live to
         lose, never fixed - mirrors the unrestricted-mode entry/exit
         pattern (`.github/docs/SAFETY.md`).
