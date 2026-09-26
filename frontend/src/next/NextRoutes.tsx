@@ -154,7 +154,10 @@ function NextRoutesWithIncognito({ person }: { person: Roster }) {
             kit's HeaderSearch remote prop (FullLayout -> Header ->
             HeaderSearch, a plain prop threaded down since FullLayout is
             the one component this file actually instantiates itself). */}
-        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} />}>
+        {/* THEME-TOGGLE-01 (2026-09-26): light/dark already lives at
+            Settings > Me > Appearance (ui.appearance) - the header's
+            own shortcut duplicated it, so it's off here. */}
+        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
