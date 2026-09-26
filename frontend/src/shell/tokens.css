@@ -23,13 +23,13 @@
  * canvas, cards, raised panes, message bubbles and sidebar related violet
  * tones. Foreground tokens stay with the selected look for legible text. */
 html.incognito {
-  --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 18%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 12%, var(--surface-page)), transparent 72%);
-  --incognito-canvas-color: color-mix(in srgb, var(--hue-violet) 18%, var(--surface-page));
-  --incognito-card: color-mix(in srgb, var(--hue-violet) 30%, var(--surface-card));
-  --incognito-pane: color-mix(in srgb, var(--hue-violet) 34%, var(--surface-pane));
-  --incognito-muted: color-mix(in srgb, var(--hue-violet-deep) 22%, var(--surface-pane));
-  --incognito-accent: color-mix(in srgb, var(--hue-violet) 36%, var(--surface-pane));
-  --incognito-sidebar: color-mix(in srgb, var(--hue-violet) 30%, var(--surface-sidebar));
+  --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, color-mix(in srgb, var(--hue-violet) 7%, var(--surface-page)) 0%, var(--surface-page) 68%), radial-gradient(ellipse 900px 650px at 0% 100%, color-mix(in srgb, var(--hue-violet-deep) 4%, var(--surface-page)), transparent 72%);
+  --incognito-canvas-color: color-mix(in srgb, var(--hue-violet) 6%, var(--surface-page));
+  --incognito-card: color-mix(in srgb, var(--hue-violet) 18%, var(--surface-card));
+  --incognito-pane: color-mix(in srgb, var(--hue-violet) 22%, var(--surface-pane));
+  --incognito-muted: color-mix(in srgb, var(--hue-violet-deep) 16%, var(--surface-pane));
+  --incognito-accent: color-mix(in srgb, var(--hue-violet) 28%, var(--surface-pane));
+  --incognito-sidebar: color-mix(in srgb, var(--hue-violet) 12%, var(--surface-sidebar));
   --incognito-border: color-mix(in srgb, var(--hue-violet-deep) 32%, var(--border));
   --incognito-input-border: color-mix(in srgb, var(--hue-violet) 78%, var(--input));
 }

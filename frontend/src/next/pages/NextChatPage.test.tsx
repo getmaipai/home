@@ -1722,7 +1722,7 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
       html.incognito { --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, rgb(244, 225, 255), rgb(255, 255, 255)); }
       html.dark.incognito { --incognito-background: radial-gradient(ellipse 1200px 780px at 50% 12%, rgb(74, 45, 96), rgb(20, 20, 20)); }
       html.incognito body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: var(--incognito-background); }
-      html.incognito { --incognito-card: rgb(247, 233, 255); --incognito-pane: rgb(230, 220, 248); --incognito-muted: rgb(224, 213, 244); --incognito-accent: rgb(219, 205, 242); --incognito-sidebar: rgb(236, 229, 250); --incognito-border: rgb(190, 163, 218); --incognito-canvas-color: rgb(244, 239, 250); }
+      html.incognito { --incognito-card: rgb(239, 218, 255); --incognito-pane: rgb(213, 194, 246); --incognito-muted: rgb(210, 199, 238); --incognito-accent: rgb(209, 183, 246); --incognito-sidebar: rgb(226, 217, 248); --incognito-border: rgb(176, 155, 225); --incognito-canvas-color: rgb(239, 235, 251); }
       html.dark.incognito { --incognito-card: rgb(67, 40, 124); --incognito-pane: rgb(82, 35, 101); --incognito-muted: rgb(48, 35, 97); --incognito-accent: rgb(76, 34, 120); --incognito-sidebar: rgb(37, 27, 84); --incognito-border: rgb(77, 44, 137); --incognito-canvas-color: rgb(36, 23, 50); }
       html.incognito body[class*="style-"] { position: relative; z-index: 0; background: transparent; --background: var(--incognito-canvas-color); --card: var(--incognito-card); --surface-card: var(--incognito-card); --popover: var(--incognito-pane); --surface-pane: var(--incognito-pane); --secondary: var(--incognito-pane); --muted: var(--incognito-muted); --accent: var(--incognito-accent); --sidebar: var(--incognito-sidebar); --surface-sidebar: var(--incognito-sidebar); --sidebar-accent: var(--incognito-accent); --border: var(--incognito-border); --sidebar-border: var(--incognito-border); --input: var(--incognito-border); }
       html.incognito body[class*="style-"] [data-slot="sidebar-inset"],
@@ -1759,10 +1759,10 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
       expect(getComputedStyle(threadRoot!).backgroundColor).toBe("transparent");
       expect(getComputedStyle(footer!).backgroundColor).toBe("transparent");
       expect(getComputedStyle(rail!).backgroundColor).toBe("transparent");
-      expect(getComputedStyle(document.body).getPropertyValue("--card").trim()).toBe(theme === "dark" ? "rgb(67, 40, 124)" : "rgb(247, 233, 255)");
-      expect(getComputedStyle(document.body).getPropertyValue("--muted").trim()).toBe(theme === "dark" ? "rgb(48, 35, 97)" : "rgb(224, 213, 244)");
+      expect(getComputedStyle(document.body).getPropertyValue("--card").trim()).toBe(theme === "dark" ? "rgb(67, 40, 124)" : "rgb(239, 218, 255)");
+      expect(getComputedStyle(document.body).getPropertyValue("--muted").trim()).toBe(theme === "dark" ? "rgb(48, 35, 97)" : "rgb(210, 199, 238)");
       expect(composer).not.toBeNull();
-      expect(getComputedStyle(threadRoot!).getPropertyValue("--composer-bg").trim()).toBe(theme === "dark" ? "rgb(67, 40, 124)" : "rgb(247, 233, 255)");
+      expect(getComputedStyle(threadRoot!).getPropertyValue("--composer-bg").trim()).toBe(theme === "dark" ? "rgb(67, 40, 124)" : "rgb(239, 218, 255)");
     } finally {
       restore();
       style.remove();

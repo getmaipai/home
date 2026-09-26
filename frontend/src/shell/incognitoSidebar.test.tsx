@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 test.each([
-  ["light", "rgb(213, 184, 249)", "rgb(246, 242, 251)"],
+  ["light", "rgb(226, 217, 248)", "rgb(239, 235, 251)"],
   ["dark", "rgb(53, 28, 110)", "rgb(36, 23, 50)"],
 ] as const)("the rendered global sidebar uses the Incognito %s surface tint", (theme, sidebarColor, canvasColor) => {
   expect(sidebarTintRule).toBeDefined();
