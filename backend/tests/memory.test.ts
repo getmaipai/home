@@ -1640,6 +1640,123 @@ describe("recall() cosine scoring (step 5: real embeddings)", () => {
   });
 });
 
+// MEM-ELIG-01 (docs/dev.md "Design pass over the reserved items",
+// "MEMORY-RELEVANCE-01: why a cosine floor cannot close LIVE-0923-01
+// (6)"): forceInclude (pinned/entity) used to bypass the cosine floor
+// unconditionally, so a pinned durable identity fact scored ~0.59
+// composite against "okay" and "thanks" exactly as readily as against a
+// real question about it - the measured leak the (c) table names. These
+// three tests are the acceptance shape the item's own brief asks for: an
+// ineligible query gets nothing, an entity-named query still gets
+// through, and an eligible query behaves exactly as it did before.
+describe("MEM-ELIG-01: forceInclude only bypasses the floor for an eligible query", () => {
+  test("a bare acknowledgment query does not force-include a pinned record whose cosine sits below the floor", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const pinned = remember(ownerRow, {
+      text: "Marlow works as a paramedic on the night shift",
+      category: "identity",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+      pinned: true,
+    });
+    if (!pinned.ok) throw new Error("setup failed");
+    // Orthogonal to the query vector: cosine 0, well under the 0.62
+    // durable floor - before this item, forceInclude alone kept this
+    // record in regardless of what was asked.
+    injectVector(pinned.value.id, [0, 1, 0, 0]);
+    const queryVector = { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" };
+
+    for (const q of ["okay", "sounds good", "thanks", "sure", "got it", "no worries", "alright then", "sure thing"]) {
+      const matches = recall(ownerRow, q, { queryVector, bumpUsage: false });
+      expect([q, matches.map((m) => m.record.id).includes(pinned.value.id)]).toEqual([q, false]);
+    }
+  });
+
+  test("an entity-named query still force-includes a matching record even though the query is a single word", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const entity = remember(ownerRow, {
+      record_kind: "entity",
+      text: "Rover: a family friend",
+      category: "relationship",
+      tier: "episodic",
+      scope: "household",
+      source: "test",
+      importance: 0.3,
+    });
+    const detail = remember(ownerRow, {
+      text: "Rover is allergic to peanuts",
+      category: "relationship",
+      tier: "episodic",
+      scope: "household",
+      source: "test",
+      importance: 0.7,
+    });
+    if (!entity.ok || !detail.ok) throw new Error("setup failed");
+    // Same shape as the acknowledgment test above: cosine 0, below the
+    // episodic floor - only the entity-name match can rescue this one.
+    injectVector(entity.value.id, [0, 1, 0, 0]);
+    injectVector(detail.value.id, [0, 1, 0, 0]);
+    const queryVector = { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" };
+
+    // "Rover" alone is one word - below the generic two-content-word
+    // floor a topic-free query would fail on - but it names a known
+    // entity, which implies eligibility on its own (docs/dev.md,
+    // MEM-ELIG-01's design comment in memory.ts's recall()).
+    const matches = recall(ownerRow, "Rover", { queryVector, bumpUsage: false });
+    const ids = matches.map((m) => m.record.id);
+    expect(ids).toContain(entity.value.id);
+    expect(ids).toContain(detail.value.id);
+  });
+
+  test("an eligible query with real content still force-includes the same pinned record as before", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const pinned = remember(ownerRow, {
+      text: "Marlow works as a paramedic on the night shift",
+      category: "identity",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+      pinned: true,
+    });
+    if (!pinned.ok) throw new Error("setup failed");
+    injectVector(pinned.value.id, [0, 1, 0, 0]);
+    const queryVector = { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" };
+
+    // Two real content words, no bare acknowledgment - eligible, so
+    // forceInclude behaves exactly as it did before this item, cosine
+    // floor or not.
+    const matches = recall(ownerRow, "what does Marlow do for work", { queryVector, bumpUsage: false });
+    expect(matches.map((m) => m.record.id)).toContain(pinned.value.id);
+  });
+
+  // The memory bench's own pinned-identity probe (scripts/bench/
+  // memory-eval.ts) relies on this: a bare GREETING is not gated the
+  // way a bare acknowledgment is - it's still a conversational opener,
+  // not a topic-free reaction, so a pinned record surfaces on it same
+  // as before this item.
+  test("a bare greeting is still eligible (unlike a bare acknowledgment), so it still force-includes a pinned record", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const pinned = remember(ownerRow, {
+      text: "Marlow works as a paramedic on the night shift",
+      category: "identity",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+      pinned: true,
+    });
+    if (!pinned.ok) throw new Error("setup failed");
+    injectVector(pinned.value.id, [0, 1, 0, 0]);
+    const queryVector = { vector: new Float32Array([1, 0, 0, 0]), space: "test", dims: 4, preprocess: "v1" };
+
+    const matches = recall(ownerRow, "hi there!", { queryVector, bumpUsage: false });
+    expect(matches.map((m) => m.record.id)).toContain(pinned.value.id);
+  });
+});
+
 describe("drainPendingEmbeddings (step 5: the retry job)", () => {
   test("embeds a queued record and clears it from the pending queue", async () => {
     const { ownerRow } = await ownerAndChildRows();

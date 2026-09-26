@@ -1100,7 +1100,12 @@ const GREETING_ONLY_RE =
 // RECALL-02b: a thank-you with what it is for ("thanks for the update",
 // "thank you for the reminder") is still bare: the object is the hub's
 // own last act, not a subject to look up.
-const BARE_ACK_RE = new RegExp(`^(?:${ACK_WORDS}|yep|nope|no|great|perfect|sounds good|sounds great|will do|thanks|thank you|thanks a lot|see you|bye|goodbye|good ?bye|later)\\b(?:\\s+(?:then|thanks|so much|a lot|for (?:the |that |this |your )?(?:update|help|info|heads up|reminder|tip|answer|reply|explanation|quick reply|quick answer)))*[\\s!.,]*$`, "i");
+// MEM-ELIG-01: "no worries" and "sure thing" added to the closed list -
+// two everyday bare acknowledgments the original list missed (found
+// measuring dev.md's MEMORY-RELEVANCE-01 (c) table: both have two
+// non-stopword words, so a word-count-only eligibility test would have
+// let them through the leak this list exists to close).
+const BARE_ACK_RE = new RegExp(`^(?:${ACK_WORDS}|yep|nope|no|great|perfect|sounds good|sounds great|no worries|sure thing|will do|thanks|thank you|thanks a lot|see you|bye|goodbye|good ?bye|later)\\b(?:\\s+(?:then|thanks|so much|a lot|for (?:the |that |this |your )?(?:update|help|info|heads up|reminder|tip|answer|reply|explanation|quick reply|quick answer)))*[\\s!.,]*$`, "i");
 /** A leading acknowledgment ("Cool, ...", "Okay so ...") taken off,
  * the near-echo's own first step, for a reader that wants the content
  * behind it (RECALL-02's answer topics). */
@@ -1109,14 +1114,36 @@ export function stripAckLead(text: string): string {
   return text.trim().replace(ACK_LEAD_RE, "").replace(ACK_LEAD_RE, "");
 }
 
-export function isBareSocialTurn(text: string): boolean {
+// With an addressee ("good morning MaiPai", "hi Marlow", "thanks Sage",
+// "morning everyone", "no worries Marlow"): a trailing name (capitalized)
+// or a group word after the bare form is still bare; "nice car" is not.
+// Shared by the greeting and acknowledgment checks below, one definition.
+const TRAILING_ADDRESSEE_RE = /[,\s]+(?:\p{Lu}\p{L}*|everyone|everybody|all|guys|folks|there)[\s!.,?]*$/u;
+
+function isBareGreeting(text: string): boolean {
   const t = text.trim();
-  if (GREETING_ONLY_RE.test(t) || BARE_ACK_RE.test(t)) return true;
-  // With an addressee ("good morning MaiPai", "hi Marlow", "thanks
-  // Sage", "morning everyone"): a trailing name (capitalized) or a
-  // group word after the bare form is still bare; "nice car" is not.
-  const withoutAddressee = t.replace(/[,\s]+(?:\p{Lu}\p{L}*|everyone|everybody|all|guys|folks|there)[\s!.,?]*$/u, "");
-  return withoutAddressee !== t && withoutAddressee.length > 0 && (GREETING_ONLY_RE.test(withoutAddressee) || BARE_ACK_RE.test(withoutAddressee));
+  if (GREETING_ONLY_RE.test(t)) return true;
+  const withoutAddressee = t.replace(TRAILING_ADDRESSEE_RE, "");
+  return withoutAddressee !== t && withoutAddressee.length > 0 && GREETING_ONLY_RE.test(withoutAddressee);
+}
+
+/** MEM-ELIG-01: the acknowledgment half of isBareSocialTurn(), split out
+ * and exported on its own - memory.ts's recall() eligibility gate needs
+ * exactly this half (a reactive "okay"/"thanks"/"no worries" carries no
+ * topic to recall about) but not the greeting half (a bare "hi there!"
+ * is still a conversational opener, not a topic-free reaction, and the
+ * memory bench's own pinned-identity probe treats it as one - dev.md
+ * "MEM-ELIG-01" has the reasoning). Pure split, no behavior change here:
+ * isBareSocialTurn() below is unchanged for every existing caller. */
+export function isBareAcknowledgment(text: string): boolean {
+  const t = text.trim();
+  if (BARE_ACK_RE.test(t)) return true;
+  const withoutAddressee = t.replace(TRAILING_ADDRESSEE_RE, "");
+  return withoutAddressee !== t && withoutAddressee.length > 0 && BARE_ACK_RE.test(withoutAddressee);
+}
+
+export function isBareSocialTurn(text: string): boolean {
+  return isBareGreeting(text) || isBareAcknowledgment(text);
 }
 
 const GREETING_ANYWHERE_RE =

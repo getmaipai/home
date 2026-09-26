@@ -122,6 +122,26 @@ const CASES: Case[] = [
   // spray preferences onto unrelated turns (guards DURABLE_MIN_COSINE).
   { id: "durable-ctrl-movie", question: "what movie should we watch?", expect: "vegetarian", absent: true },
   { id: "durable-ctrl-greet", question: "hi there!", expect: "cilantro", absent: true },
+  // MEM-ELIG-01: the measured leak (docs/dev.md "MEMORY-RELEVANCE-01"
+  // (c) table) against the same pinned-identity fixture above - eight
+  // short, topic-free acknowledgments a household member might say mid-
+  // conversation, none of which the paramedic fact has anything to do
+  // with. Before this item, `forceInclude` (pinned) bypassed the cosine
+  // floor unconditionally and every one of these leaked it in; the
+  // query eligibility gate now withholds that bypass for a query with
+  // nothing to recall about. Distinct from `durable-ctrl-greet` above,
+  // which reuses the SAME "hi there!" query as `pinned-identity` to
+  // prove a NON-pinned durable record still doesn't leak on it - these
+  // eight instead probe the pinned record itself against acknowledgments,
+  // not greetings (a bare greeting stays eligible; see memory.ts recall()).
+  { id: "topicfree-okay", question: "okay", expect: "paramedic", absent: true },
+  { id: "topicfree-sounds-good", question: "sounds good", expect: "paramedic", absent: true },
+  { id: "topicfree-thanks", question: "thanks", expect: "paramedic", absent: true },
+  { id: "topicfree-sure", question: "sure", expect: "paramedic", absent: true },
+  { id: "topicfree-got-it", question: "got it", expect: "paramedic", absent: true },
+  { id: "topicfree-no-worries", question: "no worries", expect: "paramedic", absent: true },
+  { id: "topicfree-alright-then", question: "alright then", expect: "paramedic", absent: true },
+  { id: "topicfree-sure-thing", question: "sure thing", expect: "paramedic", absent: true },
 ];
 
 function seed(actor: PersonRow, s: Seed): void {

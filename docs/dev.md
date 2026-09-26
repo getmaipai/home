@@ -28794,3 +28794,118 @@ clean, scripts 51/51, backend 4146/4146 (zero failures, not even the
 known `mdns.test.ts` environment flake other lanes hit tonight),
 standards core (gitleaks, PII wordlist, prose lint, licence) all
 clean. "All checks passed (scope: backend)."
+
+## MEM-ELIG-01: the query eligibility gate, measured (2026-09-26)
+
+Built the design pass's own fix (above, "Design pass over the reserved
+items"): `recall()` (`backend/src/lib/memory.ts`) now computes
+`queryEligibleForRecall` once per query - true when the query names a
+known entity (`matchedEntityNameWords`/`subjectIds`, already computed
+for the entity-match boost), otherwise only when it has at least two
+non-stopword words (`queryWords`, this function's own `tokenize()`
+call) AND is not a bare acknowledgment. `forceInclude` becomes `(row.
+pinned || isEntityMatch) && queryEligibleForRecall` (was `row.pinned ||
+isEntityMatch` unconditionally) - the one-line fix the (c) table's
+leak needed.
+
+**A real conflict found building this, resolved rather than guessed
+past:** the design paragraph's own words describe the gate purely as a
+content-word count, the same shape `episodeQueryEligible()` gives
+episodes. Two things broke that literal reading:
+
+1. Four of the (c) table's own eight remarks ("sounds good", "no
+   worries", "alright then", "sure thing") have two non-stopword words
+   by a plain count under either this file's stopword list (`lib/
+   text.ts`) or episodes.ts's own larger one - a pure word-count gate
+   would have judged them eligible and left the leak open for exactly
+   half the table it was built to close. Fix: the gate also checks
+   `isBareAcknowledgment()`, a new export split out of `guards.ts`'s
+   `isBareSocialTurn()` (pure refactor, proved algebraically equivalent
+   for every existing caller - `isBareSocialTurn(t) === isBareGreeting(t)
+   || isBareAcknowledgment(t)`), with "no worries" and "sure thing"
+   added to the closed `BARE_ACK_RE` phrase list it already carried
+   "sounds good"/"will do"/"thanks a lot" on.
+2. The memory bench's own `pinned-identity` probe
+   (`scripts/bench/memory-eval.ts`) queries the exact same pinned
+   paramedic fixture the (c) table uses, with `"hi there"` - a bare
+   GREETING, cosine 0.444 in the design record's own measurement, well
+   under the 0.62 durable floor, surfaced only by `forceInclude`
+   today. `episodeQueryEligible()`'s own greeting exclusion
+   (`GREETING_ONLY_RE`, inside `isBareSocialTurn()`) would have marked
+   it ineligible too, flipping that probe from pass to fail - a real
+   regression against the acceptance criterion that the bench's
+   wanted-match rows hold their pass rate. Resolved by scope, not by
+   guessing which side to break: the (c) table's own eight probes are
+   all acknowledgments, none are greetings, so the gate uses
+   `isBareAcknowledgment()` alone, never the greeting half. A bare
+   greeting stays a conversational opener, eligible, exactly as
+   `pinned-identity` already assumed; a bare acknowledgment stays a
+   topic-free reaction, never eligible. New regression test in
+   `memory.test.ts` proves both sides of that line hold.
+
+**Before/after, `scripts/bench/memory-eval.ts`** (resident engines:
+chat `qwen3-8b-instruct-q4-k-m` on :8788, embed `nomic-embed-text-
+v1.5.Q4_K_M.gguf` on :8794 via `b10797`, both already running,
+CHAT-22 shape throughout - a fresh `MAIPAI_DATA_DIR`, nothing spawned):
+
+| probe | before | after |
+|---|---|---|
+| pinned-identity | PASS | PASS (unchanged - "hi there" stays eligible) |
+| durable-pref-food/para, durable-goal | FAIL (pre-existing gap, #93/dev.md (b): cosine never clears `DURABLE_MIN_COSINE` for these three, independent of this item) | FAIL (unchanged) |
+| episodic-relevant | PASS | PASS (unchanged) |
+| specificity-ctrl, durable-ctrl-movie, durable-ctrl-greet | PASS | PASS (unchanged) |
+| entity-recall, entity-detail | PASS | PASS (unchanged) |
+| entity-flood | FAIL (pre-existing truncation gap, unrelated) | FAIL (unchanged) |
+| **topicfree-okay/sounds-good/thanks/sure/got-it/no-worries/alright-then/sure-thing (new, 8 rows)** | not run before this item | **PASS, all 8** - none recall the pinned paramedic fact |
+
+**7/11 before -> 15/19 after**: the 8 new rows all pass, and every one
+of the original 11 keeps its exact prior verdict (three pre-existing,
+unrelated gaps included) - the acceptance criterion ("the recall
+bench's own wanted-match rows hold their current pass rate") holds
+exactly, and the leak (the (c) table's own eight remarks, reproduced
+here against the bench's real pinned fixture rather than a synthetic
+one-off) is closed.
+
+**`scripts/bench/recall-floor.ts` could not be run for a before/after
+number, and didn't need to be:** it seeds no pinned records at all (no
+`pinned: true` anywhere in the file), so it has no `forceInclude` path
+to exercise regardless of this item - its own eleven signal/null
+queries are structurally unaffected by this change either way. Trying
+to run it anyway (both before AND after this item's own edits, checked
+against a clean, unmodified `HEAD` first, to rule out this item as the
+cause) found a separate, pre-existing bug: every seed comes back
+unembedded ("Seeded 26 records; 0 embedded") even against the same
+already-running resident embed engine memory-eval.ts used successfully
+moments earlier, so `main()` throws "embed engine did not embed every
+seed," and the `finally` block's own `cleanup()` then throws its own
+`SQLiteError: FOREIGN KEY constraint failed` on top of that (it never
+clears `pending_memory_work` before deleting `memory_records`, unlike
+memory-eval.ts's own cleanup). Filed as getmaipai/home#167, not fixed
+here (out of scope, and unrelated to MEM-ELIG-01 on the evidence
+above).
+
+**Regression tests**, `backend/tests/memory.test.ts`, new `describe`
+block "MEM-ELIG-01: forceInclude only bypasses the floor for an
+eligible query" (four tests, matching the existing file's own
+`injectVector()`/`ownerAndChildRows()`/hand-picked-vector pattern, no
+new harness): a bare acknowledgment query (all eight (c)-table
+remarks, one test) does not force-include a pinned record whose cosine
+sits below the floor; an entity-named single-word query ("Rover")
+still force-includes both the entity record and the record it names,
+proving entity-match-implies-eligibility holds even at word count 1;
+an eligible multi-word query still force-includes the same pinned
+record exactly as before; a bare greeting ("hi there") still
+force-includes a pinned record too, the regression guard for the
+`pinned-identity` conflict above. `bun test tests/memory.test.ts`:
+107/107 (103 prior + 4 new). `bun test tests/episodes.test.ts tests/
+guards.test.ts`: 176/176 (the `guards.ts` split is behavior-preserving
+for every existing caller, confirmed both by the algebraic equivalence
+above and by these two files staying green unchanged).
+
+Full backend suite (`bun test` in `backend/`, all 221 files): 4137/4137
+pass, 0 fail. Verification: `bash scripts/check.sh` (scope printed by
+the gate itself - this diff touches `backend/src/lib/{memory,
+guards}.ts`, `backend/tests/memory.test.ts`, `backend/scripts/bench/
+memory-eval.ts` and this doc, a backend-scoped diff). Review: medium (a
+scoring/eligibility guard in the recall path, an explicit reason under
+the org's own review-budget rule).

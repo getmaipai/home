@@ -17,6 +17,7 @@ import { toMemoryRecord } from "@/lib/memoryShape";
 import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { tokenize } from "@/lib/text";
+import { isBareAcknowledgment } from "@/lib/guards";
 import { embed, EMBED_PREPROCESS } from "@/lib/llm";
 import { getEmbedBackendKind } from "@/lib/embedSupervisor";
 import { nextHlc } from "@/lib/hlc";
@@ -489,6 +490,12 @@ const RECENCY_WEIGHT = 0.1;
 const RECENCY_DECAY_PER_DAY = 0.05;
 export const EPISODIC_MIN_COSINE = 0.62;
 export const DURABLE_MIN_COSINE = 0.62;
+/** MEM-ELIG-01's own eligibility floor, same value as episodes.ts's
+ * MIN_CONTENT_WORDS (episodeQueryEligible()) but declared separately -
+ * recall()'s own eligibility check below reuses this file's own
+ * queryWords/stopword list, not episodes.ts's, so the two constants
+ * are not the same code path even though they share a number. */
+const MEMORY_MIN_CONTENT_WORDS = 2;
 /** The measured null floor (the top hit's cosine on an unrelated
  * query, p95 and max over thirty queries) the floors above must clear;
  * a test holds the relation so a future edit cannot drop a floor under
@@ -669,6 +676,32 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
       .map((e) => e.id),
   );
 
+  // MEM-ELIG-01: whether this query has anything to recall about at all -
+  // the same shape episodes.ts's episodeQueryEligible() already gives
+  // episode lookups, mirrored locally rather than called, because the
+  // exact rule needs to differ: episodes.ts's own contentTerms() treats
+  // "there" as a stopword (built for "what were we talking about there"),
+  // which would leave "hi there!" with a single content word and mark it
+  // ineligible - but the memory bench's own pinned-identity probe
+  // (scripts/bench/memory-eval.ts) uses exactly that query and expects a
+  // pinned identity fact to still surface for it, a bare greeting being a
+  // conversational opener rather than a topic-free reaction. So this
+  // reuses queryWords (this function's own tokenize() call above, text.ts's
+  // smaller stopword list, no "there") instead of a second tokenizer. A
+  // query that names a known entity is eligible on its own: every one of
+  // its name words already had to survive that same tokenize() to land in
+  // queryWords (entityNameWords() uses the identical tokenize()), so an
+  // entity match is a content word by construction, never a bare
+  // reaction. Otherwise, eligible needs real content: at least two
+  // non-stopword words, and not itself a bare acknowledgment ("no
+  // worries", "sure thing" - two content words by a plain count, but
+  // nothing to recall about; docs/dev.md's MEMORY-RELEVANCE-01 (c) table
+  // is exactly these eight). A bare GREETING is deliberately not tested
+  // here (isBareAcknowledgment(), not isBareSocialTurn()), for the same
+  // pinned-identity reason.
+  const queryMentionsEntity = matchedEntityNameWords.length > 0 || subjectIds.size > 0;
+  const queryEligibleForRecall = queryMentionsEntity || (queryWords.size >= MEMORY_MIN_CONTENT_WORDS && !isBareAcknowledgment(query));
+
   // One batched query for every candidate's stored vector, not one per
   // row (household scale is "hundreds of rows" per the plan's own
   // words, brute-force cosine in JS, but still one round trip).
@@ -701,7 +734,16 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
     // cosine came back negative enough to pull the whole weighted score
     // under zero - forceInclude keeps the override real all the way to
     // the final push, not just past the floor check.
-    const forceInclude = row.pinned || isEntityMatch;
+    //
+    // MEM-ELIG-01: the override itself only fires for an eligible query.
+    // `isEntityMatch` already implies `queryEligibleForRecall` (see
+    // above), so this only ever changes behavior for a pinned record
+    // against an ineligible (topic-free) query - the measured leak
+    // (docs/dev.md "MEMORY-RELEVANCE-01... (c)"): a pinned record's
+    // composite score tracks its own importance and recency, not the
+    // query, so without this it surfaced on "okay" and "thanks" exactly
+    // as readily as on a real question.
+    const forceInclude = (row.pinned || isEntityMatch) && queryEligibleForRecall;
 
     let score: number;
     const vectorRow = vectorRows.find((v) => v.memoryId === row.id);
