@@ -266,6 +266,27 @@ export interface TurnValue {
    * `logTurnSafely()` beside `structured_part`; a client fetches the
    * full version from GET /api/artifacts/:id. */
   artifact?: { id: string; version: number };
+  /** APPROVE-CARD-01: set only on the turn that just parked a
+   * `confirm_needed`/`consent_needed` ask (turnNext.ts's `finishTurn()`
+   * "asked" branch, never for a temporary conversation - `setPendingAsk`
+   * is a no-op there, so a card promising a resumable confirm would lie).
+   * `package_id` names the parked tool (`PendingAsk.packageId`).
+   * `open` is true by construction on this live TurnValue (finishTurn()
+   * just parked it, so it's correct at that instant) - but on a RELOADED
+   * history row (`ConversationTurnWithMemoryIds.confirm`, below) it is
+   * never trusted from what was stored at write time: a coordinator
+   * review (2026-09-27) caught the first cut baking `open: true` into
+   * the persisted row permanently, so a reload kept showing an answered
+   * ask's card as still awaiting an answer forever, because nothing
+   * ever rewrites a PRIOR row when the ask resolves. Fixed by deriving
+   * `open` at READ time instead (conversationHistory.ts's
+   * `listConversationTurns()`/`list()`): true only for the turn whose
+   * own id matches the conversation's CURRENT `pending_ask.turnId`,
+   * false for every other row that ever carried a confirm (answered,
+   * superseded, or from before this ask existed). The frontend pairs
+   * this with the tool-call part's own `turn_id` to match a button tap
+   * back to the right ask (chatToolCallPart.ts). */
+  confirm?: { package_id: string; open: boolean };
   /** STATS-01: optional adult-only engine telemetry, never required. */
   stats?: TurnStats;
   /** ADMIN-COMPARE-01 (b): true when this turn ran the bare-mode bypass
@@ -317,7 +338,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; artifact?: { id: string; version: number }; structured_part?: StructuredPart };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; artifact?: { id: string; version: number }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

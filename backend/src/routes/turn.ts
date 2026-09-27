@@ -116,6 +116,13 @@ const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "tu
 const TURN_BODY_LIMIT = 64 * 1024;
 const evidence = z.object({ person: z.string().regex(/^person-[a-z0-9]{6,}$/).nullable(), basis: z.enum(["signed_in", "voice", "face", "voice_and_face", "claimed", "unknown"]), level: z.enum(["confirmed", "tentative", "unknown"]) }).strict();
 const present = z.array(evidence).nullable();
+// APPROVE-CARD-01: a tapped approve/deny card on a parked confirm.
+// `turn_id` is matched against the pending ask's own PendingAsk.turnId
+// (turnMachine/turnNext.ts's resumesAsk()) - a mismatch (a second ask
+// parked since the card was shown) never resumes, same as an unrelated
+// new statement. Validated here, the same way evidence/present already
+// are, since this field genuinely drives a package call when approved.
+const askAnswer = z.object({ turn_id: z.string(), approved: z.boolean() }).strict();
 
 turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");
@@ -134,9 +141,10 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     present?: unknown;
     temporary?: boolean;
     spoken?: boolean;
+    ask_answer?: unknown;
   };
-  const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional() }).safeParse(body);
-  if (!parsedEvidence.success) return c.json({ error: "Invalid turn evidence", code: "invalid_input" }, 400);
+  const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
+  if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
   // TEMP-CHAT-01: the clean 403, checked here even though
   // resolveOrCreateConversation() (conversationHistory.ts) asserts the
@@ -163,7 +171,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     ? await (async () => {
         // runTurnNext() always resolves "immediate" (its own header note);
         // the explicit kind check is TypeScript's, not a real branch.
-        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking });
+        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, ask_answer: parsedEvidence.data.ask_answer });
         return next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the new path returned a stream result unexpectedly" } : next;
       })()
     : await runTurn(actor, surface, body.text ?? "", {
@@ -578,6 +586,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     bare?: boolean;
     temporary?: boolean;
     spoken?: boolean;
+    ask_answer?: unknown;
   };
   if (body.resume_token !== undefined) {
     const session = typeof body.resume_token === "string" ? resumeSessions.get(body.resume_token) : undefined;
@@ -587,8 +596,8 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     }
     return streamResponse(session, resumeFrom!);
   }
-  const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional() }).safeParse(body);
-  if (!parsedEvidence.success) return c.json({ error: "Invalid turn evidence", code: "invalid_input" }, 400);
+  const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
+  if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
   // getmaipai/home#91 (a code review of the original ephemeral fix,
   // 2026-09-13): honoring the flag for whatever text a caller sends
@@ -659,7 +668,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
         // route needs the "stream" kind TurnStreamResult (a live status/
         // tokens pair the machine hasn't finished yet), never the
         // "immediate" one the blocking POST / route above uses.
-        ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, signal: abortController.signal })
+        ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, signal: abortController.signal, ask_answer: parsedEvidence.data.ask_answer })
         : await runTurnStream(actor, surface, body.text ?? "", {
             thinking: dropReasoning ? false : body.thinking,
             conversationId: body.conversation_id,

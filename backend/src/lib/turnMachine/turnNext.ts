@@ -27,7 +27,7 @@ import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
 import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
 import { structuredPartForOutcomes, artifactForOutcomes } from "@/lib/composer";
-import { emptyTimings } from "@/lib/turnContext";
+import { emptyTimings, outcomeOf } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { postProjectResult } from "@/lib/projects/post";
@@ -43,6 +43,11 @@ export interface RunTurnNextOpts {
   conversationId?: string;
   temporary?: boolean;
   signal?: AbortSignal;
+  // APPROVE-CARD-01: a tapped approve/deny card, from POST /api/turn or
+  // /api/turn/stream's own additive `ask_answer` field - resumesAsk()'s
+  // own doc comment has the full matching rule. Absent for every typed
+  // or spoken turn, exactly as today.
+  ask_answer?: { turn_id: string; approved: boolean };
   // U4/RESP-01 point 1: additive, forces the spoken register for a
   // dictated chat turn - unwired to any client today (no dictation
   // marker exists yet), plumbed and tested ahead of a real caller.
@@ -139,9 +144,32 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
 
 /** Whether the utterance is a plain "yes" to a stored confirm/lookup ask
  * (consentVocab.ts's own deterministic word, never a model's reading -
- * RULES-AND-LEARNED-COMPONENTS.md's "a yes is a yes by rule"). */
-function resumesAsk(ask: PendingAsk, utterance: string): ActionProposal | null {
-  if (ask.kind !== "confirm" || !AFFIRMATIVE_RE.test(utterance)) return null;
+ * RULES-AND-LEARNED-COMPONENTS.md's "a yes is a yes by rule").
+ *
+ * APPROVE-CARD-01: `askAnswer`, when present, is a button tap
+ * (POST /api/turn{,/stream}'s own `ask_answer` field) and REPLACES the
+ * AFFIRMATIVE_RE text match for this call - it never runs both. A tap
+ * only resumes when its `turn_id` matches the turn that parked THIS ask
+ * (`ask.turnId`, set by finishTurn()'s "asked" branch). In practice
+ * `beginTurn()` already intercepts a mismatched or answer-less-pending
+ * `ask_answer` before this function is ever called with one (an
+ * explicit 409 `ask_stale`, so the frontend can show "no longer waiting
+ * for an answer" instead of a bare "Yes"/"No" bubble landing as an
+ * ordinary chat message) - so the mismatch branch below is
+ * defense-in-depth for a call site that doesn't yet exist, never the
+ * primary gate; if one is ever added without going through
+ * `beginTurn()`'s check, it still can't resume the wrong ask. Deny
+ * (`approved: false`) still falls through to ordinary routing when the
+ * ids DO match: the ask is cleared and nothing resumes, exactly like a
+ * typed "no". When `askAnswer` is absent (a typed or spoken reply, no
+ * button), the AFFIRMATIVE_RE path is unchanged. */
+function resumesAsk(ask: PendingAsk, utterance: string, askAnswer?: { turn_id: string; approved: boolean }): ActionProposal | null {
+  if (ask.kind !== "confirm") return null;
+  if (askAnswer) {
+    if (ask.turnId !== askAnswer.turn_id || !askAnswer.approved) return null;
+  } else if (!AFFIRMATIVE_RE.test(utterance)) {
+    return null;
+  }
   return { kind: "side_effecting", request: { tool: ask.packageId, args: ask.args, callId: `resumed:${ask.packageId}` } };
 }
 
@@ -293,7 +321,23 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
   const pendingAsk = temporary ? null : getPendingAsk(conversation.id);
-  const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text) ?? undefined) : undefined;
+  // APPROVE-CARD-01: a tapped card's own `ask_answer` must match the
+  // conversation's CURRENT pending ask by turn id, or it's stale (a
+  // second ask parked since the card was shown, the ask was already
+  // answered, or there was never one) - reported as a real 409, never
+  // silently run through ordinary text processing (resumesAsk()'s own
+  // turn-id check is belt-and-braces, not the primary gate: without
+  // this early return a mismatch would just fall through to routing
+  // whatever "Yes"/"No" text rode along with it, exactly like an
+  // unrelated new statement, with no way for the caller to tell a real
+  // answer from a stale one). The existing pending ask, if any, is for
+  // a DIFFERENT turn than this stale tap named - left untouched, not
+  // cleared: this request doesn't get to answer someone else's live
+  // question by accident.
+  if (opts.ask_answer && (!pendingAsk || pendingAsk.turnId !== opts.ask_answer.turn_id)) {
+    return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
+  }
+  const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text, opts.ask_answer) ?? undefined) : undefined;
   // Cleared either way a pending ask existed: resumed (so it can't be
   // resumed twice, the stuck-question failure REPLY-FIND-01 already
   // named), declined (NEGATIVE_RE), or an unrelated new statement - the
@@ -363,8 +407,27 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // `state.conversationId` (a code review: nodes/context.ts re-
     // resolves the conversation every turn and can overwrite
     // `state.temporary` from that second resolution's own result).
-    if (ask && !temporary) setPendingAsk(conversationId, ask);
+    //
+    // APPROVE-CARD-01: `turnId` is stamped onto the persisted ask here,
+    // this turn's own `state.turnId` - the id resumesAsk() matches a
+    // button tap's `ask_answer.turn_id` against, so a stale card (a
+    // second ask parked since this one was shown) can never approve the
+    // wrong action. Not set when temporary: setPendingAsk()/
+    // getPendingAsk() are no-ops for a temporary conversation, so
+    // nothing is ever actually resumable there - a card promising one
+    // would lie (a pre-existing gap, filed separately, not fixed here).
+    // A "pending" outcome is recorded too, `via: "confirm"` (this path
+    // had none at all before - a real gap, unlike the old path's own
+    // equivalent park which already retains one): it's what a reload's
+    // grounding/composer read of this turn's outcomes sees, the same
+    // "the trace should say what actually happened" reasoning as every
+    // other outcome this file already retains.
+    if (ask) {
+      state.outcomes.push(outcomeOf({ callId: `${state.turnId}:confirm`, packageId: ask.packageId, status: "pending", args: ask.args, via: "confirm", userMessage: promptText }));
+    }
+    if (ask && !temporary) setPendingAsk(conversationId, { ...ask, turnId: state.turnId });
     value = buildTurnValue(state, startedAt, "confirm", promptText);
+    if (ask && !temporary) value.confirm = { package_id: ask.packageId, open: true };
   } else if (finalState === "refused") {
     // A review caught this reading `step` (SafetyOutput there, not
     // OutputGateOutput - a safety refusal parks in `refused` straight

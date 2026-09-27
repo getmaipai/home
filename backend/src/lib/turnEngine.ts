@@ -136,7 +136,18 @@ export function projectDocumentForAudience(document: TurnArtifactValue, ageBand:
  * (2026-09-04) found the two had drifted into independently-hand-typed
  * copies of the same union, one bad refactor away from silently
  * reporting different codes for what should be the same failure. */
-export type TurnFailure = { ok: false; status: 400 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable" | "temporary_mismatch"; error: string };
+// APPROVE-CARD-01: 409 (`ask_stale`) is a real, deliberate addition to
+// this otherwise narrow vocabulary, not the usual "map it onto 400/503
+// instead" call turnBareStream.ts's own comment makes for an
+// unreachable code - a stale/mismatched `ask_answer` genuinely isn't
+// "invalid input" (the request is well-formed) or "the engine is
+// unavailable" (nothing about the engine failed); it's a real conflict
+// with server-side state the client needs to tell apart from either,
+// so it could show "that ask already expired" rather than a generic
+// error. New path only (turnMachine/turnNext.ts's beginTurn()) - the
+// old path (runTurn()/runTurnStream() below) has no `ask_answer` field
+// to ever produce one.
+export type TurnFailure = { ok: false; status: 400 | 409 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable" | "temporary_mismatch" | "ask_stale"; error: string };
 
 export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
 

@@ -543,6 +543,18 @@ export const conversationTurns = sqliteTable(
     // from the done event. Null for every prose reply and every row
     // written before this item. Hub-internal, like outcomes/reasoning.
     structuredPart: text("structured_part"),
+    // APPROVE-CARD-01: wire.ts's TurnValue.confirm as JSON text, the
+    // same "persist the wire shape, rebuild it on reload" pattern
+    // structuredPart above already uses - set only on the turn that
+    // parked a confirm_needed/consent_needed ask (turnNext.ts's
+    // finishTurn() "asked" branch), null for every other row and every
+    // row written before this item. Hub-internal, like structuredPart.
+    // Unlike structuredPart, this column's own `open` field is NOT
+    // trusted verbatim on reload: conversationHistory.ts's
+    // listConversationTurns()/list() overwrite it from the
+    // conversation's live pending_ask, since nothing ever rewrites a
+    // PRIOR row here once its ask resolves.
+    confirm: text("confirm"),
   },
   // buildConversationWindow() and maybeRefreshConversationSummary() (step 3)
   // both filter by conversation_id on every model-routed turn - the

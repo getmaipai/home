@@ -2188,6 +2188,71 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
   });
 });
 
+// APPROVE-CARD-01 (a coordinator review, 2026-09-27): the first cut baked
+// `confirm.open` into the row permanently at write time (finishTurn()'s
+// "asked" branch always writes `open: true`), so a reload kept showing an
+// answered ask's card as still awaiting an answer forever - nothing ever
+// rewrites a PRIOR row once its own ask resolves. The fix reads `open`
+// fresh every time instead, from the conversation's own live pending_ask,
+// never from what was stored on the row.
+describe("APPROVE-CARD-01: confirm.open is read-time-derived, never trusted from the stored row", () => {
+  test("answering the ask (setPendingAsk cleared, matched or not) flips the SAME turn's own confirm.open to false on the next read - the live turn response never needs to change", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const turnId = "turn-confirm-open-a";
+    logTurn(actor, "chat", "lock the doors", { reply: { text: "Go ahead and lock the doors?" }, source: "confirm", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId, confirm: { package_id: "lock-doors", open: true } });
+    // finishTurn()'s own "asked" branch persists the pending ask with
+    // this turn's id, the same shape turnNext.ts's resumesAsk() matches
+    // an ask_answer's turn_id against.
+    setPendingAsk(conv.value.id, { kind: "confirm", prompt: "Go ahead and lock the doors?", packageId: "lock-doors", args: {}, turnId });
+
+    const beforeAnswer = listConversationTurns(actor, conv.value.id);
+    expect(beforeAnswer.ok).toBe(true);
+    if (beforeAnswer.ok) expect(beforeAnswer.value[0]?.confirm).toEqual({ package_id: "lock-doors", open: true });
+
+    // The next turn consumes the pending ask unconditionally (matched
+    // or not) - turnNext.ts's beginTurn() always clears it via
+    // setPendingAsk(id, null), whatever resumesAsk() decides.
+    setPendingAsk(conv.value.id, null);
+
+    const afterAnswer = listConversationTurns(actor, conv.value.id);
+    expect(afterAnswer.ok).toBe(true);
+    // package_id survives (it's what the card named, not a live fact);
+    // only open flips, and it flips on THIS SAME stored row, never a
+    // second write to it.
+    if (afterAnswer.ok) expect(afterAnswer.value[0]?.confirm).toEqual({ package_id: "lock-doors", open: false });
+  });
+
+  test("list() (chatHistoryAdapter.ts's own flat, cross-conversation reload path) derives confirm.open the same way", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const turnId = "turn-confirm-open-list";
+    logTurn(actor, "chat", "lock the doors", { reply: { text: "Go ahead and lock the doors?" }, source: "confirm", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId, confirm: { package_id: "lock-doors", open: true } });
+    setPendingAsk(conv.value.id, { kind: "confirm", prompt: "Go ahead and lock the doors?", packageId: "lock-doors", args: {}, turnId });
+
+    const beforeAnswer = list(actor);
+    expect(beforeAnswer.find((t) => t.id === turnId)?.confirm).toEqual({ package_id: "lock-doors", open: true });
+
+    setPendingAsk(conv.value.id, null);
+
+    const afterAnswer = list(actor);
+    expect(afterAnswer.find((t) => t.id === turnId)?.confirm).toEqual({ package_id: "lock-doors", open: false });
+  });
+
+  test("a turn with no confirm carries no confirm field", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-no-confirm" });
+
+    const result = listConversationTurns(actor, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value[0]?.confirm).toBeUndefined();
+  });
+});
+
 describe("resume a saved chat explicitly", () => {
   test("returning to an earlier chat preserves its title and context and routes the next message there", async () => {
     const { client, actor } = await owner();

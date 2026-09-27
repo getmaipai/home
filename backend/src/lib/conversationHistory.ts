@@ -494,6 +494,13 @@ function buildTurnRow(
     // itself, not the reasoning behind it, so REASONING-03's minor-only
     // drop never applied to it.
     structuredPart: value.structured_part ? JSON.stringify(value.structured_part) : null,
+    // APPROVE-CARD-01: wire.ts's TurnValue.confirm, persisted the same
+    // way structuredPart above is - set only for the turn that just
+    // parked a confirm_needed/consent_needed ask (turnNext.ts's
+    // finishTurn() "asked" branch), null for every other turn. No age
+    // gate on read, same reasoning as structuredPart: the card names
+    // which package is asking, not the reasoning behind it.
+    confirm: value.confirm ? JSON.stringify(value.confirm) : null,
     // ACT-01: the frozen signal, as the engine computed it before
     // routing. Its clause ranges index the raw utterance; on a redacted
     // row (CHAT-03) they are approximate, and a `policy` turn is skipped
@@ -1130,6 +1137,15 @@ export interface PendingAsk {
   /** CHAT-15: set once a confirmation has asked "yes or no?" after an
    * answer that was neither; a second unclear answer clears it. */
   clarified?: boolean;
+  /** APPROVE-CARD-01: the id of the turn that parked this ask
+   * (turnNext.ts's finishTurn() "asked" branch, state.turnId - the same
+   * id wire.ts's TurnValue.turn_id already carries for that turn), so a
+   * tapped approve/deny card can be matched back to the exact ask it
+   * was drawn for. Only ever set on the "confirm" kind today (the one
+   * kind a structured `ask_answer` resumes); absent on a row written
+   * before this item or on any other kind, which keeps resuming by
+   * typed/spoken text alone. */
+  turnId?: string;
 }
 
 export function getPendingAsk(conversationId: string): PendingAsk | null {
@@ -1631,14 +1647,26 @@ export function listConversationTurns(
   // turn (already true of every row here, per getConversation()'s own
   // access rule above) and only when that turn wasn't safety-refused.
   const artifactByTurn = artifactsByTurn(rows.map((r) => r.id));
+  // APPROVE-CARD-01: `confirm.open` is read-time-derived, never trusted
+  // from the stored value - a coordinator review caught the first cut
+  // baking `open: true` in permanently at write time (finishTurn()'s
+  // "asked" branch), so a reload kept showing an answered ask's card as
+  // still awaiting an answer forever. One lookup for the whole
+  // conversation (scoped by `id` already, like every other row here):
+  // `open` is true only for the turn that parked the CURRENT pending
+  // ask, false for every other row that ever carried a confirm
+  // (answered, superseded, or from before this ask existed).
+  const pendingAsk = getPendingAsk(id);
 
   return { ok: true, value: rows.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, ...row } = r;
     const artifact = actor.role === "child" && r.safetyAction === "refuse" ? undefined : artifactByTurn.get(r.id);
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
     // getmaipai/home#130: no age gate - see structuredPart's own write-
-    // side comment in buildTurnRow() for why.
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
+    // is the same: the card names which package is asking, not the
+    // reasoning behind it.
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2132,12 +2160,24 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   // that used to prove "an owner may read a child's stored reasoning"
   // is retired with this fix (conversationHistory.test.ts).
   const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
+  // APPROVE-CARD-01: the same read-time derivation listConversationTurns()
+  // above uses, adapted for this flat, cross-conversation list - one
+  // getPendingAsk() call per distinct conversation actually carrying a
+  // confirm row (cached here), never per row, since this is the path
+  // chatHistoryAdapter.ts reloads through and a confirm row is rare.
+  const pendingAskCache = new Map<string, PendingAsk | null>();
+  const pendingAskForConversation = (conversationId: string | null): PendingAsk | null => {
+    if (!conversationId) return null;
+    if (!pendingAskCache.has(conversationId)) pendingAskCache.set(conversationId, getPendingAsk(conversationId));
+    return pendingAskCache.get(conversationId) ?? null;
+  };
   return capped.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, ...row } = r;
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
     // getmaipai/home#130: no age gate, same call listConversationTurns()
-    // above makes - the card is the reply itself.
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    // above makes - the card is the reply itself. APPROVE-CARD-01's
+    // confirm gets the same treatment.
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

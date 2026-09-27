@@ -495,6 +495,109 @@ describe("turnNext.ts: consent and confirmation", () => {
   });
 });
 
+// APPROVE-CARD-01 (issue #177): the ask itself always resumed correctly
+// (the describe block above proves it), but nothing on the wire told a
+// client it was a yes/no ask at all - the plain-text prompt rendered as
+// an ordinary reply, indistinguishable from any other answer. This adds
+// the wire shape (TurnValue.confirm, PendingAsk.turnId, a real "pending"
+// outcome) and the structured resume path (`ask_answer`, matched by turn
+// id) a tap-to-approve card actually needs, beside the typed/spoken
+// "yes" the describe block above already covers and this leaves
+// unchanged.
+describe("turnNext.ts: APPROVE-CARD-01, the confirm card's wire shape and its structured resume", () => {
+  async function parkLockDoorsAsk(opts: { temporary?: boolean } = {}) {
+    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
+    try {
+      return await withStub(
+        {
+          calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
+          reply: () => "locking",
+        },
+        () => runTurnNext(people.owner, "chat", "lock the doors", opts.temporary ? { temporary: true } : {}),
+      );
+    } finally {
+      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
+    }
+  }
+
+  test("the asked turn's own TurnValue.confirm and the persisted PendingAsk.turnId are set, matching this turn's own id, plus a real pending/via:confirm outcome (a gap this path had entirely before)", async () => {
+    const parked = await parkLockDoorsAsk();
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(parked.value.source).toBe("confirm");
+    expect(parked.value.confirm).toEqual({ package_id: "lock-doors", open: true });
+
+    const ask = getPendingAsk(parked.value.conversation_id);
+    expect(ask).not.toBeNull();
+    expect(ask?.turnId).toBe(parked.value.turn_id);
+
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, parked.value.turn_id)).get();
+    const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; via?: string }[]) : [];
+    expect(outcomes.some((o) => o.packageId === "lock-doors" && o.status === "pending" && o.via === "confirm")).toBe(true);
+    // Persisted on the row too (chatHistoryAdapter.ts's own reload path
+    // reads it from here, not from the live TurnValue).
+    expect(row?.confirm ? (JSON.parse(row.confirm as unknown as string) as { package_id: string; open: boolean }) : null).toEqual({ package_id: "lock-doors", open: true });
+  });
+
+  test("a temporary conversation's own asked turn carries no confirm field - setPendingAsk/getPendingAsk are no-ops there, so a card promising a resumable confirm would lie", async () => {
+    const parked = await parkLockDoorsAsk({ temporary: true });
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(parked.value.confirm).toBeUndefined();
+    expect(getPendingAsk(parked.value.conversation_id)).toBeNull();
+  });
+
+  test("a button-originated ask_answer with the matching turn_id and approved:true resumes exactly as a typed yes would", async () => {
+    const parked = await parkLockDoorsAsk();
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    const resumed = await withStub({ reply: () => "unused" }, () =>
+      runTurnNext(people.owner, "chat", "Yes", { conversationId: parked.value.conversation_id, ask_answer: { turn_id: parked.value.turn_id, approved: true } }),
+    );
+    expect(resumed.ok).toBe(true);
+    if (!resumed.ok || resumed.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(resumed.value.source).toBe("plugin");
+    expect(resumed.value.plugin_id).toBe("lock-doors");
+    expect(getPendingAsk(parked.value.conversation_id)).toBeNull();
+  });
+
+  test("approved:false clears the ask without resuming, exactly like a typed no", async () => {
+    const parked = await parkLockDoorsAsk();
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    const resumed = await withStub({ reply: () => "Okay, no action taken." }, () =>
+      runTurnNext(people.owner, "chat", "No", { conversationId: parked.value.conversation_id, ask_answer: { turn_id: parked.value.turn_id, approved: false } }),
+    );
+    expect(resumed.ok).toBe(true);
+    if (!resumed.ok || resumed.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(resumed.value.source).not.toBe("plugin");
+    expect(resumed.value.plugin_id).toBeUndefined();
+    expect(getPendingAsk(parked.value.conversation_id)).toBeNull();
+  });
+
+  test("a mismatched turn_id returns 409 ask_stale, never falls through to ordinary routing", async () => {
+    const parked = await parkLockDoorsAsk();
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    const resumed = await runTurnNext(people.owner, "chat", "Yes", { conversationId: parked.value.conversation_id, ask_answer: { turn_id: "some-other-turn-id", approved: true } });
+    expect(resumed.ok).toBe(false);
+    if (resumed.ok) throw new Error("expected a failure result");
+    expect(resumed.status).toBe(409);
+    expect(resumed.code).toBe("ask_stale");
+    // The still-live pending ask (for the REAL turn, not the stale tap's
+    // named one) is untouched by the 409 - beginTurn()'s own comment:
+    // this request doesn't get to answer someone else's live question
+    // by accident.
+    expect(getPendingAsk(parked.value.conversation_id)?.turnId).toBe(parked.value.turn_id);
+  });
+
+  test("the existing typed-text AFFIRMATIVE_RE path is unchanged when ask_answer is absent", async () => {
+    const parked = await parkLockDoorsAsk();
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    const resumed = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "yes", { conversationId: parked.value.conversation_id }));
+    expect(resumed.ok).toBe(true);
+    if (!resumed.ok || resumed.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(resumed.value.source).toBe("plugin");
+    expect(resumed.value.plugin_id).toBe("lock-doors");
+  });
+});
+
 describe("turnNext.ts: PROJECT-REPLY-01, a resumed start_project confirmation surfaces its own outcome text (live incident 2026-09-27)", () => {
   // Jesse confirmed a real start_project ask with "yes" and got back a
   // bare "Yes." instead of anything about the project that actually
