@@ -1299,6 +1299,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
   const spokenNextRef = useRef(false);
+  const selectedModelRef = useRef<string | undefined>(undefined);
   // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
   // callback (ConfirmToolRender's respondToApproval, via
   // ConfirmAskAnswerContext), the same single-shot shape as
@@ -1339,16 +1340,18 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     previousThreadIdRef.current = remoteId;
     setSearchParamsRef.current({ conversation: remoteId }, { replace: true });
   }, []);
-  // PERSIST-CONV-01: the selected mode is hydrated from the active
-  // conversation's shared settings and saved when the person changes it.
-  // The ref keeps the memoized model adapter on the current value.
+  // PERSIST-CONV-01 / RESP-04: Thinking and the selected model hydrate
+  // from the active conversation settings and save when changed. Refs
+  // keep the memoized model adapter on their current values.
   const [thinking, setThinkingState] = useState(false);
   const thinkingRef = useRef(false);
   thinkingRef.current = thinking;
   const thinkingDirtyRef = useRef(false);
   const autoReadRepliesDirtyRef = useRef(false);
+  const selectedModelDirtyRef = useRef(false);
   const pendingNewConversationReadAloudRef = useRef<boolean | undefined>(undefined);
   const pendingNewConversationThinkingRef = useRef<boolean | undefined>(undefined);
+  const pendingNewConversationModelRef = useRef<string | undefined>(undefined);
   const settingsWriteRef = useRef<Promise<void>>(Promise.resolve());
   const queueReadAloudWrite = useCallback((conversationId: string, value: boolean) => {
     settingsWriteRef.current = settingsWriteRef.current
@@ -1414,17 +1417,50 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
         }
       });
   }, [applyConversationThinking]);
+  const [selectedModel, setSelectedModelState] = useState<string | undefined>();
+  const applySelectedModel = useCallback((value: string | undefined) => {
+    selectedModelRef.current = value;
+    setSelectedModelState(value);
+  }, []);
+  const setSelectedModel = useCallback((value: string) => {
+    selectedModelDirtyRef.current = true;
+    applySelectedModel(value);
+    const conversationId = visibleConversationIdRef.current;
+    if (!conversationId) {
+      pendingNewConversationModelRef.current = value;
+      return;
+    }
+    pendingNewConversationModelRef.current = undefined;
+    settingsWriteRef.current = settingsWriteRef.current
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await api.setConversationSettings(conversationId, { model: value });
+        } catch {
+          toast.error("Could not save this chat's settings. Try again.");
+        }
+      });
+  }, [applySelectedModel]);
   const onConversationSettingsLoaded = useCallback((conversationId: string, settings: Conversation["settings"]) => {
-    if (visibleConversationIdRef.current !== conversationId) return;
+    if (visibleConversationIdRef.current !== conversationId) {
+      if (visibleConversationIdRef.current === undefined) {
+        visibleConversationIdRef.current = conversationId;
+        previousThreadIdRef.current = conversationId;
+      } else return;
+    }
     if (!thinkingDirtyRef.current) applyConversationThinking(settings?.thinking ?? false);
     if (!autoReadRepliesDirtyRef.current) applyAutoReadReplies(settings?.read_aloud ?? false);
-  }, [applyAutoReadReplies, applyConversationThinking]);
-  const [selectedModel, setSelectedModel] = useState<string | undefined>();
+    if (!selectedModelDirtyRef.current) applySelectedModel(settings?.model);
+  }, [applyAutoReadReplies, applyConversationThinking, applySelectedModel]);
+  const hydrateConversationSettings = useCallback(async (conversationId: string) => {
+    const conversation = await api.conversation(conversationId);
+    onConversationSettingsLoaded(conversationId, conversation.settings);
+    return conversation;
+  }, [onConversationSettingsLoaded]);
   const selectedModelValue = modelOptions.length >= 2
     ? (modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions.some((model) => model.id === chatRole?.model?.id) ? chatRole?.model?.id : modelOptions[0]?.id)
     : undefined;
   const modelPickerAllowed = thinkingAllowed && enginesQuery.data?.configured === true && isOwnerOrAdminRole(person.role) && modelOptions.length >= 2;
-  const selectedModelRef = useRef<string | undefined>(undefined);
   selectedModelRef.current = modelPickerAllowed ? selectedModelValue : undefined;
   const modelPickerAllowedRef = useRef(false);
   modelPickerAllowedRef.current = modelPickerAllowed;
@@ -1505,7 +1541,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           getConversationId: async () => {
             const { remoteId } = await aui.threadListItem().initialize();
             await settingsWriteRef.current;
-            const conversation = await api.resumeConversation(remoteId);
+            const conversation = await hydrateConversationSettings(remoteId);
             const pendingThinking = pendingNewConversationThinkingRef.current;
             if (pendingThinking !== undefined) {
               pendingNewConversationThinkingRef.current = undefined;
@@ -1527,6 +1563,21 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
               if (pendingReadAloud) queueReadAloudWrite(remoteId, true);
             }
             if (!autoReadRepliesDirtyRef.current) applyAutoReadReplies(conversation.settings?.read_aloud ?? false);
+            const pendingModel = pendingNewConversationModelRef.current;
+            if (pendingModel !== undefined) {
+              pendingNewConversationModelRef.current = undefined;
+              selectedModelDirtyRef.current = false;
+              await settingsWriteRef.current;
+              try {
+                await api.setConversationSettings(remoteId, { model: pendingModel });
+                await settingsWriteRef.current;
+                applySelectedModel(pendingModel);
+              } catch {
+                toast.error("Could not save this chat's settings. Try again.");
+              }
+            } else {
+              if (!selectedModelDirtyRef.current) applySelectedModel(conversation.settings?.model);
+            }
             await settingsWriteRef.current;
             return remoteId;
           },
@@ -1581,7 +1632,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // enabled and the TTS role is ready.
           speakReplies: () => liveVoiceActiveRef.current || (ttsAvailableRef.current && autoReadRepliesRef.current),
         }),
-      [aui],
+      [aui, hydrateConversationSettings],
     );
     // slice 5(e): thumbs and read-aloud both ride the shipped
     // capability/adapter mechanism (`s.thread.capabilities.feedback`/
@@ -1673,19 +1724,21 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
       // scoped to the reported Thinking defect below, not a second,
       // unasked-for change to bareMode's own behavior.)
       setBareMode(false);
-      // Thinking is hydrated from each conversation's persisted
-      // settings. The model choice stays session-local and resets on a
-      // deliberate conversation switch.
+      // Thinking and model are hydrated from each conversation's
+      // persisted settings.
       if (isDeliberateSwitch) {
         thinkingRef.current = false;
         setThinkingState(false);
         thinkingDirtyRef.current = false;
         pendingNewConversationThinkingRef.current = undefined;
         autoReadRepliesDirtyRef.current = false;
+        selectedModelDirtyRef.current = false;
         pendingNewConversationReadAloudRef.current = undefined;
+        pendingNewConversationModelRef.current = undefined;
         applyAutoReadReplies(false);
-        setSelectedModel(undefined);
+        applySelectedModel(undefined);
       }
+      if (id) void hydrateConversationSettings(id).catch(() => {});
     },
   });
 
