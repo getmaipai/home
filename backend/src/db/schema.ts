@@ -595,6 +595,46 @@ export const attachments = sqliteTable(
     index("attachments_owner_person_id_idx").on(table.ownerPersonId),
     index("attachments_conversation_id_idx").on(table.conversationId),
     index("attachments_turn_id_idx").on(table.turnId),
+    // STORE-SHARE-01's dedupe: a second person's identical bytes become
+    // a share pointer to the first arrival's row (lib/shares.ts,
+    // lib/attachments.ts's own createAttachment) rather than a second
+    // row, so every lookup by digest needs to be fast, not a table scan.
+    index("attachments_sha256_idx").on(table.sha256),
+  ],
+);
+
+// STORE-SHARE-01 (spec/schemas/share.schema.json): one pointer record
+// granting another person or the household read access to one file
+// (`attachments` above, the table backing the spec's `file` shape) -
+// never a second file row, never a copy of the bytes. `to` is either the
+// literal "household" or a person id; re-sharing is a further row on the
+// same file_id with from_person_id set to the re-sharer, never a parent-
+// pointer chain (lib/shares.ts's own pruneUnreachableShares recomputes
+// which pointers still trace back to the owner after a delete, instead
+// of a `parent_share_id` column the spec's own shape has no room for -
+// share.schema.json is `.strict()`, additive only for share-link-01).
+export const shares = sqliteTable(
+  "shares",
+  {
+    id: text("id").primaryKey(),
+    fileId: text("file_id")
+      .notNull()
+      .references(() => attachments.id),
+    fromPersonId: text("from_person_id")
+      .notNull()
+      .references(() => people.id),
+    // "household" or a person id - never validated as an FK at the
+    // schema level (sqlite has no partial/conditional FK), checked in
+    // lib/shares.ts before every write instead.
+    to: text("to").notNull(),
+    provenance: text("provenance").notNull(),
+    createdAt: text("created_at").notNull(),
+    hlc: text("hlc").notNull(),
+  },
+  (table) => [
+    index("shares_file_id_idx").on(table.fileId),
+    index("shares_to_idx").on(table.to),
+    index("shares_from_person_id_idx").on(table.fromPersonId),
   ],
 );
 

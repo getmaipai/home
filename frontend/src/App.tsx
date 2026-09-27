@@ -121,6 +121,7 @@ function OldShellRoutes({
         <Routes>
           <Route path="/" element={<HomePage person={person} />} />
           <Route path="/apps" element={<AppsPage person={person} />} />
+          <Route path="/files" element={<FilesPage person={person} />} />
           <Route path="/chat" element={<ChatPage person={person} />} />
           {/* Conversations is Chat's own thread list now, not a
               destination of its own (owner ruling, "Navigation,
@@ -200,6 +201,13 @@ const AppsPage = lazyNamed<ComponentProps<typeof import("@/apps/library/AppsPage
 const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWizard")["SetupWizard"]>>(
   () => import("@/apps/setup/SetupWizard"),
   "SetupWizard",
+);
+// STORE-SHARE-01: not on the curated nav yet (shell/nav.ts's own list -
+// how this actually surfaces is STORE-PAGE-01/PEOPLE-01's call), but a
+// real, working route today.
+const FilesPage = lazyNamed<ComponentProps<typeof import("@/apps/files/FilesPage")["FilesPage"]>>(
+  () => import("@/apps/files/FilesPage"),
+  "FilesPage",
 );
 const NotificationsPage = lazyNamed(() => import("@/apps/notifications/NotificationsPage"), "NotificationsPage");
 // The shell-on-shadcndashboard stand-up (docs/plans/shell-on-shadcndashboard-

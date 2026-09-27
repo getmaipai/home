@@ -145,6 +145,12 @@ export function newFileId(): string {
   return `file-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/share.schema.json's `^share-[a-z0-9]{6,}$`
+ * (STORE-SHARE-01). */
+export function newShareId(): string {
+  return `share-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/artifact.schema.json's `^art-[a-z0-9]{6,}$`. A new
  * one is minted for every version, chained by parent_version. */
 export function newArtifactId(): string {

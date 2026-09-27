@@ -42,6 +42,7 @@ import { grantsRoutes } from "@/routes/grants";
 import { approvalsRoutes } from "@/routes/approvals";
 import { searchRoutes } from "@/routes/search";
 import { storageRoutes } from "@/routes/storage";
+import { filesRoutes, sharesRoutes } from "@/routes/files";
 import { updatesRoutes } from "@/routes/updates";
 import { openaiRoutes } from "@/routes/openai";
 import { storeRoutes } from "@/routes/store";
@@ -191,6 +192,8 @@ app.route("/api/approvals", approvalsRoutes);
 app.route("/api/search", searchRoutes);
 app.route("/api/store", storeRoutes);
 app.route("/api/storage", storageRoutes);
+app.route("/api/files", filesRoutes);
+app.route("/api/shares", sharesRoutes);
 app.route("/api/updates", updatesRoutes);
 // Root-mounted, not under /api: OpenAI's own wire contract names this
 // exact path (session-c-brain-and-voice.md step 8), which a client

@@ -24,6 +24,7 @@ import {
   settingsValues,
   scheduledJobs,
   conversationTurns,
+  shares,
   attachments,
   artifacts,
   conversations,
@@ -128,6 +129,7 @@ export function resetDb(): void {
   db.delete(episodeEmbeddings).run();
   db.delete(episodes).run();
   db.delete(projects).run(); // PROJECT-RUN-01: references people
+  db.delete(shares).run(); // STORE-SHARE-01: references attachments (the file table), deleted first
   db.delete(attachments).run();
   db.delete(artifacts).run(); // the chat program's generated-document versions, reference conversations and conversation_turns
   db.delete(conversationTurns).run();

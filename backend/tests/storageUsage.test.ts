@@ -196,6 +196,62 @@ describe("usage: computed from the File records, never a disk walk", () => {
   });
 });
 
+describe("dedupe (STORE-SHARE-01) composed with the cap: a dedupe hit is not new usage", () => {
+  // household-storage-2026-09-23.md, "Enforcement": the cap refuses "a
+  // write that would take the owner past their cap". A dedupe hit
+  // (attachments.ts's createAttachment(), sha256 match) writes no new
+  // blob and no new File row, so it is not that write - checkStorageCap()
+  // must never run for it, cap already exhausted or not.
+  test("a second person's identical bytes still succeed via a share pointer when the household cap is already fully used by the first file", async () => {
+    const ownerPerson = insertPerson("adult", "Bramble");
+    const recipient = insertPerson("adult", "Lucia");
+    const bytes = new TextEncoder().encode("bytes that exactly fill the household cap");
+    setHouseholdSettingValue("storage.household.cap_bytes", bytes.byteLength);
+
+    const firstConversationId = conversationFor(ownerPerson);
+    const firstTurnId = turnFor(ownerPerson, firstConversationId);
+    const first = createAttachment(ownerPerson, { conversationId: firstConversationId, turnId: firstTurnId, mediaType: "image/png", bytes });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(householdUsageBytes()).toBe(bytes.byteLength); // the cap is now exactly used up
+
+    // The recipient uploading the SAME bytes dedupes to a share pointer,
+    // not a new File row - no new usage, so the (already-exhausted) cap
+    // must not refuse it.
+    const secondConversationId = conversationFor(recipient);
+    const secondTurnId = turnFor(recipient, secondConversationId);
+    const second = createAttachment(recipient, { conversationId: secondConversationId, turnId: secondTurnId, mediaType: "image/png", bytes });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.id).toBe(first.value.id);
+    expect(second.value.owner_person_id).toBe(ownerPerson.id);
+    expect(db.select().from(attachments).all()).toHaveLength(1); // still one File row
+    expect(householdUsageBytes()).toBe(bytes.byteLength); // still exactly the same usage, not doubled
+    // "No duplicates at any level" (household-storage-2026-09-23.md) means
+    // no second blob either, not just no second row: the recipient's own
+    // attachments directory is never created by the dedupe branch (only
+    // the non-dedupe path below calls ensureDataDir/writeFileSync), so a
+    // future regression that accidentally wrote a redundant blob there
+    // would be caught here rather than only by the byte-count assertion
+    // above, which a duplicate write of the same size would not move.
+    expect(existsSync(join(attachmentsDir, recipient.id, "attachments"))).toBe(false);
+
+    // Contrast: the SAME recipient uploading genuinely NEW bytes (any
+    // nonzero content, distinct hash), with the cap already exhausted by
+    // the first file, is refused exactly as STORE-CAP-01 built it -
+    // proving the prior success was the dedupe path, not a cap that
+    // secretly had room.
+    const thirdConversationId = conversationFor(recipient);
+    const thirdTurnId = turnFor(recipient, thirdConversationId);
+    const newBytes = new TextEncoder().encode("genuinely different bytes, never uploaded before");
+    const third = createAttachment(recipient, { conversationId: thirdConversationId, turnId: thirdTurnId, mediaType: "image/png", bytes: newBytes });
+    expect(third.ok).toBe(false);
+    if (third.ok) return;
+    expect(third.status).toBe(403);
+    expect(third.error).toContain("Your storage is full");
+  });
+});
+
 describe("checkStorageCap() as a job's own preflight (decision 3)", () => {
   test("refuses before anything is written - no attachment, no bytes, no job needs to exist yet to prove it", () => {
     const child = insertPerson("child", "Poppy");

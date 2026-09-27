@@ -7,7 +7,7 @@
 // an equivalent inline check elsewhere).
 import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, shares } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@/wire";
 
@@ -73,4 +73,44 @@ export function canAccessPerson(actor: PersonRow, personId: string, roleOf?: Map
 // deterministic turn to turn, never dependent on SQLite's own row order.
 export function listActivePeople(): PersonRow[] {
   return db.select().from(people).where(isNull(people.deletedAt)).orderBy(people.createdAt, people.id).all();
+}
+
+// STORE-SHARE-01: the file-visibility predicate, mirroring canRead()'s
+// own role in memory.ts (RULES-AND-LEARNED-COMPONENTS.md: household
+// privacy and disclosure stay in one place, never reimplemented per
+// caller) but living here instead, because a file's readers span more
+// than one module (lib/attachments.ts's own read boundary, lib/
+// shares.ts's CRUD, the files routes) the way lib/settings.ts and
+// memory.ts both needed canAccessPerson() above. A file is visible to
+// its owner always, and to anyone a live share.schema.json pointer
+// names - by person id, or by the literal "household" (every active
+// person in it, since a household has no membership list of its own
+// beyond "every active person" today).
+export function canAccessFile(actor: PersonRow, ownerPersonId: string, fileId: string): boolean {
+  if (actor.id === ownerPersonId) return true;
+  const rows = db.select({ to: shares.to }).from(shares).where(eq(shares.fileId, fileId)).all();
+  return rows.some((row) => row.to === "household" || row.to === actor.id);
+}
+
+// STORE-SHARE-01 (household-storage-2026-09-23.md, "Sharing, and its
+// bounds"): "the disclosure filter in the turn pipeline treats a shared
+// file as context with the owner's disclosure" - keyed on whoever owns
+// the file, never on whichever person's turn is currently reading it
+// (the same file, shared with both a child and an adult, must read the
+// same way for both). Files carry no disclosure field of their own
+// (unlike a memory record, which gets one from childDisclosure.ts's own
+// vocabulary-cue heuristic over its text) and a file's bytes aren't
+// text to run that heuristic over, so this is a coarser, conservative
+// stand-in: a minor's own file defaults open (their own photo is
+// ordinary content for another child to see), anyone else's defaults
+// closed, matching childDisclosure.ts's own "adult_only unless clearly
+// fine" default. Not yet called from turnMachine/nodes/context.ts -
+// that node has no file/document context source at all today (checked
+// directly: only utterance/window/memory/profile/clock/roster), so
+// wiring this in has no real caller yet; it is exported and tested now
+// so the day a file enters context, this is the one function to call,
+// not a second disclosure rule invented at that call site.
+export function fileDisclosure(ownerPersonId: string): "child_ok" | "adult_only" {
+  const role = getPersonRole(ownerPersonId);
+  return role === "child" || role === "teen" ? "child_ok" : "adult_only";
 }

@@ -10,6 +10,8 @@ import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import type { Artifact } from "@maipai/spec/gen/ts/artifact.js";
+import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
+import type { Share } from "@maipai/spec/gen/ts/share.js";
 import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import type { SearchGroup } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
 import type {
@@ -263,6 +265,17 @@ export interface StoreInstall {
   sourceCommit: string;
   permissions: string[];
   installedAt: string;
+}
+
+// GET /api/files's response (routes/files.ts's VisibleFileSchema):
+// `shared: false` for a file the signed-in person owns, `true` for one
+// a share pointer makes visible to them - `owner_person_id` is always
+// the real owner, never the viewer, so the Library page can show "with
+// Sage" on anything that isn't the viewer's own.
+export interface VisibleFile {
+  file: FileRecord;
+  owner_person_id: string;
+  shared: boolean;
 }
 
 export class ApiError extends Error {
@@ -804,6 +817,13 @@ export const api = {
   // state suggested prompts (step 4) are drawn from these rather than
   // invented, so they're always real things MaiPai can actually do.
   plugins: () => request<InstalledPackage[]>("/api/plugins"),
+  // STORE-SHARE-01: my own Library - files I own, plus files shared with
+  // me, each listed once under its real owner (owner_person_id), never
+  // the recipient - a shared file's usage counts against the owner only.
+  files: () => request<VisibleFile[]>("/api/files"),
+  fileShares: (fileId: string) => request<Share[]>(`/api/files/${encodeURIComponent(fileId)}/shares`),
+  shareFile: (fileId: string, to: string) => request<Share>(`/api/files/${encodeURIComponent(fileId)}/shares`, { method: "POST", body: JSON.stringify({ to }) }),
+  unshare: (shareId: string) => request<{ deletedShareIds: string[] }>(`/api/shares/${encodeURIComponent(shareId)}`, { method: "DELETE" }),
   // Owner/admin only (routes/store.ts's own gate) - null means the
   // package has no active store install (bundled-only, or never
   // installed). Called lazily, on-demand for the pane's selected

@@ -11,11 +11,12 @@ import { and, eq, inArray } from "drizzle-orm";
 // this module.
 import { File as FileRecordSchema, type File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import { db, sqlite } from "@/db";
-import { attachments, conversationTurns, conversations } from "@/db/schema";
-import { newFileId } from "@/lib/id";
+import { attachments, conversationTurns, conversations, shares } from "@/db/schema";
+import { newFileId, newShareId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { checkStorageCap } from "@/lib/storage/usage";
+import { canAccessFile } from "@/lib/access";
 import type { PersonRow } from "@/types";
 
 export type AttachmentOpResult<T> =
@@ -72,7 +73,11 @@ function kindForMediaType(mediaType: string): FileRecord["kind"] {
   return "other";
 }
 
-function toRecord(row: typeof attachments.$inferSelect): FileRecord {
+// Exported: lib/shares.ts builds the same File shape from the same raw
+// row for its own listings (the Library page's owned/shared lists), and
+// a second copy of this mapping would drift from this one the moment
+// STORE-SPEC-01's shape changes again.
+export function toRecord(row: typeof attachments.$inferSelect): FileRecord {
   const parsed = FileRecordSchema.safeParse({
     id: row.id,
     owner_person_id: row.ownerPersonId,
@@ -102,6 +107,31 @@ function toRecord(row: typeof attachments.$inferSelect): FileRecord {
   });
   if (!parsed.success) throw new Error(`invalid attachment row: ${parsed.error.message}`);
   return parsed.data;
+}
+
+// A system-granted share, not a person's own share action (lib/shares.ts's
+// createShare() is that, and it requires the actor to already have access
+// to grant to someone else - the dedupe case is the opposite: the new
+// arrival has no access yet, and never asked for a share, they just typed
+// the same bytes someone else already stored). from_person_id names the
+// existing owner, since they are, structurally, the one whose bytes this
+// now points at; idempotent, so a person re-sending the same file twice
+// doesn't grow a second pointer.
+function grantDedupeShare(existingOwnerId: string, recipientId: string, fileId: string): void {
+  const already = db.select().from(shares).where(and(eq(shares.fileId, fileId), eq(shares.to, recipientId))).get();
+  if (already) return;
+  db
+    .insert(shares)
+    .values({
+      id: newShareId(),
+      fileId,
+      fromPersonId: existingOwnerId,
+      to: recipientId,
+      provenance: "dedupe:same-bytes",
+      createdAt: new Date().toISOString(),
+      hlc: nextHlc(),
+    })
+    .run();
 }
 
 function removeFile(storagePath: string): void {
@@ -138,10 +168,34 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   if (!provenance) return { ok: false, status: 400, error: "attachment provenance is required" };
 
   const bytes = new Uint8Array(input.bytes);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+
+  // STORE-SHARE-01 / file.schema.json's own sha256 doc-comment: "the blob
+  // store keys on this value: bytes are written once per digest, so a
+  // second person's identical bytes never create a second blob... only a
+  // second file record with its own owner is avoided too." Household-wide
+  // (not scoped to actor): the first arrival keeps ownership no matter
+  // who uploads the same bytes next, and the second person gets a share
+  // pointer to the existing row instead of a new blob and a new row -
+  // "no duplicates at any level" (household-storage-2026-09-23.md). This
+  // runs before checkStorageCap(): a dedupe hit writes no new blob and no
+  // new File row, so it is not "a write that would take the owner past
+  // their cap" (household-storage-2026-09-23.md, "Enforcement") - usage
+  // (storage/usage.ts) is the sum of `size` over File rows that exist,
+  // and a dedupe never adds one, so charging the cap here would refuse a
+  // person for bytes that were never going to land on disk a second time.
+  const existing = db.select().from(attachments).where(eq(attachments.sha256, sha256)).get();
+  if (existing) {
+    if (existing.ownerPersonId !== actor.id) grantDedupeShare(existing.ownerPersonId, actor.id, existing.id);
+    return { ok: true, value: toRecord(existing) };
+  }
 
   // STORE-CAP-01: refused before anything is written to disk - the two
   // caps (this person's own, the household total), in the person's own
-  // words (household-storage-2026-09-23.md, decision 3).
+  // words (household-storage-2026-09-23.md, decision 3). Only reached for
+  // bytes that are actually new (the dedupe check above already returned
+  // for a hash match), so this is exactly the "new bytes on disk" case
+  // the cap was designed to gate.
   const capCheck = checkStorageCap(actor.role, actor.id, bytes.byteLength);
   if (!capCheck.ok) return { ok: false, status: 403, error: capCheck.error! };
 
@@ -150,7 +204,6 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   const filePath = attachmentFilePath(storagePath);
   const directory = resolve(attachmentsDir, actor.id, "attachments");
   ensureDataDir(directory);
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
   const row = {
     id,
     ownerPersonId: actor.id,
@@ -181,14 +234,20 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   return { ok: true, value: record };
 }
 
-/** Return an attachment only to the person who uploaded it. */
+/** Return a file to its owner, or to anyone a live share names
+ * (STORE-SHARE-01's canAccessFile) - the one read boundary every other
+ * caller (documentExtraction.ts's extractAttachment, a future package
+ * host RPC) goes through, so shared visibility only has to be right
+ * here once. A third person with no share still gets the same 404 an
+ * owner-only check would have given them - never a 403 that would
+ * confirm the id exists. */
 export function getAttachment(actor: PersonRow, id: string): AttachmentOpResult<FileRecord> {
-  const row = db.select().from(attachments).where(and(eq(attachments.id, id), eq(attachments.ownerPersonId, actor.id))).get();
-  if (!row) return { ok: false, status: 404, error: "attachment not found" };
+  const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
+  if (!row || !canAccessFile(actor, row.ownerPersonId, id)) return { ok: false, status: 404, error: "attachment not found" };
   return { ok: true, value: toRecord(row) };
 }
 
-/** Read and integrity-check the local bytes for an owned attachment. */
+/** Read and integrity-check the local bytes for a file actor may see. */
 export function readAttachment(actor: PersonRow, id: string): AttachmentOpResult<{ record: FileRecord; bytes: Uint8Array }> {
   const found = getAttachment(actor, id);
   if (!found.ok) return found;

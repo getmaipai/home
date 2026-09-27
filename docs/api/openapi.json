@@ -20085,6 +20085,815 @@
         }
       }
     },
+    "/api/files": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "My own Library: files I own, plus files shared with me (by name or by the household)",
+        "responses": {
+          "200": {
+            "description": "A shared file is listed under its real owner, once, whether shared directly or via the household.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "file": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^file-[a-z0-9]{6,}$",
+                            "description": "Stable file id, never reused. The id is also the basename used by the storage path."
+                          },
+                          "owner_person_id": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$",
+                            "description": "The one person who owns this file, always a person, never the household. Captured at write time and not inferred from a later profile change; a file's usage counts against this person's cap only, even once shared."
+                          },
+                          "origin": {
+                            "type": "string",
+                            "enum": [
+                              "sent",
+                              "made",
+                              "exported"
+                            ],
+                            "description": "\"sent\": a file the person gave in chat (today's attachment). \"made\": a package or a job produced it on the person's behalf (a generated picture, video, audio clip or story). \"exported\": a copy the person asked for (a data export). Shapes which fields of provenance apply below."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "image",
+                              "video",
+                              "audio",
+                              "document",
+                              "story",
+                              "other"
+                            ],
+                            "description": "The kind of content, read by the manifest lint's output check (docs/PACKAGES.md \"Uninstall, and a person's files\": a manifest declares its outputs as media kinds matching this enum)."
+                          },
+                          "media_type": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\\/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$",
+                            "description": "Normalized MIME media type of the stored bytes, without parameters."
+                          },
+                          "size": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Exact byte length of the stored file."
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$",
+                            "description": "Lowercase SHA-256 digest of the stored bytes. The blob store keys on this value: bytes are written once per digest, so a second person's identical bytes never create a second blob, only a second file record with its own owner is avoided too - see share.schema.json's \"first in, owner\" rule for what the second person gets instead."
+                          },
+                          "storage_path": {
+                            "type": "string",
+                            "pattern": "^(?!\\/)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))[A-Za-z0-9._/-]+$",
+                            "description": "A normalized relative path below the household data directory. Implementations place it under people/{owner_person_id}/files/ and reject traversal or absolute paths."
+                          },
+                          "retention": {
+                            "type": "string",
+                            "enum": [
+                              "conversation",
+                              "kept"
+                            ],
+                            "description": "\"conversation\": follows the owning conversation's household.conversation_retention_days setting (currently 7-365 days, 90-day default); deleted with the owning turn and immediately by host.data.forget(person). Used when origin is \"sent\". \"kept\": kept until the owner deletes it - the default for origin \"made\" and \"exported\", and for any \"sent\" file a person chooses to keep past its conversation."
+                          },
+                          "provenance": {
+                            "type": "object",
+                            "properties": {
+                              "conversation_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^conv-[a-z0-9]{6,}$",
+                                    "description": "Set when origin is \"sent\": the conversation that received the file."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "Set when origin is \"sent\": the conversation that received the file."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null,
+                                "description": "Set when origin is \"sent\": the conversation that received the file."
+                              },
+                              "turn_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^turn-[a-z0-9]{6,}$",
+                                    "description": "Set when origin is \"sent\" (the turn whose user message carried the file) or \"made\" (the turn that started the job); optionally set for \"exported\" when the export was requested inside a turn rather than from a settings page."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "Set when origin is \"sent\" (the turn whose user message carried the file) or \"made\" (the turn that started the job); optionally set for \"exported\" when the export was requested inside a turn rather than from a settings page."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null,
+                                "description": "Set when origin is \"sent\" (the turn whose user message carried the file) or \"made\" (the turn that started the job); optionally set for \"exported\" when the export was requested inside a turn rather than from a settings page."
+                              },
+                              "package_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "Set when origin is \"made\": the catalog package id whose job produced the file."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "Set when origin is \"made\": the catalog package id whose job produced the file."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null,
+                                "description": "Set when origin is \"made\": the catalog package id whose job produced the file."
+                              },
+                              "job_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "Set when origin is \"made\": the id of the Stack job (stack-job.schema.json) that produced the file."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "Set when origin is \"made\": the id of the Stack job (stack-job.schema.json) that produced the file."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null,
+                                "description": "Set when origin is \"made\": the id of the Stack job (stack-job.schema.json) that produced the file."
+                              },
+                              "requested_by_person_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^person-[a-z0-9]{6,}$",
+                                    "description": "Set when origin is \"exported\" and the requester differs from owner_person_id (an admin exporting a child's files on the child's behalf)."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "Set when origin is \"exported\" and the requester differs from owner_person_id (an admin exporting a child's files on the child's behalf)."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null,
+                                "description": "Set when origin is \"exported\" and the requester differs from owner_person_id (an admin exporting a child's files on the child's behalf)."
+                              },
+                              "note": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "Freeform detail for a path the structured fields above don't name, matching the original attachment record's provenance string (such as composer:upload or storage-page:export). Optional; the structured fields are preferred once they apply."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "Freeform detail for a path the structured fields above don't name, matching the original attachment record's provenance string (such as composer:upload or storage-page:export). Optional; the structured fields are preferred once they apply."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null,
+                                "description": "Freeform detail for a path the structured fields above don't name, matching the original attachment record's provenance string (such as composer:upload or storage-page:export). Optional; the structured fields are preferred once they apply."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "How this file entered the household, shaped by origin: for \"sent\", the conversation and turn that carried it; for \"made\", the package, turn and job that produced it; for \"exported\", who asked for it and, when it ran inside a turn, that turn. Every field below is optional and nullable - only the ones that apply to this record's origin are set, the rest stay null - because JSON Schema in this repo describes cross-field shape in prose rather than an if/then keyed on origin (see spec/README.md on the stack schemas' own allOf/if/then codegen loss)."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "hlc": {
+                            "type": "string",
+                            "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                            "description": "Hybrid logical clock for the immutable record, matching the shared record envelope."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "owner_person_id",
+                          "origin",
+                          "kind",
+                          "media_type",
+                          "size",
+                          "sha256",
+                          "storage_path",
+                          "retention",
+                          "provenance",
+                          "created_at",
+                          "hlc"
+                        ],
+                        "additionalProperties": false,
+                        "description": "One immutable record for a file a person made or sent: a chat attachment, a package's generated output, or an exported copy (STORE-SPEC-01, home docs/plans/household-storage-2026-09-23.md). The bytes live below the household data directory, content-addressed by sha256 so identical bytes are stored once; this record carries only its owner, kind, origin, provenance, integrity and retention policy. Supersedes attachment.schema.json, generalized to the same shape (no attachment rows existed in any household yet, so the rename cost nothing); also folds in the never-built media.schema.json (MEDIA-RECORD-01). Sharing is never a field here: a share is its own pointer record, share.schema.json, so one file has one owner and any number of share pointers without a second copy of the bytes or a second file record."
+                      },
+                      "owner_person_id": {
+                        "type": "string"
+                      },
+                      "shared": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "file",
+                      "owner_person_id",
+                      "shared"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/{id}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "One file - visible to its owner or to anyone a live share names",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "file-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^file-[a-z0-9]{6,}$",
+                      "description": "Stable file id, never reused. The id is also the basename used by the storage path."
+                    },
+                    "owner_person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "The one person who owns this file, always a person, never the household. Captured at write time and not inferred from a later profile change; a file's usage counts against this person's cap only, even once shared."
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "sent",
+                        "made",
+                        "exported"
+                      ],
+                      "description": "\"sent\": a file the person gave in chat (today's attachment). \"made\": a package or a job produced it on the person's behalf (a generated picture, video, audio clip or story). \"exported\": a copy the person asked for (a data export). Shapes which fields of provenance apply below."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "image",
+                        "video",
+                        "audio",
+                        "document",
+                        "story",
+                        "other"
+                      ],
+                      "description": "The kind of content, read by the manifest lint's output check (docs/PACKAGES.md \"Uninstall, and a person's files\": a manifest declares its outputs as media kinds matching this enum)."
+                    },
+                    "media_type": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\\/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$",
+                      "description": "Normalized MIME media type of the stored bytes, without parameters."
+                    },
+                    "size": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Exact byte length of the stored file."
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$",
+                      "description": "Lowercase SHA-256 digest of the stored bytes. The blob store keys on this value: bytes are written once per digest, so a second person's identical bytes never create a second blob, only a second file record with its own owner is avoided too - see share.schema.json's \"first in, owner\" rule for what the second person gets instead."
+                    },
+                    "storage_path": {
+                      "type": "string",
+                      "pattern": "^(?!\\/)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))[A-Za-z0-9._/-]+$",
+                      "description": "A normalized relative path below the household data directory. Implementations place it under people/{owner_person_id}/files/ and reject traversal or absolute paths."
+                    },
+                    "retention": {
+                      "type": "string",
+                      "enum": [
+                        "conversation",
+                        "kept"
+                      ],
+                      "description": "\"conversation\": follows the owning conversation's household.conversation_retention_days setting (currently 7-365 days, 90-day default); deleted with the owning turn and immediately by host.data.forget(person). Used when origin is \"sent\". \"kept\": kept until the owner deletes it - the default for origin \"made\" and \"exported\", and for any \"sent\" file a person chooses to keep past its conversation."
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "properties": {
+                        "conversation_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^conv-[a-z0-9]{6,}$",
+                              "description": "Set when origin is \"sent\": the conversation that received the file."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Set when origin is \"sent\": the conversation that received the file."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Set when origin is \"sent\": the conversation that received the file."
+                        },
+                        "turn_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^turn-[a-z0-9]{6,}$",
+                              "description": "Set when origin is \"sent\" (the turn whose user message carried the file) or \"made\" (the turn that started the job); optionally set for \"exported\" when the export was requested inside a turn rather than from a settings page."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Set when origin is \"sent\" (the turn whose user message carried the file) or \"made\" (the turn that started the job); optionally set for \"exported\" when the export was requested inside a turn rather than from a settings page."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Set when origin is \"sent\" (the turn whose user message carried the file) or \"made\" (the turn that started the job); optionally set for \"exported\" when the export was requested inside a turn rather than from a settings page."
+                        },
+                        "package_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Set when origin is \"made\": the catalog package id whose job produced the file."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Set when origin is \"made\": the catalog package id whose job produced the file."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Set when origin is \"made\": the catalog package id whose job produced the file."
+                        },
+                        "job_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Set when origin is \"made\": the id of the Stack job (stack-job.schema.json) that produced the file."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Set when origin is \"made\": the id of the Stack job (stack-job.schema.json) that produced the file."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Set when origin is \"made\": the id of the Stack job (stack-job.schema.json) that produced the file."
+                        },
+                        "requested_by_person_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$",
+                              "description": "Set when origin is \"exported\" and the requester differs from owner_person_id (an admin exporting a child's files on the child's behalf)."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Set when origin is \"exported\" and the requester differs from owner_person_id (an admin exporting a child's files on the child's behalf)."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Set when origin is \"exported\" and the requester differs from owner_person_id (an admin exporting a child's files on the child's behalf)."
+                        },
+                        "note": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Freeform detail for a path the structured fields above don't name, matching the original attachment record's provenance string (such as composer:upload or storage-page:export). Optional; the structured fields are preferred once they apply."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Freeform detail for a path the structured fields above don't name, matching the original attachment record's provenance string (such as composer:upload or storage-page:export). Optional; the structured fields are preferred once they apply."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Freeform detail for a path the structured fields above don't name, matching the original attachment record's provenance string (such as composer:upload or storage-page:export). Optional; the structured fields are preferred once they apply."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "How this file entered the household, shaped by origin: for \"sent\", the conversation and turn that carried it; for \"made\", the package, turn and job that produced it; for \"exported\", who asked for it and, when it ran inside a turn, that turn. Every field below is optional and nullable - only the ones that apply to this record's origin are set, the rest stay null - because JSON Schema in this repo describes cross-field shape in prose rather than an if/then keyed on origin (see spec/README.md on the stack schemas' own allOf/if/then codegen loss)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock for the immutable record, matching the shared record envelope."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "owner_person_id",
+                    "origin",
+                    "kind",
+                    "media_type",
+                    "size",
+                    "sha256",
+                    "storage_path",
+                    "retention",
+                    "provenance",
+                    "created_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One immutable record for a file a person made or sent: a chat attachment, a package's generated output, or an exported copy (STORE-SPEC-01, home docs/plans/household-storage-2026-09-23.md). The bytes live below the household data directory, content-addressed by sha256 so identical bytes are stored once; this record carries only its owner, kind, origin, provenance, integrity and retention policy. Supersedes attachment.schema.json, generalized to the same shape (no attachment rows existed in any household yet, so the rename cost nothing); also folds in the never-built media.schema.json (MEDIA-RECORD-01). Sharing is never a field here: a share is its own pointer record, share.schema.json, so one file has one owner and any number of share pointers without a second copy of the bytes or a second file record."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such file, or not shared with you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/{id}/shares": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Who a file is shared with - visible to anyone who can already see the file",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "file-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every live share pointer on this file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^share-[a-z0-9]{6,}$",
+                        "description": "Stable share id, never reused."
+                      },
+                      "file_id": {
+                        "type": "string",
+                        "pattern": "^file-[a-z0-9]{6,}$",
+                        "description": "The file this pointer grants access to. The file's own owner_person_id is unaffected by this record."
+                      },
+                      "from_person_id": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$",
+                        "description": "Who created this share. Ordinarily the file's owner; ruling 6 of the household storage record also lets anything shared with a person be re-shared within the household, so this may be a recipient of an earlier share re-sharing it onward, never someone with no share and not the owner."
+                      },
+                      "to": {
+                        "type": "string",
+                        "pattern": "^(household|person-[a-z0-9]{6,})$",
+                        "description": "Who the file is shared with: a specific person, or the literal \"household\" for everyone in it."
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "How the share was created, such as the turn or the page that made it. Freeform, matching the file record's own provenance.note convention."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock for the immutable record, matching the shared record envelope."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "file_id",
+                      "from_person_id",
+                      "to",
+                      "provenance",
+                      "created_at",
+                      "hlc"
+                    ],
+                    "additionalProperties": false,
+                    "description": "One pointer record granting another person or the household read access to one file (STORE-SPEC-01, home docs/plans/household-storage-2026-09-23.md), never a copy of the bytes and never a second file record - the file's own owner_person_id keeps ownership and usage accounting no matter how many share pointers exist on it. Re-sharing (the recipient shares it onward) is another pointer on the same file, not a chain of files. Created when the owner shares a file; deleted outright when the owner unshares it - unsharing is a real delete, not a soft revoke, because nothing here needs a record of a past share (an external link's own audit trail is share-link-01's own view log, not this record). This shape intentionally stops at person/household sharing: share-link-01 (home docs/plans/external-sharing-2026-09-23.md) adds a kind (person, household, link) and, for kind \"link\" only, token, expires_at, download_limit, download_count and revoked_at, additive over this shape - nothing here should make that addition awkward, so no field is added ahead of that item that would need to change shape for it."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such file, or not shared with you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Share a file with a named person or the household",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "file-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "to"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Shared - or, for a target already sharing the file, the existing pointer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^share-[a-z0-9]{6,}$",
+                      "description": "Stable share id, never reused."
+                    },
+                    "file_id": {
+                      "type": "string",
+                      "pattern": "^file-[a-z0-9]{6,}$",
+                      "description": "The file this pointer grants access to. The file's own owner_person_id is unaffected by this record."
+                    },
+                    "from_person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Who created this share. Ordinarily the file's owner; ruling 6 of the household storage record also lets anything shared with a person be re-shared within the household, so this may be a recipient of an earlier share re-sharing it onward, never someone with no share and not the owner."
+                    },
+                    "to": {
+                      "type": "string",
+                      "pattern": "^(household|person-[a-z0-9]{6,})$",
+                      "description": "Who the file is shared with: a specific person, or the literal \"household\" for everyone in it."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "How the share was created, such as the turn or the page that made it. Freeform, matching the file record's own provenance.note convention."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock for the immutable record, matching the shared record envelope."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "file_id",
+                    "from_person_id",
+                    "to",
+                    "provenance",
+                    "created_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One pointer record granting another person or the household read access to one file (STORE-SPEC-01, home docs/plans/household-storage-2026-09-23.md), never a copy of the bytes and never a second file record - the file's own owner_person_id keeps ownership and usage accounting no matter how many share pointers exist on it. Re-sharing (the recipient shares it onward) is another pointer on the same file, not a chain of files. Created when the owner shares a file; deleted outright when the owner unshares it - unsharing is a real delete, not a soft revoke, because nothing here needs a record of a past share (an external link's own audit trail is share-link-01's own view log, not this record). This shape intentionally stops at person/household sharing: share-link-01 (home docs/plans/external-sharing-2026-09-23.md) adds a kind (person, household, link) and, for kind \"link\" only, token, expires_at, download_limit, download_count and revoked_at, additive over this shape - nothing here should make that addition awkward, so no field is added ahead of that item that would need to change shape for it."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a real household target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You do not have access to this file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/{id}": {
+      "delete": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Unshare - a real delete, takes effect at once",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "share-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "This pointer, plus any re-share that depended on it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deletedShareIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "deletedShareIds"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You may not remove this share",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such share",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/updates": {
       "get": {
         "tags": [
