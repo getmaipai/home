@@ -1050,7 +1050,19 @@ function SuppressSourcesFallback() {
 function ArtifactCanvasPanel({ artifactId, onClose }: { artifactId: string; onClose: () => void }) {
   const query = useQuery({ queryKey: ["artifact-current", artifactId], queryFn: () => api.artifactCurrent(artifactId) });
   return (
-    <CanvasSplit>
+    // Jesse found this: CanvasSplit's own shipped default is a fixed
+    // `md:h-80` (its own upstream use is a small preview card, never a
+    // full desktop side panel), so this panel stopped 320px down with
+    // empty space below it instead of filling the row's real height
+    // (NextChatPage.tsx's own wrapping div already stretches to the
+    // row's full height via flexbox's default `align-items: stretch` -
+    // CanvasSplit itself just never grew into it). Overridden here via
+    // the component's own `className` passthrough (never editing the
+    // vendored file) - `md:h-full` specifically, so `cn()`'s
+    // `tailwind-merge` matches and replaces the shipped `md:h-80`
+    // (same variant, same property) rather than adding a conflicting
+    // rule beside it.
+    <CanvasSplit className="md:h-full">
       <CanvasSplitThread>
         <CanvasSplitMessage speaker="assistant">{query.data ? `Wrote "${query.data.title}."` : "Wrote the document."}</CanvasSplitMessage>
       </CanvasSplitThread>
