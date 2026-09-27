@@ -1,12 +1,22 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { NextAppsPage } from "@/next/pages/NextAppsPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { InstalledPackage } from "@/lib/api";
+import type { InstalledPackage, Roster } from "@/lib/api";
 
 afterEach(() => {
   cleanup();
 });
+
+function makePerson(role: string = "owner"): Roster {
+  return {
+    id: "person-abc123", display_name: "Nova", nickname: null, role: role as Roster["role"],
+    avatar_seed: "person-abc123", source: "hub", local_only: false,
+    created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z",
+    deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null,
+    hlc: "1788000000000:0:test", hasSecret: true,
+  } as Roster;
+}
 
 function makePackage(overrides: Partial<InstalledPackage> = {}): InstalledPackage {
   return {
@@ -62,7 +72,7 @@ describe("NextAppsPage", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
     try {
-      renderWithQueryClient(<NextAppsPage />);
+      renderWithQueryClient(<NextAppsPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Something broke"));
       expect(document.body.textContent).toContain("Try again");
     } finally {
@@ -76,7 +86,7 @@ describe("NextAppsPage", () => {
       makePackage({ id: "sleepy-bot", display: "Sleepy", category: "Family", kind: "companion", installed_version: "0.3.0", status: "disabled", smoke: { last_run_at: null, ok: false, message: "boom" } }),
     ]);
     try {
-      renderWithQueryClient(<NextAppsPage />);
+      renderWithQueryClient(<NextAppsPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Weather"));
       expect(document.body.textContent).toContain("Info");
       expect(document.body.textContent).toContain("Plugin");
@@ -90,10 +100,10 @@ describe("NextAppsPage", () => {
     }
   });
 
-  test("a real Tools heading and a read-only table without the demo title or Action column", async () => {
+  test("a real Tools heading and an Actions column without the demo title", async () => {
     const restore = mockPluginsFetch([makePackage()]);
     try {
-      renderWithQueryClient(<NextAppsPage />);
+      renderWithQueryClient(<NextAppsPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Weather"));
       expect(document.querySelectorAll('[data-slot="card-title"]')[0]?.textContent).toContain("Tools");
       expect(document.title).toBe("Tools · MaiPai Home");
@@ -101,7 +111,7 @@ describe("NextAppsPage", () => {
       const table = document.querySelector('[data-slot="table"]');
       expect(table).not.toBeNull();
       expect(Array.from(table!.querySelectorAll('[data-slot="table-head"]')).map((head) => head.textContent?.trim())).toEqual([
-        "Name", "Category", "Type", "Version", "Status",
+        "Name", "Category", "Type", "Version", "Status", "Actions",
       ]);
     } finally {
       restore();
@@ -111,8 +121,39 @@ describe("NextAppsPage", () => {
   test("no packages installed: the shared table's empty message, not a blank grid", async () => {
     const restore = mockPluginsFetch([]);
     try {
-      renderWithQueryClient(<NextAppsPage />);
+      renderWithQueryClient(<NextAppsPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("No data available."));
+    } finally {
+      restore();
+    }
+  });
+
+  test("Remove requires confirmation and uninstalls the correct package", async () => {
+    const restore = mockPluginsFetch([makePackage({ id: "weather" })]);
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof mock>;
+    try {
+      renderWithQueryClient(<NextAppsPage person={makePerson("owner")} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Weather"));
+      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((item) => item.textContent?.includes("Weather"))!;
+      fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "More actions" }));
+      fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Remove" }));
+      expect(document.body.textContent).toContain("Remove Weather? This uninstalls it from the hub.");
+      expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/uninstall"), expect.anything());
+      fireEvent.click(within(document.body).getByRole("button", { name: "Confirm" }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/store/installs/weather/uninstall"), expect.objectContaining({ method: "POST" })));
+    } finally {
+      restore();
+    }
+  });
+
+  test("Remove is disabled for a non-owner", async () => {
+    const restore = mockPluginsFetch([makePackage()]);
+    try {
+      renderWithQueryClient(<NextAppsPage person={makePerson("child")} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Weather"));
+      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((item) => item.textContent?.includes("Weather"))!;
+      fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "More actions" }));
+      expect(await within(document.body).findByRole("menuitem", { name: "Remove" })).toHaveAttribute("aria-disabled", "true");
     } finally {
       restore();
     }

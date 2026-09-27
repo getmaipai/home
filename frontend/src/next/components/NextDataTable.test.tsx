@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { afterEach, describe, expect, mock, test } from "bun:test";
+import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { NextDataTable } from "./NextDataTable";
 
 afterEach(cleanup);
@@ -44,5 +44,31 @@ describe("NextDataTable", () => {
     const view = render(<NextDataTable data={[]} emptyMessage="No people available." />);
     expect(view.getByText("No people available.")).toBeTruthy();
     expect(view.queryByRole("table")).toBeNull();
+  });
+
+  test("row actions add an Actions header and run non-destructive actions from the menu", async () => {
+    const onClick = mock(() => {});
+    const view = render(<NextDataTable data={[{ name: "Nova" }]} rowActions={() => [{ label: "Open", onClick }]} />);
+    expect(view.getByRole("columnheader", { name: "Actions" })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "More actions" }));
+    fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Open" }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test("destructive row actions wait for confirmation", async () => {
+    const onClick = mock(() => {});
+    const view = render(<NextDataTable data={[{ name: "Nova" }]} rowActions={() => [{ label: "Remove", destructive: true, confirmLabel: "Remove Nova?", onClick }]} />);
+    fireEvent.click(view.getByRole("button", { name: "More actions" }));
+    fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Remove" }));
+    expect(view.getByText("Remove Nova?")).toBeTruthy();
+    expect(onClick).not.toHaveBeenCalled();
+    fireEvent.click(view.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(onClick).toHaveBeenCalledTimes(1));
+  });
+
+  test("row actions omitted means no Actions column or action button", () => {
+    const view = render(<NextDataTable data={[{ name: "Nova" }]} />);
+    expect(view.queryByRole("columnheader", { name: "Actions" })).toBeNull();
+    expect(view.queryByRole("button", { name: "More actions" })).toBeNull();
   });
 });

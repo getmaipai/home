@@ -1,15 +1,19 @@
-import { useId, useMemo, useState } from "react";
+import { Fragment, useId, useMemo, useState } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
+import type { PropertyAction } from "@maipai/ui/src/blocks/property-panel/PropertyPanel";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/dashboard/components/ui/table";
+import { hitArea } from "@maipai/ui/src/utils";
 
 const ArrowDown = getIcon("arrow-down");
 const ArrowUp = getIcon("arrow-up");
 const Download = getIcon("download");
+const MoreHorizontal = getIcon("more-horizontal");
 
 function titleFor(key: string): string {
   return key.replace(/([A-Z])/g, " $1").trim().replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -20,18 +24,21 @@ function csvValue(value: unknown): string {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-/** Home's read-only table for row data that needs no row actions. */
+/** Home's shared table for row data, with optional per-row actions. */
 export function NextDataTable<T extends Record<string, unknown>>({
   data,
   emptyMessage = "No data available.",
+  rowActions,
 }: {
   data: readonly T[];
   emptyMessage?: string;
+  rowActions?: (row: T) => PropertyAction[];
 }) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sort, setSort] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(5);
+  const [confirmAction, setConfirmAction] = useState<{ row: T; action: PropertyAction } | null>(null);
   const pageSizeId = useId();
   const columns = useMemo(() => data[0] ? Object.keys(data[0]) : [], [data]);
   const filteredData = useMemo(() => {
@@ -125,6 +132,7 @@ export function NextDataTable<T extends Record<string, unknown>>({
                     </TableHead>
                   );
                 })}
+                {rowActions && <TableHead><span className="sr-only">Actions</span></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -135,10 +143,45 @@ export function NextDataTable<T extends Record<string, unknown>>({
                     {row[key] === null || row[key] === undefined ? "-" : String(row[key])}
                   </TableCell>
                 ))}
+                {rowActions && <TableCell className="w-10 p-1 text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger aria-label="More actions" className={`inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring ${hitArea(3)}`}>
+                      <MoreHorizontal aria-hidden="true" className="size-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {rowActions(row).map((action, actionIndex) => (
+                        <Fragment key={action.label}>
+                          {actionIndex > 0 && action.destructive && <DropdownMenuSeparator />}
+                          <DropdownMenuItem
+                            variant={action.destructive ? "destructive" : "default"}
+                            disabled={action.disabled}
+                            onClick={(event) => {
+                              if (action.destructive) {
+                                event.preventDefault();
+                                setConfirmAction({ row, action });
+                              } else {
+                                void action.onClick();
+                              }
+                            }}
+                          >
+                            {action.label}
+                          </DropdownMenuItem>
+                        </Fragment>
+                      ))}
+                      {confirmAction?.row === row && <div className="max-w-56 border-t bg-popover p-2 text-xs">
+                        <p>{confirmAction.action.confirmLabel ?? `${confirmAction.action.label} this item?`}</p>
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button type="button" className="text-muted-foreground" onClick={() => setConfirmAction(null)}>Cancel</button>
+                          <button type="button" className="font-medium text-destructive" onClick={async () => { await confirmAction.action.onClick(); setConfirmAction(null); }}>Confirm</button>
+                        </div>
+                      </div>}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>}
               </TableRow>
             )) : (
               <TableRow>
-                <TableCell colSpan={Math.max(columns.length, 1)} className="py-6 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={Math.max(columns.length + (rowActions ? 1 : 0), 1)} className="py-6 text-center text-sm text-muted-foreground">
                   No results found.
                 </TableCell>
               </TableRow>

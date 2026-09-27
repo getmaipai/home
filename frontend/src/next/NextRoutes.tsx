@@ -162,7 +162,7 @@ function NextRoutesWithIncognito({ person }: { person: Roster }) {
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
-            <Route path="tools" element={<NextAppsPage />} />
+            <Route path="tools" element={<NextAppsPage person={person} />} />
             <Route path="people" element={<NextPeoplePage person={person} />} />
             <Route path="settings" element={<NextSettingsPage person={person} />} />
             <Route path="storage" element={<NextStoragePage person={person} />} />
