@@ -148,6 +148,9 @@ export interface RoleInfo {
     reason: string | null;
     stale: boolean;
   };
+  /** Models the Stack can select for a chat request. Present on the chat
+   * role response; absent when Home itself is the source of role state. */
+  models?: Array<{ id: string; name: string }>;
 }
 
 export interface RolesListResponse {

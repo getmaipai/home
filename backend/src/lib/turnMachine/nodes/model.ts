@@ -259,7 +259,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
     if (signal.aborted) controller.abort(signal.reason);
     else signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
   }
-  const started = await startCompleteStream("chat", messages, { tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens }, controller?.signal ?? signal);
+  const started = await startCompleteStream("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens }, controller?.signal ?? signal);
   if (!started.ok) {
     // GENFAIL-01 (dev.md "generation_failed is never blind again"): a
     // failed attempt used to leave no generation record at all (the
@@ -480,11 +480,11 @@ type QueryWriterResult = { ok: true; expression: string | null } | { ok: false; 
  * is untested combination this codebase has no other caller of, and
  * this whole call only ever runs on an already-rare required-call
  * miss to begin with. */
-async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal): Promise<QueryWriterResult> {
+async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal, modelId?: string): Promise<QueryWriterResult> {
   const started = await startCompleteStream(
     "chat",
     [...messages, { role: "user", content: QUERY_WRITER_INSTRUCTION }],
-    { response_format: { type: "json_schema", json_schema: QUERY_WRITER_SCHEMA }, thinking: false, max_tokens: QUERY_WRITER_MAX_TOKENS },
+    { model: modelId, response_format: { type: "json_schema", json_schema: QUERY_WRITER_SCHEMA }, thinking: false, max_tokens: QUERY_WRITER_MAX_TOKENS },
     signal,
   );
   if (!started.ok) return { ok: false, code: started.code, message: boundedGenerationError(started.error) };
@@ -527,8 +527,8 @@ async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal): Prom
  * false`) carries its own code/message into the builder row exactly
  * like every other generation failure in this file does - never
  * silently folded into an ordinary required_miss. */
-async function recoveredMissingCall(messages: LlmMessage[], utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, signal: AbortSignal): Promise<{ outcome: NodeOutcome; output: ModelOutput }> {
-  const written = await runQueryWriter(messages, signal);
+async function recoveredMissingCall(state: TurnState, messages: LlmMessage[], utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, signal: AbortSignal): Promise<{ outcome: NodeOutcome; output: ModelOutput }> {
+  const written = await runQueryWriter(messages, signal, state.modelId);
   if (!written.ok) return builderFallbackOutput(utterance, otherCalls, reasoning, written.code, written.message);
   if (written.expression === null) return builderFallbackOutput(utterance, otherCalls, reasoning);
   const queryWriterCall: ToolCall = { tool: "websearch", args: { expression: written.expression }, id: "query-writer" };
@@ -821,7 +821,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // call the model made this round still runs.
     gate?.reset();
     const otherCalls = (attempt.toolCalls ?? []).filter((c) => c.tool !== "websearch");
-    return recoveredMissingCall(messages, input.utterance, otherCalls, reasoning, signal);
+    return recoveredMissingCall(state, messages, input.utterance, otherCalls, reasoning, signal);
   }
 
   if (attempt.toolCalls && attempt.toolCalls.length > 0) {

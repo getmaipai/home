@@ -260,6 +260,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     const turnsLoad = new Promise<void>((resolve) => { finishTurnsLoad = resolve; });
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
       if (url.includes("/api/conversations/conv-archive123/resume")) return Promise.resolve(Response.json(conversation));
       if (url.includes("/api/conversations/conv-archive456/resume")) return Promise.resolve(Response.json(otherConversation));
       if (url.includes("/turns")) {
@@ -280,10 +281,10 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       );
       await view.findByText("Archive me");
       await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive123"));
-      const thinkingTrigger = view.container.querySelector('[data-slot="composer-model-trigger"]') as HTMLButtonElement;
+      const thinkingTrigger = view.container.querySelector('[data-slot="model-selector-trigger"]') as HTMLButtonElement;
       fireEvent.click(thinkingTrigger);
-      const thinkingMenu = thinkingTrigger.parentElement!.querySelector('[data-slot="composer-menu"]')!;
-      fireEvent.click(within(thinkingMenu as HTMLElement).getAllByRole("button")[1]!);
+      await view.findByRole("listbox");
+      fireEvent.click(await view.findByRole("radio", { name: "Thinking" }));
       expect(thinkingTrigger).toHaveTextContent("Thinking");
 
       const archiveRow = view.getByText("Archive me").closest('[data-slot="aui_thread-list-item"]')!;
@@ -796,7 +797,13 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
+      await waitFor(() => expect(view.queryByLabelText("Message input")).not.toBeNull());
+      await act(async () => { window.dispatchEvent(new Event("resize")); });
       restore = await openArtifact(view);
+      // Complete the thread-list's fire-and-forget refresh before the
+      // helper's fetch stub is restored; under the full gate it can run
+      // a tick after the artifact card appears.
+      await waitFor(() => expect((globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls.some((call: unknown[]) => String(call[0]).includes("/api/conversations"))).toBe(true));
       const body = await view.findByText("Every Friday night.");
       expect(body).toBeVisible();
       // No Sheet ever mounted at this width - not just CSS-hidden
@@ -2086,7 +2093,27 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
   });
 });
 
-describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () => {
+describe("NextChatPage (MODEL-SEL-01: session model picker)", () => {
+  const CHAT_ROLE = { id: "chat", label: "chat", wire: "chat" as const, residency: "resident" as const, endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready" as const, since: "2026-09-27T00:00:00.000Z" }, reason: null, model: { id: "llama-default", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true }, models: [{ id: "llama-default", name: "Llama Default" }, { id: "qwen-fast", name: "Qwen Fast" }], check: { state: "not checked" as const, at: null, reason: null, stale: false } };
+
+  function stubModelPickerFetch(configured: boolean, modelCount: number): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    const models = CHAT_ROLE.models.slice(0, modelCount);
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url === "/api/conversations" && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-modelpick1", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured, roles: configured ? [{ ...CHAT_ROLE, models }] : [], engines: [], budget: null }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(ndjsonStream([
+        { type: "delta", text: "Chosen." },
+        { type: "done", value: { turn_id: "turn-modelpick1", reply: { text: "Chosen." }, source: "model", safety: SAFETY } },
+      ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    return () => { globalThis.fetch = original; };
+  }
+
   async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
     fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
     const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
@@ -2094,21 +2121,58 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     fireEvent.click(send);
   }
 
-  // `ComposerMenu`'s items are always mounted (the kit's own `open`
-  // toggle is a CSS class, not a conditional render) - a plain
-  // getByRole/getByText query would find the trigger AND the "Instant"
-  // menu item both, so every query here goes through data-slot instead.
-  // SHELL-02 slice 6 added a second `ComposerMenu` beside this one (the
-  // composer's "+" menu) sharing the identical `data-slot="composer-menu"`
-  // (the kit's own attribute, not distinguishable by name) - `menu()`
-  // scopes to the trigger's own wrapper instead of the whole document,
-  // same fix the new menu's own tests use.
-  const trigger = () => document.querySelector('[data-slot="composer-model-trigger"]') as HTMLButtonElement;
-  const menu = () => trigger().parentElement!.querySelector('[data-slot="composer-menu"]') as HTMLElement;
-  const menuItems = () => within(menu()).getAllByRole("button");
+  test("hides without Stack configuration and with fewer than two selectable models", async () => {
+    for (const [configured, count] of [[false, 0], [true, 1]] as const) {
+      const restore = stubModelPickerFetch(configured, count);
+      try {
+        const view = renderPage(<MemoryRouter initialEntries={["/next/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
+        await view.findByLabelText("Message input");
+        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+        expect(view.queryByLabelText("Choose model")).toBeNull();
+      } finally { restore(); cleanup(); }
+    }
+  });
 
-  test("the trigger defaults to Instant, beside a two-entry Instant/Thinking menu - no separate model picker", async () => {
-    const restore = stubFetch();
+  test("renders the shipped picker and sends its explicit choice on the turn", async () => {
+    const restore = stubModelPickerFetch(true, 2);
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/next/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
+      const trigger = await view.findByRole("combobox", { name: "Choose model" });
+      expect(trigger.textContent).toContain("Llama Default");
+      fireEvent.click(trigger);
+      fireEvent.click(await view.findByText("Qwen Fast"));
+      await sendMessage(view, "use the faster model");
+      await view.findByText("Chosen.");
+      expect(turnRequestBodies()[0]!.model).toBe("qwen-fast");
+    } finally { restore(); }
+  });
+});
+
+describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode picker)", () => {
+  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+  }
+
+  const trigger = () => document.querySelector('[data-slot="model-selector-trigger"]') as HTMLButtonElement;
+  const menu = () => document.querySelector('[data-slot="model-selector-content"]') as HTMLElement;
+  const menuItems = () => within(menu()).getAllByRole("radio");
+
+  function fetchWithPicker(): () => void {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    return () => { globalThis.fetch = original; };
+  }
+
+  test("the trigger defaults to the active model and offers Instant/Thinking effort choices", async () => {
+    const restore = fetchWithPicker();
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -2116,8 +2180,9 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      expect(trigger()).toHaveTextContent("Instant");
-      const items = menuItems();
+      expect(trigger()).toHaveTextContent("Family");
+      fireEvent.click(trigger());
+      const items = within(menu()).getAllByRole("radio");
       expect(items).toHaveLength(2);
       expect(items[0]).toHaveTextContent("Instant");
       expect(items[1]).toHaveTextContent("Thinking");
@@ -2127,7 +2192,7 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
   });
 
   test("clicking the trigger opens the menu; picking Thinking updates the trigger and closes it", async () => {
-    const restore = stubFetch();
+    const restore = fetchWithPicker();
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -2135,23 +2200,11 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      expect(menu()).not.toHaveAttribute("data-open");
-      // A review caught this: `ComposerMenu`'s own `open` only ever
-      // toggles opacity/scale, never unmounts its children - closed, the
-      // two menu buttons stayed reachable by Tab and in the
-      // accessibility tree, ahead of Send. `inert` closes that gap
-      // (happy-dom's own role queries don't actually enforce `inert`'s
-      // effect - `menuItems()` above still finds them regardless - so
-      // this checks the attribute directly rather than relying on a
-      // query the test environment doesn't model faithfully).
-      expect(menu()).toHaveAttribute("inert");
+      expect(menu()).toBeNull();
       fireEvent.click(trigger());
-      expect(menu()).toHaveAttribute("data-open");
-      expect(menu()).not.toHaveAttribute("inert");
+      await waitFor(() => expect(menu()).toBeTruthy());
       fireEvent.click(menuItems()[1]!);
       expect(trigger()).toHaveTextContent("Thinking");
-      expect(menu()).not.toHaveAttribute("data-open");
-      expect(menu()).toHaveAttribute("inert");
     } finally {
       restore();
     }
@@ -2179,7 +2232,10 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       const method = init?.method ?? "GET";
-      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "tts", state: { state: "ready" } }], engines: [], budget: null }));
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [
+        { id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } },
+        { id: "tts", state: { state: "ready" } },
+      ], engines: [], budget: null }));
       if (url.endsWith("/api/conversations") && method === "GET") {
         return Promise.resolve(Response.json([{ ...saved, last_turn_at: null }]));
       }
@@ -2213,7 +2269,7 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       const first = page();
       await first.findByLabelText("Message input");
       await waitFor(() => expect(first.getByRole("button", { name: "Conversation actions" })).toBeTruthy());
-      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
       fireEvent.click(trigger());
       fireEvent.click(menuItems()[1]!);
       await waitFor(() => expect(saved.settings).toEqual({ thinking: true }));
@@ -2320,8 +2376,8 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     }
   });
 
-  test("clicking outside the control closes the menu without changing the mode", async () => {
-    const restore = stubFetch();
+  test("clicking outside the control closes the picker without changing the mode", async () => {
+    const restore = fetchWithPicker();
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -2330,17 +2386,19 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       );
       await view.findByLabelText("Message input");
       fireEvent.click(trigger());
-      expect(menu()).toHaveAttribute("data-open");
-      fireEvent.pointerDown(document.body);
-      expect(menu()).not.toHaveAttribute("data-open");
-      expect(trigger()).toHaveTextContent("Instant");
+      expect(menu()).toBeTruthy();
+      const input = await view.findByLabelText("Message input");
+      fireEvent.pointerDown(input, { bubbles: true, button: 0, ctrlKey: false, pointerId: 1, pointerType: "mouse" });
+      fireEvent.click(input, { bubbles: true, button: 0 });
+      await waitFor(() => expect(trigger()).toHaveAttribute("aria-expanded", "false"));
+      expect(trigger()).toHaveTextContent("Family");
     } finally {
       restore();
     }
   });
 
-  test("Escape closes the menu without changing the mode", async () => {
-    const restore = stubFetch();
+  test("Escape closes the picker without changing the mode", async () => {
+    const restore = fetchWithPicker();
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -2349,49 +2407,18 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       );
       await view.findByLabelText("Message input");
       fireEvent.click(trigger());
-      expect(menu()).toHaveAttribute("data-open");
+      expect(menu()).toBeTruthy();
       fireEvent.keyDown(document, { key: "Escape" });
-      expect(menu()).not.toHaveAttribute("data-open");
-      expect(trigger()).toHaveTextContent("Instant");
+      expect(menu()).toBeNull();
+      expect(trigger()).toHaveTextContent("Family");
     } finally {
       restore();
     }
   });
 
-  // Found live, 2026-09-22 (Jesse): choosing Thinking reverted to
-  // Instant right after sending - a defect against RESP-04's own
-  // design ("the choice... is remembered per person with the
-  // conversation"). The old per-turn consumeThinking path was copied
-  // from ChatPage.tsx's own per-message "Think longer" toggle;
-  // this control is a mode, the same `bareMode` lifecycle already has
-  // in this file - it survives a send, and resets only on a real
-  // conversation change. A fresh stream per call (`stubMultiTurnFetch`
-  // below): a single, once-consumed `ReadableStream` can't answer a
-  // second `/api/turn/stream` post.
-  function stubMultiTurnFetch(): () => void {
-    const original = globalThis.fetch;
-    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
-    let turnCount = 0;
-    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-thinking456", status: "open", surface: "chat" }));
-      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes("/api/turn/stream")) {
-        turnCount++;
-        const text = `Reply ${turnCount}.`;
-        const body = ndjsonStream([
-          { type: "delta", text },
-          { type: "done", value: { turn_id: `turn-thinking${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
-        ]);
-        return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
-      }
-      return Promise.resolve(new Response("{}", { status: 200 }));
-    }) as unknown as typeof fetch;
-    return () => {
-      globalThis.fetch = original;
-    };
-  }
-
+  // The mode is stored per conversation; this fixture checks that it
+  // survives sends and that a new conversation loads its own default.
+  // Each turn gets a fresh stream so both requests can be inspected.
   function turnRequestBodies(): Array<Record<string, unknown>> {
     return (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
       .filter((c: unknown[]) => (typeof c[0] === "string" ? c[0] : (c[0] as URL | Request).toString()).includes("/api/turn/stream"))
@@ -2468,8 +2495,19 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     }
   });
 
-  test("the mode survives a send within the same conversation, and resets to Instant only when the conversation changes", async () => {
-    const restore = stubMultiTurnFetch();
+  test("the mode survives a send within the same conversation, and resets on conversation change", async () => {
+    const originalFetch = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let turnCount = 0;
+    let conversationCount = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
+      if (url.includes("/api/conversations") && init?.method === "POST") { conversationCount++; return Promise.resolve(Response.json({ id: `conv-model-${conversationCount}`, status: "open", surface: "chat" })); }
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/turn/stream")) { turnCount++; const text = `Reply ${turnCount}.`; return Promise.resolve(new Response(ndjsonStream([{ type: "delta", text }, { type: "done", value: { turn_id: `turn-model-${turnCount}`, reply: { text }, source: "model", safety: SAFETY } }]), { status: 200, headers: { "content-type": "application/x-ndjson" } })); }
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -2494,11 +2532,11 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       expect(bodies[0]!.thinking).toBe(true);
       expect(bodies[1]!.thinking).toBe(true);
 
-      // A new conversation starts on Instant.
+      // A new conversation keeps the active engine default.
       fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New Thread" }));
-      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
     } finally {
-      restore();
+      globalThis.fetch = originalFetch;
     }
   });
 
@@ -2507,7 +2545,7 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
   // braces alongside the backend's own REASONING-03 gate
   // (routes/turn.ts: thinking forced off for a minor regardless of what
   // the request claims).
-  test("a child's chat renders no thinking control, and its turn request has no thinking field", async () => {
+  test("a child's chat renders no model/mode picker, and its turn request has neither field", async () => {
     const restore = stubMultiTurnFetch();
     try {
       const view = renderPage(
@@ -2525,13 +2563,14 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       const bodies = turnRequestBodies();
       expect(bodies).toHaveLength(1);
       expect("thinking" in bodies[0]!).toBe(false);
+      expect("model" in bodies[0]!).toBe(false);
     } finally {
       restore();
     }
   });
 
   test("an adult's chat renders it", async () => {
-    const restore = stubFetch();
+    const restore = fetchWithPicker();
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
@@ -2726,11 +2765,8 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
   }
 
   const addButton = () => document.querySelector('[aria-label="Add"]') as HTMLButtonElement;
-  // Two `ComposerMenu` instances share the row (mine and
-  // `ComposerThinkingControl`'s own) - both carry the identical
-  // `data-slot="composer-menu"` (the kit's own attribute, not
-  // distinguishable by name), so the query is scoped to the trigger's
-  // own `DismissableLayer.Root` wrapper rather than the document.
+  // The add menu remains scoped to its own trigger wrapper; the separate
+  // model selector uses the shipped ModelSelector kit.
   const addMenu = () => addButton().parentElement!.querySelector('[data-slot="composer-menu"]') as HTMLElement;
 
   test("lists the Apps group from a mocked plugins list, icon and description both present", async () => {

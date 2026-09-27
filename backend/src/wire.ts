@@ -219,6 +219,9 @@ export interface TurnValue {
    * time a TurnValue exists, never optional. */
   conversation_id: string;
   turn_id: string;
+  /** A per-request model choice the server could not honor and replaced
+   * with the role's current model. Omitted when no override was sent. */
+  model_status?: { requested: string; selected: string | null; fallback: boolean; message?: string };
   /** CHAT-STREAM: the persisted branch relationship, additive on the
    * completion response. Ephemeral turns may omit these fields because
    * they do not create a conversation row. */
@@ -730,6 +733,8 @@ export interface StackRoleInfo {
   reason: string | null;
   model: { id: string; sizeBytes: number | null; measuredFootprintBytes: number | null; measuredContextLength: number | null; estimated: boolean } | null;
   check: { state: "not checked" | "passed" | "failed" | "skipped"; at: string | null; reason: string | null; stale: boolean };
+  /** The chat role's verified models compatible with the installed engine. */
+  models?: Array<{ id: string; name: string }>;
 }
 
 export interface StackEngineInfo {

@@ -18,6 +18,7 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId } from "@/lib/conversationHistory";
+import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 
 // U6a (docs/plans/simple-turn-pipeline-2026-09-22.md; the coordinator's
 // ruling, 2026-09-23): one boundary, no second one. This is the only
@@ -33,6 +34,28 @@ import { turnOwnerId } from "@/lib/conversationHistory";
 // household turn).
 function newPathOn(): boolean {
   return getHouseholdSettingValue("turn.pipeline.next") === true;
+}
+
+type ModelSelectionStatus = { requested: string; selected: string | null; fallback: boolean; message?: string };
+
+async function resolveTurnModel(requested: string | undefined, surface: Surface, minor: boolean, bare: boolean): Promise<{ model?: string; status?: ModelSelectionStatus }> {
+  if (requested === undefined) return {};
+  const fallback = (selected: string | null, message: string): { status: ModelSelectionStatus } => ({ status: { requested, selected, fallback: true, message } });
+  if (surface !== "chat" || minor || bare) return fallback(null, "Model selection is unavailable for this turn; the active chat model was used.");
+  if (!isStackConfigured()) return fallback(null, "No Stack chat models are available; the active chat model was used.");
+  try {
+    const { roles } = await getStackClient().roles();
+    const chat = roles.find((role) => role.id === "chat");
+    const model = chat?.models?.find((option) => option.id === requested);
+    if (model) return { model: model.id, status: { requested, selected: model.id, fallback: false } };
+    const defaultModel = chat?.model?.id;
+    return {
+      ...(defaultModel ? { model: defaultModel } : {}),
+      status: { requested, selected: defaultModel ?? null, fallback: true, message: "That model is unknown or unavailable; the chat role's default model was used." },
+    };
+  } catch {
+    return fallback(null, "The Stack model list is unavailable; the active chat model was used.");
+  }
 }
 
 export const turnRoutes = apiRouter();
@@ -59,6 +82,7 @@ interface ResumeSession {
   // session-construction time, since streamTurnEvents() itself only ever
   // sees `ownerId`, a bare string.
   dropReasoning: boolean;
+  modelStatus?: ModelSelectionStatus;
   conversationId: string;
   turnId: string;
   controller: AbortController;
@@ -212,6 +236,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   const body = (await c.req.json().catch(() => ({}))) as {
     surface?: string;
     text?: string;
+    model?: string;
     thinking?: boolean;
     conversation_id?: string;
     supersedes?: string;
@@ -247,15 +272,17 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   // anyway.
   const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
   const dropReasoning = isMinor || surface !== "chat";
+  const modelSelection = await resolveTurnModel(body.model, surface, isMinor, false);
   const result: TurnOpResult = newPathOn()
     ? await (async () => {
         // runTurnNext() always resolves "immediate" (its own header note);
         // the explicit kind check is TypeScript's, not a real branch.
-        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, ask_answer: parsedEvidence.data.ask_answer });
+        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer });
         return next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the new path returned a stream result unexpectedly" } : next;
       })()
     : await runTurn(actor, surface, body.text ?? "", {
         thinking: dropReasoning ? false : body.thinking,
+        model: modelSelection.model,
         conversationId: body.conversation_id,
         supersedes: body.supersedes,
         temporary: body.temporary,
@@ -268,7 +295,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   // (unlike /stream's own hand-built events), so a minor's reasoning
   // field is stripped here rather than at a shared boundary - the same
   // dropReasoning gate the streaming route's own version uses.
-  return c.json(dropReasoning && result.value.reasoning !== undefined ? { ...result.value, reasoning: undefined } : result.value);
+  return c.json({ ...result.value, ...(dropReasoning && result.value.reasoning !== undefined ? { reasoning: undefined } : {}), ...(modelSelection.status ? { model_status: modelSelection.status } : {}) });
 });
 
 const encoder = new TextEncoder();
@@ -379,7 +406,7 @@ function streamResponse(session: ResumeSession, resumeFrom: number | null): Resp
 function startResumeSession(session: ResumeSession): void {
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning)) {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus)) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
         // a resuming client's own replay filter (shouldDeliver()) needs a
         // real per-event sequence for both, or a `reasoning` event sitting
@@ -449,6 +476,7 @@ export async function* streamTurnEvents(
   // OUTPUT boundary, after the combined text has gone through the
   // identical pass every turn gets.
   dropReasoning = false,
+  modelStatus?: ModelSelectionStatus,
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   // REASONING-01: splits each chunk of the pipeline's own combined text
@@ -565,7 +593,7 @@ export async function* streamTurnEvents(
     // REASONING-02: TurnValue.reasoning is dropped from the `done` event
     // for a minor's turn, the same gate `spanEvents()` already applies to
     // the live `reasoning` stream event above.
-    yield { type: "done", value: dropReasoning && value.reasoning !== undefined ? { ...value, reasoning: undefined } : value };
+    yield { type: "done", value: { ...value, ...(dropReasoning && value.reasoning !== undefined ? { reasoning: undefined } : {}), ...(modelStatus ? { model_status: modelStatus } : {}) } };
   } catch (err) {
     // This catch had no server-side log at all (a live incident,
     // 2026-09-07: the real reason only ever left the process as
@@ -652,6 +680,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     surface?: string;
     text?: string;
+    model?: string;
     thinking?: boolean;
     conversation_id?: string;
     turn_id?: string;
@@ -744,6 +773,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   // below anyway.
   const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
   const dropReasoning = isMinor || surface !== "chat";
+  const modelSelection = await resolveTurnModel(body.model, surface, isMinor, body.bare === true);
   let result: TurnStreamResult;
   try {
     // A code review caught this: `bare` must be checked BEFORE
@@ -761,9 +791,10 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
         // route needs the "stream" kind TurnStreamResult (a live status/
         // tokens pair the machine hasn't finished yet), never the
         // "immediate" one the blocking POST / route above uses.
-        ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, signal: abortController.signal, ask_answer: parsedEvidence.data.ask_answer })
+        ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, signal: abortController.signal, ask_answer: parsedEvidence.data.ask_answer })
         : await runTurnStream(actor, surface, body.text ?? "", {
             thinking: dropReasoning ? false : body.thinking,
+            model: modelSelection.model,
             conversationId: body.conversation_id,
             supersedes: body.supersedes,
             continuation: body.continuation_text === undefined ? undefined : { fromTurnId: body.continuation_of, assistantText: body.continuation_text },
@@ -808,7 +839,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     // `result.value.reasoning` is already undefined for a minor by
     // construction; stripped here too anyway, the same belt-and-braces
     // every other reasoning site in this route already keeps.
-    const value = dropReasoning && result.value.reasoning !== undefined ? { ...result.value, reasoning: undefined } : result.value;
+    const value = { ...result.value, ...(dropReasoning && result.value.reasoning !== undefined ? { reasoning: undefined } : {}), ...(modelSelection.status ? { model_status: modelSelection.status } : {}) };
     // TOOL-EVENTS-01(b): the new path's own tool_call/tool_result/
     // tool_error lines (chatModelAdapter.ts's toolTimelinePart, its
     // frontend consumer half, landed first) - present only when this
@@ -832,6 +863,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     // decision on this same turn (host.ts's chat-models gate, turnEngine.ts's
     // withholdSensitive/mayDefer, composer.ts's child-only projection).
     dropReasoning,
+    modelStatus: modelSelection.status,
     conversationId: result.conversationId,
     turnId: result.turnId,
     controller: abortController,

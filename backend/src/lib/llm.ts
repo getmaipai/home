@@ -80,6 +80,9 @@ export interface LlmMessage {
 }
 
 export interface LlmCompleteOptions {
+  /** An installed model id validated from the Stack's chat role. Omitted
+   * keeps the existing role-based selection. */
+  model?: string;
   temperature?: number;
   max_tokens?: number;
   /** Off by default (Jesse, 2026-09-04: "thinking mode off by default
@@ -404,7 +407,7 @@ async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: Llm
   const { offering, body } = chatRequestBody(messages, opts);
   try {
     const client = getStackClient();
-    const result = await client.chat({ model: role, ...body });
+    const result = await client.chat({ model: opts.model ?? role, ...body });
     if ("stream" in result) {
       // complete() never asks for stream: true; a Stack that streamed
       // anyway is a contract break worth a loud, distinct failure rather
@@ -463,7 +466,7 @@ export async function complete(
     // always win, explicitly. Both fixes live in that one shared
     // builder now, not duplicated between this call and the Stack's.
     const { offering, body } = chatRequestBody(messages, opts);
-    const response = await client.chatComplete({ model: "chat", ...body });
+    const response = await client.chatComplete({ model: opts.model ?? "chat", ...body });
     const choice = response.choices[0];
     if (!choice) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
@@ -601,7 +604,7 @@ async function startCompleteStreamViaStack(
   let headers: Headers;
   try {
     const client = getStackClient();
-    const result = await client.chat({ model: role, ...body, stream: true }, { signal });
+    const result = await client.chat({ model: opts.model ?? role, ...body, stream: true }, { signal });
     if (!("stream" in result)) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: the Stack answered a streaming request without a stream" };
     }
@@ -658,7 +661,7 @@ export async function startCompleteStream(
   // transform an individual delta the way those two do.
   async function* tokens(): AsyncGenerator<string, ToolCall[] | undefined, void> {
     try {
-      const wireToolCalls = yield* client!.chatCompleteStream({ model: "chat", ...body }, signal, stats);
+      const wireToolCalls = yield* client!.chatCompleteStream({ model: opts.model ?? "chat", ...body }, signal, stats);
       return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
     } catch (err) {
       // A request the caller itself cancelled (the person closed the tab

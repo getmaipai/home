@@ -60,6 +60,7 @@ export interface RunTurnNextOpts {
   // (thinking_budget_tokens, 0 on every real budget); true substitutes
   // thinking_budget_tokens_toggled for this turn only.
   thinking?: boolean;
+  model?: string;
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
@@ -267,7 +268,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // already trusts) - the minor gate is still enforced independently,
   // belt and braces, by model.ts's own minorThinkingOff regardless of
   // what this resolves to.
-  const resolvedBudget = resolveTurnBudget();
+  const resolvedBudget = resolveTurnBudget(opts.model);
   const budget: TurnBudget = opts.thinking === true ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
 
   const state: TurnState = {
@@ -276,6 +277,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     actor,
     surface,
     utterance: text,
+    modelId: opts.model,
     signal,
     budget,
     persona,

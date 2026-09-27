@@ -54,6 +54,7 @@ const RoleInfoSchema = z.object({
     reason: z.string().nullable(),
     stale: z.boolean(),
   }),
+  models: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
 });
 
 const EngineInfoSchema = z.object({

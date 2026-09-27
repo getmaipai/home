@@ -66,8 +66,11 @@ export interface ChatModelAdapterDeps {
   getThinking?(): boolean | undefined;
   // Retired ChatPage's one-message "Think longer" action.
   consumeThinking?(): boolean | undefined;
-  // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - bare
-  // mode is meant to stay on across every send
+  /** Session-local model selected in /next/chat; read once so a reconnect
+   * retries the same model even if the composer changes meanwhile. */
+  getModel?(): string | undefined;
+  // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - unlike
+  // `consumeThinking()`, bare mode is meant to stay on across every send
   // in the conversation until the admin turns it off themselves
   // (NextChatPage.tsx's own ephemeral, session-local switch). Undefined
   // for any surface that never offers it.
@@ -368,6 +371,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       deps.onReplyState?.("waiting");
       try {
         let conversationId = await deps.getConversationId?.();
+        const selectedModel = deps.getModel?.();
         abortSignal.throwIfAborted();
         while (!sawTerminalEvent) {
           const bare = deps.isBareMode?.() ?? false;
@@ -379,6 +383,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           const thinking = deps.getThinking ? deps.getThinking() : deps.consumeThinking?.();
           const response = await api.streamTurn(text ?? "Please read the attached document.", abortSignal, {
             thinking: reconnectAttempts === 0 && !bare ? thinking : undefined,
+            model: !bare ? selectedModel : undefined,
             // `undefined`, not `false`, when a surface has no bare-mode
             // concept at all (ChatPage.tsx's own adapter never sets
             // isBareMode) - `false` would still ride the request body

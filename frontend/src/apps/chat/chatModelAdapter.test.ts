@@ -60,12 +60,13 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   };
 }
 
-async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, onCrisisResources: (text: string) => void = () => {}): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
+async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, onCrisisResources: (text: string) => void = () => {}, getModel?: () => string | undefined): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
   const adapter = createChatModelAdapter({
     consumeThinking: () => false,
     consumeSupersedes: () => undefined,
     onCrisisResources,
     turnSchedulerRef: { current: null },
+    getModel,
   });
   const options = { messages, runConfig: {}, abortSignal, context: {}, unstable_getMessage: () => messages[messages.length - 1]! } as unknown as ChatModelRunOptions;
   const yields: ChatModelRunResult[] = [];
@@ -207,6 +208,19 @@ describe("document attachment content", () => {
 });
 
 describe("createChatModelAdapter streaming", () => {
+  test("sends the selected model on each turn request", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "Selected." },
+      { type: "done", value: { reply: { text: "Selected." }, source: "model", safety: SAFETY } },
+    ]));
+    try {
+      await collect([fakeUserMessage("hi there")], new AbortController().signal, () => {}, () => "llama-3.1-8b");
+      expect(env.turnBodies[0]).toMatchObject({ model: "llama-3.1-8b" });
+    } finally {
+      env.restore();
+    }
+  });
+
   test("a sent message's reply text streams in and each sentence is spoken automatically", async () => {
     const env = stubEnvironment(
       ndjsonStream([

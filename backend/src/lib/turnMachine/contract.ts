@@ -150,6 +150,7 @@ export interface TurnState {
   actor: PersonRow;
   surface: Surface;
   utterance: string;
+  modelId?: string;
   signal: TurnSignal;
   budget: TurnBudget;
   /** U4b: resolved once in `turnNext.ts` (the same call already feeding

@@ -931,7 +931,7 @@ export const api = {
   streamTurn: (
     text: string,
     signal?: AbortSignal,
-    opts: { thinking?: boolean; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean; spoken?: boolean; askAnswer?: { turnId: string; approved: boolean }; documentAttachments?: { name: string; mediaType: string; data: string }[] } = {},
+    opts: { thinking?: boolean; model?: string; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean; spoken?: boolean; askAnswer?: { turnId: string; approved: boolean }; documentAttachments?: { name: string; mediaType: string; data: string }[] } = {},
   ) =>
     rawStreamPost(
       "/api/turn/stream",
@@ -952,7 +952,7 @@ export const api = {
       // (routes/turn.ts's own `askAnswer` zod schema), matched against
       // the conversation's live pending ask by `turn_id`
       // (turnMachine/turnNext.ts's `resumesAsk()`).
-      { surface: "chat", text, thinking: opts.thinking, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom, bare: opts.bare, package_scope: opts.packageScope, temporary: opts.temporary, spoken: opts.spoken, ask_answer: opts.askAnswer ? { turn_id: opts.askAnswer.turnId, approved: opts.askAnswer.approved } : undefined, document_attachments: opts.documentAttachments?.map(({ name, mediaType, data }) => ({ name, media_type: mediaType, data })) },
+      { surface: "chat", text, thinking: opts.thinking, model: opts.model, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom, bare: opts.bare, package_scope: opts.packageScope, temporary: opts.temporary, spoken: opts.spoken, ask_answer: opts.askAnswer ? { turn_id: opts.askAnswer.turnId, approved: opts.askAnswer.approved } : undefined, document_attachments: opts.documentAttachments?.map(({ name, mediaType, data }) => ({ name, media_type: mediaType, data })) },
       0,
       undefined,
       signal,

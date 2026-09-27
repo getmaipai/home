@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type MutableRefObject, type PointerEvent, type PropsWithChildren, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { DismissableLayer } from "radix-ui/internal";
 import { toast } from "sonner";
 import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolApprovalOption, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
@@ -25,7 +24,7 @@ import { JobProgress, type JobStage } from "@maipai/ui/src/elements/job-progress
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
-import { ComposerMenu, ComposerModelItem, ComposerModelTrigger } from "@maipai/ui/src/elements/composer";
+import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorSearch, ModelSelectorList, ModelSelectorEffort, type ModelOption } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -197,6 +196,12 @@ const ThinkingModeContext = createContext<{
   setMode: (mode: "instant" | "thinking") => void;
 }>({ mode: "instant", setMode: () => {} });
 
+const ModelPickerContext = createContext<{
+  models: readonly ModelOption[];
+  value: string | undefined;
+  setValue: (model: string) => void;
+}>({ models: [], value: undefined, setValue: () => {} });
+
 /** ADMIN-COMPARE-01 (b): the compare-with-bare-model switch, a
  * conversation-wide sibling to feature (a)'s one-message
  * `CompareOpenContext` above - same menu, same concept family
@@ -209,60 +214,29 @@ const BareModeContext = createContext<{ on: boolean; toggle: () => void }>({ on:
  * slot, which uses it only to show the matching temporary-chat heading. */
 const TemporaryChatContext = createContext<{ on: boolean }>({ on: false });
 
-const THINKING_MODE_LABEL: Record<"instant" | "thinking", string> = { instant: "Instant", thinking: "Thinking" };
-const THINKING_MODE_OPTIONS: readonly { key: "instant" | "thinking" }[] = [{ key: "instant" }, { key: "thinking" }];
+const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinking", name: "Thinking" }] as const;
 
-/** RESP-04 (f): folds "Instant"/"Thinking" into one composer control,
- * per the item's own explicit fallback - `reasoning-effort.tsx`'s
- * `spent`/`budget` assume a reasoning-token-budget concept `TurnStats`
- * has no field for, so it doesn't fit; a second control was never
- * built. Composed from `composer.tsx`'s own trigger/menu/item
- * primitives, used exactly as they ship - `ComposerMenu` is a plain
- * controlled `div` with no built-in dismiss behavior, and open/close is
- * `DismissableLayer.Root` (`radix-ui/internal`, already a dependency),
- * not a hand-rolled `pointerdown`/`keydown` pair: a review caught the
- * hand-rolled version as a "no hand-built UI" defect (platform
- * principle 6), and `Popover` - the pattern the old `ChatPage.tsx`'s
- * own "Think longer" toggle used for this exact per-turn concept - was
- * ruled out, not just skipped: `Popover.Content` renders through
- * `@radix-ui/react-popper`'s `useFloating`, which sets its own inline
- * `transform`/position style on the floating element even without a
- * `Portal`, and that would override `ComposerMenu`'s own `absolute
- * bottom-full` composer-anchored positioning (design-resolver,
- * 2026-09-22 - see `docs/dev.md`). `DismissableLayer` has no
- * positioning opinion of its own, so `ComposerMenu` renders exactly as
- * shipped either way. Owner ruling (COORDINATOR, 2026-09-22): a control
- * with fewer than two selectable entries renders nothing at all, never
- * a disabled trigger - always true here (Instant/Thinking is a fixed
- * pair), but the composition is written so the option count drives the
- * render, not a hardcoded assumption. */
-function ComposerThinkingControl() {
+function ComposerModelSelector() {
+  const { models, value, setValue } = useContext(ModelPickerContext);
   const { mode, setMode } = useContext(ThinkingModeContext);
-  const [open, setOpen] = useState(false);
-  if (THINKING_MODE_OPTIONS.length < 2) return null;
+  if (models.length < 2) return null;
   return (
-    <DismissableLayer.Root className="relative" onDismiss={open ? () => setOpen(false) : undefined}>
-      <ComposerModelTrigger model={THINKING_MODE_LABEL[mode]} open={open} onClick={() => setOpen((value) => !value)} />
-      {/* A review caught this: `ComposerMenu`'s own `open` only ever
-          toggles opacity/scale (CSS), never unmounts its children - a
-          closed menu's two buttons stayed in tab order and in the
-          accessibility tree, reachable before Send. `inert` (the same
-          fix already used on the rail above) removes both while closed,
-          same as a real hidden menu should. */}
-      <ComposerMenu open={open} inert={!open}>
-        {THINKING_MODE_OPTIONS.map((option) => (
-          <ComposerModelItem
-            key={option.key}
-            entry={{ name: THINKING_MODE_LABEL[option.key], meta: "" }}
-            selected={option.key === mode}
-            onClick={() => {
-              setMode(option.key);
-              setOpen(false);
-            }}
-          />
-        ))}
-      </ComposerMenu>
-    </DismissableLayer.Root>
+    <ModelSelectorRoot
+      models={models}
+      value={value}
+      onValueChange={setValue}
+      effort={mode}
+      onEffortChange={(effort) => setMode(effort === "thinking" ? "thinking" : "instant")}
+    >
+      <ModelSelectorTrigger variant="ghost" size="sm" aria-label="Choose model" className="max-w-48">
+        <ModelSelectorValue showEffort />
+      </ModelSelectorTrigger>
+      <ModelSelectorContent side="top" align="start">
+        <ModelSelectorSearch />
+        <ModelSelectorList />
+        <ModelSelectorEffort label="Mode" />
+      </ModelSelectorContent>
+    </ModelSelectorRoot>
   );
 }
 
@@ -1302,7 +1276,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const [autoReadReplies, setAutoReadReplies] = useState(false);
   const autoReadRepliesRef = useRef(false);
   autoReadRepliesRef.current = autoReadReplies;
-  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
+  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isOwnerOrAdminRole(person.role) });
+  const chatRole = enginesQuery.data?.roles?.find((role) => role.id === "chat");
+  const modelOptions = useMemo<ModelOption[]>(() => {
+    if (!enginesQuery.data?.configured) return [];
+    return (chatRole?.models ?? []).map((model) => ({ ...model, efforts: MODEL_EFFORTS }));
+  }, [chatRole?.models, enginesQuery.data?.configured]);
   const ttsAvailable = readyRole(enginesQuery.data, "tts");
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
@@ -1427,6 +1406,15 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     if (!thinkingDirtyRef.current) applyConversationThinking(settings?.thinking ?? false);
     if (!autoReadRepliesDirtyRef.current) applyAutoReadReplies(settings?.read_aloud ?? false);
   }, [applyAutoReadReplies, applyConversationThinking]);
+  const [selectedModel, setSelectedModel] = useState<string | undefined>();
+  const selectedModelValue = modelOptions.length >= 2
+    ? (modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions.some((model) => model.id === chatRole?.model?.id) ? chatRole?.model?.id : modelOptions[0]?.id)
+    : undefined;
+  const modelPickerAllowed = thinkingAllowed && enginesQuery.data?.configured === true && isOwnerOrAdminRole(person.role) && modelOptions.length >= 2;
+  const selectedModelRef = useRef<string | undefined>(undefined);
+  selectedModelRef.current = modelPickerAllowed ? selectedModelValue : undefined;
+  const modelPickerAllowedRef = useRef(false);
+  modelPickerAllowedRef.current = modelPickerAllowed;
   // ADMIN-COMPARE-01 (b): bare mode. Deliberately session-local, never
   // consumed/reset per turn the way `thinking` is - it stays on for
   // every send until the admin turns it off, or the conversation
@@ -1538,6 +1526,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // current value is hydrated from the conversation settings,
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed ? thinkingRef.current : undefined),
+          getModel: () => (modelPickerAllowedRef.current ? selectedModelRef.current : undefined),
           consumeSupersedes,
           consumePackageScope: () => {
             const value = packageScopeRef.current?.id;
@@ -1671,10 +1660,9 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
       // scoped to the reported Thinking defect below, not a second,
       // unasked-for change to bareMode's own behavior.)
       setBareMode(false);
-      // RESP-04's own choice outlives a single send (see
-      // getThinking's own comment above) - a real conversation
-      // switch starts on Instant, but this conversation's OWN first
-      // send resolving its placeholder id must not look like one.
+      // Thinking is hydrated from each conversation's persisted
+      // settings. The model choice stays session-local and resets on a
+      // deliberate conversation switch.
       if (isDeliberateSwitch) {
         thinkingRef.current = false;
         setThinkingState(false);
@@ -1683,11 +1671,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
         autoReadRepliesDirtyRef.current = false;
         pendingNewConversationReadAloudRef.current = undefined;
         applyAutoReadReplies(false);
+        setSelectedModel(undefined);
       }
     },
   });
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -2106,7 +2095,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setRailPeeked(false);
     setOpenArtifactId(null);
@@ -2119,6 +2108,7 @@ export function NextChatPage({ person }: { person: Roster }) {
     }),
     [thinking, setThinking],
   );
+  const modelPickerValue = useMemo(() => ({ models: modelOptions, value: selectedModelValue, setValue: setSelectedModel }), [modelOptions, selectedModelValue, setSelectedModel]);
   const bareModeValue = useMemo(() => ({ on: bareMode, toggle: () => setBareMode((value) => !value) }), [bareMode, setBareMode]);
   const packageScopeValue = useMemo(() => ({ scope: packageScope, setScope: setPackageScope }), [packageScope, setPackageScope]);
   const temporaryChatValue = useMemo(() => ({ on: temporaryNext }), [temporaryNext]);
@@ -2373,6 +2363,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <SourcesOpenContext.Provider value={sourcesOpenValue}>
       <DetailsOpenContext.Provider value={detailsOpenValue}>
       <ThinkingModeContext.Provider value={thinkingModeValue}>
+      <ModelPickerContext.Provider value={modelPickerValue}>
       <BareModeContext.Provider value={bareModeValue}>
       <TemporaryChatContext.Provider value={temporaryChatValue}>
       <PackageScopeContext.Provider value={packageScopeValue}>
@@ -2557,7 +2548,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   AssistantActionBarExtra: SourcesActionBarTrigger,
                   AssistantMessageFooterExtra: MessageFooterExtra,
                   Indicator: ChatThinkingIndicator,
-                  ComposerExtra: thinkingAllowed ? ComposerThinkingControl : undefined,
+                  ComposerExtra: modelPickerAllowed ? ComposerModelSelector : undefined,
                   ComposerAddAttachmentOverride: ComposerAddMenu,
                   // VOICE-LIVE-01: ComposerExtraEnd is the trailing-side
                   // append point (ui-v0.5.36, beside Send/dictate, not
@@ -2646,6 +2637,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </PackageScopeContext.Provider>
       </TemporaryChatContext.Provider>
       </BareModeContext.Provider>
+      </ModelPickerContext.Provider>
       </ThinkingModeContext.Provider>
       </DetailsOpenContext.Provider>
       </SourcesOpenContext.Provider>

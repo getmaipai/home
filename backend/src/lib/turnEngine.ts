@@ -3764,7 +3764,7 @@ export async function runTurn(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; temporary?: boolean; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
+  opts: { thinking?: boolean; model?: string; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; temporary?: boolean; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
 ): Promise<TurnOpResult> {
   // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
   if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
@@ -3805,7 +3805,7 @@ async function runTurnHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
+  opts: { thinking?: boolean; model?: string; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
 ): Promise<TurnOpResult> {
   const loaded = loadAllManifests(); // one catalog scan, shared below
   const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, false, opts.speakerEvidence ?? null, opts.present ?? null, null, opts.documentAttachments);
@@ -3896,7 +3896,7 @@ async function runTurnHoldingLease(
     }
     machine.enter("composing");
     modelPrepared.modelCalls++;
-    const answer = await complete("chat", plan.messages, { thinking: false });
+    const answer = await complete("chat", plan.messages, { thinking: false, model: opts.model });
     generationDone = Date.now();
     const composed = answer.ok ? composedText(answer.value.text) : null;
     if (composed === null) {
@@ -3946,7 +3946,7 @@ async function runTurnHoldingLease(
       // would be the whole output, and its tags travel to the client.
       prepared.timings.retries++;
       prepared.modelCalls++;
-      const again = await complete("chat", prepared.messages, { thinking: false, max_tokens: RETRY_TOKEN_CAP });
+      const again = await complete("chat", prepared.messages, { thinking: false, model: opts.model, max_tokens: RETRY_TOKEN_CAP });
       generationDone = Date.now();
       if (!again.ok) return repaired;
       const second = repairReply(again.value.text);
@@ -3962,6 +3962,7 @@ async function runTurnHoldingLease(
     prepared.modelCalls++;
     const completion = await complete("chat", prepared.messages, {
       thinking: opts.thinking,
+      model: opts.model,
       // CHAT-12 reserve plus the ACT-03 plan's word budget - LAT-01's
       // own THINKING_ALLOWANCE on top when thinking is on, so the think
       // block has room of its own instead of eating the visible budget.
@@ -4003,7 +4004,7 @@ async function runTurnHoldingLease(
         // without tools, answered as an ordinary reply.
         prepared.timings.retries++;
         prepared.modelCalls++;
-        const retry = await complete("chat", prepared.messages, { thinking: opts.thinking });
+        const retry = await complete("chat", prepared.messages, { thinking: opts.thinking, model: opts.model });
         generationDone = Date.now();
         if (!retry.ok) {
           return { ok: false, status: 503, code: "unavailable", error: retry.error };
@@ -4023,7 +4024,7 @@ async function runTurnHoldingLease(
           // A self-assertion emptied it: the note carries the objection.
           const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.includes("self_assertion") ? objectionRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
           prepared.modelCalls++;
-          const again = await complete("chat", [...prepared.messages, { role: "system", content: note }], { thinking: false });
+          const again = await complete("chat", [...prepared.messages, { role: "system", content: note }], { thinking: false, model: opts.model });
           generationDone = Date.now();
           if (again.ok) {
             const before = guardHits.length;
@@ -4564,7 +4565,7 @@ export async function runTurnStream(
   // shows up in the person's real chat history. finalizeReply() (the
   // output safety boundary) and the lease still run for it exactly as
   // for a real turn: only the log write is conditional.
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
+  opts: { thinking?: boolean; model?: string; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
 ): Promise<TurnStreamResult> {
   // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
   if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
@@ -4612,7 +4613,7 @@ async function runTurnStreamHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
+  opts: { thinking?: boolean; model?: string; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
 ): Promise<TurnStreamResult> {
   const branchFrom = resolveSupersedes(opts.continuation?.fromTurnId, conversation.id);
   const continuation = opts.continuation ? { ...opts.continuation, ...(branchFrom ? { fromTurnId: branchFrom } : {}) } : null;
@@ -4684,7 +4685,7 @@ async function runTurnStreamHoldingLease(
       modelTurn.composed = { mode, model_calls: 1, ...(fellBack ? { fell_back: true } : {}), ...(ungrounded ? { ungrounded } : {}), ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
     };
     const requestSentMs = Date.now() - startedAt;
-    const started = await startCompleteStream("chat", plan.messages, { thinking: false }, opts.signal);
+    const started = await startCompleteStream("chat", plan.messages, { thinking: false, model: opts.model }, opts.signal);
     if (!started.ok) {
       console.log(`[turn] the composition on turn ${modelTurn.turnId} failed to start: ${started.error}; the direct replies stand`);
       record(true);
@@ -4880,7 +4881,7 @@ async function runTurnStreamHoldingLease(
         const priorGeneration = modelTurn.generations[modelTurn.generations.length - 1];
         const reason: TurnGenerationReason = priorGeneration?.thinking === true ? "think_exhausted" : "fragment";
         const requestSentMs = Date.now() - startedAt;
-        const again = await startCompleteStream("chat", modelMessages, { thinking: false, max_tokens: RETRY_TOKEN_CAP }, opts.signal);
+        const again = await startCompleteStream("chat", modelMessages, { thinking: false, model: opts.model, max_tokens: RETRY_TOKEN_CAP }, opts.signal);
         if (again.ok) {
           const generation: GenerationRecord = { reason, thinking: false, maxTokens: RETRY_TOKEN_CAP, requestSentMs, firstDeltaMs: null, stats: again.stats };
           modelTurn.generations.push(generation);
@@ -4984,7 +4985,7 @@ async function runTurnStreamHoldingLease(
               const guardReason = retryPhrase ? "banned_phrase" : guardHits.includes("self_assertion") ? "objection" : guardHits.includes("example_parrot") ? "example_parrot" : "statement";
               const note = retryPhrase ? bannedPhraseRetryNote(retryPhrase) : guardHits.includes("self_assertion") ? objectionRetryNote({ ...guardContextFrom(prepared.turnContext), utterance: text }) : guardHits.includes("example_parrot") ? EXAMPLE_PARROT_RETRY_NOTE : STATEMENT_RETRY_NOTE;
               const requestSentMs = Date.now() - startedAt;
-              const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: note }], { thinking: false }, opts.signal);
+              const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: note }], { thinking: false, model: opts.model }, opts.signal);
               if (!again.ok) return null;
               const generation: GenerationRecord = { reason: `guard:${guardReason}`, thinking: false, maxTokens: null, requestSentMs, firstDeltaMs: null, stats: again.stats };
               modelTurn.generations.push(generation);
@@ -5128,7 +5129,7 @@ async function runTurnStreamHoldingLease(
   if (!offeringTools) {
     modelTurn.modelCalls++;
     const requestSentMsNoTools = Date.now() - startedAt;
-    const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
+    const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking, model: opts.model }, opts.signal);
     if (!started.ok) {
       // An engine-down failure here is still a real, finished turn; the
       // caller's finally releases (no stream result was handed off).
@@ -5247,7 +5248,7 @@ async function runTurnStreamHoldingLease(
         generations++; // OUT-01: the opening hold may not regenerate after this
         modelTurn.modelCalls++;
         const requestSentMsRetry = Date.now() - startedAt;
-        const retry = await startCompleteStream("chat", modelPrepared.messages, { thinking: opts.thinking }, opts.signal);
+        const retry = await startCompleteStream("chat", modelPrepared.messages, { thinking: opts.thinking, model: opts.model }, opts.signal);
         // buildStreamResult()'s guardFirstStep() catches this (nothing
         // has been yielded yet) and marks the turn finished.
         if (!retry.ok) throw new StreamUnavailable(retry.error);
