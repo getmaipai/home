@@ -1051,6 +1051,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // can put the URL back if it matches the thread that was showing.
   const visibleConversationIdRef = useRef(searchParams.get("conversation") ?? undefined);
   const deselectedConversationIdRef = useRef<string | undefined>(undefined);
+  const previousThreadIdRef = useRef<string | undefined>(undefined);
   // useSearchParams recreates its setter when the search params change.
   // Keep the adapter callback stable so a thread switch doesn't rebuild
   // the thread-list adapter and restart its runtime.
@@ -1060,6 +1061,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     if (visibleConversationIdRef.current !== undefined || deselectedConversationIdRef.current !== remoteId) return;
     visibleConversationIdRef.current = remoteId;
     deselectedConversationIdRef.current = undefined;
+    previousThreadIdRef.current = remoteId;
     setSearchParamsRef.current({ conversation: remoteId }, { replace: true });
   }, []);
   // RESP-04 (f): the composer's thinking-mode control. Read via a ref
@@ -1265,8 +1267,6 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // a production bug - GATE-SPEED-02(b) territory), so it isn't kept
   // as a permanent test; the one below it (the reported defect itself)
   // is the regression test that stays.
-  const previousThreadIdRef = useRef<string | undefined>(undefined);
-
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: useChatRuntimeHook,
     adapter: threadListAdapter,

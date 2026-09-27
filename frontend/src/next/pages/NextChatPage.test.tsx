@@ -244,17 +244,20 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   test("a rejected Archive keeps the active conversation selected", async () => {
     const original = globalThis.fetch;
     const conversation = { id: "conv-archive123", title: "Archive me", surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false };
+    const otherConversation = { id: "conv-archive456", title: "Other conversation", surface: "chat", created_at: "2026-09-26T00:00:00Z", pinned: false };
     let finishTurnsLoad!: () => void;
     const turnsLoad = new Promise<void>((resolve) => { finishTurnsLoad = resolve; });
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/conversations/conv-archive123/resume")) return Promise.resolve(Response.json(conversation));
+      if (url.includes("/api/conversations/conv-archive456/resume")) return Promise.resolve(Response.json(otherConversation));
       if (url.includes("/turns")) {
         finishTurnsLoad();
         return Promise.resolve(Response.json([]));
       }
       if (url.includes("/api/conversations/conv-archive123")) return Promise.resolve(Response.json(conversation));
-      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([conversation]));
+      if (url.includes("/api/conversations/conv-archive456")) return Promise.resolve(Response.json(otherConversation));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([conversation, otherConversation]));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     try {
@@ -266,14 +269,26 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       );
       await view.findByText("Archive me");
       await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive123"));
-      const moreOptions = view.getByRole("button", { name: "More options" });
+      const thinkingTrigger = view.container.querySelector('[data-slot="composer-model-trigger"]') as HTMLButtonElement;
+      fireEvent.click(thinkingTrigger);
+      const thinkingMenu = thinkingTrigger.parentElement!.querySelector('[data-slot="composer-menu"]')!;
+      fireEvent.click(within(thinkingMenu as HTMLElement).getAllByRole("button")[1]!);
+      expect(thinkingTrigger).toHaveTextContent("Thinking");
+
+      const archiveRow = view.getByText("Archive me").closest('[data-slot="aui_thread-list-item"]')!;
+      const moreOptions = within(archiveRow as HTMLElement).getByRole("button", { name: "More options" });
       fireEvent.pointerDown(moreOptions, { button: 0, ctrlKey: false, pointerType: "mouse" });
       const archiveItem = await view.findByRole("menuitem", { name: "Archive" });
       fireEvent.click(archiveItem);
       await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive123"));
       expect(view.getByText("Archive me")).toBeVisible();
+      expect(thinkingTrigger).toHaveTextContent("Thinking");
       await turnsLoad;
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+      fireEvent.click(view.getByText("Other conversation"));
+      await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive456"));
+      await waitFor(() => expect(thinkingTrigger).toHaveTextContent("Instant"));
     } finally {
       globalThis.fetch = original;
     }
