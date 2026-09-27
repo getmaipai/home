@@ -39,6 +39,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
 import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type InstalledPackage, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
@@ -1512,6 +1513,22 @@ export function NextChatPage({ person }: { person: Roster }) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
+  // CANVAS-SHEET-DESKTOP-01 (fixes #183): the desktop canvas div below
+  // (`hidden lg:block`) and the phone/tablet artifact Sheet used to both
+  // bind their render to the same `openArtifactId !== null` state
+  // unconditionally - only the Sheet's own CONTENT was `lg:hidden`, so
+  // on desktop the Sheet still mounted and opened with invisible content
+  // but a full, real overlay (`SheetOverlay` has no responsive class of
+  // its own), which dimmed the page; worse, Radix computes "outside
+  // click" against that same zero-footprint content, so any click on
+  // the real desktop canvas next to it read as "outside the Sheet" and
+  // closed everything. Gating on the same `lg` (1024px) boundary the
+  // classNames already use, via the kit's own `useBreakpoint` (already
+  // used the same way by `chatDocumentPane.tsx`), keeps the two
+  // surfaces mutually exclusive: the Sheet is never actually open at
+  // desktop width, so there is no overlay and no outside-click handler
+  // to misfire.
+  const isDesktopCanvas = useBreakpoint().atLeast(1024);
   // ADMIN-COMPARE-01: the identical desktop-pane/mobile-sheet split
   // openArtifactId already has, one state slot instead of a whole second
   // "which panel is open" enum - only ever one of the two is non-null in
@@ -2205,10 +2222,13 @@ export function NextChatPage({ person }: { person: Roster }) {
                 }}
               />
             </div>
-            {openArtifactId !== null ? (
+            {isDesktopCanvas && openArtifactId !== null ? (
               // Desktop only - the phone/tablet Sheet below covers the
               // same panel under `lg:hidden`, mirroring
-              // chatDocumentPane.tsx's own split.
+              // chatDocumentPane.tsx's own split. Gated on
+              // `isDesktopCanvas` too (CANVAS-SHEET-DESKTOP-01, fixes
+              // #183), not just the CSS, so the Sheet below never
+              // mounts open at the same time this does.
               <div className="ms-4 hidden w-full max-w-xl shrink-0 overflow-y-auto lg:block">
                 <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} />
               </div>
@@ -2231,7 +2251,15 @@ export function NextChatPage({ person }: { person: Roster }) {
             {threadList}
           </SheetContent>
         </Sheet>
-        <Sheet open={openArtifactId !== null} onOpenChange={(next) => { if (!next) closeArtifact(); }}>
+        {/* CANVAS-SHEET-DESKTOP-01 (fixes #183): `open` is gated on
+            `!isDesktopCanvas` too, not just `openArtifactId !== null` -
+            otherwise this Sheet mounts and opens at desktop width as
+            well as the plain div above, and its always-on-when-open
+            `SheetOverlay` dims the page while Radix's outside-click
+            check (computed against this Sheet's own CSS-hidden,
+            zero-footprint content) fires on every click, including one
+            inside the real desktop canvas next to it. */}
+        <Sheet open={!isDesktopCanvas && openArtifactId !== null} onOpenChange={(next) => { if (!next) closeArtifact(); }}>
           {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- max-height and scroll are intentional for the mobile artifact sheet; max-h-[85vh] has no scale-token equivalent since Sheet has no max-height prop of its own (commons/ui/docs/dashboard-upstream.md) */}
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto lg:hidden">
             {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
@@ -2239,7 +2267,7 @@ export function NextChatPage({ person }: { person: Roster }) {
               <SheetTitle>Document</SheetTitle>
               <SheetDescription>The document from this reply</SheetDescription>
             </SheetHeader>
-            {openArtifactId !== null ? <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} /> : null}
+            {!isDesktopCanvas && openArtifactId !== null ? <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} /> : null}
           </SheetContent>
         </Sheet>
         <Sheet open={compareTarget !== null} onOpenChange={(next) => { if (!next) closeCompare(); }}>

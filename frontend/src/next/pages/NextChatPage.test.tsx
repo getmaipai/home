@@ -731,7 +731,23 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     fireEvent.click(send);
   }
 
-  test("a write_document turn renders an artifact card; clicking it opens the canvas with the real document, closing it keeps the thread", async () => {
+  // #183: the desktop pane (`isDesktopCanvas && ... hidden lg:block`) and
+  // the phone/tablet Sheet (`open={!isDesktopCanvas && ...}`) used to both
+  // bind to the same `openArtifactId !== null` state with no viewport
+  // gate on the Sheet's own `open` prop - only its CONTENT was
+  // `lg:hidden`, so the Sheet still mounted and opened on desktop too,
+  // with a real full-screen overlay (dimming the page) and a real
+  // Radix outside-click handler that treated any click on the actual,
+  // visible desktop pane next to it as "outside," closing everything.
+  // These two tests replace the old single test (which asserted "two
+  // mounts exist in jsdom at once" as expected) with one assertion per
+  // viewport that exactly one surface exists and behaves correctly.
+  // Stubs the turn/artifact fetch, sends the message and clicks the
+  // resulting card - the same sequence the old single test ran inline -
+  // and returns `restore()` for the caller's own `finally`, since the
+  // artifact panel's `api.artifactCurrent()` query and everything the
+  // test does after this click still need the stub alive.
+  async function openArtifact(view: ReturnType<typeof render>): Promise<() => void> {
     const restore = stubArtifactTurnFetch(
       ndjsonStream([
         { type: "delta", text: "Wrote it." },
@@ -748,35 +764,93 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
         },
       ]),
     );
+    await sendMessage(view, "write me a short note about pizza night");
+    expect(await view.findByText("Wrote it.")).toBeVisible();
+    // The card's own fetched title, not a placeholder - proves the
+    // artifact tool-call part reached ArtifactCard through a real
+    // api.artifactCurrent() round trip, not just that the turn
+    // completed.
+    const card = await view.findByText(ARTIFACT.title);
+    fireEvent.click(card);
+    return restore;
+  }
+
+  test("desktop viewport: opening an artifact shows the canvas directly, with no Sheet/overlay ever mounted, and a click inside its content never closes it", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    let restore: () => void = () => {};
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/next/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
-      await sendMessage(view, "write me a short note about pizza night");
-      expect(await view.findByText("Wrote it.")).toBeVisible();
-      // The card's own fetched title, not a placeholder - proves the
-      // artifact tool-call part reached ArtifactCard through a real
-      // api.artifactCurrent() round trip, not just that the turn
-      // completed.
-      const card = await view.findByText(ARTIFACT.title);
-      fireEvent.click(card);
-      // Two mounts of the same panel exist in jsdom at once (the
-      // desktop pane, CSS-hidden below `lg`, and the phone/tablet
-      // Sheet, a real Radix dialog only mounted while open) - the same
-      // reason "New Thread closes the phone/tablet Sheet" above scopes
-      // to the dialog rather than querying the whole document. The
-      // Sheet's own sr-only title is the scoping handle here.
-      const dialogTitle = await view.findByRole("heading", { name: "Document" });
-      const dialog = within(dialogTitle.closest('[role="dialog"]')!);
-      expect(await dialog.findByText("Every Friday night.")).toBeVisible();
-      fireEvent.click(dialog.getByRole("button", { name: "Close the canvas" }));
-      await waitFor(() => expect(view.queryByRole("heading", { name: "Document" })).toBeNull());
-      // Closing the canvas never touches the thread.
+      restore = await openArtifact(view);
+      const body = await view.findByText("Every Friday night.");
+      expect(body).toBeVisible();
+      // No Sheet ever mounted at this width - not just CSS-hidden
+      // content, no dialog role, no overlay, no sheet-content node at
+      // all.
+      expect(view.queryByRole("dialog")).toBeNull();
+      expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeNull();
+      expect(document.querySelector('[data-slot="sheet-content"]')).toBeNull();
+      // A click on the canvas's own content (selecting/scrolling it) -
+      // the exact interaction #183 reported as closing the whole
+      // canvas - leaves it open.
+      fireEvent.pointerDown(body);
+      expect(view.getByText("Every Friday night.")).toBeVisible();
+      // The explicit close action still closes it, and never touches
+      // the thread.
+      fireEvent.click(view.getByRole("button", { name: "Close the canvas" }));
+      await waitFor(() => expect(view.queryByText("Every Friday night.")).toBeNull());
       expect(view.getByText("Wrote it.")).toBeVisible();
     } finally {
       restore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
+  });
+
+  test("phone/tablet viewport: opening an artifact opens the real Sheet (dimmed by design) and renders no desktop pane; a click inside its content never closes it, a genuine outside click does", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    let restore: () => void = () => {};
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      restore = await openArtifact(view);
+      const dialogTitle = await view.findByRole("heading", { name: "Document" });
+      const dialog = within(dialogTitle.closest('[role="dialog"]')!);
+      const body = await dialog.findByText("Every Friday night.");
+      expect(body).toBeVisible();
+      // A real overlay is expected here (this is the mobile/tablet
+      // Sheet doing its normal job) - and the desktop pane never
+      // mounted alongside it, so this is the only match in the whole
+      // document.
+      expect(document.querySelector('[data-slot="sheet-overlay"]')).not.toBeNull();
+      expect(view.getAllByText("Every Friday night.").length).toBe(1);
+      // A click on the canvas's own content does not close the Sheet -
+      // Radix's own outside-click check correctly sees it as inside
+      // real, visible content now that the desktop pane isn't also
+      // mounted underneath it. Radix's dismissable layer only actually
+      // decides "outside or not" on the click that follows the
+      // pointerdown (found probing this exact component: a bare
+      // pointerdown alone never closed it, pointerdown+click did), so
+      // both fire here, on the same node, the same way a real tap or
+      // click-drag-to-select would.
+      fireEvent.pointerDown(body, { bubbles: true, button: 0, pointerId: 1, pointerType: "mouse" });
+      fireEvent.click(body, { bubbles: true, button: 0 });
+      expect(view.getByRole("heading", { name: "Document" })).toBeVisible();
+      // A genuine outside click still closes it.
+      fireEvent.pointerDown(document.body, { bubbles: true, button: 0, pointerId: 1, pointerType: "mouse" });
+      fireEvent.click(document.body, { bubbles: true, button: 0 });
+      await waitFor(() => expect(view.queryByRole("heading", { name: "Document" })).toBeNull());
+      expect(view.getByText("Wrote it.")).toBeVisible();
+    } finally {
+      restore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     }
   });
 });
