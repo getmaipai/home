@@ -1062,7 +1062,21 @@ function ArtifactCanvasPanel({ artifactId, onClose }: { artifactId: string; onCl
     // `tailwind-merge` matches and replaces the shipped `md:h-80`
     // (same variant, same property) rather than adding a conflicting
     // rule beside it.
-    <CanvasSplit className="md:h-full">
+    //
+    // Jesse also found this: CanvasSplit's own shipped `paper` surface
+    // (bg-background, a border on all four sides) plus its own
+    // `rounded-[20px]` reads as a floating card next to the thread,
+    // where ChatGPT's own reference (a real split pane, edge to edge,
+    // divided by a single hairline, never rounded) reads as an attached
+    // panel. `rounded-none` clears the shipped radius; `border-0
+    // border-l` clears the shipped all-sides border first, then adds
+    // back only the left edge as the pane's own divider (tailwind-merge
+    // tracks each side's border-width separately, so this is a real
+    // override per side, not an extra border stacked on top of the
+    // existing four). The wrapping `div` in NextChatPage.tsx dropped its
+    // own `ms-4` gap to match - flush against the thread, the same way
+    // the reference's pane sits with no gap before its own divider.
+    <CanvasSplit className="rounded-none border-0 border-l md:h-full">
       <CanvasSplitThread>
         <CanvasSplitMessage speaker="assistant">{query.data ? `Wrote "${query.data.title}."` : "Wrote the document."}</CanvasSplitMessage>
       </CanvasSplitThread>
@@ -2492,7 +2506,7 @@ export function NextChatPage({ person }: { person: Roster }) {
               // `isDesktopCanvas` too (CANVAS-SHEET-DESKTOP-01, fixes
               // #183), not just the CSS, so the Sheet below never
               // mounts open at the same time this does.
-              <div className="ms-4 hidden w-full max-w-xl shrink-0 overflow-y-auto lg:block">
+              <div className="hidden w-full max-w-xl shrink-0 overflow-y-auto lg:block">
                 <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} />
               </div>
             ) : null}
