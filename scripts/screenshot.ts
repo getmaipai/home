@@ -2364,7 +2364,11 @@ async function captureNextPeopleReview(browser: Browser, sessionValue: string): 
       try {
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/next/people`);
-        await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
+        // SHELL-04 changed this route from a table to a card grid
+        // (`NextPeoplePage.tsx`); the shared CardTitle is a div, so use
+        // a real person-card link as the data-ready signal. These links
+        // render only after the real `/api/people` query resolves.
+        await page.locator('a[href^="/people/"]').first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "People");
         await settleAnimations(page);
         const path = join(outDir, `next-people-${viewport.width}-${theme}.png`);
