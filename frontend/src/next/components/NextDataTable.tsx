@@ -148,7 +148,7 @@ export function NextDataTable<T extends Record<string, unknown>>({
                     {row[key] === null || row[key] === undefined ? "-" : String(row[key])}
                   </TableCell>
                 ))}
-                {rowActions && <TableCell className="w-10 p-1 text-right">
+                {rowActions && (actionsForRow.length === 0 ? <TableCell /> : <TableCell className="w-10 p-1 text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger render={
                       <Button type="button" variant="ghost" size="icon-lg" aria-label="More actions">
@@ -176,7 +176,7 @@ export function NextDataTable<T extends Record<string, unknown>>({
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </TableCell>}
+                </TableCell>)}
               </TableRow>
               );
             }) : (

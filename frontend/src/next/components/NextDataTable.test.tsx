@@ -114,4 +114,12 @@ describe("NextDataTable", () => {
     expect(view.queryByRole("columnheader", { name: "Actions" })).toBeNull();
     expect(view.queryByRole("button", { name: "More actions" })).toBeNull();
   });
+
+  test("an empty row action list keeps the Actions column aligned without an empty menu trigger", () => {
+    const view = render(<NextDataTable data={[{ name: "Home" }, { name: "Engine" }]} rowActions={(row) => row.name === "Engine" ? [{ label: "Apply", onClick: () => {} }] : []} />);
+    const rows = within(view.getByRole("table")).getAllByRole("row").slice(1);
+    expect(within(rows[0]!).queryByRole("button", { name: "More actions" })).toBeNull();
+    expect(rows[0]!.querySelectorAll('[data-slot="table-cell"]')).toHaveLength(2);
+    expect(within(rows[1]!).getByRole("button", { name: "More actions" })).toBeTruthy();
+  });
 });

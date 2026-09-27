@@ -1,4 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextDataTable } from "@/next/components/NextDataTable";
@@ -15,10 +17,8 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * itself, one per Stack engine and model when a Stack is configured,
  * exactly what the old page shows.
  *
- * Named gap: applying an engine update and rolling one back are real
- * actions on the old page (`UpdatesSection.tsx`'s own `ThingsTable`
- * `rowActions`, a kit block with a real callback surface) - Home's shared table is deliberately read-only, so applying updates
- * and rolling them back stay on the old route. Gated to owner/admin like the old page
+ * Applying an engine update and rolling one back use this page's own
+ * table actions. Gated to owner/admin like the old page
  * (`UpdatesPage.tsx`'s own `AdminGatedContent`) even though `GET /api/
  * updates` itself is `requireAuth` only - matching the old page's own
  * visible gate is the parity this row asks for, not a new rule. */
@@ -49,6 +49,46 @@ export function NextUpdatesPage({ person }: { person: Roster }) {
   useDocumentTitle("Updates");
   const canManage = isOwnerOrAdminRole(person.role);
   const query = useQuery<UpdateProjection>({ queryKey: ["updates"], queryFn: () => api.updates(), enabled: canManage });
+  const queryClient = useQueryClient();
+  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(new Set());
+  const [rollbackTargets, setRollbackTargets] = useState<Record<string, string>>({});
+
+  async function withBusy(id: string, run: () => Promise<void>) {
+    setBusyIds((previous) => new Set(previous).add(id));
+    try {
+      await run();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "That didn't work.");
+    } finally {
+      setBusyIds((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  async function applyEngine(name: string) {
+    await withBusy(`engine:${name}`, async () => {
+      const result = await api.applyStackEngineUpdate(name);
+      if (result.applied && result.tag && result.previous) {
+        setRollbackTargets((previous) => ({ ...previous, [name]: result.previous! }));
+      }
+      await queryClient.invalidateQueries({ queryKey: ["updates"] });
+    });
+  }
+
+  async function rollbackEngineTo(name: string, tag: string) {
+    await withBusy(`engine:${name}`, async () => {
+      await api.rollbackStackEngine(name, tag);
+      setRollbackTargets((previous) => {
+        const next = { ...previous };
+        delete next[name];
+        return next;
+      });
+      await queryClient.invalidateQueries({ queryKey: ["updates"] });
+    });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -74,7 +114,25 @@ export function NextUpdatesPage({ person }: { person: Roster }) {
           errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load updates."}
           loadingLabel="Loading updates"
         >
-          {(projection: UpdateProjection) => <NextDataTable data={rowsFrom(projection).map(toRow)} />}
+          {(projection: UpdateProjection) => {
+            const updateRows = rowsFrom(projection);
+            return (
+              <NextDataTable
+                data={updateRows.map(toRow)}
+                rowKey={(row) => row.name}
+                rowActions={(row) => {
+                  const update = updateRows.find((candidate) => candidate.name === row.name);
+                  if (!update || update.kind !== "engine") return [];
+                  const isBusy = busyIds.has(`engine:${update.name}`);
+                  const rollbackTag = rollbackTargets[update.name];
+                  return [
+                    ...(hasUpdate(update) ? [{ label: "Apply", onClick: () => applyEngine(update.name), disabled: isBusy }] : []),
+                    ...(rollbackTag ? [{ label: "Go back", destructive: true, confirmLabel: `Go back to ${rollbackTag}?`, onClick: () => rollbackEngineTo(update.name, rollbackTag), disabled: isBusy }] : []),
+                  ];
+                }}
+              />
+            );
+          }}
         </AsyncState>
       )}
       {canManage && query.data?.referenceError && (
