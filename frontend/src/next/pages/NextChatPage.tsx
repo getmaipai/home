@@ -69,6 +69,7 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { readRailCollapsePreference, writeRailCollapsePreference } from "@/next/railCollapsePreference";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
+import { useNotificationsQuery } from "@/shell/NotificationBell";
 
 const HistoryIcon = getIcon("history");
 // CHAT-UI-03 (3): the app rail's own toggle (sidebar.tsx's
@@ -1500,6 +1501,88 @@ function ChatHeaderDataBridge() {
   return null;
 }
 
+/** getmaipai/home#181: a finished background project's document attaches
+ * to the SAME turn row that already produced its "Starting…" reply
+ * (backend/src/lib/projects/post.ts's postProjectResult()) - no new
+ * message, no new turn row, so nothing already loaded ever refetches to
+ * show it without a hard refresh. NotificationBell.tsx already polls
+ * `project.done`/`project.failed` deliveries every 15s
+ * (NOTIFICATIONS_QUERY_KEY); this is the one place that turns "a
+ * delivery arrived" into "the open thread refetches," reusing that same
+ * query (React Query dedupes the identical queryKey to one fetch/poll,
+ * that file's own header comment) rather than standing up a second poll.
+ * Matched by turn id against the messages already on screen
+ * (`metadata.custom.turnId`, the same field chatActionBar.tsx already
+ * reads off a message) rather than by conversation id - a notification
+ * carries a `subjectTurnId`, never a conversationId, and every turn in
+ * the currently open thread is already loaded right here, so a
+ * notification whose turn isn't among them belongs to some OTHER
+ * conversation and is left alone. Mounted beside ArtifactCacheInvalidator/
+ * ChatDocumentTitle above - same provider scope, same "no thread-id
+ * bookkeeping needed" posture. `reloadMainThread()` (@assistant-ui/core's
+ * own "refetch the open thread's remote state for state that changed out
+ * of band" method) reruns chatHistoryAdapter.ts's load() for the one
+ * thread on screen - the incognito-discard listener below calls
+ * `threads.reload()` instead, which refreshes the thread LIST, not this
+ * thread's own messages, so it doesn't do the job here. */
+function ProjectResultReload() {
+  const aui = useAui();
+  const messages = useAuiState((s) => s.thread.messages);
+  // The open conversation's own id - a switch away and back re-scopes
+  // `seen` below (a code review, 2026-09-27: a bare module-lifetime set
+  // would leave a notification marked "seen" while a DIFFERENT thread
+  // was open, permanently masking it if its own thread later became the
+  // one on screen; in practice `switchToThread()` already does a full
+  // fresh history load on its own, so this is defense in depth, not the
+  // only thing standing between a switch and a stale card).
+  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
+  const { data: notifications } = useNotificationsQuery();
+  // Everything already pending the first time this runs for a given
+  // thread predates that (a page opened, or switched to this thread,
+  // after the project already finished) - not a fresh arrival worth
+  // reloading for, the same "no flood on first load" guard
+  // NotificationBell.tsx's own NotificationToaster uses for its seenIds.
+  const seen = useRef<{ remoteId: string | undefined; ids: Set<string> } | null>(null);
+
+  useEffect(() => {
+    // Array.isArray, not just a truthiness check: a test (or a real
+    // deploy) whose fetch stub/proxy never anticipated this query can
+    // hand back something else entirely (`{}`, an error body) before a
+    // real GET /api/notifications response replaces it - this component
+    // is now mounted on every chat page, most of which never stub that
+    // endpoint at all, so treating anything non-array as "nothing to
+    // process yet" (an unguarded `.map` here crashed every NextChatPage
+    // test that never stubbed /api/notifications, not just this file's
+    // own new ones, once this component started mounting everywhere).
+    if (!Array.isArray(notifications)) return;
+    if (seen.current === null || seen.current.remoteId !== remoteId) {
+      seen.current = { remoteId, ids: new Set(notifications.map((n) => n.id)) };
+      return;
+    }
+    // Every unseen notification is marked seen in this same pass,
+    // matching or not - a code review, 2026-09-27, caught an earlier
+    // version that `break`d out the moment one matched, which left every
+    // notification AFTER it in the array still unmarked and so
+    // re-examined (and, if it also matched, re-triggering its own
+    // reload) on every later effect run until it happened to come first.
+    // One reload already refetches every turn in this thread, so at most
+    // one call goes out per pass regardless of how many notifications
+    // matched.
+    let shouldReload = false;
+    for (const n of notifications) {
+      if (seen.current.ids.has(n.id)) continue;
+      seen.current.ids.add(n.id);
+      if (n.typeId !== "project.done" && n.typeId !== "project.failed") continue;
+      if (!n.subjectTurnId) continue;
+      const subjectTurnId = n.subjectTurnId;
+      if (messages.some((m) => (m.metadata?.custom?.turnId as string | undefined) === subjectTurnId)) shouldReload = true;
+    }
+    if (shouldReload) void aui.threads.reloadMainThread();
+  }, [notifications, messages, remoteId, aui]);
+
+  return null;
+}
+
 export function NextChatPage({ person }: { person: Roster }) {
   // CHAT-HEADER-01: ChatHeaderBar is a stable, zero-prop reference - the
   // shell header's own slot (ui-v0.5.35) mounts and unmounts it, never
@@ -2030,6 +2113,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <ArtifactCacheInvalidator />
         <ChatDocumentTitle />
         <ChatHeaderDataBridge />
+        <ProjectResultReload />
         <LiveVoiceSession
           open={voiceOpen}
           onOpenChange={setVoiceOpen}

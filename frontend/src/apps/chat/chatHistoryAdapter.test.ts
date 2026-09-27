@@ -78,6 +78,38 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.content).toBe("just a reply");
   });
 
+  // getmaipai/home#182: a background project's finished document attaches
+  // to the same turn row that already produced its "Starting…" reply
+  // (backend/src/lib/projects/post.ts's postProjectResult()) - the reply
+  // genuinely came first in time, so its card belongs AFTER the reply
+  // text, the opposite order from the synchronous write_document case
+  // above. Told apart by which tool answered the turn: a row whose
+  // pluginId is "start_project" (backend/src/lib/projects/tool.ts's
+  // START_PROJECT_TOOL_ID) never mints its own artifact, so one riding
+  // such a row can only be the project's own result, attached later.
+  test("a project-attached artifact (pluginId start_project) becomes a real tool-call part AFTER the reply text", () => {
+    const row = { ...makeRow("row-1", "Starting Bedtime story now - 3 steps, about a minute."), pluginId: "start_project", artifact: { id: "art-example123", version: 1 } };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "text", text: "Starting Bedtime story now - 3 steps, about a minute." },
+      { type: "tool-call", toolCallId: "row-1-artifact", toolName: "write_document", args: {}, argsText: "", result: { id: "art-example123", version: 1 } },
+    ]);
+  });
+
+  // Regression coverage for #182's fix: an artifact riding a row whose
+  // pluginId is the write_document package itself (the synchronous
+  // case, packageHost.ts's own `artifact.create()`) keeps the existing
+  // card-before-prose order, unchanged by the project-ordering branch
+  // just added above.
+  test("a synchronous write_document artifact (pluginId write_document) still renders BEFORE the reply text", () => {
+    const row = { ...makeRow("row-1", "Wrote it."), pluginId: "write_document", artifact: { id: "art-example456", version: 1 } };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "tool-call", toolCallId: "row-1-artifact", toolName: "write_document", args: {}, argsText: "", result: { id: "art-example456", version: 1 } },
+      { type: "text", text: "Wrote it." },
+    ]);
+  });
+
   // getmaipai/home#130: the weather/almanac card disappeared after a
   // reload - a row carrying `structured_part` becomes the same real
   // tool-call part chatModelAdapter.ts builds live from the done event,

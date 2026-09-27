@@ -31,7 +31,13 @@ const QUERY_KEY = NOTIFICATIONS_QUERY_KEY;
 // react-query already dedupes identical queryKeys to one fetch/poll
 // regardless of how many components call this, so this exists for one
 // definition, not for caching.
-function useNotificationsQuery() {
+// getmaipai/home#181: NextChatPage.tsx's own ProjectResultReload consumes
+// this exact query too (React Query dedupes an identical queryKey to one
+// fetch/poll, this file's own header comment) - a background project's
+// `project.done`/`project.failed` delivery is what tells the open chat
+// its already-loaded turn just gained an artifact, so it reuses the
+// bell's poll instead of standing up a second one.
+export function useNotificationsQuery() {
   return useQuery<NotificationDeliveryView[]>({
     queryKey: QUERY_KEY,
     queryFn: () => api.notifications(),

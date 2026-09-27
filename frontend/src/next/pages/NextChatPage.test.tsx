@@ -9,7 +9,7 @@ import { NextChatPage } from "@/next/pages/NextChatPage";
 import { writeIncognitoCache } from "@/next/incognitoCache";
 import { IncognitoProvider, useIncognitoContext } from "@/next/incognitoContext";
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
-import type { Roster } from "@/lib/api";
+import type { NotificationDeliveryView, Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 import { ndjsonStream, staggeredNdjsonStream } from "../../../tests/ndjsonStream";
 
@@ -68,13 +68,18 @@ function renderPage(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // App.tsx's own tree wraps every route in TooltipProvider - the rail
   // toggle's own tooltip (CHAT-UI-03) needs it too, or Radix throws.
-  return render(
+  // `queryClient` returned alongside (renderWithQueryClient.tsx's own
+  // shape) for the rare test - getmaipai/home#181's own reload tests -
+  // that needs to poke the cache directly to simulate a poll tick, the
+  // same way NotificationBell.test.tsx already does for this identical
+  // ["notifications"] query.
+  return { ...render(
     <QueryClientProvider client={client}>
       <IncognitoProvider>
         <TooltipProvider>{ui}</TooltipProvider>
       </IncognitoProvider>
     </QueryClientProvider>,
-  );
+  ), queryClient: client };
 }
 
 function GlobalIncognitoToggle() {
@@ -854,7 +859,6 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     }
   });
 });
-
 // APPROVE-CARD-01 (issue #177): a package's own confirm_needed/
 // consent_needed ask renders through the shipped `ToolFallback.Approval`
 // (vendored at `@maipai/ui/src/assistant-ui/tool-fallback.aui`), never a
@@ -1030,6 +1034,126 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     }
   });
 });
+
+// getmaipai/home#181: a background project's finished document attaches
+// to the same turn row that already produced its "Starting…" reply
+// with no new message and no new turn row - nothing already on screen
+// ever refetches to show it without a hard refresh. ProjectResultReload
+// (this file) is the fix: it watches NotificationBell.tsx's own
+// ["notifications"] poll and calls reloadMainThread() when a
+// project.done/failed delivery's subjectTurnId matches a turn already
+// on screen. These tests drive a "poll tick" the same way
+// NotificationBell.test.tsx already does for the identical query -
+// `queryClient.setQueryData(["notifications"], ...)` - rather than
+// waiting a real 15s for `refetchInterval`, and prove the reload by
+// counting real GET /turns calls (reloadMainThread() reruns
+// chatHistoryAdapter.ts's load(), which is the one thing that ever
+// fetches that endpoint again after the thread's first load).
+describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
+  function projectNotification(id: string, subjectTurnId: string, typeId: "project.done" | "project.failed" = "project.done"): NotificationDeliveryView {
+    return {
+      id,
+      typeId,
+      text: "Bedtime story finished.",
+      channels: ["in_app"],
+      createdAt: "2026-09-27T00:00:00.000Z",
+      readAt: null,
+      dismissedAt: null,
+      subjectTurnId,
+      memoryIds: null,
+      toast: true,
+    };
+  }
+
+  function stubProjectTurnFetch(conversationId: string): { restore: () => void; turnsFetchCount: () => number } {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let turnsFetchCount = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: conversationId, status: "open", surface: "chat" }));
+      if (url.includes(`/api/conversations/${conversationId}/turns`)) {
+        turnsFetchCount++;
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) {
+        const body = ndjsonStream([
+          { type: "delta", text: "Starting Bedtime story now - 3 steps, about a minute." },
+          {
+            type: "done",
+            value: {
+              turn_id: "turn-project1",
+              reply: { text: "Starting Bedtime story now - 3 steps, about a minute." },
+              source: "plugin",
+              plugin_id: "start_project",
+              safety: SAFETY,
+            },
+          },
+        ]);
+        return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return { restore: () => { globalThis.fetch = original; }, turnsFetchCount: () => turnsFetchCount };
+  }
+
+  test("a project.done notification whose turn is already on screen triggers a reload of the open conversation", async () => {
+    const { restore, turnsFetchCount } = stubProjectTurnFetch("conv-project123");
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "make a bedtime story");
+      expect(await view.findByText("Starting Bedtime story now - 3 steps, about a minute.")).toBeVisible();
+
+      const before = turnsFetchCount();
+      act(() => {
+        view.queryClient.setQueryData(["notifications"], [projectNotification("n1", "turn-project1")]);
+      });
+
+      await waitFor(() => expect(turnsFetchCount()).toBeGreaterThan(before));
+    } finally {
+      restore();
+    }
+  });
+
+  test("a project.done notification for a turn NOT on screen does not reload the open conversation", async () => {
+    const { restore, turnsFetchCount } = stubProjectTurnFetch("conv-project456");
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "make a bedtime story");
+      expect(await view.findByText("Starting Bedtime story now - 3 steps, about a minute.")).toBeVisible();
+
+      const before = turnsFetchCount();
+      act(() => {
+        // A real delivery, but for a project started from a DIFFERENT,
+        // not-currently-open conversation's turn - the one thing this
+        // component is required to leave alone.
+        view.queryClient.setQueryData(["notifications"], [projectNotification("n2", "turn-somewhere-else")]);
+      });
+
+      // No waitFor to satisfy here (there is nothing that will ever
+      // become true) - a real tick is given time to prove the negative,
+      // the same shape a "does NOT happen" assertion needs anywhere else
+      // in this suite.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(turnsFetchCount()).toBe(before);
+    } finally {
+      restore();
+    }
+  });
+});
+
 
 describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail collapse and peek)", () => {
   // Jesse's literal spec (22:04, refined 22:22): no floating placement

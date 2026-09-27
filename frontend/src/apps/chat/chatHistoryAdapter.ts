@@ -4,6 +4,22 @@ import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 
 export type FeedbackVerdict = "positive" | "negative";
 
+// getmaipai/home#182: a background project's finished document attaches
+// to this SAME turn row minutes after its own reply already streamed
+// (backend/src/lib/projects/post.ts's postProjectResult(), tagged
+// `provenance: "project:<id>"` there) - the opposite time order from the
+// synchronous write_document case just below, whose card belongs BEFORE
+// the prose it was written alongside. The two are told apart by which
+// tool actually answered this turn: backend/src/lib/projects/tool.ts's
+// START_PROJECT_TOOL_ID is the only tool whose own succeeded outcome
+// never itself carries an artifact (runStartProjectTool() only ever
+// returns a plain "Starting <title> now…" reply), so a `row.artifact`
+// riding a turn with this pluginId can only be the project's own result,
+// attached after the fact - never the live write_document card, whose
+// turn always carries pluginId "write_document" instead
+// (backend/src/lib/composer.ts's artifactForOutcomes()).
+const PROJECT_START_PLUGIN_ID = "start_project";
+
 /** One {message, parentId} pair per turn's user half, in the exact branch
  * shape ExportedMessageRepository.fromBranchableArray() wants. */
 export interface BranchableTurnMessages {
@@ -147,7 +163,11 @@ export function rowsToBranchableMessages(
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
-              ...(row.artifact ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
+              // #182: a project-attached artifact (PROJECT_START_PLUGIN_ID
+              // above) rides AFTER the text below, not here - it belongs
+              // with the sources footer, since the reply it's attached to
+              // genuinely came first in time.
+              ...(row.artifact && row.pluginId !== PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
               // APPROVE-CARD-01: `row.confirm` is the reload-path twin of
               // the live "done" event's own `TurnValue.confirm`
               // (chatModelAdapter.ts) - conversationHistory.ts's own
@@ -158,6 +178,7 @@ export function rowsToBranchableMessages(
               // reaches this adapter.
               ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
               { type: "text" as const, text: row.replyText },
+              ...(row.artifact && row.pluginId === PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
               ...(row.sources?.length ? [toolCallPart(`${row.id}-sources`, "sources", row.sources)] : []),
             ]
           : row.replyText,
