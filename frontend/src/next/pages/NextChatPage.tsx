@@ -1859,6 +1859,45 @@ export function NextChatPage({ person }: { person: Roster }) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
+  // Jesse's own standing rule (2026-09-27): every expand/collapse
+  // surface animates open and closed, never snaps - the desktop canvas
+  // div below used to be a bare `{condition ? <div/> : null}` mount with
+  // no transition at all. `lastCanvasArtifactId` keeps the most recently
+  // opened id around through the CLOSING transition (React would
+  // otherwise unmount `ArtifactCanvasPanel` the instant `openArtifactId`
+  // clears, before the width transition below ever gets to play) - it
+  // only ever updates to a real id, never back to null, so the panel's
+  // own content stays exactly what it was showing while it slides shut.
+  const [lastCanvasArtifactId, setLastCanvasArtifactId] = useState<string | null>(null);
+  useEffect(() => {
+    if (openArtifactId !== null) setLastCanvasArtifactId(openArtifactId);
+  }, [openArtifactId]);
+  // A code review caught the real gap this backstop closes: the
+  // wrapper's own `onTransitionEnd` (below) is the normal way
+  // `lastCanvasArtifactId` gets cleared back to null once the closing
+  // width transition genuinely finishes, but a transition that never
+  // fires - `motion-reduce:transition-none` drops it entirely, and this
+  // session's own tab-backgrounding discovery tonight (`document.hidden`
+  // suspends animation/transition timelines, the same class of bug the
+  // rail's own `RAIL_WIDTH_ANIMATION_BACKSTOP_MS` was hardened against
+  // above) - would leave it stuck at a real id forever, keeping
+  // `ArtifactCanvasPanel` and its own `useQuery` mounted for the rest of
+  // the session after the first artifact ever closed. A plain
+  // `setTimeout`, padded past the real ~200ms transition so it never
+  // wins that race in the normal foregrounded case; the effect's own
+  // cleanup (re-run whenever `openArtifactId` changes) is what cancels a
+  // stale timer if a NEW artifact opens again before the old one's timer
+  // fires - React re-running this effect on that dependency change is
+  // the ordinary mechanism, not a manual check needed at fire time.
+  // Named, not inlined, matching the rail's own `RAIL_WIDTH_ANIMATION_
+  // BACKSTOP_MS` this comment cites as its precedent - a code review
+  // caught the first cut using a bare `500` instead.
+  const CANVAS_CLOSE_BACKSTOP_MS = 500;
+  useEffect(() => {
+    if (openArtifactId !== null) return;
+    const timeout = setTimeout(() => setLastCanvasArtifactId(null), CANVAS_CLOSE_BACKSTOP_MS);
+    return () => clearTimeout(timeout);
+  }, [openArtifactId]);
   // CANVAS-SHEET-DESKTOP-01 (fixes #183): the desktop canvas div below
   // (`hidden lg:block`) and the phone/tablet artifact Sheet used to both
   // bind their render to the same `openArtifactId !== null` state
@@ -2573,15 +2612,59 @@ export function NextChatPage({ person }: { person: Roster }) {
                 }}
               />
             </div>
-            {isDesktopCanvas && openArtifactId !== null ? (
+            {isDesktopCanvas ? (
               // Desktop only - the phone/tablet Sheet below covers the
               // same panel under `lg:hidden`, mirroring
               // chatDocumentPane.tsx's own split. Gated on
               // `isDesktopCanvas` too (CANVAS-SHEET-DESKTOP-01, fixes
               // #183), not just the CSS, so the Sheet below never
-              // mounts open at the same time this does.
-              <div className="hidden w-full max-w-xl shrink-0 overflow-y-auto lg:block">
-                <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} />
+              // mounts open at the same time this does - and the
+              // wrapper's own `hidden lg:block` (below) is the matching
+              // CSS-level backstop #183 established for exactly this
+              // pairing, kept here too: a code review caught the first
+              // cut of this animation dropping it, leaving nothing to
+              // hide the panel below `lg` if `isDesktopCanvas` (a JS
+              // `matchMedia` read) were ever momentarily stale relative
+              // to the real viewport during a resize.
+              //
+              // Jesse's own standing rule (2026-09-27): this used to be
+              // a bare `{openArtifactId !== null ? <div/> : null}` mount
+              // - no transition at all, an instant snap open and closed.
+              // Always mounted here instead (while on desktop), width
+              // animated between `w-0` and its open width the same way
+              // this file's own rail already animates its collapse
+              // (`transition-[width] duration-200 ease-linear
+              // motion-reduce:transition-none`) - `overflow-hidden`
+              // clips the sliding content on the way in and out.
+              // `lastCanvasArtifactId` (declared above, next to
+              // `openArtifactId`) keeps rendering the panel's own last
+              // real content through the CLOSING transition, since
+              // React would otherwise unmount `ArtifactCanvasPanel` the
+              // instant `openArtifactId` clears, before the width
+              // transition ever gets to play. A code review caught the
+              // first cut never clearing it back to null once that
+              // transition actually finishes - `ArtifactCanvasPanel`
+              // (and its own `useQuery` for the artifact) would have
+              // stayed mounted for the rest of the session after the
+              // FIRST artifact ever opened, not just through one closing
+              // animation. `onTransitionEnd` (the rail's own collapse
+              // animation above uses the identical pattern) is the real
+              // "the animation is actually done now" signal - only
+              // clearing when it fires for THIS element's own `width`
+              // property while closed (not `openArtifactId !== null`,
+              // which would also fire and immediately unmount on OPEN).
+              <div
+                data-slot="desktop-canvas-wrapper"
+                className={cn(
+                  // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate this panel's own dynamic width, the same rule the rail's own collapse animation above is already exempted for
+                  "hidden shrink-0 overflow-hidden transition-[width] duration-200 ease-linear motion-reduce:transition-none lg:block",
+                  openArtifactId !== null ? "w-full max-w-xl" : "w-0",
+                )}
+                onTransitionEnd={(e) => {
+                  if (e.target === e.currentTarget && e.propertyName === "width" && openArtifactId === null) setLastCanvasArtifactId(null);
+                }}
+              >
+                {lastCanvasArtifactId !== null ? <ArtifactCanvasPanel artifactId={lastCanvasArtifactId} onClose={closeArtifact} /> : null}
               </div>
             ) : null}
             {compareTarget !== null ? (

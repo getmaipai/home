@@ -820,8 +820,45 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       // The explicit close action still closes it, and never touches
       // the thread.
       fireEvent.click(view.getByRole("button", { name: "Close the canvas" }));
-      await waitFor(() => expect(view.queryByText("Every Friday night.")).toBeNull());
+      // Jesse's own standing rule (2026-09-27): this wrapping div stays
+      // mounted and its content keeps rendering through the CLOSING
+      // width transition (`lastCanvasArtifactId`'s own doc comment,
+      // NextChatPage.tsx) - the same "animate open and closed, never
+      // snap" fix that made this file's own Sources/tool-call
+      // disclosures actually animate. So the text staying in the DOM is
+      // now the CORRECT behavior, not something to assert away; `w-0`
+      // on the wrapper (the class actually driving the visual collapse)
+      // is the real signal that it closed.
+      await waitFor(() => expect(document.querySelector('[data-slot="desktop-canvas-wrapper"]')).toHaveClass("w-0"));
       expect(view.getByText("Wrote it.")).toBeVisible();
+    } finally {
+      restore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
+  });
+
+  // A code review caught this: the desktop canvas's own content used
+  // to stay mounted (and its `useQuery` for the artifact with it)
+  // forever after the FIRST artifact ever closed, not just through one
+  // closing animation - `lastCanvasArtifactId` only ever updated to a
+  // real id, never back to null. A backstop timeout (500ms, well past
+  // the real ~200ms transition) clears it once the close has genuinely
+  // had time to finish, whether or not a real `transitionend` ever
+  // fired (motion-reduce, or a backgrounded tab, both drop it).
+  test("desktop viewport: closing an artifact eventually unmounts the canvas panel, not just visually collapses it", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    let restore: () => void = () => {};
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      restore = await openArtifact(view);
+      await view.findByText("Every Friday night.");
+      fireEvent.click(view.getByRole("button", { name: "Close the canvas" }));
+      await waitFor(() => expect(view.queryByText("Every Friday night.")).toBeNull(), { timeout: 2000 });
     } finally {
       restore();
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
