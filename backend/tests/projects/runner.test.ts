@@ -10,8 +10,8 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import * as llm from "@/lib/llm";
-import { start, resumeAll, waitForSettled, __liveActorForTests, __resetRunnerForTests, __startWithStartedAtForTests } from "@/lib/projects/runner";
-import { createProject } from "@/lib/projects/store";
+import { start, resumeAll, waitForSettled, liveProject, __liveActorForTests, __resetRunnerForTests, __startWithStartedAtForTests } from "@/lib/projects/runner";
+import { createProject, loadProject } from "@/lib/projects/store";
 import { executeStep } from "@/lib/projects/steps";
 import { planSteps } from "@/lib/projects/types";
 import type { ProjectPlan, ProjectProvenance } from "@/lib/projects/types";
@@ -275,6 +275,67 @@ describe("the runner (text and assemble steps, resumable)", () => {
     expect(project.artifacts.length).toBe(0);
     expect(stepA.artifactIds.length).toBe(0);
     expect(stepA.state).toBe("failed");
+
+    completeSpy.mockRestore();
+  });
+
+  // PROJECT-PROGRESS-01's own blocking gap: saveProject() (this file's
+  // own actor.subscribe()) only re-persists the row once a whole BATCH
+  // settles, so a poll against loadProject() alone sees every step
+  // "pending," then every step in the batch "done," with nothing
+  // observable in between - a real regression a mid-batch poll would
+  // otherwise never catch. liveProject() reads the running actor's own
+  // in-memory object instead, the exact one steps.ts mutates per step.
+  test("liveProject() sees one chapter done and another still running mid-batch, while the persisted row (loadProject) still shows every step pending", async () => {
+    const person = adult();
+    const releases: Array<() => void> = [];
+    const completeSpy = spyOn(llm, "complete").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releases.push(() => resolve({ ok: true, value: { text: "chapter text", model: "stub" } }));
+        }),
+    );
+
+    const plan: ProjectPlan = {
+      steps: [
+        { id: "chapter-1", kind: "text", needs: [], params: { role: "chat", promptTemplate: "chapter 1", inputs: [] } },
+        { id: "chapter-2", kind: "text", needs: [], params: { role: "chat", promptTemplate: "chapter 2", inputs: [] } },
+      ],
+      ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 2 },
+    };
+
+    const project = start({ type: "adhoc", title: "A two-chapter book", plan, provenance: provenanceFor(person.id) });
+
+    // Both steps run concurrently (maxGeneratorJobs: 2) - wait until both
+    // have actually issued their own model call before touching either.
+    while (releases.length < 2) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    // Resolve only chapter-1's call, then let its own StepState write
+    // (runOneStep()'s `state.state = "done"`) actually land.
+    releases[0]!();
+    while (liveProject(project.id)!.steps.find((s) => s.stepId === "chapter-1")!.state !== "done") {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+
+    const live = liveProject(project.id)!;
+    expect(live.steps.find((s) => s.stepId === "chapter-1")!.state).toBe("done");
+    expect(live.steps.find((s) => s.stepId === "chapter-2")!.state).toBe("running");
+
+    // The persisted row is stuck at whatever it showed the moment this
+    // batch started (both chapters "running") - saveProject() only fires
+    // again once the WHOLE batch settles, so a poll against loadProject()
+    // alone can't tell chapter-1 already finished from it still running,
+    // the exact gap this item exists to close.
+    const persisted = loadProject(project.id)!;
+    expect(persisted.steps.find((s) => s.stepId === "chapter-1")!.state).toBe("running");
+    expect(persisted.steps.find((s) => s.stepId === "chapter-1")!.state).not.toBe("done");
+
+    releases[1]!();
+    const finished = await waitForSettled(project.id);
+    expect(finished.state).toBe("done");
+    // Once truly terminal, liveProject() has nothing live left to read -
+    // the route's own fallback to loadProject() is what a caller gets.
+    expect(liveProject(project.id)).toBeUndefined();
 
     completeSpy.mockRestore();
   });

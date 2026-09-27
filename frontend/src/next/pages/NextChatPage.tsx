@@ -21,6 +21,7 @@ import { Source, SourceIcon, SourceTitle } from "@maipai/ui/src/elements/sources
 import { Collapsible, CollapsibleContent } from "@maipai/ui/src/ui/collapsible";
 import { collapsePanel } from "@maipai/ui/src/elements/surfaces";
 import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
+import { JobProgress, type JobStage } from "@maipai/ui/src/elements/job-progress";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
@@ -42,7 +43,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
-import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type EnginesOverview, type InstalledPackage, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type EnginesOverview, type InstalledPackage, type Roster, type StructuredPart, type TurnStats, type ProjectView } from "@/lib/api";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
@@ -440,6 +441,135 @@ const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, never>, { p
   );
 };
 
+// PROJECT-PROGRESS-01: once a project finishes with a real posted
+// artifact, this replaces the JobProgress card below with the exact same
+// artifact-card render ArtifactCardToolRender above uses for a
+// `write_document` turn - a small dedicated component rather than
+// reusing that one directly (its own type is a `ToolCallMessagePartComponent`,
+// shaped for `useAssistantToolUI`'s full prop set, not a bare `{id}`
+// caller). Same query key (`["artifact-current", id]`) as that render,
+// so the two share a cache entry if a reload's own real `artifact` field
+// ever fetches the identical id.
+function ProjectFinishedArtifact({ id }: { id: string }) {
+  const openArtifact = useContext(ArtifactOpenContext);
+  const query = useQuery({ queryKey: ["artifact-current", id], queryFn: () => api.artifactCurrent(id) });
+  const data = query.data;
+  const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
+  return <ArtifactCard title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onClick={() => openArtifact(id)} />;
+}
+
+// PROJECT-PROGRESS-01 (issue #180): a project's own dependency-graph
+// plan has no percentage or per-step label to report (steps.ts's own
+// header) - v1's whole "how far along" signal is which step is still
+// pending/running versus already settled. `done`/`failed`/`skipped` all
+// count as settled: nothing further ever runs on any of them, so the
+// progress bar should already credit them, not just `done`.
+function projectStages(steps: ProjectView["steps"]): JobStage[] {
+  return steps.map((step) => ({ name: step.stepId, weight: 1 }));
+}
+
+function projectStageIndex(steps: ProjectView["steps"]): number {
+  const index = steps.findIndex((step) => step.state === "pending" || step.state === "running");
+  return index === -1 ? steps.length : index;
+}
+
+// The design record's own poll interval - fast enough to read as "alive"
+// (issue #180's own ask: ChatGPT-style visible progress, not silence),
+// slow enough not to be a real load for a household hub (ModelsSection.tsx's
+// own model-download job poll is the precedent this mirrors, 1s there
+// since that download job DOES report a real byte-progress percentage;
+// this one only ever moves once a whole step settles, so 2s is plenty).
+const PROJECT_POLL_MS = 2000;
+
+// A terminal (`done`/`failed`) project with no `posted_artifact` yet is
+// either the brief FK-race window post.ts's own header names (resolves
+// within one more tick almost always - postProjectResult() saves the
+// state and posts the artifact in the same synchronous pass) or a
+// project started from an incognito thread (post.ts never creates one
+// there - "no thread to post to"). This caps the extra polling to a
+// handful of ticks so the second case gives up instead of polling
+// forever for a card that will never arrive - a code review's own
+// finding: the first cut stopped polling the instant `done` appeared, no
+// matter whether the artifact had actually landed yet.
+const PROJECT_SETTLED_ARTIFACT_POLL_LIMIT = 5;
+
+// react-query's own function-form `refetchInterval` is this file's
+// idiomatic way to poll (every other tool-call render here - SpecSheet,
+// ArtifactCard above - already reads through `useQuery`, never a
+// hand-rolled `setInterval`) - the STOP condition it implements is
+// ModelsSection.tsx's own precedent ("poll the active job while it's
+// actually in flight; stop as soon as it lands on ready/failed so an
+// idle page never keeps a timer running"), the same rule applied here to
+// a project's own terminal states.
+const ProjectToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const query = useQuery({
+    queryKey: ["project", result?.id],
+    queryFn: () => api.project(result!.id),
+    enabled: result !== undefined,
+    refetchInterval: (q) => {
+      // A persistently failing poll (the project row gone, a transient
+      // error) never gets hammered every 2s forever - a code review's
+      // own finding: this had no error branch at all before, so a
+      // permanent fetch failure polled indefinitely with nothing ever
+      // shown.
+      if (q.state.status === "error") return false;
+      const data = q.state.data;
+      if (!data) return PROJECT_POLL_MS;
+      if (data.state === "cancelled") return false;
+      const settled = data.state === "done" || data.state === "failed";
+      if (!settled) return PROJECT_POLL_MS;
+      return data.posted_artifact || q.state.dataUpdateCount >= PROJECT_SETTLED_ARTIFACT_POLL_LIMIT ? false : PROJECT_POLL_MS;
+    },
+  });
+  if (!result) return null;
+  const project = query.data;
+  if (!project) {
+    // A persistently failing fetch gets a real (if quiet) line, not
+    // silence forever - the same isError branch ArtifactCardToolRender/
+    // ProjectFinishedArtifact below already have for their own fetch.
+    if (query.isError) return <p className="text-sm text-destructive">Couldn't check on this project right now.</p>;
+    // Nothing to show yet on the very first, still-in-flight poll - the
+    // reply's own text already told the person the project started
+    // (tool.ts's own `runStartProjectTool()` phrasing), so a brief gap
+    // with no card here reads as "the reply is still settling," not as
+    // silence.
+    return null;
+  }
+  // On finish, the artifact card takes over from the progress bar - the
+  // design record's own "the live tab needs to show the posted artifact
+  // without a reload." Checked for `failed` too, not just `done`: post.ts's
+  // own header posts a real document either way (a failure summary for
+  // `failed`), only `cancelled` posts nothing.
+  if ((project.state === "done" || project.state === "failed") && project.posted_artifact) {
+    return <ProjectFinishedArtifact id={project.posted_artifact.id} />;
+  }
+  if (project.state === "failed") {
+    return <p className="text-sm text-destructive">{project.title} didn't finish{project.error ? `: ${project.error}` : "."}</p>;
+  }
+  if (project.state === "cancelled") {
+    return <p className="text-muted-foreground text-sm">{project.title} was cancelled.</p>;
+  }
+  const stages = projectStages(project.steps);
+  const stageIndex = projectStageIndex(project.steps);
+  return (
+    <JobProgress
+      title={project.title}
+      stages={stages}
+      stageIndex={stageIndex}
+      stageProgress={0}
+      eta={`Step ${Math.min(stageIndex + 1, stages.length)} of ${stages.length}`}
+      onCancel={() => {
+        void api
+          .cancelProject(project.id)
+          .then(() => query.refetch())
+          .catch(() => {
+            /* the next poll tick (still running while a cancel is in flight) settles this either way */
+          });
+      }}
+    />
+  );
+};
+
 function ConfirmTool() {
   useAssistantToolUI({ toolName: "confirm", render: ConfirmToolRender, display: "standalone" });
   return null;
@@ -466,6 +596,11 @@ function ConfirmAskAnswerProvider({ askAnswerRef, children }: { askAnswerRef: Mu
     [aui, askAnswerRef],
   );
   return <ConfirmAskAnswerContext.Provider value={respond}>{children}</ConfirmAskAnswerContext.Provider>;
+}
+
+function ProjectTool() {
+  useAssistantToolUI({ toolName: "project", render: ProjectToolRender, display: "standalone" });
+  return null;
 }
 
 // TOOL-EVENTS-01's own frontend half, consumer before producer (the same
@@ -2137,6 +2272,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <StructuredResultTools />
         <ArtifactTool />
         <ConfirmTool />
+        <ProjectTool />
         <ToolTimelineTool />
         <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />

@@ -110,6 +110,25 @@ describe("rowsToBranchableMessages", () => {
     ]);
   });
 
+  // PROJECT-PROGRESS-01: a row carrying `project` ({id}, conversationHistory.ts's
+  // own reload-path twin of the live `done` event's `TurnValue.project`)
+  // becomes the same real tool-call part chatModelAdapter.ts builds live -
+  // `toolName: "project"`, card before prose, the same order every other
+  // reserved part on this row already uses.
+  test("a row carrying a project becomes a real tool-call part alongside the reply text, card before prose", () => {
+    const row = { ...makeRow("row-1", "Starting a bedtime story now."), project: { id: "proj-example123" } };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "tool-call", toolCallId: "row-1-project", toolName: "project", args: {}, argsText: "", result: { id: "proj-example123" } },
+      { type: "text", text: "Starting a bedtime story now." },
+    ]);
+  });
+
+  test("a row with no project keeps the plain reply text, unchanged", () => {
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "just a reply")], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toBe("just a reply");
+  });
+
   // getmaipai/home#130: the weather/almanac card disappeared after a
   // reload - a row carrying `structured_part` becomes the same real
   // tool-call part chatModelAdapter.ts builds live from the done event,

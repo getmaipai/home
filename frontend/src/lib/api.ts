@@ -10,6 +10,7 @@ import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import type { Artifact } from "@maipai/spec/gen/ts/artifact.js";
+import type { Project } from "@maipai/spec/gen/ts/project.js";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { Share } from "@maipai/spec/gen/ts/share.js";
 import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
@@ -98,6 +99,13 @@ export type SignedInPerson = Roster & {
 };
 export type Role = Person["role"];
 
+// PROJECT-PROGRESS-01: routes/projects.ts's own GET response, a real
+// Project (@maipai/spec) plus the one derived sibling field that route
+// adds (post.ts's own postedProjectArtifact()) - the same "structural
+// superset over the spec shape" pattern SignedInPerson above already is
+// for Roster.
+export type ProjectView = Project & { posted_artifact: { id: string; version: number } | null };
+
 // Real backend types, imported from @/wire (not hand-duplicated): a code
 // review (2026-09-04) flagged an earlier version of this file for
 // hand-typing mirrors of these three, which could silently drift from the
@@ -118,6 +126,7 @@ export type { Relationship };
 export type { PackageManifest };
 export type { Issue };
 export type { Conversation };
+export type { Project };
 export { isOwnerOrAdminRole, canHaveTemporaryChatRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
 // imported directly rather than through @/wire.
@@ -515,6 +524,13 @@ export const api = {
   // update to the same artifact id replaces the pane's content")
   // needs this, not the bare per-version GET.
   artifactCurrent: (id: string) => request<Artifact>(`/api/artifacts/${encodeURIComponent(id)}/current`),
+  // PROJECT-PROGRESS-01: the `project` reserved tool-call part
+  // (NextChatPage.tsx) polls this - the stored plan, each step's own
+  // state, and (once posted) the finished artifact's id/version, so the
+  // live card can show it without a reload (routes/projects.ts's own
+  // `posted_artifact` sibling field).
+  project: (id: string) => request<ProjectView>(`/api/projects/${encodeURIComponent(id)}`),
+  cancelProject: (id: string) => request<Project>(`/api/projects/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   conversationFeedback: (id: string) => request<ReplyFeedback | null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`),
   submitConversationFeedback: (id: string, verdict: ReplyFeedback["verdict"], reason: ReplyFeedback["reason"] = null) =>
     request<ReplyFeedback>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, {

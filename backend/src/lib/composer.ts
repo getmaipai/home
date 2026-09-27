@@ -37,6 +37,7 @@ import { TurnArtifact as TurnArtifactSchema, type TurnArtifact as TurnArtifactVa
 import type { AgeBand } from "@/lib/ageBand";
 import type { StructuredPart } from "@/wire";
 import type { SurfaceClass } from "@/lib/surfaceClass";
+import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 
 /** The fixed line for a data-only result the composer could not phrase
  * (the model failed, or the budget was spent with no direct reply). */
@@ -607,6 +608,26 @@ export function artifactForOutcomes(outcomes: readonly ToolExecutionOutcome[]): 
     const id = data?.artifact_id;
     const version = data?.artifact_version;
     if (typeof id === "string" && typeof version === "number") return { id, version };
+  }
+  return null;
+}
+
+/** PROJECT-PROGRESS-01: `TurnValue.project`'s own writer, the identical
+ * sibling shape artifactForOutcomes() just above already is for
+ * `TurnValue.artifact` - `runStartProjectTool()`'s own succeeded outcome
+ * (tool.ts) binds `{projectId, ...}` into its result's flat `data`, read
+ * here the same way that function reads `write_document`'s own
+ * `artifact_id`/`artifact_version`. Only the id: the project's title,
+ * steps and state all live on the project record itself, which the
+ * frontend polls for live (GET /api/projects/:id), never duplicated onto
+ * the wire the way an artifact's version number is. */
+export function projectForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
+  const succeeded = outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded");
+  for (const outcome of succeeded) {
+    if (outcome.packageId !== START_PROJECT_TOOL_ID) continue;
+    const data = recordData(outcome.result?.data);
+    const id = data?.projectId;
+    if (typeof id === "string") return { id };
   }
   return null;
 }

@@ -168,6 +168,26 @@ export function waitForSettled(id: string): Promise<Project> {
   });
 }
 
+/** PROJECT-PROGRESS-01: a read-only look at the running project object
+ * itself, not the persisted row - the fix for the one real gap a poll
+ * against loadProject() alone can't see. steps.ts's own runOneStep()
+ * mutates each StepState directly on this exact object as a step starts
+ * and finishes; this file's own actor.subscribe() above only calls
+ * saveProject() (re-persisting the row) once a whole BATCH settles -
+ * machine.ts's `batch` state resolves its single `invoke` only after
+ * every step runBatch() started has itself settled - so a poll against
+ * the persisted row alone sees every step "pending," then every step in
+ * that batch "done," with nothing observable in between, even though
+ * `bedtime-storybook`'s three chapters really do start and finish at
+ * different moments within the same batch. routes/projects.ts's GET
+ * handler prefers this over loadProject() whenever this process has a
+ * live actor for the id, falling back to the persisted row once the
+ * project is either terminal or was never launched by this process (a
+ * restart, or a project this process never owned). */
+export function liveProject(id: string): Project | undefined {
+  return state.actors.get(id)?.getSnapshot().context.project;
+}
+
 /** Test-only escape hatch, the same shape llmSupervisor.ts's own
  * __resetLlmSupervisorForTests() etc. use: lets a test observe or stop a
  * live actor directly (simulating a crash between two batches) without

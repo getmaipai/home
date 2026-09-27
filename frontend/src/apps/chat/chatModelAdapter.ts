@@ -597,6 +597,23 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // - wire.ts's own doc comment on `confirm` has the full
             // read-time-derivation reasoning for `open`.
             const confirm = event.value.confirm;
+            // PROJECT-PROGRESS-01: `start_project`'s own outcome names
+            // only the id it just launched (wire.ts's own comment on
+            // `TurnValue.project` - the same "name it, don't inline it"
+            // shape `artifact` just above already is for a version) - a
+            // real ToolCallMessagePart here, `toolName: "project"`,
+            // registered in NextChatPage.tsx to poll GET /api/projects/
+            // :id and render the shipped JobProgress element while it's
+            // live. A code review caught this never checking `artifact`
+            // the way conversationHistory.ts's own reload-path gate
+            // already does: `state.outcomes` is a plural array
+            // (turnNext.ts), so a turn whose outcomes somehow included
+            // both a succeeded `write_document` and a succeeded
+            // `start_project` call would otherwise show both cards live
+            // while a reload of that same turn shows only the artifact
+            // one - the identical "no double card" rule, applied here
+            // too, not just on reload.
+            const project = artifact ? undefined : event.value.project;
             // TOOL-EVENTS-01: `toolTimelinePart` (above) is the one
             // definition, used here and by `buildContent()` mid-stream -
             // computed once so both the array-spread check and the part
@@ -650,6 +667,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 ...(structuredPart ? [toolCallPart(`${event.value.turn_id}-structured`, structuredPart.tool_id, structuredPart)] : []),
                 ...(artifact ? [toolCallPart(`${event.value.turn_id}-artifact`, "write_document", artifact)] : []),
                 ...(confirm ? [toolCallPart(`${event.value.turn_id}-confirm`, "confirm", { package_id: confirm.package_id, open: confirm.open, turn_id: event.value.turn_id })] : []),
+                ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
                 // TOOL-EVENTS-01: same "before text" placement as the
                 // structured/artifact cards above - a trace of what ran
                 // while this reply was produced reads above its own

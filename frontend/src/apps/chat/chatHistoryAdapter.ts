@@ -159,7 +159,7 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.structured_part || row.artifact || row.confirm || row.sources?.length
+        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.sources?.length
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
@@ -177,6 +177,14 @@ export function rowsToBranchableMessages(
               // needed here: `open` is already correct by the time it
               // reaches this adapter.
               ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
+              // PROJECT-PROGRESS-01: conversationHistory.ts's own
+              // projectByTurn lookup already hides this once `row.artifact`
+              // is set (the project finished and posted - the design
+              // record's own "no double card"), so it's never present
+              // alongside `row.artifact` above; carried through here the
+              // same "card before prose" order as every other reserved
+              // tool-call part on this row.
+              ...(row.project ? [toolCallPart(`${row.id}-project`, "project", row.project)] : []),
               { type: "text" as const, text: row.replyText },
               ...(row.artifact && row.pluginId === PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
               ...(row.sources?.length ? [toolCallPart(`${row.id}-sources`, "sources", row.sources)] : []),

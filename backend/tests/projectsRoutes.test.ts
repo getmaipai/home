@@ -125,6 +125,36 @@ describe("GET /api/projects/:id", () => {
     expect(res.status).toBe(404);
   });
 
+  // PROJECT-PROGRESS-01: `posted_artifact` is null while the project's
+  // deliverable hasn't posted yet, and carries the real {id, version}
+  // the moment post.ts's own createArtifact() call lands - the field
+  // the live progress card reads to show the finished document without
+  // waiting for a reload.
+  test("posted_artifact is null while the project is running, then carries the real id and version once it finishes", async () => {
+    const { client, person } = await owner();
+    let release: (() => void) | undefined;
+    const completeSpy = spyOn(llm, "complete").mockImplementation(
+      () => new Promise((resolve) => { release = () => resolve({ ok: true, value: { text: "Once upon a time.", model: "stub" } }); }),
+    );
+    const { projectId } = startProjectFor(person);
+
+    const running = await client.get(`/api/projects/${projectId}`);
+    expect(running.status).toBe(200);
+    const runningBody = (await running.json()) as { posted_artifact: unknown };
+    expect(runningBody.posted_artifact).toBeNull();
+
+    release!();
+    await waitForSettled(projectId);
+
+    const done = await client.get(`/api/projects/${projectId}`);
+    expect(done.status).toBe(200);
+    const doneBody = (await done.json()) as { state: string; posted_artifact: { id: string; version: number } | null };
+    expect(doneBody.state).toBe("done");
+    expect(doneBody.posted_artifact).toEqual({ id: expect.any(String), version: 1 });
+
+    completeSpy.mockRestore();
+  });
+
   test("a child cannot read another person's project", async () => {
     const neverResolves = spyOn(llm, "complete").mockImplementation(() => new Promise(() => {}));
     const { client: ownerClient, person: ownerPerson } = await owner();

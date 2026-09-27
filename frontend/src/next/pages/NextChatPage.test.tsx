@@ -1156,6 +1156,154 @@ describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
   });
 });
 
+// PROJECT-PROGRESS-01 (issue #180): "a running project stays visibly
+// alive in chat, no new transport" - a `start_project` turn's own
+// `project` reserved tool-call part polls GET /api/projects/:id and
+// renders the shipped JobProgress element while it's live, the shipped
+// ArtifactCard once it's posted its result.
+describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
+  const PROJECT_ARTIFACT = {
+    id: "art-story123",
+    conversation_id: "conv-project123",
+    turn_id: "turn-project123",
+    kind: "markdown" as const,
+    title: "A bedtime story",
+    body: "Once upon a time.",
+    version: 1,
+    parent_version: null,
+    created_by: "person-abc123",
+    provenance: "project:proj-story123",
+    created_at: "2026-09-27T00:00:00.000Z",
+    hlc: "1788000000000:0:test",
+  };
+
+  function projectRunning() {
+    return {
+      id: "proj-story123",
+      type: "bedtime-storybook",
+      title: "A bedtime storybook",
+      state: "running",
+      steps: [
+        { stepId: "chapter-1", state: "done", startedAt: "2026-09-27T00:00:00.000Z", endedAt: "2026-09-27T00:00:01.000Z", error: null, artifactIds: [] },
+        { stepId: "chapter-2", state: "running", startedAt: "2026-09-27T00:00:01.000Z", endedAt: null, error: null, artifactIds: [] },
+        { stepId: "chapter-3", state: "pending", startedAt: null, endedAt: null, error: null, artifactIds: [] },
+      ],
+      posted_artifact: null,
+    };
+  }
+
+  function projectDone() {
+    return { ...projectRunning(), state: "done", steps: projectRunning().steps.map((s) => ({ ...s, state: "done" })), posted_artifact: { id: PROJECT_ARTIFACT.id, version: 1 } };
+  }
+
+  // Every GET /api/projects/proj-story123 poll after the first one
+  // returns `projectDone()` - the same "still in flight, then landed"
+  // shape stubTurnFetch's siblings elsewhere in this file use, here
+  // driven by call count rather than a second stream body.
+  function stubProjectTurnFetch(streamBody: ReadableStream<Uint8Array>): { restore: () => void; cancelCalls: () => number } {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let projectPolls = 0;
+    let cancelCalls = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-project123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes(`/api/projects/${projectRunning().id}/cancel`)) {
+        cancelCalls++;
+        return Promise.resolve(Response.json(projectRunning()));
+      }
+      if (url.includes(`/api/projects/${projectRunning().id}`)) {
+        projectPolls++;
+        return Promise.resolve(Response.json(projectPolls === 1 ? projectRunning() : projectDone()));
+      }
+      if (url.includes(`/api/artifacts/${PROJECT_ARTIFACT.id}/current`)) return Promise.resolve(Response.json(PROJECT_ARTIFACT));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return { restore: () => { globalThis.fetch = original; }, cancelCalls: () => cancelCalls };
+  }
+
+  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+  }
+
+  test("a start_project turn shows live step progress that updates via polling, then shows the posted artifact once the project finishes - no reload needed", async () => {
+    const { restore } = stubProjectTurnFetch(
+      ndjsonStream([
+        { type: "delta", text: "Starting a bedtime storybook now - 3 steps, about 1 minute." },
+        {
+          type: "done",
+          value: {
+            turn_id: "turn-project123",
+            reply: { text: "Starting a bedtime storybook now - 3 steps, about 1 minute." },
+            source: "model",
+            safety: SAFETY,
+            project: { id: "proj-story123" },
+          },
+        },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "write me a bedtime storybook");
+      expect(await view.findByText("Starting a bedtime storybook now - 3 steps, about 1 minute.")).toBeVisible();
+      // The first poll's own response: chapter-1 done, chapter-2 the
+      // current stage, chapter-3 not reached yet - the real per-step
+      // signal a poll against the persisted row alone couldn't show
+      // (runner.ts's own header on the gap this closes).
+      expect(await view.findByText("A bedtime storybook")).toBeVisible();
+      expect(await view.findByText("chapter-2")).toBeVisible();
+      expect(await view.findByText("Step 2 of 3")).toBeVisible();
+
+      // The next poll tick (~2s, refetchInterval) lands on `done` with a
+      // real posted_artifact - the progress card is replaced by the
+      // finished document's own card, live, with no reload.
+      await waitFor(() => expect(view.queryByText(PROJECT_ARTIFACT.title)).not.toBeNull(), { timeout: 8000, interval: 100 });
+      expect(view.queryByText("chapter-2")).toBeNull();
+    } finally {
+      restore();
+    }
+  }, 10000);
+
+  test("cancelling a running project calls the cancel route", async () => {
+    const { restore, cancelCalls } = stubProjectTurnFetch(
+      ndjsonStream([
+        { type: "delta", text: "Starting a bedtime storybook now - 3 steps, about 1 minute." },
+        {
+          type: "done",
+          value: {
+            turn_id: "turn-project123",
+            reply: { text: "Starting a bedtime storybook now - 3 steps, about 1 minute." },
+            source: "model",
+            safety: SAFETY,
+            project: { id: "proj-story123" },
+          },
+        },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "write me a bedtime storybook");
+      const cancelButton = await view.findByRole("button", { name: "Cancel the job" });
+      fireEvent.click(cancelButton);
+      await waitFor(() => expect(cancelCalls()).toBeGreaterThan(0));
+    } finally {
+      restore();
+    }
+  });
+});
 
 describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail collapse and peek)", () => {
   // Jesse's literal spec (22:04, refined 22:22): no floating placement

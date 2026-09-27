@@ -26,7 +26,7 @@ import { surfaceClassOf } from "@/lib/surfaceClass";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
 import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
-import { structuredPartForOutcomes, artifactForOutcomes } from "@/lib/composer";
+import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
@@ -113,6 +113,10 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // outcome) for anything, on any turn. Same functions, same input.
     structured_part: structuredPartForOutcomes(state.outcomes) ?? undefined,
     artifact: artifactForOutcomes(state.outcomes) ?? undefined,
+    // PROJECT-PROGRESS-01: a start_project outcome names the project id
+    // it just launched, the same unconditional-line, no-new-dispatch
+    // hookup the two fields above already use for their own outcomes.
+    project: projectForOutcomes(state.outcomes) ?? undefined,
     ...(source === "plugin" && packageId ? { plugin_id: packageId } : {}),
     ...(source === "command" && packageId ? { command_id: packageId } : {}),
     ...(sources && sources.length > 0 ? { sources } : {}),

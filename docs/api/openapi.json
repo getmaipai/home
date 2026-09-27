@@ -6590,6 +6590,28 @@
                     "updatedAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "posted_artifact": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "version"
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -6604,7 +6626,8 @@
                     "error",
                     "hlc",
                     "createdAt",
-                    "updatedAt"
+                    "updatedAt",
+                    "posted_artifact"
                   ],
                   "additionalProperties": false,
                   "description": "A durable unit of background work a turn started: a plan of typed steps, their runtime state, and the artifacts they produced. The turn replies immediately; the project runs after it, survives restarts, and posts its artifacts back to the thread."

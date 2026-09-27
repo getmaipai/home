@@ -31,6 +31,8 @@ import {
   markPreviousTurnCorrected,
 } from "@/lib/conversationHistory";
 import { createArtifact } from "@/lib/artifacts";
+import { createProject } from "@/lib/projects/store";
+import type { ProjectPlan } from "@/lib/projects/types";
 import { newConversationTurnId } from "@/lib/id";
 import { createCommand } from "@/lib/commands";
 import { REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
@@ -2139,6 +2141,59 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     const asOwner = listConversationTurns(ownerActor, conv.value.id);
     expect(asOwner.ok).toBe(true);
     if (asOwner.ok) expect(asOwner.value[0]?.artifact).toEqual({ id: v1.id, version: 1 });
+  });
+
+  // PROJECT-PROGRESS-01: the reload-path twin of the live `done` event's
+  // `TurnValue.project` ({id}) - projectsByTurn() (store.ts) reads it
+  // straight off the `projects` table's own `provenance.turnId`, no new
+  // column, the identical shape the artifact tests just above already
+  // prove for `TurnValue.artifact`.
+  function minimalPlan(): ProjectPlan {
+    return {
+      steps: [{ id: "story", kind: "text", needs: [], params: { role: "chat", promptTemplate: "write a story", inputs: [] } }],
+      ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 1 },
+    };
+  }
+
+  test("a turn that started a project carries its project id on reload", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const turnId = newConversationTurnId();
+    logTurn(actor, "chat", "write me a bedtime story", { reply: { text: "Starting a bedtime story now." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
+    const project = createProject({ type: "bedtime-story", title: "A bedtime story", plan: minimalPlan(), provenance: { person: actor.id, conversationId: conv.value.id, turnId, planSource: "package" } });
+
+    const result = listConversationTurns(actor, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value[0]?.project).toEqual({ id: project.id });
+  });
+
+  test("a turn with no project carries no project field", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-no-project" });
+
+    const result = listConversationTurns(actor, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value[0]?.project).toBeUndefined();
+  });
+
+  test("a turn whose project already posted its artifact carries the artifact, not the project field - no double card", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const turnId = newConversationTurnId();
+    logTurn(actor, "chat", "write me a bedtime story", { reply: { text: "Starting a bedtime story now." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
+    createProject({ type: "bedtime-story", title: "A bedtime story", plan: minimalPlan(), provenance: { person: actor.id, conversationId: conv.value.id, turnId, planSource: "package" } });
+    const v1 = createArtifact({ conversationId: conv.value.id, turnId, kind: "markdown", title: "A bedtime story", body: "Once upon a time.", createdBy: actor.id, provenance: "project:proj-example123" });
+
+    const result = listConversationTurns(actor, conv.value.id);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value[0]?.artifact).toEqual({ id: v1.id, version: 1 });
+      expect(result.value[0]?.project).toBeUndefined();
+    }
   });
 
   // getmaipai/home#130: the weather/almanac card on /next/chat

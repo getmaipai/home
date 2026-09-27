@@ -51,6 +51,7 @@ import { remember } from "@/lib/memory";
 import { recordEpisodes, deleteEpisodesForTurns, contentTerms } from "@/lib/episodes";
 import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import { artifactsByTurn } from "@/lib/artifacts";
+import { projectsByTurn } from "@/lib/projects/store";
 import { nextHlc, compareHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
@@ -1657,16 +1658,37 @@ export function listConversationTurns(
   // ask, false for every other row that ever carried a confirm
   // (answered, superseded, or from before this ask existed).
   const pendingAsk = getPendingAsk(id);
+  // PROJECT-PROGRESS-01: the reload-path twin of the live `done` event's
+  // `TurnValue.project` - projectsByTurn() mirrors artifactsByTurn()
+  // just above, keyed on `provenance.turnId`, no new column (store.ts's
+  // own header on it).
+  const projectByTurn = projectsByTurn(rows.map((r) => r.id));
 
   return { ok: true, value: rows.map((r) => {
     const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, ...row } = r;
-    const artifact = actor.role === "child" && r.safetyAction === "refuse" ? undefined : artifactByTurn.get(r.id);
+    // Named once, read by both fields below (a code review's own
+    // finding: two separately-inlined copies of the identical condition
+    // is exactly the kind of thing a later rule change updates in one
+    // place and not the other, silently reopening whichever gap this
+    // one wasn't touched for).
+    const hideForRefusedChildTurn = actor.role === "child" && r.safetyAction === "refuse";
+    const artifact = hideForRefusedChildTurn ? undefined : artifactByTurn.get(r.id);
+    // Once the turn's own real `artifact` field is here (the project
+    // finished and posted its result - post.ts's own createArtifact()
+    // call), the project card would be a second, stale card for the
+    // same finished work - the design record's own "hide it once the
+    // turn's own reload path would carry the real artifact field."
+    // Never surfaced for a safety-refused child turn either, the same
+    // gate `artifact` above already applies (a project a refused turn
+    // started couldn't exist, but this keeps the two fields consistent
+    // rather than relying on that never happening).
+    const project = artifact || hideForRefusedChildTurn ? undefined : projectByTurn.get(r.id);
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
     // getmaipai/home#130: no age gate - see structuredPart's own write-
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 

@@ -6,7 +6,7 @@
 // properties are already camelCase, so there's no field-name mapping
 // beyond JSON-encoding the four nested shapes into their own text
 // columns.
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { newProjectId } from "@/lib/id";
@@ -111,4 +111,30 @@ export function listResumableProjects(): ProjectT[] {
     .where(inArray(projects.state, ["planned", "running"]))
     .all()
     .map(toProject);
+}
+
+/** PROJECT-PROGRESS-01's own reload-path lookup, the identical shape
+ * artifacts.ts's own artifactsByTurn() already is (batched by turn id,
+ * one query, no N+1): conversationHistory.ts's listConversationTurns()
+ * calls this so a reloaded turn that started a project still carries its
+ * project id, the same way `row.artifact` already survives reload.
+ * "No new column" (the design record's own words): `provenance.turnId`
+ * lives inside the `provenance` JSON text column, never its own indexed
+ * column, so this reads it with `json_extract` rather than adding one -
+ * this table is small (a household's own projects, not a high-volume
+ * log), so a per-row JSON read costs nothing worth indexing against
+ * yet. A turn keyed twice (two projects sharing one turnId) can't
+ * happen today - `start_project` is one tool call, one project - but if
+ * it ever could, the last row this query returns wins, the same
+ * "whichever the Map's insertion order leaves last" behavior
+ * artifactsByTurn() already has for a turn with more than one version. */
+export function projectsByTurn(turnIds: readonly string[]): Map<string, { id: string }> {
+  if (turnIds.length === 0) return new Map();
+  const turnIdExpr = sql<string>`json_extract(${projects.provenance}, '$.turnId')`;
+  const rows = db
+    .select({ id: projects.id, turnId: turnIdExpr })
+    .from(projects)
+    .where(inArray(turnIdExpr, turnIds))
+    .all();
+  return new Map(rows.map((row) => [row.turnId, { id: row.id }]));
 }

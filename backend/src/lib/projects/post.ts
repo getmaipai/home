@@ -21,7 +21,7 @@
 // first call to actually see the row write the artifact wins,
 // `alreadyPosted()` is what the second one reads to become a no-op.
 import { readFileSync } from "node:fs";
-import { and, eq } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { artifacts, conversationTurns } from "@/db/schema";
 import { createArtifact } from "@/lib/artifacts";
@@ -44,6 +44,29 @@ function alreadyPosted(turnId: string, projectId: string): boolean {
       .where(and(eq(artifacts.turnId, turnId), eq(artifacts.provenance, `${PROJECT_ARTIFACT_PROVENANCE_PREFIX}${projectId}`)))
       .get() !== undefined
   );
+}
+
+/** PROJECT-PROGRESS-01: routes/projects.ts's own GET response gains this
+ * as a sibling field (`posted_artifact`) so the live progress card can
+ * show the finished document without waiting for a reload - the exact
+ * `project:<id>` provenance tag this file's own createArtifact() call
+ * below writes, looked up the same way alreadyPosted() above already
+ * does, just returning the row instead of a boolean. Null before the
+ * project posts (still running, or terminal with nothing to show -
+ * `cancelled` never posts one at all, this file's own header above). */
+export function postedProjectArtifact(projectId: string): { id: string; version: number } | null {
+  // alreadyPosted() guards against a second post today, so exactly one
+  // row is the normal case - `orderBy` is here anyway (a code review's
+  // own finding) so a future path that legitimately posts more than one
+  // under this same tag can never return a stale one: `createdAt` is a
+  // real timestamp, not insertion order left to SQLite's own discretion.
+  const row = db
+    .select({ id: artifacts.id, version: artifacts.version })
+    .from(artifacts)
+    .where(eq(artifacts.provenance, `${PROJECT_ARTIFACT_PROVENANCE_PREFIX}${projectId}`))
+    .orderBy(desc(artifacts.createdAt))
+    .get();
+  return row ?? null;
 }
 
 /** The plan's own sink step (the one step nothing else `needs`) is the

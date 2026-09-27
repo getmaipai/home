@@ -771,6 +771,57 @@ describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
   });
 });
 
+// PROJECT-PROGRESS-01: `start_project`'s own outcome names the project id
+// it just launched (wire.ts's `TurnValue.project`) - a real
+// ToolCallMessagePart here, `toolName: "project"`, the same "card before
+// prose" placement as the structured/artifact cards above (NextChatPage.tsx's
+// registered JobProgress render polls GET /api/projects/:id for the rest).
+describe("createChatModelAdapter project progress (PROJECT-PROGRESS-01)", () => {
+  test("a project on the done event becomes a real tool-call part, card before prose", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Starting a bedtime story now - 2 steps, about 1 minute." },
+        {
+          type: "done",
+          value: {
+            turn_id: "turn-project123",
+            reply: { text: "Starting a bedtime story now - 2 steps, about 1 minute." },
+            source: "model",
+            safety: SAFETY,
+            project: { id: "proj-example123" },
+          },
+        },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("write me a bedtime story")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "tool-call", toolCallId: "turn-project123-project", toolName: "project", args: {}, argsText: "", result: { id: "proj-example123" } },
+        { type: "text", text: "Starting a bedtime story now - 2 steps, about 1 minute." },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a plain reply with no project yields no project tool-call part", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Basil and parsley are easy herbs." },
+        { type: "done", value: { turn_id: "turn-herbs789", reply: { text: "Basil and parsley are easy herbs." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what herbs should I grow")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([{ type: "text", text: "Basil and parsley are easy herbs." }]);
+    } finally {
+      env.restore();
+    }
+  });
+});
+
 // Slice 5(a): CHAT-16's `TurnValue.sources` becomes a real ToolCallMessagePart
 // too - `toolName: "sources"`, AFTER the text part (spec.md's "a compact card
 // under the reply," the opposite order from the structured card above, which
