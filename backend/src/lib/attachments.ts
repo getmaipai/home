@@ -15,7 +15,7 @@ import { attachments, conversationTurns, conversations, shares } from "@/db/sche
 import { newFileId, newShareId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
-import { checkStorageCap } from "@/lib/storage/usage";
+import { checkStorageCap, kindForMediaType } from "@/lib/storage/usage";
 import { canAccessFile } from "@/lib/access";
 import type { PersonRow } from "@/types";
 
@@ -57,22 +57,13 @@ function storagePathFor(ownerPersonId: string, id: string): string {
 }
 
 // STORE-SPEC-01: `kind` is a new required field the old attachment record
-// never carried, so nothing here previously classified a media type. This
-// module only ever handles origin "sent" (a composer upload), so it only
-// needs image/video/audio/other; it deliberately does not fold in
-// documentExtraction.ts's own DOCUMENT_MEDIA_TYPES (a PDF or office file
-// currently lands in "other", not "document") since that module already
-// imports FROM this one (readAttachment) - reaching back for its list
-// would be a circular import, and duplicating the list here would be a
-// second copy of the same classification. Flagged in the migration report
-// as a real gap, not silently guessed past.
-function kindForMediaType(mediaType: string): FileRecord["kind"] {
-  if (mediaType.startsWith("image/")) return "image";
-  if (mediaType.startsWith("video/")) return "video";
-  if (mediaType.startsWith("audio/")) return "audio";
-  return "other";
-}
-
+// never carried, so nothing here previously classified a media type.
+// kindForMediaType() moved to lib/storage/usage.ts (STORE-PAGE-01) so its
+// own personUsageByKind() can share the identical classification rather
+// than growing a second copy - see that module's own comment for why it
+// lives there and not here (this module already imports checkStorageCap
+// from it, so importing one more thing back is not a new cycle).
+//
 // Exported: lib/shares.ts builds the same File shape from the same raw
 // row for its own listings (the Library page's owned/shared lists), and
 // a second copy of this mapping would drift from this one the moment

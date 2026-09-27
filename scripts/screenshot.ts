@@ -246,6 +246,7 @@ const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
 const nextPerformanceReview = process.argv.includes("--next-performance-review");
+const nextStorageReview = process.argv.includes("--next-storage-review");
 const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
@@ -3169,6 +3170,51 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
   }
 }
 
+/** STORE-PAGE-01's own acceptance: both viewports, both themes, of
+ * `/next/storage`, signed in as Sage (owner) - seedHousehold() already
+ * creates three real people (Sage, Marlow, Nova), so the data table
+ * shows three real rows, each honestly at 0 bytes (createAttachment()
+ * has no live HTTP caller anywhere in this codebase yet, checked
+ * directly - the same "no image/video generation host method" gap
+ * STORE-CAP-01's own done note names - so a fresh seeded household
+ * cannot have a real file in it today; this is the same honest-empty-
+ * state posture captureNextBackupsReview's own comment above takes for
+ * its page, not a fabricated number). The household total card and the
+ * default per-person cap (20 GB) are real, non-zero settings values
+ * though, so the capture isn't only zeros. */
+async function captureNextStorageReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextStorageReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/storage`);
+        await page.locator("text=Household total").first().waitFor({ timeout: 15000 });
+        await page.locator("text=Household storage cap").first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "Storage");
+        await settleAnimations(page);
+        const path = join(outDir, `next-storage-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** SHELL-07's own acceptance: both viewports, both themes, of `/next/
  * backups`. This throwaway backend's own fresh data directory has
  * never run a backup, so the real, expected capture is the vendored
@@ -3960,8 +4006,12 @@ async function main() {
       await captureNextChatChildComposerReview(browser, sessionValue);
     }
 
-    if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview) {
+    if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextStorageReview) {
       await captureNextPerformanceReview(browser, sessionValue);
+    }
+
+    if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {
+      await captureNextStorageReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

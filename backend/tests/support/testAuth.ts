@@ -30,3 +30,15 @@ export async function teen(ownerClient: TestClient): Promise<TestClient> {
   await client.post("/api/auth/select", { personId: id });
   return client;
 }
+
+// STORE-PAGE-01: a "child sees only their own row" test needs an actual
+// child, not the sibling teen() helper's role - mirrors teen() exactly,
+// same bare-tap /select, same reason a credential-free profile can.
+export async function child(ownerClient: TestClient): Promise<{ client: TestClient; row: PersonRow }> {
+  const created = await ownerClient.post("/api/people", { displayName: "Poppy", role: "child" });
+  const { id } = (await created.json()) as { id: string };
+  const client = new TestClient();
+  await client.post("/api/auth/select", { personId: id });
+  const row = db.select().from(people).where(eq(people.id, id)).get()! as PersonRow;
+  return { client, row };
+}

@@ -1,4 +1,5 @@
 import type { Person } from "@maipai/spec/gen/ts/person.js";
+import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
@@ -853,6 +854,29 @@ export interface PerformanceDisk {
   total_bytes: number;
   free_bytes: number;
   areas: Array<{ area: string; bytes: number }>;
+}
+
+/** STORE-PAGE-01: one row on the Storage settings page's data table -
+ * lib/storage/usage.ts's storageUsageOverview() builds these from the
+ * same personUsageBytes()/personCapBytes()/personUsageByKind() the
+ * record API's own cap enforcement reads (STORE-CAP-01), never a second
+ * computation for the page. */
+export interface PersonStorageRow {
+  personId: string;
+  displayName: string;
+  role: string;
+  usageBytes: number;
+  capBytes: number;
+  byKind: Array<{ kind: FileRecord["kind"]; bytes: number }>;
+}
+
+/** `household` is null for anyone who isn't owner/admin (the acceptance's
+ * "a child sees only their own row": no household total, no other
+ * person's row - enforced inside storageUsageOverview() itself, not a
+ * second filter here or on the frontend). */
+export interface StorageUsageOverview {
+  people: PersonStorageRow[];
+  household: { usageBytes: number; capBytes: number } | null;
 }
 
 export interface Performance {

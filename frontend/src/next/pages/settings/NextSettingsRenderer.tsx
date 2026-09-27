@@ -14,6 +14,12 @@ interface NextSettingsRendererProps {
   /** The runtime scope string the API expects: "household" or
    * "person:<id>" (lib/settings.ts's parseScope). */
   scopeValue: string;
+  /** STORE-PAGE-01: render only the named `lives_in` group(s) - a second
+   * page (the Storage settings page) embedding just its own caps group
+   * reuses this exact renderer rather than a hand copy of its Card/
+   * NextSettingField loop. Omitted (every existing call site) renders
+   * every eligible group, unchanged. */
+  only?: readonly string[];
 }
 
 const REGISTRY_QUERY_KEY = ["settings-registry"];
@@ -33,7 +39,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function NextSettingsRenderer({ scope, scopeValue }: NextSettingsRendererProps) {
+export function NextSettingsRenderer({ scope, scopeValue, only }: NextSettingsRendererProps) {
   const queryClient = useQueryClient();
   // SHELL-SEARCH-02: `?section=<group.id>` (a SettingsKey's own
   // `lives_in`, the identical id `groupSettings()` groups by below) -
@@ -134,7 +140,8 @@ export function NextSettingsRenderer({ scope, scopeValue }: NextSettingsRenderer
         loadingLabel="Loading settings"
       >
         {({ registry, values }: { registry: SettingsKey[]; values: ResolvedSetting[] }) => {
-          const groups: SettingsGroup[] = groupSettings(registry, values, scope, "home");
+          const allGroups: SettingsGroup[] = groupSettings(registry, values, scope, "home");
+          const groups = only ? allGroups.filter((g) => only.includes(g.id)) : allGroups;
           return groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">No settings yet.</p>
           ) : (

@@ -1,0 +1,115 @@
+import { useQuery } from "@tanstack/react-query";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { getIcon } from "@maipai/ui/src/icons";
+import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { NextDataTable } from "@/next/components/NextDataTable";
+import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
+import { formatBytes } from "@/apps/settings/formatBytes";
+import { api, ApiError, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+
+// Exported: nextPageHeaderTitle.tsx's own MANAGE_PAGE_ENTRIES imports this
+// directly for the header's left slot, the same "that page's own exported
+// icon constant, not a second table" pattern NextPerformancePage.tsx's own
+// PerformanceIcon already follows. "database" mirrors the icon
+// performance/DiskHardwareCard.tsx already uses for the disk/storage
+// concept, not picked independently.
+export const StorageIcon = getIcon("database");
+
+interface PersonUsageRow extends Record<string, unknown> {
+  person: string;
+  role: string;
+  used: string;
+  cap: string;
+  "top kind": string;
+}
+
+function capLabel(capBytes: number): string {
+  // 0 is every cap key's own "no cap enforced at this level" (usage.ts's
+  // own comment) - shown as a plain fact, never a fabricated number.
+  return capBytes > 0 ? formatBytes(capBytes) : "No cap set";
+}
+
+function usageLine(usageBytes: number, capBytes: number): string {
+  if (capBytes <= 0) return `${formatBytes(usageBytes)} used, no cap set`;
+  const percent = Math.round((usageBytes / capBytes) * 100);
+  return `${formatBytes(usageBytes)} of ${formatBytes(capBytes)} used (${percent}%)`;
+}
+
+function toRow(row: PersonStorageRow): PersonUsageRow {
+  const top = row.byKind[0];
+  return {
+    person: row.displayName,
+    role: row.role,
+    used: formatBytes(row.usageBytes),
+    cap: capLabel(row.capBytes),
+    "top kind": top ? `${top.kind} (${formatBytes(top.bytes)})` : "None yet",
+  };
+}
+
+/** /next/storage (STORE-PAGE-01, docs/BACKLOG.md): each person's usage
+ * against their cap, the household total against its cap, the largest
+ * kinds per person, and the cap controls for an admin - composed
+ * entirely from the template's `Card`/`NextDataTable` and the settings
+ * standard's own generic renderer (docs/SETTINGS.md's "one declaration,
+ * one implementation"), never a second hand-built cap-editing form:
+ * `NextSettingsRenderer`'s new `only` prop (added for this page) renders
+ * just the "household.storage" group's own `NextSettingField`s, the
+ * identical write path Settings' Household tab already uses for these
+ * same three keys.
+ *
+ * One source with the performance dashboard's own disk panel (STORE-
+ * CAP-01/backend's own acceptance): `GET /api/storage/usage` and `GET
+ * /api/performance`'s disk.areas both read `lib/storage/usage.ts`'s
+ * `householdUsageBytes()` for the household's file-byte total - see that
+ * route/lib pair's own comments for why a raw-disk area list
+ * (`storageSummary()`) and this household-file-record concept are kept
+ * distinct rather than conflated, while still sharing the one function
+ * for the concept they DO have in common.
+ *
+ * Reachable by everyone, unlike Performance: the row-visibility rule (a
+ * child sees only their own row, never the household total or a
+ * sibling's row) lives entirely on the backend
+ * (`storageUsageOverview()`), so this page renders exactly what the API
+ * returns with no client-side role filtering of its own - the same
+ * "backend is the one gate" posture NextPerformancePage.tsx's own
+ * comment already states for its owner/admin-only case. */
+export function NextStoragePage({ person }: { person: Roster }) {
+  useDocumentTitle("Storage");
+  const query = useQuery<StorageUsageOverview>({ queryKey: ["storage-usage"], queryFn: () => api.storageUsage() });
+  const isAdmin = isOwnerOrAdminRole(person.role);
+
+  return (
+    <AsyncState
+      data={query.data}
+      error={query.isError}
+      isFetching={query.isFetching}
+      onRetry={() => query.refetch()}
+      errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load storage."}
+      loadingLabel="Loading storage"
+    >
+      {(data: StorageUsageOverview) => (
+        <div className="flex flex-col gap-4 pb-4">
+          <CardHeader className="p-0">
+            <CardTitle className="flex items-center gap-2">
+              <StorageIcon size={16} className="text-muted-foreground" />
+              Storage
+            </CardTitle>
+          </CardHeader>
+          {data.household ? (
+            <Card>
+              <CardHeader className="border-b border-border">
+                <CardTitle>Household total</CardTitle>
+              </CardHeader>
+              <CardContent className="p-5">
+                <p className="text-sm text-muted-foreground">{usageLine(data.household.usageBytes, data.household.capBytes)}</p>
+              </CardContent>
+            </Card>
+          ) : null}
+          <NextDataTable data={data.people.map(toRow)} emptyMessage="No files yet." />
+          {isAdmin ? <NextSettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} /> : null}
+        </div>
+      )}
+    </AsyncState>
+  );
+}

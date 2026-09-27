@@ -4,15 +4,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { child } from "./support/testAuth";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { storageSummary, storageImpact, checkPersonQuota, checkDiskFull } from "@/lib/storage";
 import { stageFactoryReset, pendingFactoryReset, applyPendingFactoryReset, cancelPendingFactoryReset, FACTORY_RESET_CONFIRMATION_PHRASE } from "@/lib/factoryReset";
 import { generateDiagnostics } from "@/lib/diagnostics";
 import { setValue, setHouseholdSettingValue } from "@/lib/settings";
 import { listIssues } from "@/lib/issues";
-import { sqlite } from "@/db";
+import { db, sqlite } from "@/db";
 import { dataDir, backupDir } from "@/lib/paths";
 import { readdirSync, rmSync } from "node:fs";
+import { createAttachment } from "@/lib/attachments";
+import { resolveOrCreateConversation } from "@/lib/conversationHistory";
+import { newConversationTurnId } from "@/lib/id";
+import { nextHlc } from "@/lib/hlc";
+import { conversationTurns } from "@/db/schema";
 import type { PersonRow } from "@/types";
 
 function toPersonRow(id: string): PersonRow {
@@ -235,6 +241,124 @@ describe("POST /api/storage/factory-reset", () => {
     const { client } = await owner();
     const res = await client.post("/api/storage/factory-reset", { confirmation: FACTORY_RESET_CONFIRMATION_PHRASE });
     expect(res.status).toBe(200);
+  });
+});
+
+function conversationFor(actor: PersonRow): string {
+  const result = resolveOrCreateConversation(actor, "chat");
+  if (!result.ok) throw new Error(result.error);
+  return result.value.id;
+}
+
+function turnFor(actor: PersonRow, conversationId: string): string {
+  const id = newConversationTurnId();
+  db.insert(conversationTurns)
+    .values({
+      id,
+      personId: actor.id,
+      surface: "chat",
+      conversationId,
+      userText: "here's a picture",
+      replyText: "saved",
+      source: "model",
+      safetyAction: "allow",
+      createdAt: new Date().toISOString(),
+      hlc: nextHlc(),
+    })
+    .run();
+  return id;
+}
+
+async function upload(actor: PersonRow, mediaType: string, text: string): Promise<void> {
+  const conversationId = conversationFor(actor);
+  const turnId = turnFor(actor, conversationId);
+  const result = createAttachment(actor, { conversationId, turnId, mediaType, bytes: new TextEncoder().encode(text) });
+  if (!result.ok) throw new Error(result.error);
+}
+
+// STORE-PAGE-01 (docs/BACKLOG.md): the Storage settings page's one read,
+// GET /api/storage/usage - and the proof that it and GET /api/performance
+// share the exact household number, not just numbers that happen to match.
+describe("GET /api/storage/usage", () => {
+  test("an owner/admin sees every person's row plus the household total", async () => {
+    const { client, id } = await owner();
+    const ownerRow = toPersonRow(id);
+    const { row: childRow } = await child(client);
+    await upload(ownerRow, "image/png", "a picture from the owner");
+    await upload(childRow, "video/mp4", "a clip from the child");
+
+    const res = await client.get("/api/storage/usage");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      people: Array<{ personId: string; usageBytes: number; byKind: Array<{ kind: string; bytes: number }> }>;
+      household: { usageBytes: number; capBytes: number } | null;
+    };
+
+    expect(body.people).toHaveLength(2);
+    const ownerRowOut = body.people.find((p) => p.personId === id)!;
+    const childRowOut = body.people.find((p) => p.personId === childRow.id)!;
+    expect(ownerRowOut.usageBytes).toBe("a picture from the owner".length);
+    expect(ownerRowOut.byKind).toEqual([{ kind: "image", bytes: "a picture from the owner".length }]);
+    expect(childRowOut.usageBytes).toBe("a clip from the child".length);
+    expect(childRowOut.byKind).toEqual([{ kind: "video", bytes: "a clip from the child".length }]);
+
+    expect(body.household).not.toBeNull();
+    expect(body.household!.usageBytes).toBe("a picture from the owner".length + "a clip from the child".length);
+  });
+
+  test("a child sees only their own row - never the household total, never a sibling's row", async () => {
+    const { client: ownerClient, id: ownerId } = await owner();
+    const ownerRow = toPersonRow(ownerId);
+    const { client: childClient, row: childRow } = await child(ownerClient);
+    await upload(ownerRow, "image/png", "the owner's own private picture");
+    await upload(childRow, "audio/mp3", "the child's own clip");
+
+    const res = await childClient.get("/api/storage/usage");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      people: Array<{ personId: string; usageBytes: number }>;
+      household: unknown;
+    };
+
+    expect(body.people).toHaveLength(1);
+    expect(body.people[0]!.personId).toBe(childRow.id);
+    expect(body.people[0]!.usageBytes).toBe("the child's own clip".length);
+    expect(body.household).toBeNull();
+  });
+
+  test("largest kinds per person, sorted with the biggest first", async () => {
+    const { client, id } = await owner();
+    const ownerRow = toPersonRow(id);
+    await upload(ownerRow, "audio/mp3", "a short clip"); // 12 bytes
+    await upload(ownerRow, "image/png", "a much longer picture description used as bytes"); // longer
+
+    const res = await client.get("/api/storage/usage");
+    const body = (await res.json()) as { people: Array<{ personId: string; byKind: Array<{ kind: string; bytes: number }> }> };
+    const row = body.people.find((p) => p.personId === id)!;
+    expect(row.byKind[0]!.kind).toBe("image");
+    expect(row.byKind[1]!.kind).toBe("audio");
+  });
+
+  test("requires sign-in", async () => {
+    const client = new TestClient();
+    expect((await client.get("/api/storage/usage")).status).toBe(401);
+  });
+
+  test("the Storage page's household total and the performance panel's disk area are the exact same number, from the exact same function", async () => {
+    const { client, id } = await owner();
+    const ownerRow = toPersonRow(id);
+    await upload(ownerRow, "image/png", "bytes counted on both surfaces");
+
+    const usageRes = await client.get("/api/storage/usage");
+    const usageBody = (await usageRes.json()) as { household: { usageBytes: number } };
+
+    const perfRes = await client.get("/api/performance");
+    const perfBody = (await perfRes.json()) as { disk: { areas: Array<{ area: string; bytes: number }> } };
+    const attachmentsArea = perfBody.disk.areas.find((a) => a.area === "attachments");
+
+    expect(attachmentsArea).toBeDefined();
+    expect(attachmentsArea!.bytes).toBe(usageBody.household.usageBytes);
+    expect(attachmentsArea!.bytes).toBe("bytes counted on both surfaces".length);
   });
 });
 

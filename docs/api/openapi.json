@@ -19860,6 +19860,117 @@
         }
       }
     },
+    "/api/storage/usage": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Per-person storage usage against cap, largest kinds, and the household total",
+        "description": "An owner/admin sees every active person's row plus the household total; anyone else sees a single row (themself only) and a null household - the same numbers lib/storage/usage.ts's personUsageBytes()/householdUsageBytes()/personCapBytes()/householdCapBytes() compute for the record API's own cap enforcement (STORE-CAP-01) and for the performance dashboard's disk panel (GET /api/performance).",
+        "responses": {
+          "200": {
+            "description": "Real numbers, computed straight from the File records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "people": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "personId": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "usageBytes": {
+                            "type": "number"
+                          },
+                          "capBytes": {
+                            "type": "number"
+                          },
+                          "byKind": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "image",
+                                    "video",
+                                    "audio",
+                                    "document",
+                                    "story",
+                                    "other"
+                                  ],
+                                  "description": "The kind of content, read by the manifest lint's output check (docs/PACKAGES.md \"Uninstall, and a person's files\": a manifest declares its outputs as media kinds matching this enum)."
+                                },
+                                "bytes": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "bytes"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "personId",
+                          "displayName",
+                          "role",
+                          "usageBytes",
+                          "capBytes",
+                          "byKind"
+                        ]
+                      }
+                    },
+                    "household": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "usageBytes": {
+                          "type": "number"
+                        },
+                        "capBytes": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "usageBytes",
+                        "capBytes"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "people",
+                    "household"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/storage/diagnostics": {
       "get": {
         "tags": [

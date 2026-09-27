@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@maipai/ui/src/dashboard/components/ui/tabs";
-import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
 import { NextManageSection } from "@/next/pages/settings/NextManageSection";
@@ -91,6 +91,19 @@ export function NextSettingsPage({ person }: { person: Roster }) {
         // household-scope writes 403 for anyone else.
         <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
       )}
+      {/* STORE-PAGE-01: unlike NextManageSection's owner/admin-only links
+          above, Storage is reachable by everyone regardless of tab - a
+          child's own row lives there too (GET /api/storage/usage's own
+          row-visibility rule), so this link-out sits outside the
+          canManageHousehold branch rather than inside either tab. */}
+      <Link to="/next/storage" className="block">
+        <Card className="py-4 transition-colors hover:bg-accent">
+          <CardHeader>
+            <CardTitle>Storage</CardTitle>
+            <CardDescription>Usage against the cap, and the largest kinds of files.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
     </div>
   );
 }

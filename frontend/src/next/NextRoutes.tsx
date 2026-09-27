@@ -16,6 +16,7 @@ import { NextChatPage } from "@/next/pages/NextChatPage";
 import { NextAppsPage } from "@/next/pages/NextAppsPage";
 import { NextPeoplePage } from "@/next/pages/NextPeoplePage";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
+import { NextStoragePage } from "@/next/pages/NextStoragePage";
 import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
 import { NextPerformancePage } from "@/next/pages/NextPerformancePage";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
@@ -164,6 +165,7 @@ function NextRoutesWithIncognito({ person }: { person: Roster }) {
             <Route path="tools" element={<NextAppsPage />} />
             <Route path="people" element={<NextPeoplePage person={person} />} />
             <Route path="settings" element={<NextSettingsPage person={person} />} />
+            <Route path="storage" element={<NextStoragePage person={person} />} />
             <Route path="engines" element={<NextEnginesPage />} />
             <Route path="performance" element={<NextPerformancePage />} />
             <Route path="updates" element={<NextUpdatesPage person={person} />} />

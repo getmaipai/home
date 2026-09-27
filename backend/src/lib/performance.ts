@@ -13,6 +13,7 @@ import { conversationTurns, entities, pendingEmbeddings, pendingMemoryWork } fro
 import { listActivePeople } from "@/lib/access";
 import { judgeQueueStats } from "@/lib/memoryJudge";
 import { storageSummary } from "@/lib/storage";
+import { householdUsageBytes } from "@/lib/storage/usage";
 import { isStackConfigured, getStackClient } from "@/lib/stackEngine";
 import { syncStackHealthIssues } from "@/lib/stackHealthSync";
 import { listIssues } from "@/lib/issues";
@@ -248,9 +249,21 @@ async function hardwarePanel(): Promise<PerformanceHardware> {
   }
 }
 
+// STORE-PAGE-01: storageSummary()'s own `areas` list (lib/storage.ts) never
+// walked attachmentsDir - it enumerates the OTHER areas under dataDir
+// (models, engines, cache, backups...), a raw disk-space concept distinct
+// from the household's File-record byte total lib/storage/usage.ts owns
+// (STORE-CAP-01). Both are real and neither should be silently dropped
+// here: the household's own files are real disk usage this panel was
+// missing entirely, so an "attachments" area is added by calling
+// householdUsageBytes() directly - the exact same function the new
+// Storage settings page's /api/storage/usage route calls for its own
+// household total, so the two surfaces can never show different numbers
+// for the same seeded household (the acceptance this row exists to prove).
 function diskPanel(): PerformanceDisk {
   const summary = storageSummary();
-  return { total_bytes: summary.disk.totalBytes, free_bytes: summary.disk.freeBytes, areas: summary.areas };
+  const areas = [...summary.areas, { area: "attachments", bytes: householdUsageBytes() }];
+  return { total_bytes: summary.disk.totalBytes, free_bytes: summary.disk.freeBytes, areas };
 }
 
 export async function getPerformance(requestedDays: number | undefined): Promise<Performance> {

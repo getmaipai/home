@@ -18,7 +18,39 @@ import { attachmentsDir, dataDir } from "@/lib/paths";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { walkFiles } from "@/lib/storage";
+import { listActivePeople, isOwnerOrAdmin } from "@/lib/access";
 import { HOUSEHOLD_STORAGE_CAP_KEY, PERSON_DEFAULT_STORAGE_CAP_KEY, PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
+import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
+import type { PersonRow } from "@/types";
+// The wire shape, not a second local interface (the same "one definition"
+// pattern lib/performance.ts's own Performance/PerformanceDisk imports
+// follow): the frontend's api.ts imports these two from
+// @maipai/home-backend/src/wire the identical way it already imports
+// Performance.
+import type { PersonStorageRow, StorageUsageOverview } from "@/wire";
+export type { PersonStorageRow, StorageUsageOverview } from "@/wire";
+
+// STORE-SPEC-01: `kind` is a required field on the spec's `file` shape
+// (image/video/audio/document/story/other) the `attachments` table never
+// stores directly - it's derived from `media_type` at read time, here
+// rather than in lib/attachments.ts (this module already imports from
+// that one the other way - checkStorageCap - so this is the one place
+// both attachments.ts's toRecord() and this module's own personUsageByKind()
+// below can share it without a cycle). This module only ever sees origin
+// "sent" uploads, so it only needs image/video/audio/other; it deliberately
+// does not fold in documentExtraction.ts's own DOCUMENT_MEDIA_TYPES (a PDF
+// or office file currently lands in "other", not "document") since that
+// module already imports FROM lib/attachments.ts (readAttachment) -
+// reaching back for its list would be circular, and a second copy here
+// would drift. Flagged as a real, pre-existing gap, not silently guessed
+// past: "document" and "story" never appear in a per-kind breakdown today
+// because nothing in this codebase writes an attachment with either kind.
+export function kindForMediaType(mediaType: string): FileRecord["kind"] {
+  if (mediaType.startsWith("image/")) return "image";
+  if (mediaType.startsWith("video/")) return "video";
+  if (mediaType.startsWith("audio/")) return "audio";
+  return "other";
+}
 
 /** Bytes owned by one person, summed straight from the File records. */
 export function personUsageBytes(personId: string): number {
@@ -36,6 +68,51 @@ export function personUsageBytes(personId: string): number {
 export function householdUsageBytes(): number {
   const row = db.select({ total: sql<number>`coalesce(sum(${attachments.size}), 0)` }).from(attachments).get();
   return (row?.total as number | undefined) ?? 0;
+}
+
+/** One person's bytes broken down by kind (STORE-PAGE-01: "the largest
+ * kinds per person"), largest first. Grouped in JS via the same
+ * kindForMediaType() classification toRecord() uses for the File shape's
+ * own `kind` field, rather than a second SQL CASE expression that could
+ * silently drift from it the next time that classification changes. */
+export function personUsageByKind(personId: string): Array<{ kind: FileRecord["kind"]; bytes: number }> {
+  const rows = db
+    .select({ mediaType: attachments.mediaType, size: attachments.size })
+    .from(attachments)
+    .where(eq(attachments.ownerPersonId, personId))
+    .all();
+  const totals = new Map<FileRecord["kind"], number>();
+  for (const row of rows) {
+    const kind = kindForMediaType(row.mediaType);
+    totals.set(kind, (totals.get(kind) ?? 0) + row.size);
+  }
+  return [...totals.entries()].map(([kind, bytes]) => ({ kind, bytes })).sort((a, b) => b.bytes - a.bytes);
+}
+
+/** STORE-PAGE-01's one read: the Storage settings page's data table, and
+ * the child-view rule the acceptance names ("a child sees only their own
+ * row") - enforced HERE, at the one function both the admin and the
+ * non-admin call, rather than as a second filter re-applied in the route
+ * or the frontend. An owner/admin gets every active person's row plus the
+ * household total; anyone else gets a one-row list (themself only) and a
+ * null household - never the total, never a sibling's row, the same
+ * "self, or an owner/admin" shape access.ts's own canAccessPerson() already
+ * uses elsewhere for personal settings. */
+export function storageUsageOverview(actor: PersonRow): StorageUsageOverview {
+  const admin = isOwnerOrAdmin(actor);
+  const targets = admin ? listActivePeople() : listActivePeople().filter((p) => p.id === actor.id);
+  const people: PersonStorageRow[] = targets.map((p) => ({
+    personId: p.id,
+    displayName: p.displayName,
+    role: p.role,
+    usageBytes: personUsageBytes(p.id),
+    capBytes: personCapBytes(p.id),
+    byKind: personUsageByKind(p.id),
+  }));
+  return {
+    people,
+    household: admin ? { usageBytes: householdUsageBytes(), capBytes: householdCapBytes() } : null,
+  };
 }
 
 /** This person's effective cap: their own override when an admin set one

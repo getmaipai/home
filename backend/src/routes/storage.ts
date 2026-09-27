@@ -3,11 +3,16 @@
 // a UI yet.
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { requireRoleOrGrant, requireRole } from "@/middleware/auth";
+import { requireRoleOrGrant, requireRole, requireAuth } from "@/middleware/auth";
 import { storageSummary, storageImpact } from "@/lib/storage";
+import { storageUsageOverview } from "@/lib/storage/usage";
 import { listNasMounts, createNasMount, deleteNasMount } from "@/lib/nasMounts";
 import { stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, FACTORY_RESET_CONFIRMATION_PHRASE } from "@/lib/factoryReset";
 import { generateDiagnostics } from "@/lib/diagnostics";
+// Renamed from the bare `File` export, same reason attachments.ts's own
+// toRecord() does: `File` is a Bun/Fetch global, so importing the spec's
+// zod object under that name would shadow it.
+import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
 
 export const storageRoutes = apiRouter();
 
@@ -169,6 +174,45 @@ const cancelResetRoute = createRoute({
   },
 });
 storageRoutes.openapi(cancelResetRoute, (c) => c.json({ cancelled: cancelPendingFactoryReset() }, 200));
+
+// STORE-PAGE-01: the Storage settings page's one read - every signed-in
+// person may call this (unlike every other route in this file, all
+// owner/admin only), because the row-visibility rule lives inside
+// storageUsageOverview() itself (a child sees only their own row, never
+// the household total or a sibling's row), the same "self, or an owner/
+// admin" shape settings' own person-scope reads already enforce - not a
+// second gate re-applied here.
+// `kind` reuses the spec's own closed enum (image/video/audio/document/
+// story/other) rather than a bare `z.string()` - a code review caught the
+// widened type, which would have let the generated OpenAPI docs drift
+// from `file.schema.json`'s real shape (STORE-SPEC-01's "one definition").
+const KindBreakdownSchema = z.object({ kind: FileRecordSchema.shape.kind, bytes: z.number() });
+const PersonStorageRowSchema = z.object({
+  personId: z.string(),
+  displayName: z.string(),
+  role: z.string(),
+  usageBytes: z.number(),
+  capBytes: z.number(),
+  byKind: z.array(KindBreakdownSchema),
+});
+const StorageUsageOverviewSchema = z.object({
+  people: z.array(PersonStorageRowSchema),
+  household: z.object({ usageBytes: z.number(), capBytes: z.number() }).nullable(),
+});
+
+const usageRoute = createRoute({
+  method: "get",
+  path: "/usage",
+  tags: ["Storage"],
+  summary: "Per-person storage usage against cap, largest kinds, and the household total",
+  description: "An owner/admin sees every active person's row plus the household total; anyone else sees a single row (themself only) and a null household - the same numbers lib/storage/usage.ts's personUsageBytes()/householdUsageBytes()/personCapBytes()/householdCapBytes() compute for the record API's own cap enforcement (STORE-CAP-01) and for the performance dashboard's disk panel (GET /api/performance).",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: StorageUsageOverviewSchema } }, description: "Real numbers, computed straight from the File records." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+storageRoutes.openapi(usageRoute, (c) => c.json(storageUsageOverview(c.get("person")), 200));
 
 // Diagnostics: owner/admin, no grant widening either - a support bundle
 // still names every person's role/enabled state and the household's own

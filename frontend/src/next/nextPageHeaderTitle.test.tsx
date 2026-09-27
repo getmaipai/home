@@ -35,6 +35,7 @@ describe("NextPageHeaderTitle", () => {
     ["/next/tools", "Tools", "lucide-layout-grid"],
     ["/next/people", "People", "lucide-users"],
     ["/next/settings", "Settings", "lucide-settings"],
+    ["/next/storage", "Storage", "lucide-database"],
     ["/next/engines", "Engines", "lucide-cpu"],
     ["/next/performance", "Performance", "lucide-gauge"],
     ["/next/updates", "Updates", "lucide-refresh-cw"],
