@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -41,17 +44,69 @@ export const BackupsIcon = getIcon("archive");
 interface Row extends Record<string, unknown> {
   date: string;
   size: string;
+  filename: string;
 }
 
 function toRow(backup: BackupInfo): Row {
-  return { date: new Date(backup.createdAt).toLocaleString(), size: formatBytes(backup.bytes) };
+  const row = { date: whenText(backup.createdAt), size: formatBytes(backup.bytes) };
+  Object.defineProperty(row, "filename", { value: backup.filename });
+  return row as Row;
+}
+
+function whenText(iso: string): string {
+  return new Date(iso).toLocaleString();
 }
 
 export function NextBackupsPage({ person }: { person: Roster }) {
   useDocumentTitle("Backups");
   const canManage = isOwnerOrAdminRole(person.role);
+  const canRestore = person.role === "owner";
   const backupsQuery = useQuery<BackupInfo[]>({ queryKey: ["backups"], queryFn: () => api.backups(), enabled: canManage });
   const pendingQuery = useQuery<{ pending: PendingRestore | null }>({ queryKey: ["backups-pending"], queryFn: () => api.pendingRestore(), enabled: canManage });
+  const [running, setRunning] = useState(false);
+  const [busyFilename, setBusyFilename] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  async function handleRunBackup() {
+    setRunning(true);
+    try {
+      await api.runBackup();
+      await backupsQuery.refetch();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Could not run a backup.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function handleRestore(filename: string) {
+    setBusyFilename(filename);
+    try {
+      await api.stageRestore(filename);
+      await pendingQuery.refetch();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Could not get that backup ready.");
+    } finally {
+      setBusyFilename(null);
+    }
+  }
+
+  async function handleCancel() {
+    setCancelling(true);
+    try {
+      await api.cancelRestore();
+      await pendingQuery.refetch();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Could not cancel the restore.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  function backupDate(filename: string, backups: BackupInfo[]): string {
+    const match = backups.find((backup) => backup.filename === filename);
+    return match ? whenText(match.createdAt) : "the one you chose";
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -84,12 +139,26 @@ export function NextBackupsPage({ person }: { person: Roster }) {
                   <CardContent className="p-6">
                     <p className="text-sm font-medium">Ready to restore</p>
                     <p className="text-sm text-muted-foreground">
-                      The backup from {new Date(pendingQuery.data.pending.stagedAt).toLocaleString()} will replace everything in MaiPai Home the next time it starts.
+                      The backup from {backupDate(pendingQuery.data.pending.filename, backups)} will replace everything in MaiPai Home the next time it starts.
                     </p>
+                    {canRestore ? <Button variant="secondary" onClick={handleCancel} disabled={cancelling} className="mt-3">Cancel restore</Button> : null}
                   </CardContent>
                 </Card>
               ) : null}
-              <NextDataTable data={backups.map(toRow)} />
+              <NextDataTable
+                data={backups.map(toRow)}
+                rowKey={(row) => row.filename}
+                rowActions={canRestore && !pendingQuery.data?.pending ? (row) => [{
+                  label: "Restore",
+                  destructive: true,
+                  confirmLabel: `Restore the backup from ${row.date}? Everyone in your household, everything MaiPai remembers, and every conversation will go back to how they were then. Anything added since will be gone. This takes effect the next time MaiPai Home starts.`,
+                  disabled: busyFilename !== null,
+                  onClick: () => handleRestore(row.filename),
+                }] : undefined}
+              />
+              <Button variant="secondary" onClick={handleRunBackup} disabled={running} className="w-fit">
+                {running ? "Backing up…" : "Back up now"}
+              </Button>
             </>
           )}
         </AsyncState>
