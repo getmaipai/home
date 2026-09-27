@@ -664,7 +664,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 ...(structuredPart ? [toolCallPart(`${event.value.turn_id}-structured`, structuredPart.tool_id, structuredPart)] : []),
                 ...(artifact ? [toolCallPart(`${event.value.turn_id}-artifact`, "write_document", artifact)] : []),
                 ...(confirm ? [toolCallPart(`${event.value.turn_id}-confirm`, "confirm", { package_id: confirm.package_id, open: confirm.open, turn_id: event.value.turn_id })] : []),
-                ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
                 // TOOL-EVENTS-01: same "before text" placement as the
                 // structured/artifact cards above - a trace of what ran
                 // while this reply was produced reads above its own
@@ -680,6 +679,22 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // reference card specifically (a weather card reads
                 // above its own sentence), not every tool part; sources
                 // are a footer, not a header.
+                //
+                // `project` moved down here from the "before text" group
+                // above, 2026-09-27 (Jesse found live): chatHistoryAdapter.ts's
+                // own #182 reload-path rule already renders a project's
+                // finished artifact AFTER its text (PROJECT_START_PLUGIN_ID),
+                // matching sources' own "compact card under the reply"
+                // reasoning, not the structured/artifact/confirm "reference
+                // the reply is ABOUT" reasoning above. Leaving `project`
+                // in the before-text group here, while it was live, meant
+                // ProjectResultReload's own `reloadMainThread()` (up to
+                // 15s later, once the project's done/failed notification
+                // arrives) visibly relocated the exact same card from
+                // above the reply to below it the moment the reload
+                // landed - the live and reload paths now agree on the
+                // one position from the start, so nothing has to jump.
+                ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
                 ...(sources?.length ? [toolCallPart(`${event.value.turn_id}-sources`, "sources", sources)] : []),
               ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),

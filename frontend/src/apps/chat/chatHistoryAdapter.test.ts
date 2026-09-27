@@ -113,14 +113,18 @@ describe("rowsToBranchableMessages", () => {
   // PROJECT-PROGRESS-01: a row carrying `project` ({id}, conversationHistory.ts's
   // own reload-path twin of the live `done` event's `TurnValue.project`)
   // becomes the same real tool-call part chatModelAdapter.ts builds live -
-  // `toolName: "project"`, card before prose, the same order every other
-  // reserved part on this row already uses.
-  test("a row carrying a project becomes a real tool-call part alongside the reply text, card before prose", () => {
+  // `toolName: "project"`. AFTER the reply text, not before, since
+  // 2026-09-27 (a code review caught this still card-before-prose after
+  // chatModelAdapter.ts's own live "done" event moved to card-after-text:
+  // the two disagreeing meant a reload catching a still-running project
+  // visibly relocated the exact card the live/reload-of-a-finished-project
+  // fix was supposed to stop doing).
+  test("a row carrying a project becomes a real tool-call part alongside the reply text, card after prose", () => {
     const row = { ...makeRow("row-1", "Starting a bedtime story now."), project: { id: "proj-example123" } };
     const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
     expect(items[1]!.message.content).toEqual([
-      { type: "tool-call", toolCallId: "row-1-project", toolName: "project", args: {}, argsText: "", result: { id: "proj-example123" } },
       { type: "text", text: "Starting a bedtime story now." },
+      { type: "tool-call", toolCallId: "row-1-project", toolName: "project", args: {}, argsText: "", result: { id: "proj-example123" } },
     ]);
   });
 

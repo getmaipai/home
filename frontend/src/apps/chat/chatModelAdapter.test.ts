@@ -787,11 +787,17 @@ describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
 
 // PROJECT-PROGRESS-01: `start_project`'s own outcome names the project id
 // it just launched (wire.ts's `TurnValue.project`) - a real
-// ToolCallMessagePart here, `toolName: "project"`, the same "card before
-// prose" placement as the structured/artifact cards above (NextChatPage.tsx's
+// ToolCallMessagePart here, `toolName: "project"` (NextChatPage.tsx's
 // registered JobProgress render polls GET /api/projects/:id for the rest).
+// AFTER the text, not before, since 2026-09-27 (Jesse found live): a
+// project's card is a "here's what came of that" footer like sources, the
+// same reasoning chatHistoryAdapter.ts's own #182 reload-path rule
+// already applies to a project's finished artifact - putting it before
+// text here, while live, meant ProjectResultReload's later
+// `reloadMainThread()` visibly relocated the same card once the reload
+// landed.
 describe("createChatModelAdapter project progress (PROJECT-PROGRESS-01)", () => {
-  test("a project on the done event becomes a real tool-call part, card before prose", async () => {
+  test("a project on the done event becomes a real tool-call part, card after prose", async () => {
     const env = stubEnvironment(
       ndjsonStream([
         { type: "delta", text: "Starting a bedtime story now - 2 steps, about 1 minute." },
@@ -811,8 +817,8 @@ describe("createChatModelAdapter project progress (PROJECT-PROGRESS-01)", () => 
       const { yields } = await collect([fakeUserMessage("write me a bedtime story")]);
       const last = yields[yields.length - 1];
       expect(last?.content).toEqual([
-        { type: "tool-call", toolCallId: "turn-project123-project", toolName: "project", args: {}, argsText: "", result: { id: "proj-example123" } },
         { type: "text", text: "Starting a bedtime story now - 2 steps, about 1 minute." },
+        { type: "tool-call", toolCallId: "turn-project123-project", toolName: "project", args: {}, argsText: "", result: { id: "proj-example123" } },
       ]);
     } finally {
       env.restore();

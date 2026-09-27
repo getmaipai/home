@@ -178,15 +178,24 @@ export function rowsToBranchableMessages(
               // needed here: `open` is already correct by the time it
               // reaches this adapter.
               ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
+              { type: "text" as const, text: row.replyText },
               // PROJECT-PROGRESS-01: conversationHistory.ts's own
               // projectByTurn lookup already hides this once `row.artifact`
               // is set (the project finished and posted - the design
               // record's own "no double card"), so it's never present
-              // alongside `row.artifact` above; carried through here the
-              // same "card before prose" order as every other reserved
-              // tool-call part on this row.
+              // alongside `row.artifact` above. AFTER the text, not
+              // before, since 2026-09-27 (a code review caught this): a
+              // still-running project's own card is a "here's what's
+              // happening with that" footer, the same "compact card
+              // under the reply" reasoning as `sources` and the finished
+              // project artifact right above - chatModelAdapter.ts's own
+              // live "done" event moved its `project` part to match
+              // (Jesse found the two disagreeing live, the card visibly
+              // relocating once a reload landed); leaving this ONE spot
+              // still card-before-text would only have traded that jump
+              // for the identical jump on a reload that catches a
+              // project still running.
               ...(row.project ? [toolCallPart(`${row.id}-project`, "project", row.project)] : []),
-              { type: "text" as const, text: row.replyText },
               ...(row.artifact && row.pluginId === PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
               ...(row.sources?.length ? [toolCallPart(`${row.id}-sources`, "sources", row.sources)] : []),
             ]
