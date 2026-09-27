@@ -276,6 +276,17 @@ of labels, never from the full context over an open set. Nothing in
 this design waits on it; it is how the routing decisions get cheap
 and honest once the labeled rows exist.
 
+A second open reproduction, evaluated the same day: CLM-v0.1-8B
+(`docs/plans/model-review-qwen-image-2.1-and-clm-2026-09-26.md`).
+Apache-2.0 heads on a frozen Apache-2.0 Qwen3-8B encoder, a 2,048-token
+window, an open candidate set ranked by embedding distance with the
+candidates cached, and a claimed usable zero-shot where Laya's is
+not; against that, an 8B encoder that tier 1 can only afford if the
+chat engine's own weights serve its embeddings. It joins the same
+bench (ROUTER-RLCD-01) on the same rows, and nothing above changes:
+the labelled set, the calibration study and shadow mode are still the
+path for whichever wins.
+
 ## The runner's machinery: XState v5, already decided
 
 Asked directly (Jesse, 2026-09-26): were we not supposed to use

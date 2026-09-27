@@ -28450,3 +28450,46 @@ gate rule for a failure the diff didn't touch. The hub on 8787 was not
 restarted; its own turns are still served under the old instruction
 until Jesse restarts it, which is the live check the BACKLOG tick
 names as outstanding.
+
+## Two model cards reviewed: Qwen-Image-2.1 out, CLM-8B into the router bench (2026-09-26)
+
+Jesse asked for a read of `Qwen/Qwen-Image-2.1` and
+`Contrastive-LM/CLM-v0.1-8B` and a fold into the design where they fit.
+The full review, with the licence quoted and the weights measured from
+the repositories' own blob sizes, is
+`docs/plans/model-review-qwen-image-2.1-and-clm-2026-09-26.md`.
+
+Qwen-Image-2.1 is rejected for the image role on licence: the Qwen
+Research License (2026-09-20) allows "research or evaluation purposes
+only" and reserves commercial use for a separate licence, a harder
+line than the CC BY-NC voices and the YuE2 weights this record already
+declined, and a family using a Catalog package is neither. Weight
+would have settled tiers 1 and 2 regardless (33 GB at bf16, an
+8B-class Qwen3-VL text encoder, the 8 GB path only through unofficial
+GGUF re-quantizations of the kind the jev-and-yue note refused). The
+earlier members of the family (Qwen-Image, Edit-2509, Edit-2511) are
+Apache-2.0 and stay; the sizing bar's "full Qwen-Image" row now says
+so explicitly, and IMAGE-01 carries the verdict so it is not re-asked.
+The 2.1 card's capability list (reference images, masked local edits,
+RGBA output, identity preservation) is kept as the yardstick for the
+edit shape IMAGE-02 will eventually grow.
+
+CLM-v0.1-8B is the second open reproduction of the typed-decision
+model this record picked Laya up for on 2026-09-26: Apache-2.0 heads
+(about 75 MB) on a frozen Apache-2.0 Qwen3-8B encoder, typed answers
+with a calibrated probability, or a ranking over any candidate set
+with the candidates' embeddings cached. It reads 2,048 tokens to
+Laya's 512, has no option ceiling, and claims a usable zero-shot on
+tool-calling where Laya's is below the majority baseline; it costs an
+8B encoder that tier 1 cannot hold beside the chat model unless the
+chat engine's own Qwen3-8B weights can serve last-token-pooled
+embeddings, which is the first thing its bench row verifies (in the
+installed engine source and by cosine against the reference encoder).
+It joins ROUTER-RLCD-01's bench as the third candidate on the same
+rows and numbers, may take LOOKUP-HEAD-01's shadow seat zero-shot only
+if that bench shows calibration on our rows, and is the `rerank`
+role's first named candidate. Adoption stays on
+RULES-AND-LEARNED-COMPONENTS.md's path, and the `.pt` checkpoint is
+loaded with `weights_only=True` or converted to safetensors at
+install. The card announces a multimodal CLM-35B for early October;
+the Studio is the only tier that could hold it.
