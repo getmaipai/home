@@ -1949,7 +1949,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // above) - would leave it stuck at a real id forever, keeping
   // `ArtifactCanvasPanel` and its own `useQuery` mounted for the rest of
   // the session after the first artifact ever closed. A plain
-  // `setTimeout`, padded past the real ~200ms transition so it never
+  // `setTimeout`, padded past the real ~300ms transition so it never
   // wins that race in the normal foregrounded case; the effect's own
   // cleanup (re-run whenever `openArtifactId` changes) is what cancels a
   // stale timer if a NEW artifact opens again before the old one's timer
@@ -1957,8 +1957,10 @@ export function NextChatPage({ person }: { person: Roster }) {
   // the ordinary mechanism, not a manual check needed at fire time.
   // Named, not inlined, matching the rail's own `RAIL_WIDTH_ANIMATION_
   // BACKSTOP_MS` this comment cites as its precedent - a code review
-  // caught the first cut using a bare `500` instead.
-  const CANVAS_CLOSE_BACKSTOP_MS = 500;
+  // caught the first cut using a bare `500` instead. Bumped to 750
+  // alongside the rail's own backstop when the underlying transition
+  // slowed from 200ms to 300ms (2026-09-27), keeping the same margin.
+  const CANVAS_CLOSE_BACKSTOP_MS = 750;
   useEffect(() => {
     if (openArtifactId !== null) return;
     const timeout = setTimeout(() => setLastCanvasArtifactId(null), CANVAS_CLOSE_BACKSTOP_MS);
@@ -2275,17 +2277,22 @@ export function NextChatPage({ person }: { person: Roster }) {
   // *any* width change animated - including closing the peek, which
   // flips the node from `absolute w-64` (out of flow, harmless) to
   // `static w-0` (in flow, so the chat pane gets squeezed for the
-  // animation's own 200ms). Only a real click should ever ease the
+  // animation's own 300ms). Only a real click should ever ease the
   // width; hover opening or closing the peek must jump instantly. The
   // transition classes now ride this flag instead of the base string,
   // true only across a click-driven width change - `cn()` drops a
   // falsy entry, so when it's false the transition property is
   // genuinely absent from the rail's className, not merely overridden.
-  // Must match the rail's own `duration-200` Tailwind class in its
+  // Must match the rail's own `duration-300` Tailwind class in its
   // className below - Tailwind's JIT needs that class as a literal
   // string there, so this can't be interpolated in; a change to one
-  // needs the other updated by hand.
-  const RAIL_WIDTH_TRANSITION_MS = 200;
+  // needs the other updated by hand. Jesse found the original 200ms
+  // linear timing too fast to read as a real slide, both here and on
+  // the canvas wrapper below (2026-09-27) - 300ms with `ease-out` (a
+  // standard scale step and a standard easing keyword, no arbitrary
+  // value needed for either) reads as a deliberate motion instead of a
+  // snap, matching ChatGPT's own panel feel.
+  const RAIL_WIDTH_TRANSITION_MS = 300;
   // A hard, rAF-independent ceiling - found live on 8787 (2026-09-22),
   // not by either review pass: this session's own automation tab is
   // genuinely backgrounded (`document.visibilityState === "hidden"`,
@@ -2297,9 +2304,9 @@ export function NextChatPage({ person }: { person: Roster }) {
   // that tab) until the next real click's own transitionend happened to
   // clear it. A plain `setTimeout`, scheduled with no rAF in between,
   // always eventually fires regardless of tab visibility - padded well
-  // past the transition's real ~200ms so it never wins the race in the
+  // past the transition's real ~300ms so it never wins the race in the
   // normal foregrounded case.
-  const RAIL_WIDTH_ANIMATION_BACKSTOP_MS = 600;
+  const RAIL_WIDTH_ANIMATION_BACKSTOP_MS = 900;
   const [railWidthAnimating, setRailWidthAnimating] = useState(false);
   const railWidthAnimatingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const railWidthAnimatingRafRef = useRef<number | null>(null);
@@ -2603,7 +2610,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                 // back on the element - see that function's own comment.
                 // Hovering the peek open or closed must jump, never ease.
                 // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate a dynamic rail width
-                railWidthAnimating && "transition-[width] duration-200 ease-linear motion-reduce:transition-none",
+                railWidthAnimating && "transition-[width] duration-300 ease-out motion-reduce:transition-none",
                 railCollapsed
                   ? railPeeked
                     ? "absolute inset-y-0 left-0 z-20 block w-64 border-r border-border pr-2 shadow-lg animate-in slide-in-from-left-4 fade-in motion-reduce:animate-none"
@@ -2642,7 +2649,7 @@ export function NextChatPage({ person }: { person: Roster }) {
               data-slot="next-chat-pane"
               className={cn(
                 // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[margin-inline-start] is the only way to animate the pane's margin as the rail collapses
-                "min-w-0 flex-1 transition-[margin-inline-start] duration-200 ease-linear motion-reduce:transition-none",
+                "min-w-0 flex-1 transition-[margin-inline-start] duration-300 ease-out motion-reduce:transition-none",
                 railCollapsed ? "ms-0" : "ms-4",
               )}
             >
@@ -2701,9 +2708,12 @@ export function NextChatPage({ person }: { person: Roster }) {
               // Always mounted here instead (while on desktop), width
               // animated between `w-0` and its open width the same way
               // this file's own rail already animates its collapse
-              // (`transition-[width] duration-200 ease-linear
-              // motion-reduce:transition-none`) - `overflow-hidden`
-              // clips the sliding content on the way in and out.
+              // (`transition-[width] duration-300 ease-out
+              // motion-reduce:transition-none` - bumped from the
+              // original 200ms/linear together with the rail, Jesse
+              // found both too fast to read as a real slide,
+              // 2026-09-27) - `overflow-hidden` clips the sliding
+              // content on the way in and out.
               // `lastCanvasArtifactId` (declared above, next to
               // `openArtifactId`) keeps rendering the panel's own last
               // real content through the CLOSING transition, since
@@ -2725,7 +2735,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                 data-slot="desktop-canvas-wrapper"
                 className={cn(
                   // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate this panel's own dynamic width, the same rule the rail's own collapse animation above is already exempted for
-                  "hidden shrink-0 overflow-hidden transition-[width] duration-200 ease-linear motion-reduce:transition-none lg:block",
+                  "hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-out motion-reduce:transition-none lg:block",
                   openArtifactId !== null ? "w-full max-w-xl" : "w-0",
                 )}
                 onTransitionEnd={(e) => {

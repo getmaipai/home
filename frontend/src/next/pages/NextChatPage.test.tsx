@@ -841,8 +841,8 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
   // to stay mounted (and its `useQuery` for the artifact with it)
   // forever after the FIRST artifact ever closed, not just through one
   // closing animation - `lastCanvasArtifactId` only ever updated to a
-  // real id, never back to null. A backstop timeout (500ms, well past
-  // the real ~200ms transition) clears it once the close has genuinely
+  // real id, never back to null. A backstop timeout (750ms, well past
+  // the real ~300ms transition) clears it once the close has genuinely
   // had time to finish, whether or not a real `transitionend` ever
   // fired (motion-reduce, or a backgrounded tab, both drop it).
   test("desktop viewport: closing an artifact eventually unmounts the canvas panel, not just visually collapses it", async () => {
@@ -1665,7 +1665,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     // exercised that path until now. A real (not fake) timer - no fake-
     // timer harness is set up in this suite - so this waits for it
     // rather than asserting instantly; `waitFor`'s own default timeout
-    // comfortably clears the rail's 200ms.
+    // comfortably clears the rail's 300ms.
     const restore = stubFetch();
     try {
       const view = renderPage(
