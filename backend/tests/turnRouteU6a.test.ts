@@ -142,6 +142,27 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
     expect(await response.json()).toEqual({ error: "text must be 8000 characters or fewer", code: "invalid_input" });
   });
 
+  test("the large-body fast path accepts documents serialized before text", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", false);
+    const { client } = await owner();
+    __setTikaRunnerForTests(() => "document excerpt");
+    const result = await withStubReply("Here is the summary.", async () => {
+      const response = await client.post("/api/turn/stream", {
+        document_attachments: [{
+          name: "notes.pdf",
+          media_type: "application/pdf",
+          data: `data:application/pdf;base64,${Buffer.alloc(48 * 1024).toString("base64")}`,
+        }],
+        surface: "chat",
+        text: "Summarize this",
+      });
+      return { status: response.status, events: await readNdjson(response) };
+    });
+    expect(result.status).toBe(200);
+    expect(result.events.at(-1)?.type).toBe("done");
+    expect(db.select().from(attachments).all()).toHaveLength(1);
+  });
+
   test("storage quota is checked before document extraction starts", async () => {
     setHouseholdSettingValue("turn.pipeline.next", false);
     const { client } = await owner();

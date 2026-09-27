@@ -110,8 +110,12 @@ const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "tu
 // they stay useful in their own right (diagnostics, direct model/safety
 // checks) now that this one exists.
 // Keep ordinary requests under 64 KiB. Document requests need room for
-// base64, so streamTurnBodyLimit() admits the larger ceiling only after
-// its early scan confirms a bounded text field followed by an attachment.
+// base64, so streamTurnBodyLimit() admits the larger ceiling when its early
+// scan finds an attachment marker. This is a best-effort fast-path DoS
+// mitigation, not JSON validation: its literal text-key scan can be fooled
+// by a decoy nested key, which may weaken only the early rejection. The
+// authoritative text-length check is MAX_TURN_TEXT_LENGTH downstream,
+// after parsing the request body.
 const TURN_BODY_LIMIT = 64 * 1024;
 const STREAM_TURN_BODY_LIMIT = 68 * 1024 * 1024;
 const MAX_STREAM_TEXT_CHARS = 8_000;
@@ -128,7 +132,6 @@ const streamTurnBodyLimit: MiddlewareHandler = async (c, next) => {
   let scan = new Uint8Array(0);
   const textKey = new TextEncoder().encode('"text"');
   let textStart = -1;
-  let textEnd = -1;
   let textScanned = false;
   try {
     for (;;) {
@@ -164,7 +167,7 @@ const streamTurnBodyLimit: MiddlewareHandler = async (c, next) => {
           const byte = scan[i]!;
           if (escaped) { escaped = false; chars++; continue; }
           if (byte === 92) { escaped = true; continue; }
-          if (byte === 34) { closed = true; textEnd = i; break; }
+          if (byte === 34) { closed = true; break; }
           chars++;
         }
         if (chars > MAX_STREAM_TEXT_CHARS) {
@@ -176,7 +179,7 @@ const streamTurnBodyLimit: MiddlewareHandler = async (c, next) => {
       if (size > TURN_BODY_LIMIT && scan.length >= EARLY_TEXT_SCAN_BYTES) {
         const prefix = new TextDecoder().decode(scan);
         const markerIndex = prefix.search(/"document_attachments"\s*:\s*\[\s*\{/);
-        if (markerIndex < 0 || textEnd < 0 || markerIndex <= textEnd) {
+        if (markerIndex < 0) {
           await reader.cancel();
           return c.json({ error: "Payload Too Large", code: "payload_too_large" }, 413);
         }
