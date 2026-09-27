@@ -42,7 +42,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
-import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type InstalledPackage, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type EnginesOverview, type InstalledPackage, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
@@ -70,6 +70,7 @@ import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { readRailCollapsePreference, writeRailCollapsePreference } from "@/next/railCollapsePreference";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
+import { readyRole } from "@/apps/chat/engineRoles";
 
 const HistoryIcon = getIcon("history");
 // CHAT-UI-03 (3): the app rail's own toggle (sidebar.tsx's
@@ -1136,6 +1137,16 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // one flag `consumeSpoken` reads and clears, the same single-shot
   // shape `temporaryNextRef`/`packageScopeRef` already use.
   const liveVoiceActiveRef = useRef(false);
+  // HANDSFREE-01(a): session-local conversation mode; it resets on a
+  // real conversation switch and starts off after a reload until
+  // PERSIST-CONV-01 gives conversations a durable setting.
+  const [autoReadReplies, setAutoReadReplies] = useState(false);
+  const autoReadRepliesRef = useRef(false);
+  autoReadRepliesRef.current = autoReadReplies;
+  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
+  const ttsAvailable = readyRole(enginesQuery.data, "tts");
+  const ttsAvailableRef = useRef(ttsAvailable);
+  ttsAvailableRef.current = ttsAvailable;
   const spokenNextRef = useRef(false);
   // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
   // callback (ConfirmToolRender's respondToApproval, via
@@ -1330,8 +1341,9 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // VOICE-LIVE-02: on only for the one send the live voice
           // session itself makes (liveVoiceActiveRef, set while the
           // session is open) - a typed message never speaks, unchanged
-          // from today's `false`.
-          speakReplies: () => liveVoiceActiveRef.current,
+          // unless the conversation's session-local auto-read mode is
+          // enabled and the TTS role is ready.
+          speakReplies: () => liveVoiceActiveRef.current || (ttsAvailableRef.current && autoReadRepliesRef.current),
         }),
       [aui],
     );
@@ -1356,8 +1368,16 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     // permissive "assume installed while loading" default became
     // permanent for the rest of the page's life, not just the loading
     // window it was meant to cover.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the rule's own static analysis can't see that dictationAdapter's *own* useMemo deps (sttStatusQuery.data) genuinely change across renders, and calls both deps "unnecessary" on that mistaken belief; removing them is exactly the bug named above, verified live by NextChatPage.test.tsx's DICT-01 describe block.
-    const adapters = useMemo(() => ({ feedback: createChatFeedbackAdapter(), speech: createChatSpeechAdapter(), attachments: attachmentsAdapter, dictation: dictationAdapter }), [attachmentsAdapter, dictationAdapter]);
+    const adapters = useMemo(
+      () => ({
+        feedback: createChatFeedbackAdapter(),
+        ...(ttsAvailable ? { speech: createChatSpeechAdapter() } : {}),
+        attachments: attachmentsAdapter,
+        dictation: dictationAdapter,
+      }),
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- the rule's own static analysis can't see that dictationAdapter's *own* useMemo deps (sttStatusQuery.data) genuinely change across renders, and calls the dependencies "unnecessary" on that mistaken belief; removing them is exactly the bug named above, verified live by NextChatPage.test.tsx's DICT-01 describe block. The `ttsAvailable` dependency is also essential: it adds/removes the speech adapter so the shipped Speak action follows real TTS readiness.
+      [attachmentsAdapter, dictationAdapter, ttsAvailable],
+    );
     return useLocalRuntime(chatModelAdapter, { adapters });
   }
 
@@ -1417,11 +1437,13 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
       if (isDeliberateSwitch) {
         thinkingRef.current = false;
         setThinking(false);
+        autoReadRepliesRef.current = false;
+        setAutoReadReplies(false);
       }
     },
   });
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1459,7 +1481,11 @@ function ChatDocumentTitle() {
  * pushes it into the data context. Same side-effect-mount shape as
  * ArtifactCacheInvalidator/ChatDocumentTitle above, just carrying data
  * instead of a DOM/browser-API side effect. */
-function ChatHeaderDataBridge() {
+function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable }: {
+  autoReadReplies: boolean;
+  setAutoReadReplies: (enabled: boolean) => void;
+  ttsAvailable: boolean;
+}) {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
   useEffect(() => {
@@ -1469,6 +1495,9 @@ function ChatHeaderDataBridge() {
   }, [aui]);
   useSetChatHeaderData({
     title,
+    ttsAvailable,
+    autoReadReplies,
+    onAutoReadRepliesChange: (enabled) => setAutoReadReplies(enabled),
     // A code review caught this: the vendored thread-list.aui.tsx's own
     // rename/delete already toast on failure (`toast.error("Could not
     // rename/delete this chat. Try again.")`) - this header's own
@@ -1833,7 +1862,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setRailPeeked(false);
     setOpenArtifactId(null);
@@ -2112,7 +2141,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />
         <ChatDocumentTitle />
-        <ChatHeaderDataBridge />
+        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />
         <LiveVoiceSession
           open={voiceOpen}

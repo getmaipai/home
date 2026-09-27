@@ -6,6 +6,8 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { IncognitoToggle } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/Header";
 import { NextChatPage } from "@/next/pages/NextChatPage";
+import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
+import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { writeIncognitoCache } from "@/next/incognitoCache";
 import { IncognitoProvider, useIncognitoContext } from "@/next/incognitoContext";
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
@@ -2946,6 +2948,107 @@ describe("NextChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger
       expect(waveform.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     } finally {
       restore();
+    }
+  });
+});
+
+describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
+  function stubAutoReadFetch(ttsReady: boolean): { restore: () => void; ttsCalls: () => number } {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let turnCount = 0;
+    let ttsCount = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) {
+        const roles = ttsReady ? [{ id: "tts", state: { state: "ready" } }] : [];
+        return Promise.resolve(Response.json({ configured: ttsReady, roles, engines: [], budget: null }));
+      }
+      if (url === "/api/conversations" && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-autoread1", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      if (url === "/api/turn/stream") {
+        turnCount++;
+        const text = `Typed reply ${turnCount}.`;
+        return Promise.resolve(new Response(ndjsonStream([
+          { type: "delta", text },
+          { type: "done", value: { turn_id: `turn-autoread${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
+        ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      if (url.includes("/api/tts")) ttsCount++;
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    return {
+      restore: () => { globalThis.fetch = original; },
+      ttsCalls: () => ttsCount,
+    };
+  }
+
+  async function openHeaderMenu(view: { findByRole: (role: string, options: { name: string }) => Promise<HTMLElement> }) {
+    const trigger = await view.findByRole("button", { name: "Conversation actions" });
+    act(() => {
+      fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 });
+      fireEvent.click(trigger);
+    });
+  }
+
+  test("the header toggle speaks typed turns, can stop doing so, and resets on conversation switch", async () => {
+    const env = stubAutoReadFetch(true);
+    try {
+      const view = renderPage(
+        <ChatHeaderDataProvider>
+          <ChatHeaderBar />
+          <MemoryRouter initialEntries={["/next/chat"]}>
+            <NextChatPage person={makePerson()} />
+          </MemoryRouter>
+        </ChatHeaderDataProvider>,
+      );
+      await view.findByLabelText("Message input");
+      await openHeaderMenu(view);
+      const toggle = await view.findByRole("menuitemcheckbox", { name: "Read replies aloud" });
+      fireEvent.click(toggle);
+      await sendMessage(view, "say this reply");
+      const firstReply = await view.findByText("Typed reply 1.");
+      fireEvent.mouseEnter(firstReply.closest('[data-slot="aui_assistant-message-root"]') as HTMLElement);
+      expect(await view.findByRole("button", { name: "Read aloud" })).toBeVisible();
+      await waitFor(() => expect(env.ttsCalls()).toBeGreaterThan(0));
+
+      await openHeaderMenu(view);
+      const checkedToggle = await view.findByRole("menuitemcheckbox", { name: "Read replies aloud" });
+      expect(checkedToggle).toHaveAttribute("aria-checked", "true");
+      fireEvent.click(checkedToggle);
+      const callsAfterDisable = env.ttsCalls();
+      await sendMessage(view, "keep this one quiet");
+      await view.findByText("Typed reply 2.");
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(env.ttsCalls()).toBe(callsAfterDisable);
+
+      fireEvent.click(await within(document.getElementById("next-chat-rail")!).findByRole("button", { name: "New Thread" }));
+      await openHeaderMenu(view);
+      expect(await view.findByRole("menuitemcheckbox", { name: "Read replies aloud" })).toHaveAttribute("aria-checked", "false");
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("when TTS is unavailable both the manual Speak action and header toggle are absent", async () => {
+    const env = stubAutoReadFetch(false);
+    try {
+      const view = renderPage(
+        <ChatHeaderDataProvider>
+          <ChatHeaderBar />
+          <MemoryRouter initialEntries={["/next/chat"]}>
+            <NextChatPage person={makePerson()} />
+          </MemoryRouter>
+        </ChatHeaderDataProvider>,
+      );
+      await sendMessage(view, "no tts configured");
+      const reply = await view.findByText("Typed reply 1.");
+      fireEvent.mouseEnter(reply.closest('[data-slot="aui_assistant-message-root"]') as HTMLElement);
+      expect(view.queryByRole("button", { name: "Read aloud" })).toBeNull();
+      await openHeaderMenu(view);
+      expect(view.queryByText("Read replies aloud")).toBeNull();
+    } finally {
+      env.restore();
     }
   });
 });

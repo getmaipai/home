@@ -73,6 +73,7 @@ import { hitArea } from "@maipai/ui/src/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -205,6 +206,14 @@ export function ChatHeaderBar() {
                 <PencilIcon className="size-4" />
                 Rename
               </DropdownMenuItem>
+              {data.ttsAvailable ? (
+                <DropdownMenuCheckboxItem
+                  checked={data.autoReadReplies}
+                  onCheckedChange={data.onAutoReadRepliesChange}
+                >
+                  Read replies aloud
+                </DropdownMenuCheckboxItem>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}>
                 <TrashIcon className="size-4" />

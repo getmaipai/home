@@ -36,6 +36,9 @@ function renderBar(data: ChatHeaderData | null) {
 function baseData(overrides: Partial<ChatHeaderData> = {}): ChatHeaderData {
   return {
     title: "What's 2 plus 2?",
+    ttsAvailable: false,
+    autoReadReplies: false,
+    onAutoReadRepliesChange: () => {},
     onRename: async () => {},
     onDelete: async () => {},
     ...overrides,
@@ -123,6 +126,22 @@ describe("ChatHeaderBar", () => {
     await openActionsMenu(view);
     fireEvent.click(await view.findByText("Delete"));
     await waitFor(() => expect(onDelete).toHaveBeenCalled());
+  });
+
+  test("Read replies aloud is a checked menu toggle only when TTS is available", async () => {
+    const onAutoReadRepliesChange = mock(() => {});
+    const view = renderBar(baseData({ ttsAvailable: true, autoReadReplies: true, onAutoReadRepliesChange }));
+    await openActionsMenu(view);
+    const toggle = await view.findByRole("menuitemcheckbox", { name: "Read replies aloud" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(toggle);
+    expect(onAutoReadRepliesChange).toHaveBeenCalledWith(false);
+  });
+
+  test("hides Read replies aloud when TTS is unavailable", async () => {
+    const view = renderBar(baseData({ ttsAvailable: false }));
+    await openActionsMenu(view);
+    expect(view.queryByText("Read replies aloud")).toBeNull();
   });
 
   // CHAT-FIND-0923-03: Jesse's own live finding - the menu held Rename,
