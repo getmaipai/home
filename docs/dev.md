@@ -29656,6 +29656,117 @@ The household's own live hub at `127.0.0.1:8787` was never touched by
 this work (no `bun restart`, no port 8787 traffic) - the coordinator's
 own job, per the standing "lanes never touch shared server" rule.
 
+## PROJECT-PKGTYPE-03: the second failure of the same night, params never named to the model (2026-09-27)
+
+Jesse asked for a bedtime story again after PROJECT-PKGTYPE-02 landed.
+This time the model picked the right, real `bedtime-storybook` type -
+the wrong-type bug was closed - but invented its own completely
+different params shape instead of the real one. The stored turn
+(`conversation_turns.outcomes`, `data/hub.db`):
+
+> `{"callId":"resumed:start_project","packageId":"start_project",
+> "status":"failed","via":"tool_call","args":{"type":"bedtime-storybook",
+> "params":{"title":"The Shy Dragon and the Dark","characters":["Shy
+> Dragon","Lumina the Light Fairy"],"setting":"A mystical forest at
+> night","plot":"A shy dragon named Ember fears the dark, but with the
+> help of Lumina the Light Fairy, he learns to embrace the night and
+> discovers the beauty of darkness."}},"errorCode":"invalid_params",
+> "userMessage":"Bedtime storybook's own inputs failed validation: data
+> must have required property 'topic'"}`
+
+**Root cause.** `startProjectToolSpec()`'s own `params` argument on the
+`start_project` tool is one opaque, propertyless `{ type: "object",
+description: "The project's own parameters - which fields it takes
+depends on the type." }` shared across every registered type - the
+same object regardless of which `type` the model picks. The model sees
+each type's plain-language `description` (a marketing-style pitch:
+"A three-chapter bedtime storybook written in the background...") but
+nothing that names the actual call shape a given type expects. With
+nothing else to go on, it guessed a plausible-sounding shape from the
+description alone, and guessed wrong: `title`/`characters`/`setting`/
+`plot` instead of the real `topic`/`reader_age`. `validateParams()`/
+`buildProjectTypeFromManifest()` both enforce the real schema correctly
+AFTER the call - the bug is that nothing told the model what that
+schema is BEFORE it called.
+
+**Fixed.** A new generic helper, `paramsSummary()` (`backend/src/lib/
+projects/tool.ts`), renders a type's own `paramsSchema.properties`/
+`.required` as plain, structured text: for each property, in
+declaration order, its JSON-Schema `type`, whether it's in `required`,
+and its `default` if it has one - e.g. `"Params: topic (string,
+required), reader_age (integer, optional, default 6)."` Returns `""`
+for a schema with no properties (never a bare "Params: " with nothing
+after it), so a type with no params gets no trailing clause.
+`startProjectToolSpec()` folds this in right after each type's own
+`description` in its generated per-type line, e.g. `"bedtime-storybook":
+A three-chapter bedtime storybook written in the background, for a
+child's story that is longer than one reply. Params: topic (string,
+required), reader_age (integer, optional, default 6).` Generated fresh
+from whatever `paramsSchema` any registered type actually carries -
+never hand-typed per type - so a future package's own project type
+needs nothing added here to be described correctly.
+
+**Why not a real JSON-Schema conditional.** The tool's own `args`
+schema has one flat `params: { type: "object" }` field shared across
+every registered type; a real per-type conditional (`if`/`then` or
+`oneOf` keyed on `type`) would need the tool's own args schema to
+branch on the sibling `type` property, a bigger, riskier change than
+tonight's fix, and out of scope here. It's also not obviously better
+for a small local model: JSON-Schema tool-calling conditionals are
+exactly the kind of complex, model-specific behavior small local models
+often don't reliably honor (mirrors `llama-server-required-cache-bug`'s
+own finding on `tool_choice: required`) - a plain-text params summary
+right next to the type's own description is at least as legible to a
+small model as a conditional schema branch it may not fully parse. If a
+future incident shows text summaries aren't enough, that's the design
+question to revisit, not tonight's.
+
+**The regression test, the repro itself.** `startProject.test.ts` gained
+`paramsSummary()`'s own unit coverage (a required string property, an
+optional property with a default, an optional property with no
+default, a required-plus-optional-with-default pair in declaration
+order, and the zero-properties case) plus a new
+`startProjectToolSpec()` describe block that calls
+`registerAllPackageProjectTypes()` (the real production loader) and
+asserts the real tool spec's own `description` names both `topic` and
+`reader_age` on `bedtime-storybook`'s own line specifically (split on
+its own `"bedtime-storybook":` marker, not just anywhere in the whole
+string) - the test that would have caught this second failure the way
+PROJECT-PKGTYPE-02's own repro caught the first. A second case proves a
+type with an empty `paramsSchema` gets no trailing `"Params:"` clause.
+
+**Verified the four bench scripts and every other call site are
+unaffected.** `startProjectToolSpec()`'s only other callers
+(`parity-bisect.ts`, `parity-bisect4-stages.ts`,
+`prefix-class-01-verify.ts`, `tool-calling.ts`, all four already
+special-cased for the virtual tool by PROJECT-START-01) and
+`project-pack-01-live.ts`'s own bench call it dynamically and assert
+only that the description `.includes("bedtime-storybook")` - none
+hardcode an expected description string this change could break, so
+none needed updating.
+
+Out of scope, named: a real JSON-Schema conditional/`oneOf` args schema
+keyed on `type` (a bigger, separate design question); any other project
+type; any UI change; the confirmation-step UX (already filed,
+`getmaipai/home#177`).
+
+Files: `backend/src/lib/projects/tool.ts` (`paramsSummary()`,
+`startProjectToolSpec()`). Tests: `backend/tests/projects/
+startProject.test.ts` (`paramsSummary()` unit cases, the
+`startProjectToolSpec()` real-package regression, the no-params case).
+
+Review: low effort (a description-string generator plus tests -
+mechanical), one pass, zero findings.
+
+Verified: `bash scripts/check.sh` (`MAIPAI_COMMONS_DIR`/
+`MAIPAI_STANDARDS_DIR` pointed at the real `commons`/`.github`
+checkouts, the same worktree-only path quirk PROJECT-PKGTYPE-02's own
+verified line already named) green end to end - backend 4287 pass/0
+fail, frontend typecheck clean, docs reading-level lint, standards
+core. The household's own live hub at `127.0.0.1:8787` was never
+touched by this work (no `bun restart`, no port 8787 traffic), per the
+standing "lanes never touch shared server" rule.
+
 ## HERMES-01: what Hermes Agent does, what the Hermes models are, and what Home takes (2026-09-27)
 
 Jesse asked why Home does not use Hermes. Two things carry the name,

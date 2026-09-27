@@ -15,7 +15,7 @@ import { newConversationTurnId, newPersonId } from "@/lib/id";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import * as llm from "@/lib/llm";
 import * as notifications from "@/lib/notifications";
-import { runStartProjectTool, START_PROJECT_TOOL_ID, type StartProjectArgs } from "@/lib/projects/tool";
+import { runStartProjectTool, startProjectToolSpec, paramsSummary, START_PROJECT_TOOL_ID, type StartProjectArgs } from "@/lib/projects/tool";
 import { registerProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { registerAllPackageProjectTypes } from "@/lib/plugins";
 import { policyNode } from "@/lib/turnMachine/nodes/policy";
@@ -209,6 +209,84 @@ describe("the live incident's own repro: the real bedtime-storybook package acce
     const finished = await waitForSettled(projectId);
     expect(finished.state).toBe("done");
     completeSpy.mockRestore();
+  });
+});
+
+// PROJECT-PKGTYPE-03's own unit coverage (docs/dev.md, 2026-09-27): the
+// generic renderer startProjectToolSpec() now folds into each type's own
+// description line, covering the four shapes a real paramsSchema can take.
+describe("paramsSummary(): a project type's own params, rendered plainly", () => {
+  test("a required string property", () => {
+    const summary = paramsSummary({ type: "object", required: ["topic"], properties: { topic: { type: "string", minLength: 1 } } });
+    expect(summary).toBe("Params: topic (string, required).");
+  });
+
+  test("an optional property with a default", () => {
+    const summary = paramsSummary({ type: "object", properties: { reader_age: { type: "integer", minimum: 2, maximum: 12, default: 6 } } });
+    expect(summary).toBe("Params: reader_age (integer, optional, default 6).");
+  });
+
+  test("an optional property with no default", () => {
+    const summary = paramsSummary({ type: "object", properties: { readerAge: { type: "integer", minimum: 2, maximum: 12 } } });
+    expect(summary).toBe("Params: readerAge (integer, optional).");
+  });
+
+  test("a paramsSchema with zero properties never prints an empty trailing 'Params: '", () => {
+    expect(paramsSummary({ type: "object" })).toBe("");
+    expect(paramsSummary({ type: "object", properties: {} })).toBe("");
+  });
+
+  test("a required property and an optional-with-default property together, in declaration order", () => {
+    const summary = paramsSummary({
+      type: "object",
+      required: ["topic"],
+      properties: {
+        topic: { type: "string", minLength: 1 },
+        reader_age: { type: "integer", minimum: 2, maximum: 12, default: 6 },
+      },
+    });
+    expect(summary).toBe("Params: topic (string, required), reader_age (integer, optional, default 6).");
+  });
+});
+
+// The live incident's own SECOND failure (docs/dev.md, 2026-09-27): after
+// PROJECT-PKGTYPE-02 fixed the wrong-type-picked bug, Jesse asked again and
+// the model correctly picked "bedtime-storybook" but invented its own params
+// shape (title/characters/setting/plot) instead of the real one
+// (topic/reader_age) - because nothing offered to the model named the real
+// shape, only the type's plain-language description. This proves the real
+// startProjectToolSpec() the model is actually offered now names both real
+// param fields for the real bundled package, end to end - the test that
+// would have caught this failure the way PROJECT-PKGTYPE-02's own repro
+// caught the first one.
+describe("startProjectToolSpec(): the real tool spec now names each type's real params", () => {
+  test("the real bedtime-storybook package's description names topic and reader_age", () => {
+    registerAllPackageProjectTypes();
+    const spec = startProjectToolSpec();
+    expect(spec.description).toContain("topic");
+    expect(spec.description).toContain("reader_age");
+    // Not just present anywhere - actually attached to bedtime-storybook's
+    // own line, so a household with several registered types can't pass
+    // this by accident on some OTHER type's params.
+    const bedtimeLine = spec.description.split('"bedtime-storybook":')[1];
+    expect(bedtimeLine).toBeTruthy();
+    expect(bedtimeLine).toContain("topic (string, required)");
+    expect(bedtimeLine).toContain("reader_age (integer, optional, default 6)");
+  });
+
+  test("a type with no params (paramsSchema: { type: \"object\" }) gets no trailing 'Params:' clause", () => {
+    registerProjectType({
+      id: "no-params-test-type",
+      title: "a no-params test project",
+      description: "test only",
+      minRole: "child",
+      consequential: false,
+      paramsSchema: { type: "object" },
+      buildPlan: () => ({ steps: [{ id: "a", kind: "text", needs: [], params: { role: "chat", promptTemplate: "hi", inputs: [] } }], ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 1 } }),
+    });
+    const spec = startProjectToolSpec();
+    const line = spec.description.split('"no-params-test-type":')[1]!;
+    expect(line).not.toContain("Params:");
   });
 });
 

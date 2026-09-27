@@ -21,7 +21,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { ToolSpec } from "@/lib/llm";
 import type { PersonRow } from "@/types";
-import { getProjectType, listProjectTypes, type ProjectType } from "./projectTypes";
+import { getProjectType, listProjectTypes, type ProjectType, type ProjectTypeParamsSchema } from "./projectTypes";
 import { start as startProject } from "./runner";
 
 export const START_PROJECT_TOOL_ID = "start_project";
@@ -30,6 +30,36 @@ const ajv = new Ajv2020({ strict: false });
 
 const START_PROJECT_BASE_DESCRIPTION =
   "Start a background project for a deliverable that genuinely needs several generation steps or minutes of work - a written story, a multi-part document, something one reply can't finish. Only call this when a normal reply cannot do the job; most requests should just be answered directly.";
+
+/** PROJECT-PKGTYPE-03 (docs/dev.md, 2026-09-27 - the live incident's
+ * second failure): the tool's own `params` argument is one opaque,
+ * propertyless object shared across every registered type (a real
+ * per-type JSON-Schema conditional keyed on `type` is a bigger, riskier
+ * change than tonight's fix, and out of scope - see the dated section),
+ * so nothing before this told the model what fields a given type's
+ * `params` actually takes; it only saw the type's plain-language
+ * `description`, which says nothing about the call shape, and it
+ * guessed a plausible-sounding one wrong. This renders a type's own
+ * `paramsSchema` as plain, structured text - generated fresh from
+ * whatever `properties`/`required` any registered type's schema
+ * actually carries, never hand-typed per type, so a future package's
+ * own project type needs nothing added here to be described correctly.
+ * Returns "" for a schema with no properties (the empty-args case),
+ * never a bare "Params: " with nothing after it. */
+export function paramsSummary(schema: ProjectTypeParamsSchema): string {
+  const properties = schema.properties ?? {};
+  const required = new Set(schema.required ?? []);
+  const names = Object.keys(properties);
+  if (names.length === 0) return "";
+  const parts = names.map((name) => {
+    const propSchema = (properties[name] ?? {}) as { type?: unknown; default?: unknown };
+    const type = typeof propSchema.type === "string" ? propSchema.type : "any";
+    const hasDefault = Object.prototype.hasOwnProperty.call(propSchema, "default");
+    const requirement = required.has(name) ? "required" : hasDefault ? `optional, default ${JSON.stringify(propSchema.default)}` : "optional";
+    return `${name} (${type}, ${requirement})`;
+  });
+  return `Params: ${parts.join(", ")}.`;
+}
 
 /** PROJECT-PKGTYPE-01: built fresh from the registry on every call
  * (never a static const - registerAllPackageProjectTypes() runs at
@@ -40,10 +70,18 @@ const START_PROJECT_BASE_DESCRIPTION =
  * package tool's manifest.description already reaches the model - a
  * registry with nothing in it still returns a real ToolSpec (an empty
  * enum), never throws; toolSpecFor() callers treat that the same as
- * any other tool with nothing to offer. */
+ * any other tool with nothing to offer. PROJECT-PKGTYPE-03 also folds
+ * each type's own `paramsSummary()` in, right after its description, so
+ * the model is told the real call shape, not just the marketing-style
+ * pitch. */
 export function startProjectToolSpec(): ToolSpec {
   const types = listProjectTypes();
-  const typeLines = types.map((t) => `"${t.id}": ${t.description}`).join(" ");
+  const typeLines = types
+    .map((t) => {
+      const summary = paramsSummary(t.paramsSchema);
+      return summary ? `"${t.id}": ${t.description} ${summary}` : `"${t.id}": ${t.description}`;
+    })
+    .join(" ");
   return {
     id: START_PROJECT_TOOL_ID,
     description: types.length > 0 ? `${START_PROJECT_BASE_DESCRIPTION} Registered project types: ${typeLines}` : START_PROJECT_BASE_DESCRIPTION,
