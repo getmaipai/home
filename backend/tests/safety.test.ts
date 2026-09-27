@@ -42,6 +42,23 @@ function extremeValueFor(key: SettingsKey): unknown {
       return key.range?.options?.at(-1) ?? key.default;
     case "text":
       return key.default === "" ? "stress-test-value" : `${key.default}-stressed`;
+    case "person": {
+      // NOTIFY-SHARE-02's notifications.file_shared.muted_senders is the
+      // first registry key to use this selector - `range.multiple` (Home
+      // Assistant's own "select several of a kind" shape), never a
+      // scalar id today. The list-selector's own "most permissive"
+      // extreme is the maximal list: every real person this iteration's
+      // fresh resetDb() + owner() has created so far, the same "as far
+      // as this selector can go" reasoning boolean's `true` and select's
+      // last option already use above.
+      if ((key.range as { multiple?: boolean } | undefined)?.multiple === true) {
+        return db.select({ id: people.id }).from(people).all().map((row) => row.id);
+      }
+      throw new Error(
+        `extremeValueFor() has no real stress value for a scalar "person" selector (settings key "${key.key}") - ` +
+          "add one before this test can honestly claim it stresses every registry key.",
+      );
+    }
     default:
       throw new Error(
         `extremeValueFor() has no real stress value for selector "${key.selector}" (settings key "${key.key}") - ` +
