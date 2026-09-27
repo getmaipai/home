@@ -163,6 +163,14 @@ export function resolvePersona(id: unknown): Persona {
 export const INFORMATION_HANDLING_POLICY = [
   "Skip detail nobody asked for (exact decimals, timezones, a full date when only the day matters) and round the way people round in conversation (\"about thirty\", \"low seventies\") unless they asked for the exact number or it genuinely matters, like money or an appointment time.",
   "Talk about anything uncertain or secondhand as uncertain, never as flat fact: forecasts, predictions, and guesses get hedged (\"it's supposed to\", \"I think\", \"probably\"), not asserted outright.",
+  // CORRECTION-02 (dev.md "Design pass over the reserved items", the
+  // CORRECTION-01 design record): LIVE-0923-01's own items 4/5 - a
+  // person disputed a fact the assistant had just stated, and got an
+  // empty promise ("I'll look it up," "I'll update my information")
+  // with no tool call and nothing stored behind it. The fix the design
+  // puts here, not in a word rule (CORRECTION_RE stays frozen): the
+  // model's own behavior contract.
+  "When someone tells you a fact you stated is wrong, search again right now or ask what they know, never promise to look it up or update your information later and leave it at that.",
   // FAST-06 (2026-09-12): the third sentence, "Never say the same thing
   // the same way twice: vary how you open a reply and how you phrase
   // something you've already said earlier in the conversation", is
@@ -228,9 +236,25 @@ export const WRITTEN_POLICY =
 // arm e measured (0.48x/0.37x the bare floor, tier 1's own 0.35x
 // acceptance bar). The spoken class keeps INFORMATION_HANDLING_POLICY
 // itself untouched, exactly as today.
+// CORRECTION-02: the written-class twin of the same contract added to
+// INFORMATION_HANDLING_POLICY above. Read buildStablePrefix()'s written
+// branch (turnEngine.ts) before assuming this reaches a real prompt:
+// composePersonaPrompt(persona, "written") returns "" while
+// WRITTEN_VOICE_PROSE (below) is false (PREFIX-CLASS-01, "The written
+// prompt on tier 1, decided", 2026-09-23), so this whole array,
+// including the line below, is dead on the written-adult tier today -
+// exactly WRITTEN_POLICY's own situation two definitions up. Kept
+// declared for the same reason: it goes live the day WRITTEN_VOICE_PROSE
+// flips (WRITTEN-VOICE-TIER-01), with no further edit needed here. Until
+// then, CORRECTION-02's own live measurement (dev.md) is proven on the
+// spoken class only - a real, open gap for the written-adult tier,
+// flagged there, not decided here (it would mean adding prose to a
+// prefix PREFIX-CLASS-01 measured collapses reply quality on this
+// model, a call bigger than this item's own scope).
 export const INFORMATION_HANDLING_POLICY_WRITTEN = [
   "Detail nobody asked for (exact decimals, timezones, a full date when only the day matters) is left out, rounded the way people round in conversation (\"about thirty\", \"low seventies\") unless the exact number genuinely matters, like money or an appointment time.",
   "Anything uncertain or secondhand is talked about as uncertain, never as flat fact: forecasts, predictions and guesses get hedged (\"it's supposed to\", \"I think\", \"probably\"), not asserted outright.",
+  "When the person says a fact the reply just stated is wrong, the reply searches again right then or asks what they know, never promising to look it up or update later and leaving it at that.",
 ].join(" ");
 
 // WRITTEN_POLICY's own descriptive twin, folded into the written class's

@@ -28602,3 +28602,195 @@ forward, per the org gate rule for a failure the diff didn't touch.
 The hub on 8787 was not restarted by this lane; whether the live
 weather/knowledge-panel case actually resolves this way still needs
 Jesse's own check on 8787 after a restart, the same as #166 and #168.
+## CORRECTION-02: the correction contract, live-measured (2026-09-26)
+
+Builds CORRECTION-01's design (above, "Design pass over the reserved
+items"). One line added to `INFORMATION_HANDLING_POLICY`
+(`persona.ts`): "When someone tells you a fact you stated is wrong,
+search again right now or ask what they know, never promise to look
+it up or update your information later and leave it at that." The
+written twin `INFORMATION_HANDLING_POLICY_WRITTEN` got the same
+sentence in the file's third-person register, with a comment naming
+what it is right now: dead. `buildStablePrefix()`'s written branch
+(`turnEngine.ts:1033`) returns early with `composePersonaPrompt(persona,
+"written")`'s output alone while `WRITTEN_VOICE_PROSE` is false
+(PREFIX-CLASS-01, 2026-09-23) - checked directly, not assumed, per the
+brief's own instruction. So the contract reaches a real prompt today
+only on the spoken class; the written-adult class (the default surface
+for a bench/replay conversation, and almost certainly what LIVE-0923-01's
+own two live corrections ran on, since `conversationRunner.ts` defaults
+every row to `surface: "chat"`) gets no persona or policy prose at all
+right now, by a separate, harder freeze this item does not have the
+standing to lift (that freeze exists because ANY added prose measured
+0.12x-0.48x the bare floor on this tier). This is a real, open gap,
+not closed here: written-adult coverage of CORRECTION-02's own fix
+waits on WRITTEN_VOICE_PROSE/EVAL-03's control vector, or a coordinator
+ruling that this one sentence is worth reopening the freeze for. Filed
+as a finding for the coordinator, not decided unilaterally.
+
+Bench scorer: `EMPTY_PROMISE_LINES` (`conversationFixture.ts`, beside
+`HONESTY_LINES`) catches the promise-without-action shape ("I'll look
+it up," "I'll update my information," "let me check on that and get
+back to you," and near-phrasings), merged into `replay.ts`'s own
+`UNIVERSAL_MUST_NOT_CONTAIN` so it applies to every row in the replay
+set, not just the two new ones - the BACKLOG item's own words ("fails
+any reply promising a lookup with no tool call behind it") describe a
+property the whole set should hold. A code review (medium, one pass)
+flagged the real risk in this design: the regex can false-fail a reply
+that narrates the phrase while still answering correctly in the same
+breath ("I'll look that up - you're right, it's 1989"). No regex fix
+for that (a pattern can't reliably tell "resolved in the same turn"
+from "left hanging"); the mitigation is the org's own standing rule -
+every failing repeat gets a manual read before it counts as a defect.
+None of the six live repeats below needed that read; all six passed
+clean.
+
+Two new replay rows, `backend/scripts/bench/datasets/owner-replay.json`
+(`failed`, category `correction`): `correction-thats-not-true` and
+`correction-bare-wrong`, reproducing LIVE-0923-01 items (4)/(5)'s shape
+with synthetic trivia (Berlin Wall / Frankenstein's author), never a
+household fact - the first turn's reply is scripted wrong on purpose
+via `seedReply` so the row is about the correction, not about whether
+the model knows the trivia. Both set `"surface": "robot"` to land on
+the spoken class where the contract line is actually live.
+
+**A real runner bug found building these, fixed in scope:**
+`conversationRunner.ts`'s `runConversation()` hardcoded
+`createConversation(actor, { surface: "chat" })` regardless of
+`conv.surface`, while the same function's `driveTurn()` call three
+lines down already passed `conv.surface` through - the first
+`BenchConversation` rows to ever set `surface: "robot"` hit a stored
+"chat" conversation driven as "robot", which
+`resolveOrCreateConversation()` (`conversationHistory.ts`) correctly
+refuses as a surface mismatch ("conversation not found"). Both new
+rows failed 0/3 on the first live run this way, before the fix - a
+runner bug, not a model defect. One-line fix: `surface: conv.surface ??
+"chat"`, identical behavior for every other row (none of which set
+`surface`). Confirmed zero regression: the full replay set's own
+pass/fail table is byte-identical before and after the fix on every
+row except the two new ones.
+
+**Live run**, `bun run backend/scripts/bench/replay.ts --live`, full
+set (12 failed + 18 control rows), three repeats, against a side engine
+this session started itself (never `127.0.0.1:8788`, the household's
+own live-serving port): `qwen3-4b-q4-k-m.gguf` on a spare port, not the
+household's `qwen3-8b-instruct-q4-k-m.gguf` - this machine's own
+`top`/`vm_stat` read 21-23G/24G used, 104M-2.3G free across the run
+(another session's own `check.sh`/`bun test` overlapping twice), and a
+second full 8B instance risked visibly slowing the real, live-serving
+hub sharing the same unified memory. A real, stated deviation, not a
+guess: the two new rows' own numbers below are proven on a smaller
+model than production, and a rerun on `qwen3-8b-instruct-q4-k-m.gguf`
+once the machine has headroom (or on a separate host) would be the
+stronger proof CORRECTION-02's own acceptance ultimately wants.
+
+Results, both new rows, 3/3 clean on every repeat (turn 2's own reply,
+the correction turn):
+
+- `correction-thats-not-true` ("that's not true, it fell in 1989"):
+  "You're right, it fell in 1989. I was off by a few years."; "You're
+  right, it fell in 1988. I was mistaken."; "You're right, it fell in
+  1989. I was a bit off on that one."
+- `correction-bare-wrong` ("wrong, it was Mary Shelley"): "You're
+  right, it was Mary Shelley."; "Right, Mary Shelley wrote
+  Frankenstein."; "Right, it was Mary Shelley."
+
+All six: no empty promise, no tool call needed or made - the model
+conceded from its own knowledge and restated the fact directly, a
+third good outcome the design's own "re-search or ask" framing didn't
+name but the contract's actual bar ("never promise... and leave it at
+that") does not rule out either. One factual wobble worth naming
+plainly: repeat 2's own reply says "1988," not 1989 - a small model's
+ordinary factual imprecision on a restated year, not a promise/action
+defect, and not what this bench scorer measures. Full replay set: the
+two new rows aside, every row's pass/fail is unchanged from before this
+item (pre-existing failures are the smaller model's own weaker tool
+choice, e.g. `president-of-france-repeat`, `apple-announce-this-week`,
+matching the kind of gap `#150` already tracks - not this item's to
+fix).
+
+Verification: `bash scripts/check.sh` (scope `backend`, `MAIPAI_STANDARDS_DIR`/`MAIPAI_COMMONS_DIR`
+pointed at the sibling checkouts, plus two local symlinks fixing a
+worktree-nesting path issue unrelated to this diff) - backend
+4132/4133 on the first full run; the one failure (`REASONING-01` in
+`llm.test.ts`, "chat model unavailable... 401") reproduced clean
+(72/72) on an isolated rerun of that file alone, a transient stub-auth
+flake under the same shared-machine load named above, not a real
+regression. Two frozen-prefix snapshot tests in `turnEngine.test.ts`
+(`buildOldPathStablePrefix()`'s own "byte-identical to before
+TRUEUP-01" pair) moved by design, since `INFORMATION_HANDLING_POLICY`
+is a live, shared, universal constant, not frozen itself - updated to
+match. Review: medium, two passes (the first pass's own commit was still
+uncommitted when the second was required by the repo's own commit
+hook after 30+ minutes elapsed, `require-review-before-commit.sh` -
+never a discretionary third pass). Pass one, three findings: the
+`EMPTY_PROMISE_LINES` false-fail risk (mitigated by manual reading,
+above, not a regex change); `BACKLOG.md`/this section not yet written
+at review time (written now); a stale char-count comment in
+`turnEngine.ts` (fixed, 648 not 617). Pass two, seven findings, each
+disposed:
+
+- **Fixed**, real, same class of bug as the item's own headline fix:
+  `seedTurn()`'s own `logTurn()` call also hardcoded `surface: "chat"`
+  (`conversationRunner.ts:491`, the offline/no-proxy `seedReply` path,
+  distinct from the live-proxy path my own live run actually took) -
+  now threads `conv.surface` through, same as `createConversation()`.
+- **Fixed**, real: `EMPTY_PROMISE_LINES` only matched a straight ASCII
+  apostrophe, so a reply using a Unicode right single quote (`I’ll
+  look that up`) evaded the exact defect the check exists to catch -
+  now matches either.
+- **Corrected**, a factual error in this section's own first draft:
+  "the first two rows to ever set surface: robot" was wrong -
+  `conversationFixture.ts`'s pre-existing `unknown-speaker-shared-device`
+  (the big `CONVERSATIONS` fixture, a different bench entry point) already
+  did. Checked directly, not assumed: `bun test tests/conversationBench.test.ts`
+  (44/44, including that row) is clean both before and after this
+  item's `conversationRunner.ts` fix - no second affected case was
+  silently changed, the claim was just imprecise about being first.
+- **Fixed**, per the org's own testing standard ("every real failure
+  becomes a permanent regression test, first"): `tests/ownerReplay.test.ts`
+  gained a test driving both new rows through the real stub-backed
+  pipeline, asserting neither turn's reply is ever the literal
+  "conversation not found" string a re-hardcoded surface would
+  reproduce.
+- **Disclosed, not changed**: `EMPTY_PROMISE_LINES` merged into every
+  row's `mustNotContain` can still false-fail a reply that resolves
+  the promised phrase in the same breath - the same finding pass one
+  made, already mitigated by manual reading rather than a regex fix
+  pass one already explained why a regex can't reliably make.
+- **Acknowledged, not redesigned**: a fair point that a fixed English
+  phrase list is the shape the org's "no hacky rules" standard warns
+  against in general - the distinction held here is the one the
+  BACKLOG item's own text already draws, "a bench scorer (never a live
+  gate)": `EMPTY_PROMISE_LINES` measures bench output offline, the
+  same role `HONESTY_LINES` already holds in this exact file, never a
+  rule in the live chat/turn pipeline governing what the model is
+  told or allowed to do. Redesigning bench scorers generally into
+  learned classifiers is a real, much larger question than this item,
+  not decided here.
+- **Fixed**, a second stale reference the first pass's own fix (648 not
+  617) didn't propagate to: `turnEngine.ts`'s `NATURALNESS_POLICY`
+  sizing comment, eight lines below the one already fixed, still cited
+  the old 617/800 ratio.
+
+Re-verification after both passes: `bun test tests/ownerReplay.test.ts`
+(22/22, including the new regression test) and `bun test
+tests/conversationBench.test.ts` (44/44) both clean.
+
+A third, low-effort pass (a mechanical fix-hunk re-review, the repo's
+own commit hook requiring one on record within 30 minutes) caught one
+more real regex gap: `EMPTY_PROMISE_LINES`'s optional-apostrophe
+alternatives had no leading word boundary, so "you could **still
+look** it up" or "I might **still get** back to you" matched as a
+false empty-promise ("ill look it up"/"ill get back to you" inside
+"still"), verified directly and fixed with a leading `\b` on every
+alternative; re-verified against both the original positive/negative
+cases and the two new "still ..." negatives. The pass's second
+finding was this section's own dangling "full gate below" with
+nothing under it - fixed by writing the real numbers here instead:
+final `bash scripts/check.sh` (scope `backend`, on the tree rebased
+onto `origin/main` at `55fa0512`) - typecheck clean, rule-budget lint
+clean, scripts 51/51, backend 4146/4146 (zero failures, not even the
+known `mdns.test.ts` environment flake other lanes hit tonight),
+standards core (gitleaks, PII wordlist, prose lint, licence) all
+clean. "All checks passed (scope: backend)."

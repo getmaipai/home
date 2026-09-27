@@ -379,6 +379,14 @@ export const CREDENTIAL_LINE = "Keep passwords and keys in Credentials, not in c
  * lines anywhere; the guards keep them for a caught household
  * invention only). */
 export const HONESTY_LINES = "nobody's told me|not something i've been told|don't know that one|household hasn't told|haven't been told|don't actually have that|i don't know, sorry|not sure about that(?: one)?\\.|don't have an answer for that|don't have that (?:one )?yet|one i don't have yet";
+/** CORRECTION-02 (dev.md "Design pass over the reserved items", the
+ * CORRECTION-01 design record; LIVE-0923-01 items 4/5): a promise of
+ * future work with no tool call behind it, the exact empty reply a
+ * disputed-claim turn got live twice - "I'll look it up," "I'll update
+ * my information," and the synthetic near-phrasings a small model
+ * produces for the same shape. A grounded re-search or an honest
+ * question both pass; this catches only the third, refused branch. */
+export const EMPTY_PROMISE_LINES = "\\bi[’']?ll look (?:that|it) up\\b|\\bi will look (?:that|it) up\\b|\\bi[’']?ll update my (?:information|info)\\b|\\bi will update my (?:information|info)\\b|\\blet me check (?:on|into) (?:that|this) and get back to you|\\bi[’']?ll check (?:on|into) (?:that|this) and get back to you|\\bi[’']?ll get back to you (?:on|about) that|\\bi[’']?ll find out and (?:let you know|get back to you)|\\bi[’']?ll do some research and get back to you|\\bi[’']?ll look into it and let you know";
 /** A sign-off in place of engagement. */
 export const NO_CLOSER = "enjoy the movie|enjoy the film|let me know if you need|anything else|have fun watching";
 /** A first-person experience claim (C3): the hub has watched, played,

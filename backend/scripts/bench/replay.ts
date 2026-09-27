@@ -46,7 +46,7 @@ import { tmpdir, loadavg } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { BenchConversation, TurnExpectation } from "./conversationFixture";
-import { HONESTY_LINES } from "./conversationFixture";
+import { HONESTY_LINES, EMPTY_PROMISE_LINES } from "./conversationFixture";
 import type { TurnScore, TurnObserved } from "./conversationScore";
 import type { RecordingProxy } from "./recordingProxy";
 
@@ -66,8 +66,16 @@ const STUCK_LINES = "keep landing on the same answer|going in circles|stuck on t
  * no other expectation still gets one real, scored check instead of
  * reading as a free-text row (TurnScore.pass stays null with zero
  * checks - conversationScore.ts's own convention for a humanVerdict
- * row, not what an unscored replay turn should look like). */
-const UNIVERSAL_MUST_NOT_CONTAIN = `${STUCK_LINES}|${HONESTY_LINES}`;
+ * row, not what an unscored replay turn should look like).
+ *
+ * CORRECTION-02 (dev.md "Design pass over the reserved items"):
+ * EMPTY_PROMISE_LINES joins the same universal check, not just the two
+ * new correction rows' own - the BACKLOG item's own words are "a bench
+ * scorer... that fails any reply promising a lookup with no tool call
+ * behind it," which is a property every row in this replay set should
+ * hold, the same way no row should ever emit a stuck line or an
+ * honesty line either. */
+const UNIVERSAL_MUST_NOT_CONTAIN = `${STUCK_LINES}|${HONESTY_LINES}|${EMPTY_PROMISE_LINES}`;
 
 function validateExpect(expect: unknown, where: string): asserts expect is TurnExpectation {
   if (typeof expect !== "object" || expect === null) throw new Error(`${where}: turn.expect must be an object`);

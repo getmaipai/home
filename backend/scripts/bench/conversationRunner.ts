@@ -12,7 +12,7 @@
 import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
-import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, type TurnStreamResult } from "@/lib/turnEngine";
+import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, type TurnStreamResult, type Surface } from "@/lib/turnEngine";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { pickThinkingCue } from "@/lib/replyVariation";
@@ -483,12 +483,21 @@ async function driveTurn(
 /** A row can script the hub's own reply for this turn instead of calling
  * the model. The turn is logged through logTurn() with the frozen signal
  * prepareTurn() would compute. */
-function seedTurn(actor: PersonRow, say: string, reply: string, conversationId: string): { value: TurnValue; text: string; timings: Timings; error: string | null; interrupted: boolean; spokenCue: string | null } {
+// CORRECTION-02 (code review, second pass): `logTurn()`'s own surface
+// argument was hardcoded "chat" here too, the identical mismatch the
+// createConversation() fix above closes on the create side - a
+// `surface: "robot"` row using `seedReply` in the offline/no-proxy
+// path (no live model, `deps.proxy` unset) would log its seeded turn
+// under a conversation now correctly stored "robot" but a turn row
+// claiming "chat". One definition: the conversation's surface, the
+// turn's driven surface, and the turn's logged surface are the same
+// field, never three copies that can drift.
+function seedTurn(actor: PersonRow, say: string, reply: string, conversationId: string, surface: Surface = "chat"): { value: TurnValue; text: string; timings: Timings; error: string | null; interrupted: boolean; spokenCue: string | null } {
   const turnId = newConversationTurnId();
   const signal = classifyTurnSignal({ text: say, commandOpeners: commandOpeners(loadAllManifests()), ageBand: speakerAgeBand(actor, new Date()) });
   const safety = evaluateSafety(say, speakerAgeBand(actor, new Date()));
   const value: TurnValue = { reply: { text: reply }, source: "model", safety, conversation_id: conversationId, turn_id: turnId };
-  logTurn(actor, "chat", say, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
+  logTurn(actor, surface, say, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
   return { value, text: reply, timings: { firstDeltaMs: 0, firstSentenceMs: 0, totalMs: 0 }, error: null, interrupted: false, spokenCue: null };
 }
 
@@ -735,7 +744,20 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     if (turn.confirmInferred) confirmInferredRelationships(actor);
     if (turn.daysLater) deps.backdate(turn.daysLater, turnIds.filter(Boolean));
     if (i === 0 || turn.newConversation || !conversationIds[speaker]) {
-      const created = createConversation(actor, { surface: "chat" });
+      // CORRECTION-02 (dev.md "Design pass over the reserved items"):
+      // this used to hardcode "chat" regardless of `conv.surface`,
+      // while the driveTurn() call below already passes `conv.surface`
+      // through - a conversation created "chat" then driven "robot"
+      // fails resolveOrCreateConversation()'s own surface check
+      // (conversationHistory.ts) with "conversation not found", found
+      // live building the first two `owner-replay.json` rows to set
+      // `surface: "robot"` (a review, second pass: conversationFixture.ts's
+      // own `unknown-speaker-shared-device` already did, in the bigger
+      // CONVERSATIONS fixture a different entry point drives - checked
+      // directly, `conversationBench.test.ts` stays 44/44 clean with
+      // this fix). One definition: the conversation's own stored
+      // surface and the turn's driven surface are the same field.
+      const created = createConversation(actor, { surface: conv.surface ?? "chat" });
       if (!created.ok) throw new Error(`createConversation: ${created.error}`);
       conversationIds[speaker] = created.value.id;
     }
@@ -751,7 +773,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     // one (the stub tests) it is pasted as before.
     if (turn.seedReply !== undefined && deps.proxy) deps.proxy.scriptNextReply(turn.seedReply);
     if (deps.beforeTurn) await deps.beforeTurn();
-    const driven = turn.seedReply !== undefined && !deps.proxy ? seedTurn(actor, turn.say, turn.seedReply, conversationId) : await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt, surface: conv.surface });
+    const driven = turn.seedReply !== undefined && !deps.proxy ? seedTurn(actor, turn.say, turn.seedReply, conversationId, conv.surface) : await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt, surface: conv.surface });
     await deps.proxy?.settled(); // the teed reply text lands a tick after the client's read
     // An interrupted turn logs no [turn] line today (nothing is
     // finalized for a reply nobody read); its id is on the [route] line.

@@ -261,6 +261,10 @@ checklist (`docs/dev.md`); no release has been cut yet.
   with no summary text. When a whole result set genuinely has no summary
   text, the reply now says so instead of rephrasing the titles as if
   they were an answer (#169).
+- Correcting a fact MaiPai just stated now gets a real answer, not an
+  empty promise: it searches again or concedes plainly instead of
+  saying "I'll look that up" or "I'll update my information" and doing
+  nothing (CORRECTION-02).
 
 ### Added
 - Settings (platform plan 4.6), the fourth slice of hub core: the store,

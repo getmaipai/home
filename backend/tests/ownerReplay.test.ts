@@ -107,6 +107,32 @@ describe("owner-replay.json", () => {
     });
   }, 30_000);
 
+  // CORRECTION-02 (code review, second pass): the real bug this item
+  // found and fixed - createConversation() (conversationRunner.ts)
+  // hardcoded surface: "chat" regardless of `conv.surface`, so the
+  // first BenchConversation rows to ever set `surface: "robot"`
+  // (correction-thats-not-true, correction-bare-wrong) hit a stored
+  // "chat" conversation driven as "robot",
+  // resolveOrCreateConversation()'s own surface check refusing it as
+  // "conversation not found" on turn 1 already. Permanent regression
+  // test, in the exact words that broke it: both rows run end to end
+  // through the real stub-backed pipeline, and neither turn's reply
+  // is ever the literal "conversation not found" error string a
+  // re-hardcoded surface would produce again.
+  test("scripted: correction-thats-not-true and correction-bare-wrong (surface: robot) never hit 'conversation not found'", async () => {
+    const fixture = loadFixture();
+    for (const id of ["correction-thats-not-true", "correction-bare-wrong"]) {
+      const row = fixture.failed.find((c) => c.id === id);
+      if (!row) throw new Error(`owner-replay.json is missing ${id}`);
+      expect(row.surface).toBe("robot");
+      await withStubBench({}, async (deps) => {
+        const { scores } = await runConversation(row, deps);
+        expect(scores.length).toBe(2);
+        for (const s of scores) expect(s.observed.reply).not.toContain("conversation not found");
+      });
+    }
+  }, 30_000);
+
   test("summarizeRepeats: a row counts as clean only when every repeat's every turn passed", () => {
     const rows = [{ id: "a", category: "failed" as const }, { id: "b", category: "control" as const }];
     const scoresByConversationId = new Map([

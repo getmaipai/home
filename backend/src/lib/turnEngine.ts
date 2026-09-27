@@ -737,8 +737,9 @@ const MAX_SKILLS_SECTION_CHARS = 1200;
 // every other section does against a runaway conversation summary ever
 // dominating the prompt on its own.
 const MAX_SUMMARY_SECTION_CHARS = 600;
-// Step 4's own two: "rules" (INFORMATION_HANDLING_POLICY, currently 617
-// chars) and "companion" (composePersonaPrompt()'s output, which
+// Step 4's own two: "rules" (INFORMATION_HANDLING_POLICY, currently 648
+// chars - CORRECTION-02 added one sentence, dev.md "Design pass over
+// the reserved items") and "companion" (composePersonaPrompt()'s output, which
 // genuinely varies per persona) each get their own cap too - the bot's
 // test_prompt_budget.py precedent this step copies found rules alone
 // once hit 68% of a prompt with no independent section cap to stop it.
@@ -751,7 +752,8 @@ const MAX_RULES_SECTION_CHARS = 800;
 // a cap measured before it existed.
 // Sized like every other section here: real content (383 chars) plus
 // headroom, the same ~30% margin INFORMATION_HANDLING_POLICY's own
-// 617-real/800-cap ratio already uses - a code review (2026-09-06)
+// real/800-cap ratio already uses (648/800 as of CORRECTION-02,
+// 2026-09-26; 617/800 when this comment was written) - a code review (2026-09-06)
 // pointed out this pushes the worst-case stable prefix (every section
 // simultaneously at its own max) to roughly 3,600 of PROMPT_SYSTEM_
 // CHAR_BUDGET's 4,000, leaving under 400 for the whole volatile zone

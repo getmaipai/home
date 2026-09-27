@@ -1,5 +1,5 @@
 {
-  "_comment": "U0a (docs/plans/simple-turn-pipeline-2026-09-22.md, point 4 and unit U0a). The owner's own failed turns today, verbatim, plus controls. Loaded by scripts/bench/replay.ts and run through the same fixture-conversation runner conversation.ts's --live mode uses (conversationRunner.ts, conversationScore.ts), three repeats each. Every row's `expect` follows conversationFixture.ts's TurnExpectation shape (JSON-compatible subset only): toolRan, outcomeArgsMatch (websearch's own argument key is `expression`, not `query` - conversationFixture.ts's existing websearch rows confirm this), sourcesNonEmpty, mustContain, mustNotContain. replay.ts adds the universal 'no stuck line, no honesty line' mustNotContain to every turn automatically, so it is not repeated below. No household member is named in any row (the org PII rule and the plan's point 4: 'none of which names a household member').",
+  "_comment": "U0a (docs/plans/simple-turn-pipeline-2026-09-22.md, point 4 and unit U0a). The owner's own failed turns today, verbatim, plus controls. Loaded by scripts/bench/replay.ts and run through the same fixture-conversation runner conversation.ts's --live mode uses (conversationRunner.ts, conversationScore.ts), three repeats each. Every row's `expect` follows conversationFixture.ts's TurnExpectation shape (JSON-compatible subset only): toolRan, outcomeArgsMatch (websearch's own argument key is `expression`, not `query` - conversationFixture.ts's existing websearch rows confirm this), sourcesNonEmpty, mustContain, mustNotContain. replay.ts adds the universal 'no stuck line, no honesty line, no empty promise of future work' (CORRECTION-02) mustNotContain to every turn automatically, so it is not repeated below. No household member is named in any row (the org PII rule and the plan's point 4: 'none of which names a household member').",
 
   "failed": [
     {
@@ -90,6 +90,26 @@
       "note": "OPENER-01/COMMAND-FAIL-01 (dev.md 'The knowledge hijack'): knowledge's own 'what is *' bound the whole question to `topic` and ran it as a Wikipedia page title; the lookup failed with a 502 and the raw MCP error string, carrying a Wikipedia URL, reached Jesse verbatim. commandsNode now refuses a question-word wildcard opener on anything but a directive turn (OPENER-01) - the manifest still lists the pattern (removing it broke the old, frozen path's own routing-corpus fixture, found live building this item; flagged for the coordinator, not fixed here), but the runtime gate never fires it on this question - and a failed pattern outcome now continues the turn to the model instead of answering with the error text (COMMAND-FAIL-01). No via: pattern outcome on this turn either way, a reply from source: model (a search may run under the interim rule; toolRan is not asserted), judged by WRITTEN-PARITY-01's own bare-parity column.",
       "turns": [
         { "say": "what is technical benchmarking and why do you need it", "expect": { "mustNotContain": "MCP error|404|wikipedia\\.org" } }
+      ]
+    },
+    {
+      "id": "correction-thats-not-true",
+      "category": "correction",
+      "surface": "robot",
+      "note": "CORRECTION-02 (dev.md 'Design pass over the reserved items'): reproduces LIVE-0923-01 item (4)'s shape with roster-safe synthetic trivia, never a household fact - the assistant's own scripted first-turn claim (seedReply, a deliberately wrong fixed fact so the row is about the correction, not whether the model knows the trivia), then a 'that's not true' dispute. `surface: robot` (spoken class): the contract line lives in INFORMATION_HANDLING_POLICY (persona.ts), which reaches the prompt on the spoken class today (buildStablePrefix()); the written-adult class carries no policy prose at all right now (PREFIX-CLASS-01, WRITTEN_VOICE_PROSE false), a separate, open gap named in dev.md, not this row's to close.",
+      "turns": [
+        { "say": "when did the Berlin Wall fall", "seedReply": "The Berlin Wall fell in 1987.", "expect": { "signal": { "primary_act": "question" } } },
+        { "say": "that's not true, it fell in 1989", "expect": { "signal": { "primary_act": "inform" }, "humanVerdict": true } }
+      ]
+    },
+    {
+      "id": "correction-bare-wrong",
+      "category": "correction",
+      "surface": "robot",
+      "note": "CORRECTION-02: reproduces LIVE-0923-01 item (5)'s shape - a bare 'wrong,' sentence-opener correcting the assistant's own scripted (wrong, on purpose) prior claim. Same surface/scoring rationale as correction-thats-not-true.",
+      "turns": [
+        { "say": "who wrote the novel Frankenstein", "seedReply": "Frankenstein was written by Bram Stoker.", "expect": { "signal": { "primary_act": "question" } } },
+        { "say": "wrong, it was Mary Shelley", "expect": { "signal": { "primary_act": "inform" }, "humanVerdict": true } }
       ]
     }
   ],
