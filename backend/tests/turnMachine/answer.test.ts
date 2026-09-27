@@ -69,3 +69,21 @@ test("answerNode: 'model_text' and 'context_quote' never carry the provenance ta
   const contextQuote = await answerNode(STATE, { kind: "context_quote", quote: "a line from the window" }, SIGNAL);
   expect(contextQuote.output.provenance).toBeUndefined();
 });
+
+// MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): a manifest that fails
+// validation is a real infrastructure defect, not a household member
+// asking for something the conversation doesn't ground - it must never
+// say the honesty line ("I don't actually have that in this
+// conversation, so I won't guess."), which belongs to a genuinely
+// ungrounded or invented tool call.
+describe("answerNode: 'policy_refused' with reason manifest_invalid says something on my end isn't working, never the honesty line", () => {
+  test("manifest_invalid gets its own line", async () => {
+    const { output } = await answerNode(STATE, { kind: "policy_refused", reason: "manifest_invalid" }, SIGNAL);
+    expect(output.text).toBe("I can't do that right now. Something on my end isn't working.");
+  });
+
+  test("unknown_tool is unchanged: still the honesty line", async () => {
+    const { output } = await answerNode(STATE, { kind: "policy_refused", reason: "unknown_tool" }, SIGNAL);
+    expect(output.text).toBe("I don't actually have that in this conversation, so I won't guess.");
+  });
+});

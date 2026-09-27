@@ -98,9 +98,35 @@ export function listPackageIds(): string[] {
 const manifestCache = new Map<string, { mtimeMs: number; manifest: PackageManifest }>();
 const packageCache = new Map<string, { manifestMtimeMs: number; recipeMtimeMs: number; value: LoadedPackage }>();
 
+// MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): a manifest that fails
+// validation (the 400 path below) is never added to manifestCache above
+// (only a successful parse is), so loadManifestOnly() re-reads and
+// re-validates it on EVERY call - every turn that ever tries the broken
+// package's tool. Logging unconditionally on that path would flood the
+// log the same way; this is a separate, tiny once-per-mtime memory,
+// beside manifestCache rather than inside it, so it changes nothing
+// about the real cache's own behavior or contents. Keyed by id only
+// (one mtime remembered at a time) - a package edited twice back to a
+// previously-warned mtime warns again, which is fine: that is a real
+// second occurrence of that exact broken content being live.
+const manifestWarnedAtMtime = new Map<string, number>();
+
 export function __resetPackageCachesForTests(): void {
   manifestCache.clear();
   packageCache.clear();
+  manifestWarnedAtMtime.clear();
+}
+
+// MANIFEST-REFUSAL-01: the bracketed-tag console.warn convention
+// lib/turnEngine.ts and friends already use for a household-invisible
+// diagnostic (`[conversation]`, `[background]`) - `[packages]` is a new
+// tag for the same reason, never a rule reading anything a household
+// member said (this only ever logs the loader's own Zod message about
+// a manifest's shape).
+function warnOncePerMtime(id: string, mtimeMs: number, line: string): void {
+  if (manifestWarnedAtMtime.get(id) === mtimeMs) return;
+  manifestWarnedAtMtime.set(id, mtimeMs);
+  console.warn(line);
 }
 
 /** Reads and validates just manifest.json, for lib/persona.ts's own
@@ -148,11 +174,31 @@ export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
   try {
     manifestJson = JSON.parse(readFileSync(manifestPath, "utf-8"));
   } catch {
+    // MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): the file exists
+    // (mtimeMs above is real) but couldn't be read or parsed - warned
+    // once per mtime, the same as the validation failure below, so the
+    // hub log shows it the minute it happens rather than a household
+    // member seeing a refusal with no diagnostic anywhere (the actual
+    // live incident this fixes was the validation branch below, but
+    // this sibling failure mode gets the identical treatment). The
+    // genuinely-missing-file case above (mtimeMs === null) logs
+    // nothing - that's the ordinary "no such package" a model
+    // inventing a tool name produces, never a defect worth a log line.
+    warnOncePerMtime(id, mtimeMs, `[packages] ${id}: manifest.json is unreadable`);
     return { ok: false, status: 404, error: `no such package ${id}` };
   }
   const manifestParsed = PackageManifest.safeParse(manifestJson);
   if (!manifestParsed.success) {
-    return { ok: false, status: 400, error: `package ${id}'s manifest failed validation: ${manifestParsed.error.message}` };
+    warnOncePerMtime(id, mtimeMs, `[packages] ${id}: manifest failed validation: ${manifestParsed.error.message}`);
+    // `code: "manifest_invalid"` (#92's own established pattern above,
+    // PluginOpResult's own comment) - so policy.ts can tell this apart
+    // from the OTHER 400 this function returns (an id that fails
+    // isValidPackageId(), above, before any file is even read) without
+    // parsing `error`'s own text. That other 400 stays uncoded and
+    // unlogged on purpose: it never reaches disk, so there's no real
+    // package content to diagnose, and it's the same "model invented a
+    // tool name" case 404 already is.
+    return { ok: false, status: 400, error: `package ${id}'s manifest failed validation: ${manifestParsed.error.message}`, code: "manifest_invalid" };
   }
   manifestCache.set(id, { mtimeMs, manifest: manifestParsed.data });
   return { ok: true, value: manifestParsed.data };

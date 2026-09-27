@@ -68,10 +68,21 @@ export interface PendingAskInfo {
  * the model node's own quote check catches it first) now carry their
  * own names; `ungrounded_args` keeps only `argsGrounded()`'s own false.
  * The refusal line stays one sentence either way (nodes/answer.ts's
- * policyRefusalLine()); only the trace changes. */
+ * policyRefusalLine()); only the trace changes.
+ *
+ * MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): `unknown_tool` used
+ * to also cover a manifest that exists but fails Zod validation (the
+ * loader's own 400) - the live incident (2026-09-26) had every bundled
+ * manifest gain an `incognito` key the running process's older schema
+ * didn't know, and the trace showed nothing but `unknown_tool` for
+ * every tool, indistinguishable from a model simply inventing a tool
+ * name. `manifest_invalid` is that 400 case split out on its own;
+ * `unknown_tool` now means only "no such package" (a 404, or an
+ * invalid id) - the honest "the model made this up" case GROUND-01's
+ * ruling already covers. */
 export type PolicyDecision =
   | { allow: true }
-  | { allow: false; reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "context_tool_in_policy" | "temporary_mode" | "crisis_state"; ask?: PendingAskInfo };
+  | { allow: false; reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "context_tool_in_policy" | "temporary_mode" | "crisis_state"; ask?: PendingAskInfo };
 
 /** The per-model tool-calling budget (commons spec:
  * ModelCapabilities.turn_budget, U2a). Mirrors the spec shape exactly;

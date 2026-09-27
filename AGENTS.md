@@ -60,7 +60,14 @@ but the previous tag's palette, because the bump to ui-v0.5.13 was
 installed in the session's worktree and never in `main`'s). A done
 report's "what you see on reload" line is proven on 8787 itself after
 the restart, by a probe or a screenshot taken from that port, never
-from a worktree's own build.
+from a worktree's own build. The same holds for a bundled manifest
+under `backend/packages/`, not just a pin: the running hub re-reads an
+edited manifest by mtime but validates it against whatever spec schema
+it booted with, so a manifest or spec-pin change isn't live on 8787
+until the hub restarts, and the done report for that kind of change
+says whether the restart happened (MANIFEST-REFUSAL-01, fixes #166 -
+the 2026-09-26 incident was exactly a bundled-manifest change landing
+without one).
 
 Commands: from the repo root (the `home/` folder containing `package.json`),
 `bun start` builds and starts the local app in the background and prints

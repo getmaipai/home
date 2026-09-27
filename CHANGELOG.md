@@ -222,6 +222,13 @@ checklist (`docs/dev.md`); no release has been cut yet.
   `docs/dev.md`.
 
 ### Fixed
+- A manifest that fails validation (a bundled package edited to a shape
+  the running hub's schema doesn't know yet) is now diagnosable: it's
+  logged once in the hub log and refused with "I can't do that right
+  now. Something on my end isn't working," instead of silently landing
+  the ungrounded-knowledge line a household member would read as "the
+  conversation doesn't have that," with no trace of what actually went
+  wrong (fixes #166).
 - A `code-review` pass (2026-09-04) across the identity, safety, and
   memory slices found and fixed real bugs, the most severe being a
   safety-invariant violation: `self_harm` co-occurring with another

@@ -1,12 +1,15 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
+import { mkdirSync, writeFileSync, utimesSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { listPackageIds, loadPackage, loadManifestOnly, registerAllPackageNotificationTypes, warmPackage, withHouseholdPlaceDefault } from "@/lib/plugins";
+import { listPackageIds, loadPackage, loadManifestOnly, registerAllPackageNotificationTypes, warmPackage, withHouseholdPlaceDefault, __resetPackageCachesForTests } from "@/lib/plugins";
+import { installedPackageVersionDir } from "@/lib/paths";
 import { db } from "@/db";
-import { scheduledJobs } from "@/db/schema";
+import { scheduledJobs, packageInstalls } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 beforeEach(() => {
@@ -726,4 +729,61 @@ describe("every bundled package's description is one sentence a person would say
       expect(description.length).toBeLessThanOrEqual(120);
     });
   }
+});
+
+// MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): the live incident
+// (2026-09-26) had every bundled manifest fail validation against the
+// still-running process's older schema with nothing logged anywhere -
+// a household member just saw a refusal two hours later. This proves
+// the loader itself now warns the moment a manifest stops validating,
+// exactly once per real change (mtime), never once per read - the
+// manifest here fails Zod validation on every single call (it is never
+// cached the way a valid one is), so a naive "log on every read" would
+// have flooded the log on every turn that ever tries this tool.
+describe("loadManifestOnly: a manifest that fails validation is warned about once per change, not once per read", () => {
+  const TEST_PKG_DIR = installedPackageVersionDir("broken-pkg", "1.0.0");
+  const MANIFEST_PATH = join(TEST_PKG_DIR, "manifest.json");
+
+  afterEach(() => {
+    rmSync(TEST_PKG_DIR, { recursive: true, force: true });
+    __resetPackageCachesForTests();
+  });
+
+  test("one warning for two reads of the same manifest, a second warning once it's edited", () => {
+    db.insert(packageInstalls)
+      .values({
+        packageId: "broken-pkg",
+        version: "1.0.0",
+        previousVersion: null,
+        channel: "stable",
+        sourceCommit: "test",
+        permissions: "[]",
+        installedAt: "2026-01-01T00:00:00.000Z",
+      })
+      .run();
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(MANIFEST_PATH, JSON.stringify({ id: "broken-pkg", not_a_real_field: true }));
+
+    const warnSpy = spyOn(console, "warn");
+    try {
+      const first = loadManifestOnly("broken-pkg");
+      expect(first.ok).toBe(false);
+      const second = loadManifestOnly("broken-pkg");
+      expect(second.ok).toBe(false);
+      expect(warnSpy.mock.calls.length).toBe(1);
+
+      // Touch the file: a distinct mtime is the loader's own signal
+      // that the manifest genuinely changed, forced explicitly rather
+      // than trusting two writeFileSync calls a few microseconds apart
+      // to land on different filesystem-reported millisecond values.
+      writeFileSync(MANIFEST_PATH, JSON.stringify({ id: "broken-pkg", still_not_a_real_field: true }));
+      utimesSync(MANIFEST_PATH, new Date(Date.now() + 60_000), new Date(Date.now() + 60_000));
+
+      const third = loadManifestOnly("broken-pkg");
+      expect(third.ok).toBe(false);
+      expect(warnSpy.mock.calls.length).toBe(2);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });

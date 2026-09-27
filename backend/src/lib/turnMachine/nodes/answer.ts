@@ -69,11 +69,21 @@ export interface AnswerOutput {
  * "the refusal line stays one sentence; the trace is what changes" -
  * `ungrounded_args`, `unknown_tool` and `context_tool_in_policy` all
  * fall to the same honesty line on purpose; the branch and the argument
- * name live in `stats.nodes[]`'s `policy` entry instead. */
+ * name live in `stats.nodes[]`'s `policy` entry instead.
+ *
+ * MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): `manifest_invalid`
+ * (a real package whose manifest failed Zod validation - policy.ts's
+ * own split from `unknown_tool`) is NOT the honesty line: the
+ * conversation isn't missing anything, something on the hub itself is
+ * broken, and saying "I won't guess" told the household the wrong
+ * thing entirely during the live incident this fixes. `unknown_tool`
+ * (no such package, the ordinary case of a model inventing a tool
+ * name) keeps the honesty line - GROUND-01's ruling stands. */
 function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "min_role") return "That one needs a grown-up.";
   if (reason === "temporary_mode") return "I can't save anything in a temporary chat.";
   if (reason === "crisis_state") return "Let's stay with this for now. I'm here.";
+  if (reason === "manifest_invalid") return "I can't do that right now. Something on my end isn't working.";
   return "I don't actually have that in this conversation, so I won't guess.";
 }
 

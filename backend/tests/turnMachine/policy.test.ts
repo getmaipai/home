@@ -22,9 +22,16 @@
 // distinct mechanism anywhere in this codebase. The schema passed to
 // every call below comes from the loaded manifest, the same one
 // policy.ts itself reads at runtime, never a hand-built stand-in.
-import { describe, expect, test } from "bun:test";
-import { argsGrounded } from "@/lib/turnMachine/nodes/policy";
-import { loadManifestOnly } from "@/lib/plugins";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { argsGrounded, policyNode } from "@/lib/turnMachine/nodes/policy";
+import { loadManifestOnly, __resetPackageCachesForTests } from "@/lib/plugins";
+import { installedPackageVersionDir } from "@/lib/paths";
+import { db } from "@/db";
+import { packageInstalls } from "@/db/schema";
+import { resetDb } from "../reset-db";
+import type { NodeOutcome, TurnState } from "@/lib/turnMachine/contract";
 
 const websearch = loadManifestOnly("websearch");
 if (!websearch.ok) throw new Error("websearch manifest failed to load for policy.test.ts");
@@ -91,5 +98,76 @@ describe("argsGrounded(): GROUND-01 step 2, exempts only the manifest's schema-t
 
   test("with no schema passed, every string field is still checked (schema only ever narrows what's exempt, never what's checked)", () => {
     expect(argsGrounded({ expression: "how to pick a lock" }, ["when is dune 3 releasing"])).toBe(false);
+  });
+});
+
+// MANIFEST-REFUSAL-01 (fixes getmaipai/home#166, coordinator's comment
+// 2026-09-26): the live incident was every bundled manifest gaining an
+// `incognito` key the still-running process's schema didn't know, and
+// `policyNode` reported nothing but `unknown_tool` for every tool, with
+// no way to tell "the model invented a tool name" (404, stays
+// unknown_tool) from "a real package is broken" (400, now
+// manifest_invalid, with the validation message carried into the
+// trace) - the resolver, the issue's own "suspected root cause," was
+// never the actual defect.
+describe("policyNode: a manifest that fails validation is refused as manifest_invalid, a missing package stays unknown_tool", () => {
+  const TEST_PKG_DIR = installedPackageVersionDir("test-pkg", "1.0.0");
+
+  beforeEach(() => resetDb());
+
+  afterEach(() => {
+    rmSync(TEST_PKG_DIR, { recursive: true, force: true });
+    __resetPackageCachesForTests();
+  });
+
+  function baseState(utterance: string): TurnState {
+    return {
+      actor: { role: "adult" },
+      context: [],
+      crisis: false,
+      temporary: false,
+      utterance,
+    } as unknown as TurnState;
+  }
+
+  function asFailure(outcome: NodeOutcome): { ok: false; code: string; arg?: string; message?: string } {
+    if (!("ok" in outcome) || outcome.ok !== false) throw new Error("expected a refusal outcome");
+    return outcome;
+  }
+
+  test("a package whose manifest fails validation is refused as manifest_invalid with the validation message in the trace, and a package that does not exist stays unknown_tool with no message", async () => {
+    db.insert(packageInstalls)
+      .values({
+        packageId: "test-pkg",
+        version: "1.0.0",
+        previousVersion: null,
+        channel: "stable",
+        sourceCommit: "test",
+        permissions: "[]",
+        installedAt: "2026-01-01T00:00:00.000Z",
+      })
+      .run();
+    const websearchManifest = JSON.parse(readFileSync(join(process.cwd(), "packages", "websearch", "manifest.json"), "utf-8"));
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(join(TEST_PKG_DIR, "manifest.json"), JSON.stringify({ ...websearchManifest, incognito_typo: true }));
+
+    const state = baseState("search the web for the tallest mountain");
+    const invalidCall = { tool: "test-pkg", args: { expression: "the tallest mountain" }, id: "call-1" };
+    const invalid = await policyNode(state, { calls: [invalidCall] }, new AbortController().signal);
+    expect(invalid.output.entries).toHaveLength(1);
+    expect(invalid.output.entries[0]?.decision).toEqual({ allow: false, reason: "manifest_invalid" });
+    const invalidOutcome = asFailure(invalid.outcome);
+    expect(invalidOutcome.code).toBe("manifest_invalid");
+    expect(invalidOutcome.arg).toBe("test-pkg");
+    expect(invalidOutcome.message).toContain("incognito_typo");
+
+    const missingCall = { tool: "no-such-pkg", args: {}, id: "call-2" };
+    const missing = await policyNode(state, { calls: [missingCall] }, new AbortController().signal);
+    expect(missing.output.entries).toHaveLength(1);
+    expect(missing.output.entries[0]?.decision).toEqual({ allow: false, reason: "unknown_tool" });
+    const missingOutcome = asFailure(missing.outcome);
+    expect(missingOutcome.code).toBe("unknown_tool");
+    expect(missingOutcome.arg).toBe("no-such-pkg");
+    expect(missingOutcome.message).toBeUndefined();
   });
 });

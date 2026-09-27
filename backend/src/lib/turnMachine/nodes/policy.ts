@@ -167,6 +167,21 @@ function placeholderProposal(tool: string, call: ToolCall): ActionProposal {
   return { kind: "read_only", request: { tool, args: (call.args ?? {}) as Record<string, unknown>, callId: call.id ?? tool } };
 }
 
+// MANIFEST-REFUSAL-01: the same caution GENFAIL-01 already applies to
+// the model node's own engine diagnostic text (contract.ts's own
+// NodeOutcome doc) - `loaded.error` is a Zod message about the
+// manifest's OWN shape, never a household member's words, but it is
+// still persisted to the household's DB and served over the wire, so
+// it gets the identical 2000-char cap nodes/model.ts's own
+// boundedGenerationError() applies before trusting an engine's error
+// body. Not imported from there (that function isn't exported, and
+// this node doesn't own model.ts) - the same bound, kept in sync by
+// the constant's value, not by a shared function.
+const MAX_POLICY_ERROR_CHARS = 2000;
+function boundedPolicyError(message: string): string {
+  return message.slice(0, MAX_POLICY_ERROR_CHARS);
+}
+
 export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) => {
   const entries: PolicyEntry[] = [];
   // GROUND-01 ("1. Split the reason"): the trace's own record of "the
@@ -175,9 +190,10 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
   // proposal this turn, so the node-level outcome below can only speak
   // for the first refusal; every entry's own PolicyDecision (returned
   // in `output.entries`) still carries its own full reason regardless.
-  let firstRefusal: { code: string; arg?: string } | undefined;
-  const noteRefusal = (code: string, arg?: string): void => {
-    if (!firstRefusal) firstRefusal = arg !== undefined ? { code, arg } : { code };
+  let firstRefusal: { code: string; arg?: string; message?: string } | undefined;
+  const noteRefusal = (code: string, arg?: string, message?: string): void => {
+    if (firstRefusal) return;
+    firstRefusal = { code, ...(arg !== undefined ? { arg } : {}), ...(message !== undefined ? { message } : {}) };
   };
 
   // "The model's own tool arguments as the query, grounded against the
@@ -210,6 +226,29 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
 
     const loaded = loadManifestOnly(call.tool);
     if (!loaded.ok) {
+      // MANIFEST-REFUSAL-01 (fixes #166): a manifest that EXISTS but
+      // failed Zod validation (loadManifestOnly's own `code:
+      // "manifest_invalid"` on its 400) is a real, diagnosable defect,
+      // split from every other loader failure - no such package (404),
+      // an unreadable/malformed manifest.json (also 404), or a
+      // syntactically invalid id (a DIFFERENT 400, checked before this
+      // node ever touches the filesystem) - which all stay
+      // `unknown_tool` exactly as before: the ordinary case of a model
+      // inventing a tool name, or an infrastructure edge case that
+      // isn't "a package's own content is broken." Matched on `code`,
+      // never bare `status`, since a syntactically invalid id is ALSO a
+      // 400 and must not become `manifest_invalid`. `loaded.error` is
+      // the loader's own Zod message - bounded the same way
+      // nodes/model.ts's own boundedGenerationError() bounds the
+      // engine's diagnostic text before it lands on a NodeOutcome (that
+      // function isn't exported and this node doesn't own model.ts, so
+      // the same 2000-char cap is applied here directly rather than
+      // imported).
+      if (loaded.code === "manifest_invalid") {
+        noteRefusal("manifest_invalid", call.tool, boundedPolicyError(loaded.error));
+        entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: "manifest_invalid" } });
+        continue;
+      }
       noteRefusal("unknown_tool", call.tool);
       entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: "unknown_tool" } });
       continue;
@@ -259,6 +298,6 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     entries.push({ proposal, decision: { allow: true } });
   }
 
-  const outcome = firstRefusal ? { ok: false as const, code: firstRefusal.code, arg: firstRefusal.arg } : { ok: true as const };
+  const outcome = firstRefusal ? { ok: false as const, code: firstRefusal.code, arg: firstRefusal.arg, message: firstRefusal.message } : { ok: true as const };
   return { outcome, output: { entries } };
 };

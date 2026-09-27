@@ -28259,3 +28259,105 @@ INCOGNITO-04/07 and PEOPLE-01, while this item was in flight). No live
 `bun restart` check: this is host machinery with no route or UI surface
 yet (`start_project` is PROJECT-START-01), so nothing exists on 8787 to
 exercise until that item lands.
+
+## MANIFEST-REFUSAL-01 landed: a broken manifest is diagnosable (2026-09-26)
+
+Fixes [#166](https://github.com/getmaipai/home/issues/166). The root
+cause (the coordinator's own diagnosis on the issue, not the issue's
+own "suspected root cause," which was the resolver and never held): the
+hub process serving 8787 booted at 16:18 on 2026-09-26 with spec-v0.1.38
+in memory; INCOGNITO-04 (0887c077, 17:16) added an `incognito` key to
+every bundled manifest on disk, the manifest cache re-read them by
+mtime, and the `.strict()` `PackageManifest` schema still in the
+process's memory rejected the new key on every single one. `policyNode`
+treated that failure exactly like a model inventing a tool name -
+`noteRefusal("unknown_tool", call.tool)`, `loaded.error` dropped on the
+floor - so the trace showed `unknown_tool: websearch` with nothing to
+tell "this package is broken" apart from "the model made this up," and
+the household got the ungrounded-knowledge honesty line for what was
+actually an infrastructure defect.
+
+Trace shape change: `PolicyDecision` and `NodeOutcome` gain
+`manifest_invalid`, split out of `unknown_tool` for exactly one case -
+`loadManifestOnly()`'s own 400 (a manifest that exists but fails
+`PackageManifest.safeParse`), now returned with `code:
+"manifest_invalid"` so `policyNode` can tell it apart from the OTHER
+400 the loader returns (a syntactically invalid id, checked before any
+file is ever read, which stays `unknown_tool`) without parsing the
+error text. The outcome carries the loader's own Zod message in
+`message`, bounded to 2000 characters the same way `nodes/model.ts`'s
+own `boundedGenerationError()` bounds an engine's diagnostic text
+before it lands on a `NodeOutcome` (that function isn't exported and
+this item doesn't own `model.ts`, so the same cap is applied locally in
+`policy.ts` rather than imported). `unknown_tool` is unchanged: `code`
+and `arg`, no message, still the honesty line. `manifest_invalid` gets
+its own line in `answer.ts`'s `policyRefusalLine()`: "I can't do that
+right now. Something on my end isn't working." A manifest that fails
+to parse as JSON at all (a distinct, rarer failure than a schema
+mismatch) still returns a 404 and still maps to `unknown_tool`, per the
+work order's own decision - but `loadManifestOnly()` now warns about it
+too, once per (id, mtime), the same as the validation-failure path, so
+the hub log shows either kind of broken manifest the minute it
+happens.
+
+Logging: `loadManifestOnly()` (`backend/src/lib/plugins.ts`) now warns
+once per (id, mtime) on the validation-failure path
+(`[packages] <id>: manifest failed validation: <zod message>`) and once
+per (id, mtime) on the unreadable/malformed-JSON path
+(`[packages] <id>: manifest.json is unreadable`), tracked in a small
+`manifestWarnedAtMtime` map kept beside `manifestCache` rather than
+inside it - the validation-failure path is never added to
+`manifestCache` itself (only a successful parse is), so every call
+against a broken manifest re-reads and re-validates from scratch, and
+without the separate map every turn that ever tries the broken
+package's tool would log again. A genuinely missing package (`mtimeMs
+=== null`) still logs nothing - the ordinary case of a model inventing
+a tool name, not a defect.
+
+Process note added to `AGENTS.md`'s "Pinning" paragraph: a bundled
+manifest edit is not live on 8787 until the hub restarts, the same
+"re-read by mtime, validated against whatever schema the process
+booted with" gap a pin bump already has, and a done report for that
+kind of change says whether the restart happened.
+
+Tests (`backend/tests/turnMachine/policy.test.ts`,
+`backend/tests/turnMachine/answer.test.ts`,
+`backend/tests/plugins.test.ts`), all written red first: a `policyNode`
+call against an installed `test-pkg` whose manifest is an otherwise-
+valid copy of `backend/packages/websearch/manifest.json` with one
+unrecognized key added asserts `manifest_invalid` with the offending
+key named in the trace's `message`, while a call against a genuinely
+nonexistent package stays `unknown_tool` with `message` undefined;
+`answerNode` on a `manifest_invalid` refusal never says the honesty
+line, and `unknown_tool` is confirmed unchanged; `loadManifestOnly()`
+against a broken manifest warns once for two reads at the same mtime,
+then warns a second time only after the file is genuinely touched (an
+explicit `utimesSync` bump, rather than trusting two `writeFileSync`
+calls microseconds apart to land on different filesystem-reported
+mtimes).
+
+A medium code review (one pass, `main...HEAD` in `../home-166`) raised
+one finding: the unreadable/malformed-JSON path warns but still
+returns a plain 404 with no `code`, so it falls to `unknown_tool` and
+the honesty line rather than the "something on my end isn't working"
+line the validation-failure path gets. Not actioned: this is Decision
+1's own explicit split, made before this item started - a 404 (no such
+package, or now, also, an unreadable file) always stays `unknown_tool`;
+only the loader's 400 (real content that fails schema validation, the
+actual shape of the live incident) becomes `manifest_invalid`. The log
+line added to the unreadable-JSON path makes it diagnosable in the hub
+log without changing the household-facing copy for a rarer failure
+mode this item wasn't asked to reclassify.
+
+Verified: backend `bash scripts/check.sh` (scope: backend, no shared
+config touched), 4143/4144 green. The one failure,
+`advertiseMdns()/stopMdnsAdvertisement() > a real mDNS browser
+discovers the advertised service with the documented TXT fields`
+(`tests/mdns.test.ts`), is unrelated to this diff (real multicast
+discovery, no import of anything this item touches) and failed the
+same way rerun alone - an environment finding (this sandbox's network
+doesn't carry real mDNS reliably), reported rather than fixed forward,
+per the org gate rule for a failure the diff didn't touch. No live
+`bun restart`: this item is
+policy/loader/trace logic with no manifest content changed, and the
+8787 hub was not restarted by this lane.
