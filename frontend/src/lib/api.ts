@@ -828,8 +828,17 @@ export const api = {
   // STORE-SHARE-01: my own Library - files I own, plus files shared with
   // me, each listed once under its real owner (owner_person_id), never
   // the recipient - a shared file's usage counts against the owner only.
-  files: () => request<VisibleFile[]>("/api/files"),
+  // PEOPLE-PROFILE-02: an optional `ownerId` narrows the same list to
+  // one person's own files (still filtered to what I may see) - the
+  // profile page's shared-media grid, reusing this one route rather
+  // than a second listing endpoint.
+  files: (ownerId?: string) => request<VisibleFile[]>(`/api/files${ownerId ? `?owner=${encodeURIComponent(ownerId)}` : ""}`),
   fileShares: (fileId: string) => request<Share[]>(`/api/files/${encodeURIComponent(fileId)}/shares`),
+  // Not a fetch - just the path a real <img>/<video> element loads
+  // directly (same-origin, cookie auth, no separate round trip through
+  // request<T>()'s JSON parsing). Gated server-side by the same
+  // canAccessFile boundary as everything else in @/lib/shares.ts.
+  fileContentUrl: (fileId: string) => `/api/files/${encodeURIComponent(fileId)}/content`,
   shareFile: (fileId: string, to: string) => request<Share>(`/api/files/${encodeURIComponent(fileId)}/shares`, { method: "POST", body: JSON.stringify({ to }) }),
   unshare: (shareId: string) => request<{ deletedShareIds: string[] }>(`/api/shares/${encodeURIComponent(shareId)}`, { method: "DELETE" }),
   // Owner/admin only (routes/store.ts's own gate) - null means the

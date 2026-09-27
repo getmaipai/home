@@ -5,6 +5,7 @@ import type { Person } from "@maipai/spec/gen/ts/person.js";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
+import { MediaGrid, type MediaGridItem } from "@maipai/ui/src/primitives/MediaGrid";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@maipai/ui/src/ui/tabs";
 import { Card, CardContent } from "@maipai/ui/src/ui/card";
@@ -16,7 +17,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
-import { api, ApiError, isOwnerOrAdminRole, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
 import { ROLE_LABELS, canManagePerson, ACCENT_RING_CLASS, ACCENT_SELECT_OPTIONS, ACCENT_SELECT_LABELS, NO_ACCENT } from "@/apps/people/roles";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 
@@ -122,10 +123,11 @@ export function PersonProfilePage({ person, onPersonChange }: PersonProfilePageP
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     {canViewMemories ? <TabsTrigger value="memories">Memories</TabsTrigger> : null}
                   </TabsList>
-                  <TabsContent value="overview" className="flex flex-col gap-2 py-2">
+                  <TabsContent value="overview" className="flex flex-col gap-4 py-2">
                     <p className="text-base text-muted-foreground">
                       {viewingSelf ? "This is your own profile." : `${profile.display_name}'s profile in this household.`}
                     </p>
+                    <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
                   </TabsContent>
                   {canViewMemories ? (
                     <TabsContent value="memories" className="py-2">
@@ -156,6 +158,57 @@ function idsFilter(searchParams: URLSearchParams): Set<string> | null {
 }
 
 type ProfileEntry = PersonRosterEntry | Roster;
+
+/** PEOPLE-PROFILE-02: what this person has shared, filtered to the
+ * SIGNED-IN viewer's own access - `GET /api/files?owner=` reuses
+ * STORE-SHARE-01's own visibility rule (`lib/shares.ts`'s
+ * `listPersonFilesVisibleToActor`) server-side, so this component does
+ * no filtering of its own: nothing appears here that the viewer
+ * couldn't already see in their own Library (FilesPage.tsx), and the
+ * exact same rule applies whether the viewer is a supervised (child)
+ * role or not - the design record's own "not a new rule invented for
+ * profiles, it's STORE-SHARE-01's own disclosure filter read from a
+ * second surface" (docs/plans/people-profile-2026-09-26.md). A
+ * non-image/video file (audio, document, story, other) has no
+ * thumbnail concept `MediaGrid` can render yet, so it's left out of
+ * this grid rather than shown wrong. */
+function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; viewingSelf: boolean }) {
+  const filesQuery = useQuery<VisibleFile[]>({
+    queryKey: ["files", "person", profile.id],
+    queryFn: () => api.files(profile.id),
+  });
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium text-muted-foreground">Shared</h2>
+      <AsyncState
+        data={filesQuery.data}
+        error={filesQuery.isError}
+        isFetching={filesQuery.isFetching}
+        onRetry={() => filesQuery.refetch()}
+        errorMessage="Could not load what's been shared."
+        loadingLabel="Loading shared media"
+      >
+        {(files) => {
+          const items: MediaGridItem[] = files
+            .filter((row) => row.file.kind === "image" || row.file.kind === "video")
+            .map((row) => ({
+              id: row.file.id,
+              thumbnailUrl: api.fileContentUrl(row.file.id),
+              mediaType: row.file.kind as "image" | "video",
+              altText: row.file.kind === "video" ? `A video ${profile.display_name} shared` : `A photo ${profile.display_name} shared`,
+            }));
+          return (
+            <MediaGrid
+              items={items}
+              emptyMessage={viewingSelf ? "You haven't shared anything yet." : `${profile.display_name} hasn't shared anything with you yet.`}
+            />
+          );
+        }}
+      </AsyncState>
+    </div>
+  );
+}
 
 /** PEOPLE-PROFILE-01: photo/avatar, name, role, bio, plus the Edit action
  * and the manage-actions link-out `docs/plans/people-profile-2026-09-26.md`

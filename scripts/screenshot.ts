@@ -253,6 +253,7 @@ const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
+const peopleProfileMediaReview = process.argv.includes("--people-profile-media-review");
 
 interface RouteSpec {
   slug: string;
@@ -3215,6 +3216,81 @@ async function captureNextStorageReview(browser: Browser, sessionValue: string):
   }
 }
 
+/** PEOPLE-PROFILE-02: a real file and a real share, written directly
+ * against the throwaway backend's own data directory - `createAttachment()`
+ * still has no HTTP caller anywhere in this codebase (STORE-PAGE-01's own
+ * finding, `captureNextStorageReview`'s comment above, unchanged), so this
+ * is the one way to get real, paintable image bytes into a fresh seeded
+ * household for a screenshot. `backend/src/db/index.ts` turns WAL mode on
+ * specifically so a second, short-lived connection (this script) can write
+ * safely alongside the already-running backend process; see
+ * backend/scripts/seed-profile-share.ts's own header for the full
+ * reasoning (the same direct-database pattern scripts/set-setting.ts
+ * already uses for a not-yet-started server, extended here to one already
+ * up). */
+function seedProfileShare(ownerDisplayName: string, shareToDisplayName: string): void {
+  const seed = Bun.spawnSync({
+    cmd: ["bun", "run", "scripts/seed-profile-share.ts", ownerDisplayName, shareToDisplayName],
+    cwd: join(ROOT, "backend"),
+    env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR },
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  if (seed.exitCode !== 0) throw new Error(`seed-profile-share.ts failed for ${ownerDisplayName} -> ${shareToDisplayName}`);
+}
+
+/** PEOPLE-PROFILE-02's own acceptance: both viewports, both themes, of
+ * `/people/:id` with a real shared photo in the grid. Captured as MARLOW
+ * viewing SAGE's profile, not Sage viewing her own: that's the one
+ * scenario that actually exercises the viewer-scoped filter this item
+ * built (`listPersonFilesVisibleToActor`) rather than just "an owner
+ * sees their own files," which `canAccessFile` already grants trivially
+ * either way. Signs in as Marlow the same way `flagTurnsAsMarlow` above
+ * does (no secret on the seeded teen profile). */
+async function capturePeopleProfileMediaReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const peopleRes = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } });
+  if (!peopleRes.ok) throw new Error(`capturePeopleProfileMediaReview: seed people lookup failed: ${peopleRes.status}`);
+  const seededPeople = (await peopleRes.json()) as Array<{ id: string; display_name: string }>;
+  const sage = seededPeople.find((p) => p.display_name === "Sage");
+  const marlow = seededPeople.find((p) => p.display_name === "Marlow");
+  if (!sage) throw new Error("capturePeopleProfileMediaReview: seedHousehold() didn't create Sage");
+  if (!marlow) throw new Error("capturePeopleProfileMediaReview: seedHousehold() didn't create Marlow");
+
+  seedProfileShare("Sage", "Marlow");
+
+  const marlowSelect = await fetch(`${BASE_URL}/api/auth/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: marlow.id }),
+  });
+  if (!marlowSelect.ok) throw new Error(`capturePeopleProfileMediaReview: signing in as Marlow failed: ${marlowSelect.status}`);
+  const marlowSession = marlowSelect.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!marlowSession) throw new Error("capturePeopleProfileMediaReview: Marlow's own sign-in carried no session cookie");
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, marlowSession);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/people/${sage.id}`);
+        await page.getByText("Shared", { exact: true }).waitFor({ timeout: 15000 });
+        await page.getByRole("button", { name: /^Open media:/ }).first().waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `people-profile-media-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** SHELL-07's own acceptance: both viewports, both themes, of `/next/
  * backups`. This throwaway backend's own fresh data directory has
  * never run a backup, so the real, expected capture is the vendored
@@ -4012,6 +4088,10 @@ async function main() {
 
     if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {
       await captureNextStorageReview(browser, sessionValue);
+    }
+
+    if (peopleProfileMediaReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview && !nextStorageReview) {
+      await capturePeopleProfileMediaReview(browser, sessionValue);
     }
 
     if (!a11yOnly && chatReview) {

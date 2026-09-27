@@ -20201,7 +20201,17 @@
         "tags": [
           "Files"
         ],
-        "summary": "My own Library: files I own, plus files shared with me (by name or by the household)",
+        "summary": "My own Library, or (with ?owner=) one person's own files filtered to what I may see",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "owner",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A shared file is listed under its real owner, once, whether shared directly or via the household.",
@@ -20687,6 +20697,77 @@
           },
           "404": {
             "description": "No such file, or not shared with you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/{id}/content": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "A file's own bytes - visible to its owner or to anyone a live share names",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "file-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file's own bytes, its real media type.",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "A `Range` request's own slice, for video seeking (MediaGrid's lightbox).",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such file, not shared with you, or its bytes are missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Stored bytes failed an integrity check",
             "content": {
               "application/json": {
                 "schema": {

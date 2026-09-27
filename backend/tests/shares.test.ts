@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { createAttachment, getAttachment } from "@/lib/attachments";
-import { createShare, deleteShare, listFilesVisibleToActor } from "@/lib/shares";
+import { createShare, deleteShare, listFilesVisibleToActor, listPersonFilesVisibleToActor } from "@/lib/shares";
 import { newConversationTurnId, newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -117,6 +117,62 @@ describe("share visibility", () => {
     expect(removed.ok).toBe(true);
     expect(listFilesVisibleToActor(lucia).some((row) => row.file.id === file.id)).toBe(false);
     expect(getAttachment(lucia, file.id).ok).toBe(false);
+  });
+});
+
+// PEOPLE-PROFILE-02: the profile page's shared-media grid calls this
+// through GET /api/files?owner= (routes/files.ts) - these three cases
+// are the item's own stated acceptance ("a file shared with someone
+// else but not the viewer never appears"), exercised directly against
+// the function the route wraps, the same split filesRoutes.test.ts
+// takes over lib/shares.ts's other functions.
+describe("listPersonFilesVisibleToActor (PEOPLE-PROFILE-02)", () => {
+  test("the owner viewing their own profile sees their own file even with no share at all", async () => {
+    const ownerPerson = await owner();
+    const file = uploadFile(ownerPerson);
+
+    const visible = listPersonFilesVisibleToActor(ownerPerson, ownerPerson.id);
+    expect(visible.some((row) => row.file.id === file.id)).toBe(true);
+  });
+
+  test("a direct recipient sees a file shared with them, on the owner's own profile", async () => {
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    const file = uploadFile(ownerPerson);
+    expect(createShare(ownerPerson, { fileId: file.id, to: lucia.id }).ok).toBe(true);
+
+    const visible = listPersonFilesVisibleToActor(lucia, ownerPerson.id);
+    expect(visible.some((row) => row.file.id === file.id)).toBe(true);
+  });
+
+  test("a third person with no share on that file sees nothing on the owner's profile", async () => {
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    const marlow = person("adult", "Marlow");
+    const file = uploadFile(ownerPerson);
+    expect(createShare(ownerPerson, { fileId: file.id, to: lucia.id }).ok).toBe(true);
+
+    const visible = listPersonFilesVisibleToActor(marlow, ownerPerson.id);
+    expect(visible.some((row) => row.file.id === file.id)).toBe(false);
+  });
+
+  test("a household-wide share appears on the owner's profile for every other active person", async () => {
+    const ownerPerson = await owner();
+    const bramble = person("child", "Bramble");
+    const file = uploadFile(ownerPerson);
+    expect(createShare(ownerPerson, { fileId: file.id, to: "household" }).ok).toBe(true);
+
+    const visible = listPersonFilesVisibleToActor(bramble, ownerPerson.id);
+    expect(visible.some((row) => row.file.id === file.id)).toBe(true);
+  });
+
+  test("an unowned, unshared file never appears - only rows for the requested owner come back", async () => {
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    uploadFile(lucia); // lucia's own file, never shared with the owner
+
+    const visible = listPersonFilesVisibleToActor(ownerPerson, lucia.id);
+    expect(visible).toEqual([]);
   });
 });
 

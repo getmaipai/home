@@ -266,3 +266,19 @@ export function listFilesVisibleToActor(actor: PersonRow): VisibleFile[] {
   }
   return result;
 }
+
+/** PEOPLE-PROFILE-02: one person's own files, filtered to whatever the
+ * VIEWING actor can actually see - not a second, parallel visibility
+ * rule, just `listFilesVisibleToActor`'s own owned+shared result set
+ * (the Library's own list) narrowed to the one owner the profile page
+ * asked about. Viewing your own profile trivially shows everything you
+ * own (the `owned` half of that result, the same "Mine" filter the
+ * Library page already has) since `canAccessFile` always grants the
+ * owner full access to their own files; viewing someone else's profile
+ * shows only what they shared with you directly or with the household
+ * (the `shared` half) - never their other, unshared files, which is
+ * the design record's own "never the owner's private, unshared files"
+ * (docs/plans/people-profile-2026-09-26.md). */
+export function listPersonFilesVisibleToActor(actor: PersonRow, ownerPersonId: string): VisibleFile[] {
+  return listFilesVisibleToActor(actor).filter((row) => row.ownerPersonId === ownerPersonId);
+}

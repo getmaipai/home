@@ -65,11 +65,40 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
   };
 }
 
+// PEOPLE-PROFILE-02: every render of PersonProfilePage now also fires a
+// GET /api/files?owner= for the shared-media grid - defaulted to an
+// empty list here so every existing case (none of which cares about
+// shared media) doesn't also have to stub it by hand; a caller's own
+// "/api/files" entry in `byPath` still wins (object spread order below).
+function visibleFile(overrides: Partial<{ id: string; kind: string; media_type: string; owner_person_id: string; shared: boolean }> = {}) {
+  const id = overrides.id ?? "file-abc123";
+  const kind = overrides.kind ?? "image";
+  return {
+    file: {
+      id,
+      owner_person_id: overrides.owner_person_id ?? "person-bramble",
+      origin: "sent",
+      kind,
+      media_type: overrides.media_type ?? "image/png",
+      size: 12,
+      sha256: "0".repeat(64),
+      storage_path: `people/person-bramble/attachments/${id}`,
+      retention: "kept",
+      provenance: { conversation_id: null, turn_id: null, package_id: null, job_id: null, requested_by_person_id: null, note: null },
+      created_at: "2026-09-27T00:00:00.000Z",
+      hlc: "1788000000000:0:test",
+    },
+    owner_person_id: overrides.owner_person_id ?? "person-bramble",
+    shared: overrides.shared ?? true,
+  };
+}
+
 function stubFetch(byPath: Record<string, unknown>): () => void {
   const original = globalThis.fetch;
+  const withDefaults: Record<string, unknown> = { "/api/files": [], ...byPath };
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
-    const candidates = Object.entries(byPath).filter(([path]) => url.includes(path));
+    const candidates = Object.entries(withDefaults).filter(([path]) => url.includes(path));
     const match = candidates.sort((a, b) => b[0].length - a[0].length)[0];
     if (!match) throw new Error(`unstubbed fetch: ${url}`);
     const value = match[1];
@@ -204,6 +233,7 @@ describe("PersonProfilePage", () => {
         );
       }
       if (url.endsWith("/api/people")) return Promise.resolve(new Response(JSON.stringify(ROSTER), { status: 200 }));
+      if (url.includes("/api/files")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       throw new Error(`unstubbed fetch: ${url}`);
     }) as unknown as typeof fetch;
     try {
@@ -251,6 +281,7 @@ describe("PersonProfilePage", () => {
           return Promise.resolve(new Response(JSON.stringify(forgottenIds ? [] : twoRecords()), { status: 200 }));
         }
         if (url.endsWith("/api/people")) return Promise.resolve(new Response(JSON.stringify(ROSTER), { status: 200 }));
+        if (url.includes("/api/files")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
         throw new Error(`unstubbed fetch: ${url}`);
       }) as unknown as typeof fetch;
       try {
@@ -283,6 +314,7 @@ describe("PersonProfilePage", () => {
         }
         if (url.endsWith("/api/memory")) return Promise.resolve(new Response(JSON.stringify([householdRecord()]), { status: 200 }));
         if (url.endsWith("/api/people")) return Promise.resolve(new Response(JSON.stringify(ROSTER), { status: 200 }));
+        if (url.includes("/api/files")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
         throw new Error(`unstubbed fetch: ${url}`);
       }) as unknown as typeof fetch;
       try {
@@ -395,6 +427,7 @@ describe("PersonProfilePage", () => {
           return Promise.resolve(new Response(JSON.stringify(updated), { status: 200 }));
         }
         if (url.endsWith("/api/people")) return Promise.resolve(new Response(JSON.stringify(roster), { status: 200 }));
+        if (url.includes("/api/files")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
         throw new Error(`unstubbed fetch: ${url}`);
       }) as unknown as typeof fetch;
       try {
@@ -481,6 +514,83 @@ describe("PersonProfilePage", () => {
         nonAdmin.unmount();
       } finally {
         restoreNonAdmin();
+      }
+    });
+  });
+
+  // PEOPLE-PROFILE-02: the shared-media grid on the Overview tab, wired
+  // to GET /api/files?owner= (backend/src/routes/files.ts), which
+  // already carries the real viewer-scoped filtering
+  // (lib/shares.ts's listPersonFilesVisibleToActor, covered directly in
+  // shares.test.ts and filesRoutes.test.ts) - these cases only prove
+  // this page reads that endpoint's response and renders it, not the
+  // access rule itself.
+  describe("shared media grid", () => {
+    test("shows what's been shared, and leaves out a non-image/video file", async () => {
+      const restore = stubFetch({
+        "/api/people": ROSTER,
+        "/api/files": [
+          visibleFile({ id: "file-photo1", kind: "image" }),
+          visibleFile({ id: "file-video1", kind: "video", media_type: "video/mp4" }),
+          visibleFile({ id: "file-doc1", kind: "document", media_type: "application/pdf" }),
+        ],
+      });
+      try {
+        const { findByRole, findAllByRole } = renderProfile("/people/person-bramble", defaultPerson({ id: "person-sage", role: "owner" }));
+        expect(await findByRole("button", { name: "Open media: A photo Bramble shared" })).toBeInTheDocument();
+        expect(await findByRole("button", { name: "Open media: A video Bramble shared" })).toBeInTheDocument();
+        // Exactly the two media items - the document is left out, not
+        // rendered wrong, since MediaGrid has no thumbnail concept for it.
+        expect(await findAllByRole("button", { name: /^Open media:/ })).toHaveLength(2);
+      } finally {
+        restore();
+      }
+    });
+
+    test("a file shared with someone else, not the viewer, never appears (server-side filtered, but the page must render whatever it gets back)", async () => {
+      // The viewer-scoped filter itself lives on the backend
+      // (listPersonFilesVisibleToActor) - here the endpoint simply
+      // never returns the row a third person has no access to, and
+      // this proves the page shows exactly the (already filtered) list
+      // it was given, nothing more.
+      const restore = stubFetch({ "/api/people": ROSTER, "/api/files": [] });
+      try {
+        const { findByText, queryByRole } = renderProfile("/people/person-bramble", defaultPerson({ id: "person-nova", role: "adult" }));
+        await findByText("Bramble");
+        expect(queryByRole("button", { name: /Open media/ })).toBeNull();
+      } finally {
+        restore();
+      }
+    });
+
+    test("an honest empty state when nothing's been shared yet, worded for a viewer looking at someone else", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER, "/api/files": [] });
+      try {
+        const { findByText } = renderProfile("/people/person-bramble", defaultPerson({ id: "person-sage", role: "owner" }));
+        expect(await findByText("Bramble hasn't shared anything with you yet.")).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("an honest empty state worded for your own page", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER, "/api/files": [] });
+      try {
+        const { findByText } = renderProfile("/people/person-sage", defaultPerson({ id: "person-sage", role: "owner" }));
+        expect(await findByText("You haven't shared anything yet.")).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("a failed fetch offers a retry instead of a blank grid", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER, "/api/files": 500 });
+      try {
+        const { findByText, findByRole } = renderProfile("/people/person-bramble", defaultPerson({ id: "person-sage", role: "owner" }));
+        await findByText("Bramble");
+        expect(await findByRole("button", { name: "Try again" })).toBeInTheDocument();
+      } finally {
+        restore();
       }
     });
   });
