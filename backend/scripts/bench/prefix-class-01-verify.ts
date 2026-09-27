@@ -34,7 +34,7 @@ import { contextToMessages } from "@/lib/turnMachine/messages";
 import { planFor, type PlanInput } from "@/lib/register";
 import { fallbackSignal } from "@/lib/turnSignal";
 import { loadManifestOnly } from "@/lib/plugins";
-import { START_PROJECT_TOOL_ID, START_PROJECT_TOOL } from "@/lib/projects/tool";
+import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import type { ToolSpec } from "@/lib/llm";
 
 const REPS = Number(process.env.MAIPAI_BENCH_REPEATS ?? 5);
@@ -62,7 +62,7 @@ function productionTools(): ToolSpec[] {
     .slice()
     .sort()
     .map((id) => {
-      if (id === START_PROJECT_TOOL_ID) return START_PROJECT_TOOL;
+      if (id === START_PROJECT_TOOL_ID) return startProjectToolSpec();
       const loaded = loadManifestOnly(id);
       if (!loaded.ok) throw new Error(`productionTools(): manifest for "${id}" failed to load`);
       return { id, description: loaded.value.description, args: loaded.value.args };

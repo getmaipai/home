@@ -29198,3 +29198,194 @@ src/apps/people src/apps/settings` (143 passing, 21 files) plus
 was not run (queued behind three other lanes gating serially tonight);
 the known pre-existing mDNS flake (#160) is the only expected red when
 it runs.
+
+## PROJECT-PKGTYPE-01: a package can actually declare a project type (2026-09-27)
+
+Landed on top of PROJECT-START-01. That item proved `start_project` end
+to end with two hardcoded, in-process registrations (`projectTypes.ts`'s
+`bedtime-story`, `assemblers.ts`'s `markdown-concat`) - nothing loaded a
+real package's manifest into either registry, and the offered tool's
+own `type` argument was a bare, undescribed string. This item builds
+the missing link: a package can now declare `kind: "project"` in its
+manifest and ship a `plan.json`, and the hub loads it at boot.
+
+**Commons first.** `spec/schemas/manifest.schema.json`'s `kind` enum
+gained `"project"`, with one added sentence on that field's own
+description naming `plan.json` (a `ProjectPlan`,
+`project.schema.json`'s `$defs/ProjectPlan`) as the body, and explicitly
+**not** the older, pre-existing `recipe.schema.json`/`recipe.json`
+every ordinary Tier 0 plugin package already ships - a real naming
+collision the design record left unrecorded until a design-resolver
+pass caught it; the same one sentence is now also in
+`docs/plans/harness-turns-and-projects-2026-09-26.md`'s "Recipes first"
+section. Two new fixtures (`manifest.project.example.json`,
+`project-plan.example.json`) round-trip through both generated model
+sets. Landed as commons `spec-v0.1.46` (the tag skipped straight past
+`v0.1.45`, which `STORE-CAP-01` took in the interim landing its own two
+storage-cap settings keys first).
+
+**The loader.** `plugins.ts` gained `loadProjectPackage()`, a full
+mirror of `loadPackage()`'s own shape (mtime-cached, read-both-then-
+validate, the same truncated-file try/catch posture) except it reads
+`plan.json` instead of `recipe.json` and validates it against spec's
+generated `Project` Zod object's own `.shape.plan` - `project.schema
+.json`'s `$defs` aren't exported as their own named consts anywhere in
+`spec/gen/ts/`, so `.shape.plan` is the one sub-schema that already
+stands on its own, needing no commons export addition. Kept fully
+separate from `loadPackage()` rather than branching inside it, the same
+reasoning `loadManifestOnly()`'s own header already gives for staying
+its own function.
+
+**Registration and the generic buildPlan.** `registerAllPackageProjectTypes()`
+(`plugins.ts`, beside `registerAllPackageNotificationTypes()`) loops
+every installed package, skips anything not `kind: "project"`, and for
+the rest calls a new `backend/src/lib/projects/fromManifest.ts`'s
+`buildProjectTypeFromManifest()` - written once, not per package - which
+maps the manifest's own fields onto `ProjectType` (`id`, `display`→
+title, `description`, `min_role`→minRole, `consequential`, `args`→
+paramsSchema) and builds one `buildPlan` closure per type: an ajv
+validator compiled once at registration (`useDefaults: true`, so a
+manifest arg's own JSON-Schema `default` fills in when the model omits
+it - tool.ts's own pre-check already confirmed shape without filling
+defaults, so this second, defaulting pass is what actually produces the
+filled params `buildPlan` substitutes with), then a brace-guarded
+`{arg}` substitution into every `text`/`media` step's `promptTemplate`.
+The guard (`/(?<!\{)\{(\w+)\}(?!\})/g`) matters for a real reason, not a
+theoretical one: the runner's own step-output interpolation
+(`steps.ts`'s `renderTemplate()`) uses a visually distinct double-brace
+`{{stepId}}` grammar, and a naive single-brace regex would still
+misfire on the INNER braces of a `{{stepId}}` sequence if the two ever
+appeared in the same template (a step referencing both an arg and an
+earlier step's output) - the lookbehind/lookahead keep this file's own
+substitution from ever touching one. A package is refused at load time,
+warned once per `plan.json` mtime and skipped rather than crashing
+boot, when either: a `{arg}` placeholder in a promptTemplate isn't a
+declared arg that's `required` or carries a `default` (the model could
+otherwise leave the slot unfilled), or a declared arg's own name
+collides with a step's own id - a real, distinct check from the grammar
+guard above, since a manifest author naming an arg the same as a step
+id is a name confusion the two grammars not colliding does nothing to
+prevent.
+
+**Telling the model which types exist.** `tool.ts`'s static
+`START_PROJECT_TOOL` const is gone, replaced by `startProjectToolSpec()`,
+built fresh from `listProjectTypes()` on every call: the `type`
+argument's own JSON-Schema `enum` is the real list of registered ids,
+and the tool's own top-level description names each one with its own
+one-line description folded in - closing the exact gap this item's own
+BACKLOG row named ("nothing today tells the model which project types
+exist"). Every real call site PROJECT-START-01 already special-cased
+for the old static const now calls the builder instead: `nodes/model.ts`'s
+`toolSpecFor()`, and all four bench scripts that build their own copy
+of the production tool block (`parity-bisect.ts`, `parity-bisect4-
+stages.ts`, `prefix-class-01-verify.ts`, `tool-calling.ts`).
+
+**`bedtime-story` stays, for now - a real judgment call, not a
+default.** The built-in's own header comment said it would retire "the
+day a real catalog package registers its own" - read literally, that
+day is today, since the loader now exists. It stays anyway: no real
+project-type package ships yet (`PROJECT-PACK-01` is chunked next,
+still unbuilt), and removing the one seeded type now would leave every
+household with `start_project` offered and a real, registered-ids enum
+with nothing in it - zero project types a person could ever start, a
+genuine regression for zero gain. The loader itself doesn't need
+`bedtime-story` to prove it works either way: it's proven directly
+against a real fixture package on disk (`plugins.test.ts`, mirroring
+the existing `installedPackageVersionDir()` + `packageInstalls` row
+pattern the "broken-pkg" manifest-validation test already uses), which
+is a stronger proof than the built-in ever was (that only ever proved
+the runner, never a manifest-to-registry load). `assemblers.ts`'s own
+comment on `markdown-concat` is corrected the same way: it's permanent
+host machinery a project-type package can reference by name, not a
+stand-in waiting to be replaced.
+
+**Files.** Commons: `spec/schemas/manifest.schema.json`,
+`spec/fixtures/records/{manifest.project,project-plan}.example.json`,
+`spec/tests/ts/fixtures.test.ts`, `spec/tests/py/test_fixtures.py`.
+Home: `backend/src/lib/plugins.ts` (`loadProjectPackage()`,
+`registerAllPackageProjectTypes()`), `backend/src/lib/projects/
+fromManifest.ts` (new), `backend/src/lib/projects/{projectTypes,
+assemblers,tool}.ts` (comments plus `startProjectToolSpec()`),
+`backend/src/lib/turnMachine/nodes/model.ts`, `backend/src/index.ts`
+(the boot call), the four bench scripts above, `scripts/check.sh` +
+`backend/package.json` + `frontend/package.json` (the `spec-v0.1.46`
+pin). Tests: `backend/tests/plugins.test.ts` gained two new cases (a
+real fixture package registers, with its `{arg}` filled into the
+built plan; a plan with an unbound placeholder is refused and skipped,
+proven via the exact warning text).
+
+**Sequencing note.** The pin bump surfaced a real, unrelated gap before
+it could land clean: commons' `spec-v0.1.45`/`.46` already carried
+`STORE-CAP-01`'s two new storage-cap settings keys, but home's own
+`storageKeys.ts` hadn't declared them yet, so `check.sh`'s settings-
+registry drift check failed hard - correctly, since that check exists
+exactly to catch a pin advancing past content home's own code hasn't
+caught up to. Held for `STORE-CAP-01`'s own home-side commit (`fd889b9d`,
+merged as `3258cef3`) to land on `main` first, then rebased this work
+on top rather than guessing a pass-through registry entry that would
+have risked conflicting with that commit's real implementation.
+
+**Review, medium effort, one pass plus one low-effort re-review of the
+fix hunks (org budget rule: a second pass that still finds real
+defects is a finding about the item, never a reason for a third).**
+The first pass found seven things. One was real and high-severity:
+`registerAllPackageProjectTypes()` called `buildProjectTypeFromManifest()`
+with no try/catch, and `ajv.compile()` inside it can throw synchronously
+on a schema-invalid manifest `args` field - `PackageManifest.safeParse`
+only checks `args` loosely (it's `z.any()`, an arbitrary JSON Schema),
+so a bad one passes manifest validation and only fails once ajv
+actually tries to compile it, uncaught, crashing the whole boot for
+every household over one bad package - directly contradicting this
+function's own "one bad package can't take down boot" doc comment.
+Fixed with a try/catch around the one call that can throw. Three more
+were real hygiene fixes: an arg declared `type: "object"`/`"array"` and
+referenced in a promptTemplate got `String()`-ed into the prompt as the
+literal text "[object Object]" instead of being refused (fixed - a new
+`SAFE_PROMPT_ARG_TYPES` check in `refusalReason()`); `ARG_PLACEHOLDER`'s
+regex only matched `\w+`, so a hyphenated arg name like `reader-age`
+was invisible to both the refusal check and substitution (fixed -
+`[\w-]+`); `loadProjectPackage()` re-read, re-parsed and re-validated
+`manifest.json` a second time when `registerAllPackageProjectTypes()`
+had already loaded it via `loadManifestOnly()` moments earlier (fixed -
+`loadProjectPackage()` now calls `loadManifestOnly()` itself and reuses
+its cache, the same cross-cache reuse `loadManifestOnly()`'s own header
+already documents against `loadPackage()`'s cache). Two findings were
+kept as documented, deliberate limits, not fixed: `startProjectToolSpec()`
+rebuilding the tool spec on every call is this item's own explicit
+design (the registry only ever changes at boot, and the brief asked for
+exactly this); a `tool`-kind step's own `args` isn't scanned for `{arg}`
+placeholders, moot until tool steps are wired up at all (`steps.ts`'s
+own `UNIMPLEMENTED_STEP_KINDS`) - both now have a code comment saying so
+rather than silently carrying the gap.
+
+The low-effort re-review of just the fix hunks found three more. Two
+were real: the "not a project package" code-based skip only covered
+manifests that loaded fine and simply weren't `kind: "project"` - every
+OTHER manifest-load failure (unreadable, fails Zod validation) forwarded
+`loadManifestOnly()`'s own result verbatim with no such code, so a
+broken, ordinary (non-project) package's manifest got a second,
+misleading "project plan failed to load" warning on top of
+`loadManifestOnly()`'s own correct one, contradicting this function's
+own "skipped without a warning" promise for exactly the wrong packages
+(fixed - `registerAllPackageProjectTypes()` now filters by `kind` via
+`loadManifestOnly()` itself, before ever calling `loadProjectPackage()`,
+so anything that function returns is guaranteed project-shaped); the
+manifest-reuse fix above still stat()'d `manifest.json` a second time
+for its own cache key even though `loadManifestOnly()` had just done the
+identical stat (fixed - reads `manifestCache`'s own recorded mtime back
+out instead). The third was a narrower-than-ideal check, not a bug: the
+new arg-type restriction read only a literal string `type`, refusing a
+legitimate nullable-primitive declared as a JSON-Schema array
+(`["string", "null"]`) - fixed by accepting an array `type` whose every
+member is a safe primitive or `"null"` itself; a `$ref`/`allOf`/`anyOf`
+composition stays refused (fail-closed: too little is known about the
+resolved shape to promise substituting it is safe). Five new regression
+tests total, one per real fix, in `backend/tests/plugins.test.ts`.
+
+Verified: backend `bun test` (4209 pass, 0 fail, up from 4204 with the
+five new regression tests) and `tsc --noEmit` clean; frontend `bun test`
+(772 pass), `eslint`, and `vite build` clean. Full `bash scripts/check.sh`
+green end to end (backend leg, frontend leg, docs reading-level lint,
+standards core - gitleaks, PII wordlist, prose lint, licence check),
+scope `full` (a workspace `package.json` changed), run twice - once
+before the review's fixes, once after.

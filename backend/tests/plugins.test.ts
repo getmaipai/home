@@ -6,7 +6,18 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { listPackageIds, loadPackage, loadManifestOnly, registerAllPackageNotificationTypes, warmPackage, withHouseholdPlaceDefault, __resetPackageCachesForTests } from "@/lib/plugins";
+import {
+  listPackageIds,
+  loadPackage,
+  loadManifestOnly,
+  loadProjectPackage,
+  registerAllPackageNotificationTypes,
+  registerAllPackageProjectTypes,
+  warmPackage,
+  withHouseholdPlaceDefault,
+  __resetPackageCachesForTests,
+} from "@/lib/plugins";
+import { getProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { installedPackageVersionDir } from "@/lib/paths";
 import { db } from "@/db";
 import { scheduledJobs, packageInstalls } from "@/db/schema";
@@ -782,6 +793,345 @@ describe("loadManifestOnly: a manifest that fails validation is warned about onc
       const third = loadManifestOnly("broken-pkg");
       expect(third.ok).toBe(false);
       expect(warnSpy.mock.calls.length).toBe(2);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+// PROJECT-PKGTYPE-01: a real "project"-kind manifest + plan.json pair on
+// disk, loaded through loadManifestOnly()/loadProjectPackage() and
+// registered through registerAllPackageProjectTypes() - the loader
+// proven against a real fixture package, not just commons' own
+// round-trip fixture (which only proves the SCHEMA, never that this
+// repo's own loader and registration wiring actually reads one off
+// disk). Mirrors the "broken-pkg" fixture above: installedPackageVersionDir()
+// + a packageInstalls row, so resolvePackageDir() resolves here without
+// touching backend/packages/ at all.
+describe("PROJECT-PKGTYPE-01: registerAllPackageProjectTypes() loads a real project-kind fixture package", () => {
+  const TEST_PKG_DIR = installedPackageVersionDir("test-project-fixture", "1.0.0");
+  const MANIFEST_PATH = join(TEST_PKG_DIR, "manifest.json");
+  const PLAN_PATH = join(TEST_PKG_DIR, "plan.json");
+
+  afterEach(() => {
+    rmSync(TEST_PKG_DIR, { recursive: true, force: true });
+    __resetPackageCachesForTests();
+    __resetProjectTypesForTests();
+  });
+
+  test("a real manifest.json + plan.json pair registers as a real ProjectType, args filled into promptTemplate", () => {
+    db.insert(packageInstalls)
+      .values({
+        packageId: "test-project-fixture",
+        version: "1.0.0",
+        previousVersion: null,
+        channel: "stable",
+        sourceCommit: "test",
+        permissions: "[]",
+        installedAt: "2026-01-01T00:00:00.000Z",
+      })
+      .run();
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(
+      MANIFEST_PATH,
+      JSON.stringify({
+        id: "test-project-fixture",
+        version: "0.1.0",
+        kind: "project",
+        category: "Family",
+        display: "Test project fixture",
+        description: "A fixture project type for loader tests.",
+        author: "test",
+        license: "AGPL-3.0",
+        args: { type: "object", required: ["topic"], properties: { topic: { type: "string" } } },
+        incognito: "unaffected",
+        platforms: ["home"],
+        min_role: "adult",
+        consequential: false,
+        offline: "full",
+        min_app: "0.1.0",
+        tier: 0,
+      }),
+    );
+    writeFileSync(
+      PLAN_PATH,
+      JSON.stringify({
+        steps: [{ id: "draft", kind: "text", needs: [], params: { role: "chat", promptTemplate: "Write about {topic}.", inputs: [] } }],
+        ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 1 },
+      }),
+    );
+
+    expect(loadManifestOnly("test-project-fixture").ok).toBe(true);
+    expect(loadProjectPackage("test-project-fixture").ok).toBe(true);
+
+    registerAllPackageProjectTypes();
+    const registered = getProjectType("test-project-fixture");
+    expect(registered).toBeDefined();
+    expect(registered?.title).toBe("Test project fixture");
+    expect(registered?.minRole).toBe("adult");
+
+    const plan = registered!.buildPlan({ topic: "dinosaurs" });
+    const step = plan.steps[0] as { params: { promptTemplate: string } };
+    expect(step.params.promptTemplate).toBe("Write about dinosaurs.");
+  });
+
+  test("a plan.json with an unbound {arg} placeholder is refused and skipped, not registered", () => {
+    db.insert(packageInstalls)
+      .values({
+        packageId: "test-project-fixture",
+        version: "1.0.0",
+        previousVersion: null,
+        channel: "stable",
+        sourceCommit: "test",
+        permissions: "[]",
+        installedAt: "2026-01-01T00:00:00.000Z",
+      })
+      .run();
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(
+      MANIFEST_PATH,
+      JSON.stringify({
+        id: "test-project-fixture",
+        version: "0.1.0",
+        kind: "project",
+        category: "Family",
+        display: "Test project fixture",
+        description: "A fixture project type for loader tests.",
+        author: "test",
+        license: "AGPL-3.0",
+        // No "topic" arg declared at all - the plan below references it.
+        args: { type: "object", properties: {} },
+        incognito: "unaffected",
+        platforms: ["home"],
+        min_role: "adult",
+        consequential: false,
+        offline: "full",
+        min_app: "0.1.0",
+        tier: 0,
+      }),
+    );
+    writeFileSync(
+      PLAN_PATH,
+      JSON.stringify({
+        steps: [{ id: "draft", kind: "text", needs: [], params: { role: "chat", promptTemplate: "Write about {topic}.", inputs: [] } }],
+        ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 1 },
+      }),
+    );
+
+    const warnSpy = spyOn(console, "warn");
+    try {
+      registerAllPackageProjectTypes();
+      expect(getProjectType("test-project-fixture")).toBeUndefined();
+      expect(warnSpy.mock.calls.length).toBe(1);
+      expect(String(warnSpy.mock.calls[0]?.[0])).toContain("not a declared arg");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  // A review's own finding: without this check, `{age}` below would
+  // have been silently `String()`-ed into the prompt as the literal
+  // text "[object Object]" instead of being refused.
+  test("an arg declared type: object, referenced in a promptTemplate, is refused rather than silently stringified", () => {
+    db.insert(packageInstalls)
+      .values({ packageId: "test-project-fixture", version: "1.0.0", previousVersion: null, channel: "stable", sourceCommit: "test", permissions: "[]", installedAt: "2026-01-01T00:00:00.000Z" })
+      .run();
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(
+      MANIFEST_PATH,
+      JSON.stringify({
+        id: "test-project-fixture",
+        version: "0.1.0",
+        kind: "project",
+        category: "Family",
+        display: "Test project fixture",
+        description: "A fixture project type for loader tests.",
+        author: "test",
+        license: "AGPL-3.0",
+        args: { type: "object", required: ["age"], properties: { age: { type: "object" } } },
+        incognito: "unaffected",
+        platforms: ["home"],
+        min_role: "adult",
+        consequential: false,
+        offline: "full",
+        min_app: "0.1.0",
+        tier: 0,
+      }),
+    );
+    writeFileSync(
+      PLAN_PATH,
+      JSON.stringify({
+        steps: [{ id: "draft", kind: "text", needs: [], params: { role: "chat", promptTemplate: "Write for {age}.", inputs: [] } }],
+        ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 1 },
+      }),
+    );
+
+    const warnSpy = spyOn(console, "warn");
+    try {
+      registerAllPackageProjectTypes();
+      expect(getProjectType("test-project-fixture")).toBeUndefined();
+      expect(String(warnSpy.mock.calls[0]?.[0])).toContain("substituting an object or array would silently corrupt the prompt");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  // A review's own finding: PackageManifest.safeParse only validates
+  // `args` loosely (it's `z.any()`), so a schema-invalid args field
+  // (here, an unterminated regex `pattern`) passes manifest validation
+  // and only fails once ajv actually tries to compile it - synchronously,
+  // inside buildProjectTypeFromManifest(). This proves that throw is
+  // caught and the package is skipped, never crashing the whole
+  // registration loop (and, unguarded, the hub's boot) over one bad
+  // package - registerAllPackageProjectTypes()'s own doc comment's
+  // "one bad package can't take down boot" promise, for a throw, not
+  // just an `ok: false`.
+  test("a manifest args schema ajv can't compile (a throw, not a validation failure) is warned about and skipped, never crashes registration", () => {
+    db.insert(packageInstalls)
+      .values({ packageId: "test-project-fixture", version: "1.0.0", previousVersion: null, channel: "stable", sourceCommit: "test", permissions: "[]", installedAt: "2026-01-01T00:00:00.000Z" })
+      .run();
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(
+      MANIFEST_PATH,
+      JSON.stringify({
+        id: "test-project-fixture",
+        version: "0.1.0",
+        kind: "project",
+        category: "Family",
+        display: "Test project fixture",
+        description: "A fixture project type for loader tests.",
+        author: "test",
+        license: "AGPL-3.0",
+        args: { type: "object", properties: { topic: { type: "string", pattern: "(" } } },
+        incognito: "unaffected",
+        platforms: ["home"],
+        min_role: "adult",
+        consequential: false,
+        offline: "full",
+        min_app: "0.1.0",
+        tier: 0,
+      }),
+    );
+    writeFileSync(
+      PLAN_PATH,
+      JSON.stringify({
+        steps: [{ id: "draft", kind: "text", needs: [], params: { role: "chat", promptTemplate: "hello", inputs: [] } }],
+        ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 1 },
+      }),
+    );
+
+    const warnSpy = spyOn(console, "warn");
+    try {
+      expect(() => registerAllPackageProjectTypes()).not.toThrow();
+      expect(getProjectType("test-project-fixture")).toBeUndefined();
+      expect(String(warnSpy.mock.calls[0]?.[0])).toContain("threw while building");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("a hyphenated arg name in a promptTemplate is recognized, validated and substituted", () => {
+    db.insert(packageInstalls)
+      .values({ packageId: "test-project-fixture", version: "1.0.0", previousVersion: null, channel: "stable", sourceCommit: "test", permissions: "[]", installedAt: "2026-01-01T00:00:00.000Z" })
+      .run();
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(
+      MANIFEST_PATH,
+      JSON.stringify({
+        id: "test-project-fixture",
+        version: "0.1.0",
+        kind: "project",
+        category: "Family",
+        display: "Test project fixture",
+        description: "A fixture project type for loader tests.",
+        author: "test",
+        license: "AGPL-3.0",
+        args: { type: "object", required: ["reader-age"], properties: { "reader-age": { type: "integer" } } },
+        incognito: "unaffected",
+        platforms: ["home"],
+        min_role: "adult",
+        consequential: false,
+        offline: "full",
+        min_app: "0.1.0",
+        tier: 0,
+      }),
+    );
+    writeFileSync(
+      PLAN_PATH,
+      JSON.stringify({
+        steps: [{ id: "draft", kind: "text", needs: [], params: { role: "chat", promptTemplate: "For age {reader-age}.", inputs: [] } }],
+        ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 1 },
+      }),
+    );
+
+    registerAllPackageProjectTypes();
+    const registered = getProjectType("test-project-fixture");
+    expect(registered).toBeDefined();
+    const plan = registered!.buildPlan({ "reader-age": 7 });
+    const step = plan.steps[0] as { params: { promptTemplate: string } };
+    expect(step.params.promptTemplate).toBe("For age 7.");
+  });
+
+  test("a nullable-union arg type (JSON-Schema array [\"string\",\"null\"]) is accepted in a promptTemplate", () => {
+    db.insert(packageInstalls)
+      .values({ packageId: "test-project-fixture", version: "1.0.0", previousVersion: null, channel: "stable", sourceCommit: "test", permissions: "[]", installedAt: "2026-01-01T00:00:00.000Z" })
+      .run();
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(
+      MANIFEST_PATH,
+      JSON.stringify({
+        id: "test-project-fixture",
+        version: "0.1.0",
+        kind: "project",
+        category: "Family",
+        display: "Test project fixture",
+        description: "A fixture project type for loader tests.",
+        author: "test",
+        license: "AGPL-3.0",
+        args: { type: "object", required: ["topic"], properties: { topic: { type: ["string", "null"] } } },
+        incognito: "unaffected",
+        platforms: ["home"],
+        min_role: "adult",
+        consequential: false,
+        offline: "full",
+        min_app: "0.1.0",
+        tier: 0,
+      }),
+    );
+    writeFileSync(
+      PLAN_PATH,
+      JSON.stringify({
+        steps: [{ id: "draft", kind: "text", needs: [], params: { role: "chat", promptTemplate: "Write about {topic}.", inputs: [] } }],
+        ceilings: { maxWallSeconds: 60, maxGeneratorJobs: 1 },
+      }),
+    );
+
+    registerAllPackageProjectTypes();
+    expect(getProjectType("test-project-fixture")).toBeDefined();
+  });
+
+  // A re-review's own finding: without filtering by kind before calling
+  // loadProjectPackage(), an ordinary package's own manifest failure
+  // (nothing to do with plan.json) got a second, misleading "project
+  // plan failed to load" warning on top of loadManifestOnly()'s own
+  // correct one - registerAllPackageProjectTypes()'s own doc comment's
+  // "skipped without a warning" promise, broken for exactly the wrong
+  // packages (every ordinary one with a broken manifest, not project
+  // packages at all).
+  test("a broken, non-project manifest gets loadManifestOnly()'s own one warning, never a second 'project plan failed' one", () => {
+    db.insert(packageInstalls)
+      .values({ packageId: "test-project-fixture", version: "1.0.0", previousVersion: null, channel: "stable", sourceCommit: "test", permissions: "[]", installedAt: "2026-01-01T00:00:00.000Z" })
+      .run();
+    mkdirSync(TEST_PKG_DIR, { recursive: true });
+    writeFileSync(MANIFEST_PATH, JSON.stringify({ id: "test-project-fixture", not_a_real_field: true }));
+
+    const warnSpy = spyOn(console, "warn");
+    try {
+      registerAllPackageProjectTypes();
+      expect(getProjectType("test-project-fixture")).toBeUndefined();
+      expect(warnSpy.mock.calls.length).toBe(1);
+      expect(String(warnSpy.mock.calls[0]?.[0])).toContain("manifest failed validation");
+      expect(String(warnSpy.mock.calls[0]?.[0])).not.toContain("project plan failed to load");
     } finally {
       warnSpy.mockRestore();
     }

@@ -3,11 +3,17 @@
 // `start_project` classifies against and builds a real ProjectPlan from.
 // The design's own words: "every project type is a catalog package" that
 // "ships a recipe... a typed, declarative list of steps with parameter
-// slots the model fills" - no such package exists yet (PROJECT-PACK-01,
-// the coloring book, is still unbuilt), so this registry is where a real
-// one registers itself once it does. It plays the same stand-in role
-// assemblers.ts's "markdown-concat" and steps.ts's UNIMPLEMENTED_STEP_
-// KINDS already play for their own not-yet-built neighbors.
+// slots the model fills". PROJECT-PKGTYPE-01 built the real mechanism -
+// plugins.ts's registerAllPackageProjectTypes() reads every installed
+// `kind: "project"` package's manifest + plan.json and registers it
+// here through fromManifest.ts's buildProjectTypeFromManifest() - but no
+// such package actually ships yet (PROJECT-PACK-01, the coloring book,
+// is still unbuilt), so `registerBuiltInProjectTypes()` below still
+// seeds one hardcoded entry, the same stand-in role assemblers.ts's
+// "markdown-concat" and steps.ts's UNIMPLEMENTED_STEP_KINDS already play
+// for their own not-yet-built neighbors: a household with no project
+// packages installed would otherwise have `start_project` offered with
+// nothing it could ever start.
 //
 // `minRole`/`consequential` here are exactly the fields a package's own
 // manifest.json already declares for an ordinary tool (plugins.ts's
@@ -82,9 +88,15 @@ function registerBuiltInProjectTypes(): void {
   // the result) with a text-only plan - exactly the design record's own
   // "a text-only storybook variant may prove the runner before media
   // exists" (PROJECT-PACK-01's own line), the same stand-in role
-  // assemblers.ts's "markdown-concat" plays. Retired the day a real
-  // catalog package registers its own "bedtime-story" (or whatever
-  // PROJECT-PACK-01 actually calls it).
+  // assemblers.ts's "markdown-concat" plays. Retired the day
+  // PROJECT-PACK-01 actually ships a real catalog package with its own
+  // plan.json - not the day the loader that WOULD register one exists
+  // (PROJECT-PKGTYPE-01, this file's own header above): removing this
+  // hardcoded entry before PROJECT-PACK-01 lands would leave every
+  // household with zero registered project types and `start_project`
+  // offered with nothing it could ever start, a real regression for no
+  // gain - PROJECT-PKGTYPE-01's own loader is proven separately, against
+  // a real fixture package, in plugins.test.ts.
   registerProjectType({
     id: "bedtime-story",
     title: "a bedtime story",

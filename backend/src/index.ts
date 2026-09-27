@@ -1,6 +1,6 @@
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
-import { runPlugin, registerAllPackageNotificationTypes, runDueWarmJobs } from "@/lib/plugins";
+import { runPlugin, registerAllPackageNotificationTypes, registerAllPackageProjectTypes, runDueWarmJobs } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
@@ -154,6 +154,10 @@ ensureCoreJob("packages.warm", "every:15m");
 // real, dispatchable ones in F's registry before the first turn or
 // scheduled job could ever try to trigger() one.
 registerAllPackageNotificationTypes();
+// PROJECT-PKGTYPE-01: every bundled `kind: "project"` package's own
+// manifest + plan.json becomes a real, registered project type before
+// the first turn could ever offer start_project.
+registerAllPackageProjectTypes();
 void runAllSmokeTests().then(({ ran, failed }) => {
   if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
 });

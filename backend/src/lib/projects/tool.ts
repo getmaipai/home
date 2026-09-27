@@ -21,27 +21,43 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { ToolSpec } from "@/lib/llm";
 import type { PersonRow } from "@/types";
-import { getProjectType, type ProjectType } from "./projectTypes";
+import { getProjectType, listProjectTypes, type ProjectType } from "./projectTypes";
 import { start as startProject } from "./runner";
 
 export const START_PROJECT_TOOL_ID = "start_project";
 
 const ajv = new Ajv2020({ strict: false });
 
-export const START_PROJECT_TOOL: ToolSpec = {
-  id: START_PROJECT_TOOL_ID,
-  description:
-    "Start a background project for a deliverable that genuinely needs several generation steps or minutes of work - a written story, a multi-part document, something one reply can't finish. Only call this when a normal reply cannot do the job; most requests should just be answered directly.",
-  args: {
-    type: "object",
-    required: ["type"],
-    properties: {
-      type: { type: "string", minLength: 1, description: "Which kind of project to start." },
-      params: { type: "object", description: "The project's own parameters - which fields it takes depends on the type." },
+const START_PROJECT_BASE_DESCRIPTION =
+  "Start a background project for a deliverable that genuinely needs several generation steps or minutes of work - a written story, a multi-part document, something one reply can't finish. Only call this when a normal reply cannot do the job; most requests should just be answered directly.";
+
+/** PROJECT-PKGTYPE-01: built fresh from the registry on every call
+ * (never a static const - registerAllPackageProjectTypes() runs at
+ * boot, so which types exist can change between boots, and nothing
+ * before this told the model which ones do). `type`'s own enum is the
+ * real list of registered ids, and the tool's own description names
+ * each one with its own one-line description, the same way an ordinary
+ * package tool's manifest.description already reaches the model - a
+ * registry with nothing in it still returns a real ToolSpec (an empty
+ * enum), never throws; toolSpecFor() callers treat that the same as
+ * any other tool with nothing to offer. */
+export function startProjectToolSpec(): ToolSpec {
+  const types = listProjectTypes();
+  const typeLines = types.map((t) => `"${t.id}": ${t.description}`).join(" ");
+  return {
+    id: START_PROJECT_TOOL_ID,
+    description: types.length > 0 ? `${START_PROJECT_BASE_DESCRIPTION} Registered project types: ${typeLines}` : START_PROJECT_BASE_DESCRIPTION,
+    args: {
+      type: "object",
+      required: ["type"],
+      properties: {
+        type: { type: "string", minLength: 1, enum: types.map((t) => t.id), description: "Which kind of project to start." },
+        params: { type: "object", description: "The project's own parameters - which fields it takes depends on the type." },
+      },
+      additionalProperties: false,
     },
-    additionalProperties: false,
-  },
-};
+  };
+}
 
 export interface StartProjectArgs {
   type?: unknown;
