@@ -2000,6 +2000,14 @@
                     "type": "string",
                     "nullable": true
                   },
+                  "bio": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "accent": {
+                    "type": "string",
+                    "nullable": true
+                  },
                   "birthdate": {
                     "type": "string",
                     "nullable": true
@@ -2257,7 +2265,7 @@
             }
           },
           "400": {
-            "description": "Invalid role/displayName/birthdate/guestExpiresAt",
+            "description": "Invalid role/displayName/bio/accent/birthdate/guestExpiresAt",
             "content": {
               "application/json": {
                 "schema": {
