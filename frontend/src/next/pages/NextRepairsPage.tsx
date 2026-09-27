@@ -1,4 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextDataTable } from "@/next/components/NextDataTable";
@@ -28,21 +30,58 @@ interface Row extends Record<string, unknown> {
   status: string;
   detail: string;
   fix: string;
+  id: string;
 }
 
 function toRow(issue: Issue): Row {
-  return {
+  const row = {
     title: issue.title,
     status: issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1),
     detail: issue.detail,
     fix: issue.fix?.label ?? "-",
   };
+  Object.defineProperty(row, "id", { value: issue.id });
+  return row as Row;
 }
 
 export function NextRepairsPage({ person }: { person: Roster }) {
   useDocumentTitle("Repairs");
   const canManage = isOwnerOrAdminRole(person.role);
   const query = useQuery<Issue[]>({ queryKey: ["repairs"], queryFn: () => api.repairs(), enabled: canManage });
+  const queryClient = useQueryClient();
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
+
+  async function runFix(id: string) {
+    setPendingIds((previous) => new Set(previous).add(id));
+    try {
+      await api.fixIssue(id);
+      await queryClient.invalidateQueries({ queryKey: ["repairs"] });
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Could not fix that repair.");
+    } finally {
+      setPendingIds((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  async function dismissIssue(id: string) {
+    setPendingIds((previous) => new Set(previous).add(id));
+    try {
+      await api.dismissIssue(id);
+      await queryClient.invalidateQueries({ queryKey: ["repairs"] });
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Could not dismiss that repair.");
+    } finally {
+      setPendingIds((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -68,7 +107,27 @@ export function NextRepairsPage({ person }: { person: Roster }) {
           errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load repairs."}
           loadingLabel="Loading repairs"
         >
-          {(issues: Issue[]) => <NextDataTable data={issues.map(toRow)} />}
+          {(issues: Issue[]) => (
+            <NextDataTable
+              data={issues.map(toRow)}
+              rowKey={(row) => row.id}
+              rowActions={(row) => {
+                const issue = issues.find((candidate) => candidate.id === row.id);
+                if (!issue) return [];
+                const isPending = pendingIds.has(issue.id);
+                return [
+                  ...(issue.fix ? [{ label: issue.fix.label, onClick: () => runFix(issue.id), disabled: isPending }] : []),
+                  {
+                    label: "Dismiss",
+                    destructive: true,
+                    confirmLabel: `Dismiss "${issue.title}"?`,
+                    onClick: () => dismissIssue(issue.id),
+                    disabled: isPending,
+                  },
+                ];
+              }}
+            />
+          )}
         </AsyncState>
       )}
     </div>
