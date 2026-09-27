@@ -220,4 +220,40 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.notifications",
     honoured_by: ["home"],
   }),
+  // NOTIFY-SHARE-02 (docs/plans/people-profile-2026-09-26.md, "Notified
+  // on sharing, no subscribing at all"): the one real gap the per-type
+  // toggles above can't express - muting shares from one specific
+  // household member while still hearing about everyone else's. Not
+  // suffixed `.telegram` like every key above: this isn't a channel
+  // toggle, it's a filter lib/notifications.ts's trigger() applies to
+  // BOTH file.shared_with_you and file.shared_with_household before
+  // resolving recipients (shares.ts's notifyShareCreated() passes the
+  // sharer as TriggerOptions.mutedSenderId either way), so the key names
+  // the shared feature ("file_shared"), not either type id alone -
+  // `notifications.<type.id>.telegram`'s own dotted-id convention only
+  // fits a PER-TYPE toggle, not a filter that spans both. `selector:
+  // "person"` with `range.multiple: true`: Home Assistant's own
+  // multi-target shape for "select some entities of a kind" (this
+  // schema's `selector` enum already lists "person" - settings.ts's
+  // validateSelectorValue() extends that one case to accept an array
+  // when `range.multiple` is set, the first real caller of that branch).
+  // The frontend's generic settings renderer had no person multi-select
+  // control before this (checked: NextSettingField.tsx's own selector
+  // switch had no "person" case at all, same "not supported yet" gap
+  // its header comment already named) - PersonMultiSelect.tsx is the
+  // new one, composed from the vendored kit's own Combobox/Chips
+  // primitives (dashboard/components/ui/combobox.tsx), never hand-built
+  // from scratch.
+  SettingsKey.parse({
+    key: "notifications.file_shared.muted_senders",
+    scope: "person",
+    selector: "person",
+    range: { multiple: true },
+    default: [],
+    label: "Don't notify me about shares from",
+    help: "Pick anyone in the household whose shared files you don't want a notification about. You'll still be notified about everyone else's.",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
 ];

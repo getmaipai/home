@@ -5,6 +5,7 @@ import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { PersonMultiSelect } from "@/next/pages/settings/PersonMultiSelect";
 
 /** SHELL-05's own per-key control: the registry-selector-to-primitive
  * mapping docs/SETTINGS.md's generic renderer calls for, pointed at the
@@ -16,12 +17,19 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
  * number/text/secret, the same draft/commit/reset logic, the same
  * write-only secret flow, the same "not supported yet" fallback for a
  * selector with no real registry key today (duration/time/entity/area/
- * person/media) - reusing its two pure exported helpers
- * (`titleCaseOption`, `localeDisplayName`) rather than redefining them.
- * A named, accepted duplication (docs/plans/shell-on-shadcndashboard-
- * 2026-09-21.md's own SHELL-05 gap paragraph): the field logic itself
- * lives in two places until the old shell retires and this becomes the
- * only one. */
+ * media, and a scalar `person` with no `range.multiple`) - reusing its
+ * two pure exported helpers (`titleCaseOption`, `localeDisplayName`)
+ * rather than redefining them. NOTIFY-SHARE-02 adds the one real
+ * exception: `person` WITH `range.multiple: true` renders
+ * PersonMultiSelect, this file's own new control (see its header) -
+ * the kit's `SettingField.tsx` still has no such case, an accepted gap
+ * of the same shape SHELL-05's own duplication paragraph already names
+ * (the old shell shows "Not supported in this hub version yet" for this
+ * one key until it retires, same as it already does for the other
+ * selectors this file just listed). A named, accepted duplication
+ * (docs/plans/shell-on-shadcndashboard-2026-09-21.md's own SHELL-05 gap
+ * paragraph): the field logic itself lives in two places until the old
+ * shell retires and this becomes the only one. */
 const SECRETS_WITH_DEDICATED_FLOWS = new Set(["voice.hf_token"]);
 
 interface NextSettingFieldProps {
@@ -29,9 +37,14 @@ interface NextSettingFieldProps {
   onChange: (value: unknown) => Promise<boolean>;
   onReset: () => void;
   disabled?: boolean;
+  /** NOTIFY-SHARE-02: the signed-in viewer's own id, threaded down from
+   * NextSettingsRenderer's `scopeValue` - dropped from a person
+   * multi-select's own option list (see PersonMultiSelect's header).
+   * Unused by every other selector. */
+  selfPersonId?: string;
 }
 
-export function NextSettingField({ setting, onChange, onReset, disabled }: NextSettingFieldProps) {
+export function NextSettingField({ setting, onChange, onReset, disabled, selfPersonId }: NextSettingFieldProps) {
   const { def, resolved } = setting;
   const [draft, setDraft] = useState<string>(String(resolved.value ?? ""));
   const canReset = resolved.source === "user";
@@ -159,6 +172,20 @@ export function NextSettingField({ setting, onChange, onReset, disabled }: NextS
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commitDraft}
         aria-label={def.label}
+      />
+    );
+  } else if (def.selector === "person" && (def.range as { multiple?: boolean } | undefined)?.multiple) {
+    // NOTIFY-SHARE-02: the one real key on this selector today
+    // (notifications.file_shared.muted_senders) - see PersonMultiSelect's
+    // own header for why this composes the kit's Combobox/Chips rather
+    // than a hand-built widget.
+    control = (
+      <PersonMultiSelect
+        value={(resolved.value as string[] | undefined) ?? []}
+        onValueChange={onChange}
+        disabled={disabled}
+        excludePersonId={selfPersonId}
+        ariaLabel={def.label}
       />
     );
   } else {

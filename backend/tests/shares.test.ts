@@ -463,6 +463,48 @@ describe("sharing notifies (NOTIFY-SHARE-01, docs/plans/people-profile-2026-09-2
   });
 });
 
+describe("muting a sender (NOTIFY-SHARE-02, docs/plans/people-profile-2026-09-26.md)", () => {
+  test("a muted sender's shares are silent, direct and household, while an unmuted sender's still notify", async () => {
+    const { setValue } = await import("@/lib/settings");
+    const sage = await owner();
+    const lucia = person("adult", "Lucia");
+    const marlow = person("adult", "Marlow");
+    expect(setValue(lucia, `person:${lucia.id}`, "notifications.file_shared.muted_senders", [sage.id]).ok).toBe(true);
+
+    const directFile = uploadFile(sage, "direct bytes");
+    expect(createShare(sage, { fileId: directFile.id, to: lucia.id }).ok).toBe(true);
+    const householdFile = uploadFile(sage, "household bytes");
+    expect(createShare(sage, { fileId: householdFile.id, to: "household" }).ok).toBe(true);
+    await __drainBackgroundWorkForTests();
+    expect(listPending(lucia).length).toBe(0); // both of sage's shares are muted for lucia
+
+    const marlowFile = uploadFile(marlow, "marlow bytes");
+    expect(createShare(marlow, { fileId: marlowFile.id, to: "household" }).ok).toBe(true);
+    await __drainBackgroundWorkForTests();
+    const luciaPending = listPending(lucia);
+    expect(luciaPending.length).toBe(1); // marlow was never muted
+    expect(luciaPending[0]!.typeId).toBe("file.shared_with_household");
+    expect(luciaPending[0]!.text).toBe("Marlow shared a photo with the household.");
+  });
+
+  test("muting is per-recipient: one person's mute of a sender doesn't affect what another recipient hears from that same sender", async () => {
+    const { setValue } = await import("@/lib/settings");
+    const sage = await owner();
+    const lucia = person("adult", "Lucia");
+    const marlow = person("adult", "Marlow");
+    expect(setValue(lucia, `person:${lucia.id}`, "notifications.file_shared.muted_senders", [sage.id]).ok).toBe(true);
+
+    const file = uploadFile(sage);
+    expect(createShare(sage, { fileId: file.id, to: "household" }).ok).toBe(true);
+    await __drainBackgroundWorkForTests();
+
+    expect(listPending(lucia).length).toBe(0); // lucia muted sage
+    const marlowPending = listPending(marlow);
+    expect(marlowPending.length).toBe(1); // marlow never muted sage
+    expect(marlowPending[0]!.typeId).toBe("file.shared_with_household");
+  });
+});
+
 describe("dedupe - no duplicates at any level (STORE-SPEC-01)", () => {
   test("a second person's identical bytes become a share pointer to the first person's file", async () => {
     const ownerPerson = await owner();

@@ -122,6 +122,31 @@ export interface TriggerOptions {
    * type, whose one recipient is already named by `personId`, not
    * derived from "everyone." */
   excludePersonId?: string;
+  /** NOTIFY-SHARE-02 (docs/plans/people-profile-2026-09-26.md): who
+   * actually did the thing this notification is about, checked against
+   * each resolved recipient's OWN `notifications.file_shared.muted_senders`
+   * list before delivery - the per-sender mute list's own "read by the
+   * trigger before it dispatches" contract (the design record's exact
+   * words) lives here so it applies the same way regardless of which
+   * file.shared_with_* type fired, or whether the recipient was found
+   * via `personId` or via the household fan-out. Distinct from
+   * `subjectPersonId` (which is stored on the delivery row for every
+   * caller of that field, safety and lifecycle types included): this one
+   * filters recipients and is meaningful only for a type a person can
+   * actually mute a sender of - today, only shares.ts's own two callers
+   * ever pass it. */
+  mutedSenderId?: string;
+}
+
+/** NOTIFY-SHARE-02's one settings key (settings/notificationKeys.ts):
+ * read here, not re-declared as a string literal at each call site,
+ * since `getSettingValueForPerson`'s callers below and shares.ts's own
+ * eventual settings-page usage both need to agree on the exact key. */
+const MUTED_SENDERS_KEY = "notifications.file_shared.muted_senders";
+
+function hasMutedSender(recipientId: string, senderId: string): boolean {
+  const muted = getSettingValueForPerson(recipientId, MUTED_SENDERS_KEY);
+  return Array.isArray(muted) && muted.includes(senderId);
 }
 
 /** Renders and delivers one declared notification to its whole audience.
@@ -144,7 +169,8 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
   // per this option's own doc comment) so a `person`-audience type's one
   // named recipient is never touched by it.
   const resolved = resolveRecipients(type, opts.personId);
-  const recipients = type.audience === "person" ? resolved : resolved.filter((r) => r.id !== opts.excludePersonId);
+  const afterExclude = type.audience === "person" ? resolved : resolved.filter((r) => r.id !== opts.excludePersonId);
+  const recipients = opts.mutedSenderId ? afterExclude.filter((r) => !hasMutedSender(r.id, opts.mutedSenderId!)) : afterExclude;
   const text = renderTemplate(type.template, vars);
 
   for (const recipient of recipients) {

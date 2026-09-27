@@ -127,13 +127,25 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       }
       break;
     case "person": {
-      if (typeof value !== "string") return { ok: false, status: 400, error: "expected a person id" };
-      const exists = db
-        .select({ id: people.id })
-        .from(people)
-        .where(and(eq(people.id, value), isNull(people.deletedAt)))
-        .get();
-      if (!exists) return { ok: false, status: 400, error: `unknown person: ${value}` };
+      // NOTIFY-SHARE-02: `range.multiple` (Home Assistant's own shape
+      // for "select some entities of a kind") is the first real caller
+      // of this branch - every existing "person" selector use (the
+      // spec's own recipe fixtures) is still a single id, so a plain
+      // string stays the default when `multiple` isn't set.
+      const multiple = (range as { multiple?: boolean } | undefined)?.multiple === true;
+      const ids = multiple ? value : [value];
+      if (multiple ? !Array.isArray(value) : typeof value !== "string") {
+        return { ok: false, status: 400, error: multiple ? "expected an array of person ids" : "expected a person id" };
+      }
+      for (const id of ids as unknown[]) {
+        if (typeof id !== "string") return { ok: false, status: 400, error: "expected an array of person ids" };
+        const exists = db
+          .select({ id: people.id })
+          .from(people)
+          .where(and(eq(people.id, id), isNull(people.deletedAt)))
+          .get();
+        if (!exists) return { ok: false, status: 400, error: `unknown person: ${id}` };
+      }
       break;
     }
     case "entity":

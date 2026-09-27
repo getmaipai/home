@@ -49,7 +49,7 @@ function makeValue(key: SettingsKey, value: unknown): ResolvedSetting {
   return { key: key.key, value, source: "default", label: key.label, help: key.help, level: key.level, secret: key.secret };
 }
 
-function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string, ResolvedSetting[]>) {
+function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string, ResolvedSetting[]>, roster: Roster[] = []) {
   const originalFetch = globalThis.fetch;
   const puts: Array<{ scope: string; key: string; value: unknown }> = [];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -64,6 +64,10 @@ function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string
       puts.push(body);
       const key = registry.find((k) => k.key === body.key)!;
       return Promise.resolve(Response.json(makeValue({ ...key }, body.value)));
+    }
+    // NOTIFY-SHARE-02: PersonMultiSelect's own roster fetch (api.people()).
+    if (url.includes("/api/people") && (!init?.method || init.method === "GET")) {
+      return Promise.resolve(Response.json(roster));
     }
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
@@ -249,6 +253,74 @@ describe("NextSettingsPage", () => {
       );
       await waitFor(() => expect(document.body.textContent).toContain("Appearance"));
       expect(document.querySelector('[data-slot="tabs-list"]')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  // NOTIFY-SHARE-02: the settings renderer's first `selector: "person"`
+  // + `range.multiple` key - the generic fallback above ("Not supported")
+  // is what every OTHER unimplemented selector still gets, so this key
+  // renders PersonMultiSelect instead and proves the actual round trip.
+  test("a person-selector-with-multiple key shows an existing pick as a chip, excludes the viewer, and saves a new pick", async () => {
+    const mutedSenders = makeKey({
+      key: "notifications.file_shared.muted_senders",
+      scope: "person",
+      selector: "person",
+      range: { multiple: true },
+      label: "Don't notify me about shares from",
+      level: "basic",
+    });
+    const marlow = makePerson({ id: "person-marlow1", display_name: "Marlow" });
+    const iris = makePerson({ id: "person-iris1", display_name: "Iris" });
+    const { restore, puts } = mockSettingsFetch(
+      [mutedSenders],
+      { household: [], "person:person-abc123": [makeValue(mutedSenders, ["person-marlow1"])] },
+      [makePerson(), marlow, iris], // the viewer (Nova) is in the roster too, and must never be pickable
+    );
+    try {
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(document.body.textContent).toContain("Household"));
+      const meTab = Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Me");
+      expect(meTab).toBeDefined();
+      fireEvent.click(meTab!);
+      await waitFor(() => expect(document.body.textContent).toContain("Don't notify me about shares from"));
+      // The existing pick renders as a chip with a real name, not the raw id.
+      await waitFor(() => expect(document.body.textContent).toContain("Marlow"));
+      expect(document.body.textContent).not.toContain("person-marlow1");
+
+      const input = document.querySelector('[data-slot="combobox-chip-input"]') as HTMLInputElement | null;
+      expect(input).not.toBeNull();
+      // ArrowDown is what actually opens this popup under jsdom/happy-dom
+      // (a plain click/focus does not - Base UI's pointer-open path needs
+      // real layout this test environment doesn't have); the real app
+      // still opens on a pointer click too, this is a test-only substitute
+      // for driving the identical keyboard-accessible path.
+      input!.focus();
+      fireEvent.keyDown(input!, { key: "ArrowDown" });
+      await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0));
+      const options = Array.from(document.querySelectorAll('[data-slot="combobox-item"]'));
+      // Nova is the signed-in viewer (person-abc123): never offered as a
+      // sender to mute, even though she's a real roster entry.
+      expect(options.some((el) => el.textContent === "Nova")).toBe(false);
+      const irisOption = options.find((el) => el.textContent === "Iris");
+      expect(irisOption).toBeDefined();
+      fireEvent.click(irisOption!);
+      await waitFor(() =>
+        expect(
+          puts.some(
+            (p) =>
+              p.key === "notifications.file_shared.muted_senders" &&
+              Array.isArray(p.value) &&
+              (p.value as string[]).includes("person-iris1") &&
+              (p.value as string[]).includes("person-marlow1"),
+          ),
+        ).toBe(true),
+      );
     } finally {
       restore();
     }

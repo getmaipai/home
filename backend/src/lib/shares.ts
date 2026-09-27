@@ -126,7 +126,12 @@ const KIND_PHRASES: Record<FileRecord["kind"], string> = {
  * (`isValidShareTarget` above), so it fires `file.shared_with_you`
  * straight at that one person - no exclusion needed there, since that
  * one recipient is named directly by `personId`, never derived from
- * "everyone." */
+ * "everyone." NOTIFY-SHARE-02: `mutedSenderId: actor.id` on both calls -
+ * a recipient who has muted `actor` (notifications.file_shared.muted_senders)
+ * gets neither type from them, direct or household, while still hearing
+ * about everyone else's shares; trigger() itself is where that list is
+ * actually read (lib/notifications.ts), so both call sites just name who
+ * the sender is. */
 function notifyShareCreated(actor: PersonRow, to: string, file: typeof attachments.$inferSelect): void {
   // A code review (2026-09-27) found this had no fallback for a kind
   // value the map doesn't list - `Record<FileRecord["kind"], string>`
@@ -136,13 +141,13 @@ function notifyShareCreated(actor: PersonRow, to: string, file: typeof attachmen
   const vars = { fromDisplayName: actor.displayName, kindPhrase };
   if (to === "household") {
     trackBackgroundWork(
-      trigger("file.shared_with_household", vars, { subjectPersonId: actor.id, excludePersonId: actor.id }).catch((err: unknown) =>
-        console.error(`[shares] file.shared_with_household notification failed: ${(err as Error).message}`),
+      trigger("file.shared_with_household", vars, { subjectPersonId: actor.id, excludePersonId: actor.id, mutedSenderId: actor.id }).catch(
+        (err: unknown) => console.error(`[shares] file.shared_with_household notification failed: ${(err as Error).message}`),
       ),
     );
   } else {
     trackBackgroundWork(
-      trigger("file.shared_with_you", vars, { personId: to, subjectPersonId: actor.id }).catch((err: unknown) =>
+      trigger("file.shared_with_you", vars, { personId: to, subjectPersonId: actor.id, mutedSenderId: actor.id }).catch((err: unknown) =>
         console.error(`[shares] file.shared_with_you notification failed: ${(err as Error).message}`),
       ),
     );

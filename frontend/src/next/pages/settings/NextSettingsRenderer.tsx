@@ -40,6 +40,13 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
 export function NextSettingsRenderer({ scope, scopeValue, only }: NextSettingsRendererProps) {
+  // NOTIFY-SHARE-02: NextSettingField's own PersonMultiSelect control
+  // needs the viewer's own id to drop from its option list -
+  // `scopeValue` is already exactly "person:<id>" for a person-scope
+  // render (every call site: NextSettingsPage.tsx renders a person's
+  // own settings only, never someone else's), so it's parsed here once
+  // rather than threading a second prop through every call site.
+  const selfPersonId = scope === "person" ? scopeValue.slice("person:".length) : undefined;
   const queryClient = useQueryClient();
   // SHELL-SEARCH-02: `?section=<group.id>` (a SettingsKey's own
   // `lives_in`, the identical id `groupSettings()` groups by below) -
@@ -165,7 +172,7 @@ export function NextSettingsRenderer({ scope, scopeValue, only }: NextSettingsRe
                   </CardHeader>
                   <CardContent className="flex flex-col divide-y divide-border">
                     {group.basic.map((s) => (
-                      <NextSettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} />
+                      <NextSettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />
                     ))}
                     {group.advanced.length > 0 ? (
                       group.foldAdvanced && !advancedOpen[group.id] ? (
@@ -180,7 +187,7 @@ export function NextSettingsRenderer({ scope, scopeValue, only }: NextSettingsRe
                       ) : (
                         <div className="flex flex-col divide-y divide-border border-t border-border pt-1">
                           {group.advanced.map((s) => (
-                            <NextSettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} />
+                            <NextSettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />
                           ))}
                         </div>
                       )

@@ -128,6 +128,67 @@ describe("PUT /api/settings (write)", () => {
   });
 });
 
+// notifications.file_shared.muted_senders (NOTIFY-SHARE-02) is the
+// registry's first real `selector: "person"` key with `range.multiple`
+// set - validateSelectorValue()'s "person" case only ever validated a
+// single id before this, so these exercise the new array branch through
+// the real HTTP route rather than calling the internal function directly.
+describe("PUT /api/settings for notifications.file_shared.muted_senders (a person-selector list, NOTIFY-SHARE-02)", () => {
+  test("resolves to an empty list when nothing is stored", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const ownerPerson = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const res = await owner.get(`/api/settings?scope=person:${ownerPerson.id}`);
+    const body = (await res.json()) as Array<{ key: string; value: unknown; source: string }>;
+    const muted = body.find((s) => s.key === "notifications.file_shared.muted_senders");
+    expect(muted?.value).toEqual([]);
+    expect(muted?.source).toBe("default");
+  });
+
+  test("accepts an array of real person ids and round-trips them", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    // Issues #35/#47: role: "adult" through this route requires a secret.
+    const created = await owner.post("/api/people", { displayName: "Lucia", role: "adult", secret: "0000" });
+    const lucia = (await created.json()) as { id: string };
+    const ownerPerson = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+
+    const put = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${ownerPerson.id}`, key: "notifications.file_shared.muted_senders", value: [lucia.id] },
+    });
+    expect(put.status).toBe(200);
+
+    const list = await owner.get(`/api/settings?scope=person:${ownerPerson.id}`);
+    const body = (await list.json()) as Array<{ key: string; value: unknown; source: string }>;
+    const muted = body.find((s) => s.key === "notifications.file_shared.muted_senders");
+    expect(muted?.value).toEqual([lucia.id]);
+    expect(muted?.source).toBe("user");
+  });
+
+  test("rejects a value that isn't an array", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const ownerPerson = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const put = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${ownerPerson.id}`, key: "notifications.file_shared.muted_senders", value: "not-an-array" },
+    });
+    expect(put.status).toBe(400);
+  });
+
+  test("rejects an id that isn't a real household member", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const ownerPerson = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const put = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${ownerPerson.id}`, key: "notifications.file_shared.muted_senders", value: ["person-doesnotexist"] },
+    });
+    expect(put.status).toBe(400);
+  });
+});
+
 // tts.voice_id (2026-09-04, "per user selection of voice") is the
 // registry's first real person-scope key - settings.ts's parseScope/
 // assertCanAccessScope person branches existed but had nothing to

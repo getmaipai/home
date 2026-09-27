@@ -29835,3 +29835,115 @@ Sources: [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agen
 [Hermes-4.3-36B](https://huggingface.co/NousResearch/Hermes-4.3-36B),
 [Hermes-3-Llama-3.2-3B](https://huggingface.co/NousResearch/Hermes-3-Llama-3.2-3B),
 [Hermes 4 tech report, arXiv 2508.18255](https://arxiv.org/abs/2508.18255).
+
+## NOTIFY-SHARE-02: the per-sender mute list and the settings renderer's first person multi-select (2026-09-27)
+
+The last unclaimed row of the People phase-one chunking
+(`docs/plans/people-profile-2026-09-26.md`), picked up once
+`NOTIFY-SHARE-01` landed. That design record's own "Notified on sharing,
+no subscribing at all" section names the one real gap the household-wide
+and per-type mute toggles can't express: hearing about everyone's shares
+except one specific person's. Closing it needed two things - a place to
+store the mute list, and a control to edit it, since "checked: no such
+control exists anywhere in this frontend today" was the record's own
+open item.
+
+**Confirmed before building anything.** `NextSettingField.tsx`'s header
+already listed `person` among the selectors with no real control (a
+`"Not supported in this hub version yet."` fallback); the kit's
+pre-shadcndashboard `SettingField.tsx` (`@maipai/ui`) has the identical
+gap. The one candidate that looked like a precedent - `PersonMemories.tsx`'s
+"Who may hear this" audience control - turned out to be a fixed
+three-value enum `Select` (`child_ok`/`teen_ok`/`adult_only`), not a
+person picker, so it was ruled out rather than assumed.
+
+**The key.** `notifications.file_shared.muted_senders`
+(`backend/src/settings/notificationKeys.ts`): `scope: "person"`,
+`selector: "person"` with `range: { multiple: true }`, `default: []`.
+Named for the shared feature ("file_shared"), not either type's own
+dotted id (`file.shared_with_you` / `file.shared_with_household`) the
+way every other key in this file is - `notifications.<type.id>.telegram`'s
+convention only fits a per-type channel toggle, and this one list is
+read for both types' dispatches to a given recipient, so a per-type name
+would have been misleading. `settings.ts`'s `validateSelectorValue()`
+already had a `"person"` case (single id only - the spec's own recipe
+fixtures' one real use of this selector), extended here to accept an
+array when `range.multiple` is set, its first real caller.
+
+**Where it's read.** Not at each call site - inside `trigger()` itself
+(`backend/src/lib/notifications.ts`), matching the design record's exact
+words ("read by the trigger before it dispatches"). A new
+`TriggerOptions.mutedSenderId` is checked against the resolved recipient
+list right after `excludePersonId`'s own filter, before rendering or
+delivery, for any audience - so the identical mechanism works whether a
+recipient was named directly (`file.shared_with_you`) or reached through
+the household fan-out (`file.shared_with_household`).
+`notifyShareCreated()` (`backend/src/lib/shares.ts`) passes
+`mutedSenderId: actor.id` on both of its calls; no other declared type
+passes it today.
+
+**The spec round trip, confirmed necessary first.** `backend/src/lib/
+settingsRegistry.ts` loads the registry from the installed `@maipai/spec`
+package's own `spec/settings/keys.json`, not from `notificationKeys.ts`
+directly - a new key there is invisible at runtime, and `scripts/
+check.sh`'s registry-drift check (`gen-settings-registry.ts` diffed
+against the pinned tag) confirmed a mismatch would fail the gate. So the
+`NOTIFY-SHARE-01` follow-up's exact procedure ran again: `bun run
+gen:settings` from a scratch `commons` worktree
+(`commons-scratch-notify-share-02`, added and removed with `git worktree
+add`/`remove`, never touching the shared `../commons` checkout another
+session could be mid-use on), diffed against `spec-v0.1.47`'s
+`keys.json` to confirm the change was additive-only (one new key), `spec/
+package.json` bumped to `0.1.48`, committed, pushed to `origin/main`,
+tagged `spec-v0.1.48` and pushed. This worktree's own pin bumped in
+`scripts/check.sh` and both `package.json`s'
+`@maipai/spec` `file:` path, `../commons-tags/spec-spec-v0.1.48`
+materialized via commons's `scripts/ensure-tag.sh`, `bun install --force`
+in `backend/` and `frontend/`, `bun.lock` diffed against `origin/main`
+to confirm only the pin path moved (no floated dependency).
+
+**The control.** `PersonMultiSelect.tsx` (new, `frontend/src/next/pages/
+settings/`) composes the vendored kit's own `Combobox`/`Chips`
+primitives (`@maipai/ui/src/dashboard/components/ui/combobox.tsx`, Base
+UI's `multiple` selection mode) - CLAUDE.md's "no hand-built UI": this
+wires a shipped chips-multi-select to `api.people()`'s roster, it
+doesn't invent a widget. `NextSettingField.tsx` renders it for
+`selector: "person"` with `range.multiple` set; `NextSettingsRenderer.tsx`
+parses the viewer's own id out of its `scopeValue` prop
+(`"person:<id>"`, always the signed-in person's own settings at every
+call site) and threads it down so a person is never offered as their own
+mute target. The old shell's `SettingField.tsx` (`@maipai/ui`, a
+separate, versioned copy per `SHELL-05`'s own accepted-duplication note)
+gets no matching case - it still shows the generic "Not supported"
+fallback for this one key until it retires, the same gap every other
+still-unimplemented selector already has there, not a new one this item
+creates.
+
+**Verification.** Two new tests in `backend/tests/shares.test.ts`: a
+muted sender's shares are silent both direct and household while an
+unmuted sender's still notify, and muting is per-recipient (one person's
+mute of a sender never touches what a different recipient hears from
+that same sender). Four new tests in `backend/tests/settings.test.ts`
+exercising the real `PUT /api/settings` route: the empty-list default,
+a valid array round-trip, a non-array value refused, and an unknown
+person id refused. One new test in `frontend/src/next/pages/
+NextSettingsPage.test.tsx` drives the actual control: an existing pick
+renders as a named chip (never the raw id), the signed-in viewer never
+appears in the pickable list even though she's a real roster entry, and
+picking a new person saves the full array through a real `PUT`. (Driving
+Base UI's Combobox popup open under happy-dom needed `ArrowDown` rather
+than a pointer click or focus - neither opens the popup without real
+layout in this test environment; the real app's pointer-click path is
+unexercised by this suite and worth a live look once this reaches
+8787.) `tsc --noEmit` clean on both `backend/` and `frontend/`; `eslint`
+clean on every touched frontend file. Full `bash scripts/check.sh` held
+for the shared machine's gate window per the coordinator's shared-machine
+discipline that night, not yet run at the time this entry was written.
+
+Files: `backend/src/settings/notificationKeys.ts`, `backend/src/lib/
+{notifications,shares,settings}.ts`, `backend/tests/{shares,settings}.
+test.ts`, `frontend/src/next/pages/settings/{NextSettingField,
+NextSettingsRenderer,PersonMultiSelect}.tsx`, `frontend/src/next/pages/
+NextSettingsPage.test.tsx`, `commons`'s `spec/settings/keys.json` and
+`spec/package.json` (spec-v0.1.48), `scripts/check.sh` and both
+`package.json`s' `@maipai/spec` pin.
