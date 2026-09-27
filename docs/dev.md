@@ -28493,3 +28493,27 @@ RULES-AND-LEARNED-COMPONENTS.md's path, and the `.pt` checkpoint is
 loaded with `weights_only=True` or converted to safetensors at
 install. The card announces a multimodal CLM-35B for early October;
 the Studio is the only tier that could hold it.
+
+### Amendment, same evening: Qwen-Image-2.1 stays in the bakeoff (owner's ruling)
+
+Jesse's read of the section above: keep the image model in the
+bakeoff for performance, then report the ecosystem detail. Evaluation
+is the one use the research licence grants, so the ruling costs
+nothing on licence: 2.1 cannot be a pin, and it becomes the
+evaluation-only yardstick row of a new item, IMAGE-BENCH-01, that
+measures the sizing bar's three picture rows (every cell `(?)` today)
+on the 3070 through ComfyUI and on the Studio through `mlx-serve` and
+`stable-diffusion.cpp`, with the 2.1 weights removed from both
+machines when the bench ends. The ecosystem, verified on primary
+sources and recorded in the note: native ComfyUI on day 0 with a
+Comfy-Org int8 repack (7.3 GB transformer, 9.4 GB encoder), GGUF sets
+from unsloth and leejet down to 4.2 GB at Q4, day-0
+stable-diffusion.cpp, a DMD2 six-step turbo adapter from Viggle under
+the same licence, LoRA training in ai-toolkit and DiffSynth-Studio
+(not musubi-tuner yet), a Civitai category already holding LoRAs and
+repacks, and on Apple silicon mflux and mlx-serve (the Stack's own
+candidate engine, 2.1 merged 2026-09-21) with 32 GB the smallest Mac
+anyone has run it on. The one design-level fact from the survey:
+stable-diffusion.cpp now runs every row of the bakeoff on both
+machines from one MIT binary with a Metal backend, which is a Stack
+engine question STACK-14's bench should take up beside ComfyUI.

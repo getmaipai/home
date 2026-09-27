@@ -8,23 +8,27 @@ CLM GitHub README), not against a summary.
 
 ## The two-paragraph answer
 
-Qwen-Image-2.1 is out, on its licence alone. It ships under the Qwen
-Research License Agreement (released 2026-09-20), which grants use "for
-non-commercial purposes only" and defines non-commercial as "for
-research or evaluation purposes only"; a commercial licence is by
-separate request to Qwen. A family drawing pictures in Home is neither
-research nor evaluation, and a Catalog package that ships it would be
-distributing it for exactly that. That is a harder no than the CC BY-NC
-voices and the YuE2 weights this design already declined ("fine for a
-household's own use, wrong choice for a shipped default"). The
-hardware would have said no on tiers 1 and 2 anyway: it is a 7B
-diffusion transformer with an 8B-class Qwen3-VL text encoder, about
-33 GB at bf16, and the 8 GB path exists only through unofficial GGUF
-re-quantizations with the encoder pushed to system memory. The image
-role keeps FLUX.2 Klein 4B (Apache-2.0) as its instant and everyday
-pick and Qwen-Image-Edit-2511 (Apache-2.0, December 2025) as the
-editing pick this family still offers; the 2.1 card's capability list
-becomes the yardstick the edit shape is written against, nothing more.
+Qwen-Image-2.1 cannot ship, and stays in the bakeoff (owner's ruling,
+2026-09-26, below). It is licensed under the Qwen Research License
+Agreement (released 2026-09-20), which grants use "for non-commercial
+purposes only" and defines non-commercial as "for research or
+evaluation purposes only"; a commercial licence is by separate request
+to Qwen. A family drawing pictures in Home is neither research nor
+evaluation, and a Catalog package that ships it would be distributing
+it for exactly that, so it is off the ship list on every tier, a
+harder no than the CC BY-NC voices and the YuE2 weights this design
+already declined. Measuring it is the one use the licence names, and
+it is the strongest open image model of its size this month, so it is
+the yardstick row of the image bakeoff: the row FLUX.2 Klein 4B
+(Apache-2.0) and Qwen-Image-Edit-2511 (Apache-2.0) are measured
+against, on the same prompts and the same machines, so the shipping
+pick is chosen knowing what it gives up. The ecosystem is unusually
+complete for a week-old model (native ComfyUI with an int8 repack,
+day-0 stable-diffusion.cpp, mflux and mlx-serve on Apple silicon, a
+six-step distillation, LoRA training in ai-toolkit and
+DiffSynth-Studio, a Civitai category already filling), and that is
+recorded below because it is what the bakeoff row is built from and
+what a relicensed release would inherit on day one.
 
 CLM-v0.1-8B is in, as a bench candidate on the path the design already
 laid for this class of model, not as a pin. It is the second open
@@ -99,9 +103,10 @@ Edit-2509 and Edit-2511 are all Apache-2.0 on their cards (checked
 2026-09-26 through the Hugging Face API). A `Qwen/Qwen-Image-2.0`
 repository does not resolve on Hugging Face at all as of this reading.
 
-**Verdict.** Dropped for the image role on every tier, on licence
-first and weight second. Recorded in `docs/BACKLOG.md` on IMAGE-01 so
-it is not re-asked, and the "Pictures, quality" row of
+**Verdict.** Off the ship list on every tier, on licence first and
+weight second; in the bakeoff as the evaluation-only yardstick row
+(next section). Recorded in `docs/BACKLOG.md` on IMAGE-01 and as
+IMAGE-BENCH-01, and the "Pictures, quality" row of
 `hub-on-apple-silicon-2026-09-17.md` now names the Apache-2.0 members
 of the family explicitly instead of "full Qwen-Image", which a reader
 today would take to mean 2.1.
@@ -112,15 +117,153 @@ role's job API should be written to it when IMAGE-02 grows edits:
 reference images (a count, with the consent rule per referenced
 person that the sizing bar already states), a mask or a marked region
 as the edit target, an RGBA output flag, and "keep everything else"
-as the default. None of that needs this model; FLUX.2 Klein and
-Edit-2511 cover the same shape at Apache-2.0. Revisit 2.1 only if
-Qwen relicenses it, as it did not for this release.
+as the default. FLUX.2 Klein and Edit-2511 cover the same shape at
+Apache-2.0. Revisit 2.1 as a ship pin only if Qwen relicenses it, as
+it did not for this release; the bakeoff numbers are what make that
+revisit a one-line decision instead of a new research pass.
 
-One more note for the record: the "uncensored" GGUF derivatives that
-surfaced in the same search are out on their own terms, before any
-licence question. SAFETY.md's generation invariants are non-removable
-architecture, and a checkpoint whose purpose is removing them has no
-seat in the Catalog.
+One more note for the record: the "uncensored" and "heretic" GGUF
+derivatives that surfaced in the same search (four of the fifteen
+most-downloaded 2.1 repositories on Hugging Face as of this reading)
+are out on their own terms, before any licence question. SAFETY.md's
+generation invariants are non-removable architecture, and a
+checkpoint whose purpose is removing them has no seat in the Catalog
+or the bakeoff.
+
+### Owner's ruling, 2026-09-26: keep it in the bakeoff
+
+Jesse, on reading the verdict above: "i still want the image model in
+the bakeoff for performance". That is inside the licence (evaluation
+is the one use it grants) and inside the org's own rule that a
+sizing-bar cell marked `(?)` is a hypothesis until measured. So the
+bakeoff carries it as a row that can never become a pin, and the
+ecosystem below is what that row is built from. Everything here was
+verified on the primary source named; sizes are the repositories' own
+blob sizes through the Hugging Face API, 2026-09-26.
+
+**ComfyUI, native.** Day-0 support (2026-09-20) in ComfyUI itself, no
+custom node: a Qwen Image 2.1 subgraph node that holds the prompt
+conditioning and its own sampler, a resolution selector, and a "Qwen
+Image 2.1 Cache" node that keeps the text and reference prefix across
+steps (the model's prefix KV cache). The templates are in the built-in
+gallery. Editing takes 1 to 16 reference images as `<image1>` to
+`<image16>` in the prompt, output following the first reference's
+aspect ratio; the VAE carries four channels, so RGBA falls out of the
+same graph. Default settings 25 steps, cfg 1.0, Euler, simple
+scheduler. `docs.comfy.org/tutorials/image/qwen/qwen-image-2-1`. The
+weights are the Comfy-Org repack (`Comfy-Org/Qwen-Image-2.1`, 3.6M
+downloads, the model's own licence), single files per component:
+
+| File | Size | Note |
+|---|---|---|
+| `qwen_image_2.1_bf16.safetensors` | 14.2 GB | the transformer, full precision |
+| `qwen_image_2.1_int8_convrot.safetensors` | 7.3 GB | the transformer, int8 with rotation, the template default |
+| `qwen3vl_8b_bf16.safetensors` | 17.5 GB | the text encoder |
+| `qwen3vl_8b_int8_convrot.safetensors` | 9.4 GB | the encoder, int8, the template default |
+| `qwen3vl_8b_w4a8.safetensors` | 6.3 GB | the encoder, 4-bit weights |
+| `qwen_image_2.1_vae_bf16.safetensors` | 0.7 GB | the RGBA VAE |
+| `qwen3.5_9b_qwen_image_2.1_pe_t2i` and `pe_i2i` (int8) | 9.5 GB each | the optional prompt-rewriting models, same licence |
+
+The int8 pair is 16.7 GB of weights, the bf16 pair 31.7 GB, before
+activations; the tutorial gives no VRAM figure and no timing. Comfy
+tested nothing under 8 GB in writing, and ComfyUI's own low-VRAM path
+is the same CPU offload of the encoder the community write-ups use.
+
+**GGUF and the 8 GB card.** Three GGUF sets exist. `unsloth/
+Qwen-Image-2.1-GGUF` (170k downloads, the model's licence, base
+declared): the transformer from Q2_K 2.5 GB through Q4_K_M 4.2 GB, Q6_K
+6.3 GB and Q8_0 7.6 GB, plus F16. `leejet/Qwen-Image-2.1-GGUF` (69k;
+leejet is stable-diffusion.cpp's author): Q4_0 and Q4_K 4.2 GB, Q8_0
+7.7 GB. Both load through ComfyUI-GGUF. The published 8 GB recipe is
+Q4_K_M or the int8 transformer on the card, the encoder in system
+memory (16 GB or more), and `--lowvram`; nobody has published a 3070
+time. For the bakeoff, unsloth's set is the one to pin for the 3070
+row (pinnable by revision and sha256, a declared base, a named
+organization), leejet's the cross-check; the individual-account
+re-quantizations from the first pass are dropped.
+
+**stable-diffusion.cpp.** Day-0 support 2026-09-20 (MIT; CPU, CUDA,
+Vulkan, Metal, OpenCL, SYCL), and it already runs FLUX.2 Klein
+(2026-01-18), Qwen Image and Qwen-Image-Edit. That makes one engine
+able to serve every row of the bakeoff on both machines, which matters
+more for the Stack than for this model: STACK-13b built ComfyUI as the
+managed image engine and measured it, and a single-binary engine with
+a Metal backend and no Python is the shape the Stack prefers
+everywhere else. Whether it displaces ComfyUI is a Stack question
+(STACK-14's bench), not this note's; the bakeoff records both paths
+where both exist.
+
+**Distillation.** No Lightning release from lightx2v exists for 2.1 as
+of this reading (the repository name resolves to nothing public). The
+few-step path is `Viggle/Qwen-Image-2.1-viggle-turbo` (102k
+downloads): a DMD2-distilled student shipped as a LoRA adapter (rank
+128 at 0.7 GB, rank 256 at 1.4 GB) for 5 or 6 transformer passes
+instead of 40, "about 5 times faster" end to end, with its own ComfyUI
+nodes and workflows, under the same research licence. Its card's own
+caveats: small dense text is weaker at 6 steps (8 recommended), and
+multi-reference composition, face swaps and identity-preserving edits
+may underperform the base. The bakeoff measures the base model at 25
+and 40 steps and the turbo adapter at 6, as three rows, because the
+"instant" and "everyday" bars are different sizing cells. Nunchaku's
+official organization has no 2.1 release; the one SVDQuant NVFP4 file
+(`catplusplus`, 4.4 GB) needs Blackwell, Ada or Hopper, and the 3070
+is Ampere, so it is out of the bakeoff on hardware.
+
+**LoRA, training.** `ostris/ai-toolkit` lists `Qwen/Qwen-Image-2.1`
+under both its image and its edit trainers ("one model for both; it
+edits when your dataset has control images"); a community walkthrough
+trains a character LoRA on 12 GB. ModelScope's DiffSynth-Studio is the
+official training path Qwen's README names. `musubi-tuner` and
+`sd-scripts` did not support 2.1 as of 2026-09-21. **LoRA, community.**
+Civitai opened a "Qwen 2.1" base-model category within days and it
+already holds checkpoints (the int8 and an INT4 W4A8 repack), LoRAs (a
+"fix" LoRA for two weak layers, an any-side outpaint LoRA) and
+workflows; `WarmBloodAban/Qwen-Image-2.1-LoRAs` collects more on
+Hugging Face. A week in, that is a smaller library than FLUX.2 Klein's
+and a fraction of Qwen-Image 1.0's, but growing at Qwen-Image 1.0's
+early pace. Every LoRA trained on 2.1 is a derivative under the
+research licence, so the LoRA library is as unshippable as the base;
+that is the practical cost of the licence, more than the base weights
+themselves.
+
+**Apple silicon.** No official path (Qwen documents CUDA, AMD and
+FlagOS only). `mflux` (MIT) added 2.1 the day after release:
+text-to-image and image-to-image at `-q 8` or `-q 4`, the encoder kept
+in bf16, editing "not ported", RGBA in an open pull request; on an M5
+Max at bf16, 1024 by 1024 runs about 78 s at 40 steps (about 1.8 s a
+step plus 8 s fixed). The `mlx-community/Qwen-Image-2.1-mflux-q4` pack
+is 9.6 GB. **`mlx-serve`** (the Stack's own spawned-engine candidate,
+`stack/docs/plans/field-survey-2026-09-17.md`) merged 2.1 as its
+fourth image backend on 2026-09-21 (PR 477): its own packs at 8-bit
+(17.6 GB on disk, `ddalcu/Qwen-Image-2.1-MLX-Serve-8bit`) and 4-bit
+(10.7 GB), text-to-image and image-to-image with real
+classifier-free guidance, served at `POST /v1/images/generations`,
+which is the Stack's job API shape already; no edit, no LoRA, no RGBA.
+Its measured numbers are the only ones on a small Mac: an M1 Pro with
+32 GB ran 8-bit 1024 by 1024 at 40 steps in 985 s (23 s a step, 13 GB
+peak) and 4-bit 512 by 512 at 20 steps in 118 s. The modelfit survey's
+tiers agree: 16 and 24 GB "not viable today", 32 GB runs slowly, 64 GB
+usable. So the Mac Studio row is real and the M4 Pro dev machine row
+is likely a refusal by the governor, which is itself a bakeoff result
+worth one line.
+
+**The bakeoff row, as designed.** One item, IMAGE-BENCH-01 in
+`docs/BACKLOG.md`, the same protocol as STACK-14 (engine build, model
+file and revision, a sanitized hardware line, time and peak footprint
+per row), with one fixed prompt set (the roster's demo household,
+never the family: a portrait, a typographic sign, a product on white,
+a two-reference composition, a masked local edit, an RGBA sticker)
+judged on the same rubric across rows. Rows: SD 1.5 (the pin STACK-13b
+proved, the floor), FLUX.2 Klein 4B at its shipped steps, Qwen-Image-
+Edit-2511 for the edit prompts, and Qwen-Image-2.1 at 25 and 40 steps
+plus the turbo adapter at 6, each row on the 3070 through ComfyUI (the
+GGUF or int8 files above) and on the Studio through mlx-serve and
+stable-diffusion.cpp where each supports the row. The 2.1 rows are
+marked evaluation-only in the table and the weights are removed from
+the machine when the bench ends, so no later session mistakes a cached
+file for a pin. Out of scope: LoRA training, the prompt-rewriting
+models, any "uncensored" derivative, and a ship decision, which the
+licence has already made.
 
 ## Subject 2: CLM-v0.1-8B
 
@@ -238,7 +381,14 @@ API), `Contrastive-LM/CLM-v0.1-8B` (card, file list), the cards of
 `Qwen/Qwen-Image`, `Qwen/Qwen-Image-Edit-2511`, `Qwen/Qwen3-8B` and
 `black-forest-labs/FLUX.2-klein-4B` for their licence fields.
 GitHub: `Contrastive-LM/CLM` README (serving, pooling, head size).
-Community 8 GB path for Qwen-Image-2.1: the ComfyUI GGUF write-ups at
-comfyui-wiki.com and kombitz.com (2026-09-20) and the two GGUF
-re-quantization repositories named above, cited for the memory
-figures only.
+For the ecosystem section: `docs.comfy.org/tutorials/image/qwen/
+qwen-image-2-1`, `blog.comfy.org` (2026-09-21), `Comfy-Org/Qwen-Image-2.1`,
+`unsloth/Qwen-Image-2.1-GGUF`, `leejet/Qwen-Image-2.1-GGUF`,
+`Viggle/Qwen-Image-2.1-viggle-turbo`, `catplusplus/nunchaku-qwen-image-2.1`,
+`mlx-community/Qwen-Image-2.1-mflux-q4`, `ddalcu/Qwen-Image-2.1-MLX-Serve-8bit`
+(all Hugging Face, sizes through the API), `QwenLM/Qwen-Image-2.1`,
+`ostris/ai-toolkit`, `leejet/stable-diffusion.cpp`, `filipstrand/mflux`
+and `ddalcu/mlx-serve` pull request 477 (GitHub), the modelfit.io Mac
+survey (2026-09-25), the Civitai "Qwen 2.1" category, and the ComfyUI
+GGUF write-ups at comfyui-wiki.com and kombitz.com (2026-09-20) for the
+8 GB recipe.
