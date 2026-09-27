@@ -927,7 +927,7 @@ export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: strin
   ];
   if (searchResultCount > 0) {
     const itemLimit = Math.min(searchResultCount, 7);
-    lines.push(`For a search-results list, show at most ${itemLimit} numbered items, choosing the most relevant. Keep the whole list under 140 words. Use one concise sentence of at most 15 words total per item, counting its number and any title. Prioritize each result's key point over extra detail, and omit raw URLs.`);
+    lines.push(`Keep the reply under 140 words and omit raw URLs. Answer the question first, in the shape it calls for. Only when I asked for the results themselves, list at most ${itemLimit} of them, one sentence of at most 15 words each.`);
   }
   return lines.join(" ");
 }

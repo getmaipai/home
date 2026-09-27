@@ -249,6 +249,11 @@ checklist (`docs/dev.md`); no release has been cut yet.
   details in `docs/dev.md`'s "Code review pass, 2026-09-04" section.
 - The chat header, message actions, and reply stats visibility were
   corrected so they render and toggle as intended.
+- A searched question is now answered in the shape it calls for: prose
+  for an ordinary question, a numbered list only when the results
+  themselves were asked for. The #156 fix's own list-format line fired
+  on every searched reply with rows, so a plain yes-or-no question came
+  back as a numbered list too (#168).
 
 ### Added
 - Settings (platform plan 4.6), the fourth slice of hub core: the store,

@@ -28361,3 +28361,92 @@ per the org gate rule for a failure the diff didn't touch. No live
 `bun restart`: this item is
 policy/loader/trace logic with no manifest content changed, and the
 8787 hub was not restarted by this lane.
+## SEARCH-SHAPE-01 landed: bound the searched reply, do not format it (2026-09-26)
+
+da37d88d (#156, 2026-09-25) added a line to `phrasingInstruction()`
+(`backend/src/lib/composer.ts:919-932`) that fired on every searched
+turn with rows and told the model to format the whole reply as a
+numbered list, which is the right fix for #156's own case (a request
+for a list of museum posters) but wrong for any other searched
+question. On 2026-09-26, after the hub restart for #166, "is the
+unabomber alive" and "was the unabomber subject to experimental things
+while at college" (`turn-b01plmod74`, `turn-dbyu1niupc`, both eight
+websearch rows) each came back as seven numbered one-liners, because
+the model reads a per-item length rule as the answer's required shape
+regardless of what was asked (#168). The fix keeps #156's measured
+140-word bound (that is what stopped the truncation, dev.md "#156: the
+measured search-list budget") but drops the format mandate, letting
+the instruction's own first-line shape clause ("in one to three
+sentences" for spoken, "structured where it helps" for written)
+decide prose or list, and lists at most `itemLimit` items only when
+the results themselves were asked for. New instruction (the line added
+when `searchResultCount > 0`), verbatim:
+
+> Keep the reply under 140 words and omit raw URLs. Answer the question
+> first, in the shape it calls for. Only when I asked for the results
+> themselves, list at most 7 of them, one sentence of at most 15 words
+> each.
+
+The regression test needed two cases, not one: `nodes/model.ts:610`
+passes `promptSurfaceClassFor(surfaceClassOf(surface), ageBand)` into
+`phrasingInstruction()`, and for an adult owner, `"chat"` resolves to
+the *written* register (`surfaceClass.ts`'s `promptSurfaceClassFor`,
+gated on `isWrittenAdultTurn`), the same combination the #156 test
+already drives but never asserted a length clause on, which is exactly
+how the list-format regression got past it; the new `#168` test in
+`turnNext.test.ts` therefore covers owner+`"chat"` (written,
+"structured where it helps") and owner+`"robot"` (spoken
+unconditionally, "in one to three sentences") as two cases in one
+test, each asserting the 140-word bound and the absence of "numbered".
+`"phone"`/`"pod"` aren't implemented on this host build yet
+(`IMPLEMENTED_SURFACES` in `turnEngine.ts`), which is why `"robot"` is
+the spoken case's surface, not `"phone"`.
+
+**Live A/B, no judge engine running.** Direct probe against the
+household's own resident chat engine (`qwen3-8b-instruct-q4-k-m.gguf`,
+llama-server b10797, loopback port 8788), using the two live turns'
+actual eight-row websearch outcomes read from
+`conversation_turns.outcomes` in the live hub database, the old
+instruction and the new one, `max_tokens` 608. Both new-instruction
+replies open with a sentence, not "1." (pass); the old instruction
+reproduces the incident on both questions.
+
+- turn1 ("is the unabomber alive") / old instruction:
+  > 1. Ted Kaczynski, known as the 'Unabomber,' died at 81.
+  > 2. He was found dead in a prison cell.
+- turn1 / new instruction:
+  > The Unabomber, Ted Kaczynski, is no longer alive. He was found dead
+  > in his prison cell in 2015 at the age of 81.
+- turn2 ("was the unabomber subject to experimental things while at
+  college") / old instruction:
+  > 1. Harvard's psychological experiments may have influenced Ted
+  > Kaczynski's radicalization.
+  > 2. The experiments at Harvard are linked to the Unabomber's
+  > radicalization.
+- turn2 / new instruction:
+  > The Unabomber, Ted Kaczynski, was not subjected to experimental
+  > things while at college. However, some sources suggest that
+  > Harvard's controversial psychological experiments may have
+  > contributed to his radicalization.
+
+turn1/new still appends an unsolicited "Here are the search results"
+list after its opening sentence; the pass bar (opens with a sentence)
+is met, but the model doesn't always drop the list impulse entirely on
+an 8B, an existing, known model-following limit rather than a new
+defect.
+
+Verified: backend `bash scripts/check.sh` (scope: backend, no shared
+config touched), 4144/4145 green, run twice (once before the rebase
+onto MANIFEST-REFUSAL-01's `main`, once after, on the unchanged tip).
+The one failure both times,
+`advertiseMdns()/stopMdnsAdvertisement() > a real mDNS browser
+discovers the advertised service with the documented TXT fields`
+(`tests/mdns.test.ts`), is unrelated to this diff (real multicast
+discovery, no import of anything `phrasingInstruction()` or the #168
+test touches) and is the same environment finding MANIFEST-REFUSAL-01
+recorded a run earlier tonight (this sandbox's network doesn't carry
+real mDNS reliably), reported rather than fixed forward, per the org
+gate rule for a failure the diff didn't touch. The hub on 8787 was not
+restarted; its own turns are still served under the old instruction
+until Jesse restarts it, which is the live check the BACKLOG tick
+names as outstanding.

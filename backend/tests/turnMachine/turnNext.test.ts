@@ -1307,7 +1307,7 @@ describe("turnNext.ts: #156, search-result lists get a measured answer budget", 
             if (!request.messages.some((message) => message.role === "tool")) return "Searching.";
             phrasingRequest = request;
             const instruction = request.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
-            return instruction.includes("at most 7 numbered items") && instruction.includes("under 140 words") && instruction.includes("at most 15 words total per item") ? completeReply : oldCapReply;
+            return instruction.includes("under 140 words") && instruction.includes("at most 7 of them") ? completeReply : oldCapReply;
           },
         },
         () => runTurnNext(people.owner, "chat", "what do the seven museum poster search results say?"),
@@ -1316,11 +1316,61 @@ describe("turnNext.ts: #156, search-result lists get a measured answer budget", 
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(phrasingRequest?.max_tokens).toBe(608);
       const instruction = phrasingRequest?.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
-      expect(instruction).toContain("at most 7 numbered items");
       expect(instruction).toContain("under 140 words");
-      expect(instruction).toContain("at most 15 words total per item");
+      expect(instruction).toContain("at most 7 of them");
+      expect(instruction).not.toContain("numbered");
       expect(result.value.reply.text).toBe(completeReply);
       expect(result.value.reply.text).not.toMatch(/from the$/u);
+      expect(searxng.queries).toContain("reply truncation seven rows fixture");
+    } finally {
+      searxng.stop();
+    }
+  });
+});
+
+describe("turnNext.ts: #168, a searched question is answered in the shape it calls for", () => {
+  test("a searched yes-or-no question is told to answer in sentences and never told to number the results", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const askAndCapture = async (surface: "chat" | "robot") => {
+      let phrasingRequest: ChatCompletionRequest | undefined;
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((message) => message.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "reply truncation seven rows fixture" }) }];
+          },
+          reply: (request) => {
+            if (!request.messages.some((message) => message.role === "tool")) return "Searching.";
+            phrasingRequest = request;
+            return "Yes, they are still alive as of the most recent reports.";
+          },
+        },
+        () => runTurnNext(people.owner, surface, "is the person in the fixture still alive"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      return phrasingRequest?.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+    };
+    try {
+      // Case 1: an adult owner on "chat" is the written register
+      // (surfaceClass.ts's promptSurfaceClassFor, gated on
+      // isWrittenAdultTurn) - the exact live combination from #168's
+      // two incident turns. The #156 test already drives owner+"chat"
+      // but never asserted on the length clause, which is how the
+      // list-format regression got past it.
+      const writtenInstruction = await askAndCapture("chat");
+      expect(writtenInstruction).toContain("structured where it helps");
+      expect(writtenInstruction).toContain("under 140 words");
+      expect(writtenInstruction).not.toContain("numbered");
+      // Case 2: "robot" resolves to the spoken register unconditionally
+      // (surfaceClassOf; "phone" and "pod" aren't implemented yet on
+      // this host build, IMPLEMENTED_SURFACES in turnEngine.ts), covering
+      // the other length clause the same instruction can carry.
+      const spokenInstruction = await askAndCapture("robot");
+      expect(spokenInstruction).toContain("in one to three sentences");
+      expect(spokenInstruction).toContain("under 140 words");
+      expect(spokenInstruction).not.toContain("numbered");
       expect(searxng.queries).toContain("reply truncation seven rows fixture");
     } finally {
       searxng.stop();
