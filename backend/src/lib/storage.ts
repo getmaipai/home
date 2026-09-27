@@ -19,17 +19,29 @@ import { getCacheStats } from "@/lib/packageCache";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 
+/** Recursive directory walk, calling `onFile` with every regular file's
+ * full path - shared by dirSizeBytes() below and lib/storage/usage.ts's
+ * reconcileFileStore() (STORE-CAP-01), rather than two independently
+ * maintained recursions over the same node:fs primitives (a code review
+ * caught the first version of usage.ts's own copy of this exact walk).
+ * Skips a directory that doesn't exist rather than throwing. */
+export function walkFiles(dir: string, onFile: (path: string) => void): void {
+  if (!existsSync(dir)) return;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) walkFiles(path, onFile);
+    else if (entry.isFile()) onFile(path);
+  }
+}
+
 /** Recursive, real bytes-on-disk - not `du`'s block-rounded size, a
  * plain sum of `stat().size` across every regular file. Good enough for
  * "which area is using space," not meant to match `du` exactly. */
 function dirSizeBytes(dir: string): number {
-  if (!existsSync(dir)) return 0;
   let total = 0;
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) total += dirSizeBytes(path);
-    else if (entry.isFile()) total += statSync(path).size;
-  }
+  walkFiles(dir, (path) => {
+    total += statSync(path).size;
+  });
   return total;
 }
 

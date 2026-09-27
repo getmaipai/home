@@ -40,6 +40,7 @@ import { checkSearxngHealth } from "@/lib/searxngHealth";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
 import { trigger } from "@/lib/notifications";
 import { checkDiskFull } from "@/lib/storage";
+import { reconcileFileStore } from "@/lib/storage/usage";
 import { checkForAppUpdate } from "@/lib/updates";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { stackUpdatesEnabled, checkStackUpdates, runStackReadinessCheck, sweepStackStorage } from "@/lib/stackUpdates";
@@ -244,6 +245,12 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "storage.check_disk_full": () => {
     checkDiskFull();
+  },
+  // STORE-CAP-01: bytes on disk with no File record, or a record with no
+  // bytes - reported as a health item, never purged (lib/storage/usage.ts's
+  // reconcileFileStore()).
+  "storage.reconcile_files": () => {
+    reconcileFileStore();
   },
   "updates.check": async () => {
     await checkForAppUpdate();
