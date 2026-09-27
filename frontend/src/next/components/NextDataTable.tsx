@@ -3,12 +3,12 @@ import { getIcon } from "@maipai/ui/src/icons";
 import type { PropertyAction } from "@maipai/ui/src/blocks/property-panel/PropertyPanel";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/dashboard/components/ui/table";
-import { hitArea } from "@maipai/ui/src/utils";
 
 const ArrowDown = getIcon("arrow-down");
 const ArrowUp = getIcon("arrow-up");
@@ -29,16 +29,18 @@ export function NextDataTable<T extends Record<string, unknown>>({
   data,
   emptyMessage = "No data available.",
   rowActions,
+  rowKey,
 }: {
   data: readonly T[];
   emptyMessage?: string;
   rowActions?: (row: T) => PropertyAction[];
+  rowKey?: (row: T) => string;
 }) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sort, setSort] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(5);
-  const [confirmAction, setConfirmAction] = useState<{ row: T; action: PropertyAction } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ key: string; action: PropertyAction } | null>(null);
   const pageSizeId = useId();
   const columns = useMemo(() => data[0] ? Object.keys(data[0]) : [], [data]);
   const filteredData = useMemo(() => {
@@ -136,8 +138,11 @@ export function NextDataTable<T extends Record<string, unknown>>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length > 0 ? rows.map((row, index) => (
-              <TableRow key={index} className="border-border hover:bg-muted/30">
+            {rows.length > 0 ? rows.map((row, index) => {
+              const actionsForRow = rowActions?.(row) ?? [];
+              const actionKey = rowKey?.(row) ?? String(currentPage * pageSize + index);
+              return (
+              <TableRow key={actionKey} className="border-border hover:bg-muted/30">
                 {columns.map((key) => (
                   <TableCell key={key} className="text-sm text-foreground">
                     {row[key] === null || row[key] === undefined ? "-" : String(row[key])}
@@ -145,20 +150,21 @@ export function NextDataTable<T extends Record<string, unknown>>({
                 ))}
                 {rowActions && <TableCell className="w-10 p-1 text-right">
                   <DropdownMenu>
-                    <DropdownMenuTrigger aria-label="More actions" className={`inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring ${hitArea(3)}`}>
-                      <MoreHorizontal aria-hidden="true" className="size-4" />
-                    </DropdownMenuTrigger>
+                    <DropdownMenuTrigger render={
+                      <Button type="button" variant="ghost" size="icon-lg" aria-label="More actions">
+                        <MoreHorizontal aria-hidden="true" className="size-4" />
+                      </Button>
+                    } />
                     <DropdownMenuContent align="end">
-                      {rowActions(row).map((action, actionIndex) => (
+                      {actionsForRow.map((action, actionIndex) => (
                         <Fragment key={action.label}>
-                          {actionIndex > 0 && action.destructive && <DropdownMenuSeparator />}
+                          {actionIndex > 0 && Boolean(action.destructive) !== Boolean(actionsForRow[actionIndex - 1]?.destructive) && <DropdownMenuSeparator />}
                           <DropdownMenuItem
                             variant={action.destructive ? "destructive" : "default"}
                             disabled={action.disabled}
-                            onClick={(event) => {
+                            onClick={() => {
                               if (action.destructive) {
-                                event.preventDefault();
-                                setConfirmAction({ row, action });
+                                setPendingAction({ key: actionKey, action });
                               } else {
                                 void action.onClick();
                               }
@@ -168,18 +174,12 @@ export function NextDataTable<T extends Record<string, unknown>>({
                           </DropdownMenuItem>
                         </Fragment>
                       ))}
-                      {confirmAction?.row === row && <div className="max-w-56 border-t bg-popover p-2 text-xs">
-                        <p>{confirmAction.action.confirmLabel ?? `${confirmAction.action.label} this item?`}</p>
-                        <div className="mt-2 flex justify-end gap-2">
-                          <button type="button" className="text-muted-foreground" onClick={() => setConfirmAction(null)}>Cancel</button>
-                          <button type="button" className="font-medium text-destructive" onClick={async () => { await confirmAction.action.onClick(); setConfirmAction(null); }}>Confirm</button>
-                        </div>
-                      </div>}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>}
               </TableRow>
-            )) : (
+              );
+            }) : (
               <TableRow>
                 <TableCell colSpan={Math.max(columns.length + (rowActions ? 1 : 0), 1)} className="py-6 text-center text-sm text-muted-foreground">
                   No results found.
@@ -189,6 +189,24 @@ export function NextDataTable<T extends Record<string, unknown>>({
           </TableBody>
         </Table>
       </div>
+      <AlertDialog
+        open={pendingAction !== null}
+        onOpenChange={(open) => { if (!open) setPendingAction(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pendingAction?.action.label}</AlertDialogTitle>
+            <AlertDialogDescription>{pendingAction?.action.confirmLabel ?? `Are you sure you want to ${pendingAction?.action.label.toLocaleLowerCase()} this item?`}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={async () => {
+              if (pendingAction) await pendingAction.action.onClick();
+              setPendingAction(null);
+            }}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="flex flex-col items-center justify-between gap-4 px-4 pb-4 sm:flex-row">
         <div className="flex gap-2">
           <Button type="button" variant="secondary" disabled={currentPage === 0} onClick={() => setPageIndex((page) => Math.max(0, page - 1))}>Previous</Button>

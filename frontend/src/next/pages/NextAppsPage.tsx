@@ -72,6 +72,7 @@ export function NextAppsPage({ person }: { person: Roster }) {
           </CardHeader>
           <NextDataTable
             data={rows.map(toRow)}
+            rowKey={(row) => row.id}
             rowActions={(row) => [{
               label: "Remove",
               destructive: true,

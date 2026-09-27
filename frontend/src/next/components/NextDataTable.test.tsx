@@ -66,6 +66,49 @@ describe("NextDataTable", () => {
     await waitFor(() => expect(onClick).toHaveBeenCalledTimes(1));
   });
 
+  test("destructive confirmation is a dialog outside the menu and Cancel clears it", async () => {
+    const onClick = mock(() => {});
+    const view = render(<NextDataTable data={[{ id: "nova", name: "Nova" }]} rowKey={(row) => String(row.id)} rowActions={() => [{ label: "Remove", destructive: true, onClick }]} />);
+    fireEvent.click(view.getByRole("button", { name: "More actions" }));
+    fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Remove" }));
+
+    const dialog = await within(document.body).findByRole("alertdialog");
+    expect(dialog.closest('[role="menu"]')).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Confirm" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(view.getByRole("button", { name: "More actions" }));
+    expect(await within(document.body).findByRole("menuitem", { name: "Remove" })).toBeTruthy();
+    expect(view.queryByRole("alertdialog")).toBeNull();
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  test("a stable rowKey keeps the pending action through replacement row objects", async () => {
+    const onClick = mock(() => {});
+    const rowActions = () => [{ label: "Remove", destructive: true, onClick }];
+    const view = render(<NextDataTable data={[{ id: "nova", name: "Nova" }]} rowKey={(row) => String(row.id)} rowActions={rowActions} />);
+    fireEvent.click(view.getByRole("button", { name: "More actions" }));
+    fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Remove" }));
+    expect(await within(document.body).findByRole("alertdialog")).toBeTruthy();
+
+    view.rerender(<NextDataTable data={[{ id: "nova", name: "Nova" }]} rowKey={(row) => String(row.id)} rowActions={rowActions} />);
+    expect(view.getByRole("alertdialog")).toBeTruthy();
+  });
+
+  test("separates each transition between regular and destructive actions", async () => {
+    const actions = [
+      { label: "Open", onClick: () => {} },
+      { label: "Remove", destructive: true, onClick: () => {} },
+      { label: "Archive", destructive: true, onClick: () => {} },
+      { label: "Details", onClick: () => {} },
+    ];
+    const view = render(<NextDataTable data={[{ name: "Nova" }]} rowActions={() => actions} />);
+    fireEvent.click(view.getByRole("button", { name: "More actions" }));
+    await within(document.body).findByRole("menuitem", { name: "Details" });
+    expect(document.querySelectorAll('[data-slot="dropdown-menu-separator"]')).toHaveLength(2);
+  });
+
   test("row actions omitted means no Actions column or action button", () => {
     const view = render(<NextDataTable data={[{ name: "Nova" }]} />);
     expect(view.queryByRole("columnheader", { name: "Actions" })).toBeNull();
