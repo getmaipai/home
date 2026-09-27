@@ -27,6 +27,8 @@ import { newShareId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { canAccessFile, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
 import { toRecord } from "@/lib/attachments";
+import { trigger } from "@/lib/notifications";
+import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { PersonRow } from "@/types";
 
@@ -91,7 +93,60 @@ export function createShare(actor: PersonRow, input: CreateShareInput): ShareOpR
     hlc: nextHlc(),
   };
   db.insert(shares).values(row).run();
+  notifyShareCreated(actor, to, file);
   return { ok: true, value: toShareRecord(row) };
+}
+
+/** A plain-language phrase for each File.kind, for the notification
+ * template below - grammatical ("a photo", "an audio clip") rather than
+ * the raw enum value, kept here as the one place that needs to know
+ * that mapping. */
+const KIND_PHRASES: Record<FileRecord["kind"], string> = {
+  image: "a photo",
+  video: "a video",
+  audio: "an audio clip",
+  document: "a document",
+  story: "a story",
+  other: "a file",
+};
+
+/** Fires NOTIFY-SHARE-01's declared type for a genuinely new share
+ * pointer - never for the idempotent "already shared with this target"
+ * return above `createShare` takes before reaching this call, since
+ * nothing new happened there. Fire-and-forget, the same
+ * `trackBackgroundWork(trigger(...).catch(...))` shape lib/notifications.ts's
+ * own `notifyIfFlagged()` uses to fire a declared type from a
+ * synchronous caller: `createShare` must never fail, or gain latency,
+ * because a notification attempt did. `to === "household"` fires
+ * `file.shared_with_household` (the `household` audience fans it out to
+ * everyone in resolveRecipients(), so `excludePersonId: actor.id` drops
+ * the sharer's own copy - a code review, 2026-09-27, caught the first
+ * cut of this notifying the sharer about their own share); any other
+ * `to` is already a validated person id at this point
+ * (`isValidShareTarget` above), so it fires `file.shared_with_you`
+ * straight at that one person - no exclusion needed there, since that
+ * one recipient is named directly by `personId`, never derived from
+ * "everyone." */
+function notifyShareCreated(actor: PersonRow, to: string, file: typeof attachments.$inferSelect): void {
+  // A code review (2026-09-27) found this had no fallback for a kind
+  // value the map doesn't list - `Record<FileRecord["kind"], string>`
+  // only guarantees exhaustiveness against today's type declaration, not
+  // against whatever toRecord() actually returns at runtime.
+  const kindPhrase = KIND_PHRASES[toRecord(file).kind] ?? "a file";
+  const vars = { fromDisplayName: actor.displayName, kindPhrase };
+  if (to === "household") {
+    trackBackgroundWork(
+      trigger("file.shared_with_household", vars, { subjectPersonId: actor.id, excludePersonId: actor.id }).catch((err: unknown) =>
+        console.error(`[shares] file.shared_with_household notification failed: ${(err as Error).message}`),
+      ),
+    );
+  } else {
+    trackBackgroundWork(
+      trigger("file.shared_with_you", vars, { personId: to, subjectPersonId: actor.id }).catch((err: unknown) =>
+        console.error(`[shares] file.shared_with_you notification failed: ${(err as Error).message}`),
+      ),
+    );
+  }
 }
 
 /** Unshare: a real delete, not a soft revoke (share.schema.json's own

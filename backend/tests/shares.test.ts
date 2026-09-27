@@ -10,6 +10,8 @@ import { conversationTurns } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { eq } from "drizzle-orm";
+import { listPending } from "@/lib/notifications";
+import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 
 beforeEach(() => resetDb());
 
@@ -238,6 +240,170 @@ describe("re-share cascade on unshare", () => {
     expect(removed.ok).toBe(true);
     if (removed.ok) expect(removed.value.deletedShareIds).toEqual([householdShare.value.id]);
     expect(listFilesVisibleToActor(marlow).some((row) => row.file.id === file.id)).toBe(true);
+  });
+});
+
+describe("sharing notifies (NOTIFY-SHARE-01, docs/plans/people-profile-2026-09-26.md)", () => {
+  test("sharing with a named person fires file.shared_with_you to them only - not the household, not a third person", async () => {
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    const marlow = person("adult", "Marlow");
+    const file = uploadFile(ownerPerson);
+
+    expect(createShare(ownerPerson, { fileId: file.id, to: lucia.id }).ok).toBe(true);
+    await __drainBackgroundWorkForTests();
+
+    const luciaPending = listPending(lucia);
+    expect(luciaPending.length).toBe(1);
+    expect(luciaPending[0]!.typeId).toBe("file.shared_with_you");
+    expect(luciaPending[0]!.text).toBe("Sage shared a photo with you.");
+    expect(luciaPending[0]!.toast).toBe(false);
+
+    expect(listPending(marlow).length).toBe(0);
+    // The sharer isn't the "person" audience's own target, so they get
+    // no delivery about their own action either.
+    expect(listPending(ownerPerson).length).toBe(0);
+  });
+
+  test("sharing with the household fires file.shared_with_household to everyone reachable, age no bar", async () => {
+    const ownerPerson = await owner();
+    const bramble = person("child", "Bramble");
+    const marlow = person("adult", "Marlow");
+    const file = uploadFile(ownerPerson);
+
+    expect(createShare(ownerPerson, { fileId: file.id, to: "household" }).ok).toBe(true);
+    await __drainBackgroundWorkForTests();
+
+    for (const recipient of [bramble, marlow]) {
+      const pending = listPending(recipient);
+      expect(pending.length).toBe(1);
+      expect(pending[0]!.typeId).toBe("file.shared_with_household");
+      expect(pending[0]!.text).toBe("Sage shared a photo with the household.");
+      expect(pending[0]!.toast).toBe(false);
+    }
+
+    // The sharer is an active household member too, so resolveRecipients()'s
+    // "household" branch would otherwise return them along with everyone
+    // else - a code review (2026-09-27) caught the first cut of this
+    // telling Sage that Sage shared a photo with the household.
+    expect(listPending(ownerPerson).length).toBe(0);
+  });
+
+  test("a direct share to one person never fires the household type to a bystander, and vice versa - the two types are independent", async () => {
+    // marlow is neither the direct share's own recipient nor (in this
+    // test) ever named by a household share, so marlow is the clean
+    // check: lucia herself would legitimately collect BOTH types once a
+    // separate household share also happens (she's an active household
+    // member too, same as anyone else) - that's correct fan-out, not a
+    // leak, so it isn't what this test pins.
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    const marlow = person("adult", "Marlow");
+    const directFile = uploadFile(ownerPerson, "direct-share bytes");
+
+    expect(createShare(ownerPerson, { fileId: directFile.id, to: lucia.id }).ok).toBe(true);
+    await __drainBackgroundWorkForTests();
+
+    expect(listPending(lucia).map((d) => d.typeId)).toEqual(["file.shared_with_you"]);
+    expect(listPending(marlow).length).toBe(0); // no household share happened, so marlow gets neither type
+
+    const householdFile = uploadFile(ownerPerson, "household-share bytes");
+    expect(createShare(ownerPerson, { fileId: householdFile.id, to: "household" }).ok).toBe(true);
+    await __drainBackgroundWorkForTests();
+
+    // marlow now gets file.shared_with_household from the household
+    // share, and only that - never file.shared_with_you, which was
+    // never fired at (or about) marlow at all.
+    expect(listPending(marlow).map((d) => d.typeId)).toEqual(["file.shared_with_household"]);
+  });
+
+  test("re-sharing to an already-shared target (the idempotent return) does not fire a second notification", async () => {
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    const file = uploadFile(ownerPerson);
+
+    expect(createShare(ownerPerson, { fileId: file.id, to: lucia.id }).ok).toBe(true);
+    expect(createShare(ownerPerson, { fileId: file.id, to: lucia.id }).ok).toBe(true); // same target again
+    await __drainBackgroundWorkForTests();
+
+    expect(listPending(lucia).length).toBe(1);
+  });
+
+  // Both types are configurable (notificationTypes.ts) with no telegram
+  // in their own defaultChannels - matching memory.updated's own
+  // posture. Both now also have a real settings-registry toggle key
+  // (notifications.file.shared_with_you.telegram /
+  // notifications.file.shared_with_household.telegram, settings/
+  // notificationKeys.ts, NOTIFY-SHARE-01's follow-up), defaulting to
+  // false the same way notifications.model.download_ready.telegram
+  // does - so a household with Telegram fully configured and linked
+  // still never gets either on Telegram until a person opts in,
+  // proving neither type spams a channel it hasn't been turned on for,
+  // and that the two never affect each other's channel set.
+  test("neither type sends Telegram by default, even with Telegram fully configured and linked", async () => {
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    const file = uploadFile(ownerPerson);
+    setHouseholdSettingValue("notifications.telegram.bot_token", "test-token");
+
+    const originalFetch = globalThis.fetch;
+    let sawCall = false;
+    globalThis.fetch = ((..._args: unknown[]) => {
+      sawCall = true;
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      expect(createShare(ownerPerson, { fileId: file.id, to: lucia.id }).ok).toBe(true);
+      expect(createShare(ownerPerson, { fileId: file.id, to: "household" }).ok).toBe(true);
+      await __drainBackgroundWorkForTests();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(sawCall).toBe(false);
+    const luciaPending = listPending(lucia);
+    expect(luciaPending.length).toBe(2); // one from the direct share, one from the household fan-out
+    for (const delivery of luciaPending) expect(delivery.channels).toEqual(["in_app"]);
+  });
+
+  // The settings-registry gap NOTIFY-SHARE-01's follow-up closes: a real
+  // notifications.file.shared_with_you.telegram key (spec-v0.1.47) that
+  // a person can actually flip on, mirroring
+  // notifications.model.download_ready.telegram's own toggle-on test in
+  // tests/notifications.test.ts. The sibling household type is left off
+  // to prove it stays independent (same as the test above).
+  test("a person can turn on Telegram for file.shared_with_you, and it fires only for that type", async () => {
+    const { setHouseholdSettingValue, setValue } = await import("@/lib/settings");
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    const file = uploadFile(ownerPerson);
+    setHouseholdSettingValue("notifications.telegram.bot_token", "test-token");
+    expect(setValue(lucia, `person:${lucia.id}`, "notifications.telegram.chat_id", "12345").ok).toBe(true);
+    expect(setValue(lucia, `person:${lucia.id}`, "notifications.file.shared_with_you.telegram", true).ok).toBe(true);
+
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = ((url: string) => {
+      calls++;
+      expect(url).toContain("api.telegram.org/bottest-token/sendMessage");
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      expect(createShare(ownerPerson, { fileId: file.id, to: lucia.id }).ok).toBe(true);
+      expect(createShare(ownerPerson, { fileId: file.id, to: "household" }).ok).toBe(true);
+      await __drainBackgroundWorkForTests();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(calls).toBe(1); // only the direct share fired Telegram
+    const luciaPending = listPending(lucia);
+    expect(luciaPending.length).toBe(2);
+    const directDelivery = luciaPending.find((d) => d.typeId === "file.shared_with_you")!;
+    const householdDelivery = luciaPending.find((d) => d.typeId === "file.shared_with_household")!;
+    expect(directDelivery.channels).toEqual(["in_app", "telegram"]);
+    expect(householdDelivery.channels).toEqual(["in_app"]); // never opted in, stays in_app-only
   });
 });
 

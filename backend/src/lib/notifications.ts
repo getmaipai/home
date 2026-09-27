@@ -114,6 +114,14 @@ export interface TriggerOptions {
    * about (what `remember()`/`supersede()` returned), so chatMemoryChip.tsx
    * has real ids to link to (`/memory?ids=...`) without a second query. */
   memoryIds?: readonly string[];
+  /** NOTIFY-SHARE-01: drops one person from the resolved recipient list
+   * after audience resolution - for a `household` (or `adults`) audience
+   * type fired BY one of its own members about their own action (a
+   * share to "household"), so the person who just did the thing doesn't
+   * also get told they did it. Never needed for a `person`-audience
+   * type, whose one recipient is already named by `personId`, not
+   * derived from "everyone." */
+  excludePersonId?: string;
 }
 
 /** Renders and delivers one declared notification to its whole audience.
@@ -129,7 +137,14 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
     console.error(`[notifications] trigger() called with an undeclared type: ${typeId}`);
     return;
   }
-  const recipients = resolveRecipients(type, opts.personId);
+  // A code review (2026-09-27) found this applying unconditionally: a
+  // future `person`-audience caller passing `excludePersonId ===
+  // personId` would silently zero out its own one resolved recipient.
+  // Scoped to `household`/`adults` (the only audiences it's meant for,
+  // per this option's own doc comment) so a `person`-audience type's one
+  // named recipient is never touched by it.
+  const resolved = resolveRecipients(type, opts.personId);
+  const recipients = type.audience === "person" ? resolved : resolved.filter((r) => r.id !== opts.excludePersonId);
   const text = renderTemplate(type.template, vars);
 
   for (const recipient of recipients) {
