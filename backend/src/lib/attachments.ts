@@ -5,10 +5,14 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
 import { and, eq, inArray } from "drizzle-orm";
-import { Attachment, type Attachment as AttachmentRecord } from "@maipai/spec/gen/ts/attachment.js";
+// Renamed from the `File` export to `FileRecordSchema` locally: `File` is a
+// Bun/Fetch global (the Web API type for a multipart upload), so importing
+// the spec's zod object under that bare name would shadow it everywhere in
+// this module.
+import { File as FileRecordSchema, type File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import { db, sqlite } from "@/db";
 import { attachments, conversationTurns, conversations } from "@/db/schema";
-import { newAttachmentId } from "@/lib/id";
+import { newFileId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
@@ -27,7 +31,7 @@ export interface CreateAttachmentInput {
 
 /** Resolve only a normalized, relative attachment path below dataDir. */
 export function attachmentFilePath(storagePath: string): string {
-  const parsed = Attachment.shape.storage_path.safeParse(storagePath);
+  const parsed = FileRecordSchema.shape.storage_path.safeParse(storagePath);
   const normalized = typeof storagePath === "string" ? normalize(storagePath).replaceAll("\\", "/") : "";
   if (!parsed.success || normalized !== storagePath) {
     throw new Error("invalid attachment storage path");
@@ -50,18 +54,48 @@ function storagePathFor(ownerPersonId: string, id: string): string {
   return storagePath;
 }
 
-function toRecord(row: typeof attachments.$inferSelect): AttachmentRecord {
-  const parsed = Attachment.safeParse({
+// STORE-SPEC-01: `kind` is a new required field the old attachment record
+// never carried, so nothing here previously classified a media type. This
+// module only ever handles origin "sent" (a composer upload), so it only
+// needs image/video/audio/other; it deliberately does not fold in
+// documentExtraction.ts's own DOCUMENT_MEDIA_TYPES (a PDF or office file
+// currently lands in "other", not "document") since that module already
+// imports FROM this one (readAttachment) - reaching back for its list
+// would be a circular import, and duplicating the list here would be a
+// second copy of the same classification. Flagged in the migration report
+// as a real gap, not silently guessed past.
+function kindForMediaType(mediaType: string): FileRecord["kind"] {
+  if (mediaType.startsWith("image/")) return "image";
+  if (mediaType.startsWith("video/")) return "video";
+  if (mediaType.startsWith("audio/")) return "audio";
+  return "other";
+}
+
+function toRecord(row: typeof attachments.$inferSelect): FileRecord {
+  const parsed = FileRecordSchema.safeParse({
     id: row.id,
     owner_person_id: row.ownerPersonId,
-    conversation_id: row.conversationId,
-    turn_id: row.turnId,
+    // Every attachment this module creates is a chat upload - the old
+    // record's only case, and the one origin value that applies here.
+    origin: "sent",
+    kind: kindForMediaType(row.mediaType),
     media_type: row.mediaType,
     size: row.size,
     sha256: row.sha256,
     storage_path: row.storagePath,
     retention: row.retention,
-    provenance: row.provenance,
+    // STORE-SPEC-01: conversation_id/turn_id moved off the top level into
+    // provenance, which also gained package_id/job_id/requested_by_person_id
+    // (never set here - none of those origins apply to a sent upload) and
+    // note (the old free-text provenance column, unchanged in meaning).
+    provenance: {
+      conversation_id: row.conversationId,
+      turn_id: row.turnId,
+      package_id: null,
+      job_id: null,
+      requested_by_person_id: null,
+      note: row.provenance,
+    },
     created_at: row.createdAt,
     hlc: row.hlc,
   });
@@ -80,7 +114,7 @@ function removeFile(storagePath: string): void {
 }
 
 /** Save an upload only when its conversation and turn both belong to actor. */
-export function createAttachment(actor: PersonRow, input: CreateAttachmentInput): AttachmentOpResult<AttachmentRecord> {
+export function createAttachment(actor: PersonRow, input: CreateAttachmentInput): AttachmentOpResult<FileRecord> {
   const context = db
     .select({ conversationId: conversations.id, turnId: conversationTurns.id })
     .from(conversationTurns)
@@ -97,12 +131,12 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   if (!context) return { ok: false, status: 404, error: "conversation turn not found" };
 
   const mediaType = input.mediaType.trim().toLowerCase();
-  const parsedMediaType = Attachment.shape.media_type.safeParse(mediaType);
+  const parsedMediaType = FileRecordSchema.shape.media_type.safeParse(mediaType);
   if (!parsedMediaType.success) return { ok: false, status: 400, error: "invalid attachment media type" };
   const provenance = (input.provenance ?? "composer:upload").trim();
   if (!provenance) return { ok: false, status: 400, error: "attachment provenance is required" };
 
-  const id = newAttachmentId();
+  const id = newFileId();
   const storagePath = storagePathFor(actor.id, id);
   const filePath = attachmentFilePath(storagePath);
   const directory = resolve(attachmentsDir, actor.id, "attachments");
@@ -140,14 +174,14 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
 }
 
 /** Return an attachment only to the person who uploaded it. */
-export function getAttachment(actor: PersonRow, id: string): AttachmentOpResult<AttachmentRecord> {
+export function getAttachment(actor: PersonRow, id: string): AttachmentOpResult<FileRecord> {
   const row = db.select().from(attachments).where(and(eq(attachments.id, id), eq(attachments.ownerPersonId, actor.id))).get();
   if (!row) return { ok: false, status: 404, error: "attachment not found" };
   return { ok: true, value: toRecord(row) };
 }
 
 /** Read and integrity-check the local bytes for an owned attachment. */
-export function readAttachment(actor: PersonRow, id: string): AttachmentOpResult<{ record: AttachmentRecord; bytes: Uint8Array }> {
+export function readAttachment(actor: PersonRow, id: string): AttachmentOpResult<{ record: FileRecord; bytes: Uint8Array }> {
   const found = getAttachment(actor, id);
   if (!found.ok) return found;
   try {

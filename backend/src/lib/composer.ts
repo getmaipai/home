@@ -294,20 +294,20 @@ function documentOutcome(outcome: Succeeded): DocumentOutcome | null {
   const root = recordData(outcome.result?.data);
   const page = root && recordData(root.page);
   const data = root && root.type === "document" ? root : page;
-  if (!data || data.type !== "document" || typeof data.attachment_id !== "string" || !/^att-[a-z0-9]{6,}$/.test(data.attachment_id) || !Array.isArray(data.chunks)) return null;
+  if (!data || data.type !== "document" || typeof data.file_id !== "string" || !/^file-[a-z0-9]{6,}$/.test(data.file_id) || !Array.isArray(data.chunks)) return null;
   const chunks: DocumentOutcome["chunks"] = [];
   let total = 0;
   for (const raw of data.chunks.slice(0, MAX_DOCUMENT_CHUNKS)) {
     const chunk = recordData(raw);
     const text = chunk && typeof chunk.text === "string" ? chunk.text.trim() : "";
     const page = chunk && typeof chunk.page === "number" ? chunk.page : NaN;
-    if (!chunk || chunk.attachment_id !== data.attachment_id || !Number.isInteger(page) || page < 1 || !text) continue;
+    if (!chunk || chunk.file_id !== data.file_id || !Number.isInteger(page) || page < 1 || !text) continue;
     const bounded = text.slice(0, MAX_DOCUMENT_CHUNK_CHARS);
     if (total + bounded.length > MAX_DOCUMENT_CONTEXT_CHARS) break;
-    chunks.push({ attachment_id: data.attachment_id, page, text: bounded });
+    chunks.push({ file_id: data.file_id, page, text: bounded });
     total += bounded.length;
   }
-  return chunks.length > 0 ? { type: "document", attachment_id: data.attachment_id, chunks } : null;
+  return chunks.length > 0 ? { type: "document", file_id: data.file_id, chunks } : null;
 }
 
 function documentSource(outcome: Succeeded, chunk: DocumentOutcome["chunks"][number]): Source {
@@ -319,7 +319,7 @@ function documentSource(outcome: Succeeded, chunk: DocumentOutcome["chunks"][num
     id: `src-${randomSuffix(10)}`,
     kind: "package",
     title: pageTitle ?? `Document page ${chunk.page}`,
-    url: pageUrl ?? `attachment://${chunk.attachment_id}/page/${chunk.page}`,
+    url: pageUrl ?? `attachment://${chunk.file_id}/page/${chunk.page}`,
     site: pageUrl ? new URL(pageUrl).hostname.replace(/^www\./, "") : "MaiPai Home",
     snippet: chunk.text.slice(0, 300),
     source: outcome.callId,
@@ -387,11 +387,11 @@ function documentSection(outcome: Succeeded, sourceList: readonly Source[]): Ext
   const rendered = chunks.flatMap((chunk) => {
     const data = recordData(outcome.result?.data);
     const page = data && recordData(data.page);
-    const url = page && typeof page.url === "string" ? page.url : `attachment://${chunk.attachment_id}/page/${chunk.page}`;
+    const url = page && typeof page.url === "string" ? page.url : `attachment://${chunk.file_id}/page/${chunk.page}`;
     const source = sourceList.find((candidate) => candidate.url === url);
-    return source ? [{ attachment_id: chunk.attachment_id, page: chunk.page, text: chunk.text, source_id: source.id }] : [];
+    return source ? [{ file_id: chunk.file_id, page: chunk.page, text: chunk.text, source_id: source.id }] : [];
   });
-  return rendered.length > 0 ? { type: "document", attachment_id: document.attachment_id, chunks: rendered } : null;
+  return rendered.length > 0 ? { type: "document", file_id: document.file_id, chunks: rendered } : null;
 }
 
 function stringList(value: unknown): string[] {

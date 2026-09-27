@@ -263,11 +263,11 @@ export function startFakeSearxng(): FakeSearxng {
   const url = `http://127.0.0.1:${server.port}`;
   const page: PageReadResult = {
     type: "document",
-    attachment_id: "att-page-fake001",
+    file_id: "file-page-fake001",
     url: "https://example.com/page",
     title: "Vendor support page",
     text: "The latest driver fix is in the download section. The current price is 349 dollars.",
-    chunks: [{ attachment_id: "att-page-fake001", page: 1, text: "The latest driver fix is in the download section. The current price is 349 dollars." }],
+    chunks: [{ file_id: "file-page-fake001", page: 1, text: "The latest driver fix is in the download section. The current price is 349 dollars." }],
     links: [
       { title: "Download latest game driver", href: "https://example.com/downloads/latest-driver", rel: "nofollow", surrounding_text: "Download latest game driver" },
       { title: "Support and fixes", href: "https://example.com/support/fixes", rel: null, surrounding_text: "Support and fixes" },

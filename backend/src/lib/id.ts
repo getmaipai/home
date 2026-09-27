@@ -139,9 +139,10 @@ export function newEpisodeId(): string {
   return `ep-${randomSuffix(10)}`;
 }
 
-/** Matches spec/schemas/attachment.schema.json's `^att-[a-z0-9]{6,}$`. */
-export function newAttachmentId(): string {
-  return `att-${randomSuffix(10)}`;
+/** Matches spec/schemas/file.schema.json's `^file-[a-z0-9]{6,}$` (STORE-SPEC-01:
+ * the old attachment.schema.json generalized into file.schema.json). */
+export function newFileId(): string {
+  return `file-${randomSuffix(10)}`;
 }
 
 /** Matches spec/schemas/artifact.schema.json's `^art-[a-z0-9]{6,}$`. A new

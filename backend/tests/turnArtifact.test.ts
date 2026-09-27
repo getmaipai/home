@@ -37,7 +37,7 @@ const ATTACHMENT_ARTIFACT = TurnArtifact.parse({
   turn_id: "turn-attachment123",
   revision: 1,
   evidence_version: "outcome-attachment1",
-  section: { type: "document", attachment_id: "att-example123", chunks: [{ attachment_id: "att-example123", page: 1, text: "A locally retained page.", source_id: "src-attachment123" }] },
+  section: { type: "document", file_id: "file-example123", chunks: [{ file_id: "file-example123", page: 1, text: "A locally retained page.", source_id: "src-attachment123" }] },
   sources: [{ id: "src-attachment123", kind: "package", title: "Attachment page 1", url: "attachment://att-example123/page/1", site: "MaiPai Home", snippet: "A locally retained page.", source: "turn-attachment123", created_at: "2026-09-16T00:00:00.000Z", hlc: "1789516800000:0:abc123" }],
   provenance: "composer:turn-attachment123:document",
   created_at: "2026-09-16T00:00:00.000Z",

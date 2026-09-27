@@ -6,7 +6,9 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Subprocess } from "bun";
-import { Attachment } from "@maipai/spec/gen/ts/attachment.js";
+// Renamed to FileRecordSchema locally: `File` is a Bun/Fetch global, so
+// importing the spec's zod object under that bare name would shadow it.
+import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
 import { readAttachment } from "@/lib/attachments";
 import type { PersonRow } from "@/types";
 
@@ -62,7 +64,7 @@ export function __setRapidOcrRunnerForTests(runner: OcrRunner | null): void {
 
 function normalizeMediaType(mediaType: string): string | null {
   const normalized = mediaType.trim().toLowerCase();
-  return Attachment.shape.media_type.safeParse(normalized).success ? normalized : null;
+  return FileRecordSchema.shape.media_type.safeParse(normalized).success ? normalized : null;
 }
 
 function isSupportedDocument(mediaType: string): boolean {

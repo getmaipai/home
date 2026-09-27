@@ -139,17 +139,19 @@ export interface ToolExecutionOutcome {
 }
 
 /** ATT-01c: the bounded, retained input to COMP-01's document builder.
- * Chunks carry only attachment identity, page and extracted text. The
- * composer adds a source id when it turns them into a details artifact. */
+ * Chunks carry only file identity, page and extracted text. The
+ * composer adds a source id when it turns them into a details artifact.
+ * STORE-SPEC-01: field renamed from attachment_id to file_id, matching
+ * turn-artifact.schema.json's own document section rename. */
 export interface DocumentChunk {
-  attachment_id: string;
+  file_id: string;
   page: number;
   text: string;
 }
 
 export interface DocumentOutcome {
   type: "document";
-  attachment_id: string;
+  file_id: string;
   chunks: DocumentChunk[];
 }
 
