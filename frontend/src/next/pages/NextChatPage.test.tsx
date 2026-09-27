@@ -2263,7 +2263,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       hlc: "1788000000000:0:testnode",
       created_at: "2026-09-27T00:00:00.000Z",
       updated_at: "2026-09-27T00:00:00.000Z",
-      settings: undefined as { thinking?: boolean; read_aloud?: boolean } | undefined,
+      settings: undefined as { thinking?: boolean; model?: string; read_aloud?: boolean } | undefined,
     };
     let turnCount = 0;
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -2278,6 +2278,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       }
       if (url.endsWith(`/api/conversations/${saved.id}/turns`)) return Promise.resolve(Response.json([]));
       if (url.endsWith(`/api/conversations/${saved.id}/resume`) && method === "POST") return Promise.resolve(Response.json(saved));
+      if (url.endsWith(`/api/conversations/${saved.id}`) && method !== "PATCH") return Promise.resolve(Response.json(saved));
       if (url.endsWith(`/api/conversations/${saved.id}`) && method === "PATCH") {
         const body = JSON.parse(String(init?.body)) as { settings: Record<string, unknown> };
         saved.settings = { ...(saved.settings ?? {}), ...body.settings };
@@ -2310,19 +2311,24 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       fireEvent.click(trigger());
       fireEvent.click(menuItems()[1]!);
       await waitFor(() => expect(saved.settings).toEqual({ thinking: true }));
+      fireEvent.click(trigger());
+      fireEvent.click(await first.findByText("Fast"));
+      await waitFor(() => expect(saved.settings).toEqual({ thinking: true, model: "fast.gguf" }));
       const actions = first.getByRole("button", { name: "Conversation actions" });
       act(() => {
         fireEvent.pointerDown(actions, { button: 0, ctrlKey: false, pointerId: 1 });
         fireEvent.click(actions);
       });
       fireEvent.click(await first.findByText("Read replies aloud"));
-      await waitFor(() => expect(saved.settings).toEqual({ thinking: true, read_aloud: true }));
+      await waitFor(() => expect(saved.settings).toEqual({ thinking: true, model: "fast.gguf" }));
+      await waitFor(() => expect(saved.settings).toEqual({ thinking: true, model: "fast.gguf", read_aloud: true }));
       first.unmount();
 
       const reopened = page();
       await reopened.findByLabelText("Message input");
       await waitFor(() => expect(reopened.getByRole("button", { name: "Conversation actions" })).toBeTruthy());
-      await waitFor(() => expect(trigger()).toHaveTextContent("Thinking"));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Fast"));
+      expect(trigger()).toHaveTextContent("Thinking");
       const reopenedActions = reopened.getByRole("button", { name: "Conversation actions" });
       act(() => {
         fireEvent.pointerDown(reopenedActions, { button: 0, ctrlKey: false, pointerId: 1 });
@@ -2336,6 +2342,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
         .map((call: unknown[]) => ({ url: typeof call[0] === "string" ? call[0] : String(call[0]), init: call[1] as RequestInit | undefined }))
         .find(({ url }) => url.includes("/api/turn/stream"));
       expect(JSON.parse(String(turn?.init?.body)).thinking).toBe(true);
+      expect(JSON.parse(String(turn?.init?.body)).model).toBe("fast.gguf");
     } finally {
       globalThis.fetch = original;
     }
@@ -2574,6 +2581,69 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("model choice saves for a new conversation, reloads, and follows each conversation", async () => {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    const conversations: Record<string, { id: string; settings?: { model?: string } }> = {
+      "conv-model-a": { id: "conv-model-a" },
+      "conv-model-b": { id: "conv-model-b", settings: { model: "family.gguf" } },
+    };
+    let turnCount = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = init?.method ?? "GET";
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
+      if (url === "/api/conversations" && method === "POST") return Promise.resolve(Response.json({ id: "conv-model-a", status: "open", surface: "chat" }));
+      if (url.endsWith("/api/conversations") && method === "GET") return Promise.resolve(Response.json(Object.values(conversations).map((row) => ({ ...row, surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false }))));
+      const match = url.match(/\/api\/conversations\/(conv-model-[ab])(?:\/(resume|turns))?$/);
+      if (match) {
+        const id = match[1]!;
+        const suffix = match[2];
+        const row = conversations[id]!;
+        if (suffix === "turns") return Promise.resolve(Response.json([]));
+        if (method === "PATCH") {
+          const body = JSON.parse(String(init?.body)) as { settings?: { model?: string } };
+          row.settings = { ...(row.settings ?? {}), ...body.settings };
+        }
+        return Promise.resolve(Response.json(row));
+      }
+      if (url === "/api/turn/stream") {
+        turnCount++;
+        const text = `Reply ${turnCount}.`;
+        return Promise.resolve(new Response(ndjsonStream([{ type: "delta", text }, { type: "done", value: { turn_id: `turn-model-persist-${turnCount}`, reply: { text }, source: "model", safety: SAFETY } }]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    const open = (id?: string) => renderPage(
+      <MemoryRouter initialEntries={[`/next/chat${id ? `?conversation=${id}` : ""}`]}>
+        <NextChatPage person={makePerson()} />
+      </MemoryRouter>,
+    );
+    try {
+      const first = open();
+      await first.findByLabelText("Message input");
+      fireEvent.click(trigger());
+      fireEvent.click(await first.findByText("Fast"));
+      await sendMessage(first, "use fast");
+      await first.findByText("Reply 1.");
+      await waitFor(() => expect(conversations["conv-model-a"]!.settings).toEqual({ model: "fast.gguf" }));
+      const sent = turnRequestBodies().at(-1)!;
+      expect(sent.model).toBe("fast.gguf");
+      first.unmount();
+
+      const reopened = open("conv-model-a");
+      await reopened.findByLabelText("Message input");
+      await waitFor(() => expect(trigger()).toHaveTextContent("Fast"));
+      reopened.unmount();
+
+      const other = open("conv-model-b");
+      await other.findByLabelText("Message input");
+      await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
+    } finally {
+      globalThis.fetch = original;
     }
   });
 

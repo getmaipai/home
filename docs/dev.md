@@ -30460,14 +30460,15 @@ The Next chat hydrates Thinking and automatic read-aloud from the active
 conversation and saves each change through that PATCH. Missing settings
 mean Instant and read-aloud off. A pre-send Thinking or read-aloud choice
 is attached after the new conversation is created, and later turns wait
-for pending settings writes before sending. Model selection is still
-MODEL-SEL-01; this item stores its future `model` value but adds no model
-dispatch behavior.
+for pending settings writes before sending. Model selection was initially
+left to MODEL-SEL-01; Lane B-10 now persists the selected model alongside
+these settings, so this PATCH already covers all three composer choices.
 
 The shared route test covers merge, validation, reload, and the
 temporary-chat in-memory behavior. The history adapter test confirms
 settings are loaded with history; the NextChat integration test toggles
-both values, reopens the same conversation, and confirms Thinking is
-still sent with the next turn. Commons and Home full gates passed before
-landing. The read-aloud extension also closes HANDSFREE-01(a)'s stated
-persist-across-reload acceptance.
+Thinking and read-aloud, reopens the same conversation, and confirms
+Thinking is still sent with the next turn. Lane B-10 adds model save,
+reload, and per-conversation selection coverage. Commons and Home full
+gates passed before landing. The read-aloud extension also closes
+HANDSFREE-01(a)'s stated persist-across-reload acceptance.
