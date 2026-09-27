@@ -3,7 +3,7 @@
 // own rules; tests/turnEngine.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
-import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, sensitiveAllowed, asksHowKnown, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, sensitiveAllowed, asksHowKnown, outcomeText, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { worryingConversation } from "@/lib/turnContext";
 
@@ -196,5 +196,92 @@ describe("ASK-01: the guards' unknown names are the context line's", () => {
     expect(framedUnknownNames({ subjects: refs })).toEqual(["Clover"]);
     expect(guardContextFrom(context({ subjects: refs, subjectPronouns: [{ name: "Clover", pronouns: "she" }], utterance: "Clover borrowed our tent and she loved it" })).unknownNames).toEqual(["Clover"]);
     expect(guardContextFrom(context({ subjects: refs, utterance: "Clover borrowed our tent and she loved it" })).pronounsInPlay).toEqual(["she"]);
+  });
+});
+
+describe("outcomeText(): builds displayed text from a tool outcome", () => {
+  test("start_project outcome returns only the reply text, never appends data fields", () => {
+    const outcome = {
+      packageId: "start_project" as const,
+      result: {
+        reply: { text: "Starting Bedtime storybook now - 5 steps, about 8 minutes." },
+        data: { projectId: "project-4o70qlua5m", title: "Bedtime storybook", stepCount: 5, estimatedSeconds: 480 },
+        actions: [],
+      },
+      userMessage: undefined,
+    };
+    const text = outcomeText(outcome);
+    expect(text).toBe("Starting Bedtime storybook now - 5 steps, about 8 minutes.");
+    expect(text).not.toContain("projectId:");
+    expect(text).not.toContain("title:");
+    expect(text).not.toContain("stepCount:");
+    expect(text).not.toContain("estimatedSeconds:");
+  });
+
+  test("non-start_project outcome with scalar data fields appends them as key: value", () => {
+    const outcome = {
+      packageId: "some-other-tool",
+      result: {
+        reply: { text: "Found it." },
+        data: { count: 42, status: "ready", active: true },
+        actions: [],
+      },
+      userMessage: undefined,
+    };
+    const text = outcomeText(outcome);
+    expect(text).toContain("Found it.");
+    expect(text).toContain("count: 42");
+    expect(text).toContain("status: ready");
+    expect(text).toContain("active: true");
+  });
+
+  test("outcome with userMessage appends it last", () => {
+    const outcome = {
+      packageId: "some-tool",
+      result: {
+        reply: { text: "Started." },
+        data: {},
+        actions: [],
+      },
+      userMessage: "Please note: this may fail.",
+    };
+    const text = outcomeText(outcome);
+    expect(text).toBe("Started. Please note: this may fail.");
+  });
+
+  test("start_project with userMessage appends only userMessage, no data fields", () => {
+    const outcome = {
+      packageId: "start_project",
+      result: {
+        reply: { text: "Starting task." },
+        data: { projectId: "p1", title: "Task", stepCount: 2, estimatedSeconds: 60 },
+        actions: [],
+      },
+      userMessage: "A note for the user.",
+    };
+    const text = outcomeText(outcome);
+    expect(text).toBe("Starting task. A note for the user.");
+    expect(text).not.toContain("projectId:");
+  });
+
+  test("outcome with rows data field includes row titles and snippets", () => {
+    const outcome = {
+      packageId: "search",
+      result: {
+        reply: { text: "Found results:" },
+        data: {
+          rows: [
+            { title: "First Result", snippet: "A brief excerpt." },
+            { title: "Second Result", snippet: "Another excerpt." },
+          ],
+        },
+        actions: [],
+      },
+      userMessage: undefined,
+    };
+    const text = outcomeText(outcome);
+    expect(text).toContain("First Result");
+    expect(text).toContain("A brief excerpt.");
+    expect(text).toContain("Second Result");
   });
 });

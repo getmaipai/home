@@ -167,9 +167,19 @@ export function outcomeOf(partial: Omit<ToolExecutionOutcome, "at"> & { at?: str
  * its rows' titles and snippets, its other data fields. The composer's
  * tool message carries the same content as JSON; this is the text the
  * guards ground a composed reply on. */
-export function outcomeText(outcome: Pick<ToolExecutionOutcome, "result" | "userMessage">): string {
+export function outcomeText(outcome: Pick<ToolExecutionOutcome, "result" | "userMessage" | "packageId">): string {
   const parts: string[] = [];
   if (outcome.result?.reply?.text) parts.push(outcome.result.reply.text);
+  // start_project's result.reply.text is already a complete sentence; its
+  // result.data (projectId, title, stepCount, estimatedSeconds) is API-only
+  // bookkeeping that must never be appended to spoken text. The canonical
+  // constant is START_PROJECT_TOOL_ID in backend/src/lib/projects/tool.ts;
+  // we use the literal string here to avoid a circular import (that file
+  // already imports outcomeOf/ToolExecutionOutcome from this one).
+  if (outcome.packageId === "start_project") {
+    if (outcome.userMessage) parts.push(outcome.userMessage);
+    return parts.join(" ");
+  }
   const data = outcome.result?.data;
   if (data && typeof data === "object") {
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
