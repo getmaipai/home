@@ -14,6 +14,8 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
+import { registerProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
+import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { StreamSafetyRefusal, type StreamOutcome } from "@/lib/turnEngine";
 import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
@@ -490,6 +492,135 @@ describe("turnNext.ts: consent and confirmation", () => {
     // what conversationRunner.ts's scorer and any real client expect.
     expect(resumed.value.source).toBe("plugin");
     expect(resumed.value.plugin_id).toBe("lock-doors");
+  });
+});
+
+describe("turnNext.ts: PROJECT-REPLY-01, a resumed start_project confirmation surfaces its own outcome text (live incident 2026-09-27)", () => {
+  // Jesse confirmed a real start_project ask with "yes" and got back a
+  // bare "Yes." instead of anything about the project that actually
+  // started (the project itself ran fine - a DB row reached "done"
+  // with a real artifact). The suspected mechanism: a preConfirmed/
+  // resumed action skips the model's own DECISION round (machine.ts's
+  // hasPreConfirmed guard jumps safety -> policy directly), so when
+  // the tool round's own outcome reaches `answer` with nothing else to
+  // read, answerInputFrom()'s "from_outcomes" branch used to build the
+  // reply from `outcome.userMessage` alone - a field runStartProjectTool()
+  // (projects/tool.ts) only ever sets on a FAILURE branch, never on
+  // success (success sets `result.reply.text` instead, which
+  // `userMessage` never carried).
+  //
+  // Tracing `machine.ts`'s own "tool" state onDone further (this file's
+  // own test, below) found a second real mechanism this fix interacts
+  // with: under the household's one real catalog budget (qwen3-8b,
+  // `rounds: 1`), ANY successful (non-all-failed) tool round - resumed
+  // or not - still gets exactly one further "phrasing" round through
+  // the model afterward (`moreRoundsAvailable`; `tool.ts`'s own doc
+  // comment already names this on purpose: "the phrasing round every
+  // other tool's outcome already goes through... relays it, never
+  // invents its own number"). So `from_outcomes`'s SUCCESS branch, and
+  // this fix, is reached with no further model round only when none
+  // remains: the FAILED-outcome case (already correct either way,
+  // `userMessage` was already set there) or a budget with
+  // `model_transitions` off / its one round already spent -
+  // `NO_RECORD_BUDGET` (budget.ts's own real fallback for a chat model
+  // with no measured record, not a test-only shape) is exactly that.
+  // This test proves the fix at that layer: the resumed turn's
+  // `chat.model_id` is switched to an unrecognized one before the
+  // resume, so `resolveTurnBudget()` falls to `NO_RECORD_BUDGET` for
+  // that turn only - `policy.ts`'s own start_project branch never
+  // reads `tools_offered` to classify a preConfirmed call, so this has
+  // no effect on parking or resuming the ask, only on whether a
+  // phrasing round follows the tool's own success. Whether the
+  // household's OWN real qwen3-8b budget's phrasing round is what
+  // actually said "Yes." on the live turn (a model-quality question,
+  // not this bug) is a separate, unverified question, named honestly
+  // in the report rather than assumed away.
+  let completeSpy: ReturnType<typeof spyOn>;
+
+  beforeEach(() => {
+    registerProjectType({
+      id: "test-confirm-project",
+      title: "a test confirm project",
+      description: "A project used only to exercise the confirm/resume reply path in tests.",
+      minRole: "child",
+      consequential: true,
+      paramsSchema: {
+        type: "object",
+        required: ["topic"],
+        properties: { topic: { type: "string", minLength: 1 } },
+        additionalProperties: false,
+      },
+      buildPlan: (params) => {
+        const topic = typeof params.topic === "string" && params.topic.trim() ? params.topic.trim() : "a small adventure";
+        return {
+          steps: [{ id: "a", kind: "text", needs: [], params: { role: "chat", promptTemplate: `write a short passage about ${topic}`, inputs: [] } }],
+          ceilings: { maxWallSeconds: 30, maxGeneratorJobs: 1 },
+        };
+      },
+    });
+    // The project's own background step calls llm.ts's complete()
+    // (projects/steps.ts), a different call than the turn's own model
+    // round (nodes/model.ts's startCompleteStream()) - stubbing it
+    // directly keeps the background project deterministic and fast
+    // without needing it to reach either withStub()'s HTTP server,
+    // which is already torn down by the time the project's own step
+    // runs (tool.ts starts the project and returns before any step
+    // does).
+    completeSpy = spyOn(llm, "complete").mockImplementation(async () => ({ ok: true, value: { text: "A short, gentle passage.", model: "stub" } }));
+  });
+
+  afterEach(() => {
+    completeSpy.mockRestore();
+    __resetProjectTypesForTests();
+  });
+
+  test("a confirmed start_project reply names the project it started, never a generic filler", async () => {
+    const parked = await withStub(
+      {
+        calls: (request) =>
+          request.tools?.some((t) => t.function.name === START_PROJECT_TOOL_ID)
+            ? [{ id: "call-1", name: START_PROJECT_TOOL_ID, args: JSON.stringify({ type: "test-confirm-project", params: { topic: "a shy dragon who's scared of the dark" } }) }]
+            : undefined,
+        reply: () => "unused",
+      },
+      () => runTurnNext(people.owner, "chat", "start a test confirm project about a shy dragon who's scared of the dark"),
+    );
+    expect(parked.ok).toBe(true);
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(parked.value.source).toBe("confirm");
+
+    const ask = getPendingAsk(parked.value.conversation_id);
+    expect(ask).not.toBeNull();
+    expect(ask?.packageId).toBe(START_PROJECT_TOOL_ID);
+
+    // Forces resolveTurnBudget() to NO_RECORD_BUDGET (model_transitions:
+    // false) for the resume only - no phrasing round follows the tool's
+    // own success, so this reaches from_outcomes directly, the exact
+    // layer the fix touches (see the describe block's own comment). If
+    // the model were consulted at all here, this stub's "PHRASING_
+    // SHOULD_NOT_RUN_HERE" sentinel would surface in the final text and
+    // the assertions below would catch it.
+    setHouseholdSettingValue("chat.model_id", "no-such-model-id");
+    const resumed = await withStub({ reply: () => "PHRASING_SHOULD_NOT_RUN_HERE" }, () =>
+      runTurnNext(people.owner, "chat", "yes", { conversationId: parked.value.conversation_id }),
+    );
+    expect(resumed.ok).toBe(true);
+    if (!resumed.ok || resumed.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(getPendingAsk(parked.value.conversation_id)).toBeNull();
+    expect(resumed.value.source).toBe("plugin");
+    expect(resumed.value.plugin_id).toBe(START_PROJECT_TOOL_ID);
+    // The bug: this used to be "" (userMessage is unset on success),
+    // which assessReply() then flagged as empty and a retry replaced
+    // with a generic "Yes." - never empty, and never that filler, and
+    // never the phrasing round's own sentinel (proving the model was
+    // never consulted on this turn, matching hasPreConfirmed's own
+    // intent for the decision round and NO_RECORD_BUDGET's own
+    // model_transitions: false for the round after).
+    expect(resumed.value.reply.text.length).toBeGreaterThan(0);
+    expect(resumed.value.reply.text).not.toBe("Yes.");
+    expect(resumed.value.reply.text).not.toContain("PHRASING_SHOULD_NOT_RUN_HERE");
+    expect(resumed.value.reply.text).toContain("a test confirm project");
+    expect(resumed.value.reply.text).toMatch(/^Starting a test confirm project now/);
   });
 });
 

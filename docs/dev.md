@@ -30058,3 +30058,121 @@ NextSettingsRenderer,PersonMultiSelect}.tsx`, `frontend/src/next/pages/
 NextSettingsPage.test.tsx`, `commons`'s `spec/settings/keys.json` and
 `spec/package.json` (spec-v0.1.48), `scripts/check.sh` and both
 `package.json`s' `@maipai/spec` pin.
+
+## PROJECT-REPLY-01: a confirmed start_project's own reply text, and a real complication found tracing it (2026-09-27)
+
+Jesse confirmed a real `start_project` ask ("Start Bedtime storybook?",
+"yes") and got back a bare "Yes." instead of anything about the project
+that actually started. The project itself ran fine end to end - direct
+DB inspection found a real `projects` row that reached `state: "done"`
+with a real artifact attached - so this was purely a wrong-reply-text
+bug, handed over already root-caused: a preConfirmed/resumed action
+skips the model's own DECISION round (`machine.ts`'s `hasPreConfirmed`
+guard jumps `safety` straight to `policy`), so when a tool round's
+outcome reaches `answer` with nothing else to build a reply from,
+`answerInputFrom()`'s `from_outcomes` branch used to read
+`context.turnState.outcomes.at(-1)?.userMessage ?? ""` - a field
+`runStartProjectTool()` (`backend/src/lib/projects/tool.ts`) only ever
+sets on a FAILURE branch (`unknown_project_type`, `invalid_params`,
+`project_refused`); a success sets `result.reply.text` instead (e.g.
+"Starting Bedtime storybook now - 5 steps, about 8 minutes."), which
+`userMessage` never carried - so a successful preConfirmed call's real
+reply text was silently dropped to `""`.
+
+**Fixed.** `answerInputFrom()`'s `from_outcomes` branch now calls
+`turnContext.ts`'s own `outcomeText(outcome)` instead of reading
+`userMessage` directly - it already does the right thing for both a
+success (reads `result.reply.text` first, then other result data
+fields) and a failure (falls through to `userMessage` last, unchanged
+from before). One import added (`turnContext.ts`'s `outcomeText`),
+`context.turnState.outcomes.at(-1)` bound once rather than read twice.
+
+**A real complication found tracing the fix, worth Jesse's and the
+coordinator's attention.** Confirming the fix meant driving the actual
+state machine end to end, not just reading the diff, and that surfaced
+a second real mechanism this fix interacts with: under the household's
+one real catalog budget (`qwen3-8b-instruct-q4-k-m`, `turn_budget.
+rounds: 1`, `model_transitions: true`), `machine.ts`'s own `tool` state
+onDone routes ANY successful (non-all-failed) tool round - preConfirmed
+or not - through `moreRoundsAvailable` back to `model` for exactly one
+further "phrasing" round before ever reaching `answer` (confirmed by
+directly exercising `runTurnNext()` with a scripted stub: a resumed,
+successful `start_project` call's own reply came back as the stub's
+generic phrasing-round text, not the tool's own reply string, until the
+household's `chat.model_id` was switched to an unrecognized one to
+force `NO_RECORD_BUDGET`, `model_transitions: false`, for that call).
+`nodes/tool.ts`'s own header comment already names this as intentional
+design ("the phrasing round every other tool's outcome already goes
+through ... relays it, never invents its own number"). So
+`from_outcomes`'s SUCCESS branch, and this fix, is reached with no
+further model round only when none remains: a FAILED outcome (already
+correct either way - `userMessage` was already set there) or a budget
+with `model_transitions` off or its one round already spent (a future
+model added to the catalog with no measured record, `NO_RECORD_BUDGET`
+itself, or `SEARCH-EMPTY-01`'s own forced-retry-with-rounds-exhausted
+case for a different tool entirely). Under the household's real,
+single-model budget, a confirmed `start_project`'s SUCCESS reply is
+actually composed by that phrasing round's own model generation, fed
+the tool's correct `reply.text` as its own tool-result content
+(`composer.ts`'s `usableReply()`/`toolResultContent()`, verified
+separately - these already read `result.reply.text` correctly, not
+`userMessage`, so the phrasing round was never starved of the right
+information). Whether the real qwen3-8b phrasing round is what
+actually said "Yes." on the live turn Jesse saw - a model-quality
+question (a small model given full, correct context still choosing a
+bare acknowledgment), not a code defect - is a separate, unverified
+question this item does not answer; named honestly here rather than
+assumed away, since the fix as scoped is real and correct on its own
+terms but may not by itself change what Jesse sees next time he
+confirms a `start_project` on the household's current model. Worth a
+follow-up look at the phrasing round's own prompt/behavior for a just-
+confirmed consequential action specifically, out of tonight's scope.
+
+**Verification.** `backend/tests/turnMachine/turnNext.test.ts` gained a
+new describe block, `PROJECT-REPLY-01`, driving the real confirm-then-
+resume flow through `runTurnNext()` (mirroring the file's own existing
+"consent and confirmation" lock-doors test) with a local fixture
+project type registered via `registerProjectType()`/
+`__resetProjectTypesForTests()` (the same pattern `startProject.test.ts`
+already uses) and `llm.complete()` stubbed for the project's own
+background step. To reach `from_outcomes`'s success branch directly (per
+the complication above), the resumed call's `chat.model_id` is switched
+to an unrecognized id first, forcing `NO_RECORD_BUDGET` for that turn -
+a real production fallback, not a test-only shape - so no phrasing round
+follows; the resumed stub's own `reply()` returns a sentinel
+("PHRASING_SHOULD_NOT_RUN_HERE") that would surface in the final text if
+the model were consulted at all, and every assertion checks it never
+does. Confirms: the resumed turn's own reply text is non-empty, is
+never `"Yes."`, never contains the phrasing sentinel, and matches
+`/^Starting a test confirm project now/` naming the project's own
+title. A failed preConfirmed outcome (`unknown_project_type`/
+`invalid_params`/`project_refused`) is unaffected by this fix -
+`outcomeText()` falls through to `userMessage` last exactly as the old
+code read it directly, confirmed by reading `outcomeText()` itself
+(`turnContext.ts` line ~170) rather than re-testing already-covered
+behavior. `answerInputFrom()`'s `from_outcomes` branch is also reached
+by `toolAllFailed` and by `answer_from_context_check`'s own forced
+retry with rounds exhausted (a websearch-only path, `answer.ts`'s own
+comment) - both go through the identical `outcomeText()` call now, and
+neither path's own outcome ever carries a `result.reply.text` field
+`userMessage` didn't already have, so the fix is a strict superset of
+the old read for those paths too.
+
+Files: `backend/src/lib/turnMachine/machine.ts` (`answerInputFrom()`).
+Tests: `backend/tests/turnMachine/turnNext.test.ts`.
+
+Review: low effort, deliberately not medium despite touching shared
+answer-building logic on a real code path - the change itself is a
+one-line read substitution (`outcome.userMessage` to `outcomeText
+(outcome)`) calling an already-existing, already-tested helper, not new
+logic; `outcomeText()` itself was reviewed and shipped under CHAT-16.
+One pass, zero findings.
+
+Verified: `bash scripts/check.sh` (`MAIPAI_STANDARDS_DIR`/
+`MAIPAI_COMMONS_DIR`/`MAIPAI_GATE_LOCK` pointed at the real `.github`/
+`commons` checkouts, the worktree-only path quirk earlier entries this
+same night already name) green end to end - backend 4294 pass/0 fail,
+frontend typecheck clean, docs reading-level lint, standards core
+(gitleaks, PII wordlist, prose lint, licence check) all passed. The
+household's own live hub at `127.0.0.1:8787` was never touched (no
+`bun restart`, no port 8787/8788/8794 traffic).

@@ -20,6 +20,7 @@ import { toolNode, type ToolOutput } from "./nodes/tool";
 import { answerNode, type AnswerInput, type AnswerOutput, type PolicyRefusedReason } from "./nodes/answer";
 import { outputGateNode, type OutputGateOutput } from "./nodes/outputGate";
 import { planFor } from "@/lib/register";
+import { outcomeText } from "@/lib/turnContext";
 
 const IMPL_VERSION = "1";
 
@@ -484,8 +485,23 @@ function answerInputFrom(context: MachineContext): AnswerInput {
     if (s.kind === "model_failed") return { kind: "model_failed" };
   }
   if (context.turnState.outcomes.length > 0) {
-    const lastText = context.turnState.outcomes.at(-1)?.userMessage ?? "";
-    return { kind: "from_outcomes", text: lastText, outcomes: context.turnState.outcomes };
+    const outcomes = context.turnState.outcomes;
+    // PROJECT-REPLY-01 (2026-09-27, dev.md): this is what a resumed/
+    // preConfirmed action's reply is built from whenever no further
+    // model round follows this tool round (a failed outcome, or a
+    // budget whose model_transitions is off / round already spent -
+    // most successful turns instead go on to a phrasing round, see
+    // dev.md's own account). outcomeText() (turnContext.ts) reads a
+    // succeeded outcome's own `result.reply.text` (and other result
+    // data) first, falling back to `userMessage` last - that fallback
+    // alone used to be all this read, which is empty on every SUCCESS
+    // outcome (`userMessage` is only ever set on a failure branch, e.g.
+    // runStartProjectTool()'s own unknown_project_type/invalid_params/
+    // project_refused cases), throwing away a confirmed start_project's
+    // real "Starting <title> now..." reply whenever this branch was
+    // the one actually building the final text.
+    const lastText = outcomeText(outcomes.at(-1)!);
+    return { kind: "from_outcomes", text: lastText, outcomes };
   }
   return { kind: "model_text", text: "" };
 }
