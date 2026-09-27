@@ -580,6 +580,13 @@ interface SearxngInfobox {
   urls?: unknown;
 }
 
+// One definition for `rows`'s own row shape - `SearxngSearchResult` below
+// and the row builders further down (`resultToRow`/`infoboxToRow`) both
+// reference this instead of each carrying their own copy of the same
+// literal, the exact class of drift SEARCH-ROWS-01 fixes between `text`
+// and `rows` in the first place.
+type SearxngRow = { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null };
+
 /** Formats SearXNG's own `/search?format=json` response into a single
  * readable string - a numbered list, title/url/snippet per result - not
  * the raw JSON. The recipe language has no loop or array-map primitive
@@ -663,7 +670,7 @@ export function formatSearxngResults(data: unknown, count = 5): string {
   return lines.length > 0 ? lines.join("\n") : SEARXNG_NO_RESULTS_TEXT;
 }
 
-type SearxngSearchResult = { text: string; rows: { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null }[]; page?: PageReadResult };
+type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadResult };
 
 /** SEARCH-FALLBACK-01: Wikipedia's own official, documented REST API,
  * search then the page summary - "search" (the Core REST API,
@@ -903,6 +910,74 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   return promise;
 }
 
+// The same protocol/credential/hash stripping formatResult() and
+// formatInfobox() never had to do (they only ever produce a string for
+// the model to read, never a URL a client might navigate to) - `rows`
+// ships a real url field a client can act on, so both row builders below
+// reuse this rather than trusting whatever SearXNG sent back.
+function safeRowUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    parsed.username = "";
+    parsed.password = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+// One row from an ordinary search result - the same title/url/content
+// reads formatResult() uses for `text`, plus the image fields `rows`
+// alone carries for an image search.
+function resultToRow(raw: unknown, isImages: boolean): SearxngRow | null {
+  const row = raw as { title?: unknown; url?: unknown; content?: unknown; img_src?: unknown; thumbnail_src?: unknown };
+  if (typeof row.title !== "string" || typeof row.url !== "string") return null;
+  const url = safeRowUrl(row.url);
+  if (!url) return null;
+  return {
+    title: row.title,
+    url,
+    snippet: typeof row.content === "string" ? row.content : null,
+    ...(isImages ? { image: safeRowUrl(row.img_src), thumbnail: safeRowUrl(row.thumbnail_src) } : {}),
+  };
+}
+
+// SEARCH-ROWS-01 (#169): one row from an infobox, the same field reads
+// formatInfobox() already uses for `text` (`infobox` for title, `id`
+// then `urls[0].url` for url, `content` for snippet) rather than
+// re-deriving them - `rows` used to never read `value.infoboxes` at all,
+// so a direct-topic query SearXNG answers entirely through an infobox
+// (the Wikipedia-knowledge-panel case formatInfobox()'s own doc comment
+// describes) reached the model with nothing but whatever generic,
+// usually snippet-less `results` came alongside it.
+function infoboxToRow(raw: unknown): SearxngRow | null {
+  const box = raw as SearxngInfobox;
+  if (typeof box?.infobox !== "string" || box.infobox.length === 0) return null;
+  const firstUrl = Array.isArray(box.urls) ? (box.urls[0] as { url?: unknown } | undefined)?.url : undefined;
+  const url = safeRowUrl(typeof box.id === "string" ? box.id : firstUrl);
+  if (!url) return null;
+  return { title: box.infobox, url, snippet: typeof box.content === "string" && box.content.length > 0 ? box.content : null };
+}
+
+// Shared by both rows passes (infoboxes first, then results) - the same
+// bounds-check/build/skip/push shape appendFormatted() already uses for
+// `text`, so the 8-row cap is one counter shared across both passes, not
+// a second one that could silently drift from it.
+function appendRows(items: unknown, cap: number, n: number, out: SearxngRow[], build: (raw: unknown) => SearxngRow | null): number {
+  if (!Array.isArray(items)) return n;
+  for (const raw of items) {
+    if (n >= cap) break;
+    const row = build(raw);
+    if (!row) continue;
+    n += 1;
+    out.push(row);
+  }
+  return n;
+}
+
 async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; safeEngines?: string[] | null } = {}): Promise<SearxngSearchResult> {
   // SEARCH-FALLBACK-01: `opts` is never part of the recipe's own public
   // `args` schema (a model can never set it) - the one caller that
@@ -990,7 +1065,7 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
   // first cut of this wrapping that fetch too, misreporting SearXNG as
   // down over a problem on some other site entirely.
   let text: string;
-  let rows: { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null }[];
+  let rows: SearxngRow[];
   try {
     const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
     if (result.ok) {
@@ -999,11 +1074,14 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
         baseUrl,
         "check the SearXNG URL in Settings (a URL that redirects to a login page, or an instance with JSON output disabled, both look like this)",
       );
-      rows = Array.isArray(value.results) ? value.results.slice(0, 8).flatMap((raw: unknown) => {
-        const row = raw as { title?: unknown; url?: unknown; content?: unknown; img_src?: unknown; thumbnail_src?: unknown };
-        if (typeof row.title !== "string" || typeof row.url !== "string") return [];
-        try { const parsed = new URL(row.url); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return []; parsed.username = ""; parsed.password = ""; parsed.hash = ""; const safeUrl = (value: unknown) => { if (typeof value !== "string") return null; try { const parsed = new URL(value); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null; parsed.username = ""; parsed.password = ""; parsed.hash = ""; return parsed.toString(); } catch { return null; } }; return [{ title: row.title, url: parsed.toString(), snippet: typeof row.content === "string" ? row.content : null, ...(input?.category === "images" ? { image: safeUrl(row.img_src), thumbnail: safeUrl(row.thumbnail_src) } : {}) }]; } catch { return []; }
-      }) : [];
+      // SEARCH-ROWS-01 (#169): infoboxes first, then results, sharing
+      // the one 8-row cap - the same order and shape formatSearxngResults()
+      // already uses for `text` (appendFormatted(), just above it), so
+      // the two can no longer silently diverge the way they did before
+      // this fix (`text` read `value.infoboxes`, `rows` never did).
+      rows = [];
+      const rowsAfterInfoboxes = appendRows(value.infoboxes, 8, 0, rows, infoboxToRow);
+      appendRows(value.results, 8, rowsAfterInfoboxes, rows, (raw) => resultToRow(raw, isImages));
       text = formatSearxngResults(value);
       // SEARCH-EMPTY-01 (docs/dev.md, docs/plans/search-resilience-
       // 2026-09-24.md): SearXNG already reports the problem on every

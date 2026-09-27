@@ -254,6 +254,13 @@ checklist (`docs/dev.md`); no release has been cut yet.
   themselves were asked for. The #156 fix's own list-format line fired
   on every searched reply with rows, so a plain yes-or-no question came
   back as a numbered list too (#168).
+- A direct-topic search (the kind SearXNG answers with a knowledge-panel
+  infobox instead of ordinary results) now reaches the model at all: the
+  search rows the model reads used to skip infoboxes entirely, so the
+  model saw only whatever generic results came alongside one, usually
+  with no summary text. When a whole result set genuinely has no summary
+  text, the reply now says so instead of rephrasing the titles as if
+  they were an answer (#169).
 
 ### Added
 - Settings (platform plan 4.6), the fourth slice of hub core: the store,

@@ -28517,3 +28517,88 @@ anyone has run it on. The one design-level fact from the survey:
 stable-diffusion.cpp now runs every row of the bakeoff on both
 machines from one MIT binary with a Metal backend, which is a Stack
 engine question STACK-14's bench should take up beside ComfyUI.
+
+## SEARCH-ROWS-01 landed: infobox answers reach the model, and an empty-snippet search says so (2026-09-26)
+
+Fixes #169. `searxngSearchUncached()` (`backend/src/lib/packageHost.ts`)
+built two different views of the same SearXNG response: `text`, which
+reads both `value.infoboxes` (through `formatInfobox()`) and
+`value.results`; and `rows`, which read only `value.results` and never
+looked at `value.infoboxes` at all. `text` is never sent to the model -
+the websearch recipe picks `rows` - so a direct-topic query SearXNG
+answers entirely through an infobox reached the model with nothing but
+whatever generic, usually snippet-less `results` came alongside it.
+
+The fix: `rows` gains an infobox-sourced pass, ahead of the `results`
+pass, reusing `formatInfobox()`'s own field reads (`infobox` for title,
+`id` then `urls[0].url` for url, `content` for snippet) rather than
+re-deriving them, sharing the same 8-row cap `appendFormatted()`
+already uses for `text` - two new small helpers (`appendRows`,
+`infoboxToRow`, `resultToRow`, `safeRowUrl`) mirror that shape instead
+of a second counter.
+
+**Live capture (2026-09-27), for evidence and for Decision 2's fork,
+never for deciding whether to make the fix above.** Direct HTTP GET
+against the household's own SearXNG instance for the two fixture
+queries ("weather in Denver today", "was Ted Kaczynski subject to
+experimental things while at college"). Both came back with
+`infoboxes: []` and `answers: []`, and every one of the 36 and 50
+`results` respectively carried real `content` - this capture did not
+reproduce the incident's own empty-snippet or infobox-answered shape
+live. Since `value.answers` carried nothing for either query, Decision
+2's fork (an `answers`-sourced rows pass) does not apply and was
+skipped, per the order's own rule. No raw response body or the
+instance's address is recorded here or anywhere else in this commit.
+
+**The residual case Decision 1 doesn't reach:** SearXNG can genuinely
+give back real rows, every one with no summary text at all
+(`turn-dbyu1niupc`'s own live shape: eight rows, eight empty snippets -
+the exact turn #169 itself cites). `nodes/model.ts`'s `searchResultCount`
+reduce (605-610 on `main` before this change) now also computes whether
+every counted websearch row has a falsy `snippet` (an empty string
+counts, matching what that turn actually stored), threaded into
+`phrasingInstruction()` as a new `allSnippetsEmpty` parameter;
+irrelevant, and never fires, when `searchResultCount` is 0 (no
+websearch outcome at all). New line, appended only when
+`searchResultCount > 0` and every row's snippet was falsy, verbatim:
+
+> The results have no summary text, only titles and links; say only
+> what a title itself states, and don't invent detail.
+
+Tests, red before the change and green after: "a query SearXNG answers
+through an infobox, with no results at all, still returns a row with
+the infobox's own title, link and content" and "an infobox and
+ordinary results together still respect the 8-row cap, infobox first"
+(`packageHost.test.ts`); "a searched reply whose results have no
+summary text at all is told not to invent detail" and "a normal search
+with real snippets is not told the results have no summary text"
+(`turnNext.test.ts`, mirroring SEARCH-SHAPE-01's own `#168` stub
+pattern - the new test's tool-call args needed real overlap with the
+utterance's own terms, `checkGrounding()` in `nodes/policy.ts`, or the
+round never reaches the search at all, refused as `ungrounded_args`
+before any tool runs).
+
+A code review at medium (a wire shape from an external service, and a
+change to what every searched turn tells the model) found two real
+gaps: `SearxngRow`'s own type duplicated the inline shape already on
+`SearxngSearchResult` (fixed in the same commit, both now reference
+one type) and a rare infobox shape (content but no `id` and no usable
+`urls[0].url`) still gets dropped from `rows`, the same as
+`resultToRow()` already drops a malformed ordinary result - real, but
+fixing it fully means loosening the row schema and touching
+`turnContext.ts`'s `sourcesFromRows()`, outside this item's own files,
+so it's filed as #171 rather than fixed here.
+
+Verified: `bash scripts/check.sh` (scope: backend, only backend files
+changed), run twice (once before the type-dedup fix above, once after,
+on the unchanged tip after it) - 4148/4149 both times. The one
+failure both times, `advertiseMdns()/stopMdnsAdvertisement() > a real
+mDNS browser discovers the advertised service with the documented TXT
+fields` (`tests/mdns.test.ts`), is unrelated to this diff (real
+multicast discovery, no import of anything this change touches) and
+is the same pre-existing environment flake (#160) MANIFEST-REFUSAL-01
+and SEARCH-SHAPE-01 already recorded tonight - reported, not fixed
+forward, per the org gate rule for a failure the diff didn't touch.
+The hub on 8787 was not restarted by this lane; whether the live
+weather/knowledge-panel case actually resolves this way still needs
+Jesse's own check on 8787 after a restart, the same as #166 and #168.

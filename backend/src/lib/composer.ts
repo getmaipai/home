@@ -916,7 +916,15 @@ export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[]): L
 // description. compositionInstruction() above always carried its own
 // referent ("Answer this question of mine ... : '<question>'");
 // phrasingInstruction's own first cut dropped it. This one doesn't.
-export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: string, searchResultCount = 0): string {
+// SEARCH-ROWS-01 (#169): `allSnippetsEmpty` is the residual case
+// SEARCH-ROWS-01's own rows fix (packageHost.ts) doesn't reach -
+// SearXNG can genuinely give back real rows, every one of them with no
+// summary text at all (turn-dbyu1niupc's own live shape: eight results,
+// eight empty snippets), and the model had nothing to answer from but
+// the titles themselves, so it rephrased them as if they were an
+// answer. Irrelevant, and never fired, when searchResultCount is 0 (no
+// websearch outcome at all) - guarded by the caller, nodes/model.ts.
+export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: string, searchResultCount = 0, allSnippetsEmpty = false): string {
   const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences";
   const quotedUtterance = quoteForPrompt(utterance);
   const lines = [
@@ -928,6 +936,9 @@ export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: strin
   if (searchResultCount > 0) {
     const itemLimit = Math.min(searchResultCount, 7);
     lines.push(`Keep the reply under 140 words and omit raw URLs. Answer the question first, in the shape it calls for. Only when I asked for the results themselves, list at most ${itemLimit} of them, one sentence of at most 15 words each.`);
+    if (allSnippetsEmpty) {
+      lines.push("The results have no summary text, only titles and links; say only what a title itself states, and don't invent detail.");
+    }
   }
   return lines.join(" ");
 }

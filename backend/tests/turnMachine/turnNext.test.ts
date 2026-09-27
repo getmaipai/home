@@ -1378,6 +1378,83 @@ describe("turnNext.ts: #168, a searched question is answered in the shape it cal
   });
 });
 
+// SEARCH-ROWS-01 (#169): a whole result set with no content at all still
+// reads as a real, succeeded search (SEARCH-EMPTY-01 above only guards
+// the zero-rows case) - the model was answering from the titles alone
+// as if they were a summary. The phrasing round's own prompt now says
+// plainly not to invent detail when every row it got has no snippet.
+describe("turnNext.ts: SEARCH-ROWS-01, an empty-snippet search says so", () => {
+  test("a searched reply whose results have no summary text at all is told not to invent detail", async () => {
+    const server = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname !== "/search") return new Response("not found", { status: 404 });
+        return Response.json({
+          results: Array.from({ length: 8 }, (_, index) => ({
+            title: `Empty snippet result ${index + 1}`,
+            url: `https://example.com/empty-${index + 1}`,
+            content: "",
+          })),
+        });
+      },
+    });
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((message) => message.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "unabomber experimental college" }) }];
+          },
+          reply: (request) => {
+            if (!request.messages.some((message) => message.role === "tool")) return "Searching.";
+            phrasingRequest = request;
+            return "The first result's title is the only thing I can say.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "was the unabomber subject to experimental things while at college"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      const instruction = phrasingRequest?.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+      expect(instruction).toContain("The results have no summary text, only titles and links; say only what a title itself states, and don't invent detail.");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a normal search with real snippets is not told the results have no summary text", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((message) => message.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "reply truncation seven rows fixture" }) }];
+          },
+          reply: (request) => {
+            if (!request.messages.some((message) => message.role === "tool")) return "Searching.";
+            phrasingRequest = request;
+            return "A normal reply built from real snippets.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "what do the seven museum poster search results say?"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      const instruction = phrasingRequest?.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+      expect(instruction).not.toContain("The results have no summary text");
+    } finally {
+      searxng.stop();
+    }
+  });
+});
+
 // SEARCH-MIXED-01: an independent review of SEARCH-EMPTY-01 (2026-09-24)
 // found `toolAllFailed` (machine.ts) only catches a round where EVERY
 // outcome failed - a round that mixes a failed websearch with a

@@ -602,12 +602,24 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     const phrasedOutcomes = state.outcomes.filter((o) => o.status !== "failed");
     const assistantMessage = toolCallAssistantMessage(phrasedOutcomes);
     const resultMessages = toolResultMessages(phrasedOutcomes);
-    const searchResultCount = phrasedOutcomes.reduce((count, outcome) => {
-      if (outcome.status !== "succeeded" || outcome.packageId !== "websearch") return count;
-      const rows = (outcome.result?.data as { rows?: unknown[] } | undefined)?.rows;
-      return count + (Array.isArray(rows) ? rows.length : 0);
-    }, 0);
-    const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount);
+    // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
+    // `searchResultCount` - a falsy `snippet` (missing or empty string,
+    // the exact shape turn-dbyu1niupc actually stored) on EVERY counted
+    // row means the phrasing round has nothing to summarize from but
+    // titles, and needs telling so plainly rather than left to notice
+    // on its own. Stays true (and irrelevant - guarded below) when no
+    // websearch outcome ever contributes a row at all.
+    const searchRows = phrasedOutcomes.reduce(
+      (acc, outcome) => {
+        if (outcome.status !== "succeeded" || outcome.packageId !== "websearch") return acc;
+        const rows = (outcome.result?.data as { rows?: { snippet?: unknown }[] } | undefined)?.rows;
+        if (!Array.isArray(rows)) return acc;
+        return { count: acc.count + rows.length, allEmpty: acc.allEmpty && rows.every((row) => !row?.snippet) };
+      },
+      { count: 0, allEmpty: true },
+    );
+    const searchResultCount = searchRows.count;
+    const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty);
     const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? phrasing : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${phrasing}` };
     messages = [...state.messages, assistantMessage, ...resultMessages, instruction];
     // The same tools block the forced/offered round itself sent -

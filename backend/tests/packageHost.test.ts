@@ -958,6 +958,71 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     }
   });
 
+  // SEARCH-ROWS-01 (#169): `rows` used to read only `value.results`, so
+  // a direct-topic query SearXNG answers entirely through `infoboxes`
+  // (the same case formatSearxngResults's own infobox tests below cover
+  // for `text`) reached the model with nothing at all - `text` saw the
+  // infobox, `rows` never did. Same fixture shape as those tests, this
+  // time asserted at the `rows` level a real tool call returns.
+  test("a query SearXNG answers through an infobox, with no results at all, still returns a row with the infobox's own title, link and content", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () =>
+        Response.json({
+          results: [],
+          infoboxes: [
+            {
+              infobox: "Japan",
+              id: "https://en.wikipedia.org/wiki/Japan",
+              content: "Japan is an island country in East Asia.",
+              title: "",
+              url: null,
+            },
+          ],
+        }),
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = (await host.integration.call("searxng", "search", { query: "japan" })) as {
+        rows: { title: string; url: string; snippet: string | null }[];
+      };
+      expect(result.rows).toEqual([{ title: "Japan", url: "https://en.wikipedia.org/wiki/Japan", snippet: "Japan is an island country in East Asia." }]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("an infobox and ordinary results together still respect the 8-row cap, infobox first", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () =>
+        Response.json({
+          infoboxes: [{ infobox: "Japan", id: "https://en.wikipedia.org/wiki/Japan" }],
+          results: Array.from({ length: 10 }, (_, i) => ({
+            title: `Result ${i + 1}`,
+            url: `https://example.com/result-${i + 1}`,
+            content: `Content ${i + 1}`,
+          })),
+        }),
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = (await host.integration.call("searxng", "search", { query: "japan" })) as {
+        rows: { title: string; url: string; snippet: string | null }[];
+      };
+      expect(result.rows).toHaveLength(8);
+      expect(result.rows[0]).toEqual({ title: "Japan", url: "https://en.wikipedia.org/wiki/Japan", snippet: null });
+      expect(result.rows[1]).toEqual({ title: "Result 1", url: "https://example.com/result-1", snippet: "Content 1" });
+      expect(result.rows[7]).toEqual({ title: "Result 7", url: "https://example.com/result-7", snippet: "Content 7" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
   // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): with no explicit
   // person-level set, safesearch follows the speaker's own band - child
   // strict (2), teen moderate (1), adult off (0). No image floor: an
