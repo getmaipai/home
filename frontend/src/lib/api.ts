@@ -777,6 +777,7 @@ export const api = {
   checkStackUpdates: () => request<StackUpdatesProjection>("/api/updates/stack/check", { method: "POST" }),
   applyStackEngineUpdate: (name: string) => request<{ applied: boolean; tag: string | null; previous: string | null }>(`/api/updates/stack/engines/${encodeURIComponent(name)}/apply`, { method: "POST" }),
   rollbackStackEngine: (name: string, tag: string) => request<{ ok: true; tag: string }>(`/api/updates/stack/engines/${encodeURIComponent(name)}/rollback`, { method: "POST", body: JSON.stringify({ tag }) }),
+  engineAction: (name: string, action: "start" | "stop" | "restart" | "install") => request<Record<string, unknown>>(`/api/engines/${encodeURIComponent(name)}/${action}`, { method: "POST" }),
   sweepStackStorage: () => request<{ removed: string[] }>("/api/updates/stack/sweep", { method: "POST" }),
   runStackReadinessCheck: () => request<{ at: string; ok: boolean; reason: string | null }>("/api/updates/stack/readiness-check", { method: "POST" }),
   // `person`, for the per-person view an adult opens for a child

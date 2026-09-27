@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { api, ApiError, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/engines: SHELL-06's own row (docs/plans/shell-on-shadcndashboard-
@@ -61,10 +63,11 @@ interface EngineRow extends Record<string, unknown> {
   engine: string;
   version: string;
   status: string;
+  name: string;
 }
 
 function toEngineRow(engine: StackEngineInfo): EngineRow {
-  return {
+  const row = {
     engine: engine.label,
     version: engine.currentTag ?? "-",
     // `needsRestart` is its own real field, not derived from
@@ -74,6 +77,8 @@ function toEngineRow(engine: StackEngineInfo): EngineRow {
     // silently fallen through to "Update available").
     status: engine.needsRestart ? "Needs restart" : engine.state === "current" ? "Current" : "Update available",
   };
+  Object.defineProperty(row, "name", { value: engine.name });
+  return row as EngineRow;
 }
 
 interface HealthRow extends Record<string, unknown> {
@@ -86,10 +91,32 @@ function toHealthRow(item: StackHealthItem): HealthRow {
   return { item: item.title, status: item.severity.charAt(0).toUpperCase() + item.severity.slice(1), since: new Date(item.since).toLocaleString() };
 }
 
-export function NextEnginesPage() {
+export function NextEnginesPage({ person }: { person: Roster }) {
   useDocumentTitle("Engines");
-  const overviewQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
-  const healthQuery = useQuery<EnginesHealth>({ queryKey: ["engines-health"], queryFn: () => api.enginesHealth() });
+  const canManage = isOwnerOrAdminRole(person.role);
+  const overviewQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: canManage });
+  const healthQuery = useQuery<EnginesHealth>({ queryKey: ["engines-health"], queryFn: () => api.enginesHealth(), enabled: canManage });
+  const queryClient = useQueryClient();
+  const [busyNames, setBusyNames] = useState<ReadonlySet<string>>(new Set());
+
+  async function runAction(name: string, action: "start" | "stop" | "restart" | "install") {
+    setBusyNames((previous) => new Set(previous).add(name));
+    try {
+      await api.engineAction(name, action);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["engines"] }),
+        queryClient.invalidateQueries({ queryKey: ["engines-health"] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "That didn't work.");
+    } finally {
+      setBusyNames((previous) => {
+        const next = new Set(previous);
+        next.delete(name);
+        return next;
+      });
+    }
+  }
 
   const error = overviewQuery.isError || healthQuery.isError;
   const data = overviewQuery.data && healthQuery.data ? { overview: overviewQuery.data, health: healthQuery.data } : undefined;
@@ -104,7 +131,13 @@ export function NextEnginesPage() {
         </CardTitle>
       </CardHeader>
 
-      <AsyncState
+      {!canManage ? (
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground">Only an owner or admin can manage engines.</p>
+          </CardContent>
+        </Card>
+      ) : <AsyncState
         data={data}
         error={error}
         isFetching={overviewQuery.isFetching || healthQuery.isFetching}
@@ -147,7 +180,22 @@ export function NextEnginesPage() {
                     Installed engines
                   </CardTitle>
                 </CardHeader>
-                <NextDataTable data={overview.engines.map(toEngineRow)} />
+                <NextDataTable
+                  data={overview.engines.map(toEngineRow)}
+                  rowKey={(row) => row.name}
+                  rowActions={(row) => {
+                    const engine = overview.engines.find((candidate) => candidate.name === row.name);
+                    if (!engine) return [];
+                    const busy = busyNames.has(engine.name);
+                    const actions = engine.installed
+                      ? [
+                          ...(engine.running === null ? [{ label: "Start", onClick: () => runAction(engine.name, "start"), disabled: busy }] : [{ label: "Stop", onClick: () => runAction(engine.name, "stop"), disabled: busy }]),
+                          { label: "Restart", onClick: () => runAction(engine.name, "restart"), disabled: busy },
+                        ]
+                      : [{ label: "Install", onClick: () => runAction(engine.name, "install"), disabled: busy }];
+                    return actions;
+                  }}
+                />
               </div>
 
               <div className="flex flex-col gap-4">
@@ -162,7 +210,7 @@ export function NextEnginesPage() {
             </>
           )
         }
-      </AsyncState>
+      </AsyncState>}
     </div>
   );
 }

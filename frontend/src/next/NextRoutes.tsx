@@ -166,7 +166,7 @@ function NextRoutesWithIncognito({ person }: { person: Roster }) {
             <Route path="people" element={<NextPeoplePage person={person} />} />
             <Route path="settings" element={<NextSettingsPage person={person} />} />
             <Route path="storage" element={<NextStoragePage person={person} />} />
-            <Route path="engines" element={<NextEnginesPage />} />
+            <Route path="engines" element={<NextEnginesPage person={person} />} />
             <Route path="performance" element={<NextPerformancePage />} />
             <Route path="updates" element={<NextUpdatesPage person={person} />} />
             <Route path="repairs" element={<NextRepairsPage person={person} />} />
