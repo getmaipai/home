@@ -336,6 +336,7 @@ export const conversations = sqliteTable(
     companionId: text("companion_id"),
     title: text("title"),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    settings: text("settings"),
     status: text("status").notNull().default("open"), // open|closed|deleted
     summary: text("summary"),
     summaryThroughTurn: text("summary_through_turn"),

@@ -30444,3 +30444,30 @@ same run - `plan.json` is data, not covered by a unit test, so
 `check.sh`'s own role here is confirming the manifest/plan still
 validates and nothing else in the suite regressed). The household's own
 live hub at `127.0.0.1:8787` was never touched.
+
+## PERSIST-CONV-01: conversation settings survive reopening (2026-09-27)
+
+The conversation record now has an optional `settings` object in
+`@maipai/spec` spec-v0.1.49. It currently defines `thinking`, `model`,
+and `read_aloud`; unknown keys are accepted and preserved so older
+clients can patch one setting without erasing newer ones. Home adds a
+nullable JSON column and exposes a settings patch on the existing
+conversation route. Durable conversations write to SQLite; temporary
+chats update only their in-memory session, preserving the temporary
+chat's no-durable-row boundary.
+
+The Next chat hydrates Thinking and automatic read-aloud from the active
+conversation and saves each change through that PATCH. Missing settings
+mean Instant and read-aloud off. A pre-send Thinking or read-aloud choice
+is attached after the new conversation is created, and later turns wait
+for pending settings writes before sending. Model selection is still
+MODEL-SEL-01; this item stores its future `model` value but adds no model
+dispatch behavior.
+
+The shared route test covers merge, validation, reload, and the
+temporary-chat in-memory behavior. The history adapter test confirms
+settings are loaded with history; the NextChat integration test toggles
+both values, reopens the same conversation, and confirms Thinking is
+still sent with the next turn. Commons and Home full gates passed before
+landing. The read-aloud extension also closes HANDSFREE-01(a)'s stated
+persist-across-reload acceptance.

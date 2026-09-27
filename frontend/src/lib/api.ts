@@ -513,6 +513,11 @@ export const api = {
   createConversation: (mode?: Conversation["mode"]) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}) }) }),
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
+  setConversationSettings: (id: string, settings: Record<string, unknown>) =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ settings }),
+    }),
   conversationTurns: (id: string) => request<ConversationTurnWithMemoryIds[]>(`/api/conversations/${encodeURIComponent(id)}/turns`),
   chooseConversationTurn: (id: string) =>
     request<{ turn_id: string; parent_turn_id: string | null; branch_chosen: boolean }>(`/api/conversations/turns/${encodeURIComponent(id)}/choose`, { method: "POST" }),

@@ -21,6 +21,7 @@ import {
   getConversation,
   updateConversationTitle,
   updateConversationMode,
+  updateConversationSettings,
   listConversationTurns,
   buildConversationWindow,
   maybeRefreshConversationSummary,
@@ -1827,6 +1828,59 @@ describe("updateConversationMode()", () => {
     if (!changed.ok) return;
     expect(changed.value.id).toBe(conversation.value.id);
     expect(changed.value.mode).toBe("research");
+  });
+});
+
+describe("PATCH /api/conversations/:id settings", () => {
+  test("persists settings, merges partial keys, and validates them through the shared Conversation schema", async () => {
+    const { client } = await owner();
+    const created = (await (await client.post("/api/conversations", {})).json()) as { id: string };
+    const first = await client.request(`/api/conversations/${created.id}`, {
+      method: "PATCH",
+      body: { settings: { thinking: true, model: "chat-primary", read_aloud: true, future_option: "preserved" } },
+    });
+    expect(first.status).toBe(200);
+    expect(((await first.json()) as { settings: unknown }).settings).toEqual({ thinking: true, model: "chat-primary", read_aloud: true, future_option: "preserved" });
+
+    const second = await client.request(`/api/conversations/${created.id}`, {
+      method: "PATCH",
+      body: { settings: { thinking: false } },
+    });
+    expect(second.status).toBe(200);
+    expect(((await second.json()) as { settings: unknown }).settings).toEqual({ thinking: false, model: "chat-primary", read_aloud: true, future_option: "preserved" });
+
+    const invalid = await client.request(`/api/conversations/${created.id}`, {
+      method: "PATCH",
+      body: { settings: { thinking: "yes" } },
+    });
+    expect(invalid.status).toBe(400);
+    const reloaded = await client.get(`/api/conversations/${created.id}`);
+    expect(((await reloaded.json()) as { settings: unknown }).settings).toEqual({ thinking: false, model: "chat-primary", read_aloud: true, future_option: "preserved" });
+  });
+
+  test("temporary chat settings stay in the live session and never create a durable conversation row", async () => {
+    const { client } = await owner();
+    const created = (await (await client.post("/api/conversations", { mode: "temporary" })).json()) as { id: string };
+    const changed = await client.request(`/api/conversations/${created.id}`, {
+      method: "PATCH",
+      body: { settings: { thinking: true } },
+    });
+    expect(changed.status).toBe(200);
+    expect(((await changed.json()) as { settings: unknown }).settings).toEqual({ thinking: true });
+    expect(db.select().from(conversations).where(eq(conversations.id, created.id)).get()).toBeUndefined();
+    const reloaded = await client.get(`/api/conversations/${created.id}`);
+    expect(((await reloaded.json()) as { settings: unknown }).settings).toEqual({ thinking: true });
+  });
+
+  test("updateConversationSettings removes a null-patched setting", async () => {
+    const { actor } = await owner();
+    const created = createConversation(actor);
+    if (!created.ok) throw new Error(created.error);
+    const set = updateConversationSettings(actor, created.value.id, { thinking: true });
+    if (!set.ok) throw new Error(set.error);
+    const cleared = updateConversationSettings(actor, created.value.id, { thinking: null });
+    expect(cleared.ok).toBe(true);
+    if (cleared.ok) expect(cleared.value.settings).toBeUndefined();
   });
 });
 

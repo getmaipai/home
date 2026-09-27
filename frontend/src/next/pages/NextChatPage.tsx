@@ -44,6 +44,7 @@ import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
 import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type EnginesOverview, type InstalledPackage, type Roster, type StructuredPart, type TurnStats, type ProjectView } from "@/lib/api";
+import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
@@ -188,10 +189,9 @@ const DetailsOpenContext = createContext<{
 /** RESP-04, item (f): the composer's own response-mode control -
  * `ComposerExtra` (thread.aui.tsx) is a bare `ComponentType` slot with
  * no props, the same reason `ArtifactOpenContext`/`AdminContext` above
- * exist. Per-turn only (COORDINATOR, 2026-09-22): no backend field
- * persists a choice across turns yet (PERSIST-CONV-01), so this mirrors
- * ChatPage.tsx's own "Think longer" - reset to Instant right after
- * `consumeThinking()` reads it, never carried to the next message. */
+ * exist. PERSIST-CONV-01 hydrates this mode from the active conversation
+ * and saves changes on selection; changing threads loads that thread's
+ * own mode, while an unset value means Instant. */
 const ThinkingModeContext = createContext<{
   mode: "instant" | "thinking";
   setMode: (mode: "instant" | "thinking") => void;
@@ -1298,9 +1298,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // one flag `consumeSpoken` reads and clears, the same single-shot
   // shape `temporaryNextRef`/`packageScopeRef` already use.
   const liveVoiceActiveRef = useRef(false);
-  // HANDSFREE-01(a): session-local conversation mode; it resets on a
-  // real conversation switch and starts off after a reload until
-  // PERSIST-CONV-01 gives conversations a durable setting.
+  // HANDSFREE-01(a): automatic read-aloud is remembered per conversation.
   const [autoReadReplies, setAutoReadReplies] = useState(false);
   const autoReadRepliesRef = useRef(false);
   autoReadRepliesRef.current = autoReadReplies;
@@ -1349,14 +1347,28 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     previousThreadIdRef.current = remoteId;
     setSearchParamsRef.current({ conversation: remoteId }, { replace: true });
   }, []);
-  // RESP-04 (f): the composer's thinking-mode control. Read via a ref
-  // inside the adapter (ChatPage.tsx's own `thinkingRef` - the adapter
-  // itself is memoized on `[aui]` alone, so a plain closure over
-  // `thinking` state would go stale the moment this re-renders without
-  // `aui` changing).
-  const [thinking, setThinking] = useState(false);
+  // PERSIST-CONV-01: the selected mode is hydrated from the active
+  // conversation's shared settings and saved when the person changes it.
+  // The ref keeps the memoized model adapter on the current value.
+  const [thinking, setThinkingState] = useState(false);
   const thinkingRef = useRef(false);
   thinkingRef.current = thinking;
+  const thinkingDirtyRef = useRef(false);
+  const autoReadRepliesDirtyRef = useRef(false);
+  const pendingNewConversationReadAloudRef = useRef<boolean | undefined>(undefined);
+  const pendingNewConversationThinkingRef = useRef<boolean | undefined>(undefined);
+  const settingsWriteRef = useRef<Promise<void>>(Promise.resolve());
+  const queueReadAloudWrite = useCallback((conversationId: string, value: boolean) => {
+    settingsWriteRef.current = settingsWriteRef.current
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await api.setConversationSettings(conversationId, { read_aloud: value });
+        } catch {
+          toast.error("Could not save this chat's settings. Try again.");
+        }
+      });
+  }, []);
   // Safety ruling, 2026-09-22: the same non-minor floor temporary chat
   // already uses (owner/admin/adult) - a minor's turn request never
   // carries `thinking` at all, belt and braces alongside the composer
@@ -1373,6 +1385,48 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // age_band on the signed-in person's own profile, a wire addition out
   // of scope here - flagged, not silently accepted as correct.
   const thinkingAllowed = canHaveTemporaryChatRole(person.role);
+  const applyConversationThinking = useCallback((value: boolean) => {
+    thinkingRef.current = value;
+    setThinkingState(value);
+  }, []);
+  const applyAutoReadReplies = useCallback((value: boolean) => {
+    autoReadRepliesRef.current = value;
+    setAutoReadReplies(value);
+  }, []);
+  const setConversationAutoReadReplies = useCallback((value: boolean) => {
+    autoReadRepliesDirtyRef.current = true;
+    applyAutoReadReplies(value);
+    const conversationId = visibleConversationIdRef.current;
+    if (!conversationId) {
+      pendingNewConversationReadAloudRef.current = value;
+      return;
+    }
+    pendingNewConversationReadAloudRef.current = undefined;
+    queueReadAloudWrite(conversationId, value);
+  }, [applyAutoReadReplies, queueReadAloudWrite]);
+  const setThinking = useCallback((value: boolean) => {
+    thinkingDirtyRef.current = true;
+    applyConversationThinking(value);
+    const conversationId = visibleConversationIdRef.current;
+    if (!conversationId) {
+      pendingNewConversationThinkingRef.current = value;
+      return;
+    }
+    settingsWriteRef.current = settingsWriteRef.current
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await api.setConversationSettings(conversationId, { thinking: value });
+        } catch {
+          toast.error("Could not save this chat's settings. Try again.");
+        }
+      });
+  }, [applyConversationThinking]);
+  const onConversationSettingsLoaded = useCallback((conversationId: string, settings: Conversation["settings"]) => {
+    if (visibleConversationIdRef.current !== conversationId) return;
+    if (!thinkingDirtyRef.current) applyConversationThinking(settings?.thinking ?? false);
+    if (!autoReadRepliesDirtyRef.current) applyAutoReadReplies(settings?.read_aloud ?? false);
+  }, [applyAutoReadReplies, applyConversationThinking]);
   // ADMIN-COMPARE-01 (b): bare mode. Deliberately session-local, never
   // consumed/reset per turn the way `thinking` is - it stays on for
   // every send until the admin turns it off, or the conversation
@@ -1392,7 +1446,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // The remote-thread runtime reloads its list when this adapter changes.
   // Incognito is an exclusive data source: its sessions never merge with
   // durable conversation rows.
-  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext, onArchiveUnavailable }), [person.display_name, temporaryNext, onArchiveUnavailable]);
+  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext, onArchiveUnavailable, onSettingsLoaded: onConversationSettingsLoaded }), [person.display_name, temporaryNext, onArchiveUnavailable, onConversationSettingsLoaded]);
   // SHELL-02 slice 6: the same real adapters ChatPage.tsx's composer
   // already uses - images plus, new here, text/Markdown files through
   // the shipped `SimpleTextAttachmentAdapter` (client-side only, no
@@ -1449,7 +1503,30 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
         createChatModelAdapter({
           getConversationId: async () => {
             const { remoteId } = await aui.threadListItem().initialize();
-            await api.resumeConversation(remoteId);
+            await settingsWriteRef.current;
+            const conversation = await api.resumeConversation(remoteId);
+            const pendingThinking = pendingNewConversationThinkingRef.current;
+            if (pendingThinking !== undefined) {
+              pendingNewConversationThinkingRef.current = undefined;
+              // Instant is the default, so an untouched or explicitly
+              // returned-to-default new thread needs no settings write.
+              if (pendingThinking) {
+                try {
+                  await api.setConversationSettings(remoteId, { thinking: true });
+                } catch {
+                  toast.error("Could not save this chat's settings. Try again.");
+                }
+              }
+            } else if (!thinkingDirtyRef.current) {
+              applyConversationThinking(conversation.settings?.thinking ?? false);
+            }
+            const pendingReadAloud = pendingNewConversationReadAloudRef.current;
+            if (pendingReadAloud !== undefined) {
+              pendingNewConversationReadAloudRef.current = undefined;
+              if (pendingReadAloud) queueReadAloudWrite(remoteId, true);
+            }
+            if (!autoReadRepliesDirtyRef.current) applyAutoReadReplies(conversation.settings?.read_aloud ?? false);
+            await settingsWriteRef.current;
             return remoteId;
           },
           // RESP-04's own design: "the choice... is remembered per
@@ -1457,14 +1534,10 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // live, 2026-09-22 (choosing Thinking reverted to Instant
           // right after sending). This used to reset per turn, copied
           // from ChatPage.tsx's own "Think longer" (a genuinely
-          // per-message opt-in there); RESP-04's own control is a mode,
-          // the same lifecycle `bareMode` already has in this file - it
-          // stays until the person changes it or the conversation does
-          // (`onThreadIdChange` below), never silently reverting after
-          // a send. Persisting across a reload still waits on
-          // PERSIST-CONV-01 (no backend field yet); this is the
-          // session-local half.
-          consumeThinking: () => (thinkingAllowed ? thinkingRef.current : undefined),
+          // per-message opt-in there); RESP-04's control is a mode. Its
+          // current value is hydrated from the conversation settings,
+          // saved by its setter, and used on every send until changed.
+          getThinking: () => (thinkingAllowed ? thinkingRef.current : undefined),
           consumeSupersedes,
           consumePackageScope: () => {
             const value = packageScopeRef.current?.id;
@@ -1585,6 +1658,13 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
       closeSheet();
       const isDeliberateSwitch = previousThreadIdRef.current !== undefined && id !== previousThreadIdRef.current;
       previousThreadIdRef.current = id;
+      const pendingReadAloud = pendingNewConversationReadAloudRef.current;
+      if (id && pendingReadAloud !== undefined && !isDeliberateSwitch) {
+        pendingNewConversationReadAloudRef.current = undefined;
+        if (pendingReadAloud) {
+          queueReadAloudWrite(id, true);
+        }
+      }
       // A different conversation is a different investigation - bare
       // mode never silently follows the switch. (Left as the
       // unconditional reset it already was - this row's own fix is
@@ -1592,19 +1672,22 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
       // unasked-for change to bareMode's own behavior.)
       setBareMode(false);
       // RESP-04's own choice outlives a single send (see
-      // consumeThinking's own comment above) - a real conversation
+      // getThinking's own comment above) - a real conversation
       // switch starts on Instant, but this conversation's OWN first
       // send resolving its placeholder id must not look like one.
       if (isDeliberateSwitch) {
         thinkingRef.current = false;
-        setThinking(false);
-        autoReadRepliesRef.current = false;
-        setAutoReadReplies(false);
+        setThinkingState(false);
+        thinkingDirtyRef.current = false;
+        pendingNewConversationThinkingRef.current = undefined;
+        autoReadRepliesDirtyRef.current = false;
+        pendingNewConversationReadAloudRef.current = undefined;
+        applyAutoReadReplies(false);
       }
     },
   });
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1658,7 +1741,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     title,
     ttsAvailable,
     autoReadReplies,
-    onAutoReadRepliesChange: (enabled) => setAutoReadReplies(enabled),
+    onAutoReadRepliesChange: setAutoReadReplies,
     // A code review caught this: the vendored thread-list.aui.tsx's own
     // rename/delete already toast on failure (`toast.error("Could not
     // rename/delete this chat. Try again.")`) - this header's own

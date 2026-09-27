@@ -331,6 +331,44 @@ describe("rowsToBranchableMessages", () => {
 });
 
 describe("createChatHistoryAdapter", () => {
+  test("load restores settings from the conversation record for the active thread", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/conversations/conv-example123/turns")) return Promise.resolve(Response.json([]));
+      if (url.endsWith("/api/conversations/conv-example123")) {
+        return Promise.resolve(Response.json({ id: "conv-example123", settings: { thinking: true, model: "chat-primary", future_option: "preserved" } }));
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    const loaded: Array<{ id: string; settings: unknown }> = [];
+    try {
+      const adapter = createChatHistoryAdapter("Nova", () => "conv-example123", (id, settings) => loaded.push({ id, settings }));
+      await adapter.load();
+      expect(loaded).toEqual([{ id: "conv-example123", settings: { thinking: true, model: "chat-primary", future_option: "preserved" } }]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("a conversation without stored settings reports the default state as absent", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/conversations/conv-default123/turns")) return Promise.resolve(Response.json([]));
+      if (url.endsWith("/api/conversations/conv-default123")) return Promise.resolve(Response.json({ id: "conv-default123" }));
+      throw new Error(`unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    let loadedSettings: unknown = "not-called";
+    try {
+      const adapter = createChatHistoryAdapter("Nova", () => "conv-default123", (_id, settings) => { loadedSettings = settings; });
+      await adapter.load();
+      expect(loadedSettings).toBeUndefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("load() builds an ExportedMessageRepository from GET /api/conversations/conv-example123/turns", async () => {
     // Asserts the real path, not just "any fetch resolves" - a code
     // review-adjacent finding (session E step 5, 2026-09-06): the

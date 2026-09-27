@@ -1,5 +1,6 @@
 import { ExportedMessageRepository, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
+import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 
 export type FeedbackVerdict = "positive" | "negative";
@@ -227,11 +228,21 @@ export function rowsToBranchableMessages(
 // Turns are persisted by the turn engine. `supersedes` (getmaipai/home#60)
 // is what makes an edit-and-resend a real branch here rather than just
 // another exchange in the linear history.
-export function createChatHistoryAdapter(selfName: string, getConversationId: () => string | undefined): ThreadHistoryAdapter {
+export function createChatHistoryAdapter(
+  selfName: string,
+  getConversationId: () => string | undefined,
+  onSettingsLoaded?: (conversationId: string, settings: NonNullable<Conversation["settings"]> | undefined) => void,
+): ThreadHistoryAdapter {
   return {
     async load() {
       const id = getConversationId();
-      const rows = id ? await api.conversationTurns(id) : [];
+      const [rows, conversation] = id
+        ? await Promise.all([
+            api.conversationTurns(id),
+            onSettingsLoaded ? api.conversation(id) : Promise.resolve(undefined),
+          ])
+        : [[] as ConversationTurnWithMemoryIds[], undefined] as const;
+      if (id && conversation && onSettingsLoaded) onSettingsLoaded(id, conversation.settings);
       const feedback = id
         ? await Promise.all(rows.map(async (row) => [row.id, await api.conversationFeedback(row.id).catch(() => null)] as const))
         : [];

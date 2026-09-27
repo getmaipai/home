@@ -934,6 +934,7 @@ export function toConversationRecord(row: ConversationRow): Conversation {
     companion_id: row.companionId,
     title: row.title,
     pinned: row.pinned,
+    settings: row.settings ? JSON.parse(row.settings) : undefined,
     status: row.status,
     summary: row.summary,
     summary_through_turn: row.summaryThroughTurn,
@@ -953,6 +954,7 @@ function conversationToDbValues(c: Conversation) {
     companionId: c.companion_id,
     title: c.title,
     pinned: c.pinned,
+    settings: c.settings ? JSON.stringify(c.settings) : null,
     status: c.status,
     summary: c.summary,
     summaryThroughTurn: c.summary_through_turn,
@@ -1735,6 +1737,56 @@ export function updateConversationMode(actor: PersonRow, id: string, mode: Conve
   const parsed = Conversation.safeParse({ ...found.value, mode, updated_at: now, hlc: newHlc });
   if (!parsed.success) return { ok: false, status: 400, error: parsed.error.issues.map((i) => i.message).join("; ") };
   db.update(conversations).set({ mode, updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
+  return { ok: true, value: parsed.data };
+}
+
+/** PATCH /api/conversations/:id settings. This is a key-wise patch so a
+ * client that only knows about `thinking` cannot erase a newer client's
+ * additional settings. A null value removes that key (used to return to
+ * the role/model default); the resulting record is still validated by the
+ * shared Conversation schema before it is returned or stored. Temporary
+ * chats update only their in-memory session and never write a DB row. */
+export function updateConversationSettings(actor: PersonRow, id: string, patch: unknown): ConversationOpResult<Conversation> {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    return { ok: false, status: 400, error: "settings must be an object" };
+  }
+  const found = getConversation(actor, id);
+  if (!found.ok) return found;
+
+  const nextSettings: Record<string, unknown> = { ...(found.value.settings ?? {}) };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete nextSettings[key];
+    else nextSettings[key] = value;
+  }
+  const settingsValue = Object.keys(nextSettings).length > 0 ? nextSettings : undefined;
+  const settings = Conversation.shape.settings.safeParse(settingsValue);
+  if (!settings.success) {
+    return { ok: false, status: 400, error: settings.error.issues.map((issue) => issue.message).join("; ") };
+  }
+
+  const now = new Date().toISOString();
+  const parsed = Conversation.safeParse({
+    ...found.value,
+    settings: settings.data,
+    updated_at: now,
+    hlc: nextHlc(),
+  });
+  if (!parsed.success) {
+    return { ok: false, status: 400, error: parsed.error.issues.map((issue) => issue.message).join("; ") };
+  }
+
+  const session = temporarySessions.get(id);
+  if (session) {
+    session.conversation = parsed.data;
+    session.lastActivityAt = Date.now();
+    return { ok: true, value: parsed.data };
+  }
+
+  db.update(conversations).set({
+    settings: parsed.data.settings ? JSON.stringify(parsed.data.settings) : null,
+    updatedAt: now,
+    hlc: parsed.data.hlc,
+  }).where(eq(conversations.id, id)).run();
   return { ok: true, value: parsed.data };
 }
 

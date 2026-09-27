@@ -2157,6 +2157,169 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
     }
   });
 
+  test("a conversation's Thinking setting is patched on change and restored after reopening it", async () => {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    const saved = {
+      id: "conv-persist123",
+      person: "person-abc123",
+      surface: "chat",
+      mode: "chat",
+      companion_id: null,
+      title: "Reasoning chat",
+      pinned: false,
+      status: "open",
+      source: "hub",
+      hlc: "1788000000000:0:testnode",
+      created_at: "2026-09-27T00:00:00.000Z",
+      updated_at: "2026-09-27T00:00:00.000Z",
+      settings: undefined as { thinking?: boolean; read_aloud?: boolean } | undefined,
+    };
+    let turnCount = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = init?.method ?? "GET";
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "tts", state: { state: "ready" } }], engines: [], budget: null }));
+      if (url.endsWith("/api/conversations") && method === "GET") {
+        return Promise.resolve(Response.json([{ ...saved, last_turn_at: null }]));
+      }
+      if (url.endsWith(`/api/conversations/${saved.id}/turns`)) return Promise.resolve(Response.json([]));
+      if (url.endsWith(`/api/conversations/${saved.id}/resume`) && method === "POST") return Promise.resolve(Response.json(saved));
+      if (url.endsWith(`/api/conversations/${saved.id}`) && method === "PATCH") {
+        const body = JSON.parse(String(init?.body)) as { settings: Record<string, unknown> };
+        saved.settings = { ...(saved.settings ?? {}), ...body.settings };
+        return Promise.resolve(Response.json(saved));
+      }
+      if (url.endsWith(`/api/conversations/${saved.id}`)) return Promise.resolve(Response.json(saved));
+      if (url.includes("/api/turn/stream")) {
+        turnCount++;
+        const text = `Reply ${turnCount}.`;
+        return Promise.resolve(new Response(ndjsonStream([
+          { type: "delta", text },
+          { type: "done", value: { turn_id: `turn-persist${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
+        ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    const page = () => renderPage(
+      <ChatHeaderDataProvider>
+        <ChatHeaderBar />
+        <MemoryRouter initialEntries={[`/next/chat?conversation=${saved.id}`]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>
+      </ChatHeaderDataProvider>,
+    );
+    try {
+      const first = page();
+      await first.findByLabelText("Message input");
+      await waitFor(() => expect(first.getByRole("button", { name: "Conversation actions" })).toBeTruthy());
+      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
+      fireEvent.click(trigger());
+      fireEvent.click(menuItems()[1]!);
+      await waitFor(() => expect(saved.settings).toEqual({ thinking: true }));
+      const actions = first.getByRole("button", { name: "Conversation actions" });
+      act(() => {
+        fireEvent.pointerDown(actions, { button: 0, ctrlKey: false, pointerId: 1 });
+        fireEvent.click(actions);
+      });
+      fireEvent.click(await first.findByText("Read replies aloud"));
+      await waitFor(() => expect(saved.settings).toEqual({ thinking: true, read_aloud: true }));
+      first.unmount();
+
+      const reopened = page();
+      await reopened.findByLabelText("Message input");
+      await waitFor(() => expect(reopened.getByRole("button", { name: "Conversation actions" })).toBeTruthy());
+      await waitFor(() => expect(trigger()).toHaveTextContent("Thinking"));
+      const reopenedActions = reopened.getByRole("button", { name: "Conversation actions" });
+      act(() => {
+        fireEvent.pointerDown(reopenedActions, { button: 0, ctrlKey: false, pointerId: 1 });
+        fireEvent.click(reopenedActions);
+      });
+      const readAloudItem = await reopened.findByText("Read replies aloud");
+      expect(readAloudItem.closest('[role="menuitemcheckbox"]')).toHaveAttribute("aria-checked", "true");
+      await sendMessage(reopened, "explain this carefully");
+      await reopened.findByText("Reply 1.");
+      const turn = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
+        .map((call: unknown[]) => ({ url: typeof call[0] === "string" ? call[0] : String(call[0]), init: call[1] as RequestInit | undefined }))
+        .find(({ url }) => url.includes("/api/turn/stream"));
+      expect(JSON.parse(String(turn?.init?.body)).thinking).toBe(true);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("read-aloud selected before the first send is saved before that turn is sent", async () => {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    const calls: string[] = [];
+    const saved = {
+      id: "conv-first-read-aloud",
+      person: "person-abc123",
+      surface: "chat",
+      mode: "chat",
+      companion_id: null,
+      title: null,
+      pinned: false,
+      status: "open",
+      source: "hub",
+      hlc: "1788000000000:0:testnode",
+      created_at: "2026-09-27T00:00:00.000Z",
+      updated_at: "2026-09-27T00:00:00.000Z",
+      settings: undefined as { read_aloud?: boolean } | undefined,
+    };
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = init?.method ?? "GET";
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "tts", state: { state: "ready" } }], engines: [], budget: null }));
+      if (url.endsWith("/api/conversations") && method === "POST") {
+        calls.push("create");
+        return Promise.resolve(Response.json({ id: saved.id, status: "open", surface: "chat" }));
+      }
+      if (url.endsWith(`/api/conversations/${saved.id}/resume`) && method === "POST") return Promise.resolve(Response.json(saved));
+      if (url.endsWith(`/api/conversations/${saved.id}`) && method === "PATCH") {
+        const body = JSON.parse(String(init?.body)) as { settings: Record<string, unknown> };
+        if (body.settings) {
+          calls.push("settings");
+          saved.settings = { ...(saved.settings ?? {}), ...body.settings };
+        } else calls.push("rename");
+        return Promise.resolve(Response.json(saved));
+      }
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/turn/stream")) {
+        calls.push("turn");
+        return Promise.resolve(new Response(ndjsonStream([
+          { type: "delta", text: "Here is the reply." },
+          { type: "done", value: { turn_id: "turn-first-read-aloud", reply: { text: "Here is the reply." }, source: "model", safety: SAFETY } },
+        ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(
+        <ChatHeaderDataProvider>
+          <ChatHeaderBar />
+          <MemoryRouter initialEntries={["/next/chat"]}>
+            <NextChatPage person={makePerson()} />
+          </MemoryRouter>
+        </ChatHeaderDataProvider>,
+      );
+      await view.findByLabelText("Message input");
+      const actions = await view.findByRole("button", { name: "Conversation actions" });
+      act(() => {
+        fireEvent.pointerDown(actions, { button: 0, ctrlKey: false, pointerId: 1 });
+        fireEvent.click(actions);
+      });
+      fireEvent.click(await view.findByRole("menuitemcheckbox", { name: "Read replies aloud" }));
+      await sendMessage(view, "read the reply");
+      await view.findByText("Here is the reply.");
+      expect(saved.settings).toEqual({ read_aloud: true });
+      expect(calls.filter((call) => call === "settings")).toHaveLength(1);
+      expect(calls.indexOf("settings")).toBeLessThan(calls.indexOf("turn"));
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   test("clicking outside the control closes the menu without changing the mode", async () => {
     const restore = stubFetch();
     try {
@@ -2198,8 +2361,8 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
   // Found live, 2026-09-22 (Jesse): choosing Thinking reverted to
   // Instant right after sending - a defect against RESP-04's own
   // design ("the choice... is remembered per person with the
-  // conversation"). `consumeThinking` used to reset the mode per turn,
-  // copied from ChatPage.tsx's own per-message "Think longer" toggle;
+  // conversation"). The old per-turn consumeThinking path was copied
+  // from ChatPage.tsx's own per-message "Think longer" toggle;
   // this control is a mode, the same `bareMode` lifecycle already has
   // in this file - it survives a send, and resets only on a real
   // conversation change. A fresh stream per call (`stubMultiTurnFetch`

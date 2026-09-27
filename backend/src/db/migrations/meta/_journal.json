@@ -484,6 +484,13 @@
       "when": 1790505231364,
       "tag": "0068_nebulous_mandrill",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "6",
+      "when": 1790523107327,
+      "tag": "0069_clear_human_cannonball",
+      "breakpoints": true
     }
   ]
 }

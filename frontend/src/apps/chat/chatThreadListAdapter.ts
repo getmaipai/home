@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createChatHistoryAdapter } from "@/apps/chat/chatHistoryAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { api } from "@/lib/api";
+import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 
 export interface ChatThreadListOptions {
   /** The household member whose own conversations to list - omit for
@@ -23,10 +24,12 @@ export interface ChatThreadListOptions {
   incognito?: boolean;
   /** Called synchronously when an unsupported archive action is rejected. */
   onArchiveUnavailable?: (remoteId: string) => void;
+  /** Supplies persisted settings when the active conversation history loads. */
+  onSettingsLoaded?: (conversationId: string, settings: NonNullable<Conversation["settings"]> | undefined) => void;
 }
 
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
-  const { personId, query, incognito = false, onArchiveUnavailable } = options;
+  const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded } = options;
   return {
     async list() {
       const rows = incognito ? await api.incognitoConversationList(personId) : await api.conversationList(personId, query);
@@ -89,7 +92,7 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
     },
     unstable_useAdapters: function useChatAdapters() {
       const aui = useAui();
-      return useMemo(() => ({ history: createChatHistoryAdapter(selfName, () => aui.threadListItem().getState().remoteId) }), [aui]);
+      return useMemo(() => ({ history: createChatHistoryAdapter(selfName, () => aui.threadListItem().getState().remoteId, onSettingsLoaded) }), [aui, onSettingsLoaded]);
     },
   };
 }

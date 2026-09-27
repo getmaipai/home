@@ -5867,6 +5867,27 @@
                       "default": false,
                       "description": "Whether this conversation stays at the top of its person's list."
                     },
+                    "settings": {
+                      "type": "object",
+                      "properties": {
+                        "thinking": {
+                          "type": "boolean",
+                          "description": "Whether turns in this conversation use extended reasoning. Absent means the default (Instant)."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Optional model id selected for turns in this conversation. Absent means the role default."
+                        },
+                        "read_aloud": {
+                          "type": "boolean",
+                          "description": "Whether assistant replies are read aloud automatically in this conversation. Absent means off."
+                        }
+                      },
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Optional settings remembered with this conversation. Unknown keys are preserved for additive cross-client evolution."
+                    },
                     "status": {
                       "type": "string",
                       "enum": [

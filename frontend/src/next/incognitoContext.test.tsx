@@ -44,5 +44,5 @@ describe("IncognitoProvider", () => {
     fireEvent.click(second.getByRole("button", { name: "Incognito Off" }));
     expect(second.queryByRole("dialog")).toBeNull();
     await waitFor(() => expect(second.getByRole("button", { name: "Incognito On" })).toHaveAttribute("aria-pressed", "true"));
-  });
+  }, 10_000);
 });

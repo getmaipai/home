@@ -25,6 +25,7 @@ import {
   listConversationTurns,
   updateConversationTitle,
   updateConversationMode,
+  updateConversationSettings,
   deleteConversationById,
   batchDeleteConversations,
   clearConversations,
@@ -357,11 +358,16 @@ conversationsRoutes.get("/:id/turns", requireAuth, async (c) => {
 
 conversationsRoutes.patch("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null; pinned?: boolean; mode?: Conversation["mode"] };
+  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null; pinned?: boolean; mode?: Conversation["mode"]; settings?: unknown };
   if (body.mode !== undefined) {
     const mode = Conversation.shape.mode.safeParse(body.mode);
     if (!mode.success || mode.data === undefined) return c.json({ error: "invalid conversation mode" }, 400);
     const result = updateConversationMode(actor, c.req.param("id"), mode.data);
+    if (!result.ok) return fail(c, result);
+    return c.json(result.value);
+  }
+  if (Object.hasOwn(body, "settings")) {
+    const result = updateConversationSettings(actor, c.req.param("id"), body.settings);
     if (!result.ok) return fail(c, result);
     return c.json(result.value);
   }

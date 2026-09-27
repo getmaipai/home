@@ -59,21 +59,15 @@ function lastUserText(messages: ChatModelRunOptions["messages"]): string | undef
 }
 
 export interface ChatModelAdapterDeps {
-  // Reads AND resets the composer's "Think longer" toggle in one call
-  // (ChatPage.tsx): a per-message opt-in, not a mode a household member
-  // could forget is still on and pay the latency for every later reply -
-  // the same "back to off after every send" the pre-assistant-ui version
-  // did in handleSend's own `finally` block, just consumed here since the
-  // adapter (created once via useMemo) has no per-run finally of its own
-  // to hang that reset off.
   onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
   onSpeechError?(): void;
-  // undefined for a minor (safety ruling, 2026-09-22): the turn request
-  // omits `thinking` entirely rather than sending `false`, so a minor's
-  // request looks identical to a surface that never offers the control.
-  consumeThinking(): boolean | undefined;
-  // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - unlike
-  // `consumeThinking()`, bare mode is meant to stay on across every send
+  // NewChat reads the active conversation's selected mode. Undefined
+  // for a minor (safety ruling, 2026-09-22): its request omits `thinking`.
+  getThinking?(): boolean | undefined;
+  // Retired ChatPage's one-message "Think longer" action.
+  consumeThinking?(): boolean | undefined;
+  // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - bare
+  // mode is meant to stay on across every send
   // in the conversation until the admin turns it off themselves
   // (NextChatPage.tsx's own ephemeral, session-local switch). Undefined
   // for any surface that never offers it.
@@ -81,9 +75,8 @@ export interface ChatModelAdapterDeps {
   // getmaipai/home#60: reads AND resets the "which turn is this Update
   // replacing" ref that thread.aui.tsx's EditComposer sets right before
   // its own Send click reaches assistant-ui's real send callback
-  // (chatEditSupersedes.ts), the same single-shot pattern consumeThinking()
-  // already uses - undefined for an ordinary send, never anything else's
-  // edit once this one's been read.
+  // (chatEditSupersedes.ts) - undefined for an ordinary send, never
+  // anything else's edit once this one's been read.
   consumeSupersedes(): string | undefined;
   consumeContinuation?(): PendingContinuation | undefined;
   // SHELL-02 slice 6: reads AND resets the composer's Apps-menu choice
@@ -378,15 +371,14 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         abortSignal.throwIfAborted();
         while (!sawTerminalEvent) {
           const bare = deps.isBareMode?.() ?? false;
-          // A review caught this: consumeThinking() isn't a pure read -
-          // it resets the composer's own Instant/Thinking selection
-          // (NextChatPage.tsx). Bare mode's own completion ignores
-          // `thinking` entirely (bareCompletion.ts hardcodes it on), so
-          // calling this for a bare send used to flip the composer back
-          // to Instant for a value the request never even looked at -
-          // a confusing side effect on a choice this send didn't use.
+          // Bare completion ignores `thinking` entirely
+          // (bareCompletion.ts hardcodes it on), so don't add a thinking
+          // field to that request. NewChat's getter reads the active
+          // conversation setting; the old ChatPage fallback consumes its
+          // one-message action.
+          const thinking = deps.getThinking ? deps.getThinking() : deps.consumeThinking?.();
           const response = await api.streamTurn(text ?? "Please read the attached document.", abortSignal, {
-            thinking: reconnectAttempts === 0 && !bare ? deps.consumeThinking() : undefined,
+            thinking: reconnectAttempts === 0 && !bare ? thinking : undefined,
             // `undefined`, not `false`, when a surface has no bare-mode
             // concept at all (ChatPage.tsx's own adapter never sets
             // isBareMode) - `false` would still ride the request body
