@@ -86,3 +86,8 @@ own `gen/ts` and `gen/py` already generated, and a sibling
 or the gate fails with a "missing" error that looks unrelated to what
 you changed.
 A commit that touches only docs runs `bash scripts/check.sh --docs` instead (the reading-level lint plus the standards core, seconds not minutes).
+Every scope but docs first takes the machine-wide full-gate lock from
+`../.github/standards/bin/gate-lock.sh` (override with `MAIPAI_GATE_LOCK`)
+and waits its turn behind any other repo's gate on this machine; `bash
+../.github/standards/bin/gate-lock.sh status` shows who holds it and who
+is queued. Never hand-roll a wait for another gate: run `check.sh`.

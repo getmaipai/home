@@ -37,6 +37,39 @@ done
 
 stage() { now=$(date +%s); [ -n "${STAGE_T:-}" ] && echo "   (${STAGE_NAME}: $((now-STAGE_T))s)" >&2; STAGE_T=$now; STAGE_NAME="$1"; echo "== $1"; }
 
+# The run's one EXIT handler: bash keeps a single EXIT trap, so the scope
+# temp files (compute_scope() below) and the full-gate lock (taken once
+# the scope is known) both clean up here rather than one trap replacing
+# the other. Subshells (the concurrent legs, every $(...)) never run it.
+# A gate killed mid-run (a SIGTERM while it waits on the full scope's two
+# legs) stops its own legs before freeing the lock: bash does not kill a
+# background subshell when its parent exits, and a released lock with
+# this run's bun test and vite build still going would let the next
+# queued gate overlap them, the exact memory pressure the lock prevents
+# (found in review). Only PIDs this run started are ever signalled.
+SCOPE_CHANGED_FILE=""
+SCOPE_IMPORTED_FILE=""
+GATE_LOCK="${MAIPAI_GATE_LOCK:-../.github/standards/bin/gate-lock.sh}"
+GATE_LOCK_LABEL=""
+BACKEND_PID=""
+FRONTEND_PID=""
+descendants() { local c; for c in $(pgrep -P "$1" 2>/dev/null); do echo "$c"; descendants "$c"; done; }
+stop_tree() {
+  local tree
+  tree="$(descendants "$1")"
+  kill "$1" $tree 2>/dev/null || true
+}
+on_exit() {
+  if [ -n "$BACKEND_PID" ]; then stop_tree "$BACKEND_PID"; fi
+  if [ -n "$FRONTEND_PID" ]; then stop_tree "$FRONTEND_PID"; fi
+  wait 2>/dev/null || true
+  rm -f "$SCOPE_CHANGED_FILE" "$SCOPE_IMPORTED_FILE"
+  if [ -n "$GATE_LOCK_LABEL" ]; then
+    bash "$GATE_LOCK" release "$GATE_LOCK_LABEL" >/dev/null 2>&1 || true
+  fi
+}
+trap on_exit EXIT
+
 # --- Scope computation (before anything else can print, so it is
 # genuinely the gate's first line) -----------------------------------
 #
@@ -129,14 +162,14 @@ compute_scope() {
   local changed_file imported_file
   changed_file="$(mktemp)"
   imported_file="$(mktemp)"
-  # An EXIT trap, not RETURN: `set -e` aborting the whole script from a
-  # failing command inside this function (bun missing, gateScope.ts
-  # throwing) skips straight past a RETURN trap without firing it -
-  # confirmed live on this machine's own bash. The paths are expanded
-  # now, with double quotes, into the trap's own command string, since
-  # $changed_file/$imported_file are this function's locals and won't
-  # exist by the time a later EXIT actually fires.
-  trap "rm -f '$changed_file' '$imported_file'" EXIT
+  # Removed by on_exit() (the EXIT trap), not a RETURN trap: `set -e`
+  # aborting the whole script from a failing command inside this
+  # function (bun missing, gateScope.ts throwing) skips straight past a
+  # RETURN trap without firing it - confirmed live on this machine's own
+  # bash. Copied into globals, since $changed_file/$imported_file are
+  # this function's locals and won't exist by the time EXIT fires.
+  SCOPE_CHANGED_FILE="$changed_file"
+  SCOPE_IMPORTED_FILE="$imported_file"
   # "${files[@]}" on a genuinely empty array throws "unbound variable"
   # under set -u on this machine's own bash (3.2.57 - macOS never
   # shipped past the last GPLv2 release, and 3.2's array expansion
@@ -169,6 +202,7 @@ compute_scope() {
     | sort -u > "$imported_file"
 
   { IFS= read -r SCOPE; IFS= read -r SCOPE_WHY; } < <(bun scripts/gateScope.ts "$changed_file" "$imported_file")
+  rm -f "$changed_file" "$imported_file"
 }
 
 if [ "$FULL_FORCED" = 1 ]; then
@@ -181,6 +215,27 @@ else
   fi
 fi
 echo "== scope: $SCOPE ($SCOPE_WHY)"
+
+# One full gate at a time on this machine (org CLAUDE.md > Verification;
+# getmaipai/.github docs/DECISIONS.md, 2026-09-27): every non-docs scope
+# takes the machine-wide lock before any memory-heavy work, blocking FIFO
+# behind any other repo's gate, and on_exit() frees it on every exit
+# path. The docs scope never touches it and runs beside anything. The
+# lock comes from the sibling .github checkout, not the pinned standards
+# tag below: it is one machine resource every caller must agree on,
+# whatever tag each pins. GATE_LOCK_ITEM, when a caller sets it, names
+# the item in `gate-lock.sh status`.
+if [ "$SCOPE" != "docs" ]; then
+  if [ ! -f "$GATE_LOCK" ]; then
+    echo "== gate-lock: $GATE_LOCK is missing (getmaipai/.github checkout older than gate-lock.sh, or set MAIPAI_GATE_LOCK); not running a $SCOPE gate without the machine-wide lock"
+    exit 1
+  fi
+  GATE_LOCK_LABEL="home-$$"
+  if ! GATE_LOCK_PID=$$ bash "$GATE_LOCK" acquire "$GATE_LOCK_LABEL" "${GATE_LOCK_ITEM:-}"; then
+    echo "== gate-lock: could not take the machine-wide full-gate lock (see above); not running the $SCOPE gate"
+    exit 1
+  fi
+fi
 
 STANDARDS_REPO="${MAIPAI_STANDARDS_DIR:-../.github}"
 STD_TAG="std-v0.3.0"
@@ -341,10 +396,14 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
   ) > "$FRONTEND_LOG" 2>&1 &
   FRONTEND_PID=$!
 
+  # Each leg's PID is cleared once it is reaped: nothing left for
+  # on_exit() to stop, and a PID the OS may reuse is never signalled.
   BACKEND_RC=0
   wait "$BACKEND_PID" || BACKEND_RC=$?
+  BACKEND_PID=""
   FRONTEND_RC=0
   wait "$FRONTEND_PID" || FRONTEND_RC=$?
+  FRONTEND_PID=""
 
   echo "== backend leg =="
   cat "$BACKEND_LOG"
