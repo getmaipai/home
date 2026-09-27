@@ -27648,8 +27648,12 @@ Home has to be, and it is the only part Open WebUI actually provides.
   MaiPai's `policy.ts` consent/confirm gate and CONFIRM-01's parked-ask
   mechanism already do the functional equivalent, independently arrived
   at. What is missing is the surface: the ask is answered only by
-  typing or saying "yes", and the kit's shipped `approval-card.tsx`
-  goes unused. APPROVE-CARD-01 closes that.
+  typing or saying "yes", with no real approve/deny control drawn.
+  APPROVE-CARD-01 closes that (corrected 2026-09-27 by design-resolver,
+  issue #177: the right component is assistant-ui's own
+  `ToolFallback.Approval`, not the kit's `approval-card.tsx`, which is
+  built for a terminal command and can't be relabeled - see
+  BACKLOG.md's APPROVE-CARD-01 entry).
 - Two smaller notes, not standalone items: their terminal-style file
   previewer (hands a document's content back into the reply) is worth a
   glance before `REFERENCE-LAYOUTS-01` designs the citation reader;
@@ -27742,10 +27746,11 @@ research (2026-09-26)":**
   `TurnStats.nodes`) and shows it only in aggregate on
   `/next/performance`; the missing piece is the page, plus a replay of
   one turn through the bench's replay path.
-- **APPROVE-CARD-01**, tap-to-approve for a parked confirm, from the
-  kit's shipped `approval-card.tsx`, beside the spoken or typed yes;
-  and a page for the household approval queue that has a route and no
-  frontend.
+- **APPROVE-CARD-01**, tap-to-approve for a parked confirm, from
+  assistant-ui's own `ToolFallback.Approval` (corrected 2026-09-27,
+  not the kit's `approval-card.tsx` - see BACKLOG.md), beside the
+  spoken or typed yes; and a page for the household approval queue
+  that has a route and no frontend.
 - **CONV-STATE-01**, conversation list marks for "waiting on your
   answer" (from `conversations.pending_ask`), unread and scheduled.
 - **ROUTINES-01**, a catalog package for a scheduled prompt delivered
