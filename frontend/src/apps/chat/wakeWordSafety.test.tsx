@@ -20,7 +20,7 @@ const DEVICE_SCOPE = "device:browser-1234567890ab";
 function adult(): Roster {
   return {
     id: "person-adult123",
-    display_name: "Morgan",
+    display_name: "Riff",
     nickname: null,
     role: "adult",
     avatar_seed: "person-adult123",

@@ -117,7 +117,7 @@ describe("device wake-word setting safety", () => {
     const child = new TestClient();
     await child.post("/api/auth/select", { personId: childId });
 
-    const adultCreated = await owner.post("/api/people", { displayName: "Morgan", role: "adult", secret: "0000" });
+    const adultCreated = await owner.post("/api/people", { displayName: "Riff", role: "adult", secret: "0000" });
     const adultId = (await adultCreated.json() as { id: string }).id;
     const adult = new TestClient();
     await adult.post("/api/auth/select", { personId: adultId });
