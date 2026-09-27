@@ -2,6 +2,9 @@ import type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from "@
 import { IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
+const DOCUMENT_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet", "application/vnd.oasis.opendocument.presentation"]);
+const stagedDocuments = new Map<string, File>();
 
 /** The browser-side portion of ATT-01's immutable local attachment record.
  * The conversation and turn references are supplied by the turn engine when
@@ -71,9 +74,15 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
   const capability = options.capability ?? (() => ({ imageParts: false, engine: "text-only" as const, transport: "local" as const }));
 
   return {
-    accept: "image/*",
+    accept: "image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp",
 
     async add({ file }): Promise<PendingAttachment> {
+      if (DOCUMENT_TYPES.has(file.type.toLowerCase())) {
+        if (file.size > MAX_DOCUMENT_BYTES) throw new Error("That document is too large. Choose one under 50 MB.");
+        const id = newLocalAttachmentId();
+        stagedDocuments.set(id, file);
+        return { id, type: "file", name: file.name, contentType: file.type, file, status: { type: "requires-action", reason: "composer-send" } };
+      }
       validateImage(file);
       if (!capability().imageParts) throw new Error(IMAGE_VISION_UNAVAILABLE_MESSAGE);
       const bytes = await file.arrayBuffer();
@@ -99,6 +108,8 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
     },
 
     async send(attachment: PendingAttachment): Promise<CompleteAttachment> {
+      const doc = stagedDocuments.get(attachment.id);
+      if (doc) return { ...attachment, status: { type: "complete" }, content: [{ type: "text", text: `Document: ${doc.name}` }] };
       if (!capability().imageParts) throw new Error(IMAGE_VISION_UNAVAILABLE_MESSAGE);
       validateImage(attachment.file);
       return {
@@ -109,6 +120,7 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
     },
 
     async remove(attachment): Promise<void> {
+      stagedDocuments.delete(attachment.id);
       stagedRecords.delete(attachment.id);
       options.onRemove?.(attachment.id);
     },
@@ -121,6 +133,13 @@ export function stagedImageAttachment(id: string): LocalImageAttachmentRecord | 
 
 export function clearStagedImageAttachments(): void {
   stagedRecords.clear();
+  stagedDocuments.clear();
+}
+
+export async function stagedDocumentPayload(id: string): Promise<{ name: string; mediaType: string; data: string } | undefined> {
+  const file = stagedDocuments.get(id);
+  if (!file) return undefined;
+  return { name: file.name, mediaType: file.type.toLowerCase(), data: await fileDataURL(file) };
 }
 
 export { MAX_IMAGE_BYTES };

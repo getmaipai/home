@@ -101,13 +101,13 @@ function GroupLabel({ children }: { children: string }) {
 
 /** Add photos and files: the shipped `ComposerPrimitive.AddAttachment`
  * (opens the native file picker, accepts whatever the runtime's
- * attachments adapter declares - images plus text/Markdown, per
+ * attachments adapter declares - images, text/Markdown and PDF/office
  * `useNextChatRuntime`'s own `CompositeAttachmentAdapter`), styled as a
  * menu row via `asChild` instead of its own bare button. */
 function AddPhotosAndFilesItem({ onSelect }: { onSelect: () => void }) {
   return (
     <ComposerPrimitive.AddAttachment asChild>
-      <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, Markdown" onClick={onSelect} />
+      <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, PDF, Office" onClick={onSelect} />
     </ComposerPrimitive.AddAttachment>
   );
 }

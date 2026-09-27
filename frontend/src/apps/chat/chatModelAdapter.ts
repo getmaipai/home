@@ -5,6 +5,7 @@ import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { messageText } from "@/apps/chat/chatMessageText";
+import { stagedDocumentPayload } from "@/apps/chat/localImageAttachmentAdapter";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
 import { CURRENT_LOCAL_VISION_CAPABILITY, IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
@@ -174,8 +175,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
     async *run({ messages, abortSignal }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
       const lastMessage = messages[messages.length - 1];
       const imageAttached = lastMessage?.role === "user" && lastMessage.attachments.some((attachment) => attachment.type === "image");
-      const text = lastUserText(messages);
-      if (!text && !imageAttached) return;
+      const documentPayloads = lastMessage?.role === "user" ? (await Promise.all(lastMessage.attachments.filter((attachment) => attachment.type === "file").map((attachment) => stagedDocumentPayload(attachment.id)))).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];
+      const typedText = lastUserText(messages);
+      const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
+      if (!text && !imageAttached && documentPayloads.length === 0) return;
       // A complete attachment can arrive here from a restored or custom
       // runtime even when the composer adapter was bypassed. Refuse before
       // conversation resolution or fetch so a text-only engine never sees
@@ -185,7 +188,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         yield { content: [{ type: "text", text: IMAGE_VISION_UNAVAILABLE_MESSAGE }] };
         return;
       }
-      if (!text) return;
+      if (!text && documentPayloads.length === 0) return;
 
       // Stop whatever an earlier live reply was still speaking - never two
       // voices at once. A manual "Listen" replay (chatListen.ts) stops
@@ -382,7 +385,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // calling this for a bare send used to flip the composer back
           // to Instant for a value the request never even looked at -
           // a confusing side effect on a choice this send didn't use.
-          const response = await api.streamTurn(text, abortSignal, {
+          const response = await api.streamTurn(text ?? "Please read the attached document.", abortSignal, {
             thinking: reconnectAttempts === 0 && !bare ? deps.consumeThinking() : undefined,
             // `undefined`, not `false`, when a surface has no bare-mode
             // concept at all (ChatPage.tsx's own adapter never sets
@@ -405,6 +408,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // only ever meaningful on the first attempt of this send,
             // never resent on a reconnect retry within the same send.
             askAnswer: reconnectAttempts === 0 ? deps.consumeAskAnswer?.() : undefined,
+            documentAttachments: reconnectAttempts === 0 && documentPayloads.length > 0 ? documentPayloads : undefined,
           });
           for await (const event of readTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event

@@ -55,7 +55,8 @@ import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, PERSONA_IDS, DEFAULT_PERSONA } from "@/lib/persona";
 import { db } from "@/db";
-import { people, conversationTurns, memoryRecords, episodes } from "@/db/schema";
+import { people, conversationTurns, memoryRecords, episodes, attachments } from "@/db/schema";
+import { __setTikaRunnerForTests } from "@/lib/documentExtraction";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
@@ -491,6 +492,29 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     if (!result.ok || result.kind !== "immediate") return;
     expect(result.value.source).toBe("safety_refuse");
     expect(REFUSAL_FIRST).toContain(result.value.reply.text);
+  });
+
+  test("stores and extracts a PDF after its provisional turn exists, then sends extracted text to the model", async () => {
+    const { actor } = await owner();
+    __setTikaRunnerForTests(() => "Extracted meeting notes.");
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const requests: ChatCompletionRequest[] = [];
+    const stub = startStubLlmServer(0, { scriptedChatReply: (request) => { requests.push(request); return "I read the notes."; } });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurnStream(actor, "chat", "Summarize this", { documentAttachments: [{ name: "notes.pdf", mediaType: "application/pdf", data: "data:application/pdf;base64,cGRm" }] });
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      for await (const _ of result.tokens) { /* drain */ }
+      expect(JSON.stringify(requests)).toContain("Extracted meeting notes.");
+      const row = db.select().from(attachments).get();
+      expect(row).toMatchObject({ mediaType: "application/pdf", turnId: result.turnId });
+    } finally {
+      await stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __setTikaRunnerForTests(null);
+      __resetLlmSupervisorForTests();
+    }
   });
 
   test("rejects text over MAX_TURN_TEXT_LENGTH before it reaches the safety classifier or the model (SEC-5)", async () => {

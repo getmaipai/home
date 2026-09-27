@@ -78,4 +78,21 @@ describe("local image attachment adapter", () => {
     const oversized = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "large.png", { type: "image/png" });
     await expect(adapter.add({ file: oversized })).rejects.toThrow("under 10 MB");
   });
+
+  test("stages PDF bytes locally and exposes them only as a send payload", async () => {
+    const adapter = createLocalImageAttachmentAdapter();
+    const pending = await adapter.add({ file: new File(["pdf bytes"], "note.pdf", { type: "application/pdf" }) }) as PendingAttachment;
+    expect(pending.type).toBe("file");
+    expect(await import("@/apps/chat/localImageAttachmentAdapter").then((m) => m.stagedDocumentPayload(pending.id))).toEqual({
+      name: "note.pdf", mediaType: "application/pdf", data: "data:application/pdf;base64,cGRmIGJ5dGVz",
+    });
+    await adapter.remove(pending);
+    expect(await import("@/apps/chat/localImageAttachmentAdapter").then((m) => m.stagedDocumentPayload(pending.id))).toBeUndefined();
+  });
+
+  test("rejects an unsupported document and an oversized document at pick time", async () => {
+    const adapter = createLocalImageAttachmentAdapter();
+    await expect(adapter.add({ file: new File(["x"], "x.bin", { type: "application/octet-stream" }) })).rejects.toThrow("image files");
+    await expect(adapter.add({ file: new File([new Uint8Array(50 * 1024 * 1024 + 1)], "large.pdf", { type: "application/pdf" }) })).rejects.toThrow("under 50 MB");
+  });
 });

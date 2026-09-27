@@ -1,11 +1,13 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ThreadMessage } from "@assistant-ui/react";
+import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, PendingAttachment, ThreadMessage } from "@assistant-ui/react";
 import { createChatModelAdapter, stripThinking } from "@/apps/chat/chatModelAdapter";
+import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
 import { FakeAudioContext, fakeWavBody } from "../../../tests/fakeAudioContext";
 import { ndjsonStream, staggeredNdjsonStream } from "../../../tests/ndjsonStream";
 
 afterEach(() => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
+  clearStagedImageAttachments();
 });
 
 // `ChatModelAdapter.run()`'s own return type is a union with a plain
@@ -143,6 +145,26 @@ describe("image capability boundary", () => {
 // never reached the model, even though the attach-and-send itself
 // succeeded with no error at all.
 describe("document attachment content", () => {
+  test("a PDF rides as an additive document_attachments payload on the actual turn request", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "Read." },
+      { type: "done", value: { turn_id: "turn-pdf", reply: { text: "Read." }, source: "model", safety: SAFETY } },
+    ]));
+    const fileAdapter = createLocalImageAttachmentAdapter();
+    const pending = await fileAdapter.add({ file: new File(["pdf bytes"], "notes.pdf", { type: "application/pdf" }) });
+    try {
+      const message = { ...fakeUserMessage("summarize"), attachments: [{ ...pending, type: "file", status: { type: "complete" as const } }] };
+      await collect([message as unknown as ThreadMessage]);
+      expect(env.turnBodies[0]).toMatchObject({
+        text: "summarize",
+        document_attachments: [{ name: "notes.pdf", media_type: "application/pdf", data: "data:application/pdf;base64,cGRmIGJ5dGVz" }],
+      });
+    } finally {
+      await fileAdapter.remove(pending as PendingAttachment);
+      env.restore();
+    }
+  });
+
   test("attaching a text file and sending delivers the turn - its own content rides along in the outgoing text", async () => {
     const env = stubEnvironment(ndjsonStream([
       { type: "delta", text: "Noted." },

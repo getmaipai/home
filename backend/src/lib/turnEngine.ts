@@ -49,6 +49,8 @@ import { promptNow } from "@/lib/benchSampling";
 import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
+import { createAttachment } from "@/lib/attachments";
+import { extractDocument } from "@/lib/documentExtraction";
 import {
   logTurn,
   appendTemporaryTurn,
@@ -382,6 +384,8 @@ export type ComposedRecord = Pick<ComposedTurn, "mode" | "model_calls" | "budget
 export type SpeakerEvidence = { person: string | null; basis: "signed_in" | "voice" | "face" | "voice_and_face" | "claimed" | "unknown"; level: "confirmed" | "tentative" | "unknown" };
 export type PresentPerson = SpeakerEvidence;
 export type TurnContinuation = { fromTurnId?: string; assistantText: string };
+export type DocumentTurnAttachment = { name: string; mediaType: string; data: string };
+export class DocumentAttachmentError extends Error {}
 const CONTINUATION_INSTRUCTION = "Continue the incomplete answer above. Do not repeat any text already given. Start at the first missing point and finish the answer clearly.";
 
 function logTurnSafely(
@@ -2294,6 +2298,7 @@ async function prepareTurn(
   speakerEvidence: SpeakerEvidence | null = null,
   present: readonly PresentPerson[] | null = null,
   continuation: TurnContinuation | null = null,
+  documentAttachments: readonly DocumentTurnAttachment[] = [],
 ): Promise<PreparedTurn> {
   const turnId = newConversationTurnId();
   // getmaipai/home#131: a real row for this exact id, before anything
@@ -2324,6 +2329,23 @@ async function prepareTurn(
     } catch (err) {
       console.error(`[turn] insertProvisionalTurn failed, tool calls needing this turn's own row will fail their own way: ${(err as Error).message}`);
     }
+  }
+  if (documentAttachments.length > 0) {
+    if (ephemeral || conversation.mode === "temporary") throw new DocumentAttachmentError("Documents cannot be attached in a temporary chat");
+    const extracted: string[] = [];
+    for (const item of documentAttachments) {
+      const match = /^data:([^;,]+);base64,([A-Za-z0-9+/]*={0,2})$/.exec(item.data);
+      if (!match || match[1]!.toLowerCase() !== item.mediaType.toLowerCase()) throw new DocumentAttachmentError("Document attachment is invalid");
+      const bytes = new Uint8Array(Buffer.from(match[2]!, "base64"));
+      const result = await extractDocument(bytes, item.mediaType);
+      if (!result.ok) throw new DocumentAttachmentError(result.error);
+      const body = result.value.pages.map((page) => page.text).join("\n\n").trim();
+      if (!body) throw new DocumentAttachmentError("Document has no readable text");
+      const saved = createAttachment(actor, { conversationId: conversation.id, turnId, mediaType: item.mediaType, bytes });
+      if (!saved.ok) throw new DocumentAttachmentError(saved.error);
+      extracted.push(`<document name="${item.name.replace(/[<>\r\n]/g, " ")}">\n${body}\n</document>`);
+    }
+    text = `${text}\n\n${extracted.join("\n\n")}`;
   }
   // Stamps conversation_id/turn_id exactly once, rather than at each of
   // this function's five immediate-return sites (a code review,
@@ -3740,7 +3762,7 @@ export async function runTurn(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; temporary?: boolean } = {},
+  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; temporary?: boolean; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
 ): Promise<TurnOpResult> {
   // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
   if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
@@ -3781,10 +3803,10 @@ async function runTurnHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
+  opts: { thinking?: boolean; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
 ): Promise<TurnOpResult> {
   const loaded = loadAllManifests(); // one catalog scan, shared below
-  const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, false, opts.speakerEvidence ?? null, opts.present ?? null);
+  const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, false, opts.speakerEvidence ?? null, opts.present ?? null, null, opts.documentAttachments);
 
   let value: TurnValue;
   // Set by answerWithSafetyAndGuards() when retryable guards emptied
@@ -4540,7 +4562,7 @@ export async function runTurnStream(
   // shows up in the person's real chat history. finalizeReply() (the
   // output safety boundary) and the lease still run for it exactly as
   // for a real turn: only the log write is conditional.
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null } = {},
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
 ): Promise<TurnStreamResult> {
   // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
   if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
@@ -4588,11 +4610,11 @@ async function runTurnStreamHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null },
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
 ): Promise<TurnStreamResult> {
   const branchFrom = resolveSupersedes(opts.continuation?.fromTurnId, conversation.id);
   const continuation = opts.continuation ? { ...opts.continuation, ...(branchFrom ? { fromTurnId: branchFrom } : {}) } : null;
-  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, opts.ephemeral === true, opts.speakerEvidence ?? null, opts.present ?? null, continuation);
+  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, opts.ephemeral === true, opts.speakerEvidence ?? null, opts.present ?? null, continuation, opts.documentAttachments);
 
   if (prepared.kind === "immediate") {
     const trace: ReplyTrace = { hits: [], replaced: false };

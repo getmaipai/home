@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
-import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnEngine";
+import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnEngine";
 import { runBareTurnStream, BareModeForbidden } from "@/lib/turnBareStream";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
@@ -114,6 +114,7 @@ const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "tu
 // fields, the same "reject at the edge, then validate the content"
 // pairing lib/turnEngine.ts's own length check backs up.
 const TURN_BODY_LIMIT = 64 * 1024;
+const STREAM_TURN_BODY_LIMIT = 68 * 1024 * 1024;
 const evidence = z.object({ person: z.string().regex(/^person-[a-z0-9]{6,}$/).nullable(), basis: z.enum(["signed_in", "voice", "face", "voice_and_face", "claimed", "unknown"]), level: z.enum(["confirmed", "tentative", "unknown"]) }).strict();
 const present = z.array(evidence).nullable();
 // APPROVE-CARD-01: a tapped approve/deny card on a parked confirm.
@@ -567,7 +568,7 @@ export async function* streamTurnEvents(
 // body, no `text/event-stream` framing to parse on the way back out for a
 // wire shape this simple - see wire.ts's TurnStreamEvent for the three
 // event kinds. Same auth posture as POST /api/turn above.
-turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
+turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: STREAM_TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");
   const body = (await c.req.json().catch(() => ({}))) as {
     surface?: string;
@@ -587,6 +588,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     temporary?: boolean;
     spoken?: boolean;
     ask_answer?: unknown;
+    document_attachments?: { name: string; media_type: string; data: string }[];
   };
   if (body.resume_token !== undefined) {
     const session = typeof body.resume_token === "string" ? resumeSessions.get(body.resume_token) : undefined;
@@ -596,6 +598,11 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     }
     return streamResponse(session, resumeFrom!);
   }
+  const documentAttachments = body.document_attachments ?? [];
+  if (!Array.isArray(documentAttachments) || documentAttachments.length > 8 || documentAttachments.some((item) =>
+    !item || typeof item.name !== "string" || item.name.length > 255 || typeof item.media_type !== "string" || typeof item.data !== "string" ||
+    !/^data:[^;,]+;base64,[A-Za-z0-9+/]*={0,2}$/.test(item.data) || item.data.length > 70_000_000
+  )) return c.json({ error: "Invalid document attachment" }, 400);
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
@@ -681,11 +688,13 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
             // typed message does (getmaipai/home BACKLOG, found 2026-09-11).
             ephemeral,
             temporary: body.temporary,
+            documentAttachments: documentAttachments.map((item) => ({ name: item.name, mediaType: item.media_type, data: item.data })),
             signal: abortController.signal,
             ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
           });
   } catch (err) {
     if (err instanceof BareModeForbidden) return c.json({ error: err.message }, 403);
+    if (err instanceof DocumentAttachmentError) return c.json({ error: err.message, code: "invalid_document" }, 400);
     throw err;
   }
   if (!result.ok) {

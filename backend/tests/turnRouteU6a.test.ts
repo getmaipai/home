@@ -18,12 +18,15 @@ import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
+import { __setTikaRunnerForTests } from "@/lib/documentExtraction";
+import { attachments } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
 beforeEach(() => resetDb());
 afterEach(() => {
   __resetLlmSupervisorForTests();
+  __setTikaRunnerForTests(null);
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
 
@@ -70,6 +73,46 @@ function storedNodeNames(turnId: string): string[] | undefined {
 }
 
 describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
+  test("a corrupt document is refused with one safe line before any attachment is stored", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", false);
+    const { client } = await owner();
+    __setTikaRunnerForTests(() => { throw new Error("parser internals with private bytes"); });
+    const response = await client.post("/api/turn/stream", {
+      surface: "chat", text: "Summarize this", document_attachments: [{ name: "broken.pdf", media_type: "application/pdf", data: "data:application/pdf;base64,eA==" }],
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "document extraction failed", code: "invalid_document" });
+    expect(db.select().from(attachments).all()).toHaveLength(0);
+  });
+
+  test("an unreadable document is refused with a one-line reason", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", false);
+    const { client } = await owner();
+    __setTikaRunnerForTests(() => " \n\f ");
+    const response = await client.post("/api/turn/stream", {
+      surface: "chat", text: "Summarize this", document_attachments: [{ name: "blank.pdf", media_type: "application/pdf", data: "data:application/pdf;base64,eA==" }],
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Document has no readable text", code: "invalid_document" });
+    expect(db.select().from(attachments).all()).toHaveLength(0);
+  });
+
+  test("a temporary chat refuses documents cleanly before extraction or durable storage", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", false);
+    const { client } = await owner();
+    let parserCalls = 0;
+    __setTikaRunnerForTests(() => { parserCalls++; return "should not parse"; });
+    const response = await client.post("/api/turn/stream", {
+      surface: "chat", text: "Summarize this", temporary: true,
+      document_attachments: [{ name: "notes.pdf", media_type: "application/pdf", data: "data:application/pdf;base64,eA==" }],
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Documents cannot be attached in a temporary chat", code: "invalid_document" });
+    expect(parserCalls).toBe(0);
+    expect(db.select().from(attachments).all()).toHaveLength(0);
+    expect(db.select().from(conversationTurns).all()).toHaveLength(0);
+  });
+
   test("with turn.pipeline.next off, a turn runs the frozen path - no stats.nodes trace at all", async () => {
     setHouseholdSettingValue("turn.pipeline.next", false);
     const { client } = await owner();
