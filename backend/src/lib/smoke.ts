@@ -186,6 +186,10 @@ export async function runDenoTestSmoke(dir: string, timeoutMs: number = DENO_TES
   const proc = Bun.spawn(["deno", "test", "--no-check", `--allow-read=${dir}`, "--cached-only", dir], {
     stdout: "pipe",
     stderr: "pipe",
+    // Use the same Deno package-resolution mode as the live sandbox:
+    // bundled handlers resolve npm: imports from Deno's global cache,
+    // not a Deno-managed node_modules tree beside Bun's package.json.
+    env: { ...process.env, DENO_NO_PACKAGE_JSON: "1" },
     timeout: timeoutMs,
   });
   const [stdout, stderr, exitCode] = await Promise.all([

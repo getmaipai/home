@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
+import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
+import { getDeviceSettingsScope } from "@/lib/deviceSettingsScope";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Roster, ResolvedSetting } from "@/lib/api";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -54,6 +57,7 @@ function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string
   const puts: Array<{ scope: string; key: string; value: unknown }> = [];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: true }));
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.includes("/api/settings?scope=")) {
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
@@ -63,7 +67,12 @@ function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string
       const body = JSON.parse(String(init.body));
       puts.push(body);
       const key = registry.find((k) => k.key === body.key)!;
-      return Promise.resolve(Response.json(makeValue({ ...key }, body.value)));
+      const updated = makeValue({ ...key }, body.value);
+      const current = valuesByScope[body.scope] ?? [];
+      valuesByScope[body.scope] = current.some((item) => item.key === body.key)
+        ? current.map((item) => item.key === body.key ? updated : item)
+        : [...current, updated];
+      return Promise.resolve(Response.json(updated));
     }
     // NOTIFY-SHARE-02: PersonMultiSelect's own roster fetch (api.people()).
     if (url.includes("/api/people") && (!init?.method || init.method === "GET")) {
@@ -75,6 +84,42 @@ function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string
 }
 
 describe("NextSettingsPage", () => {
+  test("an adult's composer and This device settings control write the same wake-word value", async () => {
+    const wakeword = makeKey({ key: "voice.wakeword.enabled", scope: "device", selector: "boolean", default: false, label: "Wake word listening", lives_in: "device.voice" });
+    localStorage.setItem("maipai.device-settings-id.v1", "browser-1234567890ab");
+    const deviceScope = getDeviceSettingsScope();
+    const adult = makePerson({ id: "person-adult123", avatar_seed: "person-adult123", role: "adult" });
+    const { restore, puts } = mockSettingsFetch([wakeword], {
+      household: [],
+      [`person:${adult.id}`]: [],
+      [deviceScope]: [makeValue(wakeword, false)],
+    });
+    try {
+      const view = renderWithQueryClient(
+        <MemoryRouter>
+          <TooltipProvider>
+            <NextSettingsPage person={adult} />
+            <ComposerWakeWordControl person={adult} />
+          </TooltipProvider>
+        </MemoryRouter>,
+      );
+      const composerToggle = await view.findByRole("button", { name: "Turn on wake word listening" });
+      fireEvent.click(composerToggle);
+      await waitFor(() => expect(puts).toContainEqual({ scope: deviceScope, key: wakeword.key, value: true }));
+      await waitFor(() => expect(view.getByRole("button", { name: "Turn off wake word listening" }).getAttribute("aria-pressed")).toBe("true"));
+
+      fireEvent.click(await view.findByRole("tab", { name: "This device" }));
+      const settingsToggle = await view.findByRole("switch", { name: "Wake word listening" });
+      await waitFor(() => expect(settingsToggle.getAttribute("aria-checked")).toBe("true"));
+      fireEvent.click(settingsToggle);
+      await waitFor(() => expect(puts).toContainEqual({ scope: deviceScope, key: wakeword.key, value: false }));
+      await waitFor(() => expect(view.getByRole("button", { name: "Turn on wake word listening" }).getAttribute("aria-pressed")).toBe("false"));
+      expect(puts.every((put) => put.scope === deviceScope && put.key === wakeword.key)).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
   test("an owner sees both tabs; a basic person-scope select key changes live", async () => {
     const appearance = makeKey({ key: "ui.appearance", scope: "person", selector: "select", range: { options: ["system", "light", "dark"] }, label: "Appearance", level: "basic", lives_in: "profile.appearance" });
     const { restore, puts } = mockSettingsFetch([appearance], {

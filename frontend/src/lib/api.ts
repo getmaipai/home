@@ -578,6 +578,7 @@ export const api = {
   // result into a real command item.
   search: (q: string) => request<{ groups: SearchGroup[] }>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.groups),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
+  wakewordStatus: () => request<{ detectors: { id: string; label: string; file: string }[]; installed: boolean }>("/api/voice/wakewords"),
   settingsValues: (scope: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}`),
   setSetting: (scope: string, key: string, value: unknown) =>

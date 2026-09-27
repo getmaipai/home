@@ -16,7 +16,6 @@ import { ThreadList, ThreadListNew, type ThreadListActions } from "@maipai/ui/sr
 import * as Popover from "@radix-ui/react-popover";
 import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-button";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry } from "@/lib/api";
-import { useWakeWord } from "@/apps/chat/useWakeWord";
 import { getIcon } from "@maipai/ui/src/icons";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
@@ -294,7 +293,6 @@ export function ChatPage({ person }: ChatPageProps) {
   // everywhere below, so the two can't drift apart again.
   const sheetOpen = phone && threadsOpen;
   const [speechError, setSpeechError] = useState(false);
-  const wakeWord = useWakeWord({ onWakeDetected: () => setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.") });
 
   // Single source for the model's lifecycle state (the composer's
   // ready-to-send gate below, and the header's own model picker in
@@ -345,11 +343,6 @@ export function ChatPage({ person }: ChatPageProps) {
   // that sense is simply never included) as status icons, teal/
   // secondary/red for active/idle/refused.
   const senses: SenseItem[] = [
-    {
-      kind: "listening",
-      state: wakeWord.status === "listening" ? "active" : wakeWord.status === "error" ? "refused" : "idle",
-      label: wakeWord.status === "listening" ? 'Listening for "hey jarvis"' : wakeWord.status === "error" ? (wakeWord.error ?? "Microphone unavailable") : wakeWord.status === "starting" ? "Starting the microphone" : "Wake word is off",
-    },
     {
       kind: "speaking",
       state: speechError ? "refused" : isSpeaking ? "active" : "idle",
@@ -582,7 +575,11 @@ export function ChatPage({ person }: ChatPageProps) {
                 picker is not a chat control - it lives in the header
                 picker slot (AppShell.tsx's own headerActions, gated to
                 this route and Developer disclosure), not here. */}
-            <SensesDock senses={senses} wakeWordLabel="Wake word" wakeWordEnabled={wakeWord.enabled} onWakeWordChange={() => wakeWord.toggle()} />
+            {/* The legacy shell's wake-word toggle used an unpersisted
+                detector stub. HANDSFREE-01(c) now lives on /next/chat,
+                where it shares the device setting, LiveVoiceSession and
+                the persistent indicator. Keep the other sense icons here. */}
+            <SensesDock senses={senses} wakeWordLabel="" wakeWordEnabled={false} onWakeWordChange={() => {}} className="[&>label]:hidden" />
                     </div>
                   </div>
                   {person.role === "child" ? <ChildBand personName={person.display_name} /> : null}

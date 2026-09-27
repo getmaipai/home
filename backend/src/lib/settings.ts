@@ -13,6 +13,7 @@ import { encryptSecret, decryptSecret } from "@/lib/secrets";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { safeSearchDefaultFor, safeSearchStrictness, type SafeSearchLevel } from "@/lib/safeSearch";
 import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
+import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { PersonRow } from "@/types";
 
@@ -68,11 +69,8 @@ export function parseScope(scope: string): ParsedScope | null {
   return null;
 }
 
-// device:<id> has no real authorization model yet: 3.1's Device record
-// type isn't built (deferred, see docs/dev.md), so there's no ownership
-// or pairing concept to check against. Owner/admin only for now,
-// provisional until Device exists. Exported for the same reason as
-// parseScope above.
+// Generic device settings remain owner/admin-only. Adult access to the
+// wakeword opt-in is granted separately at that key's boundary below.
 export function assertCanAccessScope(
   actor: PersonRow,
   parsed: ParsedScope,
@@ -89,6 +87,11 @@ export function assertCanAccessScope(
   // device
   if (isOwnerOrAdmin(actor)) return { ok: true, value: true };
   return { ok: false, status: 403, error: "only owner or admin may access device settings" };
+}
+
+function assertCanAccessWakewordDeviceSetting(actor: PersonRow): SettingsOpResult<true> {
+  if (isOwnerOrAdmin(actor) || actor.role === "adult") return { ok: true, value: true };
+  return { ok: false, status: 403, error: "only a household adult may access the wakeword setting" };
 }
 
 function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpResult<true> {
@@ -195,7 +198,15 @@ export function resolveForResponse(
 export function listValues(actor: PersonRow, scope: string): SettingsOpResult<ResolvedSetting[]> {
   const parsed = parseScope(scope);
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
-  const auth = assertCanAccessScope(actor, parsed, "read");
+  const auth = parsed.kind === "device" && actor.role === "adult"
+    ? (() => {
+        const deviceKeys = getRegistry().filter((keyDef) => keyDef.scope === "device");
+        if (deviceKeys.length > 0 && deviceKeys.every((keyDef) => keyDef.key === WAKEWORD_SETTING_KEY)) {
+          return assertCanAccessWakewordDeviceSetting(actor);
+        }
+        return assertCanAccessScope(actor, parsed, "read");
+      })()
+    : assertCanAccessScope(actor, parsed, "read");
   if (!auth.ok) return auth;
 
   const stored = db.select().from(settingsValues).where(eq(settingsValues.scope, scope)).all();
@@ -395,6 +406,8 @@ export function setValue(
       ? assertCanSetSafeSearch(actor, parsed.id!, value)
       : key === SESSION_LOCK_REQUIRED_KEY || key === SESSION_LOCK_TIMEOUT_KEY
         ? assertCanSetSessionLock(actor, parsed.id!)
+      : key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
+        ? assertCanAccessWakewordDeviceSetting(actor)
         : key === PERSON_STORAGE_CAP_KEY
           ? assertCanSetPersonStorageCap(actor, parsed.id!)
           : assertCanAccessScope(actor, parsed, "write");
@@ -556,7 +569,9 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
 
-  const auth = assertCanAccessScope(actor, parsed, "write");
+  const auth = key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
+    ? assertCanAccessWakewordDeviceSetting(actor)
+    : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();

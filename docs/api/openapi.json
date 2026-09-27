@@ -7676,10 +7676,14 @@
                           "file"
                         ]
                       }
+                    },
+                    "installed": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
-                    "detectors"
+                    "detectors",
+                    "installed"
                   ]
                 }
               }

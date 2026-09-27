@@ -23,6 +23,7 @@ import { ALLOWANCE_SETTINGS_KEYS } from "../src/settings/allowanceKeys.js";
 import { STORAGE_SETTINGS_KEYS } from "../src/settings/storageKeys.js";
 import { REFERENCE_SETTINGS_KEYS } from "../src/settings/referenceKeys.js";
 import { SECURITY_SETTINGS_KEYS } from "../src/settings/securityKeys.js";
+import { WAKEWORD_SETTINGS_KEYS } from "../src/settings/wakewordKeys.js";
 
 const SHARED_DIR = process.env.MAIPAI_COMMONS_DIR ?? join(import.meta.dir, "..", "..", "..", "commons");
 const outPath = join(SHARED_DIR, "spec", "settings", "keys.json");
@@ -41,6 +42,7 @@ const sorted = [
   ...STORAGE_SETTINGS_KEYS,
   ...REFERENCE_SETTINGS_KEYS,
   ...SECURITY_SETTINGS_KEYS,
+  ...WAKEWORD_SETTINGS_KEYS,
 ].sort((a, b) => a.key.localeCompare(b.key));
 writeFileSync(outPath, JSON.stringify(sorted, null, 2) + "\n");
 console.log(`Wrote ${sorted.length} settings key(s) to ${outPath}`);

@@ -1,19 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
-import { WakeWordLoop } from "@/lib/voice/wake-word-loop";
+import { WakeWordLoop, type WakeWordLoopOptions } from "@/lib/voice/wake-word-loop";
 import { onWakeDetected, type WakeDetectedEvent } from "@/lib/voice/wake-word-events";
 import { loadInstalledWakewords, DEFAULT_WAKE_WORD_MODEL_ID } from "@/lib/voice/wake-word-models";
 
 export type WakeWordStatus = "idle" | "starting" | "listening" | "error";
 
-interface UseWakeWordOptions {
+export interface UseWakeWordOptions {
   onWakeDetected: (event: WakeDetectedEvent) => void;
+  /** Injected by focused tests; production defaults remain the real local
+   * microphone, asset loader and on-device inference loop. */
+  startCapture?: typeof startMicCapture;
+  loadModels?: typeof loadInstalledWakewords;
+  createLoop?: (options: WakeWordLoopOptions) => WakeWordLoopPort;
 }
+
+interface WakeWordLoopPort {
+  setEnabled: (enabled: boolean) => void;
+  pushFrame: (frame: Float32Array) => void;
+  onError: ((err: unknown) => void) | null;
+}
+
+const createWakeWordLoop = (options: WakeWordLoopOptions): WakeWordLoopPort => new WakeWordLoop(options);
 
 interface UseWakeWordResult {
   enabled: boolean;
   status: WakeWordStatus;
   error: string | null;
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
   toggle: () => void;
 }
 
@@ -32,12 +47,17 @@ interface UseWakeWordResult {
 // of that control's own hard-won async logic (moved here unchanged from
 // the pre-step-5b WakeWordToggle component, kept as `enabled`/`status`/
 // `error`/`toggle` so the kit's dock can drive it directly.
-export function useWakeWord({ onWakeDetected: onWake }: UseWakeWordOptions): UseWakeWordResult {
+export function useWakeWord({
+  onWakeDetected: onWake,
+  startCapture = startMicCapture,
+  loadModels = loadInstalledWakewords,
+  createLoop = createWakeWordLoop,
+}: UseWakeWordOptions): UseWakeWordResult {
   const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState<WakeWordStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const micRef = useRef<MicCaptureHandle | null>(null);
-  const loopRef = useRef<WakeWordLoop | null>(null);
+  const loopRef = useRef<WakeWordLoopPort | null>(null);
   // Guards every async continuation below against a superseded toggle:
   // starting mic capture and loading the model registry both await real
   // work, so a rapid on/off/on could otherwise let a stale "started"
@@ -70,7 +90,7 @@ export function useWakeWord({ onWakeDetected: onWake }: UseWakeWordOptions): Use
     return onWakeDetected(onWake);
   }, [onWake]);
 
-  async function stop() {
+  const stop = useCallback(async () => {
     requestIdRef.current++;
     micRef.current?.stop();
     micRef.current = null;
@@ -78,24 +98,25 @@ export function useWakeWord({ onWakeDetected: onWake }: UseWakeWordOptions): Use
     loopRef.current = null;
     setEnabled(false);
     setStatus("idle");
-  }
+  }, []);
 
-  async function start() {
+  const start = useCallback(async () => {
+    if (enabled || status === "starting" || status === "listening") return;
     const requestId = ++requestIdRef.current;
     setEnabled(true);
     setStatus("starting");
     setError(null);
     try {
-      await loadInstalledWakewords();
+      await loadModels();
       if (requestId !== requestIdRef.current) return; // superseded mid-load
-      const loop = new WakeWordLoop({ modelId: DEFAULT_WAKE_WORD_MODEL_ID });
+      const loop = createLoop({ modelId: DEFAULT_WAKE_WORD_MODEL_ID });
       loop.setEnabled(true);
       loop.onError = (err) => {
         if (requestId !== requestIdRef.current) return;
         setStatus("error");
         setError(err instanceof Error ? err.message : "Wake-word inference failed.");
       };
-      const mic = await startMicCapture({ onFrame: (frame) => loop.pushFrame(frame) });
+      const mic = await startCapture({ onFrame: (frame) => loop.pushFrame(frame) });
       if (requestId !== requestIdRef.current) {
         mic.stop();
         loop.setEnabled(false);
@@ -116,7 +137,8 @@ export function useWakeWord({ onWakeDetected: onWake }: UseWakeWordOptions): Use
             : "Could not start the microphone.",
       );
     }
-  }
+  }, [enabled, status, createLoop, loadModels, startCapture]);
 
-  return { enabled, status, error, toggle: () => (enabled ? stop() : start()) };
+  const toggle = useCallback(() => (enabled ? void stop() : void start()), [enabled, start, stop]);
+  return { enabled, status, error, start, stop, toggle };
 }

@@ -127,7 +127,10 @@ async function startProcess(id: string, manifest: PackageManifest, actor: Person
   const transport = new StdioClientTransport({
     command: "deno",
     args: buildDenoRunArgs(sourceDir, dataDir, entryPath(id)),
-    env: {},
+    // Bundled handlers use Deno's npm: specifiers from the global cache.
+    // Deno 2.9 otherwise detects backend/package.json from cwd and expects
+    // a Deno-managed node_modules tree, which Bun does not provide.
+    env: { DENO_NO_PACKAGE_JSON: "1" },
     cwd: sourceDir,
     stderr: "pipe",
   });

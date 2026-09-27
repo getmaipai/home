@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@maipai/ui/src/dashboard/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardDescription } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
 import { NextManageSection } from "@/next/pages/settings/NextManageSection";
-import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type Roster } from "@/lib/api";
+import { meetsMinRole } from "@/apps/people/roles";
+import { getDeviceSettingsScope } from "@/lib/deviceSettingsScope";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 // Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this
@@ -40,16 +43,22 @@ export const SettingsIcon = getIcon("settings");
 export function NextSettingsPage({ person }: { person: Roster }) {
   useDocumentTitle("Settings");
   const canManageHousehold = isOwnerOrAdminRole(person.role);
+  const canConfigureDevice = meetsMinRole(person.role, "adult");
+  const registryQuery = useQuery({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry() });
+  const wakewordAssetsQuery = useQuery({ queryKey: ["wakeword-assets"], queryFn: () => api.wakewordStatus() });
+  const hasDeviceWakeWord = wakewordAssetsQuery.data?.installed === true && Array.isArray(registryQuery.data) && registryQuery.data.some((entry) => entry.key === "voice.wakeword.enabled");
+  const showDeviceSettings = canConfigureDevice && hasDeviceWakeWord;
   // SHELL-SEARCH-02: a search result for a setting names which tab it
   // lives on (`?tab=household|me`).
   const [searchParams] = useSearchParams();
-  function tabFromParams(): "household" | "me" {
+  const tabFromParams = useCallback((): "household" | "me" | "device" => {
     const requested = searchParams.get("tab");
     if (requested === "me") return "me";
+    if (requested === "device" && showDeviceSettings) return "device";
     if (requested === "household" && canManageHousehold) return "household";
     return canManageHousehold ? "household" : "me";
-  }
-  const [tab, setTab] = useState<"household" | "me">(tabFromParams);
+  }, [searchParams, showDeviceSettings, canManageHousehold]);
+  const [tab, setTab] = useState<"household" | "me" | "device">(tabFromParams);
   // A review caught this: a lazy useState initializer runs once, at
   // mount - a person already on Settings (this component stays mounted
   // across a same-route navigation, react-router never remounts it for
@@ -61,7 +70,7 @@ export function NextSettingsPage({ person }: { person: Roster }) {
   // itself never causes (choosing a tab by hand doesn't touch the URL).
   useEffect(() => {
     if (searchParams.get("tab") !== null) setTab(tabFromParams());
-  }, [searchParams, canManageHousehold]);
+  }, [searchParams, tabFromParams]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -71,19 +80,27 @@ export function NextSettingsPage({ person }: { person: Roster }) {
           Settings
         </CardTitle>
       </CardHeader>
-      {canManageHousehold ? (
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "household" | "me")}>
+      {canManageHousehold || showDeviceSettings ? (
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "household" | "me" | "device")}>
           <TabsList>
-            <TabsTrigger value="household">Household</TabsTrigger>
+            {canManageHousehold ? <TabsTrigger value="household">Household</TabsTrigger> : null}
             <TabsTrigger value="me">Me</TabsTrigger>
+            {showDeviceSettings ? <TabsTrigger value="device">This device</TabsTrigger> : null}
           </TabsList>
-          <TabsContent value="household" className="flex flex-col gap-4">
-            <NextSettingsRenderer scope="household" scopeValue="household" />
-            <NextManageSection />
-          </TabsContent>
+          {canManageHousehold ? (
+            <TabsContent value="household" className="flex flex-col gap-4">
+              <NextSettingsRenderer scope="household" scopeValue="household" />
+              <NextManageSection />
+            </TabsContent>
+          ) : null}
           <TabsContent value="me" className="flex flex-col gap-4">
             <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
           </TabsContent>
+          {showDeviceSettings ? (
+            <TabsContent value="device" className="flex flex-col gap-4">
+              <NextSettingsRenderer scope="device" scopeValue={getDeviceSettingsScope()} />
+            </TabsContent>
+          ) : null}
         </Tabs>
       ) : (
         // No tab bar to render for one destination (SettingsPage.tsx's

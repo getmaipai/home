@@ -54,6 +54,8 @@ import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { ComposerAddMenu, PackageScopeContext } from "@/apps/chat/composerAddMenu";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
+import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
+import { WakeWordController } from "@/apps/chat/WakeWordController";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
@@ -213,6 +215,17 @@ const BareModeContext = createContext<{ on: boolean; toggle: () => void }>({ on:
 /** Carries the session-wide Incognito state into the kit's bare Welcome
  * slot, which uses it only to show the matching temporary-chat heading. */
 const TemporaryChatContext = createContext<{ on: boolean }>({ on: false });
+const WakeWordPersonContext = createContext<Roster | null>(null);
+
+function ComposerExtraControls() {
+  const person = useContext(WakeWordPersonContext);
+  return (
+    <>
+      <ComposerVoiceControls />
+      {person ? <ComposerWakeWordControl person={person} /> : null}
+    </>
+  );
+}
 
 const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinking", name: "Thinking" }] as const;
 
@@ -2407,8 +2420,10 @@ export function NextChatPage({ person }: { person: Roster }) {
       <TemporaryChatContext.Provider value={temporaryChatValue}>
       <PackageScopeContext.Provider value={packageScopeValue}>
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
+      <WakeWordPersonContext.Provider value={person}>
       <DictationLevelMeterProvider value={dictationLevelMeter}>
         <StructuredResultTools />
+        <WakeWordController person={person} />
         <ArtifactTool />
         <ConfirmTool />
         <ProjectTool />
@@ -2595,7 +2610,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   // own render on stt+tts both being ready
                   // (composerVoiceControls.tsx's own header), so this is
                   // unconditional here the same way ComposerAddMenu is.
-                  ComposerExtraEnd: ComposerVoiceControls,
+                  ComposerExtraEnd: ComposerExtraControls,
                   // VOICE-LIVE-04b: ComposerInputOverride (ui-v0.5.40)
                   // fully owns the composer's text-field region -
                   // composerDictationWaveform.tsx's own component reads
@@ -2716,6 +2731,7 @@ export function NextChatPage({ person }: { person: Roster }) {
           </SheetContent>
         </Sheet>
       </DictationLevelMeterProvider>
+      </WakeWordPersonContext.Provider>
       </VoiceSessionProvider>
       </PackageScopeContext.Provider>
       </TemporaryChatContext.Provider>

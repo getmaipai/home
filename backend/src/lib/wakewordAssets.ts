@@ -62,6 +62,14 @@ export function isWakewordAssetInstalled(file: string): boolean {
   return existsSync(wakewordAssetPath(file));
 }
 
+/** The stock detector is available only after its complete local inference
+ * pipeline has been downloaded. Checking all four pinned files prevents a
+ * partial or manually interrupted install from exposing a toggle that cannot
+ * start. */
+export function areWakewordAssetsInstalled(): boolean {
+  return WAKEWORD_ALL_ASSETS.every((asset) => isWakewordAssetInstalled(asset.file));
+}
+
 /** Downloads every pinned wake-word asset not already on disk. Safe to
  * call on every request that needs one (routes/voice.ts): the frontend
  * pipeline loads mel, embedding, and the detector as three concurrent

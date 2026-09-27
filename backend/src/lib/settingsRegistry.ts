@@ -10,6 +10,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { SPEC_DIR } from "./specDir.js";
+import { areWakewordAssetsInstalled } from "@/lib/wakewordAssets";
+import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 
 const REGISTRY_PATH = join(SPEC_DIR, "settings", "keys.json");
 
@@ -22,7 +24,11 @@ let cached: SettingsKey[] | null = null;
 
 export function getRegistry(): SettingsKey[] {
   if (!cached) cached = loadRegistry();
-  return cached;
+  // Wake-word controls are absent until the stock detector and its local
+  // inference assets are actually on disk. The catalog package system does
+  // not yet own wakeword installation; keep this gate tied to the real
+  // downloadable asset state.
+  return areWakewordAssetsInstalled() ? cached : cached.filter((key) => key.key !== WAKEWORD_SETTING_KEY);
 }
 
 export function getRegistryKey(key: string): SettingsKey | undefined {

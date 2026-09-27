@@ -9,6 +9,7 @@ import { requireAuth } from "@/middleware/auth";
 import {
   WAKEWORD_ALL_ASSETS,
   WAKEWORD_STOCK_DETECTOR,
+  areWakewordAssetsInstalled,
   ensureWakewordAssets,
   wakewordAssetPath,
 } from "@/lib/wakewordAssets";
@@ -34,9 +35,9 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 export const voiceRoutes = apiRouter();
 
 // What the browser pipeline should load: the shared stage file names plus
-// every available per-phrase detector, so the frontend registry
-// (frontend/src/lib/voice/wake-word-models.ts) has one real source
-// instead of a second, hand-duplicated copy of this list.
+// every available per-phrase detector, and whether the complete stock
+// detector pipeline is already on disk. The settings registry uses this
+// installed bit to hide the opt-in until local inference can actually run.
 const wakewordsRoute = createRoute({
   method: "get",
   path: "/wakewords",
@@ -58,6 +59,7 @@ const wakewordsRoute = createRoute({
                 file: z.string(),
               }),
             ),
+            installed: z.boolean(),
           }),
         },
       },
@@ -69,7 +71,10 @@ const wakewordsRoute = createRoute({
 
 voiceRoutes.openapi(wakewordsRoute, async (c) => {
   return c.json(
-    { detectors: [{ id: "hey_jarvis", label: "openWakeWord \"hey jarvis\"", file: WAKEWORD_STOCK_DETECTOR.file }] },
+    {
+      detectors: [{ id: "hey_jarvis", label: "openWakeWord \"hey jarvis\"", file: WAKEWORD_STOCK_DETECTOR.file }],
+      installed: areWakewordAssetsInstalled(),
+    },
     200,
   );
 });
