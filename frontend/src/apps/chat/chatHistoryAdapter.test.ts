@@ -99,6 +99,36 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.content).toBe("just a reply");
   });
 
+  // APPROVE-CARD-01: `row.confirm` is the reload-path twin of the live
+  // "done" event's own `TurnValue.confirm` (chatModelAdapter.ts) -
+  // conversationHistory.ts's own listConversationTurns()/list() already
+  // derive `open` fresh on every read (never trusted from what was
+  // stored at write time), so `row.confirm.open` here is already
+  // correct by the time it reaches this adapter - no additional
+  // freshness handling needed.
+  test("a row carrying an open confirm becomes a real tool-call part before the reply text", () => {
+    const row = { ...makeRow("row-1", "Go ahead and lock the doors?"), confirm: { package_id: "lock-doors", open: true } };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "tool-call", toolCallId: "row-1-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: true, turn_id: "row-1" } },
+      { type: "text", text: "Go ahead and lock the doors?" },
+    ]);
+  });
+
+  test("a row carrying an answered (closed) confirm still becomes a tool-call part, with open: false", () => {
+    const row = { ...makeRow("row-1", "Go ahead and lock the doors?"), confirm: { package_id: "lock-doors", open: false } };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "tool-call", toolCallId: "row-1-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: false, turn_id: "row-1" } },
+      { type: "text", text: "Go ahead and lock the doors?" },
+    ]);
+  });
+
+  test("a row with no confirm keeps the plain reply text, unchanged", () => {
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "just a reply")], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toBe("just a reply");
+  });
+
   // REASONING-04 (safety ruling, 2026-09-22): a reloaded adult turn shows
   // the answer and a Reasoning block, never "<think>" - conversationHistory.ts's
   // own read-side gate is what ensures `row.reasoning` is only ever

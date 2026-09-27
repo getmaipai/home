@@ -102,6 +102,17 @@ export interface ChatModelAdapterDeps {
   // chosen for), never a mode a later message inherits. Undefined for
   // any surface with no temporary-chat entry.
   consumeTemporary?(): boolean | undefined;
+  // APPROVE-CARD-01: reads AND resets the confirm card's own tapped
+  // approve/deny (ConfirmTool, NextChatPage.tsx), the same single-shot
+  // shape as `consumeSupersedes()`/`consumePackageScope()` - only
+  // meaningful on the one send the card's own Yes/No click makes (which
+  // also sets the composer text to that label before sending, so the
+  // transcript reads naturally), never a mode a later typed message
+  // inherits. Undefined for any surface with no confirm card (a plain
+  // typed "yes" still resumes an ask too, through the backend's own
+  // AFFIRMATIVE_RE text match - this field only carries a real button
+  // tap's structured answer).
+  consumeAskAnswer?(): { turnId: string; approved: boolean } | undefined;
   // VOICE-LIVE-02: reads AND resets the live voice session's own
   // "this send is spoken" choice, the same single-shot shape as
   // consumeTemporary()/consumePackageScope() - only meaningful on the
@@ -389,6 +400,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             packageScope: reconnectAttempts === 0 ? deps.consumePackageScope?.() : undefined,
             temporary: reconnectAttempts === 0 ? deps.consumeTemporary?.() : undefined,
             spoken: reconnectAttempts === 0 ? deps.consumeSpoken?.() : undefined,
+            // APPROVE-CARD-01: the same reconnectAttempts===0 gate as
+            // packageScope/temporary/spoken above - a single-shot field
+            // only ever meaningful on the first attempt of this send,
+            // never resent on a reconnect retry within the same send.
+            askAnswer: reconnectAttempts === 0 ? deps.consumeAskAnswer?.() : undefined,
           });
           for await (const event of readTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
@@ -565,6 +581,18 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // (NextChatPage.tsx) can fetch the full version and open
             // it in canvas-split on click.
             const artifact = event.value.artifact;
+            // APPROVE-CARD-01: `TurnValue.confirm` (wire.ts) - set only
+            // on the turn that just parked a confirm_needed/consent_needed
+            // ask (turnNext.ts's finishTurn() "asked" branch). A real
+            // ToolCallMessagePart here, `toolName: "confirm"`
+            // (ConfirmTool's own registration, NextChatPage.tsx), the
+            // same "package result, not model text" composition as
+            // structuredPart/artifact above. `turn_id` rides in the
+            // result (not just the toolCallId) because the approve/deny
+            // click handler needs it to build the outgoing `ask_answer`
+            // - wire.ts's own doc comment on `confirm` has the full
+            // read-time-derivation reasoning for `open`.
+            const confirm = event.value.confirm;
             // TOOL-EVENTS-01: `toolTimelinePart` (above) is the one
             // definition, used here and by `buildContent()` mid-stream -
             // computed once so both the array-spread check and the part
@@ -617,6 +645,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 ...(finalReasoning ? [{ type: "reasoning" as const, text: finalReasoning }] : []),
                 ...(structuredPart ? [toolCallPart(`${event.value.turn_id}-structured`, structuredPart.tool_id, structuredPart)] : []),
                 ...(artifact ? [toolCallPart(`${event.value.turn_id}-artifact`, "write_document", artifact)] : []),
+                ...(confirm ? [toolCallPart(`${event.value.turn_id}-confirm`, "confirm", { package_id: confirm.package_id, open: confirm.open, turn_id: event.value.turn_id })] : []),
                 // TOOL-EVENTS-01: same "before text" placement as the
                 // structured/artifact cards above - a trace of what ran
                 // while this reply was produced reads above its own

@@ -143,11 +143,20 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.structured_part || row.artifact || row.sources?.length
+        row.reasoning || row.structured_part || row.artifact || row.confirm || row.sources?.length
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
               ...(row.artifact ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
+              // APPROVE-CARD-01: `row.confirm` is the reload-path twin of
+              // the live "done" event's own `TurnValue.confirm`
+              // (chatModelAdapter.ts) - conversationHistory.ts's own
+              // listConversationTurns()/list() already derive `open`
+              // fresh on every read (never trusted from what was stored
+              // at write time), so no additional freshness handling is
+              // needed here: `open` is already correct by the time it
+              // reaches this adapter.
+              ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
               { type: "text" as const, text: row.replyText },
               ...(row.sources?.length ? [toolCallPart(`${row.id}-sources`, "sources", row.sources)] : []),
             ]

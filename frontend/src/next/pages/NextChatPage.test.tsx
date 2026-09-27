@@ -781,6 +781,182 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
   });
 });
 
+// APPROVE-CARD-01 (issue #177): a package's own confirm_needed/
+// consent_needed ask renders through the shipped `ToolFallback.Approval`
+// (vendored at `@maipai/ui/src/assistant-ui/tool-fallback.aui`), never a
+// hand-built card - `ConfirmTool`'s own registration, NextChatPage.tsx.
+describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
+  // stubTurnFetch's own shape (slice 3, above), extended to return a
+  // DIFFERENT stream per successive /api/turn/stream call - the click-
+  // driven follow-up turn a tapped Yes/No card sends is a real second
+  // request this stub has to answer differently from the first.
+  function stubConfirmTurnFetch(streamBodies: ReadableStream<Uint8Array>[]): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let call = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-confirm123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) {
+        const body = streamBodies[Math.min(call, streamBodies.length - 1)]!;
+        call++;
+        return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+  }
+
+  test("an open confirm card renders ToolFallback.Approval's Yes/No options", async () => {
+    const restore = stubConfirmTurnFetch([
+      ndjsonStream([
+        { type: "delta", text: "Go ahead and lock the doors?" },
+        { type: "done", value: { turn_id: "turn-confirm1", reply: { text: "Go ahead and lock the doors?" }, source: "confirm", safety: SAFETY, confirm: { package_id: "lock-doors", open: true } } },
+      ]),
+    ]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "lock the doors");
+      expect(await view.findByText("Go ahead and lock the doors?")).toBeVisible();
+      expect(await view.findByRole("button", { name: "Yes" })).toBeVisible();
+      expect(await view.findByRole("button", { name: "No" })).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("tapping Yes sends a new turn with the matching ask_answer and the tapped label as its text, then clears the one-shot field", async () => {
+    const restore = stubConfirmTurnFetch([
+      ndjsonStream([
+        { type: "delta", text: "Go ahead and lock the doors?" },
+        { type: "done", value: { turn_id: "turn-confirm2", reply: { text: "Go ahead and lock the doors?" }, source: "confirm", safety: SAFETY, confirm: { package_id: "lock-doors", open: true } } },
+      ]),
+      ndjsonStream([
+        { type: "delta", text: "Sure, locking the doors." },
+        { type: "done", value: { turn_id: "turn-confirm2-resumed", reply: { text: "Sure, locking the doors." }, source: "plugin", plugin_id: "lock-doors", safety: SAFETY } },
+      ]),
+      ndjsonStream([
+        { type: "delta", text: "You're welcome." },
+        { type: "done", value: { turn_id: "turn-confirm2-thanks", reply: { text: "You're welcome." }, source: "model", safety: SAFETY } },
+      ]),
+    ]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "lock the doors");
+      const yesButton = await view.findByRole("button", { name: "Yes" });
+      fireEvent.click(yesButton);
+      expect(await view.findByText("Sure, locking the doors.")).toBeVisible();
+      const bodies = turnRequestBodies();
+      expect(bodies[1]).toMatchObject({ text: "Yes", ask_answer: { turn_id: "turn-confirm2", approved: true } });
+      // One-shot: a plain follow-up sent right after never repeats the
+      // field (chatModelAdapter.ts's `consumeAskAnswer()` cleared it).
+      await sendMessage(view, "thanks");
+      await view.findByText("You're welcome.");
+      const bodies2 = turnRequestBodies();
+      expect(bodies2[2]).not.toHaveProperty("ask_answer");
+    } finally {
+      restore();
+    }
+  });
+
+  test("tapping No sends a new turn with ask_answer approved: false", async () => {
+    const restore = stubConfirmTurnFetch([
+      ndjsonStream([
+        { type: "delta", text: "Go ahead and lock the doors?" },
+        { type: "done", value: { turn_id: "turn-confirm3", reply: { text: "Go ahead and lock the doors?" }, source: "confirm", safety: SAFETY, confirm: { package_id: "lock-doors", open: true } } },
+      ]),
+      ndjsonStream([
+        { type: "delta", text: "Okay, no action taken." },
+        { type: "done", value: { turn_id: "turn-confirm3-resumed", reply: { text: "Okay, no action taken." }, source: "model", safety: SAFETY } },
+      ]),
+    ]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "lock the doors");
+      const noButton = await view.findByRole("button", { name: "No" });
+      fireEvent.click(noButton);
+      expect(await view.findByText("Okay, no action taken.")).toBeVisible();
+      const bodies = turnRequestBodies();
+      expect(bodies[1]).toMatchObject({ text: "No", ask_answer: { turn_id: "turn-confirm3", approved: false } });
+    } finally {
+      restore();
+    }
+  });
+
+  // A live "done" event's own `confirm.open` is always true by
+  // construction (wire.ts's own comment: finishTurn() just parked it, so
+  // it's correct at that instant) - `open: false` only ever happens on
+  // RELOAD, once conversationHistory.ts's own read-time derivation sees
+  // the ask already answered. Exercised here through the real reload
+  // path (GET /api/conversations/:id/turns), the same shape
+  // "the open conversation's title is the tab title" (above) already
+  // uses to open an existing conversation.
+  test("a closed (open: false) confirm card on reload renders no Yes/No buttons - already answered, non-interactive", async () => {
+    const conversation = { id: "conv-confirm-closed", title: "Locks", surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false };
+    const row = {
+      id: "turn-confirm-closed",
+      personId: "person-abc123",
+      surface: "chat",
+      userText: "lock the doors",
+      replyText: "Go ahead and lock the doors?",
+      source: "confirm",
+      pluginId: null,
+      commandId: null,
+      safetyFlagged: false,
+      safetyAction: "allow",
+      minorSpeaker: false,
+      createdAt: "2026-09-27T00:00:00.000Z",
+      supersedes: null,
+      judgeStatus: null,
+      memory_ids: [],
+      confirm: { package_id: "lock-doors", open: false },
+    };
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes(`/api/conversations/${conversation.id}/resume`)) return Promise.resolve(Response.json(conversation));
+      if (url.includes(`/api/conversations/${conversation.id}/turns`)) return Promise.resolve(Response.json([row]));
+      if (url.includes(`/api/conversations/${conversation.id}`)) return Promise.resolve(Response.json(conversation));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([conversation]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={[`/next/chat?conversation=${conversation.id}`]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await view.findByText("Go ahead and lock the doors?")).toBeVisible();
+      expect(view.queryByRole("button", { name: "Yes" })).toBeNull();
+      expect(view.queryByRole("button", { name: "No" })).toBeNull();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
 describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail collapse and peek)", () => {
   // Jesse's literal spec (22:04, refined 22:22): no floating placement
   // for the column itself - it's one node (`next-chat-rail`) that always

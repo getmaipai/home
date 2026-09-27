@@ -673,6 +673,82 @@ describe("createChatModelAdapter structured results (SHELL-02 slice 3)", () => {
   });
 });
 
+// APPROVE-CARD-01: `TurnValue.confirm` (wire.ts) - set only on the turn
+// that just parked a confirm_needed/consent_needed ask (turnNext.ts's
+// finishTurn() "asked" branch) - becomes a real ToolCallMessagePart the
+// same way structured_part/artifact above do, `toolName: "confirm"`
+// (ConfirmTool's own registration, NextChatPage.tsx), card before the
+// prose that carries the actual question text.
+describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
+  test("confirm on the done event becomes a real tool-call part, card before prose", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Go ahead and lock the doors?" },
+        { type: "done", value: { turn_id: "turn-confirm123", reply: { text: "Go ahead and lock the doors?" }, source: "confirm", safety: SAFETY, confirm: { package_id: "lock-doors", open: true } } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("lock the doors")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([
+        { type: "tool-call", toolCallId: "turn-confirm123-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: true, turn_id: "turn-confirm123" } },
+        { type: "text", text: "Go ahead and lock the doors?" },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a plain-text reply with no confirm yields no confirm tool-call part", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Basil and parsley are easy herbs." },
+        { type: "done", value: { turn_id: "turn-herbs789", reply: { text: "Basil and parsley are easy herbs." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what herbs should I grow")]);
+      const last = yields[yields.length - 1];
+      expect(last?.content).toEqual([{ type: "text", text: "Basil and parsley are easy herbs." }]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  // The same single-shot shape consumeSpoken()/consumeTemporary()/
+  // consumePackageScope() already establish - consumeAskAnswer() is the
+  // one place `ask_answer` ever reaches the wire (ConfirmTool's own
+  // respondToApproval handler, NextChatPage.tsx).
+  test("consumeAskAnswer() arms ask_answer on the request, once, then resets", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Sure, locking the doors." },
+        { type: "done", value: { reply: { text: "Sure, locking the doors." }, source: "plugin", plugin_id: "lock-doors", safety: SAFETY } },
+      ]),
+    );
+    try {
+      let askAnswer: { turnId: string; approved: boolean } | undefined = { turnId: "turn-confirm123", approved: true };
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        consumeSupersedes: () => undefined,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+        consumeAskAnswer: () => {
+          const value = askAnswer;
+          askAnswer = undefined;
+          return value;
+        },
+      });
+      const options = { messages: [fakeUserMessage("Yes")], runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => fakeUserMessage("Yes") } as unknown as ChatModelRunOptions;
+      const yields: ChatModelRunResult[] = [];
+      for await (const r of runAdapter(adapter, options)) yields.push(r);
+      expect(env.turnBodies[0]).toMatchObject({ ask_answer: { turn_id: "turn-confirm123", approved: true } });
+    } finally {
+      env.restore();
+    }
+  });
+});
+
 // Slice 5(a): CHAT-16's `TurnValue.sources` becomes a real ToolCallMessagePart
 // too - `toolName: "sources"`, AFTER the text part (spec.md's "a compact card
 // under the reply," the opposite order from the structured card above, which

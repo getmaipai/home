@@ -910,7 +910,7 @@ export const api = {
   streamTurn: (
     text: string,
     signal?: AbortSignal,
-    opts: { thinking?: boolean; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean; spoken?: boolean } = {},
+    opts: { thinking?: boolean; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean; spoken?: boolean; askAnswer?: { turnId: string; approved: boolean } } = {},
   ) =>
     rawStreamPost(
       "/api/turn/stream",
@@ -926,7 +926,12 @@ export const api = {
       // gates the menu entry on client-side.
       // `spoken`: VOICE-LIVE-02's live voice session - RESP-01's flag,
       // read by the new path only (U6a); the frozen path ignores it.
-      { surface: "chat", text, thinking: opts.thinking, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom, bare: opts.bare, package_scope: opts.packageScope, temporary: opts.temporary, spoken: opts.spoken },
+      // `ask_answer` (APPROVE-CARD-01): a tapped approve/deny card
+      // (ConfirmTool, NextChatPage.tsx) - read by the new path only
+      // (routes/turn.ts's own `askAnswer` zod schema), matched against
+      // the conversation's live pending ask by `turn_id`
+      // (turnMachine/turnNext.ts's `resumesAsk()`).
+      { surface: "chat", text, thinking: opts.thinking, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom, bare: opts.bare, package_scope: opts.packageScope, temporary: opts.temporary, spoken: opts.spoken, ask_answer: opts.askAnswer ? { turn_id: opts.askAnswer.turnId, approved: opts.askAnswer.approved } : undefined },
       0,
       undefined,
       signal,

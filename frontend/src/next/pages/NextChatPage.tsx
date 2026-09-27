@@ -1,10 +1,18 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent, type PropsWithChildren, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type MutableRefObject, type PointerEvent, type PropsWithChildren, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DismissableLayer } from "radix-ui/internal";
 import { toast } from "sonner";
-import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolCallMessagePartComponent } from "@assistant-ui/react";
+import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolApprovalOption, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
+// APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
+// default `ToolFallback` renders (its own `import { ToolFallback } from
+// "@maipai/ui/src/assistant-ui/tool-fallback.aui"`) - used here directly
+// so a "confirm" card renders through `ToolFallback.Approval` exactly as
+// it ships, never a hand-built card (the kit's own `approval-card.tsx`
+// is built for a terminal command and can't be relabeled, per the org's
+// "no hand-built UI" rule).
+import { ToolFallback } from "@maipai/ui/src/assistant-ui/tool-fallback.aui";
 import { ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "@maipai/ui/src/elements/reasoning.aui";
 import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
@@ -119,6 +127,23 @@ function StructuredResultTools() {
 // same way the open canvas does, if a later turn updates this exact
 // artifact before the card is ever clicked.
 const ArtifactOpenContext = createContext<(id: string) => void>(() => {});
+
+// APPROVE-CARD-01: the same lifted-context shape as `ArtifactOpenContext`
+// above - `ConfirmToolRender` (below) needs a way to send the tapped
+// answer, and a bare `ComponentType` slot with no props of its own
+// (`useAssistantToolUI`'s own `render`) is exactly why `ArtifactOpenContext`
+// exists too. Carries the actual send callback, never a raw `aui` handle:
+// a code review (live, this item) found `useAui()` called from INSIDE a
+// tool-call renderer resolves to that message's own part-scoped client
+// (assistant-ui's per-message/part context), not the thread-level
+// composer - `aui.composer.send()` there threw "Composer is not
+// available" every time. `ConfirmAskAnswerProvider` (below, mounted at
+// the same root level `LiveVoiceSession` already proves works for this
+// exact same "send from outside the composer's own click handler"
+// need - ChatPage.tsx's own `SttAutoSend` comment has the fuller
+// reasoning) calls `useAui()` once, correctly scoped, and hands down the
+// closure instead.
+const ConfirmAskAnswerContext = createContext<(turnId: string, approved: boolean) => void>(() => {});
 
 // ADMIN-COMPARE-01: the same two-context shape as the artifact panel
 // above (an "open" callback threaded down through context, since
@@ -357,6 +382,86 @@ const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>
 function ArtifactTool() {
   useAssistantToolUI({ toolName: "write_document", render: ArtifactCardToolRender, display: "standalone" });
   return null;
+}
+
+const CONFIRM_APPROVAL_OPTIONS: readonly ToolApprovalOption[] = [
+  { id: "yes", kind: "allow-once", label: "Yes" },
+  { id: "no", kind: "reject-once", label: "No" },
+];
+
+// APPROVE-CARD-01: a package's own confirm_needed/consent_needed ask
+// (turnNext.ts's finishTurn() "asked" branch), rendered through the
+// shipped `ToolFallback.Approval` exactly as it ships - never the kit's
+// own `approval-card.tsx` (built for a terminal command, can't be
+// relabeled). The tool-call part's own `result` carries
+// `{package_id, open, turn_id}` (chatModelAdapter.ts/chatHistoryAdapter.ts),
+// never the part's own `approval` field: setting a REAL `part.approval`
+// would mark the message `requires-action` in assistant-ui's
+// LocalRuntime and re-run the model adapter on this SAME assistant
+// message once answered - wrong here, since Home parks the ask
+// server-side and the answer is a genuinely new turn. The `approval`
+// object below is synthesized purely for THIS component's own render
+// logic (never written back onto the real message part, which never
+// carries one), and `respondToApproval` here is OUR OWN handler, never
+// the real one `ToolCallMessagePartProps` would supply (that one is
+// only ever valid while a real `part.approval` is set - ours never is).
+const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, never>, { package_id: string; open: boolean; turn_id: string }> = ({ result }) => {
+  const respond = useContext(ConfirmAskAnswerContext);
+  if (!result) return null;
+  return (
+    <ToolFallback.Approval
+      approval={{
+        id: result.turn_id,
+        options: CONFIRM_APPROVAL_OPTIONS,
+        // The component's own source (tool-fallback.aui.tsx): a
+        // `resolution` set at all - "cancelled" or "expired" - suppresses
+        // interactive rendering entirely (its top guard returns null),
+        // never partially disables it. `open: false` (an answered,
+        // superseded, or reload-stale ask - conversationHistory.ts's own
+        // read-time derivation) is exactly a "no longer waiting for an
+        // answer" case, so "expired" is the honest value here.
+        resolution: result.open ? undefined : "expired",
+      }}
+      respondToApproval={async (response) => {
+        // Our own two options are both known kinds with no `confirm`
+        // step, so `ToolFallbackApproval`'s own `respondWithOption()`
+        // always calls this with `{optionId: "yes" | "no"}` - never the
+        // `approved` field a real runtime resolution would carry (that
+        // derivation is the runtime's job for a real `part.approval`,
+        // which this never is).
+        const approved = "optionId" in response ? response.optionId === "yes" : false;
+        respond(result.turn_id, approved);
+      }}
+    />
+  );
+};
+
+function ConfirmTool() {
+  useAssistantToolUI({ toolName: "confirm", render: ConfirmToolRender, display: "standalone" });
+  return null;
+}
+
+// APPROVE-CARD-01: computes the actual send callback and provides it
+// through `ConfirmAskAnswerContext` - mounted at the SAME root level as
+// `LiveVoiceSession` below (a sibling of `Thread`, never nested inside
+// it), the one place `useAui()` resolves to the thread-level composer
+// rather than a message/part-scoped one (`ConfirmAskAnswerContext`'s own
+// doc comment has the live "Composer is not available" failure this
+// fixed). `askAnswerRef` is armed here, synchronously, before the
+// composer send - the same single-shot shape `spokenNextRef` already
+// uses for VOICE-LIVE-02's live voice session; `chatModelAdapter.ts`'s
+// own `consumeAskAnswer()` reads AND resets it.
+function ConfirmAskAnswerProvider({ askAnswerRef, children }: { askAnswerRef: MutableRefObject<{ turnId: string; approved: boolean } | undefined>; children: ReactNode }) {
+  const aui = useAui();
+  const respond = useCallback(
+    (turnId: string, approved: boolean) => {
+      askAnswerRef.current = { turnId, approved };
+      aui.composer.setText(approved ? "Yes" : "No");
+      void Promise.resolve(aui.composer.send());
+    },
+    [aui, askAnswerRef],
+  );
+  return <ConfirmAskAnswerContext.Provider value={respond}>{children}</ConfirmAskAnswerContext.Provider>;
 }
 
 // TOOL-EVENTS-01's own frontend half, consumer before producer (the same
@@ -1029,6 +1134,11 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // shape `temporaryNextRef`/`packageScopeRef` already use.
   const liveVoiceActiveRef = useRef(false);
   const spokenNextRef = useRef(false);
+  // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
+  // callback (ConfirmToolRender's respondToApproval, via
+  // ConfirmAskAnswerContext), the same single-shot shape as
+  // `spokenNextRef` above - `consumeAskAnswer` below reads and clears it.
+  const askAnswerRef = useRef<{ turnId: string; approved: boolean } | undefined>(undefined);
   // VOICE-LIVE-02: chatModelAdapter.ts's own onSpeakingChange, relayed as
   // real state so LiveVoiceSession (a sibling component, not inside this
   // hook) can react to the live scheduler's own start/end - nothing else
@@ -1199,6 +1309,14 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
             spokenNextRef.current = false;
             return value;
           },
+          // APPROVE-CARD-01: armed once, right before ConfirmTool's own
+          // respondToApproval handler calls aui.composer.send() - the
+          // same single-shot shape consumeSpoken() above already uses.
+          consumeAskAnswer: () => {
+            const value = askAnswerRef.current;
+            askAnswerRef.current = undefined;
+            return value;
+          },
           isBareMode: () => bareModeRef.current,
           onCrisisResources: setBanner,
           onSpeakingChange: (speaking) => {
@@ -1300,7 +1418,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     },
   });
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1614,7 +1732,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, banner, thinking, setThinking, thinkingAllowed, bareMode, setBareMode, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setRailPeeked(false);
     setOpenArtifactId(null);
@@ -1875,6 +1993,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ArtifactOpenContext.Provider value={setOpenArtifactId}>
+      <ConfirmAskAnswerProvider askAnswerRef={askAnswerRef}>
       <AdminContext.Provider value={isOwnerOrAdminRole(person.role)}>
       <CompareOpenContext.Provider value={setCompareTarget}>
       <SourcesOpenContext.Provider value={sourcesOpenValue}>
@@ -1887,6 +2006,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <DictationLevelMeterProvider value={dictationLevelMeter}>
         <StructuredResultTools />
         <ArtifactTool />
+        <ConfirmTool />
         <ToolTimelineTool />
         <SuppressSourcesFallback />
         <ArtifactCacheInvalidator />
@@ -2143,6 +2263,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </SourcesOpenContext.Provider>
       </CompareOpenContext.Provider>
       </AdminContext.Provider>
+      </ConfirmAskAnswerProvider>
       </ArtifactOpenContext.Provider>
     </AssistantRuntimeProvider>
   );
