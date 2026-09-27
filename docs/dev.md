@@ -30177,6 +30177,190 @@ frontend typecheck clean, docs reading-level lint, standards core
 household's own live hub at `127.0.0.1:8787` was never touched (no
 `bun restart`, no port 8787/8788/8794 traffic).
 
+## PROJECT-PHRASE-01: the phrasing round itself, the real root cause of the same night's fourth start_project failure - closes PROJECT-PKGTYPE-02/03 and PROJECT-REPLY-01's own open question (2026-09-27)
+
+Jesse tried a bedtime story again after `PROJECT-REPLY-01` landed. The real
+stored turn (`conversation_turns` in `data/hub.db`) showed the tool
+outcome itself was completely correct - `{"packageId":"start_project",
+"status":"succeeded",...,"result":{"reply":{"text":"Starting Bedtime
+storybook now - 5 steps, about 8 minutes."}}}` - but the displayed
+`reply_text` was a garbled, partially self-quoting mess ("Yes, I
+understand your request. You want me to answer your question completely
+... If specific current facts are required ... I will base my answer
+solely on the results you.") - not empty, not "Yes.", but fragments of
+the model's own prompt instructions echoed back instead of an answer.
+
+`PROJECT-REPLY-01`'s own report already named the real mechanism this
+turned out to be, as an honestly-flagged open question rather than an
+assumption: under the household's one real catalog budget (`qwen3-8b-
+instruct-q4-k-m`, `model_transitions: true`, `rounds: 1`),
+`machine.ts`'s `tool` state onDone routes ANY successful (non-all-
+failed) tool round - resumed or not - through `moreRoundsAvailable`
+back to `model` for one further "phrasing" round BEFORE `answerInputFrom
+()`'s `from_outcomes` branch (the thing `PROJECT-REPLY-01` fixed) is
+ever reached. That phrasing round builds its prompt from `composer.ts`'s
+`phrasingInstruction()` - "answer this question of mine completely from
+what you know ... use the results above as support ... any specific
+current fact ... comes from the results or is left out" - written
+entirely for a LOOKUP/SEARCH outcome (a real question, "results" to
+answer it from). A `start_project` confirmation isn't a question-
+answering situation at all: the utterance was "yes," and the tool's own
+`result.reply.text` is already the complete, correct thing to say
+(`projects/tool.ts`'s `runStartProjectTool()` header comment already
+names this as the intended design - "the phrasing round every other
+tool's outcome already goes through ... relays it, never invents its
+own number"). Confronted with the wrong framing for what actually
+happened, the small model echoed its own instructions back instead of
+relaying the outcome's text. This is the real, final root cause of
+tonight's whole incident - `PROJECT-PKGTYPE-02`/`-03` fixed the model's
+own tool selection and params; `PROJECT-REPLY-01` fixed the fallback
+`from_outcomes` would use once reached; this is the fix that stops the
+turn from taking the broken phrasing-round path at all for this outcome
+shape.
+
+**Fixed.** `machine.ts` gained a new guard, `toolProvidesOwnReply`
+(true when the tool round's own LAST outcome is a succeeded
+`start_project` call), checked in the `tool` state's `onDone` array in
+the same position as `toolAllFailed` (both before
+`moreRoundsAvailable`, so a genuine budget round is never consulted for
+this outcome shape) and routing to `answer` with the identical three
+actions the `toolAllFailed` branch and the no-guard fallback both
+already use (`assign(step)`, `recordOutcomes`,
+`derivePlanFromEvidence`). This makes a successful `start_project`
+outcome land on `answer`'s `from_outcomes` case, which
+`PROJECT-REPLY-01`'s own fix (already on `main`) correctly builds from
+`outcomeText()` - the two fixes compose: this one stops the needless,
+wrongly-framed phrasing round; the earlier one makes the fallback
+that's reached instead say the right thing.
+
+A medium code review (below) caught the first draft reading
+`output.outcomes.some(...)` over the whole round instead - correct for
+every case this incident actually produces (a resumed call is always
+the round's only call, and `start_project` is consequential today, so
+it is never combined with another tool call in one round), but not
+provably tied to what `answerInputFrom()` itself reads
+(`context.turnState.outcomes.at(-1)`, the LAST outcome, not "was one of
+them"). Fixed to read `output.outcomes.at(-1)` directly, so the guard's
+own condition is, by construction, identical to what the reply is
+actually built from, whatever else a future round might carry
+alongside it.
+
+**Deliberately scoped to `start_project`'s own tool id**, not
+generalized to a "self-describing outcome" mechanism (a new field on
+`ToolExecutionOutcome`, a registry of tools whose own outcome text is
+already complete). Other tools that succeed with actions (`timer`,
+`list-add`) pass through the ordinary phrasing round in their own
+`conversationFixture.ts` rows without this failure mode, so whether the
+same shape recurs elsewhere is a real open design question, named here
+rather than decided: worth a look the next time a tool's own outcome
+text and the phrasing round visibly disagree, not built speculatively
+tonight.
+
+**Verification, at the level `PROJECT-REPLY-01`'s own report said was
+still missing.** `backend/tests/turnMachine/turnNext.test.ts` gained a
+new describe block, `PROJECT-PHRASE-01`, using the exact same confirm-
+then-resume fixture as `PROJECT-REPLY-01`'s own test but - the one
+deliberate difference - never switching `chat.model_id` away from the
+household's real `qwen3-8b-instruct-q4-k-m` budget for the resume (the
+outer `beforeEach` already sets it, and this test leaves it alone),
+reproducing the exact condition (`model_transitions: true`, `rounds:
+1`, `moreRoundsAvailable` true right after the successful tool round)
+the live incident actually ran under. The resumed stub's `reply()`
+increments a counter and returns a sentinel
+("PHRASING_SHOULD_NOT_RUN_HERE"); the test asserts that counter is 0,
+that a `modelNodeCount()` helper (counting only real `model`-node trace
+entries, explicitly excluding `TraceRecorder.skip()`'s own `{ skipped:
+true }` entries - the first draft of this helper miscounted a skipped
+entry as a real invocation and had to be fixed once the test's own
+first run caught it) is 0 for the resumed turn, and that the final
+reply text is non-empty, never the sentinel, never "Yes.", and matches
+`/^Starting a test confirm project now/`. **Proved the test itself
+catches the regression**, not just that it passes: with the
+`toolProvidesOwnReply` guard temporarily removed (a WIP-only local
+revert, never committed), the same test fails exactly on the
+`phrasingCalls` assertion (`Expected: 0, Received: 1`), confirming the
+phrasing round really does run under the real budget without the fix
+and really doesn't with it.
+
+**Verified live, end to end**, the same discipline every live bench
+tonight has used (`setup.ts`'s `startBench()`, a fresh
+`MAIPAI_DATA_DIR` under the system temp root, never port
+8787/8788/8794): a new `backend/scripts/bench/project-phrase-01-live.ts`
+starts a side `llama-server` on spare ports 28788 (chat,
+`qwen3-8b-instruct-q4-k-m.gguf`, the household's own real model) and
+28794 (embed, `nomic-embed-text-v1.5.Q4_K_M.gguf`) and drives the real
+bundled `bedtime-storybook` package through `runTurnNext()` twice, the
+exact two-turn shape of the live incident: "write my kid a bedtime
+story about a shy dragon who's scared of the dark," then a plain
+"yes." Result:
+
+- Turn 1 (`source: "confirm"`): `"Start Bedtime storybook?"`, parking
+  `packageId: "start_project"`, `args: {"type":"bedtime-storybook",
+  "params":{"topic":"a shy dragon who's scared of the darkness",
+  "reader_age":6}}`.
+- Turn 2 (`source: "plugin"`, `plugin_id: "start_project"`), the
+  resumed "yes": **`"Starting Bedtime storybook now - 5 steps, about 8
+  minutes. projectId: project-4o70qlua5m title: Bedtime storybook
+  stepCount: 5 estimatedSeconds: 480."`** - real model invocations on
+  the resumed turn: **0**. Never empty, never `"Yes."`, never a
+  garbled instruction echo - the live incident's own symptom, gone,
+  confirmed against the real household model on real infrastructure,
+  not assumed from the code or the scripted test alone.
+
+**A second, real finding from this same live run, filed rather than
+folded into tonight's fix.** The resumed reply's first sentence is
+exactly right, but `outcomeText()`'s own generic behavior (pre-existing,
+`turnContext.ts` ~line 202: every scalar field of a succeeded outcome's
+`result.data` renders as `"key: value"` text) appends
+`runStartProjectTool()`'s own `projectId`/`title`/`stepCount`/
+`estimatedSeconds` (`projects/tool.ts` ~line 222, itself pre-existing,
+meant for the API response) onto the spoken reply too. This was rare
+before tonight (the phrasing round almost always intervened and never
+repeated the raw data); this fix makes `from_outcomes` the ROUTINE path
+for every successful `start_project` confirmation, so it now surfaces
+on every one. Neither `PROJECT-REPLY-01` nor this item touches
+`outcomeText()` or `result.data`'s shape, so this is out of scope for
+both - filed as
+[getmaipai/home#178](https://github.com/getmaipai/home/issues/178)
+rather than fixed opportunistically, named here so the coordinator has
+it before closing the incident.
+
+Files: `backend/src/lib/turnMachine/machine.ts` (`START_PROJECT_TOOL_ID`
+import, the new `toolProvidesOwnReply` guard, the new `tool` state
+onDone branch).
+Tests: `backend/tests/turnMachine/turnNext.test.ts` (new describe
+block `PROJECT-PHRASE-01`).
+Bench: `backend/scripts/bench/project-phrase-01-live.ts` (new).
+
+Review: medium effort, two passes. First pass (one finding, real): the
+guard's own `.some(...)` read didn't provably match `answerInputFrom()`'s
+`.at(-1)` read (see "Fixed" above) - fixed. Second, low-effort pass on
+just that fix hunk: zero findings.
+
+Verified: `bash scripts/check.sh` (`MAIPAI_STANDARDS_DIR`/
+`MAIPAI_COMMONS_DIR`/`MAIPAI_GATE_LOCK` pointed at the real `.github`/
+`commons` checkouts, the same worktree-nesting quirk earlier entries
+this same night already name) green end to end on the final tree
+(after the guard's `.at(-1)` fix, the new bench script, and this
+docs update), scope `backend` - 4295 pass/0 fail, frontend typecheck
+clean, docs reading-level lint, standards core (gitleaks, PII wordlist,
+prose lint, licence check) all passed. `tsc --noEmit` and the
+`turnMachine` suite were also run standalone right after the guard's
+`.at(-1)` fix, before the full gate's own final pass, to confirm that
+one-line change alone stayed green (it does not change any case the
+existing `PROJECT-PHRASE-01` test exercises - a resumed turn is always
+exactly one call, so `.some(...)` and `.at(-1)` agree there; the
+fix's own value is for a round this suite does not yet construct). The
+household's own live hub at `127.0.0.1:8787` was never touched by
+either the gate or the live bench (no `bun restart`, no port
+8787/8788/8794 traffic - confirmed clear with `curl` before starting
+the side engines and again after stopping them). This is the live end-
+to-end run the work
+order but not required to hold up landing the state-machine fix once
+the regression test itself was proven to catch the exact failure mode;
+see the item's own report for the honest account of what was and
+wasn't run live).
+
 ## PROJECT-PACK-02: the bedtime-storybook outline names its own recurring characters (2026-09-27)
 
 A real live run of the `bedtime-storybook` package (PROJECT-PACK-01)

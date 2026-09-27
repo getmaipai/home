@@ -624,6 +624,141 @@ describe("turnNext.ts: PROJECT-REPLY-01, a resumed start_project confirmation su
   });
 });
 
+describe("turnNext.ts: PROJECT-PHRASE-01, a successful start_project outcome skips the phrasing round under the household's own real budget (closes the incident: PROJECT-PKGTYPE-02/03, PROJECT-REPLY-01, 2026-09-27)", () => {
+  // The describe block above (PROJECT-REPLY-01) proves `answerInputFrom()`'s
+  // `from_outcomes` branch is correct once reached, but its own test
+  // forces `chat.model_id` to an unrecognized one before the resume so
+  // `resolveTurnBudget()` falls to `NO_RECORD_BUDGET` (model_transitions:
+  // false) - exactly the layer that made the bug INVISIBLE to that test,
+  // not the layer the live incident actually broke on. Jesse's real turn
+  // ran under the household's one real catalog budget (qwen3-8b:
+  // model_transitions true, rounds: 1), where `moreRoundsAvailable` is
+  // true after ANY successful (non-all-failed) tool round - `tool`'s
+  // onDone used to route there unconditionally, straight to a second
+  // `model` invocation (the "phrasing round") built from
+  // `composer.ts`'s `phrasingInstruction()`, a prompt written for a
+  // lookup's "answer the question from the results" framing that is the
+  // wrong shape entirely for a "yes" that just started a project -
+  // confronted with it, the model echoed fragments of its own
+  // instructions back rather than relaying `runStartProjectTool()`'s own
+  // already-correct `result.reply.text`. This test keeps the real
+  // qwen3-8b budget in force for the resume (never switching
+  // chat.model_id away from it, unlike the describe block above) and
+  // proves machine.ts's new `toolProvidesOwnReply` guard routes straight
+  // to `answer` before that phrasing round's `model` invocation can ever
+  // happen - the single thing PROJECT-REPLY-01's own report said was
+  // still unverified.
+  let completeSpy: ReturnType<typeof spyOn>;
+
+  beforeEach(() => {
+    registerProjectType({
+      id: "test-confirm-project",
+      title: "a test confirm project",
+      description: "A project used only to exercise the confirm/resume reply path in tests.",
+      minRole: "child",
+      consequential: true,
+      paramsSchema: {
+        type: "object",
+        required: ["topic"],
+        properties: { topic: { type: "string", minLength: 1 } },
+        additionalProperties: false,
+      },
+      buildPlan: (params) => {
+        const topic = typeof params.topic === "string" && params.topic.trim() ? params.topic.trim() : "a small adventure";
+        return {
+          steps: [{ id: "a", kind: "text", needs: [], params: { role: "chat", promptTemplate: `write a short passage about ${topic}`, inputs: [] } }],
+          ceilings: { maxWallSeconds: 30, maxGeneratorJobs: 1 },
+        };
+      },
+    });
+    // Same reason as PROJECT-REPLY-01's own beforeEach: the project's
+    // background step calls llm.ts's complete() directly, a different
+    // call than the turn's own model round, and withStub()'s HTTP
+    // server is already torn down by the time the project's own step
+    // runs.
+    completeSpy = spyOn(llm, "complete").mockImplementation(async () => ({ ok: true, value: { text: "A short, gentle passage.", model: "stub" } }));
+  });
+
+  afterEach(() => {
+    completeSpy.mockRestore();
+    __resetProjectTypesForTests();
+  });
+
+  // TraceRecorder.skip() (trace.ts) pushes a `{ node: "model", outcome:
+  // { skipped: true, ... } }` entry for every state the machine's own
+  // route never entered, to satisfy the state record's "all eight
+  // nodes present (ran or skipped)" acceptance - a resumed turn that
+  // never enters `model` at all still carries exactly one such skipped
+  // entry, so counting `n.node === "model"` alone (SEARCH-EMPTY-01's
+  // own helper above, which never needed to tell the two apart since
+  // its turns always ran `model` at least once) would wrongly count 1
+  // here too. This filters those out to count only real invocations.
+  async function modelNodeCount(turnId: string): Promise<number> {
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { skipped?: boolean } }[] };
+    return (stats.nodes ?? []).filter((n) => n.node === "model" && n.outcome?.skipped !== true).length;
+  }
+
+  test("the resumed turn reaches answer with zero model invocations under the real qwen3-8b budget, and the reply is the outcome's own text, never a garbled phrasing-round echo", async () => {
+    const parked = await withStub(
+      {
+        calls: (request) =>
+          request.tools?.some((t) => t.function.name === START_PROJECT_TOOL_ID)
+            ? [{ id: "call-1", name: START_PROJECT_TOOL_ID, args: JSON.stringify({ type: "test-confirm-project", params: { topic: "a shy dragon who's scared of the dark" } }) }]
+            : undefined,
+        reply: () => "unused",
+      },
+      () => runTurnNext(people.owner, "chat", "start a test confirm project about a shy dragon who's scared of the dark"),
+    );
+    expect(parked.ok).toBe(true);
+    if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(parked.value.source).toBe("confirm");
+
+    const ask = getPendingAsk(parked.value.conversation_id);
+    expect(ask).not.toBeNull();
+    expect(ask?.packageId).toBe(START_PROJECT_TOOL_ID);
+
+    // Deliberately NOT switching `chat.model_id` here (the top-level
+    // beforeEach already set it to "qwen3-8b-instruct-q4-k-m", and it
+    // stays that way): the household's real budget has
+    // `model_transitions: true` and `rounds: 1`, so `moreRoundsAvailable`
+    // is true right after this successful tool round and a phrasing
+    // round would run were it not for the new guard. Any chat
+    // completion at all on the resumed turn surfaces this sentinel in
+    // the final reply text.
+    let phrasingCalls = 0;
+    const resumed = await withStub(
+      {
+        reply: () => {
+          phrasingCalls++;
+          return "PHRASING_SHOULD_NOT_RUN_HERE";
+        },
+      },
+      () => runTurnNext(people.owner, "chat", "yes", { conversationId: parked.value.conversation_id }),
+    );
+    expect(resumed.ok).toBe(true);
+    if (!resumed.ok || resumed.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(getPendingAsk(parked.value.conversation_id)).toBeNull();
+    expect(resumed.value.source).toBe("plugin");
+    expect(resumed.value.plugin_id).toBe(START_PROJECT_TOOL_ID);
+
+    // The single most important assertion: no second (phrasing) model
+    // call happened at all for the resumed turn - `hasPreConfirmed`
+    // already skips the decision round (safety -> policy directly), and
+    // machine.ts's new `toolProvidesOwnReply` guard is what now skips
+    // the phrasing round too, so `modelNodeCount` for this turn is 0,
+    // not 1.
+    expect(phrasingCalls).toBe(0);
+    expect(await modelNodeCount(resumed.value.turn_id)).toBe(0);
+
+    expect(resumed.value.reply.text.length).toBeGreaterThan(0);
+    expect(resumed.value.reply.text).not.toContain("PHRASING_SHOULD_NOT_RUN_HERE");
+    expect(resumed.value.reply.text).not.toBe("Yes.");
+    expect(resumed.value.reply.text).toContain("a test confirm project");
+    expect(resumed.value.reply.text).toMatch(/^Starting a test confirm project now/);
+  });
+});
+
 describe("turnNext.ts: the commands node's own guards", () => {
   test("a temporary chat's \"remember that\" never bypasses the temporary-mode gate", async () => {
     // A code review (2026-09-22) caught the commands node's literal-

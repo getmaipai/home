@@ -17,6 +17,7 @@ import { contextNode, applyContext, type ContextOutput } from "./nodes/context";
 import { modelNode, ANSWER_FROM_CONTEXT_TOOL_ID, rawUtteranceWebsearchCall, type ModelOutput } from "./nodes/model";
 import { policyNode, type PolicyOutput, type PolicyEntry } from "./nodes/policy";
 import { toolNode, type ToolOutput } from "./nodes/tool";
+import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { answerNode, type AnswerInput, type AnswerOutput, type PolicyRefusedReason } from "./nodes/answer";
 import { outputGateNode, type OutputGateOutput } from "./nodes/outputGate";
 import { planFor } from "@/lib/register";
@@ -205,6 +206,51 @@ export const turnMachine = setup({
     toolAllFailed: ({ event }) => {
       const output = (event as unknown as { output: ToolOutput }).output;
       return output.outcomes.length > 0 && output.outcomes.every((o) => o.status === "failed");
+    },
+    // PROJECT-PHRASE-01 (2026-09-27, dev.md - closes the live incident
+    // PROJECT-PKGTYPE-02/03 and PROJECT-REPLY-01 fixed the symptoms
+    // of, without reaching this): a succeeded start_project outcome's
+    // own `result.reply.text` is already the complete, correct thing
+    // to say (projects/tool.ts's runStartProjectTool()'s own header
+    // comment names this as the intended design - "the phrasing round
+    // every other tool's outcome already goes through ... relays it,
+    // never invents its own number"). The phrasing round itself never
+    // implements that intent: `composer.ts`'s phrasingInstruction() is
+    // written for a lookup's "answer the question from the results"
+    // framing, which is the wrong shape entirely for a "yes" that just
+    // started a project - confronted with it, the model echoed
+    // fragments of its own instructions back instead of relaying the
+    // outcome's own text. Checked in the same array position as
+    // `toolAllFailed` above (both before `moreRoundsAvailable`), so a
+    // successful start_project call never reaches a phrasing round
+    // even when the household's own real budget (qwen3-8b:
+    // model_transitions true, rounds: 1) would otherwise always offer
+    // one. Scoped to this one tool id on purpose - other tools (timer,
+    // list-add) also succeed with actions, but their own
+    // conversationFixture.ts rows pass through the ordinary phrasing
+    // round without this failure mode, so whether this generalizes to
+    // a "self-describing outcome" mechanism is a real open design
+    // question, not decided here.
+    //
+    // Reads `output.outcomes.at(-1)` specifically, never `.some(...)`
+    // over the whole round (a medium code review, 2026-09-27, caught
+    // this: `answerInputFrom()`'s own `from_outcomes` branch builds the
+    // reply from `context.turnState.outcomes.at(-1)` alone, so a round
+    // whose LAST outcome was something else - a second tool call
+    // proposed in the same round as a non-consequential project type,
+    // never possible for `start_project` today since every registered
+    // type is consequential and a resumed call is always the round's
+    // only call, but not something this guard should silently assume
+    // stays true - would have this guard fire on an EARLIER
+    // start_project outcome while the reply actually built from a
+    // different, later one). Checking the round's own last outcome
+    // directly keeps this guard's condition identical to what
+    // `answerInputFrom()` will actually read, by construction, however
+    // many calls the round carried.
+    toolProvidesOwnReply: ({ event }) => {
+      const output = (event as unknown as { output: ToolOutput }).output;
+      const last = output.outcomes.at(-1);
+      return last?.packageId === START_PROJECT_TOOL_ID && last.status === "succeeded";
     },
     outputRefused: ({ event }) => ((event as unknown as { output: OutputGateOutput }).output).refused === true,
     hasPreConfirmed: ({ context }) => context.preConfirmed !== undefined,
@@ -417,6 +463,18 @@ export const turnMachine = setup({
           // to both.
           {
             guard: "toolAllFailed",
+            actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes", "derivePlanFromEvidence"],
+            target: "answer",
+          },
+          // PROJECT-PHRASE-01: same three actions as the `toolAllFailed`
+          // branch above and the no-guard fallback below (see that
+          // branch's own comment on why this stays two literal arrays,
+          // not a shared reference) - checked here, before
+          // `moreRoundsAvailable` ever runs, so a successful
+          // start_project outcome always lands on `answer` directly,
+          // never on a phrasing round `model` invocation.
+          {
+            guard: "toolProvidesOwnReply",
             actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes", "derivePlanFromEvidence"],
             target: "answer",
           },
