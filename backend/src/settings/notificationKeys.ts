@@ -196,4 +196,28 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.notifications",
     honoured_by: ["home"],
   }),
+  // NOTIFY-SHARE-01's follow-up: `file.shared_with_you` and
+  // `file.shared_with_household` (lib/notificationTypes.ts) have been
+  // `configurable: true` since e6112f5c but had no real toggle key here,
+  // the exact gap this pass closes - mirroring `memory.updated` above.
+  SettingsKey.parse({
+    key: "notifications.file.shared_with_you.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when someone shares a file with me",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "notifications.file.shared_with_household.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when someone shares a file with the household",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
 ];

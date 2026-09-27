@@ -343,6 +343,50 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  // NOTIFY-SHARE-01 (docs/plans/people-profile-2026-09-26.md, "Notified
+  // on sharing, no subscribing at all"): lib/shares.ts's createShare()
+  // fires one of these two the moment a share pointer is actually
+  // created - never on the idempotent "already shared with this target"
+  // return path. `person` when `to` names someone directly - the exact
+  // audience reasoning `memory.updated` above already carries (this is
+  // about something that just happened involving them specifically).
+  // `household` when `to` is the literal "household" - the first core
+  // type to use this audience; resolveRecipients() in lib/notifications.ts
+  // already has the branch (`everyone`, no filtering), it just had
+  // nothing wired to it yet. `passive`/`toast: false`/`defaultChannels:
+  // ["in_app"]` all match `memory.updated`'s own posture exactly: a
+  // share is a record to notice next time someone looks, not urgent
+  // enough to toast over. `configurable: true` so a household that finds
+  // shares noisy can turn either one off independently, the same
+  // `notifications.<id>.telegram` per-type key shape every other
+  // configurable type already uses - registering that key for these two
+  // ids is a settings-registry change (a commons spec pin bump, see
+  // settings/notificationKeys.ts's own header), out of this item's scope
+  // on purpose; declaring `configurable: true` here is what lets that
+  // key attach the moment it's added, with no code change on this side.
+  {
+    id: "file.shared_with_you",
+    level: "passive",
+    audience: "person",
+    // `{kindPhrase}` is a pre-built, grammatical phrase ("a photo", "an
+    // audio clip"), not the raw File.kind enum value - lib/shares.ts's
+    // own notifyShareCreated() builds it once there so this template
+    // stays a plain string replace, the same as every other template
+    // here, instead of needing article logic of its own.
+    template: "{fromDisplayName} shared {kindPhrase} with you.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
+  {
+    id: "file.shared_with_household",
+    level: "passive",
+    audience: "household",
+    template: "{fromDisplayName} shared {kindPhrase} with the household.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
 ] as const;
 
 // session-d-packages-and-store.md step 2: a package's own manifest

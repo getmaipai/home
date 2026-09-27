@@ -14,6 +14,32 @@ test("child.worrying_conversation is an adult-only, non-configurable notice with
   expect(rendered).not.toContain("{");
 });
 
+test("file.shared_with_you is a passive, configurable, person-audience notice matching memory.updated's posture", () => {
+  const type = getNotificationType("file.shared_with_you");
+  expect(type).toBeDefined();
+  expect(type?.level).toBe("passive");
+  expect(type?.audience).toBe("person");
+  expect(type?.configurable).toBe(true);
+  expect(type?.defaultChannels).toEqual(["in_app"]);
+  expect(type?.toast).toBe(false);
+  const rendered = type!.template.replace("{fromDisplayName}", "Lucia").replace("{kindPhrase}", "a photo");
+  expect(rendered).toBe("Lucia shared a photo with you.");
+  expect(rendered).not.toContain("{");
+});
+
+test("file.shared_with_household is a passive, configurable, household-audience notice", () => {
+  const type = getNotificationType("file.shared_with_household");
+  expect(type).toBeDefined();
+  expect(type?.level).toBe("passive");
+  expect(type?.audience).toBe("household");
+  expect(type?.configurable).toBe(true);
+  expect(type?.defaultChannels).toEqual(["in_app"]);
+  expect(type?.toast).toBe(false);
+  const rendered = type!.template.replace("{fromDisplayName}", "Lucia").replace("{kindPhrase}", "a video");
+  expect(rendered).toBe("Lucia shared a video with the household.");
+  expect(rendered).not.toContain("{");
+});
+
 describe("registerPackageNotificationTypes", () => {
   test("a package's declared type becomes real and dispatchable", () => {
     registerPackageNotificationTypes({
