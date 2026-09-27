@@ -4,25 +4,9 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
-import { ROLE_LABELS } from "@/apps/people/roles";
+import { ROLE_LABELS, ACCENT_RING_CLASS } from "@/apps/people/roles";
 import { api, ApiError, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-
-/** `Person.accent`'s six named swatches (`spec-v0.1.43`) to the matching
- * `--profile-accent-*` token (`ui-v0.5.68`'s `tokens.css`) as a literal
- * Tailwind arbitrary-value class per name, the same lookup-map-of-
- * literals pattern the kit's own `HeaderPicker.tsx`/`FooterBar.tsx` use
- * for their hue tokens - there is no `@theme inline` bridge for these
- * (they are per-person, not a fixed palette a utility class could name),
- * so this is how a token gets read without inventing a new primitive. */
-const ACCENT_RING_CLASS: Record<NonNullable<PersonRosterEntry["accent"]>, string> = {
-  blue: "ring-[var(--profile-accent-blue)]",
-  violet: "ring-[var(--profile-accent-violet)]",
-  teal: "ring-[var(--profile-accent-teal)]",
-  orange: "ring-[var(--profile-accent-orange)]",
-  pink: "ring-[var(--profile-accent-pink)]",
-  red: "ring-[var(--profile-accent-red)]",
-};
 
 /** One person's card: `Card` (`@maipai/ui/src/dashboard/components/ui/
  * card`) plus the kit's own `Avatar`, no new primitive - `docs/plans/

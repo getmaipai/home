@@ -1,5 +1,5 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { PersonProfilePage } from "@/apps/people/PersonProfilePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -81,16 +81,25 @@ function stubFetch(byPath: Record<string, unknown>): () => void {
   };
 }
 
-const ROSTER = [
+interface RosterFixture {
+  id: string;
+  display_name: string;
+  role: string;
+  bio?: string | null;
+  accent?: string | null;
+}
+
+const ROSTER: RosterFixture[] = [
   { id: "person-sage", display_name: "Sage", role: "owner" },
-  { id: "person-bramble", display_name: "Bramble", role: "child" },
+  { id: "person-bramble", display_name: "Bramble", role: "child", bio: "Loves dinosaurs", accent: "teal" },
+  { id: "person-nova", display_name: "Nova", role: "adult" },
 ];
 
 function renderProfile(path: string, person: Roster = defaultPerson()) {
   return renderWithQueryClient(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/people/:id" element={<PersonProfilePage person={person} />} />
+        <Route path="/people/:id" element={<PersonProfilePage person={person} onPersonChange={() => {}} />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -317,5 +326,162 @@ describe("PersonProfilePage", () => {
     } finally {
       restore();
     }
+  });
+
+  // PEOPLE-PROFILE-01: the header card (photo/avatar, name, role, bio),
+  // its Edit dialog (bio/accent/display-name, gated by canManagePerson -
+  // the frontend's own mirror of the backend's canManage()), the photo
+  // opt-in's consent-floor copy for a supervised (child) target, and the
+  // manage-actions link-out to Settings -> Users.
+  describe("header card and Edit dialog", () => {
+    test("shows the photo/avatar, name, role and bio", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER });
+      try {
+        const { findByText } = renderProfile("/people/person-bramble", defaultPerson({ id: "person-sage", role: "owner" }));
+        await findByText("Bramble");
+        expect(await findByText("Child")).toBeInTheDocument();
+        expect(await findByText("Loves dinosaurs")).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("Edit is offered on your own page", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER });
+      try {
+        const { findByRole } = renderProfile("/people/person-sage", defaultPerson({ id: "person-sage", role: "owner" }));
+        expect(await findByRole("button", { name: "Edit" })).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("Edit is offered to an owner managing someone else", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER });
+      try {
+        const { findByRole } = renderProfile("/people/person-bramble", defaultPerson({ id: "person-sage", role: "owner" }));
+        expect(await findByRole("button", { name: "Edit" })).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("an adult viewing another adult's page gets no Edit action", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER });
+      try {
+        const { findByText, queryByRole } = renderProfile("/people/person-nova", defaultPerson({ id: "person-sage", role: "adult" }));
+        await findByText("Nova");
+        expect(queryByRole("button", { name: "Edit" })).toBeNull();
+      } finally {
+        restore();
+      }
+    });
+
+    test("saving the Edit dialog sends the changed name, bio and accent, then shows them", async () => {
+      let patchBody: unknown = null;
+      // The roster GET has to reflect the PATCH once it lands - the
+      // component reads the SAVED profile from a refetch of `["people"]`
+      // (it isn't viewing itself), never from the PATCH response body
+      // directly, so a mock that always returns the original ROSTER would
+      // never show the save actually took.
+      let roster = ROSTER;
+      const original = globalThis.fetch;
+      globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.endsWith("/api/people/person-bramble") && init?.method === "PATCH") {
+          patchBody = JSON.parse(init.body as string);
+          const updated = { ...roster[1]!, display_name: "Bram", bio: "Loves the beach", accent: "violet" };
+          roster = [roster[0]!, updated, roster[2]!];
+          return Promise.resolve(new Response(JSON.stringify(updated), { status: 200 }));
+        }
+        if (url.endsWith("/api/people")) return Promise.resolve(new Response(JSON.stringify(roster), { status: 200 }));
+        throw new Error(`unstubbed fetch: ${url}`);
+      }) as unknown as typeof fetch;
+      try {
+        const { findByRole, findByLabelText, findByText } = renderProfile(
+          "/people/person-bramble",
+          defaultPerson({ id: "person-sage", role: "owner" }),
+        );
+        fireEvent.click(await findByRole("button", { name: "Edit" }));
+        const nameInput = await findByLabelText("Name");
+        fireEvent.change(nameInput, { target: { value: "Bram" } });
+        const bioInput = await findByLabelText("Bio");
+        fireEvent.change(bioInput, { target: { value: "Loves the beach" } });
+        fireEvent.click(await findByRole("combobox", { name: "Accent color" }));
+        fireEvent.click(await findByRole("option", { name: "Violet" }));
+
+        await act(async () => {
+          fireEvent.click(await findByRole("button", { name: "Save" }));
+        });
+
+        await waitFor(() => expect(patchBody).toEqual({ displayName: "Bram", bio: "Loves the beach", accent: "violet" }));
+        expect(await findByText("Bram")).toBeInTheDocument();
+        expect(await findByText("Loves the beach")).toBeInTheDocument();
+      } finally {
+        globalThis.fetch = original;
+      }
+    });
+
+    test("turning on the photo opt-in for a supervised (child) target asks for admin approval", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER });
+      try {
+        const { findByRole, findByLabelText, findByText } = renderProfile(
+          "/people/person-bramble",
+          defaultPerson({ id: "person-sage", role: "owner" }),
+        );
+        fireEvent.click(await findByRole("button", { name: "Edit" }));
+        fireEvent.click(await findByLabelText("Use a real photo"));
+        expect(await findByText("An admin needs to approve a real photo for Bramble before it shows anywhere.")).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("turning on the photo opt-in for an adult says uploads aren't wired up yet, not the child copy", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER });
+      try {
+        const { findByRole, findByLabelText, findByText, queryByText } = renderProfile(
+          "/people/person-nova",
+          defaultPerson({ id: "person-sage", role: "owner" }),
+        );
+        fireEvent.click(await findByRole("button", { name: "Edit" }));
+        fireEvent.click(await findByLabelText("Use a real photo"));
+        expect(await findByText("Photo uploads aren't wired up yet. This will use MaiPai Home's own storage once it ships.")).toBeInTheDocument();
+        expect(queryByText(/needs to approve/)).toBeNull();
+      } finally {
+        restore();
+      }
+    });
+
+    test("the manage-actions link-out appears only for an owner/admin viewing someone else", async () => {
+      const restore = stubFetch({ "/api/people": ROSTER });
+      try {
+        const owner = renderProfile("/people/person-bramble", defaultPerson({ id: "person-sage", role: "owner" }));
+        expect(await owner.findByRole("link", { name: "Manage in Settings" })).toBeInTheDocument();
+        owner.unmount();
+      } finally {
+        restore();
+      }
+
+      const restoreSelf = stubFetch({ "/api/people": ROSTER });
+      try {
+        const self = renderProfile("/people/person-sage", defaultPerson({ id: "person-sage", role: "owner" }));
+        await self.findByText("Sage");
+        expect(self.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
+        self.unmount();
+      } finally {
+        restoreSelf();
+      }
+
+      const restoreNonAdmin = stubFetch({ "/api/people": ROSTER });
+      try {
+        const nonAdmin = renderProfile("/people/person-nova", defaultPerson({ id: "person-sage", role: "adult" }));
+        await nonAdmin.findByText("Nova");
+        expect(nonAdmin.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
+        nonAdmin.unmount();
+      } finally {
+        restoreNonAdmin();
+      }
+    });
   });
 });

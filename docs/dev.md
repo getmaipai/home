@@ -29083,3 +29083,118 @@ is a finding about the item, not a reason to loop) - both rounds'
 fixes verified with `tsc --noEmit` and the targeted suites
 (`projects/`, `turnMachine/`, the four bench-adjacent test files), 234
 tests, 0 failures, before the full gate.
+
+## PEOPLE-PROFILE-01 landed: the profile page's header card and Edit dialog, photo upload deliberately deferred (2026-09-26)
+
+`docs/plans/people-profile-2026-09-26.md` named `PEOPLE-PROFILE-01` as
+the profile page's header card plus an Edit dialog for bio, accent,
+photo opt-in, and (per decision 3) display name. `PEOPLE-GRID-01`
+landed the card grid the same day but left `bio`/`accent` completely
+unwired end to end - the spec had the fields, nothing else did. This
+item wires them and builds the page around them.
+
+**The route is the existing one, not a new next-shell page.**
+`NextPeoplePage.tsx`'s cards link to `/people/${id}`, the pre-existing
+route served by `frontend/src/apps/people/PersonProfilePage.tsx` (the
+older kit-styled shell, not `frontend/src/next/`). The design record's
+own "same route pattern `PersonProfilePage.tsx` uses today" confirms
+this is intentional for phase one: the new grid and the older profile
+page share one page across two shells rather than the item building a
+parallel `/next/people/:id`. Everything here composes from
+`@maipai/ui/src/ui/*` (Dialog, Input, Label, Textarea, Select, Switch,
+Button, Card) to match that file's own existing imports, not the
+vendored `dashboard/components/ui/*` snapshot `NextPeoplePage.tsx`
+uses - both trees ship the same primitives under different paths;
+staying consistent with the file being edited beat mixing two visual
+systems on one page for a migration this item was never scoped to do.
+
+**bio/accent wiring.** `backend/src/db/schema.ts`'s `people` table
+gained two nullable `text` columns (migration
+`0066_flaky_cobalt_man.sql`, via `bun run db:generate` - the worktree
+had no `node_modules` at all until a fresh `bun install`, worth noting
+since a from-scratch worktree needs that before `drizzle-kit` or
+anything else here runs). `personShape.ts`'s `toPerson`/
+`personToDbValues` read and write both fields the same way every
+existing field there does (no special-casing). `PATCH /api/people/:id`
+accepts `bio`/`accent` in its body schema and folds them into the same
+`parsePersonCandidate()` call every other field already goes through,
+so an unknown accent value gets the same 400 an invalid role would -
+no separate validation function needed. `canManage()`'s existing
+"anyone edits their own, the ladder governs anyone else" gate is the
+only permission check; the design record's bio field description ("in
+the person's own words or, for a child, a parent's") is exactly why an
+owner/admin editing a child's bio is the intended case, not a gap.
+
+**Display name moved, not duplicated.** `DisplayNameSection.tsx`
+(Settings -> Me's own self-rename field, 2026-09-15's placement) is
+deleted along with its test and its `PERSON_TREE` search-index entry
+in `SettingsPage.tsx`. The Edit dialog on the profile page now owns
+display-name editing for both self-edits and an owner/admin renaming
+someone else (through the same dialog, same `canManagePerson` gate) -
+`UsersSection.tsx`'s own separate inline rename (part of the Settings
+-> Users management row, alongside role change and delete) was left
+untouched: that is an admin/management action bundled with role and
+deletion, explicitly kept off the profile page by the design record's
+own "manage actions... never duplicated onto the profile page itself,"
+not the self-service field this item's decision 3 was about. Editing
+your OWN name/bio/accent from the profile page needed one more wire
+than the roster query: viewing yourself reads straight from the
+`person` prop (`App.tsx`'s top-level state, used for the whole shell -
+sidebar, avatar menu), never from the `["people"]` query the profile
+page also invalidates, so `PersonProfilePage` now takes an
+`onPersonChange` prop (`App.tsx` passes its existing `revalidatePerson`
+straight through) alongside the query invalidation, or a self-rename
+would show correctly to everyone else while your own sidebar stayed
+stale until a reload.
+
+**Photo upload: deferred on purpose, not half-built.** The design
+record lists `avatar_file_id` as one of three `PEOPLE-SPEC-01` fields;
+checking the actual pinned `spec-v0.1.43` found only `bio` and
+`accent` ever shipped - there is no `avatar_file_id` on `Person` at
+all, and no upload endpoint (`STORE-SPEC-01`, the storage system, is
+still ahead in `commons`). Adding a field or a one-off upload path from
+this repo alone to make the toggle "work" would be exactly the
+hub-only patch to a spec-shaped record CLAUDE.md's "shared record
+changes go through the spec first" rules out - the fields drift, and
+the round-trip fixtures that would catch it don't exist yet either. So
+the Edit dialog's "Use a real photo" toggle is real, working UI state
+(a `Switch`, not disabled or hidden) that shows one of two honest
+messages instead of a file picker with nothing to send bytes to: for a
+supervised-role (`child`) target, "An admin needs to approve a real
+photo for `{name}` before it shows anywhere" (the design's own decision
+1, in spirit mirroring `entities.ts`'s `confirmTransition`/"Unconfirmed"
+consent-floor pattern, though there is genuinely nothing to persist a
+pending-photo state to yet, so no transition is actually wired); for
+anyone else, "Photo uploads aren't wired up yet. This will use MaiPai
+Home's own storage once it ships." `TODO(AVATAR-RENDER-01,
+STORE-SPEC-01)` marks the real work: the spec field, the upload
+endpoint, and the actual admin-confirmation transition, once both
+land.
+
+**Tests.** `PersonProfilePage.test.tsx` gained 8 tests: the header
+card renders photo/avatar/name/role/bio; Edit is offered on your own
+page and to an owner managing someone else, refused to an adult
+viewing another adult; saving the dialog sends the real changed fields
+in one PATCH body and the page reflects them after the roster
+refetches (the test's own mock had to grow a mutable roster - a mock
+that always returns the original list can never show a save actually
+took, an easy way to write a green test that proves nothing); the two
+photo-toggle messages, by role; the manage-link-out shown only to an
+owner/admin viewing someone else. Backend: `personShape.test.ts`
+gained a bio/accent round-trip pair (`toPerson`, `personToDbValues`);
+`people.test.ts` gained three PATCH tests (self bio/accent, an owner
+setting a child's bio, an unknown accent rejected). `ACCENT_RING_CLASS`
+moved out of `NextPeoplePage.tsx` into `apps/people/roles.ts` (with new
+`ACCENT_LABELS`/`ACCENT_SELECT_OPTIONS`/`NO_ACCENT` alongside it) so
+the card grid and the profile page share one definition instead of two
+hand copies of the same six-swatch map.
+
+Verified: backend `bun test tests/personShape.test.ts tests/people.test.ts
+tests/ageBand.test.ts tests/turnEngine.test.ts tests/routingCorpus.test.ts`
+(all green, 407+17 passing across the touched files), `tsc --noEmit`
+clean in both `backend/` and `frontend/`. Frontend `bun test
+src/apps/people src/apps/settings` (143 passing, 21 files) plus
+`eslint` on every changed file, clean. The full `scripts/check.sh` gate
+was not run (queued behind three other lanes gating serially tonight);
+the known pre-existing mDNS flake (#160) is the only expected red when
+it runs.

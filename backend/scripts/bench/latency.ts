@@ -171,6 +171,8 @@ export function syntheticActor(): PersonRow {
     id: "person-benchalfred",
     displayName: "alfred",
     nickname: null,
+    bio: null,
+    accent: null,
     birthdate: null,
     role: "adult",
     avatarSeed: "bench",

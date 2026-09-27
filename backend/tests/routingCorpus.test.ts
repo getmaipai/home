@@ -34,6 +34,8 @@ function fakeActor(): PersonRow {
     id: "person-corpus",
     displayName: "Corpus",
     nickname: null,
+    bio: null,
+    accent: null,
     birthdate: null,
     role: "adult",
     avatarSeed: "seed",

@@ -1,4 +1,7 @@
+import type { Person } from "@maipai/spec/gen/ts/person.js";
 import { isOwnerOrAdminRole, type Role } from "@/lib/api";
+
+type Accent = NonNullable<Person["accent"]>;
 
 export const ROLE_LABELS: Record<Role, string> = {
   owner: "Owner",
@@ -80,3 +83,39 @@ export function canDeletePerson(actorRole: Role, actorId: string, target: { id: 
   if (actorId === target.id) return false;
   return creatableRoles(actorRole).includes(target.role);
 }
+
+// `Person.accent`'s six named swatches (spec-v0.1.43) to the matching
+// `--profile-accent-*` token (ui-v0.5.68's tokens.css), one definition
+// shared by NextPeoplePage.tsx's card grid and PersonProfilePage.tsx's
+// header card/Edit dialog - a code review on PEOPLE-GRID-01 would have
+// flagged a second hand-copy of this exact map. Literal Tailwind
+// arbitrary-value classes, the same lookup-map-of-literals pattern the
+// kit's own HeaderPicker.tsx/FooterBar.tsx use for their hue tokens -
+// there is no `@theme inline` bridge for these (per-person, not a fixed
+// palette a utility class could name).
+export const ACCENT_RING_CLASS: Record<Accent, string> = {
+  blue: "ring-[var(--profile-accent-blue)]",
+  violet: "ring-[var(--profile-accent-violet)]",
+  teal: "ring-[var(--profile-accent-teal)]",
+  orange: "ring-[var(--profile-accent-orange)]",
+  pink: "ring-[var(--profile-accent-pink)]",
+  red: "ring-[var(--profile-accent-red)]",
+};
+
+export const ACCENT_LABELS: Record<Accent, string> = {
+  blue: "Blue",
+  violet: "Violet",
+  teal: "Teal",
+  orange: "Orange",
+  pink: "Pink",
+  red: "Red",
+};
+
+/** `Select` (the primitives wrapper) refuses "" as a real option value
+ * (its own header comment: an empty string reads as "unset" to Radix and
+ * shows a blank trigger) - "none" is the real, named sentinel for "no
+ * accent", mapped to/from `null` at the edges by the Edit dialog, never
+ * passed to the API or the swatch maps above. */
+export const NO_ACCENT = "none" as const;
+export const ACCENT_SELECT_OPTIONS: readonly string[] = [NO_ACCENT, ...(Object.keys(ACCENT_LABELS) as Accent[])];
+export const ACCENT_SELECT_LABELS: Record<string, string> = { [NO_ACCENT]: "No accent", ...ACCENT_LABELS };

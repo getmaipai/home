@@ -98,6 +98,8 @@ function fakeActor(overrides: Partial<PersonRow> = {}): PersonRow {
     id: "person-faketest",
     displayName: "Testy",
     nickname: null,
+    bio: null,
+    accent: null,
     birthdate: null,
     role: "adult",
     avatarSeed: "seed",

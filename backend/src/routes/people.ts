@@ -219,6 +219,13 @@ const patchRoute = createRoute({
           schema: z.object({
             displayName: z.string().optional(),
             nickname: z.string().nullable().optional(),
+            // PEOPLE-PROFILE-01: the profile page's own Edit dialog. The
+            // final parsePersonCandidate() call below is what actually
+            // enforces bio's 160-char cap and accent's named enum (the
+            // same spec Person shape every other field here is validated
+            // against) - no separate check needed, same as nickname above.
+            bio: z.string().nullable().optional(),
+            accent: z.string().nullable().optional(),
             birthdate: z.string().nullable().optional(),
             role: z.string().optional(),
             avatarSeed: z.string().optional(),
@@ -238,7 +245,7 @@ const patchRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: RosterWithSecuritySchema } }, description: "Updated." },
-    ...errorResponses({ 400: "Invalid role/displayName/birthdate/guestExpiresAt", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
+    ...errorResponses({ 400: "Invalid role/displayName/bio/accent/birthdate/guestExpiresAt", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
   },
 });
 peopleRoutes.openapi(patchRoute, async (c) => {
@@ -326,6 +333,8 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     id: target.id,
     display_name: displayName,
     nickname: body.nickname !== undefined ? body.nickname : target.nickname,
+    bio: body.bio !== undefined ? body.bio : target.bio,
+    accent: body.accent !== undefined ? body.accent : target.accent,
     birthdate: body.birthdate !== undefined ? body.birthdate : target.birthdate,
     role: nextRole,
     avatar_seed: body.avatarSeed ?? target.avatarSeed,

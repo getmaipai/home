@@ -7,6 +7,8 @@ function actor(overrides: Partial<PersonRow> = {}): PersonRow {
     id: "person-test",
     displayName: "Testy",
     nickname: null,
+    bio: null,
+    accent: null,
     birthdate: null,
     role: "adult",
     avatarSeed: "seed",

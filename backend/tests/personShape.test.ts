@@ -72,6 +72,24 @@ describe("toPerson", () => {
     const person = toPerson(row);
     expect(person.enabled).toBe(false);
   });
+
+  // PEOPLE-PROFILE-01: bio/accent were added to spec-v0.1.43 (PEOPLE-
+  // GRID-01's landing note flagged them "not yet wired") - this is that
+  // wiring, so it gets its own round-trip coverage the same way every
+  // other field on this row already has.
+  test("surfaces a set bio and accent", () => {
+    const row = insertPerson({ id: "person-bioacc1", bio: "Likes dinosaurs", accent: "teal" });
+    const person = toPerson(row);
+    expect(person.bio).toBe("Likes dinosaurs");
+    expect(person.accent).toBe("teal");
+  });
+
+  test("bio and accent default to null when never set", () => {
+    const row = insertPerson({ id: "person-nobioacc" });
+    const person = toPerson(row);
+    expect(person.bio).toBeNull();
+    expect(person.accent).toBeNull();
+  });
 });
 
 describe("toRoster", () => {
@@ -162,6 +180,13 @@ describe("personToDbValues", () => {
     expect(values.localOnly).toBe(person.local_only);
     expect(values.guestExpiresAt).toBe(person.guest_expires_at);
     expect(values.memorializedAt).toBe(person.memorialized_at);
+  });
+
+  test("round-trips bio and accent", () => {
+    const person = toPerson(insertPerson({ id: "person-rtbioacc", bio: "Loves the beach", accent: "violet" }));
+    const values = personToDbValues(person);
+    expect(values.bio).toBe("Loves the beach");
+    expect(values.accent).toBe("violet");
   });
 });
 

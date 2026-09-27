@@ -634,6 +634,9 @@ export const api = {
     edit: {
       displayName?: string;
       nickname?: string | null;
+      // PEOPLE-PROFILE-01: the profile page's own Edit dialog.
+      bio?: string | null;
+      accent?: Person["accent"];
       role?: string;
       sessionLockRequired?: boolean;
       sessionLockTimeoutMinutes?: number;

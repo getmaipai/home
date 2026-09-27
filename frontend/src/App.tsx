@@ -132,7 +132,7 @@ function OldShellRoutes({
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/search" element={<SearchPage person={person} />} />
           <Route path="/people" element={<PeoplePage person={person} />} />
-          <Route path="/people/:id" element={<PersonProfilePage person={person} />} />
+          <Route path="/people/:id" element={<PersonProfilePage person={person} onPersonChange={revalidatePerson} />} />
           {/* Memories belong to a person now (same ruling): both
               spellings of the old destination redirect to the
               signed-in person's own Memories tab, so nothing

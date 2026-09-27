@@ -28,6 +28,8 @@ function benchActor(): PersonRow {
     id: "person-bench",
     displayName: "Bench",
     nickname: null,
+    bio: null,
+    accent: null,
     birthdate: null,
     role: "adult",
     avatarSeed: "seed",

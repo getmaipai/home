@@ -9,6 +9,13 @@ export const people = sqliteTable("people", {
   id: text("id").primaryKey(),
   displayName: text("display_name").notNull(),
   nickname: text("nickname"),
+  // PEOPLE-PROFILE-01 (spec-v0.1.43): the profile page's own bio/accent -
+  // person.schema.json's own field descriptions ("The line under the
+  // person's name..."/"A named profile color accent."). Both nullable,
+  // unset meaning exactly what the spec says (no line, no accent), never
+  // an empty-string placeholder.
+  bio: text("bio"),
+  accent: text("accent"),
   birthdate: text("birthdate"),
   role: text("role").notNull(),
   avatarSeed: text("avatar_seed").notNull(),

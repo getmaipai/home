@@ -123,6 +123,12 @@ export function canManage(actor: PersonRow, target: { id: string; role: string }
 export interface PersonEdit {
   displayName?: string;
   nickname?: string | null;
+  // PEOPLE-PROFILE-01: the profile page's own Edit dialog - bio/accent are
+  // gated by the same canManage() ladder as the rest of this interface
+  // (self, always; someone else, only owner/admin/etc per MANAGEABLE_BY),
+  // no extra check of their own.
+  bio?: string | null;
+  accent?: string | null;
   birthdate?: string | null;
   avatarSeed?: string;
   role?: string;

@@ -236,6 +236,53 @@ describe("PATCH /api/people/:id", () => {
     expect(body.nickname).toBe("Bee");
   });
 
+  // PEOPLE-PROFILE-01: bio/accent are self-service fields (canManage()'s
+  // same "anyone may edit their own" rule the test above already covers
+  // for name/nickname) - the profile page's own Edit dialog is the real
+  // caller, this is the route contract it depends on.
+  test("anyone may set their own bio and accent", async () => {
+    const ownerClient = await ownerSession();
+    const child = await addPerson(ownerClient, "Bramble", "child");
+    const childClient = await sessionFor(child.id);
+
+    const res = await childClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { bio: "Likes dinosaurs", accent: "teal" },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { bio: string; accent: string };
+    expect(body.bio).toBe("Likes dinosaurs");
+    expect(body.accent).toBe("teal");
+  });
+
+  test("an unknown accent is refused", async () => {
+    const ownerClient = await ownerSession();
+    const child = await addPerson(ownerClient, "Bramble", "child");
+    const childClient = await sessionFor(child.id);
+
+    const res = await childClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { accent: "chartreuse" },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // A parent (owner/admin) may write a child's bio too - person.schema.
+  // json's own field description: "in the person's own words or (for a
+  // child) a parent's" - not a loophole, the documented case.
+  test("an owner may set a child's bio on their behalf", async () => {
+    const ownerClient = await ownerSession();
+    const child = await addPerson(ownerClient, "Bramble", "child");
+
+    const res = await ownerClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { bio: "Loves dinosaurs, from Mom" },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { bio: string };
+    expect(body.bio).toBe("Loves dinosaurs, from Mom");
+  });
+
   // SEC-8 (code review, 2026-09-06): canManage() lets anyone edit their
   // own profile with no ladder check at all, which used to cover
   // birthdate too - a child could set their own birthdate to any adult
