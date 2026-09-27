@@ -29655,3 +29655,183 @@ fail, frontend 781 pass/0 fail, docs reading-level lint, standards core.
 The household's own live hub at `127.0.0.1:8787` was never touched by
 this work (no `bun restart`, no port 8787 traffic) - the coordinator's
 own job, per the standing "lanes never touch shared server" rule.
+
+## HERMES-01: what Hermes Agent does, what the Hermes models are, and what Home takes (2026-09-27)
+
+Jesse asked why Home does not use Hermes. Two things carry the name,
+and the repo already uses a third: `engineAutotune.ts` passes `--jinja`
+so llama-server parses Qwen3's Hermes-style tool calls, the
+`<tool_call>{json}</tool_call>` wire inside ChatML that Nous's Hermes
+models introduced and Qwen adopted. Home already speaks Hermes's tool
+format without a Hermes model. The two real readings were researched
+on 2026-09-27 against primary sources (the repo at `v2026.9.24`, its
+docs site, the Hugging Face model cards), with secondary coverage
+marked as such.
+
+**Hermes Agent, what it is.** Nous Research's MIT agent harness on
+Python 3.11 to 3.14, released 2026-02-25, at about 249k stars and a
+release every three to seven days. It installs as a `curl | bash`
+one-liner (which also installs Node) and runs as a standalone CLI or
+TUI plus a "messaging gateway" process (Telegram, Discord, Slack,
+WhatsApp, Signal, with Matrix, Teams, SMS and others as extras); a
+desktop app exists. It is one model in a tool-calling loop with 40-plus
+tools, sub-agents, an MCP client, built-in cron delivered to any
+gateway, and seven terminal backends (local shell, Docker, SSH, Modal
+and others). Memory is two curated files, `MEMORY.md` (2,200 chars)
+and `USER.md` (1,375 chars), loaded into the system prompt every
+session, plus a SQLite store with full-text search over every session
+and seven optional external memory services (Honcho, Mem0,
+Supermemory and others), off unless set up. Skills are Markdown files
+in the agentskills.io format that the agent writes itself after a
+complex task and "self-improve during use". Providers: Nous Portal
+(OAuth, "300+ models" and a hosted Tool Gateway), the cloud vendors,
+and `provider: custom` with a base URL for llama-server, vLLM, LM
+Studio or Ollama; its Mac guide recommends Qwen3.5-9B Q4 on llama.cpp
+or oMLX.
+
+**Why not a base for Home, on six grounds.**
+
+1. **One operator, no people.** One identity per profile, a profile is
+   a whole Hermes home, and the docs say never to point two agent
+   processes at one profile: a household is several processes with
+   separate memories, and sharing memory means an external service.
+   No roles, age bands, per-person rules or child-safety layer ("no
+   dedicated child-safety layer or content filtering policy", its own
+   security page). The same ground that ruled out Open WebUI
+   (OPENWEBUI-01) and DeepSeek Harness (DSH-01), and the one that
+   decides this on its own.
+2. **The trust model runs the other way.** The local backend has the
+   user's own filesystem and a direct shell by default; `approvals.mode`
+   defaults to `smart`, where an auxiliary model judges a command's
+   risk (a learned component as the sole gate in the safety path,
+   which RULES-AND-LEARNED-COMPONENTS.md forbids outright); `--yolo`
+   removes prompts and the container backends skip approval entirely.
+   Skills the agent writes for itself are persistent prompt injection
+   by construction (the Cloud Security Alliance's note calls this, and
+   memory poisoning, the consequential risk; a 2026 study of evolved
+   skills found unsafe artifacts in 21 of 21 configurations and harm
+   carried into fresh sessions in 15). Three CVEs in 2026 (path
+   traversal in two adapters, symlink following). The catalog's
+   signed, one-call-at-a-time packages are the opposite design.
+3. **A second runtime that owns the loop.** Python, not embeddable in
+   the Bun and Hono process; the org runs one TypeScript pipeline on
+   the hub and the robot (bot RUNTIME-01, "the pipeline is never
+   ported to Python", STACK.md). Adopting it splits the platform, which
+   principle 2 forbids, and the robot fit is poor besides: the `voice`
+   extra hangs building `ctranslate2` and `onnxruntime` on 32-bit ARM
+   (open issue), and community Pi guides run it only with a hosted
+   model (secondary). XState, the adopted sequencer, is 3 MB on Bun
+   and boots on arm64 (ARCH-BUILD-01).
+4. **Local-model tool calling is its weak path, and Home's strong
+   one.** For a `custom` endpoint, tool definitions are rendered as
+   prompt text and calls parsed back out of the reply; native
+   structured `tools` and `tool_calls` exist only for six hosted
+   adapters. Issue #97967 (2026-08-29) measured about 70 percent
+   unparseable replies and 0 of 10 successful tool calls on a local
+   endpoint that worked natively over plain REST. ENGINE-CONTRACT-01
+   is the exact inverse: native tool calls proven per pinned build,
+   with a post-load canned `tools` request that fails the boot if the
+   reply carries no `tool_calls`. Whether 2026.9.x fixed the bridge
+   was not found in the release notes fetched.
+5. **Hosted by default where Home is local by design.** Web search,
+   TTS, image generation and browser automation are Nous Portal Tool
+   Gateway tools, or the person's own cloud keys; nothing local ships
+   for them. Home has SearXNG, sherpa-onnx speech and ComfyUI, all
+   in the house. A passive update check reaches the GitHub API once
+   every 24 hours with no documented opt-out, which PRIVACY.md's zero
+   phone-home rule does not allow even at that rate.
+6. **It fails ARCH-BUILD-01's bar.** Adopt only what deletes a large
+   amount of our orchestration without taking ownership of the
+   safety, privacy and control-flow semantics. Hermes is the process:
+   it owns all three by construction, and the memory it would bring
+   (two files in the system prompt) is exactly the "large system
+   prompt standing in for a real technique" principle 6 names as
+   hand-built.
+
+**Where it is honest, and Home should say so.** Its FAQ states no
+telemetry, usage data or analytics, that API calls go only to the
+configured provider, and that it works offline with local models; the
+update check above is the one outbound default found. Gateway access
+is default-deny (an allowlist plus a one-time pairing code per chat).
+Memory writes from background and messaging sessions can be staged for
+explicit approval (`write_approval: true`), the same posture the
+household-memory design already gives household records.
+
+**The Hermes models.** Hermes 4 (2025-08-26) ships a 14B on Qwen3-14B
+(Apache 2.0, ChatML) and a 70B and 405B on Llama 3.1 (Llama licence);
+Hermes 4.3-Seed-36B (2025-12-03) sits on ByteDance's Seed-OSS-36B with
+official GGUFs; the only sub-8B model is Hermes 3 Llama-3.2-3B
+(2024-12-11, Llama licence), and DeepHermes-3-8B is a preview. Nothing
+under 14B exists on a Qwen3 base, so none fits the tiers Home runs
+today (Qwen3-1.7B, 4B and 8B; Qwen3.5-9B class). Their stated
+distinction is "broadly neutral alignment" and "extreme improvements
+on steerability, especially on reduced refusal rates", measured on
+Nous's own RefusalBench. That is the wrong axis for a household with
+child profiles: Home's child safety is the deterministic floor and the
+output gate, never the model's refusals, so a lower-refusal model adds
+load to the gate and gives back nothing the gate needs. No text
+benchmark against a same-size Qwen3, Qwen3.5 or Gemma was found (the
+14B card's table is an image; the 4.3 card compares to Qwen3-235B).
+Verdict: not a candidate for the `chat` role on any current tier. If a
+14B slot ever opens for the Studio's `best` quality, Hermes 4 14B may
+enter that bakeoff on the model bench like any other candidate, on
+measured numbers, with no priority now.
+
+**What Home takes**, as BACKLOG rows under "From Hermes research
+(2026-09-27)":
+
+- **GATEWAY-01**, reaching the hub from a messaging app the family
+  already has, inbound, with Hermes's gateway shape (allowlist, a
+  one-time pairing code binding a chat to one Person, default deny).
+  A design pass first, and PRIVACY.md's verdict before anything else:
+  every message transits the vendor's servers, and the outbound
+  Telegram notification channel already crossed that line once with a
+  per-type toggle, so the record must say whether inbound is the same
+  class or a new one.
+- **TOOL-RESULT-TRUST-01**, fetched content as untrusted data. Hermes
+  scans context files for injected instructions by default; Home
+  treats nothing it fetches (search snippets, `read_page`, feeds, a
+  document) as anything but text, and `promptSanitize.ts` only strips
+  line breaks and braces from a display name. Research first, and the
+  answer is structural or measured, never a word list.
+
+Notes with no row of their own: skill self-creation is the opposite of
+the harness design's measured `plan_authoring` (a model earns plan
+authoring on a bench; a skill written after one lucky run is exactly
+the unmeasured rule the org retired), so nothing is taken there; cron
+delivered into a conversation is ROUTINES-01 already; the MCP client is
+STACK.md's package RPC already; issue #97967 is a live confirmation
+that ENGINE-CONTRACT-01's post-load tools check is worth its boot cost.
+
+**Skipped:** the terminal backends, sub-agents and desktop app until
+ARCH-AGENT-01's design says otherwise (as DSH-01 skipped them); the
+external memory services (a second store beside the hub's, principle
+1, and hosted ones fail "nothing leaves the home"); Nous Portal.
+
+**Not verified at the source:** the star count and release date (the
+repo page and secondary coverage), the Pi memory figures (community
+guides), whether #97967 is fixed in 2026.9.x, whether the update check
+can be disabled, Hermes 4.3's licence inheritance from Seed-OSS (the
+card says Apache 2.0), and Hermes 4 14B against Qwen3-14B (an image).
+
+Sources: [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent),
+[releases](https://github.com/NousResearch/hermes-agent/releases),
+[pyproject.toml](https://raw.githubusercontent.com/NousResearch/hermes-agent/main/pyproject.toml),
+[providers](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/integrations/providers.md),
+[local LLM on Mac](https://hermes-agent.nousresearch.com/docs/guides/local-llm-on-mac),
+[memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory),
+[configuration](https://hermes-agent.nousresearch.com/docs/user-guide/configuration),
+[security](https://hermes-agent.nousresearch.com/docs/user-guide/security),
+[profiles](https://hermes-agent.nousresearch.com/docs/user-guide/profiles),
+[multi-profile gateways](https://hermes-agent.nousresearch.com/docs/user-guide/multi-profile-gateways),
+[FAQ](https://hermes-agent.nousresearch.com/docs/reference/faq),
+[issue #97967](https://github.com/NousResearch/hermes-agent/issues/97967),
+[issue #21425](https://github.com/NousResearch/hermes-agent/issues/21425),
+[issue #8397](https://github.com/NousResearch/hermes-agent/issues/8397),
+[CSA research note](https://labs.cloudsecurityalliance.org/research/csa-research-note-hermes-agent-cves-20260504-csa-styled/),
+[Practice Makes Unsafe, arXiv 2608.12851](https://arxiv.org/abs/2608.12851),
+[Nous releases](https://nousresearch.com/releases),
+[Hermes-4-14B](https://huggingface.co/NousResearch/Hermes-4-14B),
+[Hermes-4.3-36B](https://huggingface.co/NousResearch/Hermes-4.3-36B),
+[Hermes-3-Llama-3.2-3B](https://huggingface.co/NousResearch/Hermes-3-Llama-3.2-3B),
+[Hermes 4 tech report, arXiv 2508.18255](https://arxiv.org/abs/2508.18255).
