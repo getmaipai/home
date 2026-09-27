@@ -365,7 +365,11 @@ describe("postProjectResult(): completion posts to the thread and notifies", () 
     return db.select().from(artifacts).where(eq(artifacts.turnId, turnId)).all();
   }
 
-  test("a finished project's deliverable becomes a markdown artifact on the starting turn, and project.done fires", async () => {
+  function replyTextFor(turnId: string): string {
+    return db.select({ replyText: conversationTurns.replyText }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!.replyText;
+  }
+
+  test("a finished project's deliverable becomes a markdown artifact on the starting turn, its reply text stops saying 'Starting...', and project.done fires", async () => {
     const completeSpy = stubComplete("Once upon a time, a small fox learned to share.");
     const triggerSpy = spyOn(notifications, "trigger").mockResolvedValue();
     const actor = person("Sage");
@@ -383,11 +387,19 @@ describe("postProjectResult(): completion posts to the thread and notifies", () 
     expect(rows[0]!.provenance).toBe(`project:${projectId}`);
     expect(triggerSpy).toHaveBeenCalledWith("project.done", expect.objectContaining({ title: "a bedtime story" }), expect.objectContaining({ personId: actor.id, subjectTurnId: turnId }));
 
+    // Jesse found live (2026-09-27): a reload of a long-finished project
+    // still showed its "Starting a bedtime story now - N steps, about Y
+    // minutes." reply, unchanged from the moment it launched. The turn's
+    // own stored reply text now updates to reflect what actually
+    // happened, the same wording NextChatPage.tsx's own canvas caption
+    // uses for a written document.
+    expect(replyTextFor(turnId)).toBe('Wrote "a bedtime story."');
+
     completeSpy.mockRestore();
     triggerSpy.mockRestore();
   });
 
-  test("a failed project posts a plain-words summary of what did and didn't finish, and project.failed fires", async () => {
+  test("a failed project posts a plain-words summary of what did and didn't finish, updates its reply text to match, and project.failed fires", async () => {
     const completeSpy = spyOn(llm, "complete").mockImplementation(async () => ({ ok: false, status: 503, code: "unavailable", error: "the chat engine is not responding" }));
     const triggerSpy = spyOn(notifications, "trigger").mockResolvedValue();
     const actor = person("Sage");
@@ -403,6 +415,9 @@ describe("postProjectResult(): completion posts to the thread and notifies", () 
     expect(rows[0]!.body).toContain("didn't finish");
     expect(rows[0]!.body).toContain("story");
     expect(triggerSpy).toHaveBeenCalledWith("project.failed", expect.objectContaining({ title: "a bedtime story" }), expect.anything());
+    // Matches ProjectToolRender's own live `failed` render exactly
+    // (NextChatPage.tsx) - the live and the reloaded text never disagree.
+    expect(replyTextFor(turnId)).toBe(`a bedtime story didn't finish: the "story" step's model call failed: the chat engine is not responding`);
 
     completeSpy.mockRestore();
     triggerSpy.mockRestore();

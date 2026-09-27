@@ -22,9 +22,10 @@
 // `alreadyPosted()` is what the second one reads to become a no-op.
 import { readFileSync } from "node:fs";
 import { and, eq, desc } from "drizzle-orm";
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { artifacts, conversationTurns } from "@/db/schema";
 import { createArtifact } from "@/lib/artifacts";
+import { nextHlc } from "@/lib/hlc";
 import { trigger } from "@/lib/notifications";
 import { loadProject } from "./store";
 import { planSteps } from "./types";
@@ -116,6 +117,25 @@ function failureBody(project: Project): string {
   return `**${project.title}** didn't finish: ${project.error ?? "something went wrong"}.\n\n${lines.join("\n")}`;
 }
 
+// Jesse found live (2026-09-27): the turn's own reply text is
+// runStartProjectTool()'s `Starting ${title} now - N steps, about Y
+// minutes.` (tool.ts), written once when the project launches and never
+// touched again - so a reload of a LONG-finished project still reads
+// "Starting... about 8 minutes," the opposite of what actually happened.
+// Nothing else in the system ever rewrites `replyText` once a turn is
+// logged (memoryJudge.ts's own writes are to judgeStatus/judgeAttempts,
+// never this field), so this is the one place a project's own
+// completion can correct it. `Wrote "${title}."` matches the wording
+// NextChatPage.tsx's own `CanvasSplitMessage` already uses for a
+// write_document artifact's canvas caption (one phrase, not a second
+// one invented here); the failure phrasing matches ProjectToolRender's
+// own live `failed` render exactly, so the live and the reloaded text
+// never disagree with each other either.
+function finishedReplyText(project: Project): string {
+  if (project.state === "done") return `Wrote "${project.title}."`;
+  return `${project.title} didn't finish${project.error ? `: ${project.error}` : "."}`;
+}
+
 // The same "fire-and-forget, but never an unhandled rejection" shape
 // every other notify-in-the-background call site already uses
 // (modelDownloadJobs.ts's own model.download_ready/failed, issues.ts's
@@ -162,14 +182,28 @@ export function postProjectResult(projectId: string): void {
   if (alreadyPosted(turnId, project.id)) return; // the other caller already finalized this project
 
   const body = project.state === "done" ? deliverableBody(project) : failureBody(project);
-  createArtifact({
-    conversationId,
-    turnId,
-    kind: "markdown",
-    title: project.title,
-    body,
-    createdBy: person,
-    provenance: `${PROJECT_ARTIFACT_PROVENANCE_PREFIX}${project.id}`,
-  });
+  // A code review caught this: the artifact insert and the replyText
+  // rewrite below used to be two separate statements - a crash or a
+  // throw between them would leave the artifact posted but the reply
+  // text stuck on "Starting..." forever, since `alreadyPosted()` above
+  // would then treat every later retry as already finished. One atomic
+  // transaction, the same `sqlite.transaction()` wrapping
+  // conversationHistory.ts's own insert-then-update pair
+  // (insertTurnAndBumpConversation) already uses for the identical
+  // hazard - `db` and `sqlite` share the one connection, so a plain
+  // `db.insert()`/`db.update()` inside this callback is still part of
+  // the same transaction, exactly as that precedent's own calls are.
+  sqlite.transaction(() => {
+    createArtifact({
+      conversationId,
+      turnId,
+      kind: "markdown",
+      title: project.title,
+      body,
+      createdBy: person,
+      provenance: `${PROJECT_ARTIFACT_PROVENANCE_PREFIX}${project.id}`,
+    });
+    db.update(conversationTurns).set({ replyText: finishedReplyText(project), hlc: nextHlc() }).where(eq(conversationTurns.id, turnId)).run();
+  })();
   notifyResult(project, person, turnId);
 }
