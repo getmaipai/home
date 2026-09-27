@@ -2521,28 +2521,71 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   });
   if (!setShellNext.ok) throw new Error(`captureNextChatReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
-    const context = await newContext(browser, viewport, "dark", sessionValue);
-    try {
-      const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next/chat`);
-      await page.getByRole("textbox", { name: "Message input" }).fill("What's 2 plus 2?");
+  // SHELL-02's holistic review uses one persisted conversation with real
+  // turns in the seeded backend. Keep the same conversation across all
+  // four captures so viewport/theme comparisons show identical content.
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const conversation = await seedTitledConversation("captureNextChatReview", cookie, "A few questions for today");
+  const seedContext = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "dark", sessionValue);
+  try {
+    const page = await seedContext.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.goto(`${BASE_URL}/next/chat?conversation=${conversation.id}`);
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    for (const prompt of ["What's 2 plus 2?", "What herbs work well in a kitchen garden?", "Give me a simple bedtime story."]) {
+      await page.getByRole("textbox", { name: "Message input" }).fill(prompt);
       await page.getByRole("button", { name: "Send message", exact: true }).click();
-      // Wait for the turn to fully finish (Stop generating appears, then
-      // reverts) before expanding Reasoning - otherwise the capture can
-      // land mid-stream, before the model's own reasoning has finished
-      // building up.
       await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
       await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
-      await page.getByRole("button", { name: "Reasoning" }).click();
-      await settleAnimations(page);
-      const path = join(outDir, `next-chat-${viewport.width}-dark.png`);
-      await page.screenshot({ path, fullPage: slug === "phone" });
-      console.log(`Wrote ${path}`);
-      await page.close();
-    } finally {
-      await context.close();
+    }
+  } finally {
+    await seedContext.close();
+  }
+
+  const turnsResponse = await fetch(`${BASE_URL}/api/conversations/${conversation.id}/turns`, { headers: cookie });
+  if (!turnsResponse.ok) throw new Error(`captureNextChatReview: reading seeded turns failed: ${turnsResponse.status}`);
+  const turns = await turnsResponse.json() as Array<{ reasoning?: string; reply_text?: string; replyText?: string }>;
+  if (turns.length !== 3) throw new Error(`captureNextChatReview: expected 3 persisted turns, found ${turns.length}`);
+  if (!turns.some((turn) => typeof turn.reasoning === "string" && turn.reasoning.length > 0)) {
+    throw new Error("captureNextChatReview: no persisted turn includes reasoning");
+  }
+  console.log(`captureNextChatReview: seeded conversation ${conversation.id} has ${turns.length} persisted turns including reasoning`);
+
+  // Keep the repository's current model-selection wiring visible in this
+  // capture's technical evidence. A household without Stack configured
+  // correctly hides the selector; the current page still owns the model
+  // picker slot and must not regress to the retired thinking control.
+  const nextChatSource = readFileSync(join(ROOT, "frontend", "src", "next", "pages", "NextChatPage.tsx"), "utf8");
+  if (!nextChatSource.includes("ComposerExtra: modelPickerAllowed ? ComposerModelSelector : undefined") || nextChatSource.includes("ComposerThinkingControl")) {
+    throw new Error("captureNextChatReview: current ComposerModelSelector wiring was not found or retired ComposerThinkingControl remains in NextChatPage");
+  }
+  console.log("captureNextChatReview: composer source check confirms ComposerModelSelector is wired and ComposerThinkingControl is absent");
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      const consoleErrors: string[] = [];
+      try {
+        const page = await context.newPage();
+        page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+        page.on("pageerror", (error) => consoleErrors.push(error.message));
+        await page.goto(`${BASE_URL}/next/chat?conversation=${conversation.id}`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        await page.getByText("A few questions for today", { exact: true }).first().waitFor();
+        await page.getByRole("button", { name: "Reasoning" }).first().click();
+        await settleAnimations(page);
+        const filename = `next-chat-${viewport.width}-${theme}.png`;
+        const path = join(outDir, filename);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        dedicatedScreenshots.push({ file: filename, route: "/next/chat", viewport: viewport.slug, theme });
+        console.log(`Wrote ${path}`);
+        if (consoleErrors.length) throw new Error(`captureNextChatReview: ${slug}/${theme} console errors: ${consoleErrors.join(" | ")}`);
+        console.log(`captureNextChatReview: ${slug}/${theme} had no console errors`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
     }
   }
 }
@@ -4037,6 +4080,8 @@ async function main() {
 
     if (nextChatReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview) {
       await captureNextChatReview(browser, sessionValue);
+      console.log("completed named review: --next-chat-review");
+      return;
     }
 
     if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview) {
