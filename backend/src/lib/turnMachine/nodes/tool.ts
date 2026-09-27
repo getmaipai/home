@@ -10,6 +10,7 @@
 import { runPlugin } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
+import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
@@ -116,6 +117,24 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // phrase today; the seam is here so a real label wins the moment
     // one exists, with no further change at this call site.
     state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "searching", state.persona), stage: "tool" });
+
+    // PROJECT-START-01: start_project never goes through runPlugin() -
+    // tool.ts's own header explains why (no recipe op for "start a
+    // background job and return immediately") - this call itself is
+    // synchronous (it only creates the row and launches the runner's own
+    // background actor; the project keeps running long after this turn's
+    // reply goes out), so there's no deadline race to run it under.
+    if (tool === START_PROJECT_TOOL_ID) {
+      const outcome = runStartProjectTool({ actor: state.actor, args: args as StartProjectArgs, callId, conversationId: state.conversationId, turnId: state.turnId, temporary: state.temporary });
+      outcomes.push(outcome);
+      if (outcome.status === "succeeded") {
+        toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      } else {
+        toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.userMessage! });
+      }
+      continue;
+    }
+
     const raced = await withDeadline(runPlugin(tool, state.actor, args, { id: state.turnId, conversationId: state.conversationId }), signal);
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", userMessage: "That took too long, sorry." });

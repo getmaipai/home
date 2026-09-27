@@ -311,6 +311,38 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  // PROJECT-START-01 (docs/plans/harness-turns-and-projects-2026-09-26.md,
+  // "What the person sees": "Completion posts the artifact into the
+  // thread and sends a notification"). `person` audience, not `household`
+  // or `adults`: a project belongs to whoever asked for it, the same
+  // reasoning `memory.updated` above already carries. `time_sensitive`
+  // (not `passive`): the household is often waiting on this the way they
+  // wait on a timer or a download, not just noting it for later.
+  // `configurable`: a household that starts a lot of projects can turn
+  // the pings off without losing the artifact itself, which is always in
+  // the thread either way.
+  {
+    id: "project.done",
+    level: "time_sensitive",
+    audience: "person",
+    template: "{title} is ready.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
+  // The design record's own "a failed step fails honestly... offers
+  // retry" - the notification side of that: the person is told it didn't
+  // finish, in plain words, the same moment the failed artifact (post.ts)
+  // lands in the thread.
+  {
+    id: "project.failed",
+    level: "time_sensitive",
+    audience: "person",
+    template: "{title} didn't finish: {reason}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
 ] as const;
 
 // session-d-packages-and-store.md step 2: a package's own manifest

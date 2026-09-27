@@ -28909,3 +28909,177 @@ guards}.ts`, `backend/tests/memory.test.ts`, `backend/scripts/bench/
 memory-eval.ts` and this doc, a backend-scoped diff). Review: medium (a
 scoring/eligibility guard in the recall path, an explicit reason under
 the org's own review-budget rule).
+
+## PROJECT-START-01: `start_project` as an ordinary tool (2026-09-26)
+
+Landed per `docs/plans/harness-turns-and-projects-2026-09-26.md` ("How
+a project starts", "What the person sees"), on top of PROJECT-RUN-01's
+runner. Two real design questions had no existing answer in the
+codebase to copy - a `design-resolver` pass (opus) read the design
+record, the runner, `artifacts.ts`, `turnNext.ts`, `notifications.ts`
+and `scheduler.ts` before this was built, and its rulings are what's
+below.
+
+**The tool itself is virtual, the same shape `answer_from_this_
+conversation` already is.** `runPlugin()`'s recipe interpreter (18
+closed ops: `integration.call`, `pick`, `format`, `artifact`...) has no
+op for "start a background job and return immediately while it keeps
+running," so `start_project` has no `backend/packages/start_project`
+directory at all - it's special-cased at its own three touch points
+(`nodes/model.ts`'s `toolSpecFor()`, `nodes/policy.ts`'s `policyNode`,
+`nodes/tool.ts`'s `toolNode`), exactly where `ANSWER_FROM_CONTEXT_TOOL_
+ID` already is. Its own classification is deliberately not hardcoded on
+the tool (the design record: "the package/recipe declares this, the
+tool doesn't hardcode it") - a new `backend/src/lib/projects/
+projectTypes.ts` registry holds each project type's own `minRole`/
+`consequential`/`paramsSchema`/`buildPlan()`, keyed by the model's own
+`type` argument, and `policyNode` reads from THAT registry instead of a
+manifest when it sees `start_project`. No real catalog package for a
+project type exists yet (PROJECT-PACK-01), so the registry is seeded
+with one built-in type, `bedtime-story` (a two-step text/assemble
+plan), the same stand-in role `assemblers.ts`'s `markdown-concat` and
+`steps.ts`'s `UNIMPLEMENTED_STEP_KINDS` already play for their own
+not-yet-built neighbors - it's what "the flow driven end to end with a
+text-only recipe" (this item's own exit line) actually runs.
+
+**Completion posting, design-resolver's first ruling.** `createArtifact
+()` only ever needs a `turnId`, and `artifactsByTurn()` looks an
+artifact up by `turnId` at READ time, whenever that is - so a finished
+project's own deliverable becomes a markdown artifact attached to the
+STARTING turn (`project.provenance.turnId`), with no new `conversation_
+turns` row and no new `source` value invented. The real gap the pass
+found: `turnMachine/turnNext.ts` (unlike the legacy `turnEngine.ts`'s
+`prepareTurn()`) writes that turn's own row only once, at the very end
+(`logResult()`), never a provisional one up front - so a project that
+finishes fast enough (every scripted test; a real one-step project on a
+fast engine) can reach `done` before its own turn row exists, and
+`createArtifact()`'s FK to `conversation_turns` would throw. Fixed with
+one idempotent `postProjectResult(projectId)` (`lib/projects/post.ts`),
+called from two places: the runner's own terminal hook (`runner.ts`'s
+`launch()`, the moment a project reaches `done`/`failed`/`cancelled`),
+and `turnNext.ts`'s `logResult()` (once the row is guaranteed to
+exist), for any `start_project` outcome that turn carried. Whichever
+call actually finds the row wins; `alreadyPosted()` (an artifact
+already tagged `provenance: "project:<id>"` on that turn) is what makes
+the other one a no-op - proven directly in `startProject.test.ts` by
+calling `postProjectResult()` before the row exists (no-op), then again
+after inserting it (posts). `cancelled` gets neither an artifact nor a
+notification (the person who cancelled it already knows); a project
+with no thread to post to (an incognito or temporary conversation, the
+design record's own "its provenance then records the person and no
+thread") still fires its notification, since that branch has exactly
+one caller and no race to guard.
+
+**Progress and cancel, design-resolver's second and third rulings.**
+The only existing tool-event/status channel (`statusChannel.ts`) is
+scoped to one turn's own live SSE response and closes the moment that
+response ends; scheduler.ts's `timer.done` is the only prior art for
+"something finishes in the background," and it fires a notification
+only, nothing live. There is no live per-conversation push transport
+anywhere in this codebase to reuse, and building one is real, separate
+platform machinery the design never names - so this item's own wiring
+is an ordinary REST read, `GET /api/projects/:id` (the stored `Project`
+row, the exact `StepState`/artifact trace the runner already persists),
+and `POST /api/projects/:id/cancel` (calls the runner's existing
+`cancel()`), both in a new `backend/src/routes/projects.ts` mirroring
+`routes/artifacts.ts`'s own shape. Access is the identical rule
+`visibleArtifactRow()` already applies to a turn's own artifact:
+`canAccessPerson(actor, project.provenance.person)` - the project's own
+person, or an owner/admin for a child's project, never another adult's.
+A project-list-by-conversation route and a real live-push transport are
+both named, not built - out of scope for this item.
+
+**A real, pre-existing gap the change surfaced.** Four bench scripts
+(`parity-bisect.ts`, `parity-bisect4-stages.ts`, `prefix-class-01-
+verify.ts`, `tool-calling.ts`) each build their own copy of the
+production tool block straight from `modelCatalog.ts`'s own `tools_
+offered`, via `loadManifestOnly()` - the exact assumption `parity-
+bisect4-stages.ts`'s own comment already names as deliberate ("a
+manifest that fails to load is a loud failure too, never a silently
+shorter tool list"), but none of the four knew about a VIRTUAL tool
+with no manifest to load at all, since `answer_from_this_conversation`
+was never added to `tools_offered` in the first place (it rides a
+separate budget flag, `answer_from_context_tool`). Caught running the
+full suite once, before this item's own gate: `start_project` in `tools
+_offered` broke all four scripts' own tool-block builders and one
+hardcoded tool-count assertion in `parityBisect4Stages.test.ts`. Fixed
+by mirroring `toolSpecFor()`'s own special case in each of the four
+(a `TurnBudget.start_project` boolean would have needed a spec change
+in `commons` - the array stays a plain `string[]` on purpose, so this
+was the right-sized fix); the test's own hardcoded count moved from
+nine to ten.
+
+Files: `backend/src/lib/projects/{tool,projectTypes,post}.ts` (new);
+`backend/src/lib/turnMachine/contract.ts` (`unknown_project_type`
+policy reason), `nodes/model.ts`/`nodes/policy.ts`/`nodes/tool.ts`
+(the three special-case touch points), `turnNext.ts` (`logResult()`'s
+second `postProjectResult()` call); `backend/src/lib/modelCatalog.ts`
+(`start_project` added to the resident budget's `tools_offered`);
+`backend/src/lib/notificationTypes.ts` (`project.done`/`project.
+failed`); `backend/src/routes/projects.ts` (new) + `app.ts`; the four
+bench scripts above. Tests: `backend/tests/projects/startProject.test.
+ts` (tool execution including unknown-type/invalid-params refusal,
+policy classification including min_role and the pre-confirmed path,
+`toolNode`'s own event pair, and `postProjectResult()`'s six cases
+including the FK-race regression), `backend/tests/projectsRoutes.test.
+ts` (an owner reading/cancelling their own project, a child refused on
+another person's, cancelling an already-finished project as 409).
+
+**A medium review (one pass, `main...HEAD`) found four real issues:**
+
+1. `runner.ts`'s `start()`/`__startWithStartedAtForTests()` flipped a
+   plan refused at validation (any `media`/`tool` step) straight to
+   `failed` without ever calling `postProjectResult()` - unlike every
+   other terminal state a project can reach, this one got no artifact
+   and no `project.failed` notification, currently unreachable only
+   because the one built-in type (`bedtime-story`) never emits a
+   `media`/`tool` step. Fixed with a `saveRefused()` helper that also
+   called `postProjectResult()`.
+2. `ProjectType.estimatedSeconds` was declared and set on the one
+   built-in type but never read anywhere - the real duration always
+   came from `plan.ceilings.maxWallSeconds` (`tool.ts`'s own
+   `durationLabel()`), so the two numbers could silently disagree.
+   Removed the field entirely.
+3. `post.ts`'s `deliverableText()` appended an explicit `undefined` to
+   its sink-step candidates array, then immediately filtered it back
+   out - dead code implying the fallback lived in that list when it's
+   actually a separate branch below. Removed the no-op append.
+4. `tool.ts`'s `validateParams()` called `ajv.compile()` fresh on every
+   single `start_project` call instead of caching the compiled
+   validator per project type (a fixed schema that never changes for a
+   given type id). Fixed with a `Map` keyed by type id.
+
+**A second, low-effort pass over just those four fix hunks caught the
+first fix over-correcting, plus two further real issues:**
+
+1. Calling `postProjectResult()` from `saveRefused()` (finding 1 above)
+   doubled the household's own signal for one event: a plan refused at
+   validation never ran, so it happens synchronously inside the very
+   tool call that becomes this turn's own immediate reply
+   (`runStartProjectTool()`'s `project_refused` outcome already carries
+   the refusal in `userMessage`) - a person who just read that reply
+   also got a `project.failed` notification and artifact a moment
+   later saying the identical thing. `postProjectResult()` exists for
+   the case this genuinely isn't - a project that already told the
+   person "starting now" and failed sometime after they moved on.
+   Reverted `saveRefused()` to a documented no-op (kept only as a DRY
+   helper for the two identical `saveProject()` calls), with a comment
+   explaining why calling `postProjectResult()` there is wrong rather
+   than just missing, so it isn't "fixed" back a third time. The
+   regression test from finding 1 was rewritten to assert the opposite
+   (no artifact, no notification, the immediate outcome's own
+   `userMessage` is what carries it).
+2. `post.ts`'s `notifyResult()` fired `void trigger(...)` with no
+   `.catch()` - a transient `trigger()` failure would become an
+   unhandled promise rejection and silently drop the notification with
+   no log trail. Fixed to the same `.catch()`-and-`console.error()`
+   shape `modelDownloadJobs.ts`'s own `model.download_ready`/`failed`
+   notification calls already use.
+3. `tool.ts`'s params-resolution had a trailing `?? {}` after a ternary
+   whose else-branch already produced `{}` - dead code, removed.
+
+No third pass (org policy: a second pass that still finds real defects
+is a finding about the item, not a reason to loop) - both rounds'
+fixes verified with `tsc --noEmit` and the targeted suites
+(`projects/`, `turnMachine/`, the four bench-adjacent test files), 234
+tests, 0 failures, before the full gate.

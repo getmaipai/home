@@ -29,6 +29,8 @@ import { buildTurnStats } from "@/lib/turnStats";
 import { structuredPartForOutcomes, artifactForOutcomes } from "@/lib/composer";
 import { emptyTimings } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
+import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
+import { postProjectResult } from "@/lib/projects/post";
 import { StatusChannel } from "@/lib/statusChannel";
 import { StreamGate } from "./nodes/outputGate";
 import { resolveTurnBudget } from "./budget";
@@ -114,8 +116,25 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
 
 function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: string, value: TurnValue): void {
   const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary };
-  if (state.temporary) appendTemporaryTurn(actor, surface, text, value, opts);
-  else logTurn(actor, surface, text, value, opts);
+  if (state.temporary) {
+    appendTemporaryTurn(actor, surface, text, value, opts);
+    return;
+  }
+  logTurn(actor, surface, text, value, opts);
+  // PROJECT-START-01 (lib/projects/post.ts's own header): this turn's
+  // own conversation_turns row is only ever written here, at the very
+  // end - unlike the legacy turnEngine.ts's prepareTurn(), nothing on
+  // this path writes a provisional row up front. A project that finishes
+  // fast enough (every scripted test; a real one-step project on a fast
+  // engine) can reach its terminal state, and try to attach its result to
+  // this row, before this line ever runs - runner.ts's own terminal hook
+  // finds no row yet and skips; this is the second, idempotent call that
+  // catches exactly that race, now that the row certainly exists.
+  for (const outcome of state.outcomes) {
+    if (outcome.packageId !== START_PROJECT_TOOL_ID || outcome.status !== "succeeded") continue;
+    const projectId = (outcome.result?.data as { projectId?: string } | undefined)?.projectId;
+    if (projectId) postProjectResult(projectId);
+  }
 }
 
 /** Whether the utterance is a plain "yes" to a stored confirm/lookup ask

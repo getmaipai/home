@@ -6308,6 +6308,654 @@
         }
       }
     },
+    "/api/projects/{id}": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Read one project's current state",
+        "description": "The stored plan, each step's own state, and any artifacts so far - a client polls this for progress. Visible to the project's own person, or an owner/admin for a child's project.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "proj-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project's current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The catalog package id that defined this project's plan, or adhoc for a model-authored plan."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Person-readable, shown in the thread."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "planned",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "steps": {
+                          "type": "array",
+                          "items": {},
+                          "minItems": 1,
+                          "maxItems": 25
+                        },
+                        "ceilings": {
+                          "type": "object",
+                          "properties": {
+                            "maxWallSeconds": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "maxGeneratorJobs": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "maxWallSeconds",
+                            "maxGeneratorJobs"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "steps",
+                        "ceilings"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stepId": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "running",
+                              "done",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "startedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "endedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "error": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "artifactIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "stepId",
+                          "state",
+                          "startedAt",
+                          "endedAt",
+                          "error",
+                          "artifactIds"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "document",
+                              "image",
+                              "audio",
+                              "video",
+                              "file"
+                            ]
+                          },
+                          "path": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "gate": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "passed",
+                              "failed"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "path",
+                          "gate",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "properties": {
+                        "person": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "conversationId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "Null when the project was started from an incognito thread."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Null when the project was started from an incognito thread."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "description": "Null when the project was started from an incognito thread."
+                        },
+                        "turnId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        },
+                        "planSource": {
+                          "type": "string",
+                          "enum": [
+                            "package",
+                            "model"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "person",
+                        "conversationId",
+                        "turnId",
+                        "planSource"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Plain words when state is failed."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Plain words when state is failed."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "Plain words when state is failed."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "title",
+                    "state",
+                    "plan",
+                    "steps",
+                    "artifacts",
+                    "provenance",
+                    "error",
+                    "hlc",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A durable unit of background work a turn started: a plan of typed steps, their runtime state, and the artifacts they produced. The turn replies immediately; the project runs after it, survives restarts, and posts its artifacts back to the thread."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Cancel a running project",
+        "description": "Stops a running or planned project (design record: 'Cancel is a first-class action from the thread'). No notification and nothing posted to the thread - the person asking already knows.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "proj-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cancellation sent; the project's own state as of right now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The catalog package id that defined this project's plan, or adhoc for a model-authored plan."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Person-readable, shown in the thread."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "planned",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "steps": {
+                          "type": "array",
+                          "items": {},
+                          "minItems": 1,
+                          "maxItems": 25
+                        },
+                        "ceilings": {
+                          "type": "object",
+                          "properties": {
+                            "maxWallSeconds": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "maxGeneratorJobs": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "maxWallSeconds",
+                            "maxGeneratorJobs"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "steps",
+                        "ceilings"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stepId": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "running",
+                              "done",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "startedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "endedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "error": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ]
+                          },
+                          "artifactIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "stepId",
+                          "state",
+                          "startedAt",
+                          "endedAt",
+                          "error",
+                          "artifactIds"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "document",
+                              "image",
+                              "audio",
+                              "video",
+                              "file"
+                            ]
+                          },
+                          "path": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "gate": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "passed",
+                              "failed"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "path",
+                          "gate",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "properties": {
+                        "person": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "conversationId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "Null when the project was started from an incognito thread."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Null when the project was started from an incognito thread."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "description": "Null when the project was started from an incognito thread."
+                        },
+                        "turnId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        },
+                        "planSource": {
+                          "type": "string",
+                          "enum": [
+                            "package",
+                            "model"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "person",
+                        "conversationId",
+                        "turnId",
+                        "planSource"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Plain words when state is failed."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Plain words when state is failed."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "Plain words when state is failed."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "title",
+                    "state",
+                    "plan",
+                    "steps",
+                    "artifacts",
+                    "provenance",
+                    "error",
+                    "hlc",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A durable unit of background work a turn started: a plan of typed steps, their runtime state, and the artifacts they produced. The turn replies immediately; the project runs after it, survives restarts, and posts its artifacts back to the thread."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already finished - nothing to cancel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/backups": {
       "get": {
         "tags": [

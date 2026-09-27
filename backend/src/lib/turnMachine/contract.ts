@@ -82,7 +82,17 @@ export interface PendingAskInfo {
  * ruling already covers. */
 export type PolicyDecision =
   | { allow: true }
-  | { allow: false; reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "context_tool_in_policy" | "temporary_mode" | "crisis_state"; ask?: PendingAskInfo };
+  | {
+      allow: false;
+      // PROJECT-START-01: `unknown_project_type` is start_project's own
+      // refusal (nodes/policy.ts) when its `type` argument names no
+      // registered ProjectType - answer.ts's own default line ("I don't
+      // actually have that in this conversation") covers it, the same
+      // closed set of named-then-defaulted reasons `ungrounded_args`/
+      // `unknown_tool`/`context_tool_in_policy` already are.
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "context_tool_in_policy" | "temporary_mode" | "crisis_state" | "unknown_project_type";
+      ask?: PendingAskInfo;
+    };
 
 /** The per-model tool-calling budget (commons spec:
  * ModelCapabilities.turn_budget, U2a). Mirrors the spec shape exactly;

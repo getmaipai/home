@@ -10,6 +10,7 @@ import { createProject, loadProject, saveProject, listResumableProjects, type Cr
 import { projectMachine } from "./machine";
 import { refusalFor } from "./steps";
 import { planSteps } from "./types";
+import { postProjectResult } from "./post";
 import type { Project } from "./types";
 
 export type { CreateProjectInput as StartProjectInput };
@@ -59,22 +60,46 @@ function launch(project: Project, startedAtMs?: number): ProjectActor {
       scheduleContinue(project.id, actor);
     } else if (snapshot.status !== "active" && state.actors.get(project.id) === actor) {
       state.actors.delete(project.id);
+      // PROJECT-START-01: the moment this project reaches a terminal
+      // state (done/failed/cancelled), post its result to the thread and
+      // fire its notification - post.ts's own idempotency guard is what
+      // makes this safe to also call a second time from turnNext.ts's
+      // logResult() (the FK race post.ts's own header explains).
+      postProjectResult(project.id);
     }
   });
   actor.start();
   return actor;
 }
 
+/** A plan refused at validation (today: any `media`/`tool` step -
+ * PROJECT-MEDIA-01/START-01's own scope) never reaches launch() - unlike
+ * every OTHER way a project reaches a terminal state, this one never ran
+ * a single step, and it happens synchronously inside the very tool call
+ * that's about to become this turn's own immediate reply
+ * (runStartProjectTool()'s own `project_refused` outcome, tool.ts) - the
+ * person already gets told, in the same turn, in plain words, why it
+ * didn't start. postProjectResult() (a project.failed notification plus
+ * a markdown artifact echoing that same refusal) exists for the case
+ * this ISN'T: a project that already told the person "starting now" and
+ * failed sometime after they moved on. Calling it here too was tried and
+ * reverted (a review caught it): it doubled the household's own signal
+ * for one event, an inline reply AND a notification/artifact saying the
+ * identical thing a moment apart - never call postProjectResult() from
+ * this path. */
+function saveRefused(project: Project, refusal: string): Project {
+  return saveProject({ ...project, state: "failed", error: refusal });
+}
+
 /** Creates the row (always, in `planned` state - store.ts's own
- * header), then either launches it or, for a plan validation refuses
- * (today: any `media`/`tool` step - PROJECT-MEDIA-01/START-01's own
- * scope), flips that same row straight to `failed` - "the project fails
+ * header), then either launches it or, for a plan validation refusal,
+ * flips that same row straight to `failed` - "the project fails
  * planned-to-failed, nothing half-run," never a row that never existed
  * and never a step that ran before the refusal. */
 export function start(input: CreateProjectInput): Project {
   const project = createProject(input);
   const refusal = refusalFor(planSteps(input.plan));
-  if (refusal) return saveProject({ ...project, state: "failed", error: refusal });
+  if (refusal) return saveRefused(project, refusal);
   launch(project);
   return project;
 }
@@ -86,7 +111,7 @@ export function start(input: CreateProjectInput): Project {
 export function __startWithStartedAtForTests(input: CreateProjectInput, startedAtMs: number): Project {
   const project = createProject(input);
   const refusal = refusalFor(planSteps(input.plan));
-  if (refusal) return saveProject({ ...project, state: "failed", error: refusal });
+  if (refusal) return saveRefused(project, refusal);
   launch(project, startedAtMs);
   return project;
 }

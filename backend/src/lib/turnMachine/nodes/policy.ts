@@ -11,6 +11,7 @@
 import { loadManifestOnly, meetsMinRole } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { tokenize, isBarePronoun } from "@/lib/text";
+import { START_PROJECT_TOOL_ID, projectTypeForArgs } from "@/lib/projects/tool";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { ANSWER_FROM_CONTEXT_TOOL_ID } from "./model";
 
@@ -221,6 +222,55 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     if (call.tool === ANSWER_FROM_CONTEXT_TOOL_ID) {
       noteRefusal("context_tool_in_policy", call.tool);
       entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: "context_tool_in_policy" } });
+      continue;
+    }
+
+    // PROJECT-START-01: `start_project` is never a real package (tool.ts's
+    // own header), so it never goes through loadManifestOnly() below -
+    // its classification comes from the NAMED project type's own registry
+    // entry instead (the design record: "min_role from the project
+    // type's manifest... consequential per the type's manifest, the tool
+    // doesn't hardcode it"), keyed by this call's own `type` argument
+    // rather than by the tool id, since what start_project actually DOES
+    // depends on which type it's starting, not on the fact that
+    // something starts it. GROUND-01's own term-overlap grounding check
+    // is deliberately not run here (below): it operates on top-level
+    // string arguments, and a project's real parameters live nested
+    // under `params`, which a future project type with a real household-
+    // fact-shaped field should ground itself, inside its own `text` step
+    // prompts - a gap named, not silently inherited from the generic path
+    // by accident.
+    if (call.tool === START_PROJECT_TOOL_ID) {
+      const projectType = projectTypeForArgs(call.args ?? {});
+      if (!projectType) {
+        noteRefusal("unknown_project_type", call.tool);
+        entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: "unknown_project_type" } });
+        continue;
+      }
+      const args = (call.args ?? {}) as Record<string, unknown>;
+      const proposal: ActionProposal = { kind: projectType.consequential ? "side_effecting" : "read_only", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
+      if (state.crisis) {
+        noteRefusal("crisis_state");
+        entries.push({ proposal, decision: { allow: false, reason: "crisis_state" } });
+        continue;
+      }
+      if (!meetsMinRole(state.actor.role, projectType.minRole)) {
+        noteRefusal("min_role");
+        entries.push({ proposal, decision: { allow: false, reason: "min_role" } });
+        continue;
+      }
+      // No temporary_mode refusal here (unlike an ordinary
+      // memory:write-permissioned package below): the design record's
+      // own ruling is that a project started from an incognito or
+      // temporary thread is ALLOWED ("its artifact is the point and is
+      // durably wanted"), never blocked the way saving a fact is.
+      const isPreConfirmed = input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
+      if (!isPreConfirmed && projectType.consequential) {
+        noteRefusal("confirm_needed");
+        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `Start ${projectType.title}?` } } });
+        continue;
+      }
+      entries.push({ proposal, decision: { allow: true } });
       continue;
     }
 

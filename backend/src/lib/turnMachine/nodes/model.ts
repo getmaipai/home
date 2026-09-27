@@ -21,6 +21,7 @@
 import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
+import { START_PROJECT_TOOL_ID, START_PROJECT_TOOL } from "@/lib/projects/tool";
 import { speakerNamedAny } from "@/lib/subjects";
 import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
@@ -143,6 +144,11 @@ function householdSubjectNamed(state: TurnState): boolean {
 
 function toolSpecFor(id: string): ToolSpec | null {
   if (id === ANSWER_FROM_CONTEXT_TOOL_ID) return ANSWER_FROM_CONTEXT_TOOL;
+  // PROJECT-START-01: start_project is a virtual tool the same way
+  // answer_from_this_conversation is (tool.ts's own header) - it never
+  // has a backend/packages/start_project manifest.json for
+  // loadManifestOnly() to find below.
+  if (id === START_PROJECT_TOOL_ID) return START_PROJECT_TOOL;
   const loaded = loadManifestOnly(id);
   if (!loaded.ok) return null;
   return { id, description: loaded.value.description, args: loaded.value.args };

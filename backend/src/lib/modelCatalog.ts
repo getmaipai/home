@@ -93,7 +93,12 @@ export const CATALOG: ModelCapabilities[] = [
       // worse than before), so the offering does not land; the
       // description's own three rows still held perfectly (5/5, 5/5,
       // 5/5). Kept out of the budget on that gate.
-      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "timer", "weather", "websearch"],
+      // PROJECT-START-01: start_project offered alongside the rest,
+      // "the tool offered per the model's budget" (docs/BACKLOG.md) - a
+      // virtual tool (tool.ts's own header), never a bundled package, so
+      // it's added here by hand rather than discovered from
+      // backend/packages/ the way a real one would be.
+      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "start_project", "timer", "weather", "websearch"],
       always_search: true,
       // GROUND-01 (state record, "The interim rule"): off in every
       // budget until reuse-with-freshness is built - a quote check

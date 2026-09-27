@@ -37,6 +37,7 @@ import { withTimeout } from "@maipai/core/src/withTimeout";
 import { getEngineStatus, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
+import { START_PROJECT_TOOL_ID, START_PROJECT_TOOL } from "@/lib/projects/tool";
 import { SPEC_DIR } from "@/lib/specDir";
 import { buildPromptParts, loadAllManifests, ordinaryToolIds } from "@/lib/turnEngine";
 import { CATALOG } from "@/lib/modelCatalog";
@@ -121,7 +122,11 @@ const WRITE_DOCUMENT_ROWS: ToolCallCorpusRow[] = [
  * set `nodes/model.ts`'s own `offeredToolsFor()` builds from the 8B's
  * catalog entry, loaded here from the real manifests the same way
  * (never a hand-copied list, the same reason `TOOLS` above already
- * loads from the manifests instead of hardcoding descriptions). */
+ * loads from the manifests instead of hardcoding descriptions).
+ * `start_project` (PROJECT-START-01) is a virtual tool with no
+ * backend/packages manifest on disk (lib/projects/tool.ts's own
+ * header), the same shape `nodes/model.ts`'s own `toolSpecFor()`
+ * special-cases - mirrored here for the identical reason. */
 function budgetOfferedTools(): ToolSpec[] {
   const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
   if (!entry?.turn_budget) throw new Error("qwen3-8b-instruct-q4-k-m has no turn_budget in modelCatalog.ts");
@@ -129,6 +134,7 @@ function budgetOfferedTools(): ToolSpec[] {
     .slice()
     .sort()
     .map((id) => {
+      if (id === START_PROJECT_TOOL_ID) return START_PROJECT_TOOL;
       const loaded = loadManifestOnly(id);
       if (!loaded.ok) throw new Error(`budget tool ${id} failed to load: ${loaded.error}`);
       return { id, description: loaded.value.description, args: loaded.value.args };

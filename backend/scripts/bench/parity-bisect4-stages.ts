@@ -23,6 +23,7 @@ import {
 import { identityLine, STABLE_SYSTEM_SUFFIX, STABLE_SYSTEM_SUFFIX_SENTENCES, buildStablePrefix } from "@/lib/turnEngine";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { loadManifestOnly } from "@/lib/plugins";
+import { START_PROJECT_TOOL_ID, START_PROJECT_TOOL } from "@/lib/projects/tool";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
 
@@ -64,10 +65,20 @@ export const THINKING_ON_MAX_TOKENS = RESIDENT_BUDGET.reply_ceiling_tokens + RES
 // ToolSpec constant is private to model.ts, not exported, and this
 // file makes no production source changes to get at it) - the assert
 // below turns that gap into a loud failure instead of a silent one if
-// this budget's own answer_from_context_tool ever flips true. A
-// manifest that fails to load is a loud failure too, never a silently
-// shorter tool list: "five-tool block present" is the ruling's own
-// literal test condition, not "up to five."
+// this budget's own answer_from_context_tool ever flips true. It DOES
+// mirror toolSpecFor's other virtual-tool special case, start_project
+// (PROJECT-START-01): that ToolSpec constant IS exported (lib/projects/
+// tool.ts's own header - a virtual tool the same shape answer_from_
+// this_conversation is, with no backend/packages/start_project manifest
+// on disk for loadManifestOnly() to find), so there's no reason to
+// leave this bench guessing at it the way it does for the private one -
+// this is the loud-failure branch this file's own comment already
+// promises for exactly this class of drift, applied now that it's
+// happened once for real (start_project landed in RESIDENT_BUDGET.
+// tools_offered and broke this file's own manifest-only assumption
+// until this fix). A manifest that fails to load is a loud failure too,
+// never a silently shorter tool list: "five-tool block present" is the
+// ruling's own literal test condition, not "up to five."
 function productionTools(): ToolSpec[] {
   if (RESIDENT_BUDGET.answer_from_context_tool) {
     throw new Error("productionTools() does not build the answer-from-context tool - RESIDENT_BUDGET.answer_from_context_tool is now true, so this bench's tool block no longer matches production's");
@@ -76,6 +87,7 @@ function productionTools(): ToolSpec[] {
     .slice()
     .sort()
     .map((id) => {
+      if (id === START_PROJECT_TOOL_ID) return START_PROJECT_TOOL;
       const loaded = loadManifestOnly(id);
       if (!loaded.ok) throw new Error(`productionTools(): manifest for "${id}" failed to load (${loaded.status} ${loaded.error}) - the tool block would be silently short of the ruling's "five-tool block present"`);
       return { id, description: loaded.value.description, args: loaded.value.args };
