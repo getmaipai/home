@@ -310,41 +310,41 @@ describe("COMP-01 typed document builders", () => {
   test("a document outcome becomes bounded page chunks with local citations", () => {
     const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({
       type: "document",
-      attachment_id: "att-document123",
+      file_id: "file-document123",
       chunks: [
-        { attachment_id: "att-document123", page: 1, text: "The first page says hello." },
-        { attachment_id: "att-document123", page: 3, text: "Page three explains the safe temperature." },
+        { file_id: "file-document123", page: 1, text: "The first page says hello." },
+        { file_id: "file-document123", page: 3, text: "Page three explains the safe temperature." },
       ],
     })] });
     expect(document?.section).toMatchObject({
       type: "document",
-      attachment_id: "att-document123",
+      file_id: "file-document123",
       chunks: [
-        { attachment_id: "att-document123", page: 1, text: "The first page says hello." },
-        { attachment_id: "att-document123", page: 3, text: "Page three explains the safe temperature." },
+        { file_id: "file-document123", page: 1, text: "The first page says hello." },
+        { file_id: "file-document123", page: 3, text: "Page three explains the safe temperature." },
       ],
     });
     expect(document?.sources.map((source) => source.url)).toEqual([
-      "attachment://att-document123/page/1",
-      "attachment://att-document123/page/3",
+      "attachment://file-document123/page/1",
+      "attachment://file-document123/page/3",
     ]);
   });
 
   test("a page request selects only that document page and the bounded context is retained", () => {
-    const chunks = Array.from({ length: 40 }, (_, index) => ({ attachment_id: "att-document123", page: index + 1, text: "x".repeat(4001) }));
-    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ type: "document", attachment_id: "att-document123", chunks }, "src-document456", { topic: "document example" })] });
+    const chunks = Array.from({ length: 40 }, (_, index) => ({ file_id: "file-document123", page: index + 1, text: "x".repeat(4001) }));
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ type: "document", file_id: "file-document123", chunks }, "src-document456", { topic: "document example" })] });
     expect(document?.section.type).toBe("document");
     if (!document || document.section.type !== "document") throw new Error("expected a document section");
     expect(document.section.chunks).toHaveLength(8);
     expect(document.section.chunks.every((chunk: { text: string }) => chunk.text.length === 4000)).toBe(true);
     expect(document.section.chunks.reduce((total: number, chunk: { text: string }) => total + chunk.text.length, 0)).toBeLessThanOrEqual(32000);
 
-    const page = buildDocument({ turnId: "turn-document456", outcomes: [typedOutcome({ type: "document", attachment_id: "att-document123", chunks }, "src-document789", { page: 3 })] });
+    const page = buildDocument({ turnId: "turn-document456", outcomes: [typedOutcome({ type: "document", file_id: "file-document123", chunks }, "src-document789", { page: 3 })] });
     expect(page?.section).toMatchObject({ type: "document", chunks: [{ page: 3 }] });
   });
 
   test("a document page request uses the same evidence revision path", () => {
-    const base = { type: "document", attachment_id: "att-document123", chunks: [{ attachment_id: "att-document123", page: 3, text: "The first retained answer." }] };
+    const base = { type: "document", file_id: "file-document123", chunks: [{ file_id: "file-document123", page: 3, text: "The first retained answer." }] };
     const first = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome(base)] });
     if (!first) throw new Error("expected the first document");
     const same = buildDocument({ turnId: "turn-document456", previous: first, outcomes: [typedOutcome({ ...base, chunks: [{ ...base.chunks[0], text: "The first retained answer." }] })] });
@@ -369,7 +369,7 @@ describe("COMP-01 typed document builders", () => {
   });
 
   test("the child projection does not deliver an attachment document", () => {
-    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ type: "document", attachment_id: "att-document123", chunks: [{ attachment_id: "att-document123", page: 3, text: "Adult document text." }] })] });
+    const document = buildDocument({ turnId: "turn-document123", outcomes: [typedOutcome({ type: "document", file_id: "file-document123", chunks: [{ file_id: "file-document123", page: 3, text: "Adult document text." }] })] });
     if (!document) throw new Error("expected a document");
     expect(projectDocumentForChild(document)).toBeNull();
   });
@@ -426,7 +426,7 @@ describe("the grounding", () => {
   });
 
   test("a document outcome grounds its bounded page text", () => {
-    const document = outcome({ callId: "call-document", packageId: "documents", status: "succeeded", result: { actions: [], data: { type: "document", attachment_id: "att-document123", chunks: [{ attachment_id: "att-document123", page: 3, text: "Page three says the valve is closed." }] } } });
+    const document = outcome({ callId: "call-document", packageId: "documents", status: "succeeded", result: { actions: [], data: { type: "document", file_id: "file-document123", chunks: [{ file_id: "file-document123", page: 3, text: "Page three says the valve is closed." }] } } });
     expect(outcomeText(document)).toContain("Page three says the valve is closed.");
   });
 

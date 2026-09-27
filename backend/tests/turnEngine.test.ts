@@ -148,10 +148,10 @@ describe("ATT-01c document outcome delivery", () => {
         actions: [],
         data: {
           type: "document",
-          attachment_id: "att-document123",
+          file_id: "file-document123",
           chunks: [
-            { attachment_id: "att-document123", page: 1, text: "Page one." },
-            { attachment_id: "att-document123", page: 3, text: "Page three." },
+            { file_id: "file-document123", page: 1, text: "Page one." },
+            { file_id: "file-document123", page: 3, text: "Page three." },
           ],
         },
       },

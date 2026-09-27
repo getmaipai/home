@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { Attachment } from "@maipai/spec/gen/ts/attachment.js";
+import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { createHost } from "@/lib/packageHost";
 import {
@@ -119,6 +119,6 @@ describe("local document extraction", () => {
     const result = runRapidOcr(new TextEncoder().encode(secret), "image/png");
     expect(result).toEqual({ ok: false, code: "internal_error", error: "OCR failed: runner stopped" });
     expect(JSON.stringify(result)).not.toContain(secret);
-    expect(Attachment.shape.media_type.safeParse("image/png").success).toBe(true);
+    expect(FileRecordSchema.shape.media_type.safeParse("image/png").success).toBe(true);
   });
 });

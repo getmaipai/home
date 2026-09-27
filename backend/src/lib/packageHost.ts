@@ -754,7 +754,7 @@ async function wikipediaFallback(query: string): Promise<SearxngSearchResult | n
   return {
     text: `1. ${title} (${pageUrl}) - ${snippet}`,
     rows: [row],
-    page: { type: "document", attachment_id: pageAttachmentId(pageUrl), url: pageUrl, title, text: pageText, chunks: [], links: [], sections: [] },
+    page: { type: "document", file_id: pageFileId(pageUrl), url: pageUrl, title, text: pageText, chunks: [], links: [], sections: [] },
   };
 }
 
@@ -1208,11 +1208,11 @@ export interface PageReadSection {
 
 export interface PageReadResult {
   type: "document";
-  attachment_id: string;
+  file_id: string;
   url: string;
   title: string;
   text: string;
-  chunks: { attachment_id: string; page: number; text: string }[];
+  chunks: { file_id: string; page: number; text: string }[];
   links: PageReadLink[];
   sections: PageReadSection[];
 }
@@ -1223,8 +1223,13 @@ export function __setPageReaderForTests(reader: ((url: string) => Promise<PageRe
   pageReaderForTests = reader;
 }
 
-function pageAttachmentId(url: string): string {
-  return `att-page-${createHash("sha256").update(url).digest("hex").slice(0, 12)}`;
+// STORE-SPEC-01: re-prefixed from `att-page-` to match the file record's
+// new id prefix (file.schema.json's id pattern starts `file-`, not `att-`).
+// The `-page-` mid-segment means this id has never actually matched
+// composer.ts's own stricter `^(att|file)-[a-z0-9]{6,}$` id check (a
+// pre-existing gap, not something this rename introduces or fixes).
+function pageFileId(url: string): string {
+  return `file-page-${createHash("sha256").update(url).digest("hex").slice(0, 12)}`;
 }
 
 async function validatePublicPageUrl(value: string): Promise<void> {
@@ -1284,7 +1289,7 @@ export function parseReadablePage(html: string, url: string): PageReadResult {
   const sourceDocument = parseHTML(html).document as any;
   const article = new Readability(sourceDocument).parse();
   const readableDocument = article?.content ? parseHTML(article.content).document as any : sourceDocument;
-  const attachmentId = pageAttachmentId(url);
+  const fileId = pageFileId(url);
   const text = String(article?.textContent ?? readableDocument.body?.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 32_000);
   if (!text) throw new HostError("network_unreachable", `The page at ${url} did not contain readable text.`);
   const links: PageReadLink[] = Array.from(readableDocument.querySelectorAll("a")).slice(0, 64).flatMap((node: any) => {
@@ -1312,11 +1317,11 @@ export function parseReadablePage(html: string, url: string): PageReadResult {
   });
   return {
     type: "document",
-    attachment_id: attachmentId,
+    file_id: fileId,
     url,
     title: String(article?.title ?? sourceDocument.title ?? url).trim().slice(0, 300),
     text,
-    chunks: [{ attachment_id: attachmentId, page: 1, text: text.slice(0, 4_000) }],
+    chunks: [{ file_id: fileId, page: 1, text: text.slice(0, 4_000) }],
     links,
     sections,
   };

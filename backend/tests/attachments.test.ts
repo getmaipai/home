@@ -1,7 +1,10 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { existsSync } from "node:fs";
 import { createHost } from "@/lib/packageHost";
-import { Attachment, type Attachment as AttachmentRecord } from "@maipai/spec/gen/ts/attachment.js";
+// Renamed to FileRecordSchema/FileRecord locally: `File` is a Bun/Fetch
+// global, so importing the spec's zod object under that bare name would
+// shadow it.
+import { File as FileRecordSchema, type File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import { db } from "@/db";
 import { attachments, conversationTurns, conversations, people } from "@/db/schema";
 import { createAttachment, attachmentFilePath, deleteAttachmentsForPerson, getAttachment, readAttachment } from "@/lib/attachments";
@@ -78,10 +81,12 @@ describe("attachment storage", () => {
     const created = createAttachment(actor, { conversationId, turnId, mediaType: "TEXT/PLAIN", bytes });
     expect(created.ok).toBe(true);
     if (!created.ok) return;
-    expect(Attachment.safeParse(created.value).success).toBe(true);
+    expect(FileRecordSchema.safeParse(created.value).success).toBe(true);
     expect(created.value.owner_person_id).toBe(actor.id);
-    expect(created.value.conversation_id).toBe(conversationId);
-    expect(created.value.turn_id).toBe(turnId);
+    // STORE-SPEC-01: conversation_id/turn_id moved off the top level into
+    // the new provenance object.
+    expect(created.value.provenance.conversation_id).toBe(conversationId);
+    expect(created.value.provenance.turn_id).toBe(turnId);
     expect(created.value.size).toBe(bytes.byteLength);
     expect(created.value.sha256).toBe("ad4f8b9a71fafb89ec7255e9af4dcc351c858433b39155411b520bd0b55e4800");
     expect(existsSync(attachmentFilePath(created.value.storage_path))).toBe(true);

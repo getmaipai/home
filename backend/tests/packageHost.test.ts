@@ -1449,7 +1449,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   test("a combined search+read_page call costs one search token, not two - page reads have their own separate budget", async () => {
     const { __setPageReaderForTests } = await import("@/lib/packageHost");
     __resetRateLimiterForTests();
-    __setPageReaderForTests(async (url) => ({ type: "document", attachment_id: "att-1", url, title: "T", text: "text", chunks: [], links: [], sections: [] }));
+    __setPageReaderForTests(async (url) => ({ type: "document", file_id: "file-1", url, title: "T", text: "text", chunks: [], links: [], sections: [] }));
     const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "T", url: "https://example.com", content: "c" }] }) });
     try {
       const actor = await owner();
