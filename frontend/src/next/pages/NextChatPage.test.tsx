@@ -1957,6 +1957,76 @@ describe("NextChatPage (RESP-04 (f): the composer's thinking-mode control)", () 
       .map((c: unknown[]) => JSON.parse((c[1] as RequestInit).body as string));
   }
 
+  test("an edit resend records its superseded turn and the two branches survive a reload", async () => {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let turnCount = 0;
+    const historyRows = [
+      { id: "turn-edit1", personId: "person-abc123", surface: "chat", userText: "first version", replyText: "Reply 1.", source: "model", pluginId: null, commandId: null, safetyFlagged: false, safetyAction: "allow", minorSpeaker: false, createdAt: "2026-09-27T00:00:00.000Z", supersedes: null, judgeStatus: null, memory_ids: [] },
+      { id: "turn-edit2", personId: "person-abc123", surface: "chat", userText: "edited version", replyText: "Reply 2.", source: "model", pluginId: null, commandId: null, safetyFlagged: false, safetyAction: "allow", minorSpeaker: false, createdAt: "2026-09-27T00:00:01.000Z", supersedes: "turn-edit1", judgeStatus: null, memory_ids: [] },
+    ];
+    const conversation = { id: "conv-edit123", status: "open", surface: "chat", title: "Edit test" };
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url === "/api/conversations" && init?.method === "POST") return Promise.resolve(Response.json(conversation));
+      if (url === "/api/conversations") return Promise.resolve(Response.json([{ ...conversation, created_at: "2026-09-27T00:00:00Z", pinned: false }]));
+      if (url.endsWith("/resume")) return Promise.resolve(Response.json(conversation));
+      if (url.endsWith("/turns")) return Promise.resolve(Response.json(historyRows));
+      if (url.includes("/api/conversations/conv-edit123")) return Promise.resolve(Response.json(conversation));
+      if (url === "/api/turn/stream") {
+        turnCount++;
+        const text = `Reply ${turnCount}.`;
+        return Promise.resolve(new Response(ndjsonStream([
+          { type: "delta", text },
+          { type: "done", value: { turn_id: `turn-edit${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
+        ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "first version");
+      await view.findByText("Reply 1.");
+
+      const userMessage = view.container.querySelector('[data-slot="aui_user-message-root"]') as HTMLElement;
+      fireEvent.mouseEnter(userMessage);
+      fireEvent.click(await within(userMessage).findByRole("button", { name: "Edit" }));
+      const update = await view.findByRole("button", { name: "Update" });
+      const editInput = view.container.querySelector(".aui-edit-composer-input") as HTMLTextAreaElement;
+      fireEvent.change(editInput, { target: { value: "edited version" } });
+      expect(editInput.value).toBe("edited version");
+      fireEvent.click(update);
+      await waitFor(() => expect(turnRequestBodies()).toHaveLength(2));
+      expect(turnRequestBodies()[1]!.supersedes).toBe("turn-edit1");
+
+      const sentBodies = turnRequestBodies();
+      expect(sentBodies).toHaveLength(2);
+      expect(sentBodies[1]!.supersedes).toBe("turn-edit1");
+
+      view.unmount();
+      const reloaded = renderPage(
+        <MemoryRouter initialEntries={["/next/chat?conversation=conv-edit123"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => {
+        const calls = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls;
+        expect(calls.some((call: unknown[]) => String(call[0]).endsWith("/api/conversations/conv-edit123/turns"))).toBe(true);
+      });
+      expect(await reloaded.findByText("Reply 2.")).toBeVisible();
+      const previousBranch = reloaded.getByRole("button", { name: "Previous" });
+      expect(previousBranch).toBeEnabled();
+      fireEvent.click(previousBranch);
+      expect(await reloaded.findByText("Reply 1.")).toBeVisible();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   test("the mode survives a send within the same conversation, and resets to Instant only when the conversation changes", async () => {
     const restore = stubMultiTurnFetch();
     try {

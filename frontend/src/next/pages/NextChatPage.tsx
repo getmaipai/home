@@ -45,6 +45,7 @@ import { cn } from "@maipai/ui/src/utils";
 import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type InstalledPackage, type Roster, type StructuredPart, type TurnStats } from "@/lib/api";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
+import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
@@ -1291,7 +1292,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // PERSIST-CONV-01 (no backend field yet); this is the
           // session-local half.
           consumeThinking: () => (thinkingAllowed ? thinkingRef.current : undefined),
-          consumeSupersedes: () => undefined,
+          consumeSupersedes,
           consumePackageScope: () => {
             const value = packageScopeRef.current?.id;
             packageScopeRef.current = null;
@@ -2193,6 +2194,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                 temporary={temporaryNext}
                 components={{
                   Welcome: NextChatWelcome,
+                  onEditSend: (_messageId, turnId) => setPendingSupersedes(turnId ?? null),
                   AssistantMoreItems,
                   AssistantActionBarExtra: SourcesActionBarTrigger,
                   AssistantMessageFooterExtra: MessageFooterExtra,
