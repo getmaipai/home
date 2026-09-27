@@ -15,6 +15,7 @@ import { attachments, conversationTurns, conversations } from "@/db/schema";
 import { newFileId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
+import { checkStorageCap } from "@/lib/storage/usage";
 import type { PersonRow } from "@/types";
 
 export type AttachmentOpResult<T> =
@@ -136,12 +137,19 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   const provenance = (input.provenance ?? "composer:upload").trim();
   if (!provenance) return { ok: false, status: 400, error: "attachment provenance is required" };
 
+  const bytes = new Uint8Array(input.bytes);
+
+  // STORE-CAP-01: refused before anything is written to disk - the two
+  // caps (this person's own, the household total), in the person's own
+  // words (household-storage-2026-09-23.md, decision 3).
+  const capCheck = checkStorageCap(actor.role, actor.id, bytes.byteLength);
+  if (!capCheck.ok) return { ok: false, status: 403, error: capCheck.error! };
+
   const id = newFileId();
   const storagePath = storagePathFor(actor.id, id);
   const filePath = attachmentFilePath(storagePath);
   const directory = resolve(attachmentsDir, actor.id, "attachments");
   ensureDataDir(directory);
-  const bytes = new Uint8Array(input.bytes);
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   const row = {
     id,

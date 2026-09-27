@@ -110,6 +110,11 @@ ensureCoreJob("backup.run", "every:1d");
 // daily: unlike a backup, running low on disk is not something a
 // household should ever wait most of a day to hear about.
 ensureCoreJob("storage.check_disk_full", "every:1h");
+// STORE-CAP-01: a directory walk under attachmentsDir compared against
+// every File record's storage_path - real I/O work, not a cheap statfs
+// call, so daily like backup.run rather than hourly like the disk-full
+// check above.
+ensureCoreJob("storage.reconcile_files", "every:1d");
 // A dead/outdated/misconfigured SearXNG instance is the same "don't wait
 // most of a day to hear about it" shape as disk space, not the leaf
 // cert's own 1d cadence (lib/searxngHealth.ts's own header has the full

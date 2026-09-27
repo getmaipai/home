@@ -12,6 +12,7 @@ import { isOwnerOrAdmin, canAccessPerson, getPersonRole } from "@/lib/access";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { safeSearchDefaultFor, safeSearchStrictness, type SafeSearchLevel } from "@/lib/safeSearch";
+import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { PersonRow } from "@/types";
 
@@ -292,22 +293,46 @@ const SAFE_SEARCH_KEY = "search.safe_search";
 export const SESSION_LOCK_REQUIRED_KEY = "security.session_lock_required";
 export const SESSION_LOCK_TIMEOUT_KEY = "security.session_lock_timeout_minutes";
 
-function assertCanSetSessionLock(actor: PersonRow, targetPersonId: string): SettingsOpResult<true> {
+// The shared "owner/admin only; self is always fine; but an admin may not
+// act on another owner's or admin's own value" ladder - INCOGNITO-07's
+// session lock and STORE-CAP-01's storage-cap override both need exactly
+// this shape. One definition now, not two: a code review on the
+// storage-cap addition caught assertCanSetPersonStorageCap as a hand
+// copy of assertCanSetSessionLock, the very risk this function's own
+// comment (below) already named ("if that table's own admin row ever
+// changes, this needs the matching edit") - true of two hand-kept copies,
+// not of one shared function each caller supplies its own error text to.
+//
+// Self is always fine for owner/admin (birthdate/localOnly's own
+// precedent in routes/people.ts: "owner/admin editing themselves is
+// unaffected") - a second review pass on the session-lock version (low
+// effort, before commit) caught the first cut of this ladder refusing an
+// admin setting THEIR OWN session lock, since the target-role check
+// resolved to "admin" for a self-edit too before the self-exemption
+// existed; kept here so neither caller can reintroduce that bug.
+function assertOwnerAdminLadder(actor: PersonRow, targetPersonId: string, errorMessage: string): SettingsOpResult<true> {
   if (actor.role === "owner") return { ok: true, value: true };
-  if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "only owner or admin may change session lock settings" };
-  // A second review pass (low effort, before commit) caught the first
-  // version of this fix refusing an admin setting THEIR OWN session lock
-  // - getPersonRole(targetPersonId) resolved to "admin" for a self-edit
-  // too, since the ladder check didn't exempt self first. Self is always
-  // fine for owner/admin (birthdate/localOnly's own precedent in
-  // routes/people.ts: "owner/admin editing themselves is unaffected");
-  // the ladder only binds acting on someone ELSE.
+  if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: errorMessage };
   if (actor.id === targetPersonId) return { ok: true, value: true };
   const targetRole = getPersonRole(targetPersonId);
   if (targetRole === "owner" || targetRole === "admin") {
-    return { ok: false, status: 403, error: "only owner or admin may change session lock settings" };
+    return { ok: false, status: 403, error: errorMessage };
   }
   return { ok: true, value: true };
+}
+
+function assertCanSetSessionLock(actor: PersonRow, targetPersonId: string): SettingsOpResult<true> {
+  return assertOwnerAdminLadder(actor, targetPersonId, "only owner or admin may change session lock settings");
+}
+
+// STORE-CAP-01: the person-scope cap override is "set by an admin"
+// (household-storage-2026-09-23.md's cap table) - the generic per-person
+// gate below (canAccessPerson's `actor.id === personId` branch) would
+// otherwise let anyone raise their OWN cap just by writing their own
+// person-scope setting, which defeats the whole point of an admin-set
+// override.
+function assertCanSetPersonStorageCap(actor: PersonRow, targetPersonId: string): SettingsOpResult<true> {
+  return assertOwnerAdminLadder(actor, targetPersonId, "only owner or admin may change a person's storage cap");
 }
 
 function assertCanSetSafeSearch(actor: PersonRow, targetPersonId: string, newValue: unknown): SettingsOpResult<true> {
@@ -358,7 +383,9 @@ export function setValue(
       ? assertCanSetSafeSearch(actor, parsed.id!, value)
       : key === SESSION_LOCK_REQUIRED_KEY || key === SESSION_LOCK_TIMEOUT_KEY
         ? assertCanSetSessionLock(actor, parsed.id!)
-        : assertCanAccessScope(actor, parsed, "write");
+        : key === PERSON_STORAGE_CAP_KEY
+          ? assertCanSetPersonStorageCap(actor, parsed.id!)
+          : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
   return writeValue(scope, keyDef, value);
