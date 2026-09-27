@@ -17,6 +17,7 @@ import * as llm from "@/lib/llm";
 import * as notifications from "@/lib/notifications";
 import { runStartProjectTool, START_PROJECT_TOOL_ID, type StartProjectArgs } from "@/lib/projects/tool";
 import { registerProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
+import { registerAllPackageProjectTypes } from "@/lib/plugins";
 import { policyNode } from "@/lib/turnMachine/nodes/policy";
 import { toolNode } from "@/lib/turnMachine/nodes/tool";
 import { waitForSettled, cancel, __resetRunnerForTests } from "@/lib/projects/runner";
@@ -24,10 +25,67 @@ import { postProjectResult } from "@/lib/projects/post";
 import type { TurnState, ActionProposal, ToolCall } from "@/lib/turnMachine/contract";
 import type { PersonRow } from "@/types";
 
+// The registry has no built-in of its own any more (PROJECT-PKGTYPE-02,
+// docs/dev.md, 2026-09-27: the placeholder `bedtime-story` type was
+// retired the night the real `bedtime-storybook` package shipped
+// alongside it - two registered types with overlapping descriptions
+// let the model pick the older, generic-sounding placeholder over the
+// real one and fail a live request). Every test below that needs a
+// registered "bedtime-story" project type registers this fixture
+// itself, mirroring the exact shape the retired built-in had (so the
+// existing assertions on its title/description/schema keep meaning the
+// same thing) - the same "register a local fixture directly" pattern
+// the "adult-only-test-type" and "refused-test-type" cases below
+// already use.
+function registerBedtimeStoryFixture(): void {
+  registerProjectType({
+    id: "bedtime-story",
+    title: "a bedtime story",
+    description: "Write a short, original bedtime story with a title page - for a topic that needs a real story written, not a quick answer.",
+    minRole: "child",
+    consequential: true,
+    paramsSchema: {
+      type: "object",
+      required: ["topic"],
+      properties: {
+        topic: { type: "string", minLength: 1, description: "What the story is about." },
+        readerAge: { type: "integer", minimum: 2, maximum: 12, description: "The child's age, if known." },
+      },
+      additionalProperties: false,
+    },
+    buildPlan: (params) => {
+      const topic = typeof params.topic === "string" && params.topic.trim() ? params.topic.trim() : "a small adventure";
+      const readerAge = typeof params.readerAge === "number" ? params.readerAge : 6;
+      return {
+        steps: [
+          {
+            id: "story",
+            kind: "text",
+            needs: [],
+            params: {
+              role: "chat",
+              promptTemplate: `Write a short, gentle bedtime story for a ${readerAge}-year-old about ${topic}. Keep it kind and simple: a title, then a few short paragraphs, a happy or comforting ending.`,
+              inputs: [],
+            },
+          },
+          {
+            id: "book",
+            kind: "assemble",
+            needs: ["story"],
+            params: { assembler: "markdown-concat", inputs: ["story"] },
+          },
+        ],
+        ceilings: { maxWallSeconds: 120, maxGeneratorJobs: 1 },
+      };
+    },
+  });
+}
+
 beforeEach(() => {
   resetDb();
   __resetRunnerForTests();
   __resetProjectTypesForTests();
+  registerBedtimeStoryFixture();
 });
 
 afterEach(() => __resetRunnerForTests());
@@ -106,6 +164,46 @@ describe("runStartProjectTool(): the tool's own execution", () => {
     expect(outcome.status).toBe("succeeded");
     expect(outcome.result?.reply?.text).toContain("bedtime story");
     expect(outcome.result?.reply?.text).toMatch(/\d+ steps?, about \d+/);
+    const projectId = (outcome.result?.data as { projectId: string }).projectId;
+    expect(projectId).toBeTruthy();
+    const finished = await waitForSettled(projectId);
+    expect(finished.state).toBe("done");
+    completeSpy.mockRestore();
+  });
+});
+
+// The live incident this whole file was extended for (docs/dev.md,
+// 2026-09-27): Jesse asked the real hub for "a bedtime story about a
+// shy dragon who's scared of the dark," and the stored turn's own
+// `outcomes` row showed `errorCode: "invalid_params", userMessage: "a
+// bedtime story's own inputs failed validation: data must NOT have
+// additional properties"` - the model offered `audience`/`length`
+// alongside `topic`, and the package's own `additionalProperties: false`
+// (now removed from manifest.json, matching every other bundled
+// package) rejected them. This registers the REAL bundled
+// `bedtime-storybook` package through the REAL production loader
+// (registerAllPackageProjectTypes(), the same one index.ts calls at
+// boot) and drives it through `runStartProjectTool()` with the exact
+// params the model actually sent, proving both validation layers that
+// touch `manifest.json`'s `args` field - `tool.ts`'s own pre-check
+// (`validateParams()`, compiling `projectType.paramsSchema`) and
+// `fromManifest.ts`'s `buildProjectTypeFromManifest()`'s defensive
+// re-validation inside `buildPlan()` - now both accept the extra
+// fields instead of refusing them.
+describe("the live incident's own repro: the real bedtime-storybook package accepts the model's real params", () => {
+  test("topic + audience + length (exactly what the model sent) succeeds, not invalid_params", async () => {
+    registerAllPackageProjectTypes();
+    const completeSpy = stubComplete();
+    const outcome = runStartProjectTool({
+      actor: person("Sage"),
+      args: { type: "bedtime-storybook", params: { topic: "a shy dragon who's scared of the dark", audience: "a child", length: "short" } },
+      callId: "c1",
+      conversationId: "conv-1",
+      turnId: "turn-1",
+      temporary: false,
+    });
+    expect(outcome.status).toBe("succeeded");
+    expect(outcome.errorCode).toBeUndefined();
     const projectId = (outcome.result?.data as { projectId: string }).projectId;
     expect(projectId).toBeTruthy();
     const finished = await waitForSettled(projectId);

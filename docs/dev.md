@@ -29533,3 +29533,125 @@ not a real missing pin) green end to end, scope `backend` (backend
 leg 4227 pass/0 fail, scripts typecheck and `bun test` 51 pass, frontend
 typecheck, docs reading-level lint, standards core - gitleaks, PII
 wordlist, prose lint, licence check).
+
+## PROJECT-PKGTYPE-02: a live incident, root-caused and fixed (2026-09-27)
+
+Hours after PROJECT-PACK-01 landed, Jesse asked the real household hub
+at `127.0.0.1:8787`, "can you write my kid a bedtime story about a shy
+dragon who's scared of the dark," confirmed the consequential-action
+prompt, and got back "Sorry, I couldn't do that." The stored turn row
+(`conversation_turns.outcomes`, read directly from `data/hub.db`) named
+the exact failure:
+
+> `{"callId":"resumed:start_project","packageId":"start_project",
+> "status":"failed","via":"tool_call","args":{"type":"bedtime-story",
+> "params":{"topic":"a shy dragon who's scared of the dark",
+> "audience":"a child","length":"short"}},"errorCode":"invalid_params",
+> "userMessage":"a bedtime story's own inputs failed validation: data
+> must NOT have additional properties"}`
+
+Two real, separate bugs, both fixed here.
+
+**Bug 1: the wrong project type won.** `projectTypes.ts` still
+registered a built-in `bedtime-story` type (id `"bedtime-story"`, title
+"a bedtime story") alongside the real, just-shipped `bedtime-storybook`
+package (id `"bedtime-storybook"`, title "Bedtime storybook").
+PROJECT-PKGTYPE-01's own landing note explicitly kept the built-in as a
+judgment call, on the grounds that no real project-type package shipped
+yet - that condition stopped being true the moment PROJECT-PACK-01
+shipped its own real package, hours later in the same night, and nobody
+came back to remove it. With both
+registered and offered in the same `start_project` tool call, the model
+picked the older, more generic-sounding placeholder over the real
+package. Fixed by deleting `registerBuiltInProjectTypes()` and its
+call entirely: `__resetProjectTypesForTests()` now just does
+`registry.clear()`, with no built-in to re-seed. `startProject.test.ts`
+and `projectsRoutes.test.ts` each gained a `registerBedtimeStoryFixture()`
+helper, called from their own `beforeEach`, that registers a local
+fixture matching the retired built-in's exact id/title/description/
+schema/`buildPlan()` - the same "register a local fixture directly via
+`registerProjectType()`" pattern both files already used for their
+`"adult-only-test-type"` and `"refused-test-type"` cases, so every
+existing assertion (the reply text containing "bedtime story," the
+confirm prompt reading "Start a bedtime story?") keeps meaning exactly
+what it meant before, now proven against a type the test registers
+itself instead of one the module silently seeded at import time.
+`runner.test.ts` needed no change - it only ever drove `markdown-concat`
+directly. Comments in `projectTypes.ts`'s own header, `assemblers.ts`
+(which cited the retired built-in as `markdown-concat`'s other caller),
+and `project-pack-01-live.ts`'s bench script (whose own comment said
+`__resetProjectTypesForTests()` "clears the registry back to just the
+built-in bedtime-story type") were all updated to describe the registry
+as it is now - empty until something registers into it, real packages
+or test fixtures alike.
+
+**Bug 2: the only strict manifest in the whole codebase.** Independent
+of which type won, `bedtime-storybook/manifest.json`'s own `args` field
+set `"additionalProperties": false`. `grep -c '"additionalProperties"'
+backend/packages/*/manifest.json` confirmed this is the ONLY bundled
+package manifest in the entire repo that sets this key at all - every
+other one (`write_document`, `joke`, and the rest) leaves it unset,
+which JSON Schema defaults to permissive. A model asked for a bedtime
+story naturally offers descriptive fields like `audience`/`length`
+that this package's own `buildPlan()` (`fromManifest.ts`'s generic
+`substituteArgs()`) already ignores harmlessly - it only reads named
+`{topic}`/`{reader_age}` placeholders, nothing else - so there was no
+reason for this one package to be stricter than the rest of the
+codebase, and every reason not to be: strict rejection is exactly what
+broke this feature live. Fixed by removing the `"additionalProperties":
+false` line, matching every other bundled manifest's own convention.
+
+**The regression test, the repro itself.** Added to
+`startProject.test.ts`, in a new describe block ("the live incident's
+own repro"): `registerAllPackageProjectTypes()` (the real production
+loader, the same one `index.ts` calls at boot) registers the REAL
+bundled `bedtime-storybook` package, then `runStartProjectTool()` is
+called with the exact params the model actually sent -
+`{ type: "bedtime-storybook", params: { topic: "a shy dragon who's
+scared of the dark", audience: "a child", length: "short" } }` -
+asserting `outcome.status` is `"succeeded"`, not `"failed"`. This
+exercises both validation layers that read the same manifest `args`
+field: `tool.ts`'s own pre-check (`validateParams()`, compiling
+`projectType.paramsSchema`) and `fromManifest.ts`'s
+`buildProjectTypeFromManifest()`'s defensive re-validation inside
+`buildPlan()`. Confirmed as a real regression test, not just a new
+passing test: reverted the manifest fix alone (a temporary `git stash`
+of just that one file) and reran this one test - it failed with
+`Expected: "succeeded", Received: "failed"`, the identical shape of
+the real incident. Restored the fix and reran; it passes.
+
+**Confirmed the wrong-type selection is closed too.**
+`startProjectToolSpec()` (`tool.ts`) is built fresh from
+`listProjectTypes()` on every call - with the built-in gone, a booted
+hub with only the `bedtime-storybook` package installed now offers
+exactly one registered type, so there is no second, competing
+placeholder left for the model to pick over the real package.
+
+**Out of scope, named:** the confirmation-step UX ("Start a bedtime
+story?" reading unclear as a yes/no prompt) - a separate, real finding
+Jesse also raised from the same live turn, handled separately, not
+here. No other project type, no live end-to-end rerun against the
+household's own resident engine (PROJECT-PACK-01's own bench,
+`project-pack-01-live.ts`, already proved this class of run against a
+real engine; this fix's own regression test is the proof this specific
+failure class is closed).
+
+Files: `backend/src/lib/projects/projectTypes.ts` (built-in removed),
+`backend/packages/bedtime-storybook/manifest.json` (`additionalProperties`
+removed), `backend/src/lib/projects/assemblers.ts` and
+`backend/scripts/bench/project-pack-01-live.ts` (comments corrected).
+Tests: `backend/tests/projects/startProject.test.ts` (the repro,
+plus `registerBedtimeStoryFixture()`), `backend/tests/
+projectsRoutes.test.ts` (`registerBedtimeStoryFixture()`).
+
+Review: low effort (a deletion, a one-line manifest change, one new
+regression test - mechanical), one pass, zero findings.
+
+Verified: `bash scripts/check.sh --full` (`MAIPAI_COMMONS_DIR`/
+`MAIPAI_STANDARDS_DIR` pointed at the real `commons`/`.github`
+checkouts, the same worktree-only path quirk PROJECT-PACK-01's own
+verified line already named) green end to end - backend 4280 pass/0
+fail, frontend 781 pass/0 fail, docs reading-level lint, standards core.
+The household's own live hub at `127.0.0.1:8787` was never touched by
+this work (no `bun restart`, no port 8787 traffic) - the coordinator's
+own job, per the standing "lanes never touch shared server" rule.

@@ -60,11 +60,10 @@ function person(displayName: string) {
 async function main(): Promise<void> {
   console.log(`[project-pack-01-live] MAIPAI_DATA_DIR=${process.env.MAIPAI_DATA_DIR}`);
 
-  // __resetProjectTypesForTests() clears the registry back to just the
-  // built-in bedtime-story type, then registerAllPackageProjectTypes()
-  // is the SAME loader index.ts calls at real boot - this proves the
-  // real bundled package registers through the real production path,
-  // not a hand-built ProjectType.
+  // __resetProjectTypesForTests() clears the registry to empty, then
+  // registerAllPackageProjectTypes() is the SAME loader index.ts calls
+  // at real boot - this proves the real bundled package registers
+  // through the real production path, not a hand-built ProjectType.
   __resetProjectTypesForTests();
   registerAllPackageProjectTypes();
   const projectType = getProjectType("bedtime-storybook");

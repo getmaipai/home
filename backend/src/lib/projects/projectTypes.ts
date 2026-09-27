@@ -6,14 +6,20 @@
 // slots the model fills". PROJECT-PKGTYPE-01 built the real mechanism -
 // plugins.ts's registerAllPackageProjectTypes() reads every installed
 // `kind: "project"` package's manifest + plan.json and registers it
-// here through fromManifest.ts's buildProjectTypeFromManifest() - but no
-// such package actually ships yet (PROJECT-PACK-01, the coloring book,
-// is still unbuilt), so `registerBuiltInProjectTypes()` below still
-// seeds one hardcoded entry, the same stand-in role assemblers.ts's
-// "markdown-concat" and steps.ts's UNIMPLEMENTED_STEP_KINDS already play
-// for their own not-yet-built neighbors: a household with no project
-// packages installed would otherwise have `start_project` offered with
-// nothing it could ever start.
+// here through fromManifest.ts's buildProjectTypeFromManifest(). A real
+// package now ships (PROJECT-PACK-01, `backend/packages/
+// bedtime-storybook/`), so the placeholder built-in type this file used
+// to seed (`bedtime-story`, a stand-in the same role assemblers.ts's
+// "markdown-concat" and steps.ts's UNIMPLEMENTED_STEP_KINDS still play
+// for their own not-yet-built neighbors) is gone: it was retired the
+// night the real package shipped alongside it made the model pick the
+// older, generic-sounding placeholder over the real one and fail a
+// live bedtime-story request (its own `additionalProperties: false`
+// rejecting the model's `audience`/`length` fields) - see docs/dev.md's
+// dated section for the incident. Only registered project types now
+// come from real packages; a household with none installed has
+// `start_project` offered with nothing it can start, which is correct,
+// not a regression to guard against with a hardcoded stand-in.
 //
 // `minRole`/`consequential` here are exactly the fields a package's own
 // manifest.json already declares for an ordinary tool (plugins.ts's
@@ -77,67 +83,11 @@ export function listProjectTypes(): ProjectType[] {
   return [...registry.values()];
 }
 
+/** Test-only: clears every registered project type back to empty. No
+ * built-in is re-seeded (there is none) - a test that needs a project
+ * type registers its own fixture via `registerProjectType()` right
+ * after calling this, the same way plugins.test.ts and
+ * project-pack-01-live.ts already register real ones. */
 export function __resetProjectTypesForTests(): void {
   registry.clear();
-  registerBuiltInProjectTypes();
 }
-
-function registerBuiltInProjectTypes(): void {
-  // One built-in type, proving the whole start_project mechanism (offer,
-  // classify, build a real ProjectPlan, run it, name a duration, post
-  // the result) with a text-only plan - exactly the design record's own
-  // "a text-only storybook variant may prove the runner before media
-  // exists" (PROJECT-PACK-01's own line), the same stand-in role
-  // assemblers.ts's "markdown-concat" plays. Retired the day
-  // PROJECT-PACK-01 actually ships a real catalog package with its own
-  // plan.json - not the day the loader that WOULD register one exists
-  // (PROJECT-PKGTYPE-01, this file's own header above): removing this
-  // hardcoded entry before PROJECT-PACK-01 lands would leave every
-  // household with zero registered project types and `start_project`
-  // offered with nothing it could ever start, a real regression for no
-  // gain - PROJECT-PKGTYPE-01's own loader is proven separately, against
-  // a real fixture package, in plugins.test.ts.
-  registerProjectType({
-    id: "bedtime-story",
-    title: "a bedtime story",
-    description: "Write a short, original bedtime story with a title page - for a topic that needs a real story written, not a quick answer.",
-    minRole: "child",
-    consequential: true,
-    paramsSchema: {
-      type: "object",
-      required: ["topic"],
-      properties: {
-        topic: { type: "string", minLength: 1, description: "What the story is about." },
-        readerAge: { type: "integer", minimum: 2, maximum: 12, description: "The child's age, if known." },
-      },
-      additionalProperties: false,
-    },
-    buildPlan: (params) => {
-      const topic = typeof params.topic === "string" && params.topic.trim() ? params.topic.trim() : "a small adventure";
-      const readerAge = typeof params.readerAge === "number" ? params.readerAge : 6;
-      return {
-        steps: [
-          {
-            id: "story",
-            kind: "text",
-            needs: [],
-            params: {
-              role: "chat",
-              promptTemplate: `Write a short, gentle bedtime story for a ${readerAge}-year-old about ${topic}. Keep it kind and simple: a title, then a few short paragraphs, a happy or comforting ending.`,
-              inputs: [],
-            },
-          },
-          {
-            id: "book",
-            kind: "assemble",
-            needs: ["story"],
-            params: { assembler: "markdown-concat", inputs: ["story"] },
-          },
-        ],
-        ceilings: { maxWallSeconds: 120, maxGeneratorJobs: 1 },
-      };
-    },
-  });
-}
-
-registerBuiltInProjectTypes();

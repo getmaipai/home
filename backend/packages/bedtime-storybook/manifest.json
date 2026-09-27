@@ -24,8 +24,7 @@
     "properties": {
       "topic": { "type": "string", "minLength": 1, "description": "What the story is about." },
       "reader_age": { "type": "integer", "minimum": 2, "maximum": 12, "default": 6, "description": "The child's age, if known." }
-    },
-    "additionalProperties": false
+    }
   },
   "incognito": "ephemeral",
   "requires": [],

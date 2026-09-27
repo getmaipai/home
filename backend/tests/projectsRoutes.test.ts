@@ -14,12 +14,63 @@ import { newConversationTurnId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { conversationTurns } from "@/db/schema";
 import { runStartProjectTool } from "@/lib/projects/tool";
+import { registerProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { __resetRunnerForTests, waitForSettled } from "@/lib/projects/runner";
 import type { PersonRow } from "@/types";
+
+// The registry has no built-in of its own any more (PROJECT-PKGTYPE-02,
+// docs/dev.md, 2026-09-27) - a local fixture matching the retired
+// built-in `bedtime-story` type's own shape, the same pattern
+// startProject.test.ts uses.
+function registerBedtimeStoryFixture(): void {
+  registerProjectType({
+    id: "bedtime-story",
+    title: "a bedtime story",
+    description: "Write a short, original bedtime story with a title page - for a topic that needs a real story written, not a quick answer.",
+    minRole: "child",
+    consequential: true,
+    paramsSchema: {
+      type: "object",
+      required: ["topic"],
+      properties: {
+        topic: { type: "string", minLength: 1, description: "What the story is about." },
+        readerAge: { type: "integer", minimum: 2, maximum: 12, description: "The child's age, if known." },
+      },
+      additionalProperties: false,
+    },
+    buildPlan: (params) => {
+      const topic = typeof params.topic === "string" && params.topic.trim() ? params.topic.trim() : "a small adventure";
+      const readerAge = typeof params.readerAge === "number" ? params.readerAge : 6;
+      return {
+        steps: [
+          {
+            id: "story",
+            kind: "text",
+            needs: [],
+            params: {
+              role: "chat",
+              promptTemplate: `Write a short, gentle bedtime story for a ${readerAge}-year-old about ${topic}. Keep it kind and simple: a title, then a few short paragraphs, a happy or comforting ending.`,
+              inputs: [],
+            },
+          },
+          {
+            id: "book",
+            kind: "assemble",
+            needs: ["story"],
+            params: { assembler: "markdown-concat", inputs: ["story"] },
+          },
+        ],
+        ceilings: { maxWallSeconds: 120, maxGeneratorJobs: 1 },
+      };
+    },
+  });
+}
 
 beforeEach(() => {
   resetDb();
   __resetRunnerForTests();
+  __resetProjectTypesForTests();
+  registerBedtimeStoryFixture();
 });
 
 async function owner() {

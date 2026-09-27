@@ -4,11 +4,11 @@
 // is permanent host machinery, not a stand-in waiting to be replaced
 // (PROJECT-PKGTYPE-01): it's the generic "join these text artifacts in
 // order" assembler every plain-text project type can reference by name
-// in its own plan.json, the same way `bedtime-story`'s own built-in
-// project type (projectTypes.ts) already does - a real catalog package
-// (PROJECT-PACK-01) is free to name it too, or register its own
-// assembler for a shape this one doesn't cover (a real coloring book's
-// page layout, say).
+// in its own plan.json, the way the real bundled `bedtime-storybook`
+// package (`backend/packages/bedtime-storybook/plan.json`) already
+// does - another real catalog package is free to name it too, or
+// register its own assembler for a shape this one doesn't cover (a
+// real coloring book's page layout, say).
 export interface AssemblerInput {
   stepId: string;
   text: string;
