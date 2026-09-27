@@ -1137,3 +1137,95 @@ describe("PROJECT-PKGTYPE-01: registerAllPackageProjectTypes() loads a real proj
     }
   });
 });
+
+// PROJECT-PACK-01: the real bundled bedtime-storybook package
+// (backend/packages/bedtime-storybook/), the first real "project"-kind
+// catalog package - proving registerAllPackageProjectTypes() actually
+// picks up a package that lives where every real package lives
+// (backend/packages/, resolved through resolvePackageDir()'s bundled
+// fallback), not just the installedPackageVersionDir()+packageInstalls
+// fixture the describe block above already covers for the generic
+// loader. No packageInstalls row, no writeFileSync: the package is
+// already on disk, the same way "the bundled remember package" (top of
+// this file) proves an ordinary plugin without writing one either.
+describe("PROJECT-PACK-01: the real bundled bedtime-storybook package", () => {
+  afterEach(() => {
+    __resetProjectTypesForTests();
+  });
+
+  test("is discoverable and its manifest + plan.json validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("bedtime-storybook");
+    const manifest = loadManifestOnly("bedtime-storybook");
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+    expect(manifest.value.kind).toBe("project");
+    expect(manifest.value.permissions).toContain("artifact:write");
+
+    const loaded = loadProjectPackage("bedtime-storybook");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.plan.steps.map((s) => (s as { id: string }).id)).toEqual(["outline", "chapter-1", "chapter-2", "chapter-3", "book"]);
+  });
+
+  test("registerAllPackageProjectTypes() registers it as a real ProjectType", () => {
+    registerAllPackageProjectTypes();
+    const registered = getProjectType("bedtime-storybook");
+    expect(registered).toBeDefined();
+    expect(registered?.title).toBe("Bedtime storybook");
+    expect(registered?.minRole).toBe("child");
+    expect(registered?.consequential).toBe(true);
+  });
+
+  // The five-step fan-out/fan-in shape (outline -> three chapters that
+  // each need only "outline", never each other -> the assemble step)
+  // is the whole point of this package: it proves the dependency walker
+  // on a real package, not just a single text step PROJECT-RUN-01's own
+  // tests already cover. Asserted directly against the loaded plan.json
+  // rather than only through buildPlan(), so a future edit to the
+  // fixture's needs/inputs can't drift from what this test believes it
+  // is proving.
+  test("chapter-1/2/3 each depend only on outline, never on each other, proving the fan-out", () => {
+    const loaded = loadProjectPackage("bedtime-storybook");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    const steps = loaded.value.plan.steps as unknown as { id: string; needs: string[] }[];
+    for (const chapterId of ["chapter-1", "chapter-2", "chapter-3"]) {
+      const step = steps.find((s) => s.id === chapterId);
+      expect(step?.needs).toEqual(["outline"]);
+    }
+    const book = steps.find((s) => s.id === "book");
+    expect(book?.needs).toEqual(["chapter-1", "chapter-2", "chapter-3"]);
+  });
+
+  test("buildPlan() fills topic and defaults reader_age, leaving the runner's own {{outline}} step-output slot untouched", () => {
+    registerAllPackageProjectTypes();
+    const projectType = getProjectType("bedtime-storybook");
+    expect(projectType).toBeDefined();
+    if (!projectType) return;
+
+    const plan = projectType.buildPlan({ topic: "a trip to the moon" });
+    expect(plan.ceilings).toEqual({ maxWallSeconds: 480, maxGeneratorJobs: 1 });
+    const steps = plan.steps as unknown as { id: string; params: { promptTemplate?: string } }[];
+    const outline = steps.find((s) => s.id === "outline");
+    expect(outline?.params.promptTemplate).toContain("a trip to the moon");
+    // default reader_age (6) filled in since the model didn't supply one.
+    expect(outline?.params.promptTemplate).toContain("6-year-old");
+    const chapter1 = steps.find((s) => s.id === "chapter-1");
+    // The arg slot is filled; the runner's own {{outline}} step-output
+    // placeholder is left exactly as-is for steps.ts's renderTemplate()
+    // to fill once the project actually runs (fromManifest.ts's own
+    // planFilledWith() contract).
+    expect(chapter1?.params.promptTemplate).toContain("6-year-old");
+    expect(chapter1?.params.promptTemplate).toContain("{{outline}}");
+  });
+
+  test("buildPlan() honors an explicit reader_age", () => {
+    registerAllPackageProjectTypes();
+    const projectType = getProjectType("bedtime-storybook");
+    if (!projectType) throw new Error("bedtime-storybook did not register");
+    const plan = projectType.buildPlan({ topic: "a brave little fox", reader_age: 9 });
+    const steps = plan.steps as unknown as { id: string; params: { promptTemplate?: string } }[];
+    const outline = steps.find((s) => s.id === "outline");
+    expect(outline?.params.promptTemplate).toContain("9-year-old");
+  });
+});

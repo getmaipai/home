@@ -11,7 +11,11 @@
 // - `{ "kind": "static" }`: no recipe, nothing to run against a host - a
 //   `kind: "skill"` package (plain instructions) or any package with
 //   nothing more to prove than "it loads." Confirms loadSkill()/
-//   loadPackage() succeeds.
+//   loadPackage() succeeds. A `kind: "project"` package (PROJECT-PACK-01)
+//   has no `recipe.json` either - its body is `plan.json` - so this
+//   branch confirms loadProjectPackage() succeeds instead of loadPackage(),
+//   which would otherwise fail every project-kind package by looking for
+//   a `recipe.json` that was never supposed to exist.
 // - `{ "kind": "recipe_fixture", "fixture": "<path relative to the
 //   package dir>" }`: a Tier 0 plugin. Runs the package's own recipe.json
 //   through the exact same interpreter production uses
@@ -32,7 +36,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { packageStatus } from "@/db/schema";
-import { listPackageIds, loadPackage } from "@/lib/plugins";
+import { listPackageIds, loadPackage, loadProjectPackage } from "@/lib/plugins";
 import { loadSkill } from "@/lib/skills";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { isValidPackageId } from "@/lib/paths";
@@ -233,6 +237,10 @@ export async function runSmoke(id: string): Promise<SmokeResult> {
     if (manifestJson.kind === "skill") {
       const loadedSkill = loadSkill(id);
       return recordResult(id, loadedSkill ? { ok: true, message: "skill loads" } : { ok: false, message: "skill failed to load" });
+    }
+    if (manifestJson.kind === "project") {
+      const loadedProject = loadProjectPackage(id);
+      return recordResult(id, loadedProject.ok ? { ok: true, message: "project package loads" } : { ok: false, message: loadedProject.error });
     }
     const loaded = loadPackage(id);
     return recordResult(id, loaded.ok ? { ok: true, message: "package loads" } : { ok: false, message: loaded.error });

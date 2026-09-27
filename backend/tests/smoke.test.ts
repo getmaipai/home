@@ -32,6 +32,19 @@ describe("runSmoke, static kind", () => {
     expect(result.ok).toBe(true);
     expect(getPackageStatus("storytime-style").status).toBe("enabled");
   });
+
+  // PROJECT-PACK-01: before this fix, smoke.ts's static-kind branch
+  // unconditionally called loadPackage(id), which requires recipe.json -
+  // a "project"-kind package (its body is plan.json, no recipe.json at
+  // all, PROJECT-PKGTYPE-01) would fail its own honest `smoke: { kind:
+  // "static" }` declaration and get disabled at boot for a reason that
+  // has nothing to do with whether it actually works.
+  test("a project-kind package with no recipe.json passes by loading through loadProjectPackage()", async () => {
+    const result = await runSmoke("bedtime-storybook");
+    expect(result.ok).toBe(true);
+    expect(result.message).toBe("project package loads");
+    expect(getPackageStatus("bedtime-storybook").status).toBe("enabled");
+  });
 });
 
 // SEC-2 (code review, 2026-09-06): POST /:id/smoke used to pass the raw

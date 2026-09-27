@@ -29389,3 +29389,147 @@ green end to end (backend leg, frontend leg, docs reading-level lint,
 standards core - gitleaks, PII wordlist, prose lint, licence check),
 scope `full` (a workspace `package.json` changed), run twice - once
 before the review's fixes, once after.
+
+## PROJECT-PACK-01: the bedtime storybook package, the proving recipe (2026-09-27)
+
+The first real `"project"`-kind catalog package, closing PROJECT-PKGTYPE-01's
+own gap: the loader was real but nothing installed to load. Ships as
+`backend/packages/bedtime-storybook/`, mirroring `write_document/`'s
+full bundled file set (`manifest.json`, `README.md`, `CHANGELOG.md`,
+`quality_scale.yaml`) but a `plan.json` in place of `recipe.json`, per
+`kind: "project"`'s own manifest field.
+
+**Not the coloring book, and not media.** The item's own title names "the
+coloring book"; built as a text-only bedtime storybook instead, per the
+item's own out-of-scope line ("a text-only storybook variant may prove
+the runner before media exists") and PROJECT-MEDIA-01's own scope (a
+real coloring book needs the Stack image role, not built yet). A real
+coloring book with actual images stays PROJECT-MEDIA-01's job.
+
+**The plan: five steps, a real fan-out/fan-in shape.** `outline` (needs:
+`[]`) plans a three-chapter story from the model's `topic`/`reader_age`
+args; `chapter-1`/`chapter-2`/`chapter-3` each need only `outline`, never
+each other, and each interpolates its own `{reader_age}` arg alongside
+the runner's own `{{outline}}` step-output placeholder
+(`steps.ts`'s `renderTemplate()`, filled from each step's own
+`params.inputs: ["outline"]`); `book` (an `assemble` step, `needs:
+["chapter-1","chapter-2","chapter-3"]`) joins them with the host's own
+`markdown-concat` assembler. The three chapters depending only on
+`outline` and not on each other is deliberate, not an oversight: with
+`ceilings.maxGeneratorJobs: 1` they still run one at a time (this
+package's own live run confirmed the actual order was
+outline→chapter-1→chapter-2→chapter-3→book), but the dependency walker
+sees all three become ready at once the moment `outline` finishes - the
+identical fan-out shape `PROJECT-RUN-01`'s own tests already proved the
+runner handles, now proven again against a real package's real plan.json
+rather than a scripted fixture.
+
+**The ceiling: 480s, not 300s - a real number, checked against the
+runner's own constant, not copied from the schema's own coloring-book
+fixture example.** The fixture example in `spec/fixtures/records/
+project-plan.example.json` (a one-step plan) uses `maxWallSeconds: 300`;
+copying that number here would have been dishonest, since this plan
+makes four serial chat calls (`outline` then three chapters), each
+already capped at `machine.ts`'s own `STEP_DEADLINE_MS` (120s), under
+`maxGeneratorJobs: 1` - the runner's `runBatch()` only checks
+`wallTimeExceeded` once a whole batch of ready steps has settled, and
+the second batch (all three chapters, ready together, run one at a time
+under the concurrency cap) can itself take up to 3×120s before that
+check ever runs. Four calls at up to 120s each is 480s in the real worst
+case a working (not even a timed-out) run could still legitimately take;
+300s would risk `skipRemaining()` cancelling the project - discarding the
+finished chapters and the `book` step that would have assembled them -
+for no reason but an honest ceiling being too tight for the runner's own
+constant. Set to 480s. The real live run below finished in 9.9s, so this
+is genuinely a ceiling, not a promise anyone will wait that long.
+
+**The manifest.** `min_role: "child"`, `consequential: true`,
+`incognito: "ephemeral"`, `permissions: ["artifact:write"]`, `tier: 0`,
+`quality_scale: "bronze"`. Args: `topic` (required string) and
+`reader_age` (integer 2-12, `default: 6`) - snake_case, confirmed against
+`write_document/manifest.json`'s own `artifact_id` arg as the one other
+multi-word arg name in any bundled manifest, rather than assumed.
+`smoke: { kind: "static" }` - a real, closed gap, not just a
+declaration: `smoke.ts`'s static-kind branch special-cased `kind:
+"skill"` but otherwise unconditionally called `loadPackage()`, which
+requires `recipe.json` and would have failed every project-kind
+package's own honest `static` declaration for a reason that has nothing
+to do with whether it actually works. Fixed with a parallel `kind ===
+"project"` branch calling `loadProjectPackage()` instead, same
+`recordResult()` shape as the other two branches - `backend/tests/
+smoke.test.ts` gained a regression test pointed at this real package.
+
+**Verification, split as the brief asked.** `backend/tests/plugins.test.ts`
+gained a new describe block proving the loader against the real
+bundled package on disk (no `installedPackageVersionDir()`/
+`packageInstalls` fixture row - `resolvePackageDir()`'s own bundled
+fallback resolves it the same way every ordinary package already does):
+discoverable via `listPackageIds()`, `loadProjectPackage()` returns the
+five steps in order, `registerAllPackageProjectTypes()` registers it as
+a real `ProjectType`, the fan-out asserted directly against the loaded
+plan (`chapter-1`/`2`/`3` each `needs: ["outline"]` only), and
+`buildPlan()` fills `topic`/defaults `reader_age` while leaving the
+runner's own `{{outline}}` placeholder untouched.
+
+A real, live, end-to-end run (`backend/scripts/bench/
+project-pack-01-live.ts`, new) against a side engine started on spare
+ports 28788/28794 (qwen3-4b, nomic-embed - never the household's own
+8787/8788/8794, per CHAT-22 and this item's own out-of-scope line) drove
+the real mechanism: `registerAllPackageProjectTypes()` at "boot",
+`startProjectToolSpec()` confirmed to name `bedtime-storybook` in its
+description (the "offer"), `policyNode` asked for confirmation on the
+first pass and allowed the identical call once `preConfirmed`
+(the "classify"), `runStartProjectTool()` started the real runner
+against the real engine, and `waitForSettled()` returned a project in
+state `done` after 9.9s with every one of the five steps `done` and the
+`book` artifact's gate `passed`. The artifact, opened and judged (topic
+`"a shy dragon who is scared of the dark"`, roster-safe, never a real
+household fact):
+
+> # Lila and the Light in the Dark
+> ## Chapter 1
+>
+> Lila was a shy dragon who loved the daylight. [...] even in the
+> darkest night, there was a special light waiting for her. [...]
+>
+> ## Chapter 2
+> [...] "Hi," said the creature, in a whispery voice. "I'm Spark. I'm
+> not very big, but I'm not afraid of the dark." [...]
+>
+> ## Chapter 3
+> [...] Sometimes, she'd even whisper to the dark, "I am not afraid. I
+> am light." [...] Good night, Lila. Sleep tight. The dark is not so
+> bad when you have a light inside you.
+
+A real title, three real chapters each under its own heading, a plot
+that actually develops (a new character, Spark, introduced in chapter 2
+and paid off in chapter 3), and a comforting, sleepy ending exactly as
+`chapter-3`'s own promptTemplate asked for - not garbage, not an empty
+promise.
+
+**Explicitly not done here, per this item's own brief:** driving this on
+the household's real, live-serving hub at `127.0.0.1:8787` - reserved
+for the coordinator to do personally after this lands (the standing rule
+from the 2026-09-26 incident where a dispatched lane took down the
+shared hub trying its own live check, `docs/BACKLOG.md`'s "Lanes never
+touch shared server" note). Port 8787 was never reached and `bun
+restart` was never called from this work.
+
+**Files.** New: `backend/packages/bedtime-storybook/{manifest.json,
+plan.json,README.md,CHANGELOG.md,quality_scale.yaml}`, `backend/scripts/
+bench/project-pack-01-live.ts`. Changed: `backend/src/lib/smoke.ts` (the
+project-kind static branch). Tests: `backend/tests/plugins.test.ts`
+(five new cases), `backend/tests/smoke.test.ts` (one new case).
+
+Review: low effort (a mostly-declarative package plus one small
+`smoke.ts` branch, per the org budget rule), one pass, zero findings.
+
+Verified: `bash scripts/check.sh` (`MAIPAI_COMMONS_DIR`/`MAIPAI_STANDARDS_DIR`
+pointed at the real `commons`/`.github` checkouts rather than this
+worktree's own `../commons`/`../.github` symlinks - the symlinked path
+string doesn't match `git worktree list`'s own recorded absolute path
+for the shared per-tag worktrees, a worktree-only environment quirk,
+not a real missing pin) green end to end, scope `backend` (backend
+leg 4227 pass/0 fail, scripts typecheck and `bun test` 51 pass, frontend
+typecheck, docs reading-level lint, standards core - gitleaks, PII
+wordlist, prose lint, licence check).

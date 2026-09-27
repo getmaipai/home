@@ -1,0 +1,51 @@
+{
+  "steps": [
+    {
+      "id": "outline",
+      "kind": "text",
+      "needs": [],
+      "params": {
+        "role": "chat",
+        "promptTemplate": "Plan a gentle three-chapter bedtime story for a {reader_age}-year-old about {topic}: a title, then one line per chapter.",
+        "inputs": []
+      }
+    },
+    {
+      "id": "chapter-1",
+      "kind": "text",
+      "needs": ["outline"],
+      "params": {
+        "role": "chat",
+        "promptTemplate": "Using this plan: {{outline}} Write chapter 1 for a {reader_age}-year-old. Start with the book's own title as a '# ' heading, then '## Chapter 1'. A few short, kind paragraphs.",
+        "inputs": ["outline"]
+      }
+    },
+    {
+      "id": "chapter-2",
+      "kind": "text",
+      "needs": ["outline"],
+      "params": {
+        "role": "chat",
+        "promptTemplate": "Using this plan: {{outline}} Write chapter 2 for a {reader_age}-year-old. Start with '## Chapter 2'. A few short, kind paragraphs.",
+        "inputs": ["outline"]
+      }
+    },
+    {
+      "id": "chapter-3",
+      "kind": "text",
+      "needs": ["outline"],
+      "params": {
+        "role": "chat",
+        "promptTemplate": "Using this plan: {{outline}} Write chapter 3 for a {reader_age}-year-old. Start with '## Chapter 3'. A few short, kind paragraphs, ending on a comforting, sleepy note.",
+        "inputs": ["outline"]
+      }
+    },
+    {
+      "id": "book",
+      "kind": "assemble",
+      "needs": ["chapter-1", "chapter-2", "chapter-3"],
+      "params": { "assembler": "markdown-concat", "inputs": ["chapter-1", "chapter-2", "chapter-3"] }
+    }
+  ],
+  "ceilings": { "maxWallSeconds": 480, "maxGeneratorJobs": 1 }
+}

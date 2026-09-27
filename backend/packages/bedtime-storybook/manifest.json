@@ -1,0 +1,48 @@
+{
+  "id": "bedtime-storybook",
+  "version": "0.1.0",
+  "kind": "project",
+  "category": "Family",
+  "display": "Bedtime storybook",
+  "description": "A three-chapter bedtime storybook written in the background, for a child's story that is longer than one reply.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "write a three-chapter bedtime story about a brave little fox",
+      "can you write my kid a longer bedtime story with chapters",
+      "make a whole bedtime storybook, not just one story",
+      "write a full three chapter bedtime book for my daughter",
+      "put together a longer bedtime story with a beginning, middle, and end",
+      "write a bedtime storybook about a trip to the moon"
+    ]
+  },
+  "args": {
+    "type": "object",
+    "required": ["topic"],
+    "properties": {
+      "topic": { "type": "string", "minLength": 1, "description": "What the story is about." },
+      "reader_age": { "type": "integer", "minimum": 2, "maximum": 12, "default": 6, "description": "The child's age, if known." }
+    },
+    "additionalProperties": false
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": true,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["artifact:write"],
+  "notifications": [],
+  "backup": "hot",
+  "background": true,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "static" }
+}
