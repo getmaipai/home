@@ -21,10 +21,12 @@ export interface ChatThreadListOptions {
   query?: string;
   /** When true, list the live session-only Incognito conversations. */
   incognito?: boolean;
+  /** Called synchronously when an unsupported archive action is rejected. */
+  onArchiveUnavailable?: (remoteId: string) => void;
 }
 
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
-  const { personId, query, incognito = false } = options;
+  const { personId, query, incognito = false, onArchiveUnavailable } = options;
   return {
     async list() {
       const rows = incognito ? await api.incognitoConversationList(personId) : await api.conversationList(personId, query);
@@ -50,12 +52,14 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
     // The shared record has no archive state. The shipped Elements menu
     // still offers Archive, so explain the unsupported action before
     // rejecting it; the runtime rolls back its own optimistic status.
-    async archive() {
+    async archive(remoteId) {
       toast.error("Archiving isn't available yet.");
+      onArchiveUnavailable?.(remoteId);
       throw new Error("Archiving conversations is not supported.");
     },
-    async unarchive() {
+    async unarchive(remoteId) {
       toast.error("Archiving isn't available yet.");
+      onArchiveUnavailable?.(remoteId);
       throw new Error("Archiving conversations is not supported.");
     },
     async delete(remoteId) { await api.deleteConversation(remoteId); },

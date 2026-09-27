@@ -1045,6 +1045,23 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const [speakingEndedAt, setSpeakingEndedAt] = useState(0);
   const [banner, setBanner] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  // Archive first switches an active remote thread to the blank thread
+  // before calling the adapter. Keep the identity of that just-deselected
+  // conversation so the adapter's synchronous unsupported-action signal
+  // can put the URL back if it matches the thread that was showing.
+  const visibleConversationIdRef = useRef(searchParams.get("conversation") ?? undefined);
+  const deselectedConversationIdRef = useRef<string | undefined>(undefined);
+  // useSearchParams recreates its setter when the search params change.
+  // Keep the adapter callback stable so a thread switch doesn't rebuild
+  // the thread-list adapter and restart its runtime.
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
+  const onArchiveUnavailable = useCallback((remoteId: string) => {
+    if (visibleConversationIdRef.current !== undefined || deselectedConversationIdRef.current !== remoteId) return;
+    visibleConversationIdRef.current = remoteId;
+    deselectedConversationIdRef.current = undefined;
+    setSearchParamsRef.current({ conversation: remoteId }, { replace: true });
+  }, []);
   // RESP-04 (f): the composer's thinking-mode control. Read via a ref
   // inside the adapter (ChatPage.tsx's own `thinkingRef` - the adapter
   // itself is memoized on `[aui]` alone, so a plain closure over
@@ -1088,7 +1105,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // The remote-thread runtime reloads its list when this adapter changes.
   // Incognito is an exclusive data source: its sessions never merge with
   // durable conversation rows.
-  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext }), [person.display_name, temporaryNext]);
+  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext, onArchiveUnavailable }), [person.display_name, temporaryNext, onArchiveUnavailable]);
   // SHELL-02 slice 6: the same real adapters ChatPage.tsx's composer
   // already uses - images plus, new here, text/Markdown files through
   // the shipped `SimpleTextAttachmentAdapter` (client-side only, no
@@ -1255,6 +1272,13 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     adapter: threadListAdapter,
     threadId: searchParams.get("conversation") ?? undefined,
     onThreadIdChange: (id) => {
+      if (id === undefined) {
+        deselectedConversationIdRef.current = visibleConversationIdRef.current;
+        visibleConversationIdRef.current = undefined;
+      } else {
+        visibleConversationIdRef.current = id;
+        deselectedConversationIdRef.current = undefined;
+      }
       setSearchParams(id ? { conversation: id } : {}, { replace: true });
       closeSheet();
       const isDeliberateSwitch = previousThreadIdRef.current !== undefined && id !== previousThreadIdRef.current;

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { ReactElement } from "react";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { IncognitoToggle } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/Header";
 import { NextChatPage } from "@/next/pages/NextChatPage";
@@ -80,6 +80,11 @@ function renderPage(ui: ReactElement) {
 function GlobalIncognitoToggle() {
   const { on, setOn } = useIncognitoContext();
   return <IncognitoToggle on={on} onChange={setOn} />;
+}
+
+function ConversationLocation() {
+  const location = useLocation();
+  return <output data-testid="conversation-location">{location.search}</output>;
 }
 
 function makePerson(overrides: Partial<Roster> = {}): Roster {
@@ -236,6 +241,44 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     }
   });
 
+  test("a rejected Archive keeps the active conversation selected", async () => {
+    const original = globalThis.fetch;
+    const conversation = { id: "conv-archive123", title: "Archive me", surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false };
+    let finishTurnsLoad!: () => void;
+    const turnsLoad = new Promise<void>((resolve) => { finishTurnsLoad = resolve; });
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations/conv-archive123/resume")) return Promise.resolve(Response.json(conversation));
+      if (url.includes("/turns")) {
+        finishTurnsLoad();
+        return Promise.resolve(Response.json([]));
+      }
+      if (url.includes("/api/conversations/conv-archive123")) return Promise.resolve(Response.json(conversation));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([conversation]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/next/chat?conversation=conv-archive123"]}>
+          <ConversationLocation />
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByText("Archive me");
+      await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive123"));
+      const moreOptions = view.getByRole("button", { name: "More options" });
+      fireEvent.pointerDown(moreOptions, { button: 0, ctrlKey: false, pointerType: "mouse" });
+      const archiveItem = await view.findByRole("menuitem", { name: "Archive" });
+      fireEvent.click(archiveItem);
+      await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive123"));
+      expect(view.getByText("Archive me")).toBeVisible();
+      await turnsLoad;
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   // Found live, on 8787, verifying this slice: clicking "New Thread"
   // from the phone/tablet Sheet started a fresh conversation but left
   // the Sheet open over it, blocking the composer until it was
@@ -295,6 +338,9 @@ describe("NextChatPage (c-99f5: the tab's document title)", () => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/conversations/conv-titled123/resume")) {
         return Promise.resolve(Response.json(conversation));
+      }
+      if (url.includes("/api/conversations/conv-titled123/turns")) {
+        return Promise.resolve(Response.json([]));
       }
       if (url.includes("/api/conversations/conv-titled123")) {
         return Promise.resolve(Response.json(conversation));
