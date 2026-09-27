@@ -30176,3 +30176,82 @@ frontend typecheck clean, docs reading-level lint, standards core
 (gitleaks, PII wordlist, prose lint, licence check) all passed. The
 household's own live hub at `127.0.0.1:8787` was never touched (no
 `bun restart`, no port 8787/8788/8794 traffic).
+
+## PROJECT-PACK-02: the bedtime-storybook outline names its own recurring characters (2026-09-27)
+
+A real live run of the `bedtime-storybook` package (PROJECT-PACK-01)
+produced a continuity slip: a helper character named "Starla" in
+chapter 2 became "Luna" in chapter 3. Not a crash - each chapter step
+is a real, working generation, and `plan.json`'s `chapter-1`/
+`chapter-2`/`chapter-3` steps deliberately depend only on `outline`,
+never on each other (the fan-out/fan-in shape PROJECT-PACK-01 built on
+purpose, to prove the runner's parallel dependency walk - unchanged by
+this fix). The cause: the `outline` step's own prompt asked only for "a
+title, then one line per chapter," never for the model to commit to and
+name any character appearing across chapters, so each chapter's own
+independent generation - reading the same outline but free to invent
+anything the outline didn't pin down - guessed its own name for the
+same character.
+
+**Fixed.** `backend/packages/bedtime-storybook/plan.json`'s `outline`
+step `promptTemplate` now explicitly asks for "the name of any
+character who appears in more than one chapter" alongside the title and
+per-chapter lines. Every chapter step already interpolates `{{outline}}`
+verbatim (the runner's own step-output substitution), so naming a
+character once there, before the parallel fan-out ever starts, is
+enough to keep every chapter consistent without touching the dependency
+structure (`needs: ["outline"]` only, on all three chapter steps,
+unchanged) at all.
+
+**Verified with one real, live, end-to-end regeneration** (own-side
+engine, never the household's), per the standing live-bench discipline:
+`llama-server` (`home/data/engines/llama-server-b10797-macos-arm64/`)
+started by hand on spare ports 28788 (chat, `qwen3-8b-instruct-q4-k-m.
+gguf`) and 28794 (embed, `nomic-embed-text-v1.5.Q4_K_M.gguf`), never
+8787/8788/8794 - confirmed clear before and after with `lsof`.
+`backend/scripts/bench/project-pack-01-live.ts` (PROJECT-PACK-01's own
+bench, unmodified) run against a fresh `MAIPAI_DATA_DIR` under the
+system temp root with the SAME topic Jesse actually used, "a shy dragon
+who's scared of the dark" (the script's own constant, already
+roster-safe and PII-free). Result: offer, classify (confirm-then-allow),
+run (all five steps done in 18.9s), artifact gate passed. The real
+`outline.md` step artifact:
+
+> **Title: "Lila the Shy Dragon and the Nightlight"**
+>
+> **Character that appears in more than one chapter:** **Lila**
+>
+> **Chapter 1: "The Shy Dragon in the Forest"**
+> Lila is a small dragon who lives in the forest and hides in her cave
+> when it gets dark.
+>
+> **Chapter 2: "A Starry Night Adventure"**
+> Lila meets a friendly owl who helps her find a magical nightlight
+> that glows with stars.
+>
+> **Chapter 3: "The Dragon Who Loves the Dark"**
+> Lila learns to love the dark and now uses her nightlight to help
+> other shy creatures sleep soundly.
+
+The model followed the new instruction directly, naming "Lila" once in
+the outline; the assembled book then used "Lila" by name consistently
+across chapter 1, 2 and 3 (a friendly owl introduced by name in chapter
+2, "Oliver," and two one-off animals introduced only in chapter 3,
+"Milo" and "Felix," never recur elsewhere, so there was no second
+character whose consistency the same run could test). This is one real
+run's evidence that the fix works as intended, not proof a model can
+never drift on a future run - a small model given a clear instruction
+can still ignore it occasionally, and this item makes no claim beyond
+what this one regeneration showed.
+
+Files: `backend/packages/bedtime-storybook/plan.json`.
+
+Review: low effort (a prompt-string edit, no code path changed), one
+pass, zero findings.
+
+Verified: the live bench above, plus `bash scripts/check.sh` green as
+part of this commit's combined gate run (see PROJECT-REPLY-01 above,
+same run - `plan.json` is data, not covered by a unit test, so
+`check.sh`'s own role here is confirming the manifest/plan still
+validates and nothing else in the suite regressed). The household's own
+live hub at `127.0.0.1:8787` was never touched.

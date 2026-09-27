@@ -6,7 +6,7 @@
       "needs": [],
       "params": {
         "role": "chat",
-        "promptTemplate": "Plan a gentle three-chapter bedtime story for a {reader_age}-year-old about {topic}: a title, then one line per chapter.",
+        "promptTemplate": "Plan a gentle three-chapter bedtime story for a {reader_age}-year-old about {topic}: a title, the name of any character who appears in more than one chapter, then one line per chapter.",
         "inputs": []
       }
     },
