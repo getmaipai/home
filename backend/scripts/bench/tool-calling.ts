@@ -37,7 +37,7 @@ import { withTimeout } from "@maipai/core/src/withTimeout";
 import { getEngineStatus, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
-import { START_PROJECT_TOOL_ID, START_PROJECT_TOOL } from "@/lib/projects/tool";
+import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import { SPEC_DIR } from "@/lib/specDir";
 import { buildPromptParts, loadAllManifests, ordinaryToolIds } from "@/lib/turnEngine";
 import { CATALOG } from "@/lib/modelCatalog";
@@ -134,7 +134,7 @@ function budgetOfferedTools(): ToolSpec[] {
     .slice()
     .sort()
     .map((id) => {
-      if (id === START_PROJECT_TOOL_ID) return START_PROJECT_TOOL;
+      if (id === START_PROJECT_TOOL_ID) return startProjectToolSpec();
       const loaded = loadManifestOnly(id);
       if (!loaded.ok) throw new Error(`budget tool ${id} failed to load: ${loaded.error}`);
       return { id, description: loaded.value.description, args: loaded.value.args };

@@ -20,7 +20,7 @@ import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { startBench, finishBench } from "./setup";
 import { startCompleteStream, type LlmMessage, type ToolSpec, type LlmCompleteOptions } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
-import { START_PROJECT_TOOL_ID, START_PROJECT_TOOL } from "@/lib/projects/tool";
+import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { resolvePersona } from "@/lib/persona";
 import { classifyTurnSignal } from "@/lib/turnSignal";
@@ -103,7 +103,7 @@ async function main() {
     .slice()
     .sort()
     .map((id) => {
-      if (id === START_PROJECT_TOOL_ID) return START_PROJECT_TOOL;
+      if (id === START_PROJECT_TOOL_ID) return startProjectToolSpec();
       const loaded = loadManifestOnly(id);
       if (!loaded.ok) throw new Error(`bundled package ${id} failed to load: ${loaded.error}`);
       return { id, description: loaded.value.description, args: loaded.value.args };

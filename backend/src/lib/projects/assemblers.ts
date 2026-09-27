@@ -1,9 +1,14 @@
 // PROJECT-RUN-01: the `assemble` step's own registry - a deterministic
 // function a package ships, named by `PlanStep.params.assembler`, no
-// model, no network (the design record's own words). One built-in
-// entry, markdown-concat, exists so the runner and its tests have a real
-// assembler to prove the mechanism with before any package ships one of
-// its own (PROJECT-PACK-01).
+// model, no network (the design record's own words). `markdown-concat`
+// is permanent host machinery, not a stand-in waiting to be replaced
+// (PROJECT-PKGTYPE-01): it's the generic "join these text artifacts in
+// order" assembler every plain-text project type can reference by name
+// in its own plan.json, the same way `bedtime-story`'s own built-in
+// project type (projectTypes.ts) already does - a real catalog package
+// (PROJECT-PACK-01) is free to name it too, or register its own
+// assembler for a shape this one doesn't cover (a real coloring book's
+// page layout, say).
 export interface AssemblerInput {
   stepId: string;
   text: string;

@@ -21,7 +21,7 @@
 import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
-import { START_PROJECT_TOOL_ID, START_PROJECT_TOOL } from "@/lib/projects/tool";
+import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import { speakerNamedAny } from "@/lib/subjects";
 import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
@@ -148,7 +148,7 @@ function toolSpecFor(id: string): ToolSpec | null {
   // answer_from_this_conversation is (tool.ts's own header) - it never
   // has a backend/packages/start_project manifest.json for
   // loadManifestOnly() to find below.
-  if (id === START_PROJECT_TOOL_ID) return START_PROJECT_TOOL;
+  if (id === START_PROJECT_TOOL_ID) return startProjectToolSpec();
   const loaded = loadManifestOnly(id);
   if (!loaded.ok) return null;
   return { id, description: loaded.value.description, args: loaded.value.args };

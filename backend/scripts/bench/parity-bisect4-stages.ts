@@ -23,7 +23,7 @@ import {
 import { identityLine, STABLE_SYSTEM_SUFFIX, STABLE_SYSTEM_SUFFIX_SENTENCES, buildStablePrefix } from "@/lib/turnEngine";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { loadManifestOnly } from "@/lib/plugins";
-import { START_PROJECT_TOOL_ID, START_PROJECT_TOOL } from "@/lib/projects/tool";
+import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
 
@@ -87,7 +87,7 @@ function productionTools(): ToolSpec[] {
     .slice()
     .sort()
     .map((id) => {
-      if (id === START_PROJECT_TOOL_ID) return START_PROJECT_TOOL;
+      if (id === START_PROJECT_TOOL_ID) return startProjectToolSpec();
       const loaded = loadManifestOnly(id);
       if (!loaded.ok) throw new Error(`productionTools(): manifest for "${id}" failed to load (${loaded.status} ${loaded.error}) - the tool block would be silently short of the ruling's "five-tool block present"`);
       return { id, description: loaded.value.description, args: loaded.value.args };

@@ -17,12 +17,16 @@ import Ajv2020 from "ajv/dist/2020.js";
 import ERROR_CATALOG from "@maipai/spec/errors/errors.json" with { type: "json" };
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { Recipe } from "@maipai/spec/gen/ts/recipe.js";
+import { Project } from "@maipai/spec/gen/ts/project.js";
 import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
+import { registerProjectType } from "@/lib/projects/projectTypes";
+import { buildProjectTypeFromManifest } from "@/lib/projects/fromManifest";
+import type { ProjectPlan } from "@/lib/projects/types";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -115,6 +119,8 @@ export function __resetPackageCachesForTests(): void {
   manifestCache.clear();
   packageCache.clear();
   manifestWarnedAtMtime.clear();
+  projectPlanCache.clear();
+  projectTypeWarnedAtMtime.clear();
 }
 
 // MANIFEST-REFUSAL-01: the bracketed-tag console.warn convention
@@ -251,6 +257,100 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
   return { ok: true, value };
 }
 
+export interface LoadedProjectPackage {
+  manifest: PackageManifest;
+  plan: ProjectPlan;
+}
+
+const projectPlanCache = new Map<string, { manifestMtimeMs: number; planMtimeMs: number; value: LoadedProjectPackage }>();
+const projectTypeWarnedAtMtime = new Map<string, number>();
+
+// PROJECT-PKGTYPE-01: the same bracketed-tag, warn-once-per-mtime
+// convention MANIFEST-REFUSAL-01 (above) uses, kept as its own small
+// map rather than sharing `manifestWarnedAtMtime` - that map is keyed
+// only by id, against the MANIFEST's own mtime, for a manifest
+// validation failure; a project package can fail to register for a
+// reason that's about `plan.json` specifically (this map's own key),
+// and conflating the two would let a real manifest-validation warning
+// suppress a later plan-shaped one for the same id, or vice versa.
+function warnProjectTypeOnce(id: string, mtimeMs: number, line: string): void {
+  if (projectTypeWarnedAtMtime.get(id) === mtimeMs) return;
+  projectTypeWarnedAtMtime.set(id, mtimeMs);
+  console.warn(line);
+}
+
+/** The `"project"`-kind mirror of `loadPackage()` above (PROJECT-
+ * PKGTYPE-01, manifest.schema.json's own `project` kind description): a
+ * project-type package has no `recipe.json` at all - its body is
+ * `plan.json`, a `ProjectPlan` validated against spec's own generated
+ * `Project` Zod object's `.shape.plan` (project.schema.json's `$defs`
+ * aren't exported as their own named consts, so this reads the one
+ * sub-schema that already stands on its own). Same mtime-cached,
+ * same read-both-then-validate, same truncated-file try/catch posture
+ * as `loadPackage()`; kept fully separate rather than branching inside
+ * it, the same reasoning `loadManifestOnly()`'s own header gives for
+ * staying its own function - a project package's `plan.json` failing to
+ * read must never change what `loadPackage()`'s existing callers see
+ * for an ordinary recipe package. */
+export function loadProjectPackage(id: string): PluginOpResult<LoadedProjectPackage> {
+  if (!isValidPackageId(id)) {
+    return { ok: false, status: 400, error: `${id} is not a valid package id` };
+  }
+  // Reuses loadManifestOnly()'s own cache rather than re-reading,
+  // re-parsing and re-validating manifest.json a second time - a review
+  // caught an earlier version doing exactly that duplicate work for
+  // every project-kind package, the identical "packageCache already
+  // holds this exact manifest" reuse loadManifestOnly() itself already
+  // does against loadPackage()'s cache, above.
+  const manifestResult = loadManifestOnly(id);
+  if (!manifestResult.ok) return manifestResult;
+  const manifest = manifestResult.value;
+  if (manifest.kind !== "project") {
+    // `code` distinguishes this from every other failure below: every
+    // non-project package (the overwhelming majority) hits this branch
+    // on every boot, and it's never worth a warning - only
+    // registerAllPackageProjectTypes() (below) reads this code, to
+    // skip silently instead of logging a spurious refusal for every
+    // ordinary plugin/skill/app package installed.
+    return { ok: false, status: 400, error: `package ${id} is kind "${manifest.kind}", not a project package - use loadPackage(), not loadProjectPackage(), for one`, code: "not_a_project_package" };
+  }
+
+  const packageDir = resolvePackageDir(id);
+  const planPath = join(packageDir, "plan.json");
+  // loadManifestOnly() (above) already stat()'d manifest.json to reach
+  // this point and recorded that exact mtime in manifestCache before
+  // returning - a re-review caught an earlier version stat()-ing it a
+  // second time here for no reason beyond building this cache's own
+  // key; reading it back out is free.
+  const manifestMtimeMs = manifestCache.get(id)!.mtimeMs;
+  const planMtimeMs = statMtimeMs(planPath);
+  if (planMtimeMs === null) {
+    projectPlanCache.delete(id);
+    return { ok: false, status: 404, error: `no bundled package ${id}` };
+  }
+  const cached = projectPlanCache.get(id);
+  if (cached && cached.manifestMtimeMs === manifestMtimeMs && cached.planMtimeMs === planMtimeMs) {
+    return { ok: true, value: cached.value };
+  }
+
+  let planJson: unknown;
+  try {
+    planJson = JSON.parse(readFileSync(planPath, "utf-8"));
+  } catch {
+    // Same posture as loadPackage()'s identical try/catch: a truncated
+    // or half-written file (an interrupted install) is reported as an
+    // unloadable package, never thrown straight out of a caller.
+    return { ok: false, status: 404, error: `no such package ${id}` };
+  }
+  const planParsed = Project.shape.plan.safeParse(planJson);
+  if (!planParsed.success) {
+    return { ok: false, status: 400, error: `package ${id}'s plan.json failed validation: ${planParsed.error.message}` };
+  }
+  const value: LoadedProjectPackage = { manifest, plan: planParsed.data as ProjectPlan };
+  projectPlanCache.set(id, { manifestMtimeMs, planMtimeMs, value });
+  return { ok: true, value };
+}
+
 /** Every loadable package's own manifest, in `listPackageIds()`'s
  * order - the exact `listPackageIds().map(loadPackage).filter(ok).map(
  * manifest)` pipeline `GET /api/plugins` (routes/plugins.ts) already
@@ -276,6 +376,70 @@ export function registerAllPackageNotificationTypes(): void {
   for (const id of listPackageIds()) {
     const loaded = loadManifestOnly(id);
     if (loaded.ok) registerPackageNotificationTypes(loaded.value);
+  }
+}
+
+/** Called once at boot (index.ts), beside `registerAllPackageNotificationTypes()`
+ * above: every installed `kind: "project"` package's manifest + `plan.json`
+ * becomes a real, registered `ProjectType` (`projects/projectTypes.ts`) -
+ * PROJECT-PKGTYPE-01, closing the gap PROJECT-START-01 left ("nothing
+ * loads a real package's manifest into either registry"). A package
+ * that isn't `kind: "project"` is skipped without a warning (the
+ * ordinary case, every other package kind); one that IS but fails to
+ * load, or whose plan/args combination fails `buildProjectTypeFromManifest()`'s
+ * own refusal checks (an unbound `{arg}` placeholder, an arg name that
+ * collides with a step id), is warned about once per `plan.json` mtime
+ * and skipped - the same "one bad package can't take down boot" posture
+ * `registerAllPackageNotificationTypes()` already has, mirrored for a
+ * project-shaped reason (a bad plan.json is a package bug, never a
+ * household-visible crash). */
+export function registerAllPackageProjectTypes(): void {
+  for (const id of listPackageIds()) {
+    // Checked here, not just inside loadProjectPackage(): a re-review
+    // caught the earlier version relying on `code === "not_a_project_
+    // package"` alone to decide what's silent - but that code is only
+    // ever set for a manifest that loaded fine and simply isn't
+    // kind:"project". Every OTHER manifest-load failure (unreadable,
+    // fails Zod validation) forwards loadManifestOnly()'s own result
+    // verbatim with no such code, and loadManifestOnly() has already
+    // warned about that failure itself (registerAllPackageNotification
+    // Types() calls it for the identical id, earlier in the same boot) -
+    // a second, misleading "project plan failed to load" warning here
+    // would be about a manifest that was never a project package's
+    // problem to begin with. Filtering by kind up front, before ever
+    // calling loadProjectPackage(), means any failure THAT returns is
+    // real: the manifest was confirmed kind:"project" already, so it's
+    // plan.json specifically that failed.
+    const manifestResult = loadManifestOnly(id);
+    if (!manifestResult.ok || manifestResult.value.kind !== "project") continue;
+    const loaded = loadProjectPackage(id);
+    const planMtimeMs = statMtimeMs(join(resolvePackageDir(id), "plan.json")) ?? -1;
+    if (!loaded.ok) {
+      warnProjectTypeOnce(id, planMtimeMs, `[packages] ${id}: project plan failed to load: ${loaded.error}`);
+      continue;
+    }
+    let built: ReturnType<typeof buildProjectTypeFromManifest>;
+    try {
+      // A review's own finding: PackageManifest.safeParse only checks
+      // `args` loosely (it's declared `z.any()` - an arbitrary JSON
+      // Schema, not spec's own dialect), so a schema-invalid `args`
+      // field passes manifest validation and only fails once
+      // buildProjectTypeFromManifest()'s own `ajv.compile()` actually
+      // tries to compile it - synchronously, and uncaught would crash
+      // this whole loop, and with it every household's boot, over one
+      // bad package. This function's own doc comment already promises
+      // "one bad package can't take down boot"; this is what keeps
+      // that promise true for a throw, not just an `ok: false`.
+      built = buildProjectTypeFromManifest(loaded.value.manifest, loaded.value.plan);
+    } catch (err) {
+      warnProjectTypeOnce(id, planMtimeMs, `[packages] ${id}: project type threw while building: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+    if (!built.ok) {
+      warnProjectTypeOnce(id, planMtimeMs, `[packages] ${id}: project type refused: ${built.error}`);
+      continue;
+    }
+    registerProjectType(built.value);
   }
 }
 
