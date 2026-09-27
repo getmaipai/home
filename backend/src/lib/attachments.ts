@@ -31,6 +31,25 @@ export interface CreateAttachmentInput {
   provenance?: string;
 }
 
+/** Check whether bytes would fit before an expensive consumer (such as
+ * Tika) runs. Mirrors createAttachment's household-wide digest dedupe:
+ * existing bytes need no new storage and therefore no quota. The write
+ * path still repeats this check to cover changes during extraction. */
+export function checkAttachmentCapacity(actor: PersonRow, mediaTypeInput: string, bytesInput: Uint8Array): AttachmentOpResult<null> {
+  const mediaType = mediaTypeInput.trim().toLowerCase();
+  if (!FileRecordSchema.shape.media_type.safeParse(mediaType).success) {
+    return { ok: false, status: 400, error: "invalid attachment media type" };
+  }
+  const sha256 = createHash("sha256").update(bytesInput).digest("hex");
+  if (db.select({ id: attachments.id }).from(attachments).where(eq(attachments.sha256, sha256)).get()) {
+    return { ok: true, value: null };
+  }
+  const capCheck = checkStorageCap(actor.role, actor.id, bytesInput.byteLength);
+  return capCheck.ok
+    ? { ok: true, value: null }
+    : { ok: false, status: 403, error: capCheck.error! };
+}
+
 /** Resolve only a normalized, relative attachment path below dataDir. */
 export function attachmentFilePath(storagePath: string): string {
   const parsed = FileRecordSchema.shape.storage_path.safeParse(storagePath);

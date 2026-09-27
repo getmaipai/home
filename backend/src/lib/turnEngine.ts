@@ -49,7 +49,7 @@ import { promptNow } from "@/lib/benchSampling";
 import { StatusChannel } from "@/lib/statusChannel";
 import { computeDateAnswer, parseDateQuestion } from "@/lib/almanacCompute";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
-import { createAttachment } from "@/lib/attachments";
+import { checkAttachmentCapacity, createAttachment } from "@/lib/attachments";
 import { extractDocument } from "@/lib/documentExtraction";
 import {
   logTurn,
@@ -2337,6 +2337,8 @@ async function prepareTurn(
       const match = /^data:([^;,]+);base64,([A-Za-z0-9+/]*={0,2})$/.exec(item.data);
       if (!match || match[1]!.toLowerCase() !== item.mediaType.toLowerCase()) throw new DocumentAttachmentError("Document attachment is invalid");
       const bytes = new Uint8Array(Buffer.from(match[2]!, "base64"));
+      const capacity = checkAttachmentCapacity(actor, item.mediaType, bytes);
+      if (!capacity.ok) throw new DocumentAttachmentError(capacity.error);
       const result = await extractDocument(bytes, item.mediaType);
       if (!result.ok) throw new DocumentAttachmentError(result.error);
       const body = result.value.pages.map((page) => page.text).join("\n\n").trim();

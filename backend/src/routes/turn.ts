@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
+import type { MiddlewareHandler } from "hono";
 import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnEngine";
@@ -108,13 +109,88 @@ const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "tu
 // caller those two routes' comments named as "ahead of the turn engine";
 // they stay useful in their own right (diagnostics, direct model/safety
 // checks) now that this one exists.
-// bodyLimit (SEC-5, 2026-09-06) rejects an oversized request as its bytes
-// arrive, before JSON.parse or runTurn()'s own MAX_TURN_TEXT_LENGTH check
-// ever run - a margin over that cap for the surrounding JSON and other
-// fields, the same "reject at the edge, then validate the content"
-// pairing lib/turnEngine.ts's own length check backs up.
+// Keep ordinary requests under 64 KiB. Document requests need room for
+// base64, so streamTurnBodyLimit() admits the larger ceiling only after
+// its early scan confirms a bounded text field followed by an attachment.
 const TURN_BODY_LIMIT = 64 * 1024;
 const STREAM_TURN_BODY_LIMIT = 68 * 1024 * 1024;
+const MAX_STREAM_TEXT_CHARS = 8_000;
+const EARLY_TEXT_SCAN_BYTES = 64 * 1024;
+const streamTurnBodyLimit: MiddlewareHandler = async (c, next) => {
+  const request = c.req.raw as Request;
+  const lengthHeader = request.headers.get("content-length");
+  const length = lengthHeader === null ? Number.POSITIVE_INFINITY : Number(lengthHeader);
+  if (length <= TURN_BODY_LIMIT) return bodyLimit({ maxSize: TURN_BODY_LIMIT })(c, next);
+  const reader = request.body?.getReader();
+  if (!reader) return c.json({ error: "Payload Too Large", code: "payload_too_large" }, 413);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  let scan = new Uint8Array(0);
+  const textKey = new TextEncoder().encode('"text"');
+  let textStart = -1;
+  let textEnd = -1;
+  let textScanned = false;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > STREAM_TURN_BODY_LIMIT) {
+        await reader.cancel();
+        return c.json({ error: "Payload Too Large", code: "payload_too_large" }, 413);
+      }
+      chunks.push(value);
+      if (scan.length < EARLY_TEXT_SCAN_BYTES && !textScanned) {
+        const merged = new Uint8Array(Math.min(EARLY_TEXT_SCAN_BYTES, scan.length + value.length));
+        merged.set(scan);
+        merged.set(value.subarray(0, merged.length - scan.length), scan.length);
+        scan = merged;
+        outer: for (let i = 0; textStart < 0 && i <= scan.length - textKey.length; i++) {
+          let matched = true;
+          for (let j = 0; j < textKey.length; j++) if (scan[i + j] !== textKey[j]) { matched = false; break; }
+          if (!matched) continue;
+          let cursor = i + textKey.length;
+          while (cursor < scan.length && [32, 9, 10, 13].includes(scan[cursor]!)) cursor++;
+          if (scan[cursor++] !== 58) continue;
+          while (cursor < scan.length && [32, 9, 10, 13].includes(scan[cursor]!)) cursor++;
+          if (scan[cursor] === 34) { textStart = cursor + 1; break outer; }
+        }
+      }
+      if (textStart >= 0 && !textScanned) {
+        let escaped = false;
+        let chars = 0;
+        let closed = false;
+        for (let i = textStart; i < scan.length; i++) {
+          const byte = scan[i]!;
+          if (escaped) { escaped = false; chars++; continue; }
+          if (byte === 92) { escaped = true; continue; }
+          if (byte === 34) { closed = true; textEnd = i; break; }
+          chars++;
+        }
+        if (chars > MAX_STREAM_TEXT_CHARS) {
+          await reader.cancel();
+          return c.json({ error: "text must be 8000 characters or fewer", code: "invalid_input" }, 400);
+        }
+        if (closed) textScanned = true;
+      }
+      if (size > TURN_BODY_LIMIT && scan.length >= EARLY_TEXT_SCAN_BYTES) {
+        const prefix = new TextDecoder().decode(scan);
+        const markerIndex = prefix.search(/"document_attachments"\s*:\s*\[\s*\{/);
+        if (markerIndex < 0 || textEnd < 0 || markerIndex <= textEnd) {
+          await reader.cancel();
+          return c.json({ error: "Payload Too Large", code: "payload_too_large" }, 413);
+        }
+      }
+    }
+  } catch {
+    return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  c.req.raw = new Request(request, { body: bytes, duplex: "half" });
+  return next();
+};
 const evidence = z.object({ person: z.string().regex(/^person-[a-z0-9]{6,}$/).nullable(), basis: z.enum(["signed_in", "voice", "face", "voice_and_face", "claimed", "unknown"]), level: z.enum(["confirmed", "tentative", "unknown"]) }).strict();
 const present = z.array(evidence).nullable();
 // APPROVE-CARD-01: a tapped approve/deny card on a parked confirm.
@@ -568,7 +644,7 @@ export async function* streamTurnEvents(
 // body, no `text/event-stream` framing to parse on the way back out for a
 // wire shape this simple - see wire.ts's TurnStreamEvent for the three
 // event kinds. Same auth posture as POST /api/turn above.
-turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: STREAM_TURN_BODY_LIMIT }), async (c) => {
+turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   const actor = c.get("person");
   const body = (await c.req.json().catch(() => ({}))) as {
     surface?: string;
@@ -603,6 +679,13 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: STREAM_TURN_BODY_LI
     !item || typeof item.name !== "string" || item.name.length > 255 || typeof item.media_type !== "string" || typeof item.data !== "string" ||
     !/^data:[^;,]+;base64,[A-Za-z0-9+/]*={0,2}$/.test(item.data) || item.data.length > 70_000_000
   )) return c.json({ error: "Invalid document attachment" }, 400);
+  const useNextPath = newPathOn();
+  if (documentAttachments.length > 0 && body.bare === true) {
+    return c.json({ error: "Document attachments are not available in bare mode", code: "document_attachments_unavailable" }, 400);
+  }
+  if (documentAttachments.length > 0 && useNextPath) {
+    return c.json({ error: "Document attachments are not available on the next turn pipeline", code: "document_attachments_unavailable" }, 400);
+  }
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
@@ -670,7 +753,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: STREAM_TURN_BODY_LI
     // defeating the comparison with no error at all.
     result = body.bare === true
       ? await runBareTurnStream(actor, body.text ?? "", body.conversation_id, abortController.signal)
-      : newPathOn()
+      : useNextPath
         // STREAM-NEXT-01: runTurnNextStream(), not runTurnNext() - this
         // route needs the "stream" kind TurnStreamResult (a live status/
         // tokens pair the machine hasn't finished yet), never the

@@ -113,6 +113,51 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
     expect(db.select().from(conversationTurns).all()).toHaveLength(0);
   });
 
+  test("documents receive an explicit refusal on the next pipeline path", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", true);
+    const { client } = await owner();
+    const response = await client.post("/api/turn/stream", {
+      surface: "chat", text: "Summarize this",
+      document_attachments: [{ name: "notes.pdf", media_type: "application/pdf", data: "data:application/pdf;base64,eA==" }],
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Document attachments are not available on the next turn pipeline", code: "document_attachments_unavailable" });
+    expect(db.select().from(attachments).all()).toHaveLength(0);
+  });
+
+  test("documents receive an explicit refusal on the bare path", async () => {
+    const { client } = await owner();
+    const response = await client.post("/api/turn/stream", {
+      surface: "chat", text: "Summarize this", bare: true,
+      document_attachments: [{ name: "notes.pdf", media_type: "application/pdf", data: "data:application/pdf;base64,eA==" }],
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Document attachments are not available in bare mode", code: "document_attachments_unavailable" });
+  });
+
+  test("an oversized text-only request is rejected while its body is still streaming", async () => {
+    const { client } = await owner();
+    const response = await client.post("/api/turn/stream", { surface: "chat", text: "x".repeat(100_000) });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "text must be 8000 characters or fewer", code: "invalid_input" });
+  });
+
+  test("storage quota is checked before document extraction starts", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", false);
+    const { client } = await owner();
+    setHouseholdSettingValue("storage.person.default_cap_bytes", 1);
+    let parserCalls = 0;
+    __setTikaRunnerForTests(() => { parserCalls++; return "unreachable"; });
+    const response = await client.post("/api/turn/stream", {
+      surface: "chat", text: "Summarize this",
+      document_attachments: [{ name: "notes.pdf", media_type: "application/pdf", data: "data:application/pdf;base64,eHg=" }],
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Your storage is full; delete some pictures or ask a parent for more room, or raise the limit under Settings", code: "invalid_document" });
+    expect(parserCalls).toBe(0);
+    expect(db.select().from(attachments).all()).toHaveLength(0);
+  });
+
   test("with turn.pipeline.next off, a turn runs the frozen path - no stats.nodes trace at all", async () => {
     setHouseholdSettingValue("turn.pipeline.next", false);
     const { client } = await owner();
