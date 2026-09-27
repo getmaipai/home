@@ -45,7 +45,14 @@ export interface ProjectTypeParamsSchema {
 export interface ProjectType {
   id: string;
   /** Person-readable, becomes the project's own `title` (shown in the
-   * thread, per project.schema.json's own description of that field). */
+   * thread, per project.schema.json's own description of that field).
+   * No one fixed grammatical shape: a package's own manifest.json can
+   * read like a proper noun ("Bedtime storybook") or, same as the
+   * placeholder fixture backend/tests/projects/startProject.test.ts
+   * registers, a lowercase noun phrase carrying its own article ("a
+   * bedtime story") - `sentenceInitial()` below is for the one place
+   * that distinction actually bites: splicing `title` in as a
+   * sentence's own FIRST word. */
   title: string;
   /** What the model reads to decide whether this type fits the request -
    * folded into start_project's own tool description at offer time. */
@@ -67,6 +74,23 @@ export interface ProjectType {
    * cut the project off at (a review's own finding: an earlier draft
    * carried both, and nothing ever read the separate one). */
   buildPlan: (params: Record<string, unknown>) => ProjectPlan;
+}
+
+// A code review caught this (2026-09-27): policy.ts's own confirm
+// prompt and post.ts's own finishedReplyText() both splice a
+// ProjectType's `title` in as a sentence's first word - fine for the
+// proper-noun-style titles, but the noun-phrase-style ones (this
+// module's own doc comment above) produced a reply that opened
+// lowercase. Not `sentenceCaseOpener()` (turnEngine.ts): that one is
+// deliberately scoped to a MODEL reply's own opener, never "a
+// package's own reply... left as authored" per its own comment - a
+// project's title isn't authored prose at all, it's a data field, so
+// the right fix is at the splice point. Lives here, not in tool.ts or
+// post.ts, to avoid a real import cycle: tool.ts's own `startProject()`
+// comes from runner.ts, which calls post.ts's `postProjectResult()`
+// directly - this module imports neither.
+export function sentenceInitial(title: string): string {
+  return title.length > 0 ? title.charAt(0).toUpperCase() + title.slice(1) : title;
 }
 
 const registry = new Map<string, ProjectType>();

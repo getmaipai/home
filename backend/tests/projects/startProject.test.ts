@@ -163,7 +163,11 @@ describe("runStartProjectTool(): the tool's own execution", () => {
     });
     expect(outcome.status).toBe("succeeded");
     expect(outcome.result?.reply?.text).toContain("bedtime story");
-    expect(outcome.result?.reply?.text).toMatch(/\d+ steps?, about \d+/);
+    // Jesse found live (2026-09-27): the old "N steps, about Y minutes"
+    // phrasing read like a log line - the step count is gone from the
+    // sentence (still in `data.stepCount` below for anything that wants
+    // it), the real, ceiling-backed duration stays.
+    expect(outcome.result?.reply?.text).toMatch(/^Creating a bedtime story - about \d+/);
     const projectId = (outcome.result?.data as { projectId: string }).projectId;
     expect(projectId).toBeTruthy();
     const finished = await waitForSettled(projectId);
@@ -391,9 +395,11 @@ describe("postProjectResult(): completion posts to the thread and notifies", () 
     // still showed its "Starting a bedtime story now - N steps, about Y
     // minutes." reply, unchanged from the moment it launched. The turn's
     // own stored reply text now updates to reflect what actually
-    // happened, the same wording NextChatPage.tsx's own canvas caption
-    // uses for a written document.
-    expect(replyTextFor(turnId)).toBe('Wrote "a bedtime story."');
+    // happened. (Revised again the same live session: the first pass's
+    // `Wrote "a bedtime story."` still read like a log line - see
+    // finishedReplyText()'s own comment in post.ts for why no
+    // possessive/"your" wording is used here.)
+    expect(replyTextFor(turnId)).toBe("A bedtime story is ready.");
 
     completeSpy.mockRestore();
     triggerSpy.mockRestore();
@@ -417,7 +423,7 @@ describe("postProjectResult(): completion posts to the thread and notifies", () 
     expect(triggerSpy).toHaveBeenCalledWith("project.failed", expect.objectContaining({ title: "a bedtime story" }), expect.anything());
     // Matches ProjectToolRender's own live `failed` render exactly
     // (NextChatPage.tsx) - the live and the reloaded text never disagree.
-    expect(replyTextFor(turnId)).toBe(`a bedtime story didn't finish: the "story" step's model call failed: the chat engine is not responding`);
+    expect(replyTextFor(turnId)).toBe(`A bedtime story didn't finish: the "story" step's model call failed: the chat engine is not responding`);
 
     completeSpy.mockRestore();
     triggerSpy.mockRestore();

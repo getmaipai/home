@@ -27,6 +27,7 @@ import { artifacts, conversationTurns } from "@/db/schema";
 import { createArtifact } from "@/lib/artifacts";
 import { nextHlc } from "@/lib/hlc";
 import { trigger } from "@/lib/notifications";
+import { sentenceInitial } from "./projectTypes";
 import { loadProject } from "./store";
 import { planSteps } from "./types";
 import type { Project } from "./types";
@@ -118,22 +119,33 @@ function failureBody(project: Project): string {
 }
 
 // Jesse found live (2026-09-27): the turn's own reply text is
-// runStartProjectTool()'s `Starting ${title} now - N steps, about Y
-// minutes.` (tool.ts), written once when the project launches and never
-// touched again - so a reload of a LONG-finished project still reads
-// "Starting... about 8 minutes," the opposite of what actually happened.
-// Nothing else in the system ever rewrites `replyText` once a turn is
-// logged (memoryJudge.ts's own writes are to judgeStatus/judgeAttempts,
-// never this field), so this is the one place a project's own
-// completion can correct it. `Wrote "${title}."` matches the wording
-// NextChatPage.tsx's own `CanvasSplitMessage` already uses for a
-// write_document artifact's canvas caption (one phrase, not a second
-// one invented here); the failure phrasing matches ProjectToolRender's
-// own live `failed` render exactly, so the live and the reloaded text
-// never disagree with each other either.
+// runStartProjectTool()'s starting-turn phrasing (tool.ts), written once
+// when the project launches and never touched again - so a reload of a
+// LONG-finished project still read the starting phrasing, the opposite
+// of what actually happened. Nothing else in the system ever rewrites
+// `replyText` once a turn is logged (memoryJudge.ts's own writes are to
+// judgeStatus/judgeAttempts, never this field), so this is the one place
+// a project's own completion can correct it.
+//
+// `${title} is ready.` (revised again 2026-09-27, same live session:
+// Jesse's own first pass here, `Wrote "${title}."`, still read as a
+// log line, not something a person said) - no possessive ("your
+// ${title}") anywhere in this file's own phrasing on purpose: a
+// project's `title` is declared per type (projectTypes.ts) with no one
+// fixed grammatical shape - the real `bedtime-storybook` package's is a
+// proper-noun-style "Bedtime storybook," a test fixture's own is a
+// noun-phrase-style "a bedtime story" that already carries its own
+// article - and "your a bedtime story" is broken where "a bedtime
+// story is ready" reads fine plugged into the exact same template. The
+// failure phrasing matches ProjectToolRender's own live `failed` render
+// exactly, so the live and the reloaded text never disagree with each
+// other either. `sentenceInitial()` (projectTypes.ts) on both branches: a code
+// review caught this splicing `title` in as the sentence's own first
+// word with no capitalization, so the noun-phrase-style fixture above
+// ("a bedtime story") produced a reply opening lowercase.
 function finishedReplyText(project: Project): string {
-  if (project.state === "done") return `Wrote "${project.title}."`;
-  return `${project.title} didn't finish${project.error ? `: ${project.error}` : "."}`;
+  if (project.state === "done") return `${sentenceInitial(project.title)} is ready.`;
+  return `${sentenceInitial(project.title)} didn't finish${project.error ? `: ${project.error}` : "."}`;
 }
 
 // The same "fire-and-forget, but never an unhandled rejection" shape

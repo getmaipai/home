@@ -12,6 +12,7 @@ import { loadManifestOnly, meetsMinRole } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { tokenize, isBarePronoun } from "@/lib/text";
 import { START_PROJECT_TOOL_ID, projectTypeForArgs } from "@/lib/projects/tool";
+import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { ANSWER_FROM_CONTEXT_TOOL_ID } from "./model";
 
@@ -267,7 +268,19 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const isPreConfirmed = input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
       if (!isPreConfirmed && projectType.consequential) {
         noteRefusal("confirm_needed");
-        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `Start ${projectType.title}?` } } });
+        // Jesse found live (2026-09-27): "Start Bedtime storybook?" reads
+        // as a bare yes/no with no reason given - `consequential` is
+        // exactly "spends real compute for minutes" (this file's own
+        // ProjectType doc comment), so the ask should say that plainly,
+        // the actual reason a project asks at all (an instant project
+        // type would never reach this branch). No precise number here on
+        // purpose: `buildPlan()`'s own contract (projectTypes.ts) is
+        // "called only after paramsSchema has already validated
+        // [params] - free to assume they're well-shaped," and nothing
+        // has validated this call's params yet at classification time -
+        // tool.ts's own real, ceiling-backed `durationLabel()` names the
+        // honest number instead, once the project actually starts.
+        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `${sentenceInitial(projectType.title)} can take a few minutes to put together. Want me to create it?` } } });
         continue;
       }
       entries.push({ proposal, decision: { allow: true } });

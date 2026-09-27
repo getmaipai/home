@@ -723,7 +723,7 @@ describe("turnNext.ts: PROJECT-REPLY-01, a resumed start_project confirmation su
     expect(resumed.value.reply.text).not.toBe("Yes.");
     expect(resumed.value.reply.text).not.toContain("PHRASING_SHOULD_NOT_RUN_HERE");
     expect(resumed.value.reply.text).toContain("a test confirm project");
-    expect(resumed.value.reply.text).toMatch(/^Starting a test confirm project now/);
+    expect(resumed.value.reply.text).toMatch(/^Creating a test confirm project/);
   });
 });
 
@@ -858,7 +858,7 @@ describe("turnNext.ts: PROJECT-PHRASE-01, a successful start_project outcome ski
     expect(resumed.value.reply.text).not.toContain("PHRASING_SHOULD_NOT_RUN_HERE");
     expect(resumed.value.reply.text).not.toBe("Yes.");
     expect(resumed.value.reply.text).toContain("a test confirm project");
-    expect(resumed.value.reply.text).toMatch(/^Starting a test confirm project now/);
+    expect(resumed.value.reply.text).toMatch(/^Creating a test confirm project/);
   });
 });
 

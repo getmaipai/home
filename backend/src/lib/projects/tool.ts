@@ -210,7 +210,13 @@ export function runStartProjectTool(input: RunStartProjectInput): ToolExecutionO
     });
   }
   const stepCount = plan.steps.length;
-  const text = `Starting ${project.title} now - ${stepCount} step${stepCount === 1 ? "" : "s"}, ${durationLabel(plan.ceilings.maxWallSeconds)}.`;
+  // Jesse found live (2026-09-27): "Starting Bedtime storybook now - 5
+  // steps, about 8 minutes" reads like a log line, not something a
+  // person said - `stepCount` is dropped from the sentence entirely
+  // (still returned below in `data` for anything that wants it), and
+  // the real, ceiling-backed duration moves in beside a plain verb
+  // instead of trailing after a dash-separated list of facts.
+  const text = `Creating ${project.title} - ${durationLabel(plan.ceilings.maxWallSeconds)}.`;
   return outcomeOf({
     callId: input.callId,
     packageId: START_PROJECT_TOOL_ID,
