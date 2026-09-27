@@ -75,6 +75,15 @@ reader age: 5"). The coloring book, a bedtime story with pictures, a
 birthday card, a family newsletter: each is a package with a recipe, and
 installing the package is what makes the project type exist.
 
+The word "recipe" above is the product word, not the wire shape: on disk
+this is a `ProjectPlan` (`commons/spec/schemas/project.schema.json`), shipped
+by the package as `plan.json` - a different, newer shape than the
+pre-existing `recipe.schema.json`/`recipe.json` every ordinary tool package
+already ships (a "Tier 0 declarative package body" of `fetch`/`pick`/
+`lookup`/... steps, unrelated to this harness). PROJECT-PKGTYPE-01 is what
+actually wires a package's `plan.json` into the runner; nothing below this
+line is buildable before it lands.
+
 A model whose budget record grants `plan_authoring` may instead propose a
 custom recipe built from the same step vocabulary, for requests no installed
 recipe covers. The proposal is still data, validated by the same schema,
