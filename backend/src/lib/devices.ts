@@ -10,6 +10,7 @@ import { devices, deviceTokens } from "@/db/schema";
 import { newDeviceId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
+import { deleteRobotCredential } from "@/lib/robotCredentials";
 
 export type DeviceKind = "robot" | "pod" | "tv" | "phone" | "desktop" | "browser";
 
@@ -79,6 +80,25 @@ export function listDevicesForPerson(personId: string): Device[] {
   return db.select().from(devices).where(eq(devices.personId, personId)).all().map(toDevice);
 }
 
+/** Any device by id, household-wide - unlike listDevicesForPerson, not scoped
+ * to a person: an admin route (ROBOT-DEVICE-01's password rotation, or a
+ * future household-wide Devices page) looks a device up this way. */
+export function getDeviceById(id: string): Device | null {
+  const row = db.select().from(devices).where(eq(devices.id, id)).get();
+  return row ? toDevice(row) : null;
+}
+
+/** Every device of one kind, household-wide - unlike listDevicesForPerson,
+ * not scoped to whoever paired it. ROBOT-DEVICE-01's password-rotation UI
+ * needs this: Quick Connect mints a robot's device under whichever admin
+ * approved the pairing, so a different admin still needs to see it to
+ * rotate its password. Robots are a household concern the way a personal
+ * phone or TV isn't, so this stays kind-scoped rather than a general
+ * household-wide device list. */
+export function listDevicesByKind(kind: DeviceKind): Device[] {
+  return db.select().from(devices).where(eq(devices.kind, kind)).all().map(toDevice);
+}
+
 /** Deletes the Device row and every token pointing at it - revoking a
  * device revokes its access, full stop, not just its current token. */
 export function deleteDevice(id: string, personId: string): boolean {
@@ -91,6 +111,10 @@ export function deleteDevice(id: string, personId: string): boolean {
   // backup (POST /api/backups/received) was revoked, since nothing
   // cleared this table first.
   deleteReceivedBackupsForDevice(id);
+  // robot_credentials.device_id has the same no-cascade FK shape - a robot
+  // that had its SSH password rotated (ROBOT-DEVICE-01) hits the same
+  // violation on revoke unless this table is cleared first too.
+  deleteRobotCredential(id);
   db.delete(devices).where(eq(devices.id, id)).run();
   return true;
 }

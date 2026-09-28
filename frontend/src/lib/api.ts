@@ -179,6 +179,18 @@ export interface DeviceInfo {
   lastSeenAt: string | null;
   createdAt: string;
 }
+// ROBOT-DEVICE-01: hand-typed to match backend/src/routes/devices.ts's
+// DiscoveredRobotSchema, same reasoning as DeviceInfo above (inline
+// zod, no @/wire export yet).
+export interface DiscoveredRobotInfo {
+  name: string;
+  host: string;
+  port: number;
+  addresses: string[];
+  model: string | null;
+  daemonVersion: string | null;
+  unitId: string | null;
+}
 export interface SessionInfo {
   id: string;
   userAgent: string | null;
@@ -479,6 +491,30 @@ export const api = {
   devices: () => request<DeviceInfo[]>("/api/devices"),
   revokeDevice: (id: string) =>
     request<{ success: true }>(`/api/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  // ROBOT-DEVICE-01: "Add a robot" - discover a unit on the LAN, then
+  // approve the code it spoke through Quick Connect's own existing
+  // approve route (it already mints a "robot" device token generically;
+  // no new pairing route was needed).
+  discoverRobots: () => request<DiscoveredRobotInfo[]>("/api/devices/discover-robots"),
+  // Household-wide, unlike devices() above: Quick Connect mints a robot's
+  // device under whichever admin approved the pairing, so a different
+  // admin still needs to find it here to rotate its password.
+  robotDevices: () => request<DeviceInfo[]>("/api/devices/robots"),
+  approveRobotCode: (code: string, totpToken?: string) =>
+    request<{ success: true }>("/api/auth/quick-connect/approve", {
+      method: "POST",
+      body: JSON.stringify({ code, totpToken }),
+    }),
+  // ROBOT-DEVICE-01: a separate step from pairing - rotates a paired
+  // robot's SSH password off the vendor's published default, which this
+  // hub never stores or guesses, only the admin typing it here does.
+  rotateRobotPassword: (deviceId: string, host: string, currentPassword: string) =>
+    request<{ success: true; rotatedAt: string }>(`/api/devices/${encodeURIComponent(deviceId)}/rotate-robot-password`, {
+      method: "POST",
+      body: JSON.stringify({ host, currentPassword }),
+    }),
+  robotPasswordStatus: (deviceId: string) =>
+    request<{ rotated: boolean }>(`/api/devices/${encodeURIComponent(deviceId)}/robot-password-status`),
   sessions: () => request<SessionInfo[]>("/api/auth/sessions"),
   revokeSession: (id: string) =>
     request<{ success: true }>(`/api/auth/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),

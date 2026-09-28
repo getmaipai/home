@@ -155,7 +155,7 @@ function OldShellRoutes({
             <Route path="backups" element={<BackupsPage person={person} />} />
             <Route path="voices" element={<VoicesPage person={person} />} />
             <Route path="commands" element={<CommandsPage person={person} />} />
-            <Route path="devices" element={<DevicesPage />} />
+            <Route path="devices" element={<DevicesPage person={person} />} />
             <Route path="repairs" element={<RepairsPage person={person} />} />
             <Route path="updates" element={<UpdatesPage person={person} />} />
             {/* No AdminGatedContent wrapper, unlike Repairs
@@ -258,7 +258,10 @@ const UsersPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/UsersP
   () => import("@/apps/settings/UsersPage"),
   "UsersPage",
 );
-const DevicesPage = lazyNamed(() => import("@/apps/settings/DevicesPage"), "DevicesPage");
+const DevicesPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/DevicesPage")["DevicesPage"]>>(
+  () => import("@/apps/settings/DevicesPage"),
+  "DevicesPage",
+);
 const PeoplePage = lazyNamed<ComponentProps<typeof import("@/apps/people/PeoplePage")["PeoplePage"]>>(
   () => import("@/apps/people/PeoplePage"),
   "PeoplePage",

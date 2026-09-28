@@ -39,6 +39,7 @@ import {
   hubIdentity,
   hubEndpoints,
   deviceTokens,
+  robotCredentials,
   devices,
   passkeyCredentials,
   totpSecrets,
@@ -109,6 +110,7 @@ export function resetDb(): void {
   db.delete(nasMounts).run();
   db.delete(appUpdateState).run();
   db.delete(deviceTokens).run();
+  db.delete(robotCredentials).run();
   db.delete(devices).run();
   db.delete(passkeyCredentials).run();
   db.delete(totpSecrets).run();

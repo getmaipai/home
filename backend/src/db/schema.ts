@@ -1000,6 +1000,23 @@ export const deviceTokens = sqliteTable("device_tokens", {
   createdAt: text("created_at").notNull(),
 });
 
+// ROBOT-DEVICE-01 (bot/docs/dev/design-reachy-mini-2026-09-27.md section
+// 10): the rotated SSH credential for a paired robot, one row per
+// device. `passwordEncrypted` is AES-256-GCM via lib/secrets.ts
+// (CLAUDE.md > Credentials and secrets: "any reversible secret the app
+// stores... is encrypted with the keystore"), the same treatment
+// totpSecrets.secretEncrypted already gets. The vendor's own published
+// default is never stored anywhere - only the password this hub itself
+// generated and rotated to.
+export const robotCredentials = sqliteTable("robot_credentials", {
+  deviceId: text("device_id")
+    .primaryKey()
+    .references(() => devices.id),
+  sshUsername: text("ssh_username").notNull(),
+  passwordEncrypted: text("password_encrypted").notNull(),
+  rotatedAt: text("rotated_at").notNull(),
+});
+
 // WebAuthn credentials (lib/passkeys.ts, @simplewebauthn/server). A
 // person can register several (a phone's platform authenticator, a
 // security key), so this is one row per credential, not per person -

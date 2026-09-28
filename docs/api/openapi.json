@@ -11969,6 +11969,67 @@
         }
       }
     },
+    "/api/devices/robots": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Every paired robot, household-wide",
+        "responses": {
+          "200": {
+            "description": "Every device of kind \"robot\", regardless of who paired it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "robot",
+                          "pod",
+                          "tv",
+                          "phone",
+                          "desktop",
+                          "browser"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "area": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "lastSeenAt": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "name",
+                      "area",
+                      "lastSeenAt",
+                      "createdAt"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{id}": {
       "delete": {
         "tags": [
@@ -12010,6 +12071,228 @@
           },
           "404": {
             "description": "No such device (or it isn't mine)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/discover-robots": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Browse the LAN for a Reachy Mini robot to pair",
+        "responses": {
+          "200": {
+            "description": "Every robot that answered within the browse window. Empty if none did.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "host": {
+                        "type": "string"
+                      },
+                      "port": {
+                        "type": "number"
+                      },
+                      "addresses": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "model": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "daemonVersion": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "unitId": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "host",
+                      "port",
+                      "addresses",
+                      "model",
+                      "daemonVersion",
+                      "unitId"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{id}/rotate-robot-password": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Rotate a paired robot's SSH password off the vendor's published default",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "host": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The robot's LAN address or mDNS host."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "default": 22
+                  },
+                  "sshUsername": {
+                    "type": "string",
+                    "minLength": 1,
+                    "default": "pollen"
+                  },
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The vendor's own published default - never stored."
+                  }
+                },
+                "required": [
+                  "host",
+                  "currentPassword"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rotated - the new password is stored encrypted, never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "rotatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "rotatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a robot, or the robot refused the connection or the password change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{id}/robot-password-status": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Whether a paired robot's SSH password has been rotated off the vendor default",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "true once rotate-robot-password has succeeded for this device.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rotated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "rotated"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a robot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such device",
             "content": {
               "application/json": {
                 "schema": {
