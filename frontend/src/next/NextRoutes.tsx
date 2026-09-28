@@ -28,6 +28,7 @@ import { NextDevicesPage } from "@/next/pages/NextDevicesPage";
 import { NextPrivacyPage } from "@/next/pages/NextPrivacyPage";
 import { NextUsersPage } from "@/next/pages/NextUsersPage";
 import { NextModelsPage } from "@/next/pages/NextModelsPage";
+import { NextPersonProfilePage } from "@/next/pages/NextPersonProfilePage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { api, type Roster } from "@/lib/api";
@@ -91,18 +92,18 @@ function NextPageHeaderLayout() {
 // component rather than inlining the hook call in `NextRoutes` itself,
 // which needs to return `<ThemeProvider>` before anything inside it
 // can call a hook that reads from it.
-function NextRoutesInner({ person }: { person: Roster }) {
+function NextRoutesInner({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
   useNextAppearance(person.id);
   useNextLook(person.id);
 
   return (
     <IncognitoProvider>
-      <NextRoutesWithIncognito person={person} />
+      <NextRoutesWithIncognito person={person} onPersonChange={onPersonChange} />
     </IncognitoProvider>
   );
 }
 
-function NextRoutesWithIncognito({ person }: { person: Roster }) {
+function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
 
   const onIncognitoChange = (on: boolean) => {
@@ -170,6 +171,7 @@ function NextRoutesWithIncognito({ person }: { person: Roster }) {
             <Route index element={<NextDashboardPage person={person} />} />
             <Route path="tools" element={<NextAppsPage person={person} />} />
             <Route path="people" element={<NextPeoplePage person={person} />} />
+            <Route path="people/:id" element={<NextPersonProfilePage person={person} onPersonChange={onPersonChange} />} />
             <Route path="settings" element={<NextSettingsPage person={person} />} />
             <Route path="storage" element={<NextStoragePage person={person} />} />
             <Route path="engines" element={<NextEnginesPage person={person} />} />
@@ -213,7 +215,7 @@ function NextSignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
 // loading indicator. If it says null or "off", the old shell's navy
 // palette and RouteSkeleton stand - the person either never visited
 // /next or the flag was off, so the old shell's loading state is fine.
-export function NextRoutes({ person, onSignedIn }: { person: Roster | null; onSignedIn: () => void }) {
+export function NextRoutes({ person, onSignedIn, onPersonChange = () => {} }: { person: Roster | null; onSignedIn: () => void; onPersonChange?: () => void | Promise<void> }) {
   const queryClient = useQueryClient();
   const wasSignedOut = useRef(person === null);
   // A code review, SHELL-08: `useShellNext()`'s own query, once it 401s
@@ -242,5 +244,5 @@ export function NextRoutes({ person, onSignedIn }: { person: Roster | null; onSi
   }
   if (shellNext === "off") return <Navigate to="/" replace />;
 
-  return <ThemeProvider>{person === null ? <NextSignedOutRoutes onSignedIn={onSignedIn} /> : <NextRoutesInner person={person} />}</ThemeProvider>;
+  return <ThemeProvider>{person === null ? <NextSignedOutRoutes onSignedIn={onSignedIn} /> : <NextRoutesInner person={person} onPersonChange={onPersonChange} />}</ThemeProvider>;
 }

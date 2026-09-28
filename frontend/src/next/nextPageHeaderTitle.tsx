@@ -63,6 +63,7 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
 };
 
 function entryFor(pathname: string): PageHeaderEntry | undefined {
+  if (pathname.startsWith("/next/people/")) return sidebarEntries.get("/next/people");
   return sidebarEntries.get(pathname) ?? MANAGE_PAGE_ENTRIES[pathname];
 }
 

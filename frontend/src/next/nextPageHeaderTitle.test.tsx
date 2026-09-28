@@ -34,6 +34,7 @@ describe("NextPageHeaderTitle", () => {
     ["/next/chat", "Chat", "lucide-message-circle"],
     ["/next/tools", "Tools", "lucide-layout-grid"],
     ["/next/people", "People", "lucide-users"],
+    ["/next/people/person-sage", "People", "lucide-users"],
     ["/next/settings", "Settings", "lucide-settings"],
     ["/next/storage", "Storage", "lucide-database"],
     ["/next/engines", "Engines", "lucide-cpu"],

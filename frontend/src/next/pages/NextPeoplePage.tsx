@@ -23,7 +23,7 @@ function PersonCard({ entry }: { entry: PersonRosterEntry }) {
   const accentClass = entry.accent ? ACCENT_RING_CLASS[entry.accent] : null;
   return (
     <Link
-      to={`/people/${entry.id}`}
+      to={`/next/people/${entry.id}`}
       className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Card className={accentClass ? `ring-2 ring-offset-2 ring-offset-background transition-shadow hover:shadow-md ${accentClass}` : "transition-shadow hover:shadow-md"}>
@@ -54,9 +54,7 @@ function PersonCard({ entry }: { entry: PersonRosterEntry }) {
  * it, which is what the old stacked layout's double avatar came from
  * (the design record: "their name shows twice today: once above the
  * table, once as a row in it"). Tapping any card, including your own,
- * opens the existing `/people/:id` route (`PersonProfilePage.tsx`), the
- * same route pattern the design record names - a new next-shell profile
- * page is `PEOPLE-PROFILE-01`, out of scope here. */
+ * opens `/next/people/:id`, the next-shell profile page for any person. */
 export function NextPeoplePage({ person }: { person: Roster }) {
   useDocumentTitle("People");
   const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });

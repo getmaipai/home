@@ -244,6 +244,7 @@ const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextLaneA13Review = process.argv.includes("--next-lane-a-13-review");
 const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
 const nextPrivacyReview = process.argv.includes("--next-privacy-review");
+const nextPersonProfileReview = process.argv.includes("--next-person-profile-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
@@ -2371,7 +2372,7 @@ async function captureNextPeopleReview(browser: Browser, sessionValue: string): 
         // (`NextPeoplePage.tsx`); the shared CardTitle is a div, so use
         // a real person-card link as the data-ready signal. These links
         // render only after the real `/api/people` query resolves.
-        await page.locator('a[href^="/people/"]').first().waitFor({ timeout: 15000 });
+        await page.locator('a[href^="/next/people/"]').first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "People");
         await settleAnimations(page);
         const path = join(outDir, `next-people-${viewport.width}-${theme}.png`);
@@ -3146,7 +3147,6 @@ async function captureNextLaneA13Review(browser: Browser, sessionValue: string):
     body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
   });
   if (!setShellNext.ok) throw new Error(`captureNextLaneA13Review: seeding ui.shell.next=true failed: ${setShellNext.status}`);
-
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     for (const theme of THEMES) {
@@ -3172,6 +3172,63 @@ async function captureNextLaneA13Review(browser: Browser, sessionValue: string):
         } finally {
           await context.close();
         }
+      }
+    }
+  }
+}
+
+/** Lane 15: real own Memories content plus the owner's view of another
+ * household member. Every capture is 1440/390 in light/dark. */
+async function captureNextPersonProfileReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const headers = { "Content-Type": "application/json", Cookie: `session=${sessionValue}` };
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT", headers,
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextPersonProfileReview: seeding ui.shell.next failed: ${setShellNext.status}`);
+  const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } });
+  if (!peopleResponse.ok) throw new Error(`captureNextPersonProfileReview: GET /api/people failed: ${peopleResponse.status}`);
+  const people = await peopleResponse.json() as Array<{ id: string; display_name: string }>;
+  const sage = people.find((entry) => entry.display_name === "Sage");
+  const other = people.find((entry) => entry.id !== sage?.id);
+  if (!sage || !other) throw new Error("captureNextPersonProfileReview: seeded household lacks Sage or another person");
+  const memoryResponse = await fetch(`${BASE_URL}/api/memory`, {
+    method: "POST", headers,
+    body: JSON.stringify({ text: "Likes exploring tide pools", category: "preference", tier: "durable", scope: "person", person: sage.id, importance: 0.6 }),
+  });
+  if (!memoryResponse.ok) throw new Error(`captureNextPersonProfileReview: seeding own memory failed: ${memoryResponse.status} ${await memoryResponse.text()}`);
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        const ownPath = `${BASE_URL}/next/people/${sage.id}`;
+        await page.goto(ownPath);
+        await page.getByText("This is your own profile.").waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        let file = `next-profile-own-overview-${viewport.width}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
+        console.log(`Wrote ${join(outDir, file)}`);
+
+        await page.goto(`${ownPath}?tab=memories`);
+        await page.getByText("Likes exploring tide pools", { exact: true }).waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        file = `next-profile-own-memories-${viewport.width}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
+        console.log(`Wrote ${join(outDir, file)}`);
+
+        await page.goto(`${BASE_URL}/next/people/${other.id}`);
+        await page.getByText(`${other.display_name}'s profile in this household.`, { exact: true }).waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        file = `next-profile-other-overview-${viewport.width}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
+        console.log(`Wrote ${join(outDir, file)}`);
+        await page.close();
+      } finally {
+        await context.close();
       }
     }
   }
@@ -4159,6 +4216,11 @@ async function main() {
     if (nextPrivacyReview) {
       await captureNextPrivacyReview(browser, sessionValue);
       console.log("completed named review: --next-privacy-review");
+      return;
+    }
+    if (nextPersonProfileReview) {
+      await captureNextPersonProfileReview(browser, sessionValue);
+      console.log("completed named review: --next-person-profile-review");
       return;
     }
     if (nextTableRolloutReview) {

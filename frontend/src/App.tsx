@@ -349,7 +349,7 @@ export function App() {
                           LOADING_PERSON
                         ) : (
                           <Suspense fallback={<RouteSkeleton />}>
-                            <NextRoutes person={person} onSignedIn={loadPerson} />
+                            <NextRoutes person={person} onSignedIn={loadPerson} onPersonChange={revalidatePerson} />
                           </Suspense>
                         )
                       }
