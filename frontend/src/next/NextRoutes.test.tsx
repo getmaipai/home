@@ -203,7 +203,7 @@ describe("NextRoutes sign-in redirect", () => {
   });
 });
 
-describe("NextRoutes tools path", () => {
+describe("NextRoutes retired Tools paths", () => {
   function renderNextRoute(path: string) {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -214,7 +214,6 @@ describe("NextRoutes tools path", () => {
           { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
         ]));
       }
-      if (url.includes("/api/plugins")) return Promise.resolve(Response.json([]));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     const view = renderWithQueryClient(
@@ -227,20 +226,10 @@ describe("NextRoutes tools path", () => {
     return { view, restore: () => { globalThis.fetch = originalFetch; } };
   }
 
-  test("/tools mounts the tools page and the sidebar points to it", async () => {
-    const { view, restore } = renderNextRoute("/tools");
+  test.each(["/tools", "/apps"])("%s renders without Tools page content", (path) => {
+    const { view, restore } = renderNextRoute(path);
     try {
-      await waitFor(() => expect(document.title).toBe("Tools · MaiPai Home"));
-      expect(view.container.querySelector('[data-slot="card-title"]')?.textContent).toContain("Tools");
-      expect(view.getByRole("link", { name: "Tools" }).getAttribute("href")).toBe("/next/tools");
-    } finally {
-      restore();
-    }
-  });
-
-  test("/apps no longer mounts the tools page", async () => {
-    const { view, restore } = renderNextRoute("/apps");
-    try {
+      expect(view.container.textContent).not.toContain("Everything installed on this hub.");
       expect(view.container.querySelector('[data-slot="card-title"]')).toBeNull();
       expect(view.queryByRole("table")).toBeNull();
     } finally {

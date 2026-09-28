@@ -237,7 +237,6 @@ const nextLookPresetsReview = process.argv.includes("--next-look-presets-review"
 const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mismatch-review");
 const nextPeopleReview = process.argv.includes("--next-people-review");
 const nextDashboardReview = process.argv.includes("--next-dashboard-review");
-const nextAppsReview = process.argv.includes("--next-apps-review");
 const nextProfileSheetReview = process.argv.includes("--next-profile-sheet-review");
 const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
@@ -284,12 +283,8 @@ const ROUTES: RouteSpec[] = [
   { slug: "chat", path: "/chat" },
   { slug: "chat-list", path: "/chat?list=1" },
   { slug: "people", path: "/people" },
+  // Family-tab screenshots are a follow-up; the existing People route capture stays here.
   { slug: "people-memories", path: "/memory" },
-  // Missing since /apps existed at all (a gap this file's own header
-  // comment calls out): App.tsx has always had this route, but no entry
-  // here ever covered it - found rebuilding the page as a things table
-  // (HOME-UI-02) and closed in the same commit as the rebuild.
-  { slug: "apps", path: "/tools" },
   { slug: "privacy", path: "/privacy" },
   { slug: "settings", path: "/settings" },
   { slug: "settings-models", path: "/models" },
@@ -1563,22 +1558,6 @@ async function capturePeopleAndThings(browser: Browser, sessionValue: string, vi
 // Memory's own tabs - the ordinary ROUTES matrix only ever proves the
 // table itself, never the pane a real household member spends most of
 // this page's time in.
-async function captureAppsPaneOpen(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
-  const context = await newContext(browser, viewport, theme, sessionValue);
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/apps`);
-    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
-    await page.getByText("Weather", { exact: true }).first().click();
-    await page.getByRole("complementary").waitFor();
-    await settleAnimations(page);
-    await page.screenshot({ path: join(SCREENS_DIR, `apps-pane-${viewport.slug}-${theme}.png`) });
-  } finally {
-    await context.close();
-  }
-}
-
 /** Lane 10 item 2's own acceptance: "the loading state between chunks
  * must be the kit's own skeleton, never a blank screen: take one shot
  * mid-load if the script can." Two things stack against catching it
@@ -2079,8 +2058,7 @@ async function captureNextStandup(browser: Browser, sessionValue: string): Promi
 
   const pages: Array<{ slug: string; path: string; waitFor: string }> = [
     { slug: "dashboard", path: "/", waitFor: "text=Stay informed with today's activity" },
-    { slug: "tools", path: "/tools", waitFor: "table" },
-    { slug: "people", path: "/people", waitFor: "table" },
+    { slug: "people", path: "/people", waitFor: 'a[href^="/people/"]' },
     { slug: "settings", path: "/settings", waitFor: "text=Default Inputs" },
     { slug: "sign-in", path: "/sign-in", waitFor: "form" },
   ];
@@ -2179,8 +2157,7 @@ async function flagTurnsAsMarlow(sessionValue: string, texts: readonly string[],
 // text findings: a throwaway review set (data-scratch, not the stand-
 // up's own committed acceptance captures), expanded vs. collapsed, both
 // themes, desktop only (the owner's own findings were both desktop-
-// only), plus one dark-only shot of /tools (the Employee Data
-// Table row the owner's own third capture flagged).
+// only).
 async function captureNextSidebarReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2202,13 +2179,6 @@ async function captureNextSidebarReview(browser: Browser, sessionValue: string):
       await page.screenshot({ path: join(outDir, `next-sidebar-collapsed-desktop-${theme}.png`) });
       console.log(`Wrote ${join(outDir, `next-sidebar-collapsed-desktop-${theme}.png`)}`);
 
-      if (theme === "dark") {
-        await page.goto(`${BASE_URL}/tools`);
-        await page.locator("text=Employee Data Table").first().waitFor({ timeout: 15000 });
-        await settleAnimations(page);
-        await page.screenshot({ path: join(outDir, `next-tools-table-desktop-${theme}.png`) });
-        console.log(`Wrote ${join(outDir, `next-tools-table-desktop-${theme}.png`)}`);
-      }
       await page.close();
     } finally {
       await context.close();
@@ -2409,48 +2379,13 @@ async function captureNextProfileSheetReview(browser: Browser, sessionValue: str
   }
 }
 
-/** SHELL-03's own acceptance ("1440 and 390... judged, report what
- * Jesse sees at /tools"): both viewports, both themes, of that
- * route - the same permanent-capture shape `captureNextDashboardReview`
- * above already established for the dashboard row. Waits on a real
- * table row rather than any one package's own display name: GET
- * /api/plugins's own row order isn't alphabetical (readdirSync's
- * filesystem order), and DataTable's default page size (5) means a
- * package picked at random can land past the first page - a specific
- * name was exactly this flaky the first time this was written. */
-async function captureNextAppsReview(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
-    for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, sessionValue);
-      try {
-        const page = await context.newPage();
-        await page.goto(`${BASE_URL}/tools`);
-        await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
-        await assertNoLegacyDataTableChrome(page, "Tools");
-        await settleAnimations(page);
-        const path = join(outDir, `next-tools-${viewport.width}-${theme}.png`);
-        await page.screenshot({ path, fullPage: slug === "phone" });
-        console.log(`Wrote ${path}`);
-        await page.close();
-      } finally {
-        await context.close();
-      }
-    }
-  }
-}
-
 /** SHELL-02's first slice, its own stated acceptance ("captures 1440
  * dark only for this slice"), extended 2026-09-22 to also capture
  * phone (390): a live finding on the reasoning card's left edge and
  * width against the reply text needed both to judge. A real turn
  * against the real dev engine (not a mocked stream, the same "real
  * household showed real data" standard
- * `captureNextDashboardReview`/`captureNextAppsReview` hold to), with
+ * `captureNextDashboardReview` holds to), with
  * the reasoning Element expanded so the capture actually shows what
  * the slice proves - not just the collapsed trigger every reply
  * always renders regardless of whether reasoning ever wired up to
@@ -3204,7 +3139,6 @@ async function captureNextPersonProfileReview(browser: Browser, sessionValue: st
 
 async function captureShell09DocsMatrixReview(browser: Browser, sessionValue: string): Promise<void> {
   await captureNextDashboardReview(browser, sessionValue);
-  await captureNextAppsReview(browser, sessionValue);
   await captureNextPeopleReview(browser, sessionValue);
   await captureNextLaneA13Review(browser, sessionValue);
   // Lane A13 also captures Settings while checking its Users/Models links;
@@ -4097,7 +4031,6 @@ async function main() {
       return;
     }
     if (nextTableRolloutReview) {
-      await captureNextAppsReview(browser, sessionValue);
       await captureNextPeopleReview(browser, sessionValue);
       await captureNextEnginesReview(browser, sessionValue);
       await captureNextUpdatesReview(browser, sessionValue);
@@ -4151,48 +4084,44 @@ async function main() {
       await captureNextDashboardReview(browser, sessionValue);
     }
 
-    if (nextAppsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
-      await captureNextAppsReview(browser, sessionValue);
-    }
-
-    if (nextChatReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview) {
+    if (nextChatReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
       await captureNextChatReview(browser, sessionValue);
       console.log("completed named review: --next-chat-review");
       return;
     }
 
-    if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview) {
+    if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview) {
       await captureNextSettingsReview(browser, sessionValue);
     }
 
-    if (nextEnginesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview) {
+    if (nextEnginesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview) {
       await captureNextEnginesReview(browser, sessionValue);
     }
 
-    if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
+    if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
       await captureNextChatToolsSitesReview(browser, sessionValue);
       await captureNextChatToolsReview(browser, sessionValue);
       console.log("completed named review: --next-chat-tools-review");
       return;
     }
 
-    if (nextUpdatesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview) {
+    if (nextUpdatesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview) {
       await captureNextUpdatesReview(browser, sessionValue);
     }
 
-    if (nextRepairsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview) {
+    if (nextRepairsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview) {
       await captureNextRepairsReview(browser, sessionValue);
     }
 
-    if (nextBackupsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview) {
+    if (nextBackupsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview) {
       await captureNextBackupsReview(browser, sessionValue);
     }
 
-    if (nextChatArtifactReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview) {
+    if (nextChatArtifactReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview) {
       await captureNextChatArtifactReview(browser, sessionValue);
     }
 
-    if (nextSignInReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
+    if (nextSignInReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
       await captureNextSignInReview(browser, sessionValue);
     }
 
@@ -4202,23 +4131,23 @@ async function main() {
       return;
     }
 
-    if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatChildComposerReview) {
+    if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatChildComposerReview) {
       await captureNextChatComposerReview(browser, sessionValue);
     }
 
-    if (nextChatChildComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview) {
+    if (nextChatChildComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview) {
       await captureNextChatChildComposerReview(browser, sessionValue);
     }
 
-    if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextStorageReview) {
+    if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextStorageReview) {
       await captureNextPerformanceReview(browser, sessionValue);
     }
 
-    if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {
+    if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {
       await captureNextStorageReview(browser, sessionValue);
     }
 
-    if (peopleProfileMediaReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview && !nextStorageReview) {
+    if (peopleProfileMediaReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview && !nextStorageReview) {
       await capturePeopleProfileMediaReview(browser, sessionValue);
     }
 
@@ -4294,7 +4223,6 @@ async function main() {
       await capturePaletteOpen(browser, sessionValue, desktop, "light");
       await capturePeopleAndThings(browser, sessionValue, phone, "dark");
       await capturePeopleAndThings(browser, sessionValue, desktop, "light");
-      await captureAppsPaneOpen(browser, sessionValue, desktop, "light");
       // Isolated, unlike the captures above: it hardcodes one chunk's own
       // hashed-filename prefix and races a fixed delay against a fixed
       // timeout, both of which are more likely to need adjusting after an

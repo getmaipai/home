@@ -47,19 +47,6 @@ describe("runSearchProviders - apps", () => {
   });
 });
 
-describe("runSearchProviders - pages", () => {
-  test("the Apps library page matches 'apps' even with no query typed yet", async () => {
-    const restore = stubFetch({});
-    try {
-      const groups = await runSearchProviders("");
-      const pages = findGroup(groups, "Pages");
-      expect(pages?.items).toEqual([{ id: "page:/apps", label: "Apps", icon: "layout-grid", to: "/apps" }]);
-    } finally {
-      restore();
-    }
-  });
-});
-
 describe("runSearchProviders - people", () => {
   test("matches a household member by display name", async () => {
     const restore = stubFetch({

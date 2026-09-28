@@ -1,6 +1,5 @@
 import { APP_CATALOG, filterApps } from "@/shell/appCatalog";
 import { api } from "@/lib/api";
-import { NAV_ENTRIES } from "@/shell/nav";
 import type { SearchGroup, SearchResultItem } from "@maipai/ui/src/search/types";
 
 export type { SearchGroup, SearchResultItem };
@@ -10,10 +9,7 @@ const RESULTS_PER_PROVIDER = 6;
 // "Last token prefix-matched" (docs/plans/session-b-ui.md step 6): typing
 // "kitchen we" still finds "Weather" by its last fragment, the same way a
 // launcher lets you keep typing past an irrelevant first word rather than
-// restarting the search. An empty token matches nothing - the palette's
-// own empty-query state is the plain apps list, not every record in the
-// house (see `pagesProvider` below, the one provider that answers an
-// empty query on purpose).
+// restarting the search. An empty token matches nothing.
 function lastToken(query: string): string {
   const parts = query.trim().toLowerCase().split(/\s+/);
   return parts[parts.length - 1] ?? "";
@@ -30,17 +26,6 @@ function matchesQuery(query: string, ...fields: (string | null | undefined)[]): 
 // shape from one never keeps the rest of the palette from answering, so
 // every provider catches its own failure rather than relying on the
 // caller to isolate it.
-
-function pagesProvider(query: string): SearchGroup {
-  // The one provider that answers an empty query: with nothing typed yet
-  // the palette is just an app switcher (the nav note's "search plus
-  // launcher" combination), which only makes sense if the plain page list
-  // shows up before a single keystroke.
-  const items = NAV_ENTRIES.filter((e) => (e.to === "/apps") && (query.trim() === "" || matchesQuery(query, e.label))).map(
-    (e) => ({ id: `page:${e.to}`, label: e.label, icon: e.icon, to: e.to }),
-  );
-  return { heading: "Pages", items: items.slice(0, RESULTS_PER_PROVIDER) };
-}
 
 async function peopleProvider(query: string): Promise<SearchGroup> {
   try {
@@ -132,7 +117,6 @@ async function commandsProvider(query: string): Promise<SearchGroup> {
 export async function runSearchProviders(query: string): Promise<SearchGroup[]> {
   const groups = await Promise.all([
     Promise.resolve({ heading: "Apps", items: filterApps(APP_CATALOG, query).slice(0, RESULTS_PER_PROVIDER).map((app) => ({ id: `app:${app.to}`, label: app.label, sublabel: app.description, icon: app.icon, to: app.to })) }),
-    Promise.resolve(pagesProvider(query)),
     peopleProvider(query),
     memoriesProvider(query),
     conversationsProvider(query),

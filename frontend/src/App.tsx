@@ -99,7 +99,6 @@ export function App() {
                       path="/next/*"
                       element={<LegacyNextRedirect />}
                     />
-                    <Route path="/apps" element={<LegacyNextRedirect />} />
                     <Route path="/conversations" element={<LegacyNextRedirect />} />
                     <Route path="/settings/users" element={<LegacyNextRedirect />} />
                     <Route path="/settings/models" element={<LegacyNextRedirect />} />

@@ -34,7 +34,7 @@ test("every primary destination gets its own title and subtitle", () => {
 
 test("a nested route matches its ancestor destination, not the root", () => {
   expect(routeHeader("/settings/models", person).title).toBe("Settings");
-  expect(routeHeader("/people/person-abc123", person).title).toBe("People");
+  expect(routeHeader("/people/person-abc123", person).title).toBe("Family");
 });
 
 test("an unregistered route falls back rather than showing a stale title", () => {

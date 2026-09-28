@@ -9,8 +9,7 @@ import { useNextAppearance } from "@/next/useNextAppearance";
 import { NextPageHeaderTitle } from "@/next/nextPageHeaderTitle";
 import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
 import { NextChatPage } from "@/next/pages/NextChatPage";
-import { NextAppsPage } from "@/next/pages/NextAppsPage";
-import { NextPeoplePage } from "@/next/pages/NextPeoplePage";
+import { NextFamilyPage } from "@/next/pages/NextFamilyPage";
 import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
 import { NextStoragePage } from "@/next/pages/NextStoragePage";
 import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
@@ -66,8 +65,7 @@ function NextPageHeaderLayout() {
   const { pathname } = useLocation();
   useHeaderExtra(NextPageHeaderTitle);
   const titleByPath: Record<string, string> = {
-    "/tools": "Tools",
-    "/people": "People",
+    "/people": "Family",
     "/settings": "Settings",
     "/storage": "Storage",
     "/engines": "Engines",
@@ -179,8 +177,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
-            <Route path="tools" element={<NextAppsPage person={person} />} />
-            <Route path="people" element={<NextPeoplePage person={person} />} />
+            <Route path="people" element={<NextFamilyPage person={person} />} />
             <Route path="people/:id" element={<NextPersonProfilePage person={person} onPersonChange={onPersonChange} />} />
             <Route path="settings" element={<NextSettingsPage person={person} />} />
             <Route path="storage" element={<NextStoragePage person={person} />} />

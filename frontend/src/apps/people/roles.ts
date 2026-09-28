@@ -86,7 +86,7 @@ export function canDeletePerson(actorRole: Role, actorId: string, target: { id: 
 
 // `Person.accent`'s six named swatches (spec-v0.1.43) to the matching
 // `--profile-accent-*` token (ui-v0.5.68's tokens.css), one definition
-// shared by NextPeoplePage.tsx's card grid and PersonProfilePage.tsx's
+// shared by NextFamilyPage.tsx's card grid and PersonProfilePage.tsx's
 // header card/Edit dialog - a code review on PEOPLE-GRID-01 would have
 // flagged a second hand-copy of this exact map. Literal Tailwind
 // arbitrary-value classes, the same lookup-map-of-literals pattern the

@@ -9,7 +9,7 @@ interface RouteHeaderOverride {
   subtitle: string | ((person: Roster) => string);
 }
 
-// Routes with no app-catalog entry (Home itself, Apps, and the two
+// Routes with no app-catalog entry (Home itself and the two
 // header-reachable-only destinations, Search and Notifications) - every
 // other destination's title and subtitle come straight from
 // APP_CATALOG (shell/appCatalog.ts, itself built from NAV_ENTRIES'
@@ -18,7 +18,6 @@ interface RouteHeaderOverride {
 // search keywords elsewhere in this diff.
 const ROUTE_HEADER_OVERRIDES: RouteHeaderOverride[] = [
   { to: "/", title: "Home", subtitle: (person) => `${greetingFor(new Date(), person.display_name)}. Here is your household today.` },
-  { to: "/apps", title: "Apps", subtitle: "Everything installed on this hub." },
   { to: "/search", title: "Search", subtitle: "Find anything across your household." },
   { to: "/notifications", title: "Notifications", subtitle: "What MaiPai has told you." },
 ];

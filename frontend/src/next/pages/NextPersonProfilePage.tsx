@@ -65,7 +65,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
             return (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
                 <p className="text-base font-medium">No one in this household has that profile.</p>
-                <Link to="/people" className="text-primary underline">Back to People</Link>
+                <Link to="/people" className="text-primary underline">Back to Family</Link>
               </div>
             );
           }

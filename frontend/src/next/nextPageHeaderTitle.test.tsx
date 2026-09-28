@@ -1,7 +1,16 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { NextPageHeaderTitle } from "@/next/nextPageHeaderTitle";
+import { getIcon } from "@maipai/ui/src/icons";
+
+mock.module("@maipai/ui/src/dashboard/layouts/full/vertical/sidebar/sidebaritems", () => ({
+  default: [{ items: [
+    { name: "Home", icon: getIcon("home"), url: "/next" },
+    { name: "Chat", icon: getIcon("message-circle"), url: "/next/chat" },
+    { name: "Family", icon: getIcon("users"), url: "/next/people" },
+  ] }],
+}));
+const { NextPageHeaderTitle } = await import("@/next/nextPageHeaderTitle");
 
 afterEach(cleanup);
 
@@ -32,9 +41,8 @@ describe("NextPageHeaderTitle", () => {
     // answer for it, and a future regression there should fail a test,
     // not just look right by accident.
     ["/chat", "Chat", "lucide-message-circle"],
-    ["/tools", "Tools", "lucide-layout-grid"],
-    ["/people", "People", "lucide-users"],
-    ["/people/person-sage", "People", "lucide-users"],
+    ["/people", "Family", "lucide-users"],
+    ["/people/person-sage", "Family", "lucide-users"],
     ["/settings", "Settings", "lucide-settings"],
     ["/storage", "Storage", "lucide-database"],
     ["/engines", "Engines", "lucide-cpu"],

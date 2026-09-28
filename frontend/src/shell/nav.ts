@@ -21,16 +21,13 @@ export type { NavEntry };
 // Owner ruling, "Navigation, corrected," 2026-09-20: Conversations is
 // Chat's own thread list, not a destination of its own; Memories moved
 // onto a person's own profile (People > a person > Memories). Order
-// matters here beyond readability - AppShell.tsx's own `groups` puts
-// Home/Chat/Apps first for exactly this list, and the phone tab bar
-// (`Shell`'s `phoneNavMax`) shows the first three before folding the
-// rest under More, so those three have to be first in the flattened
-// entry list this feeds.
+// matters here beyond readability - the phone tab bar (`Shell`'s
+// `phoneNavMax`) shows the first three before folding the rest under
+// More, so Home, Chat and Family stay first in the flattened list.
 export const NAV_ENTRIES: readonly NavEntry[] = [
   { to: "/", icon: "home", label: "Home" },
   { to: "/chat", icon: "message-circle", label: "Chat" },
-  { to: "/apps", icon: "layout-grid", label: "Apps" },
-  { to: "/people", icon: "users", label: "People" },
+  { to: "/people", icon: "users", label: "Family" },
   { to: "/privacy", icon: "shield-check", label: "Privacy" },
   { to: "/settings", icon: "settings", label: "Settings" },
 ] as const;

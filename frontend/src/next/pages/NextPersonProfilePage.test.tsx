@@ -124,7 +124,7 @@ describe("NextPersonProfilePage", () => {
     try {
       const view = renderProfile("/people/person-missing", viewer({ role: "owner" }));
       expect(await view.findByText("No one in this household has that profile.")).toBeTruthy();
-      expect(view.getByRole("link", { name: "Back to People" }).getAttribute("href")).toBe("/people");
+      expect(view.getByRole("link", { name: "Back to Family" }).getAttribute("href")).toBe("/people");
     } finally { restore(); }
   });
 

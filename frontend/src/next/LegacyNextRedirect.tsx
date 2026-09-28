@@ -6,7 +6,6 @@ export function LegacyNextRedirect() {
   const { pathname, search, hash } = useLocation();
   const rootPath = pathname.replace(/^\/next(?=\/|$)/, "") || "/";
   const aliases: Record<string, string> = {
-    "/apps": "/tools",
     "/conversations": "/chat",
     "/settings/users": "/users",
     "/settings/models": "/models",
