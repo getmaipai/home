@@ -34,6 +34,7 @@ import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
+import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 
 /** The `/next/*` route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): behind `ui.shell.next`, mounts the template's
@@ -153,6 +154,11 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
     // needs the SAME provider instance NextChatPage writes into.
     <ChatHeaderDataProvider>
       <Routes>
+        {/* HOME-UI-02d: the old Memories page now lives on the signed-in
+            person's own profile. Preserve both old bookmarks and deep
+            links (including ?ids=...) through the existing redirect. */}
+        <Route path="memory" element={<MemoriesRedirect selfId={person.id} />} />
+        <Route path="memories" element={<MemoriesRedirect selfId={person.id} />} />
         {/* Reachable only while signed out (NextSignedOutRoutes below) -
             an already-authenticated visit to this URL has nothing to do
             here, so it bounces to the dashboard instead of a blank
