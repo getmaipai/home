@@ -140,6 +140,15 @@ export interface ChatModelAdapterDeps {
   /** The selected local engine must opt into image parts explicitly. */
   canUseVision?(): LocalVisionCapability;
   onResearchDocument?(turnId: string): void;
+  // Jesse, live-found 2026-09-27: "this should be the default when
+  // generating an artifact that requires the canvas" - a synchronous
+  // write_document reply used to leave its own artifact card sitting
+  // there unopened until clicked. Fired exactly once, right where
+  // `artifact` (below) is known non-null on the turn's own terminal
+  // event - never on chatHistoryAdapter.ts's reload path, which has no
+  // such callback at all, so reopening an old conversation never
+  // re-triggers this for a document written minutes or days ago.
+  onArtifactReady?(artifactId: string): void;
   // SHELL-02: the plan's own wiring table (docs/plans/shell-on-
   // shadcndashboard-2026-09-21.md) lists "Speaking a reply" (the
   // read-aloud Element) as its own row, separate from the reply text
@@ -582,6 +591,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // (NextChatPage.tsx) can fetch the full version and open
             // it in canvas-split on click.
             const artifact = event.value.artifact;
+            if (artifact) deps.onArtifactReady?.(artifact.id);
             // APPROVE-CARD-01: `TurnValue.confirm` (wire.ts) - set only
             // on the turn that just parked a confirm_needed/consent_needed
             // ask (turnNext.ts's finishTurn() "asked" branch). A real

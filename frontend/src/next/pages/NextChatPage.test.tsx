@@ -778,12 +778,16 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     );
     await sendMessage(view, "write me a short note about pizza night");
     expect(await view.findByText("Wrote it.")).toBeVisible();
-    // The card's own fetched title, not a placeholder - proves the
-    // artifact tool-call part reached ArtifactCard through a real
-    // api.artifactCurrent() round trip, not just that the turn
-    // completed.
-    const card = await view.findByText(ARTIFACT.title);
-    fireEvent.click(card);
+    // Jesse's own standing rule (2026-09-27): "auto open the canvas...
+    // this should be the default" - a synchronous write_document reply
+    // now opens its own canvas the moment the turn completes
+    // (chatModelAdapter.ts's own onArtifactReady), no click needed here
+    // any more. Waiting for the artifact's own fetched body text (not
+    // the card's title, which the now-open canvas ALSO renders in its
+    // own heading, ambiguous for a bare findByText) is what proves the
+    // canvas is genuinely open, through a real api.artifactCurrent()
+    // round trip, not just that the turn completed.
+    await view.findByText(ARTIFACT.body);
     return restore;
   }
 
@@ -905,6 +909,76 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       expect(view.getByText("Wrote it.")).toBeVisible();
     } finally {
       restore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
+  });
+
+  // A code review caught this (2026-09-27): every test above proves the
+  // canvas auto-opens now, and none of them still click the card - the
+  // shipped `onClick={() => openArtifact(id)}` on ArtifactCard
+  // (ArtifactCardToolRender) could silently break with the whole suite
+  // green. A document loaded from history (never a live "just streamed
+  // in" turn - chatModelAdapter.ts's own `onArtifactReady` only fires on
+  // the live completion path, never chatHistoryAdapter.ts's reload one)
+  // never auto-opens, so a person reopening an old conversation still
+  // has to click it - this is that path, still real, shipped code.
+  test("desktop viewport: a document loaded from history does not auto-open, but clicking its card still opens the canvas", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes(`/api/conversations/${ARTIFACT.conversation_id}/turns`)) {
+        return Promise.resolve(
+          Response.json([
+            {
+              id: ARTIFACT.turn_id,
+              personId: "person-abc123",
+              surface: "chat",
+              conversationId: ARTIFACT.conversation_id,
+              userText: "write me a short note about pizza night",
+              replyText: "Wrote it.",
+              source: "plugin",
+              pluginId: "write_document",
+              commandId: null,
+              safetyFlagged: false,
+              safetyAction: "allow",
+              bare: false,
+              minorSpeaker: false,
+              createdAt: ARTIFACT.created_at,
+              artifact: { id: ARTIFACT.id, version: ARTIFACT.version },
+              memory_ids: [],
+            },
+          ]),
+        );
+      }
+      if (url.includes(`/api/conversations/${ARTIFACT.conversation_id}`)) return Promise.resolve(Response.json({ id: ARTIFACT.conversation_id, title: "Pizza night", surface: "chat", created_at: ARTIFACT.created_at, pinned: false }));
+      if (url.includes(`/api/artifacts/${ARTIFACT.id}/current`)) return Promise.resolve(Response.json(ARTIFACT));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={[`/next/chat?conversation=${ARTIFACT.conversation_id}`]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await view.findByText("Wrote it.")).toBeVisible();
+      // Not auto-opened: the card's own title shows, but the artifact's
+      // body (only fetched once the canvas is genuinely open) does not.
+      // The title text also appears in the sidebar's own thread-list
+      // item (the conversation's title is the same string) - the card
+      // is whichever match isn't inside that list.
+      await view.findAllByText(ARTIFACT.title);
+      const card = view.getAllByText(ARTIFACT.title).find((el) => !el.closest('[data-slot="aui_thread-list-item"]'))!;
+      expect(card).toBeVisible();
+      expect(view.queryByText(ARTIFACT.body)).toBeNull();
+
+      fireEvent.click(card);
+      expect(await view.findByText(ARTIFACT.body)).toBeVisible();
+    } finally {
+      globalThis.fetch = original;
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     }
   });
@@ -1100,6 +1174,21 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
 // chatHistoryAdapter.ts's load(), which is the one thing that ever
 // fetches that endpoint again after the thread's first load).
 describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
+  const PROJECT_RELOAD_ARTIFACT = {
+    id: "art-project789",
+    conversation_id: "conv-project789",
+    turn_id: "turn-project1",
+    kind: "markdown" as const,
+    title: "Bedtime storybook",
+    body: "Once upon a time.",
+    version: 1,
+    parent_version: null,
+    created_by: "person-abc123",
+    provenance: "project:proj-story789",
+    created_at: "2026-09-27T00:00:00.000Z",
+    hlc: "1788000000000:0:test",
+  };
+
   function projectNotification(id: string, subjectTurnId: string, typeId: "project.done" | "project.failed" = "project.done"): NotificationDeliveryView {
     return {
       id,
@@ -1168,6 +1257,86 @@ describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
       await waitFor(() => expect(turnsFetchCount()).toBeGreaterThan(before));
     } finally {
       restore();
+    }
+  });
+
+  // Jesse, live-found 2026-09-27, on top of a code review's own finding
+  // the same day: "auto open the canvas when the book is ready" has to
+  // cover THIS path too, not just the live in-thread poll
+  // (ProjectFinishedArtifact's own useEffect) - the whole reason this
+  // reload exists is the case where nobody was watching live. The
+  // reloaded row is a plain `write_document`-shaped artifact
+  // (pluginId: "start_project", chatHistoryAdapter.ts's #182 rule), the
+  // same shape a synchronous write uses - ProjectResultReload's own
+  // `pendingOpenTurnId` remembers the turn a genuinely fresh
+  // notification named, then opens whatever artifact shows up on it
+  // once the reload lands. Opens an ALREADY-existing conversation
+  // (rather than sending a live message first, the way the sibling
+  // tests above do) - matching the real scenario this reload exists
+  // for: a project that finished while nobody had the thread open,
+  // found again later, not one just started this session - and sidesteps
+  // a brand-new thread's own "new" -> real status promotion (a separate,
+  // asynchronous transition reloadMainThread() silently no-ops during)
+  // entirely, since a conversation opened by id is never "new".
+  test("a project.done notification whose turn is already on screen opens the canvas once the reload lands with the finished artifact", async () => {
+    const conversationId = "conv-project789";
+    const startingRow = {
+      id: "turn-project1",
+      personId: "person-abc123",
+      surface: "chat",
+      conversationId,
+      userText: "make a bedtime story",
+      replyText: "Starting Bedtime story now - 3 steps, about a minute.",
+      source: "plugin",
+      pluginId: "start_project",
+      commandId: null,
+      safetyFlagged: false,
+      safetyAction: "allow",
+      bare: false,
+      minorSpeaker: false,
+      createdAt: "2026-09-27T00:00:00.000Z",
+      memory_ids: [],
+    };
+    // A project's finished artifact rides the SAME turn that already
+    // produced its "Starting…" reply (post.ts's own postProjectResult()),
+    // never a second row - #182's own shape (pluginId: "start_project",
+    // a real `artifact`), the one chatHistoryAdapter.ts renders as a
+    // plain write_document part once reloaded.
+    const finishedRow = { ...startingRow, replyText: "Bedtime storybook is ready.", artifact: { id: PROJECT_RELOAD_ARTIFACT.id, version: PROJECT_RELOAD_ARTIFACT.version } };
+    const conversation = { id: conversationId, title: "make a bedtime story", surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false };
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let turnsFetchCount = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes(`/api/conversations/${conversationId}/turns`)) {
+        turnsFetchCount++;
+        return Promise.resolve(new Response(JSON.stringify([turnsFetchCount === 1 ? startingRow : finishedRow]), { status: 200 }));
+      }
+      if (url.includes(`/api/conversations/${conversationId}`)) return Promise.resolve(Response.json(conversation));
+      if (url.includes(`/api/artifacts/${PROJECT_RELOAD_ARTIFACT.id}/current`)) return Promise.resolve(Response.json(PROJECT_RELOAD_ARTIFACT));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([conversation]), { status: 200 }));
+      if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={[`/next/chat?conversation=${conversationId}`]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await view.findByText("Starting Bedtime story now - 3 steps, about a minute.")).toBeVisible();
+
+      const before = turnsFetchCount;
+      act(() => {
+        view.queryClient.setQueryData(["notifications"], [projectNotification("n3", "turn-project1")]);
+      });
+
+      await waitFor(() => expect(turnsFetchCount).toBeGreaterThan(before));
+      expect(await view.findByText("Bedtime storybook is ready.")).toBeVisible();
+      expect(await view.findByText(PROJECT_RELOAD_ARTIFACT.body)).toBeVisible();
+    } finally {
+      globalThis.fetch = original;
     }
   });
 
@@ -1316,6 +1485,13 @@ describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
       // finished document's own card, live, with no reload.
       await waitFor(() => expect(view.queryByText(PROJECT_ARTIFACT.title)).not.toBeNull(), { timeout: 8000, interval: 100 });
       expect(view.queryByText("chapter-2")).toBeNull();
+      // Jesse, live-found 2026-09-27: "auto open the canvas when the
+      // book is ready... this should be the default." ProjectFinishedArtifact
+      // opens it itself the moment it mounts - no click on the card
+      // needed - so the artifact's own fetched body is already on
+      // screen (via a real api.artifactCurrent() round trip), proving
+      // the canvas is genuinely open, not just that the card rendered.
+      expect(await view.findByText(PROJECT_ARTIFACT.body)).toBeVisible();
     } finally {
       restore();
     }

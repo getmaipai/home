@@ -60,13 +60,14 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   };
 }
 
-async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, onCrisisResources: (text: string) => void = () => {}, getModel?: () => string | undefined): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
+async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, onCrisisResources: (text: string) => void = () => {}, getModel?: () => string | undefined, onArtifactReady?: (artifactId: string) => void): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
   const adapter = createChatModelAdapter({
     consumeThinking: () => false,
     consumeSupersedes: () => undefined,
     onCrisisResources,
     turnSchedulerRef: { current: null },
     getModel,
+    onArtifactReady,
   });
   const options = { messages, runConfig: {}, abortSignal, context: {}, unstable_getMessage: () => messages[messages.length - 1]! } as unknown as ChatModelRunOptions;
   const yields: ChatModelRunResult[] = [];
@@ -836,6 +837,55 @@ describe("createChatModelAdapter project progress (PROJECT-PROGRESS-01)", () => 
       const { yields } = await collect([fakeUserMessage("what herbs should I grow")]);
       const last = yields[yields.length - 1];
       expect(last?.content).toEqual([{ type: "text", text: "Basil and parsley are easy herbs." }]);
+    } finally {
+      env.restore();
+    }
+  });
+});
+
+// Jesse, live-found 2026-09-27: "auto open the canvas... this should
+// be the default when generating an artifact that requires the
+// canvas" - `onArtifactReady` fires exactly once, right where `artifact`
+// (chatModelAdapter.ts) is known non-null on the turn's own terminal
+// event, so NextChatPage.tsx can open the canvas with no click needed.
+describe("createChatModelAdapter onArtifactReady", () => {
+  test("a write_document reply calls onArtifactReady with the new artifact's id", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Wrote it." },
+        {
+          type: "done",
+          value: {
+            turn_id: "turn-artifact123",
+            reply: { text: "Wrote it." },
+            source: "plugin",
+            plugin_id: "write_document",
+            safety: SAFETY,
+            artifact: { id: "art-example123", version: 1 },
+          },
+        },
+      ]),
+    );
+    const ready: string[] = [];
+    try {
+      await collect([fakeUserMessage("write me a short note")], undefined, undefined, undefined, (id) => ready.push(id));
+      expect(ready).toEqual(["art-example123"]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a plain reply with no artifact never calls onArtifactReady", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Basil and parsley are easy herbs." },
+        { type: "done", value: { turn_id: "turn-herbs789", reply: { text: "Basil and parsley are easy herbs." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    const ready: string[] = [];
+    try {
+      await collect([fakeUserMessage("what herbs should I grow")], undefined, undefined, undefined, (id) => ready.push(id));
+      expect(ready).toEqual([]);
     } finally {
       env.restore();
     }

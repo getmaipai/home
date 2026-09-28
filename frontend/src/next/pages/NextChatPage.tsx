@@ -442,6 +442,18 @@ function ProjectFinishedArtifact({ id }: { id: string }) {
   const query = useQuery({ queryKey: ["artifact-current", id], queryFn: () => api.artifactCurrent(id) });
   const data = query.data;
   const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
+  // Jesse, live-found 2026-09-27: "auto open the canvas when the book
+  // is ready... this should be the default." This component only ever
+  // mounts live: a reload turns a finished project's row into a plain
+  // `write_document`-shaped artifact (chatHistoryAdapter.ts's own #182
+  // rule hides `row.project` once `row.artifact` is set), so there is
+  // no "reopening old history" case here to guard against the way
+  // chatModelAdapter.ts's own onArtifactReady comment has to - every
+  // mount of this component genuinely means the artifact just became
+  // available in front of whoever has this thread open right now.
+  useEffect(() => {
+    openArtifact(id);
+  }, [id, openArtifact]);
   return <ArtifactCard title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onClick={() => openArtifact(id)} />;
 }
 
@@ -766,6 +778,18 @@ function NextReasoningGroup({ children, group }: PropsWithChildren<{ group: Thre
 // own content changes, same as any other assistant-ui message part) -
 // a cache miss just recomputes, so a wrong assumption about that
 // stability would cost renders, never wrong data.
+// A code review caught this (2026-09-27): ProjectResultReload's own
+// artifact lookup (below) duplicated this exact find-by-toolName shape
+// with a different toolName and no caching - one definition instead,
+// used by both. The caching this file's own WeakMaps add (sourcesCache
+// just below) is specific to each CALLER's own transform, not to the
+// find itself, so it stays out of this shared helper.
+function toolCallPartFromMessage(message: ThreadMessage | undefined, toolName: string): Extract<ThreadAssistantMessagePart, { type: "tool-call" }> | undefined {
+  return message?.content.find(
+    (p): p is Extract<ThreadAssistantMessagePart, { type: "tool-call" }> => p.type === "tool-call" && p.toolName === toolName,
+  );
+}
+
 interface ChatSource {
   domain: string;
   title: string;
@@ -774,10 +798,7 @@ interface ChatSource {
 const sourcesCache = new WeakMap<object, ChatSource[]>();
 const NO_SOURCES: ChatSource[] = [];
 function sourcesFromMessage(message: ThreadMessage | undefined): ChatSource[] {
-  const part = message?.content.find(
-    (p): p is Extract<ThreadAssistantMessagePart, { type: "tool-call" }> =>
-      p.type === "tool-call" && p.toolName === "sources",
-  );
+  const part = toolCallPartFromMessage(message, "sources");
   if (!part) return NO_SOURCES;
   const cached = sourcesCache.get(part);
   if (cached) return cached;
@@ -1276,7 +1297,7 @@ function NextThreadList({
   );
 }
 
-function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean) {
+function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, onArtifactReady: (artifactId: string) => void) {
   const temporaryNextRef = useRef(temporaryNext);
   temporaryNextRef.current = temporaryNext;
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
@@ -1620,6 +1641,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           },
           isBareMode: () => bareModeRef.current,
           onCrisisResources: setBanner,
+          // Jesse, live-found 2026-09-27: a synchronous write_document
+          // reply's own artifact card used to sit there unopened until
+          // clicked - the default now is to open it, the same way a
+          // background project's own live completion does (below,
+          // ProjectFinishedArtifact).
+          onArtifactReady,
           onSpeakingChange: (speaking) => {
             setIsSpeaking(speaking);
             if (!speaking) setSpeakingEndedAt((n) => n + 1);
@@ -1632,7 +1659,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // enabled and the TTS role is ready.
           speakReplies: () => liveVoiceActiveRef.current || (ttsAvailableRef.current && autoReadRepliesRef.current),
         }),
-      [aui, hydrateConversationSettings],
+      [aui, hydrateConversationSettings, onArtifactReady],
     );
     // slice 5(e): thumbs and read-aloud both ride the shipped
     // capability/adapter mechanism (`s.thread.capabilities.feedback`/
@@ -1856,6 +1883,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
 function ProjectResultReload() {
   const aui = useAui();
   const messages = useAuiState((s) => s.thread.messages);
+  const openArtifact = useContext(ArtifactOpenContext);
   // The open conversation's own id - a switch away and back re-scopes
   // `seen` below (a code review, 2026-09-27: a bare module-lifetime set
   // would leave a notification marked "seen" while a DIFFERENT thread
@@ -1871,8 +1899,54 @@ function ProjectResultReload() {
   // reloading for, the same "no flood on first load" guard
   // NotificationBell.tsx's own NotificationToaster uses for its seenIds.
   const seen = useRef<{ remoteId: string | undefined; ids: Set<string> } | null>(null);
+  // A code review caught this (2026-09-27): ProjectFinishedArtifact's
+  // own auto-open (its useEffect, above) only ever fires through the
+  // LIVE in-thread poll (ProjectToolRender still mounted, actively
+  // watching) - exactly the case this component's own reload does NOT
+  // exist for. The whole reason a background project needs this
+  // notification-driven reload at all is the case where nobody was
+  // watching (the poll gave up at PROJECT_SETTLED_ARTIFACT_POLL_LIMIT,
+  // or the thread wasn't even open) - reload turns that project's row
+  // into a plain `write_document` part (chatHistoryAdapter.ts's #182
+  // rule), which `ArtifactCardToolRender` renders with no auto-open of
+  // its own (unlike a synchronous write, that one's "was this genuinely
+  // just created" signal isn't available at render time - see
+  // chatModelAdapter.ts's own `onArtifactReady` comment). So the turn id
+  // a genuinely fresh notification just confirmed is the ONE case
+  // where "this artifact is new, not historical" is trustworthy here
+  // too - remembered until its own artifact shows up in the reloaded
+  // `messages`, then opened the same way. A Set, not a single id (a
+  // code review's own finding): two projects finishing inside the same
+  // notification poll tick each add their own turn here, and each is
+  // opened (and removed) independently as its own artifact shows up -
+  // a single overwritable ref would have silently dropped every match
+  // but the last one iterated. `project.failed` lands here too, on
+  // purpose: postProjectResult() posts a real artifact (a failure
+  // summary) for a failed project exactly the same way it does for a
+  // finished one, never leaving a failed turn's own id stuck pending.
+  const pendingOpenTurnIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    // Every pending turn from an earlier pass, now present in the
+    // reloaded messages with a real artifact - open it and stop
+    // waiting on it. Checked on every `messages` change (including the
+    // one the reload below itself causes), not a second effect: this
+    // is the only signal that the reload has actually landed.
+    for (const turnId of pendingOpenTurnIds.current) {
+      // `role === "assistant"`, not just a turnId match: a row's own
+      // USER half carries the identical `metadata.custom.turnId`
+      // (rowsToBranchableMessages's own construction gives both halves
+      // of one row the same turnId), and `messages` lists the user
+      // message before its own reply - a bare turnId match found that
+      // one first, every single time, and it never carries an artifact.
+      const message = messages.find((m) => m.role === "assistant" && (m.metadata?.custom?.turnId as string | undefined) === turnId);
+      const artifactPart = toolCallPartFromMessage(message, "write_document");
+      const result = artifactPart?.result as { id: string } | undefined;
+      if (result) {
+        openArtifact(result.id);
+        pendingOpenTurnIds.current.delete(turnId);
+      }
+    }
     // Array.isArray, not just a truthiness check: a test (or a real
     // deploy) whose fetch stub/proxy never anticipated this query can
     // hand back something else entirely (`{}`, an error body) before a
@@ -1903,10 +1977,13 @@ function ProjectResultReload() {
       if (n.typeId !== "project.done" && n.typeId !== "project.failed") continue;
       if (!n.subjectTurnId) continue;
       const subjectTurnId = n.subjectTurnId;
-      if (messages.some((m) => (m.metadata?.custom?.turnId as string | undefined) === subjectTurnId)) shouldReload = true;
+      if (messages.some((m) => (m.metadata?.custom?.turnId as string | undefined) === subjectTurnId)) {
+        shouldReload = true;
+        pendingOpenTurnIds.current.add(subjectTurnId);
+      }
     }
     if (shouldReload) void aui.threads.reloadMainThread();
-  }, [notifications, messages, remoteId, aui]);
+  }, [notifications, messages, remoteId, aui, openArtifact]);
 
   return null;
 }
@@ -2207,7 +2284,7 @@ export function NextChatPage({ person }: { person: Roster }) {
     setRailPeeked(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
-  }, temporaryNext);
+  }, temporaryNext, setOpenArtifactId);
   const thinkingModeValue = useMemo(
     () => ({
       mode: (thinking ? "thinking" : "instant") as "instant" | "thinking",
