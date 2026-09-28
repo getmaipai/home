@@ -30476,3 +30476,32 @@ HANDSFREE-01(a)'s stated persist-across-reload acceptance.
 ## SHELL-09 Phase 5 known follow-up
 
 The Chat guide's preview-toggle directions and its eight feature-specific screenshots remain until Lane A's chat-doc pass can replace the feedback reasons, document pane, turn stats, conversation list, Research mode, model picker, temporary mode, and Continue states with matching current captures; the refreshed route captures do not show those exact states.
+
+## SHELL-09 cutover closure (2026-09-28)
+
+The old shell is retired: the migrated `NextRoutes` tree is mounted at `/`,
+the preview setting is removed from the spec, and `/files` now has a real
+Library page and sidebar entry. A fresh Phase 4 audit found no record fields
+or fixtures used exclusively by the old shell; the coordinated spec release
+removes only that setting key. Historical design and backlog notes retain
+the flag's name as part of the migration record.
+
+The final implementation ranges are Home `6572d727..d1c6680e`
+(`d1c6680ed991da87247f09f757019eb8fa26cdec`, including the route cutover at
+`6bed798c`, chat retirement at `a2733a3a`, kit retirement at `c8d59b48`, and
+Library migration; Phase 5 capture documentation is `195cbd9a`), Commons UI
+`40e653c..a414ef3f` (`a414ef3fce09f316a44bba0bcf624e5a6029c3e7`, tag
+`ui-v0.5.78`, including the shared chrome fixes, old-kit retirement, and
+Library navigation), and Commons spec `248519a..1bbc0e79` (tag `spec-v0.1.51`,
+removal of the preview setting). Each final tip was fetched and verified as
+an ancestor of its respective `origin/main`.
+The final Home gate passed with 823 tests passed, 1 skipped, and 0 failed;
+the Commons gate passed with 571 tests passed and 0 failed, plus 252 spec
+pytest tests passed. Home's a11y matrix now includes `/files`. The earlier
+visual screenshot matrix covers the routes migrated before Library; dedicated
+1440/390, light/dark captures for `/files` remain a named follow-up:
+`data-scratch/screenshots/next-files-{1440,390}-{light,dark}.png`. The capture
+harness could not start because this environment refused local TCP binds
+(`Bun.serve(0)` returned `EADDRINUSE`; Node's equivalent returned `EPERM`).
+The page itself is built and covered by the a11y route matrix. The Chat guide's
+eight state-specific captures remain the follow-up recorded above.
