@@ -96,7 +96,7 @@ export function ComposerDictationWaveform() {
         // its "aui-composer-input" marker class, which has no real CSS
         // rule anywhere and only the kit's own thread.aui.tsx carries an
         // eslint exemption for that non-Tailwind naming convention.
-        className="caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
+        className="caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-12 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
         rows={1}
         enterKeyHint="send"
         aria-label="Message input"

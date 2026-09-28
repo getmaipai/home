@@ -256,6 +256,7 @@ const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
+const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
 const peopleProfileMediaReview = process.argv.includes("--people-profile-media-review");
 
@@ -2913,6 +2914,120 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
   }
 }
 
+/** Lane B-15: exercise the actual tap targets named by the cutover
+ * review, including controls hidden inside the chat attachment and row
+ * action menus. This is a real-browser check because happy-dom has no
+ * rendered geometry. */
+async function verifyLaneBTouchTargets(browser: Browser, sessionValue: string): Promise<void> {
+  const headers = { "Content-Type": "application/json", Cookie: `session=${sessionValue}` };
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`verifyLaneBTouchTargets: enabling /next failed: ${setShellNext.status}`);
+
+  let checked = 0;
+  async function check(page: Page, locator: Locator, label: string): Promise<void> {
+    await locator.waitFor({ state: "visible", timeout: 10000 });
+    const dimensions = await locator.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      let width = rect.width;
+      let height = rect.height;
+      for (const pseudo of ["::before", "::after"] as const) {
+        const layer = getComputedStyle(element, pseudo);
+        if (layer.content !== "none" && layer.position === "absolute") {
+          width = Math.max(width, rect.width + Math.max(0, -(parseFloat(layer.left) || 0)) + Math.max(0, -(parseFloat(layer.right) || 0)));
+          height = Math.max(height, rect.height + Math.max(0, -(parseFloat(layer.top) || 0)) + Math.max(0, -(parseFloat(layer.bottom) || 0)));
+        }
+      }
+      return { width: Math.round(width), height: Math.round(height) };
+    });
+    checked++;
+    console.log(`touch-target ${label}: ${dimensions.width}x${dimensions.height}`);
+    if (dimensions.width < 48 || dimensions.height < 48) {
+      throw new Error(`verifyLaneBTouchTargets: ${label} is still below 48px (${dimensions.width}x${dimensions.height})`);
+    }
+  }
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((entry) => entry.slug === slug)!;
+    const context = await newContext(browser, viewport, slug === "phone" ? "dark" : "light", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(10000);
+      await page.goto(`${BASE_URL}/next/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      await check(page, page.getByRole("textbox", { name: "Message input" }), `Message input (${slug})`);
+      await check(page, page.getByRole("button", { name: "Start voice input" }), `Start voice input (${slug})`);
+      await check(page, page.getByRole("button", { name: "Send message" }), `Send message (${slug})`);
+      await check(page, page.getByRole("button", { name: "Add", exact: true }), `Add (${slug})`);
+
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+      const menuItems = page.locator('[data-slot="composer-menu-item"]');
+      await check(page, menuItems.filter({ hasText: "Add photos and files" }), `Add photos and files (${slug})`);
+      if (slug === "phone") await check(page, menuItems.filter({ hasText: "Take a photo" }), "Take a photo (phone)");
+      await page.keyboard.press("Escape");
+      if (slug === "phone") {
+        await page.getByRole("button", { name: "Show threads" }).click();
+        await check(page, page.getByRole("dialog").getByRole("button", { name: "New Thread", exact: true }), "New Thread (phone)");
+      } else {
+        await check(page, page.getByRole("button", { name: "New Thread", exact: true }), "New Thread (desktop)");
+      }
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+
+  const desktop = VIEWPORTS.find((entry) => entry.slug === "desktop")!;
+  const context = await newContext(browser, desktop, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(10000);
+    await page.route("**/api/repairs", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([{
+        id: "touch-target-repair",
+        source: "backup",
+        key: "backup.failed",
+        severity: "error",
+        title: "A backup failed",
+        detail: "The last scheduled backup could not finish.",
+        fix: { label: "Fix", action: "retry_backup" },
+        learn_more: null,
+        created_at: "2026-09-21T00:00:00.000Z",
+      }]),
+    }));
+    await page.goto(`${BASE_URL}/next/repairs`);
+    await page.getByText("A backup failed", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "More actions" }).click();
+    await check(page, page.getByRole("menuitem", { name: "Fix", exact: true }), "Fix (Repairs)");
+    await page.close();
+  } finally {
+    await context.close();
+  }
+
+  const backupContext = await newContext(browser, desktop, "light", sessionValue);
+  try {
+    const page = await backupContext.newPage();
+    page.setDefaultTimeout(10000);
+    await page.route("**/api/backups**", (route) => {
+      const url = route.request().url();
+      const body = url.includes("restore/pending") ? { pending: null } : [];
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    await page.goto(`${BASE_URL}/next/backups`);
+    await check(page, page.getByRole("button", { name: "Back up now" }), "Back up now");
+    await page.close();
+  } finally {
+    await backupContext.close();
+  }
+
+  console.log(`Lane B touch-target violations remaining: 0 (${checked} named targets checked)`);
+}
+
 /** Safety ruling, 2026-09-22: the composer's thinking-mode control
  * (RESP-04) is hidden entirely for a minor, never just disabled - the
  * model trigger (`[data-slot="composer-model-trigger"]`) must be absent
@@ -4323,6 +4438,12 @@ async function main() {
       await captureNextSignInReview(browser, sessionValue);
     }
 
+    if (laneBTouchTargetsReview) {
+      await verifyLaneBTouchTargets(browser, sessionValue);
+      console.log("completed named review: --lane-b-touch-targets-review");
+      return;
+    }
+
     if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextAppsReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatChildComposerReview) {
       await captureNextChatComposerReview(browser, sessionValue);
     }
@@ -4407,7 +4528,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -4439,7 +4560,7 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview
+    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || laneBTouchTargetsReview
       ? []
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview
         ? A11Y_ONLY_COMBOS
@@ -4509,7 +4630,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);

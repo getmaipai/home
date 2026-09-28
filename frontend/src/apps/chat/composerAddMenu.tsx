@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ComposerAttachButton, ComposerMenu, ComposerMenuItem } from "@maipai/ui/src/elements/composer";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { getIcon } from "@maipai/ui/src/icons";
+import { cn } from "@maipai/ui/src/utils";
 import { kindStyle } from "@/apps/library/AppsPage";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { api, type EnginesOverview, type InstalledPackage } from "@/lib/api";
@@ -82,10 +83,10 @@ const SparklesIcon = getIcon("sparkles");
 // ComposerCommandItem is the shipped one-line form (name, then a short
 // grey description sharing the SAME row) - used as shipped here instead
 // of inventing a second stacked layout.
-function ComposerAddMenuItem({ icon, name, description, ...props }: { icon: ComponentType<{ className?: string }>; name: string; description: string } & Omit<ComponentProps<typeof ComposerMenuItem>, "children">) {
+function ComposerAddMenuItem({ icon, name, description, className, ...props }: { icon: ComponentType<{ className?: string }>; name: string; description: string } & Omit<ComponentProps<typeof ComposerMenuItem>, "children">) {
   const Icon = icon;
   return (
-    <ComposerMenuItem {...props}>
+    <ComposerMenuItem className={cn("min-h-13", className)} {...props}>
       <Icon className="text-foreground/35 size-4 shrink-0" />
       <span className="font-medium shrink-0">{name}</span>
       {/* Deliberate type-floor exception: text-xs, same compact size
@@ -224,7 +225,12 @@ export function ComposerAddMenu() {
   const close = () => setOpen(false);
   return (
     <DismissableLayer.Root className="relative" onDismiss={open ? close : undefined}>
-      <ComposerAttachButton aria-label="Add" aria-expanded={open} onClick={() => setOpen((value) => !value)} />
+      <ComposerAttachButton
+        aria-label="Add"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="relative before:absolute before:-inset-2 before:content-['']"
+      />
       <ComposerMenu open={open} inert={!open} align="start">
         <GroupLabel>Add</GroupLabel>
         <AddPhotosAndFilesItem onSelect={close} />

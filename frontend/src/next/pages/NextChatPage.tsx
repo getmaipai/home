@@ -53,6 +53,7 @@ import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { ComposerAddMenu, PackageScopeContext } from "@/apps/chat/composerAddMenu";
+import "@/next/pages/nextChatTouchTargets.css";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { WakeWordController } from "@/apps/chat/WakeWordController";
@@ -1289,7 +1290,7 @@ function NextThreadList({
     <ThreadListRoot>
       <div className="flex items-center gap-1">
         {collapseToggle}
-        <ThreadListNew onClick={onNewThread} />
+        <ThreadListNew className="min-h-12" onClick={onNewThread} />
       </div>
       {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />

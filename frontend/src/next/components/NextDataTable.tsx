@@ -160,6 +160,7 @@ export function NextDataTable<T extends Record<string, unknown>>({
                         <Fragment key={action.label}>
                           {actionIndex > 0 && Boolean(action.destructive) !== Boolean(actionsForRow[actionIndex - 1]?.destructive) && <DropdownMenuSeparator />}
                           <DropdownMenuItem
+                            className="min-w-12 min-h-13"
                             variant={action.destructive ? "destructive" : "default"}
                             disabled={action.disabled}
                             onClick={() => {

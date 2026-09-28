@@ -1,0 +1,14 @@
+/* Keep the compact icon buttons visually unchanged while extending their
+   real hit areas to Home's 48px floor. This is scoped to the /next chat
+   pane, where the shipped Thread element owns the composer markup. */
+[data-slot="next-chat-pane"] .aui-composer-dictate,
+[data-slot="next-chat-pane"] .aui-composer-send {
+  position: relative;
+}
+
+[data-slot="next-chat-pane"] .aui-composer-dictate::before,
+[data-slot="next-chat-pane"] .aui-composer-send::before {
+  position: absolute;
+  inset: -10px;
+  content: "";
+}

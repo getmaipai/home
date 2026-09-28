@@ -156,7 +156,7 @@ export function NextBackupsPage({ person }: { person: Roster }) {
                   onClick: () => handleRestore(row.filename),
                 }] : undefined}
               />
-              <Button variant="secondary" onClick={handleRunBackup} disabled={running} className="w-fit">
+              <Button variant="secondary" onClick={handleRunBackup} disabled={running} className="w-fit min-h-13">
                 {running ? "Backing up…" : "Back up now"}
               </Button>
             </>
