@@ -38,7 +38,11 @@ const LIVE = process.argv.includes("--live");
 // self-contained, one that needs `startFakeSearxng()`'s own fixture
 // and carries a real scored check (`groundedNames`) alongside
 // `humanVerdict`, not `toolRan: null` uniformly any more.
-const WRITTEN_QUESTIONS: readonly { id: string; kind: "fact" | "how-to" | "comparison" | "list" | "small-talk"; say: string; groundedNames?: boolean }[] = [
+// Exported (STYLE-CORPUS-01): backend/scripts/voice/corpus.ts holds
+// these exact twenty-two rows out of every companion's voice corpus (the
+// bench's own held-out set, never trained on) by importing the list
+// directly rather than a second hand-copied one that could drift.
+export const WRITTEN_QUESTIONS: readonly { id: string; kind: "fact" | "how-to" | "comparison" | "list" | "small-talk"; say: string; groundedNames?: boolean }[] = [
   { id: "written-fact-1", kind: "fact", say: "what's the boiling point of water in fahrenheit" },
   { id: "written-fact-2", kind: "fact", say: "how many bones are in the human hand" },
   { id: "written-fact-3", kind: "fact", say: "what's the capital of australia" },

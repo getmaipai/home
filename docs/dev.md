@@ -30896,6 +30896,160 @@ lacked (a longer surrounding conversation before the bare "wrong",
 roster content), added to the replay set as a control that must stay
 clean. Voice work never touches it again.
 
+### STYLE-CORPUS-01: built, the rewrite brief and the real numbers (Sonnet, 2026-09-28)
+
+Built `backend/scripts/voice/corpus.ts` exactly to this design pass's
+own "Corpus (STYLE-CORPUS-01)" section above. What follows is the
+implementation record the backlog row asked to land here: the exact
+brief the frontier model gets, the validator as actually coded, the
+sourcing calls that section left to the builder, and the real numbers
+from running it against the live engines.
+
+**The fixed rewrite brief, verbatim.** The frontier model's system
+message is `display_name`, `tagline`, `backstory`, `interests`, the
+four dials in words, `examples` verbatim as few-shot, then this exact
+text (`REWRITE_BRIEF` in corpus.ts - the two are kept in sync by hand):
+
+> Rewrite the reply below into this speaker's own voice. Keep every
+> fact, number, name, date and list item exactly as given, in the same
+> order. Keep the same structure: if the original has headings or a
+> list, the rewrite keeps them; if it does not, the rewrite does not
+> add them. Keep the length within 15 percent of the original. Change
+> only the voice: word choice, sentence rhythm, contractions, and the
+> personality below. Never add a fact the original did not state,
+> never drop one, and never soften or hedge a fact the original stated
+> flatly. Reply with the rewritten text only: no preamble, no
+> quotation marks around it, no explanation.
+
+The four dials are translated to plain words (`FORMALITY_WORDS` and its
+three siblings in corpus.ts) rather than handed the raw enum value -
+"formal" alone tells a frontier model nothing about what MaiPai means
+by it; "formal: no contractions, precise and complete phrasing" does.
+
+**The validator, as coded (matches this section's own list above):**
+length within 15% by word count; the digit-run multiset (`\d+` matches,
+count-sensitive, not deduplicated - a repeated number dropped to one
+occurrence is exactly the kind of drift a plain set would miss)
+identical; the capitalized-token multiset (tokens after each sentence's
+first word) identical; a heading or list marker's presence unchanged
+between the neutral reply and the rewrite in either direction (present
+on one and not the other fails it either way - a code review, 2026-09-28,
+caught the first cut only checking the drop direction, when
+REWRITE_BRIEF also promises the rewrite never adds structure the
+neutral reply didn't have); no forbidden phrase. The
+forbidden-phrase check reuses `replay.ts`'s own `STUCK_LINES` literal
+plus `HONESTY_LINES`/`EMPTY_PROMISE_LINES` (imported from
+`conversationFixture.ts`, the one place this codebase already declares
+"never say this") - the persona bench's own list, not a new one
+invented for this script - checked unconditionally against the
+rewrite, never contingent on whether the neutral reply already carried
+one of those phrases.
+
+**Sourcing calls this section left open, made by the builder:**
+
+- `written-set.ts`'s `WRITTEN_QUESTIONS` gained an `export` (a
+  one-line, zero-behavior change) so the corpus builder imports the
+  canonical 22-row held-out set directly instead of a second
+  hand-copied list that could drift. `steering-spike.ts`'s thirty
+  `EXCHANGES` could not be imported the same way: that file has no
+  `import.meta.main` guard and runs its own bench unconditionally
+  (`process.exit(1)` without `MAIPAI_LLAMA_SERVER_URL` and a `--label`
+  argument this script never passes), so its thirty utterances are
+  reproduced literally in corpus.ts, kept in sync by hand like the item
+  below.
+- The fifty tool rows come from `tool-calling.ts`'s own positive
+  fixtures (`expect_calls` non-empty): the spec's own
+  `tool-call-corpus.json` (10 positive rows, read live so it stays in
+  sync automatically), plus `ROUTE01_ROWS` (2) and
+  `INVERSE_MISS_ROWS` (5) reproduced literally for the same reason as
+  `EXCHANGES` above (`tool-calling.ts` also has no
+  `import.meta.main` guard). `WRITE_DOCUMENT_ROWS` is left out: that
+  file's own comment says `write_document` is not in
+  `modelCatalog.ts`'s shipped `tools_offered` today, so it can never
+  produce a real native tool call to freeze - its row would read
+  0/REPEATS forever, not a usable fixture. The builder calls the live
+  engine round-robin over these 17 rows until fifty rows match their
+  expected tool exactly, then freezes that frozen set byte-identical
+  into every companion's corpus.
+- The prompt list is template-generated (five typed word banks mirrored
+  off `written-set.ts`'s own five kinds, seven spoken categories
+  mirrored off `naturalness-corpus.json`'s own `category` field with a
+  topic bank standing in for that file's own ten fixture rows - reused
+  as a bench fixture elsewhere, not a prompt list to copy), plus
+  `owner-replay.json`'s own already household-free rows (that file's
+  own header: "No household member is named in any row") flattened one
+  prompt per turn. Every generated and drawn prompt is filtered against
+  the held-out text set before use - this is what actually caught
+  `owner-replay.json`'s `benchmarking-typed-adult` row, whose text is
+  byte-identical to `written-set.ts`'s own
+  `written-conceptual-benchmarking` row, and dropped it correctly.
+- The neutral reply is generated **per companion**, not once and
+  shared: `identityLine(persona)` names the companion
+  ("You are Buddy, a private, self-hosted AI assistant..."), so the
+  bare floor differs slightly by which name the model is told to
+  answer as, before any voice is applied. This reads as the more
+  faithful interpretation of "the neutral reply is the bare local
+  model's own answer" (a floor of the turn, not of the model in the
+  abstract) but is a judgment call, not a line this design pass spelled
+  out - flagged for anyone re-reading this row.
+- The rewrite model is Claude Haiku 4.5, not a bigger model: a style
+  rewrite behind a strict deterministic validator does not need Opus-
+  or Sonnet-tier reasoning, and this call runs on the order of a
+  thousand times across four companions.
+
+**Code review (medium, 2026-09-28), findings and disposition.** Fixed:
+the heading/list check above (both directions, not just drop);
+`buildPromptList()`'s typed and spoken pools now round-robin across
+every source (`interleave()`) before filtering and slicing, so
+`MAIPAI_VOICE_TYPED_COUNT`/`MAIPAI_VOICE_SPOKEN_COUNT` at a reduced
+count still draws from every kind instead of exhausting
+`owner-replay.json` first; the isolated `MAIPAI_DATA_DIR` scratch
+directory is now removed in a `finally` around the whole run (a thrown
+`MissingCredentialError`, caught once at the top, replaces the
+`process.exit(2)` that used to fire mid-loop and skip the cleanup); the
+full-corpus and 20-row-sample JSONL writes share one `toJsonl()`
+helper instead of two copies of the same serialization; a real
+regression suite landed at `backend/tests/voiceCorpus.test.ts` (17
+tests, mirrors `labels.test.ts`'s own "import the pure functions by
+relative path" pattern), covering the acceptance text's own three
+cases (a changed number, a changed name, a changed list presence all
+drop the pair; phrasing-only changes keep it) plus `interleave()`,
+`toJsonl()`, and the held-out exclusion, including the real
+`benchmarking-typed-adult`/`written-conceptual-benchmarking` collision
+named above. **Declined:** the review's suggestion to fix
+`steering-spike.ts`/`tool-calling.ts` at the root (add
+`import.meta.main` guards there instead of reproducing their rows
+literally here) - both are live-bench scripts outside this row's own
+scope, and a guard change to either risks their own unconditional
+execution shape (a historical measurement fixture and a production
+reliability bench) for a corpus-builder convenience; flagged here for
+the coordinator to size as its own follow-up if the hand-copy drift
+risk is judged worse than that risk.
+
+**Real run, 2026-09-28.** Both engines confirmed live before running
+(`curl 127.0.0.1:8788/health` and `:8794/health`, both `{"status":"ok"}`).
+No Anthropic credential resolves on this dev machine right now (no
+`ANTHROPIC_API_KEY`, no `ant` CLI, no keychain entry under any
+Anthropic-related service name checked) - `ant auth status` cannot even
+run (`ant` is not installed here). The script's own preflight (it
+tries the first real rewrite call rather than probing separately, so
+the local-engine half of the pipeline is never skipped for nothing) hit
+this and refused with a clear message, exit code 2, per this script's
+own header rule: never a fabricated or padded drop rate when the
+frontier half cannot run. STYLE-CORPUS-01's acceptance ("four corpora
+built, drop rates under 20 percent each... the sample fixtures
+committed") is **not met today** - it is blocked on Jesse making an
+Anthropic API key available on this machine (an exported
+`ANTHROPIC_API_KEY`, or `ant auth login`), not on anything left to
+build. What is verified real: `bun run scripts/voice/corpus.ts` at a
+reduced count (`MAIPAI_VOICE_TYPED_COUNT`/`MAIPAI_VOICE_SPOKEN_COUNT`/
+`MAIPAI_VOICE_TOOL_COUNT`) against the live 127.0.0.1:8788/:8794 ran the
+gate check, the tool-row collection, and neutral-reply generation for
+real, then hit the credential refusal at the first rewrite call, exactly
+where it should. The four real drop rates land in this section the day
+a key is available and the full run (or a stated reduced one) completes;
+this paragraph is the honest state until then.
+
 ### What changes in the standing rules, and what does not
 
 `.github/docs/RULES-AND-LEARNED-COMPONENTS.md` says "a measured
