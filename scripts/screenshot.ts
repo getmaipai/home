@@ -284,11 +284,11 @@ const ROUTES: RouteSpec[] = [
   // comment calls out): App.tsx has always had this route, but no entry
   // here ever covered it - found rebuilding the page as a things table
   // (HOME-UI-02) and closed in the same commit as the rebuild.
-  { slug: "apps", path: "/apps" },
+  { slug: "apps", path: "/tools" },
   { slug: "privacy", path: "/privacy" },
   { slug: "settings", path: "/settings" },
   { slug: "settings-models", path: "/settings/models" },
-  { slug: "settings-backups", path: "/settings/backups" },
+  { slug: "settings-backups", path: "/backups" },
   { slug: "settings-voices", path: "/settings/voices" },
   { slug: "settings-commands", path: "/settings/commands" },
   // Added here 2026-09-06 alongside settings-devices: main's own commit
@@ -298,8 +298,8 @@ const ROUTES: RouteSpec[] = [
   // rather than leaving Users permanently unchecked by the matrix.
   { slug: "settings-users", path: "/settings/users" },
   { slug: "settings-devices", path: "/settings/devices" },
-  { slug: "settings-repairs", path: "/settings/repairs" },
-  { slug: "settings-updates", path: "/settings/updates" },
+  { slug: "settings-repairs", path: "/repairs" },
+  { slug: "settings-updates", path: "/updates" },
 ];
 
 interface ViewportSpec {
