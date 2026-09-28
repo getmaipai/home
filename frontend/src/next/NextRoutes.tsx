@@ -26,6 +26,8 @@ import { NextVoicesPage } from "@/next/pages/NextVoicesPage";
 import { NextCommandsPage } from "@/next/pages/NextCommandsPage";
 import { NextDevicesPage } from "@/next/pages/NextDevicesPage";
 import { NextPrivacyPage } from "@/next/pages/NextPrivacyPage";
+import { NextUsersPage } from "@/next/pages/NextUsersPage";
+import { NextModelsPage } from "@/next/pages/NextModelsPage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { api, type Roster } from "@/lib/api";
@@ -179,6 +181,8 @@ function NextRoutesWithIncognito({ person }: { person: Roster }) {
             <Route path="commands" element={<NextCommandsPage person={person} />} />
             <Route path="devices" element={<NextDevicesPage />} />
             <Route path="privacy" element={<NextPrivacyPage />} />
+            <Route path="users" element={<NextUsersPage person={person} />} />
+            <Route path="models" element={<NextModelsPage person={person} />} />
           </Route>
         </Route>
       </Routes>

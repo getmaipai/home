@@ -12,6 +12,8 @@ const MANAGE_LINKS: readonly ManageLink[] = [
   { title: "Updates", description: "What's available and what's already up to date.", to: "/next/updates" },
   { title: "Repairs", description: "Open issues and the fix each one names.", to: "/next/repairs" },
   { title: "Backups", description: "History, size, and anything staged to restore.", to: "/next/backups" },
+  { title: "Users", description: "Add, edit, and remove household accounts.", to: "/next/users" },
+  { title: "AI models", description: "Download, choose, and manage the household's AI models.", to: "/next/models" },
   // ADMIN-PERF-01: the backlog's own "reached from Settings' Manage
   // section and the System card" - the System card is DASH-CARDS-01's
   // (not landed), so Manage is this page's only entry point for now.

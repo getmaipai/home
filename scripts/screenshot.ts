@@ -241,6 +241,7 @@ const nextAppsReview = process.argv.includes("--next-apps-review");
 const nextProfileSheetReview = process.argv.includes("--next-profile-sheet-review");
 const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
+const nextLaneA13Review = process.argv.includes("--next-lane-a-13-review");
 const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
 const nextPrivacyReview = process.argv.includes("--next-privacy-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
@@ -3133,6 +3134,49 @@ async function captureNextPrivacyReview(browser: Browser, sessionValue: string):
   }
 }
 
+/** Lane A-13 acceptance: capture the two newly migrated admin pages and
+ * their Settings entry points at phone/desktop in both themes. */
+async function captureNextLaneA13Review(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextLaneA13Review: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      for (const pageSpec of [
+        { slug: "users", ready: () => "Add someone" },
+        { slug: "models", ready: () => "This computer:" },
+        { slug: "settings", ready: () => "Manage" },
+      ]) {
+        const context = await newContext(browser, viewport, theme, sessionValue);
+        try {
+          const page = await context.newPage();
+          await page.goto(`${BASE_URL}/next/${pageSpec.slug === "settings" ? "settings" : pageSpec.slug}`);
+          await page.getByText(pageSpec.ready(), { exact: false }).first().waitFor({ timeout: 20000 });
+          if (pageSpec.slug === "settings") {
+            await page.getByRole("link", { name: /^Users/ }).waitFor({ timeout: 15000 });
+            await page.getByRole("link", { name: /^AI models/ }).waitFor({ timeout: 15000 });
+          }
+          await settleAnimations(page);
+          const path = join(outDir, `next-${pageSpec.slug}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path, fullPage: slug === "phone" || pageSpec.slug === "settings" });
+          console.log(`Wrote ${path}`);
+          await page.close();
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
 /** SHELL-06's own acceptance ("1440 and 390... captures"): both
  * viewports, both themes, of `/next/engines`. This seeded demo
  * household has no Stack configured (the same state the acceptance
@@ -4097,6 +4141,11 @@ async function main() {
 
     const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
+    if (nextLaneA13Review) {
+      await captureNextLaneA13Review(browser, sessionValue);
+      console.log("completed named review: --next-lane-a-13-review");
+      return;
+    }
     if (nextProfileSheetReview) {
       await captureNextProfileSheetReview(browser, sessionValue);
       console.log("completed named review: --next-profile-sheet-review");

@@ -41,12 +41,15 @@ describe("NextPageHeaderTitle", () => {
     ["/next/updates", "Updates", "lucide-refresh-cw"],
     ["/next/repairs", "Repairs", "lucide-wrench"],
     ["/next/backups", "Backups", "lucide-archive"],
+    ["/next/users", "Users", "lucide-users"],
+    ["/next/models", "AI models", "lucide-cpu"],
   ];
 
   for (const [pathname, label, iconClass] of cases) {
     test(`${pathname} shows the ${label} icon and label`, () => {
       const view = renderAt(pathname);
-      expect(view.getByText(label)).toBeVisible();
+      expect(view.getAllByText(label).length).toBeGreaterThan(0);
+      for (const node of view.getAllByText(label)) expect(node).toBeVisible();
       expect(view.container.querySelector(`svg.${iconClass}`)).not.toBeNull();
     });
   }
