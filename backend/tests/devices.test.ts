@@ -53,7 +53,14 @@ describe("DELETE /api/devices/:id", () => {
     expect(res.status).toBe(404);
   });
 
-  test("revokes a robot whose password was rotated, without a foreign-key violation", async () => {
+  test("revokes a robot whose password was rotated, without a foreign-key violation, and the credential survives for a future re-pair", async () => {
+    // A code review (2026-09-28) changed this from the credential being
+    // deleted alongside the device (the original 2026-09-27 fix for the
+    // FK violation) to it deliberately surviving: robot_credentials.
+    // device_id is no longer a foreign key at all, precisely so a
+    // rotated password isn't lost the moment its device row is revoked -
+    // 1.8's own fix needs the row to still be there for a future
+    // getMostRecentRobotCredentialForHost(host) lookup.
     const { client, personId } = await owner();
     const { deviceId } = issueDeviceToken(personId, "robot", "Reachy Mini");
     const sshd = await startFakeSshd({
@@ -75,7 +82,7 @@ describe("DELETE /api/devices/:id", () => {
 
     const res = await client.request(`/api/devices/${deviceId}`, { method: "DELETE" });
     expect(res.status).toBe(200);
-    expect(hasRotatedRobotCredential(deviceId)).toBe(false);
+    expect(hasRotatedRobotCredential(deviceId)).toBe(true);
   });
 });
 
@@ -192,6 +199,102 @@ describe("POST /api/devices/:id/rotate-robot-password", () => {
       expect(hasRotatedRobotCredential(deviceId)).toBe(false);
     } finally {
       await sshd.close();
+    }
+  });
+
+  test("'Rotate again' needs no password typed - the server tries the device's own stored credential first", async () => {
+    const { client, personId } = await owner();
+    const { deviceId } = issueDeviceToken(personId, "robot", "Reachy Mini");
+    const firstSshd = await startFakeSshd({
+      username: "pollen",
+      password: "reachy-default",
+      onCommand: () => ({ code: 0 }),
+    });
+    try {
+      await client.post(`/api/devices/${deviceId}/rotate-robot-password`, {
+        host: "127.0.0.1",
+        port: firstSshd.port,
+        sshUsername: "pollen",
+        currentPassword: "reachy-default",
+      });
+    } finally {
+      await firstSshd.close();
+    }
+    const firstRotated = getRobotCredential(deviceId)!.password;
+
+    // The robot's real password is now whatever the first rotation set -
+    // a second fake sshd stands in for the same unit, now only accepting
+    // that password, never the original vendor default again.
+    const secondSshd = await startFakeSshd({
+      username: "pollen",
+      password: firstRotated,
+      onCommand: () => ({ code: 0 }),
+    });
+    try {
+      const res = await client.post(`/api/devices/${deviceId}/rotate-robot-password`, {
+        host: "127.0.0.1",
+        port: secondSshd.port,
+        sshUsername: "pollen",
+        // No currentPassword at all.
+      });
+      expect(res.status).toBe(200);
+      expect(getRobotCredential(deviceId)!.password).not.toBe(firstRotated);
+    } finally {
+      await secondSshd.close();
+    }
+  });
+
+  test("re-pairing a revoked robot at the same host succeeds with no password typed, using the credential its predecessor left behind", async () => {
+    // ROBOT-DEVICE-01's own bug (a code review, 2026-09-27): revoke a
+    // rotated robot and re-pair the same physical unit, and the new
+    // device row's own rotation used to demand the vendor default, which
+    // no longer opens a unit whose password was already changed - the
+    // only way out was a factory reflash. This is the fix's own
+    // acceptance test.
+    const { client, personId } = await owner();
+    const { deviceId: firstDeviceId } = issueDeviceToken(personId, "robot", "Reachy Mini");
+    const firstSshd = await startFakeSshd({
+      username: "pollen",
+      password: "reachy-default",
+      onCommand: () => ({ code: 0 }),
+    });
+    try {
+      await client.post(`/api/devices/${firstDeviceId}/rotate-robot-password`, {
+        host: "127.0.0.1",
+        port: firstSshd.port,
+        sshUsername: "pollen",
+        currentPassword: "reachy-default",
+      });
+    } finally {
+      await firstSshd.close();
+    }
+    const rotatedPassword = getRobotCredential(firstDeviceId)!.password;
+
+    const revokeRes = await client.request(`/api/devices/${firstDeviceId}`, { method: "DELETE" });
+    expect(revokeRes.status).toBe(200);
+
+    // The same physical unit, re-paired: a brand-new device row that has
+    // never itself been rotated.
+    const { deviceId: secondDeviceId } = issueDeviceToken(personId, "robot", "Reachy Mini");
+    expect(hasRotatedRobotCredential(secondDeviceId)).toBe(false);
+
+    const secondSshd = await startFakeSshd({
+      username: "pollen",
+      password: rotatedPassword,
+      onCommand: () => ({ code: 0 }),
+    });
+    try {
+      const res = await client.post(`/api/devices/${secondDeviceId}/rotate-robot-password`, {
+        host: "127.0.0.1",
+        port: secondSshd.port,
+        sshUsername: "pollen",
+        // No currentPassword: the admin doesn't know the last rotation's
+        // password, only the hub does.
+      });
+      expect(res.status).toBe(200);
+      expect(hasRotatedRobotCredential(secondDeviceId)).toBe(true);
+    } finally {
+      await secondSshd.close();
     }
   });
 

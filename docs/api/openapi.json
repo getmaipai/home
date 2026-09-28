@@ -11951,6 +11951,12 @@
                       },
                       "createdAt": {
                         "type": "string"
+                      },
+                      "capabilities": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
                       }
                     },
                     "required": [
@@ -11959,7 +11965,8 @@
                       "name",
                       "area",
                       "lastSeenAt",
-                      "createdAt"
+                      "createdAt",
+                      "capabilities"
                     ]
                   }
                 }
@@ -12012,6 +12019,12 @@
                       },
                       "createdAt": {
                         "type": "string"
+                      },
+                      "capabilities": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
                       }
                     },
                     "required": [
@@ -12020,7 +12033,8 @@
                       "name",
                       "area",
                       "lastSeenAt",
-                      "createdAt"
+                      "createdAt",
+                      "capabilities"
                     ]
                   }
                 }
@@ -12185,12 +12199,11 @@
                   "currentPassword": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "The vendor's own published default - never stored."
+                    "description": "The vendor's own published default - never stored. Optional once this device or another at the same host has a rotated password on file; that one is tried first."
                   }
                 },
                 "required": [
-                  "host",
-                  "currentPassword"
+                  "host"
                 ]
               }
             }
@@ -12359,6 +12372,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "A robot device token, but the unit's password has not been rotated off the vendor default",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -12392,6 +12415,13 @@
                       "browser"
                     ],
                     "default": "tv"
+                  },
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
                   }
                 },
                 "required": [
@@ -12458,7 +12488,7 @@
         ],
         "responses": {
           "200": {
-            "description": "\"pending\" while waiting, \"approved\" exactly once (a session cookie is also set for this address), \"expired\" for an unknown or timed-out poll_token.",
+            "description": "\"pending\" while waiting, \"approved\" exactly once (a session cookie is also set for this address, except for a robot device - see the handler), \"expired\" for an unknown or timed-out poll_token.",
             "content": {
               "application/json": {
                 "schema": {

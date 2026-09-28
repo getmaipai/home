@@ -29,6 +29,12 @@ export interface QuickConnectRequest {
   /** Human label for the approval prompt ("Living room TV"). */
   label: string;
   kind: DeviceKind;
+  /** The requesting device's own capability ids, when it sent any (the
+   * spec vocabulary RM-00/commons BODY-VOCAB-01 will validate against
+   * doesn't exist yet, so this is carried, not checked, until it does -
+   * a code review, 2026-09-28, tracked against ROBOT-DEVICE-01's own
+   * unmet "appears with its capability list" acceptance line). */
+  capabilities: string[];
   createdAt: number;
   expiresAt: number;
   /** True once a session has been minted, so a code can never be redeemed twice. */
@@ -78,7 +84,7 @@ const CODE_RATE_LIMIT = { capacity: 20, refillPerSecond: 0.2 };
 
 /** Start a login: the caller shows this code and polls with its own
  * poll_token until approved. Returns null if the rate limit is hit. */
-export function createQuickConnect(label: string, kind: DeviceKind): QuickConnectRequest | null {
+export function createQuickConnect(label: string, kind: DeviceKind, capabilities: string[] = []): QuickConnectRequest | null {
   if (!tryConsume("quick-connect:create", CODE_RATE_LIMIT)) return null;
   sweep();
   let code = newCode();
@@ -91,6 +97,7 @@ export function createQuickConnect(label: string, kind: DeviceKind): QuickConnec
     approvedPersonId: null,
     label: label.trim().slice(0, 60) || "A device",
     kind,
+    capabilities,
     createdAt: now,
     expiresAt: now + TTL_MS,
     consumed: false,
@@ -123,12 +130,12 @@ export function approveQuickConnect(code: string, personId: string): boolean {
 
 /** The waiting device polls with its poll_token, exactly once claiming
  * the approval. Null for unknown/expired/not-yet-approved/already-claimed. */
-export function consumeQuickConnect(pollToken: string): { personId: string; kind: DeviceKind; label: string } | null {
+export function consumeQuickConnect(pollToken: string): { personId: string; kind: DeviceKind; label: string; capabilities: string[] } | null {
   if (!tryConsume("quick-connect:poll", CODE_RATE_LIMIT)) return null;
   const req = getByPollToken(pollToken);
   if (!req || !req.approvedPersonId || req.consumed) return null;
   req.consumed = true;
-  return { personId: req.approvedPersonId, kind: req.kind, label: req.label };
+  return { personId: req.approvedPersonId, kind: req.kind, label: req.label, capabilities: req.capabilities };
 }
 
 /** True while a poll_token's request is still pending approval - lets the

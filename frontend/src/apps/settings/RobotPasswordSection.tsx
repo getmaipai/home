@@ -44,7 +44,7 @@ export function RobotPasswordRow({
     setError(null);
     setSubmitting(true);
     try {
-      await api.rotateRobotPassword(device.id, host.trim(), currentPassword);
+      await api.rotateRobotPassword(device.id, host.trim(), currentPassword.trim());
       setOpen(false);
       setHost("");
       setCurrentPassword("");
@@ -80,14 +80,23 @@ export function RobotPasswordRow({
           />
           <Input
             type="password"
-            placeholder="Current (default) password"
+            // A code review (2026-09-27) found re-pairing a
+            // revoked-and-rediscovered robot could never complete: its
+            // rotated password was orphaned under the deleted device
+            // row, so this field demanded a vendor default that no
+            // longer worked. The server now tries this device's own
+            // stored credential, then the most recent one rotated at
+            // this same host, before ever needing what's typed here -
+            // left blank on a re-pair or a plain re-rotation, only
+            // required for a genuinely new or factory-reset unit.
+            placeholder="Current password (leave blank to try the last one used)"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             disabled={submitting}
           />
           {error ? <p className="text-sm text-[var(--destructive)]">{error}</p> : null}
           <div className="flex gap-2">
-            <Button onClick={handleRotate} disabled={submitting || !host.trim() || !currentPassword}>
+            <Button onClick={handleRotate} disabled={submitting || !host.trim()}>
               {submitting ? "Rotating…" : "Rotate"}
             </Button>
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>

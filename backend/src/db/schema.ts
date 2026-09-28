@@ -1008,10 +1008,26 @@ export const deviceTokens = sqliteTable("device_tokens", {
 // totpSecrets.secretEncrypted already gets. The vendor's own published
 // default is never stored anywhere - only the password this hub itself
 // generated and rotated to.
+//
+// `host`, and no FK on `deviceId` (added 2026-09-28, a code review): a
+// code review found this keyed by `deviceId` alone, cascade-deleted the
+// moment its device row was revoked (deleteDevice() below) - so revoke a
+// robot and re-pair the same physical unit, and its rotated password
+// is gone with the old row, and the new pairing's own rotation demands
+// a vendor default that no longer opens it, with no way to recover
+// short of a factory reflash. `host` is the practical, always-available
+// "same unit" signal (the mDNS `unit_id` TXT field the design record
+// also names is absent in the simulator and not threaded to the
+// rotation form at all): robotCredentials.ts's
+// getMostRecentRobotCredentialForHost() lets a rotation try the last
+// password that worked at that address before ever asking for the
+// default - which only works if the row survives its device's own
+// deletion, so `deviceId` here is informational only (which device most
+// recently held this credential), never an enforced foreign key, and
+// deleteDevice() no longer clears this table at all.
 export const robotCredentials = sqliteTable("robot_credentials", {
-  deviceId: text("device_id")
-    .primaryKey()
-    .references(() => devices.id),
+  deviceId: text("device_id").primaryKey(),
+  host: text("host").notNull(),
   sshUsername: text("ssh_username").notNull(),
   passwordEncrypted: text("password_encrypted").notNull(),
   rotatedAt: text("rotated_at").notNull(),

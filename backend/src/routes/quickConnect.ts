@@ -28,6 +28,13 @@ const createRouteDef = createRoute({
           schema: z.object({
             label: z.string().min(1).max(60).openapi({ description: "\"Living room TV\" - shown on the approving phone." }),
             kind: z.enum(DEVICE_KINDS).default("tv"),
+            // A code review (2026-09-28): carried onto the Device row once
+            // approved, not validated - the spec vocabulary (RM-00/commons
+            // BODY-VOCAB-01) to check these ids against doesn't exist yet.
+            // No caller sends this today (bot's own hub client, RM-05, is
+            // unbuilt); the field exists so the row can carry it the
+            // moment one does.
+            capabilities: z.array(z.string()).default([]),
           }),
         },
       },
@@ -49,8 +56,8 @@ const createRouteDef = createRoute({
   },
 });
 quickConnectRoutes.openapi(createRouteDef, (c) => {
-  const { label, kind } = c.req.valid("json");
-  const req = createQuickConnect(label, kind);
+  const { label, kind, capabilities } = c.req.valid("json");
+  const req = createQuickConnect(label, kind, capabilities);
   if (!req) return c.json({ error: "Too many Quick Connect requests right now. Wait a moment and try again." }, 429);
   return c.json({ code: req.code, poll_token: req.pollToken }, 200);
 });
@@ -74,7 +81,7 @@ const pollRoute = createRoute({
           ]),
         },
       },
-      description: "\"pending\" while waiting, \"approved\" exactly once (a session cookie is also set for this address), \"expired\" for an unknown or timed-out poll_token.",
+      description: "\"pending\" while waiting, \"approved\" exactly once (a session cookie is also set for this address, except for a robot device - see the handler), \"expired\" for an unknown or timed-out poll_token.",
     },
   },
 });
@@ -95,8 +102,16 @@ quickConnectRoutes.openapi(pollRoute, (c) => {
     const person = db.select({ enabled: people.enabled }).from(people).where(and(eq(people.id, approved.personId), isNull(people.deletedAt))).get();
     if (!person || !person.enabled) return c.json({ status: "expired" as const }, 200);
 
-    issueSession(c, approved.personId);
-    const { token, expiresAt } = issueDeviceToken(approved.personId, approved.kind, approved.label);
+    // A code review (2026-09-27) found this issuing a working session
+    // cookie right here for a robot, before any rotation gate could ever
+    // run - the polling caller is the robot's own process, not the
+    // admin's browser, so there is no shared-device convenience to
+    // preserve the way there is for a phone that approved its own Quick
+    // Connect request. A robot only ever gets a device_token from here;
+    // it must redeem it like any other native client (POST
+    // /api/auth/devices/redeem), which is where the rotation gate lives.
+    if (approved.kind !== "robot") issueSession(c, approved.personId);
+    const { token, expiresAt } = issueDeviceToken(approved.personId, approved.kind, approved.label, approved.capabilities);
     return c.json({ status: "approved" as const, device_token: token, expires_at: expiresAt }, 200);
   }
   if (isQuickConnectPending(poll_token)) return c.json({ status: "pending" as const }, 200);

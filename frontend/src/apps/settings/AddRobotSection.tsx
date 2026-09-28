@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -11,6 +11,14 @@ import { RobotPasswordRow } from "./RobotPasswordSection";
 
 const TOTP_REQUIRED_MESSAGE = "A current TOTP code is required to approve a new device";
 const AWAIT_ROBOT_POLL_MS = 2000;
+// quickConnect.ts's own TTL_MS for a Quick Connect request, counted from
+// when it was CREATED (the robot spoke the code), not from when this
+// page approved it - so this is a generous upper bound on how much
+// longer the underlying request can possibly still be good for, not a
+// promise of the server's own exact expiry moment. Good enough for a
+// "this is clearly not happening, start over" nudge, which is all it's
+// for; the real enforcement is server-side (deviceAuth.ts's redeem gate).
+const CODE_TTL_MS = 5 * 60_000;
 
 // ROBOT-DEVICE-01 (bot/docs/dev/design-reachy-mini-2026-09-27.md sections
 // 9 and 10): the robot has no screen, so it speaks its own six-digit
@@ -48,6 +56,7 @@ export function AddRobotSection() {
   const [needsTotp, setNeedsTotp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [priorRobotIds, setPriorRobotIds] = useState<Set<string> | null>(null);
+  const [awaitingSince, setAwaitingSince] = useState<number | null>(null);
   const [rotationDone, setRotationDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -67,6 +76,35 @@ export function AddRobotSection() {
   const newRobot = awaitingRobot
     ? (robotsQuery.data ?? []).find((d) => priorRobotIds !== null && !priorRobotIds.has(d.id))
     : undefined;
+  // A code review (2026-09-27) found this flow had no way out when the
+  // robot never claims the approval at all (an expired code, a reboot
+  // mid-pairing, RM-05 not existing yet so nothing ever polls) - the
+  // form stayed unmounted forever with only the failed-poll retry button
+  // covering a different case (a poll that errors, not one that just
+  // keeps succeeding with an empty list). "Start over" is available the
+  // whole time waiting, not only once presumed-expired, since an admin
+  // who realizes they mistyped or the robot rebooted shouldn't have to
+  // wait out the clock either.
+  const presumedExpired = awaitingSince !== null && Date.now() - awaitingSince > CODE_TTL_MS;
+  // react-query's own structural sharing keeps the same `data` reference
+  // (and skips notifying this observer at all) across a poll that keeps
+  // returning an equally-empty list, so nothing here would ever
+  // naturally re-render to notice presumedExpired flip true - a live
+  // bug this ticking state exists purely to force, independent of
+  // whether the query's own data ever changes.
+  const [, forceRecheck] = useState(0);
+  useEffect(() => {
+    if (!awaitingRobot) return;
+    const interval = setInterval(() => forceRecheck((n) => n + 1), 1000);
+    return () => clearInterval(interval);
+  }, [awaitingRobot]);
+
+  function startOver() {
+    setPriorRobotIds(null);
+    setAwaitingSince(null);
+    setRotationDone(false);
+    setError(null);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -78,6 +116,7 @@ export function AddRobotSection() {
     // now-stale snapshot before the fresh one lands, flashing "waiting for
     // the robot" with the code input already gone.
     setPriorRobotIds(null);
+    setAwaitingSince(null);
     setSubmitting(true);
     try {
       // Snapshot who already exists before approving, so the poll below
@@ -89,6 +128,7 @@ export function AddRobotSection() {
       setTotpToken("");
       setNeedsTotp(false);
       setPriorRobotIds(new Set(existing.map((d) => d.id)));
+      setAwaitingSince(Date.now());
       await queryClient.invalidateQueries({ queryKey: ["devices"] });
       await queryClient.invalidateQueries({ queryKey: ["robot-devices"] });
     } catch (err) {
@@ -189,14 +229,34 @@ export function AddRobotSection() {
             Approved, but checking whether it finished pairing failed. It may still be paired -
             check the robot list below, or try again.
           </p>
-          <Button variant="outline" className="w-fit" onClick={() => robotsQuery.refetch()}>
-            Check again
+          <div className="flex gap-2">
+            <Button variant="outline" className="w-fit" onClick={() => robotsQuery.refetch()}>
+              Check again
+            </Button>
+            <Button variant="ghost" className="w-fit" onClick={startOver}>
+              Start over
+            </Button>
+          </div>
+        </div>
+      ) : presumedExpired ? (
+        <div className="flex max-w-sm flex-col gap-2">
+          <p className="text-base text-[var(--destructive)]">
+            The robot hasn't finished pairing and the code has likely expired. Turn the robot's
+            Wi-Fi setup back on so it speaks a fresh code, then try again.
+          </p>
+          <Button variant="outline" className="w-fit" onClick={startOver}>
+            Start over
           </Button>
         </div>
       ) : (
-        <p className="text-base text-[var(--muted-foreground)]">
-          Approved. Waiting for the robot to finish pairing on its own end…
-        </p>
+        <div className="flex max-w-sm flex-col gap-2">
+          <p className="text-base text-[var(--muted-foreground)]">
+            Approved. Waiting for the robot to finish pairing on its own end…
+          </p>
+          <Button variant="ghost" className="w-fit" onClick={startOver}>
+            Start over
+          </Button>
+        </div>
       )}
     </Section>
   );

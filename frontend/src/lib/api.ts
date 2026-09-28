@@ -178,6 +178,7 @@ export interface DeviceInfo {
   area: string | null;
   lastSeenAt: string | null;
   createdAt: string;
+  capabilities: string[];
 }
 // ROBOT-DEVICE-01: hand-typed to match backend/src/routes/devices.ts's
 // DiscoveredRobotSchema, same reasoning as DeviceInfo above (inline
@@ -508,10 +509,16 @@ export const api = {
   // ROBOT-DEVICE-01: a separate step from pairing - rotates a paired
   // robot's SSH password off the vendor's published default, which this
   // hub never stores or guesses, only the admin typing it here does.
-  rotateRobotPassword: (deviceId: string, host: string, currentPassword: string) =>
+  // currentPassword is optional now (a code review, 2026-09-27): the
+  // server tries this device's own stored credential, then the most
+  // recent one rotated at this same host, before ever needing it -
+  // "Rotate again" and re-pairing a previously-known unit both need no
+  // typing at all. An empty field is omitted entirely rather than sent
+  // as "", which the backend's schema would reject as too short.
+  rotateRobotPassword: (deviceId: string, host: string, currentPassword?: string) =>
     request<{ success: true; rotatedAt: string }>(`/api/devices/${encodeURIComponent(deviceId)}/rotate-robot-password`, {
       method: "POST",
-      body: JSON.stringify({ host, currentPassword }),
+      body: JSON.stringify({ host, currentPassword: currentPassword || undefined }),
     }),
   robotPasswordStatus: (deviceId: string) =>
     request<{ rotated: boolean }>(`/api/devices/${encodeURIComponent(deviceId)}/robot-password-status`),

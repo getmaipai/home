@@ -10,7 +10,6 @@ import { devices, deviceTokens } from "@/db/schema";
 import { newDeviceId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
-import { deleteRobotCredential } from "@/lib/robotCredentials";
 
 export type DeviceKind = "robot" | "pod" | "tv" | "phone" | "desktop" | "browser";
 
@@ -48,14 +47,14 @@ function toDevice(row: typeof devices.$inferSelect): Device {
  * from lib/deviceTokens.ts's issueDeviceToken() - there is no standalone
  * "register a device" route; pairing and token issuance are the same
  * moment. */
-export function createDevice(kind: DeviceKind, name: string, personId: string): Device {
+export function createDevice(kind: DeviceKind, name: string, personId: string, capabilities: string[] = []): Device {
   const now = new Date().toISOString();
   const row = {
     id: newDeviceId(),
     kind,
     name: name.trim().slice(0, 60) || "A device",
     area: null,
-    capabilities: "[]",
+    capabilities: JSON.stringify(capabilities),
     personId,
     watermarks: "{}",
     lastSeenAt: null,
@@ -111,10 +110,11 @@ export function deleteDevice(id: string, personId: string): boolean {
   // backup (POST /api/backups/received) was revoked, since nothing
   // cleared this table first.
   deleteReceivedBackupsForDevice(id);
-  // robot_credentials.device_id has the same no-cascade FK shape - a robot
-  // that had its SSH password rotated (ROBOT-DEVICE-01) hits the same
-  // violation on revoke unless this table is cleared first too.
-  deleteRobotCredential(id);
+  // robot_credentials.device_id is deliberately NOT a foreign key (a code
+  // review, 2026-09-28): a rotated password needs to survive its device
+  // row's own deletion so a re-pair of the same physical unit can find
+  // it again by host (robotCredentials.ts's own comment has the story).
+  // Nothing to clear here - that row staying behind is the whole point.
   db.delete(devices).where(eq(devices.id, id)).run();
   return true;
 }

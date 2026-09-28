@@ -10,7 +10,7 @@ import { requireAuth, requireRole } from "@/middleware/auth";
 import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById } from "@/lib/devices";
 import { discoverRobots } from "@/lib/robotDiscovery";
 import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh";
-import { storeRobotCredential, hasRotatedRobotCredential } from "@/lib/robotCredentials";
+import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getMostRecentRobotCredentialForHost } from "@/lib/robotCredentials";
 
 export const devicesRoutes = apiRouter();
 
@@ -21,6 +21,11 @@ const DeviceSchema = z.object({
   area: z.string().nullable(),
   lastSeenAt: z.string().nullable(),
   createdAt: z.string(),
+  // A code review (2026-09-28): stored on pairing (createDevice) but never
+  // surfaced before now - ROBOT-CARD-01 (not yet built) is what actually
+  // renders it; carried here so that page has something to read once it
+  // exists.
+  capabilities: z.array(z.string()),
 });
 
 const listRoute = createRoute({
@@ -37,7 +42,7 @@ devicesRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const devices = listDevicesForPerson(actor.id);
   return c.json(
-    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt })),
+    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities })),
     200,
   );
 });
@@ -58,7 +63,7 @@ const listRobotsRoute = createRoute({
 devicesRoutes.openapi(listRobotsRoute, (c) => {
   const robots = listDevicesByKind("robot");
   return c.json(
-    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt })),
+    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities })),
     200,
   );
 });
@@ -136,7 +141,11 @@ const rotatePasswordRoute = createRoute({
             host: z.string().min(1).openapi({ description: "The robot's LAN address or mDNS host." }),
             port: z.number().int().positive().default(22),
             sshUsername: z.string().min(1).default("pollen"),
-            currentPassword: z.string().min(1).openapi({ description: "The vendor's own published default - never stored." }),
+            currentPassword: z
+              .string()
+              .min(1)
+              .optional()
+              .openapi({ description: "The vendor's own published default - never stored. Optional once this device or another at the same host has a rotated password on file; that one is tried first." }),
           }),
         },
       },
@@ -161,16 +170,47 @@ devicesRoutes.openapi(rotatePasswordRoute, async (c) => {
   if (!device) return c.json({ error: "No such device" }, 404);
   if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
 
-  let newPassword: string;
-  try {
-    ({ newPassword } = await rotateRobotPassword({ host, port, username: sshUsername, currentPassword }));
-  } catch (err) {
-    const message = err instanceof RobotPasswordRotationError ? err.message : "Could not connect or change the password";
+  // A code review (2026-09-27) found re-pairing a revoked-and-rediscovered
+  // robot could never complete: its previously rotated password lived
+  // only under the old, deleted device row, so a fresh pairing's own
+  // rotation demanded a vendor default that no longer opened the unit.
+  // Candidates are tried in order, stopping at the first that connects -
+  // but a code review (2026-09-28) found the original ordering (stored
+  // credentials first, admin-supplied last) sends live SSH auth attempts
+  // with stale passwords ahead of one the admin explicitly typed, a real
+  // lockout risk if the robot's own SSH daemon rate-limits or bans after
+  // a few failures (a DHCP-reused host, a factory reset). Typing a
+  // password is a deliberate signal - it goes first. Stored credentials
+  // exist only to let "Rotate again" and a same-unit re-pair need no
+  // typing at all, so they're the fallback, never a guess ahead of one.
+  const candidates: string[] = [];
+  if (currentPassword) candidates.push(currentPassword);
+  const ownCredential = getRobotCredential(device.id);
+  if (ownCredential && !candidates.includes(ownCredential.password)) candidates.push(ownCredential.password);
+  const hostCredential = getMostRecentRobotCredentialForHost(host);
+  if (hostCredential && !candidates.includes(hostCredential.password)) candidates.push(hostCredential.password);
+
+  if (candidates.length === 0) {
+    return c.json({ error: "The robot's current password is required the first time it's rotated." }, 400);
+  }
+
+  let newPassword: string | undefined;
+  let lastError: unknown;
+  for (const candidate of candidates) {
+    try {
+      ({ newPassword } = await rotateRobotPassword({ host, port, username: sshUsername, currentPassword: candidate }));
+      break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  if (newPassword === undefined) {
+    const message = lastError instanceof RobotPasswordRotationError ? lastError.message : "Could not connect or change the password";
     return c.json({ error: message }, 400);
   }
 
   try {
-    storeRobotCredential(device.id, sshUsername, newPassword);
+    storeRobotCredential(device.id, host, sshUsername, newPassword);
   } catch (err) {
     // The robot's password already changed at this point - only the write
     // to our own store failed. Never log the password itself; the admin

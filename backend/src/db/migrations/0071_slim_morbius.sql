@@ -1,0 +1,1 @@
+ALTER TABLE `robot_credentials` ADD `host` text NOT NULL DEFAULT '';

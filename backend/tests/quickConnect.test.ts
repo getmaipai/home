@@ -43,7 +43,7 @@ describe("the approve -> poll flow", () => {
     // The code itself is not a valid poll_token - someone who only saw
     // the code on the TV screen cannot steal the approved session.
     expect(consumeQuickConnect(req.code)).toBeNull();
-    expect(consumeQuickConnect(req.pollToken)).toEqual({ personId: "person-abc123", kind: "tv", label: "Living room TV" });
+    expect(consumeQuickConnect(req.pollToken)).toEqual({ personId: "person-abc123", kind: "tv", label: "Living room TV", capabilities: [] });
   });
 
   test("consumed exactly once - a second poll gets nothing", () => {

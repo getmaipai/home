@@ -14,6 +14,7 @@ function device(overrides: Partial<DeviceInfo> = {}): DeviceInfo {
     area: null,
     lastSeenAt: null,
     createdAt: "2026-09-27T00:00:00.000Z",
+    capabilities: [],
     ...overrides,
   };
 }
@@ -96,7 +97,7 @@ describe("RobotPasswordSection", () => {
       const { findByRole, findByPlaceholderText, queryByPlaceholderText } = renderSection();
       fireEvent.click(await findByRole("button", { name: "Rotate password" }));
       fireEvent.change(await findByPlaceholderText("Robot's LAN address"), { target: { value: "192.0.2.10" } });
-      fireEvent.change(await findByPlaceholderText("Current (default) password"), { target: { value: "vendor-default" } });
+      fireEvent.change(await findByPlaceholderText("Current password (leave blank to try the last one used)"), { target: { value: "vendor-default" } });
       fireEvent.click(await findByRole("button", { name: "Rotate" }));
 
       await waitFor(() => expect(calls).toEqual([{ host: "192.0.2.10", currentPassword: "vendor-default" }]));
@@ -116,7 +117,7 @@ describe("RobotPasswordSection", () => {
       const { findByRole, findByPlaceholderText, findByText } = renderSection();
       fireEvent.click(await findByRole("button", { name: "Rotate password" }));
       fireEvent.change(await findByPlaceholderText("Robot's LAN address"), { target: { value: "192.0.2.10" } });
-      fireEvent.change(await findByPlaceholderText("Current (default) password"), { target: { value: "wrong" } });
+      fireEvent.change(await findByPlaceholderText("Current password (leave blank to try the last one used)"), { target: { value: "wrong" } });
       fireEvent.click(await findByRole("button", { name: "Rotate" }));
 
       await findByText("Could not connect or change the password");

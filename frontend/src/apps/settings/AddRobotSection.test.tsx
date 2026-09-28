@@ -1,10 +1,13 @@
-import { describe, expect, test, mock, afterEach } from "bun:test";
+import { describe, expect, test, mock, afterEach, setSystemTime } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { DeviceInfo, DiscoveredRobotInfo } from "@/lib/api";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setSystemTime(); // restore the real clock after any test that faked it
+});
 
 function robot(overrides: Partial<DiscoveredRobotInfo> = {}): DiscoveredRobotInfo {
   return {
@@ -59,6 +62,7 @@ function pairedDevice(overrides: Partial<DeviceInfo> = {}): DeviceInfo {
     area: null,
     lastSeenAt: null,
     createdAt: "2026-09-27T00:00:00.000Z",
+    capabilities: [],
     ...overrides,
   };
 }
@@ -213,7 +217,7 @@ describe("AddRobotSection", () => {
       expect(queryByPlaceholderText("Six-digit code")).toBeNull();
 
       fireEvent.change(hostInput, { target: { value: "192.0.2.10" } });
-      fireEvent.change(await findByPlaceholderText("Current (default) password"), {
+      fireEvent.change(await findByPlaceholderText("Current password (leave blank to try the last one used)"), {
         target: { value: "vendor-default" },
       });
       fireEvent.click(await findByRole("button", { name: "Rotate" }));
@@ -264,4 +268,53 @@ describe("AddRobotSection", () => {
       globalThis.fetch = original;
     }
   });
+
+  test("Start over abandons an in-progress wait and shows the pairing form again", async () => {
+    // A code review (2026-09-27) found this flow had no way out when the
+    // robot never claims the approval (an expired code, a reboot
+    // mid-pairing, or - as today - nothing ever polling since RM-05
+    // doesn't exist yet): /api/devices/robots keeps returning [], and
+    // without this action the form stayed unmounted forever.
+    const restore = stubFetch({ discovered: [] });
+    try {
+      const { findByPlaceholderText, findByRole, findByText, queryByPlaceholderText } = renderSection();
+      fireEvent.change(await findByPlaceholderText("Six-digit code"), { target: { value: "ABC123" } });
+      fireEvent.click(await findByRole("button", { name: "Pair" }));
+
+      await findByText(/Waiting for the robot to finish pairing/);
+      expect(queryByPlaceholderText("Six-digit code")).toBeNull();
+
+      fireEvent.click(await findByRole("button", { name: "Start over" }));
+
+      await findByPlaceholderText("Six-digit code");
+    } finally {
+      restore();
+    }
+  });
+
+  test("the code is presumed expired once its TTL has passed, with its own Start over", async () => {
+    // AddRobotSection's own once-a-second interval is what forces this
+    // re-render: react-query's structural sharing keeps the same `data`
+    // reference (and skips notifying the observer at all) across a poll
+    // that keeps returning an equally-empty list, so nothing would
+    // otherwise ever re-render to notice presumedExpired flip true no
+    // matter how much real time passed - a live bug this test caught
+    // before the ticking state was added.
+    const restore = stubFetch({ discovered: [] });
+    try {
+      setSystemTime(new Date("2026-09-27T12:00:00.000Z"));
+      const { findByPlaceholderText, findByRole, findByText } = renderSection();
+      fireEvent.change(await findByPlaceholderText("Six-digit code"), { target: { value: "ABC123" } });
+      fireEvent.click(await findByRole("button", { name: "Pair" }));
+      await findByText(/Waiting for the robot to finish pairing/);
+
+      setSystemTime(new Date("2026-09-27T12:06:00.000Z")); // 6 minutes later: past the 5-minute TTL
+
+      await findByText(/code has likely expired/, {}, { timeout: 5000 });
+      fireEvent.click(await findByRole("button", { name: "Start over" }));
+      await findByPlaceholderText("Six-digit code");
+    } finally {
+      restore();
+    }
+  }, 10_000);
 });

@@ -43,9 +43,9 @@ describe("Quick Connect end to end", () => {
 
     // A device row now shows up under the approving person's own list.
     const devicesRes = await phone.get("/api/devices");
-    const devices = (await devicesRes.json()) as Array<{ id: string; name: string; kind: string; area: string | null; lastSeenAt: string | null; createdAt: string }>;
+    const devices = (await devicesRes.json()) as Array<{ id: string; name: string; kind: string; area: string | null; lastSeenAt: string | null; createdAt: string; capabilities: string[] }>;
     expect(devices).toEqual([
-      { id: expect.any(String), name: "Living room TV", kind: "tv", area: null, lastSeenAt: expect.any(String), createdAt: expect.any(String) },
+      { id: expect.any(String), name: "Living room TV", kind: "tv", area: null, lastSeenAt: expect.any(String), createdAt: expect.any(String), capabilities: [] },
     ]);
   });
 
@@ -105,5 +105,36 @@ describe("Quick Connect end to end", () => {
     // The real code: approved.
     const rightTotp = await phone.post("/api/auth/quick-connect/approve", { code, totpToken: codeFromUri() });
     expect(rightTotp.status).toBe(200);
+  });
+
+  // A code review (2026-09-27) found the poll route minting a working
+  // session cookie for a robot the instant its approval was consumed -
+  // there is no shared-device convenience to preserve there the way
+  // there is for a phone polling its own request, so the session was
+  // pure exposure with no gate on it. A robot only gets a device_token
+  // now; deviceAuth.test.ts covers the actual rotation gate at redeem.
+  test("a robot's own poll gets a device token but no immediate session, unlike a TV's", async () => {
+    const robot = new TestClient();
+    const codeRes = await robot.post("/api/auth/quick-connect/code", { label: "Reachy Mini", kind: "robot" });
+    const { code, poll_token } = (await codeRes.json()) as { code: string; poll_token: string };
+
+    const phone = new TestClient();
+    await phone.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    await phone.post("/api/auth/quick-connect/approve", { code });
+
+    const approvedPoll = await robot.get(`/api/auth/quick-connect/poll?poll_token=${poll_token}`);
+    expect(approvedPoll.status).toBe(200);
+    const body = (await approvedPoll.json()) as { status: string; device_token: string };
+    expect(body.status).toBe("approved");
+    expect(typeof body.device_token).toBe("string");
+
+    // No session cookie was set for the polling address, unlike a TV.
+    const robotMe = await robot.get("/api/auth/me");
+    expect(robotMe.status).toBe(401);
+
+    // The device token itself is real and correctly refused (unrotated),
+    // not just missing - the gate lives at redeem, not here.
+    const redeemRes = await new TestClient().post("/api/auth/devices/redeem", { token: body.device_token });
+    expect(redeemRes.status).toBe(403);
   });
 });

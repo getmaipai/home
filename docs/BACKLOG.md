@@ -9059,6 +9059,55 @@ on a spec tag that was never cut.
       second robot immediately after the first one's rotation could
       briefly flash a stale "waiting" state; and a failed poll silently
       froze the page with no way out, now a retry button.
+      **2026-09-28 additions, from a Fable-model audit of the above
+      (`bot/docs/dev/reachy-mini-gap-audit-2026-09-27.md`):**
+      - **The enforcement was UI-only.** The server handed a robot a
+        working 365-day token the moment its own poll consumed the
+        approval, before any rotation gate could run - close the tab, or
+        have a second admin look, and the robot was fully paired with the
+        vendor's password and nothing had ever refused anything.
+        `quickConnect.ts`'s `/poll` no longer issues an immediate session
+        for a robot (only a device token, unlike every other device
+        kind); `deviceAuth.ts`'s `/redeem` - the one place every device
+        token is ever traded for a working session - now refuses a
+        `robot` device with no `robot_credentials` row, with a
+        `robot_password_unrotated` code. Tested at the backend route
+        level, not just the frontend's own local state.
+      - **No way out if the robot never claims the approval** (an
+        expired code, a reboot mid-pairing, or - as of this writing -
+        nothing ever polling since RM-05 doesn't exist yet).
+        `AddRobotSection` now has a "Start over" action available the
+        whole time it's waiting, plus a presumed-expired message once
+        the code's own 5-minute TTL has clearly passed. Fixing this
+        exposed a real bug in the fix itself: react-query's structural
+        sharing skips re-rendering an observer when a poll keeps
+        returning an equally-empty list, so nothing would have ever
+        noticed the TTL passing no matter how long a real user waited -
+        closed with a small ticking interval, independent of whether the
+        query's own data ever changes.
+      - **Re-pairing a revoked robot could never complete.** Its rotated
+        password lived only under the old, deleted device row -
+        `robot_credentials.device_id` cascade-deleted right alongside it
+        - so a fresh pairing's own rotation demanded the vendor default,
+        which no longer opened a unit whose password had already
+        changed. The only way out was a factory reflash. Fixed by making
+        `device_id` no longer a foreign key at all (the row now
+        deliberately survives its device's own deletion) and adding a
+        `host` column: `rotate-robot-password` now tries, in order, this
+        device's own stored credential (so "Rotate again" needs no
+        typing), then the most recent credential rotated at the same
+        host (a re-pair of a known unit), then whatever the admin typed
+        - stopping at the first one that actually connects. The admin's
+        `currentPassword` is optional now for exactly this reason.
+      - **The device row never got a capability list**, despite this
+        item's own acceptance line naming one. Quick Connect's `/code`
+        request now accepts an optional `capabilities: string[]`,
+        carried through to the Device row and exposed on both device-list
+        routes - not validated against the spec vocabulary, since RM-00
+        (commons BODY-VOCAB-01) hasn't landed yet, and nothing sends one
+        today since the robot's own hub client (RM-05/G4) doesn't exist
+        either. Storage and plumbing only; tracked against G4/G5 in the
+        gap-audit doc for when a real sender exists.
 - [ ] **ROBOT-ROUTES-01: the turn, cancel, `stt` and `tts` routes accept a robot's device token** (S-M, filed 2026-09-27, same design, section 4). Objective: a `robot` device token opens the turn stream with `surface: robot` (SURFACE-01's surface, WIRE-01's `signal` and `cancel` events), `POST /api/turn/{id}/cancel`, the `stt` transcribe route for an endpointed utterance, and the `tts` stream, each scoped to that device's own conversation and the person its evidence names, never to another device's. Mirror: the PWA's use of the same routes with a session. Acceptance: the bot repo's fake completes a three-turn conversation through these routes; a robot token cannot read another conversation; tests in those words. Out of scope: any new route. Exit: `bash scripts/check.sh` (medium review: a route and a guard).
 - [ ] **ROBOT-CARD-01: the robot's card and its update row** (S, after ROBOT-DEVICE-01; same design, sections 5, 7 and 10). Objective: the Devices page's robot card, from the dashboard template's widget, shows the body's live state frame (listening, thinking, speaking, muted, tracking, on battery with "level unknown" where the body cannot read it, unreachable since) because a body with no screen or light ring carries its states here; the body's daemon version appears on the card and its vendor update as a row on the Updates page applied only on a person's click, per UPDATES.md. Acceptance: the fake's state frames render on the card at 1440 and 390; the update row appears and does nothing until clicked; captures opened and judged. Out of scope: the pose widget (a kit block, later). Exit: `bash scripts/check.sh` and the captures.
 - [ ] **VOICE-BROWSER-01: the voice browser** (M, owner request

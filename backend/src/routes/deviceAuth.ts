@@ -26,6 +26,8 @@ import { eq, and, isNull } from "drizzle-orm";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { issueSession } from "@/lib/session";
 import { redeemDeviceToken } from "@/lib/deviceTokens";
+import { getDeviceById } from "@/lib/devices";
+import { hasRotatedRobotCredential } from "@/lib/robotCredentials";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 
@@ -41,7 +43,10 @@ const redeemRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "A session cookie is now set for this origin." },
-    ...errorResponses({ 401: "Unknown or expired device token, or the profile is disabled" }),
+    ...errorResponses({
+      401: "Unknown or expired device token, or the profile is disabled",
+      403: "A robot device token, but the unit's password has not been rotated off the vendor default",
+    }),
   },
 });
 deviceAuthRoutes.openapi(redeemRoute, (c) => {
@@ -59,6 +64,24 @@ deviceAuthRoutes.openapi(redeemRoute, (c) => {
   // here too.
   const person = db.select({ enabled: people.enabled }).from(people).where(and(eq(people.id, redeemed.personId), isNull(people.deletedAt))).get();
   if (!person || !person.enabled) return c.json({ error: "Unknown or expired device token" }, 401);
+
+  // ROBOT-DEVICE-01 (bot/docs/dev/design-reachy-mini-2026-09-27.md
+  // section 8): "a robot with the published password is refused by
+  // Home's add flow until it is [rotated]." A code review (2026-09-27)
+  // found the prior landing only enforced this in one browser tab's own
+  // React state - the server handed out a working, year-long token the
+  // moment the robot's own poll consumed the approval, with nothing
+  // server-side ever refusing anything. This is the actual gate: a
+  // robot device with no robot_credentials row is refused here, the one
+  // place every device token (native client, and eventually the robot's
+  // own hub client, RM-05) is traded for a working session.
+  const device = getDeviceById(redeemed.deviceId);
+  if (device && device.kind === "robot" && !hasRotatedRobotCredential(device.id)) {
+    return c.json(
+      { error: "This robot's password has not been rotated off the vendor default yet.", code: "robot_password_unrotated" },
+      403,
+    );
+  }
 
   issueSession(c, redeemed.personId);
   return c.json({ success: true as const }, 200);

@@ -53,11 +53,12 @@ export function issueDeviceToken(
   personId: string,
   kind: DeviceKind,
   label: string,
+  capabilities: string[] = [],
 ): { token: string; deviceId: string; expiresAt: string } {
   pruneExpiredDeviceTokens();
   pruneOldestIfOverLimit(personId);
 
-  const device = createDevice(kind, label, personId);
+  const device = createDevice(kind, label, personId, capabilities);
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + TTL_MS).toISOString();
   db.insert(deviceTokens)
