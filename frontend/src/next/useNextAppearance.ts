@@ -11,7 +11,7 @@ function isAppearance(value: unknown): value is Appearance {
 }
 
 /** `ui.appearance` (person scope, backend/src/settings/uiKeys.ts) fed
- * into the vendored template's own ThemeProvider on `/next`
+ * into the vendored template's own ThemeProvider on `/`
  * (mounted in NextRoutes.tsx) - HOME-UI-04d's own name, "one theme
  * writer": the provider is the only thing that ever writes `.dark`/
  * `.light` on `<html>` here (its own effect, unedited), never this
@@ -30,7 +30,7 @@ function isAppearance(value: unknown): value is Appearance {
  * choice written back so a reload sees the same one.
  *
  * Named gap, found in review: `ui.appearance = "system"` doesn't
- * live-track the OS if it changes while `/next` is already open. The
+ * live-track the OS if it changes while `/` is already open. The
  * provider's own effect (unedited, ThemeContext.tsx) keys only on its
  * `theme` state (`"system"` itself, unchanged), never on the media
  * query firing - `@/shell/useAppearance.ts`'s live `matchMedia`
@@ -109,20 +109,16 @@ export function useNextAppearance(personId: string): void {
       });
   }, [theme, appearance, scopeValue, queryClient, setTheme]);
 
-  // HOME-UI-04g: resolve the effective dark/light and, when the shell
-  // is on, paint the right `.dark`/`.light` class on `<html>` (so the
-  // old shell's loading state already wears the template's palette
-  // while the settings fetch is pending) and write it into the
-  // per-browser cache so main.tsx can paint the same class before
-  // React mounts.
+  // Paint the resolved appearance on the document and cache it so the
+  // root shell's palette is correct before React mounts on reload.
   const cached = readShellNextCache();
   useEffect(() => {
-    if (!cached?.on || appearance === undefined) return;
+    if (appearance === undefined) return;
     const dark =
       appearance === "dark" ||
       (appearance === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
     document.documentElement.classList.toggle("light", !dark);
-    writeShellNextCache({ ...cached, dark });
-  }, [appearance, cached]);
+    writeShellNextCache({ look: cached?.look ?? "neutral", dark });
+  }, [appearance, cached?.look]);
 }

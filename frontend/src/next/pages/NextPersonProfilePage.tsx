@@ -65,7 +65,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
             return (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
                 <p className="text-base font-medium">No one in this household has that profile.</p>
-                <Link to="/next/people" className="text-primary underline">Back to People</Link>
+                <Link to="/people" className="text-primary underline">Back to People</Link>
               </div>
             );
           }
@@ -73,9 +73,9 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
             <>
               <ProfileHeaderCard profile={profile} viewer={person} viewingSelf={viewingSelf} onPersonChange={onPersonChange} />
               <Tabs value={activeTab} onValueChange={onTabChange}>
-                <TabsList>
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  {canViewMemories ? <TabsTrigger value="memories">Memories</TabsTrigger> : null}
+              <TabsList className="h-auto min-h-14 p-1">
+                <TabsTrigger value="overview" className="min-h-12">Overview</TabsTrigger>
+                  {canViewMemories ? <TabsTrigger value="memories" className="min-h-12">Memories</TabsTrigger> : null}
                 </TabsList>
                 <TabsContent value="overview" className="flex flex-col gap-4 py-2">
                   <p className="text-sm text-muted-foreground">{viewingSelf ? "This is your own profile." : `${profile.display_name}'s profile in this household.`}</p>
@@ -129,8 +129,8 @@ function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { p
           {profile.bio ? <p className="text-base text-muted-foreground">{profile.bio}</p> : null}
         </div>
         <div className="flex basis-full flex-row items-center justify-end gap-4 sm:w-auto sm:basis-auto sm:flex-col sm:items-end sm:gap-2">
-          {canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
-          {showManageLink ? <Link to="/next/settings?tab=household" className="text-sm text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Manage in Settings</Link> : null}
+          {canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
+          {showManageLink ? <Link to="/settings?tab=household" className="text-sm text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Manage in Settings</Link> : null}
         </div>
       </CardContent>
       {canEdit ? <EditProfileDialog profile={profile} open={editOpen} onOpenChange={setEditOpen} onPersonChange={onPersonChange} /> : null}

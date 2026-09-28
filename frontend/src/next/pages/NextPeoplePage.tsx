@@ -23,7 +23,7 @@ function PersonCard({ entry }: { entry: PersonRosterEntry }) {
   const accentClass = entry.accent ? ACCENT_RING_CLASS[entry.accent] : null;
   return (
     <Link
-      to={`/next/people/${entry.id}`}
+      to={`/people/${entry.id}`}
       className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Card className={accentClass ? `ring-2 ring-offset-2 ring-offset-background transition-shadow hover:shadow-md ${accentClass}` : "transition-shadow hover:shadow-md"}>
@@ -33,7 +33,7 @@ function PersonCard({ entry }: { entry: PersonRosterEntry }) {
             className={accentClass ? `size-16 text-xl ring-2 ring-offset-2 ring-offset-card ${accentClass}` : "size-16 text-xl"}
           />
           <div className="flex flex-col gap-1">
-            <h3 className="text-base font-semibold">{entry.display_name}</h3>
+            <h2 className="text-base font-semibold">{entry.display_name}</h2>
             <p className="text-sm text-muted-foreground">{ROLE_LABELS[entry.role]}</p>
             {entry.bio ? <p className="text-sm text-muted-foreground">{entry.bio}</p> : null}
           </div>
@@ -54,7 +54,7 @@ function PersonCard({ entry }: { entry: PersonRosterEntry }) {
  * it, which is what the old stacked layout's double avatar came from
  * (the design record: "their name shows twice today: once above the
  * table, once as a row in it"). Tapping any card, including your own,
- * opens `/next/people/:id`, the next-shell profile page for any person. */
+ * opens `/people/:id`, the next-shell profile page for any person. */
 export function NextPeoplePage({ person }: { person: Roster }) {
   useDocumentTitle("People");
   const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });

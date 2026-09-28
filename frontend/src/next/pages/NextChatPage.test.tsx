@@ -203,7 +203,7 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
     const restore = stubFetch();
     try {
       const { findByLabelText } = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -219,7 +219,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     const restore = stubFetch();
     try {
       const { findByText } = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -242,7 +242,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     }) as unknown as typeof fetch;
     try {
       const { findByText } = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -274,7 +274,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat?conversation=conv-archive123"]}>
+        <MemoryRouter initialEntries={["/chat?conversation=conv-archive123"]}>
           <ConversationLocation />
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
@@ -319,7 +319,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -345,7 +345,7 @@ describe("NextChatPage (c-99f5: the tab's document title)", () => {
     try {
       document.title = "Before";
       renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -381,7 +381,7 @@ describe("NextChatPage (c-99f5: the tab's document title)", () => {
     try {
       document.title = "Before";
       renderPage(
-        <MemoryRouter initialEntries={["/next/chat?conversation=conv-titled123"]}>
+        <MemoryRouter initialEntries={["/chat?conversation=conv-titled123"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -438,7 +438,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -463,7 +463,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -515,7 +515,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     });
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -555,7 +555,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -583,7 +583,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -625,7 +625,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -655,7 +655,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -686,7 +686,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     const restore = stubTurnFetch(stream);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -797,7 +797,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     let restore: () => void = () => {};
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -855,7 +855,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     let restore: () => void = () => {};
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -875,7 +875,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     let restore: () => void = () => {};
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -960,7 +960,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={[`/next/chat?conversation=${ARTIFACT.conversation_id}`]}>
+        <MemoryRouter initialEntries={[`/chat?conversation=${ARTIFACT.conversation_id}`]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1028,7 +1028,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     ]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1058,7 +1058,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     ]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1092,7 +1092,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     ]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1146,7 +1146,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={[`/next/chat?conversation=${conversation.id}`]}>
+        <MemoryRouter initialEntries={[`/chat?conversation=${conversation.id}`]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1242,7 +1242,7 @@ describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
     const { restore, turnsFetchCount } = stubProjectTurnFetch("conv-project123");
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1321,7 +1321,7 @@ describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={[`/next/chat?conversation=${conversationId}`]}>
+        <MemoryRouter initialEntries={[`/chat?conversation=${conversationId}`]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1344,7 +1344,7 @@ describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
     const { restore, turnsFetchCount } = stubProjectTurnFetch("conv-project456");
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1500,7 +1500,7 @@ describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1559,7 +1559,7 @@ describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1599,7 +1599,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1638,7 +1638,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1680,7 +1680,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const first = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1690,7 +1690,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       cleanup();
 
       const second = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1706,7 +1706,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1746,7 +1746,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1803,7 +1803,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1831,7 +1831,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1856,7 +1856,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1889,7 +1889,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1920,7 +1920,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1963,7 +1963,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -1984,7 +1984,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2029,7 +2029,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2059,7 +2059,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2095,7 +2095,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2131,7 +2131,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2174,7 +2174,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     const restore = stubFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2248,7 +2248,7 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2281,7 +2281,7 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2309,7 +2309,7 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2334,7 +2334,7 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2382,7 +2382,7 @@ describe("NextChatPage (MODEL-SEL-01: session model picker)", () => {
     for (const [configured, count] of [[false, 0], [true, 1]] as const) {
       const restore = stubModelPickerFetch(configured, count);
       try {
-        const view = renderPage(<MemoryRouter initialEntries={["/next/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
+        const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
         await view.findByLabelText("Message input");
         await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
         expect(view.queryByLabelText("Choose model")).toBeNull();
@@ -2393,7 +2393,7 @@ describe("NextChatPage (MODEL-SEL-01: session model picker)", () => {
   test("renders the shipped picker and sends its explicit choice on the turn", async () => {
     const restore = stubModelPickerFetch(true, 2);
     try {
-      const view = renderPage(<MemoryRouter initialEntries={["/next/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
       const trigger = await view.findByRole("combobox", { name: "Choose model" });
       expect(trigger.textContent).toContain("Llama Default");
       fireEvent.click(trigger);
@@ -2432,7 +2432,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     const restore = fetchWithPicker();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2452,7 +2452,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     const restore = fetchWithPicker();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2522,7 +2522,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     const page = () => renderPage(
       <ChatHeaderDataProvider>
         <ChatHeaderBar />
-        <MemoryRouter initialEntries={[`/next/chat?conversation=${saved.id}`]}>
+        <MemoryRouter initialEntries={[`/chat?conversation=${saved.id}`]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>
       </ChatHeaderDataProvider>,
@@ -2617,7 +2617,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       const view = renderPage(
         <ChatHeaderDataProvider>
           <ChatHeaderBar />
-          <MemoryRouter initialEntries={["/next/chat"]}>
+          <MemoryRouter initialEntries={["/chat"]}>
             <NextChatPage person={makePerson()} />
           </MemoryRouter>
         </ChatHeaderDataProvider>,
@@ -2643,7 +2643,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     const restore = fetchWithPicker();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2664,7 +2664,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     const restore = fetchWithPicker();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2716,7 +2716,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2740,7 +2740,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
 
       view.unmount();
       const reloaded = renderPage(
-        <MemoryRouter initialEntries={["/next/chat?conversation=conv-edit123"]}>
+        <MemoryRouter initialEntries={["/chat?conversation=conv-edit123"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2773,7 +2773,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2839,7 +2839,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
     const open = (id?: string) => renderPage(
-      <MemoryRouter initialEntries={[`/next/chat${id ? `?conversation=${id}` : ""}`]}>
+      <MemoryRouter initialEntries={[`/chat${id ? `?conversation=${id}` : ""}`]}>
         <NextChatPage person={makePerson()} />
       </MemoryRouter>,
     );
@@ -2877,7 +2877,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     const restore = stubMultiTurnFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson({ role: "child" })} />
         </MemoryRouter>,
       );
@@ -2901,7 +2901,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     const restore = fetchWithPicker();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2944,7 +2944,7 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
     writeIncognitoCache(true);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -2985,7 +2985,7 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
       const view = renderPage(
         <>
           <GlobalIncognitoToggle />
-          <MemoryRouter initialEntries={["/next/chat"]}>
+          <MemoryRouter initialEntries={["/chat"]}>
             <NextChatPage person={makePerson()} />
           </MemoryRouter>
         </>,
@@ -3018,7 +3018,7 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
       localStorage.setItem("maipai.incognito-explanation-seen", "true");
       writeIncognitoCache(true);
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3048,7 +3048,7 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
     try {
       writeIncognitoCache(false);
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3106,7 +3106,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     const restore = stubAddMenuFetch();
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3132,7 +3132,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     );
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3159,7 +3159,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     const restore = stubAddMenuFetch(undefined, true);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3182,7 +3182,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     const restore = stubAddMenuFetch(undefined, true);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3200,7 +3200,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     const restore = stubAddMenuFetch(undefined, false);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3224,7 +3224,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     const restore = stubAddMenuFetch(undefined, true);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3314,7 +3314,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
     const restore = stubCompareFetch([TRACE_EVENT, { type: "delta", text: "It's " }, { type: "delta", text: "probably sunny too." }, { type: "done" }]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3341,7 +3341,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
     const restore = stubCompareFetch([]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makeAdultPerson()} />
         </MemoryRouter>,
       );
@@ -3363,7 +3363,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
     const restore = stubCompareFetch([TRACE_EVENT, { type: "refused" }]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3382,7 +3382,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
     const restore = stubCompareFetch([]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makeAdultPerson()} />
         </MemoryRouter>,
       );
@@ -3406,7 +3406,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
     const restore = stubCompareFetch([]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3443,7 +3443,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
     const restore = stubCompareFetch([]);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3538,7 +3538,7 @@ describe("NextChatPage (DICT-01: the mic button's not-installed state)", () => {
     const restore = stubDictationFetch(false);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3602,7 +3602,7 @@ describe("NextChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger
     const restore = stubDictationFetch(false);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3622,7 +3622,7 @@ describe("NextChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger
     const restore = stubDictationFetch(true);
     try {
       const view = renderPage(
-        <MemoryRouter initialEntries={["/next/chat"]}>
+        <MemoryRouter initialEntries={["/chat"]}>
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
@@ -3685,7 +3685,7 @@ describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
       const view = renderPage(
         <ChatHeaderDataProvider>
           <ChatHeaderBar />
-          <MemoryRouter initialEntries={["/next/chat"]}>
+          <MemoryRouter initialEntries={["/chat"]}>
             <NextChatPage person={makePerson()} />
           </MemoryRouter>
         </ChatHeaderDataProvider>,
@@ -3724,7 +3724,7 @@ describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
       const view = renderPage(
         <ChatHeaderDataProvider>
           <ChatHeaderBar />
-          <MemoryRouter initialEntries={["/next/chat"]}>
+          <MemoryRouter initialEntries={["/chat"]}>
             <NextChatPage person={makePerson()} />
           </MemoryRouter>
         </ChatHeaderDataProvider>,

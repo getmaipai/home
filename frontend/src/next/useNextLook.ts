@@ -5,7 +5,7 @@ import { readShellNextCache, writeShellNextCache } from "@/next/shellNextCache";
 const STYLE_CLASSES = LOOKS.map((look) => `style-${look}`);
 
 /** `ui.look` (person scope, the same key `@/shell/useLook.ts` reads for
- * the old shell's `data-look` attribute) applied to the `/next` stand-up
+ * the old shell's `data-look` attribute) applied to the `/` stand-up
  * instead as the vendored template's own body-class style-variant
  * mechanism (the eight shadcn base-color presets, ui/src/dashboard/css/
  * globals.css) - a different mechanism, the same setting, per the
@@ -23,7 +23,7 @@ export function useNextLook(personId: string): Look {
     document.body.classList.remove(...STYLE_CLASSES);
     document.body.classList.add(`style-${look}`);
     const cached = readShellNextCache();
-    if (cached) writeShellNextCache({ ...cached, look });
+    writeShellNextCache({ look, dark: cached?.dark ?? false });
     return () => {
       document.body.classList.remove(...STYLE_CLASSES);
     };

@@ -6,7 +6,7 @@ import { NextPageHeaderTitle } from "@/next/nextPageHeaderTitle";
 afterEach(cleanup);
 
 // A review (2026-09-23): nothing in the suite exercised the route-to-
-// icon lookup beyond the single "/next" case NextRoutes.test.tsx's own
+// icon lookup beyond the single "/" case NextRoutes.test.tsx's own
 // sign-in-redirect test happens to touch - a typo in a route key, or a
 // route added to NextRoutes.tsx without a matching entry here, would
 // silently render a blank header with nothing catching it. One row per
@@ -26,24 +26,24 @@ function renderAt(pathname: string) {
 
 describe("NextPageHeaderTitle", () => {
   const cases: Array<[pathname: string, label: string, iconClass: string]> = [
-    ["/next", "Home", "lucide-house"],
+    ["/", "Home", "lucide-house"],
     // Never actually mounted here in the real app (see the dedicated
     // test below) - included anyway since SidebarContent really does
     // answer for it, and a future regression there should fail a test,
     // not just look right by accident.
-    ["/next/chat", "Chat", "lucide-message-circle"],
-    ["/next/tools", "Tools", "lucide-layout-grid"],
-    ["/next/people", "People", "lucide-users"],
-    ["/next/people/person-sage", "People", "lucide-users"],
-    ["/next/settings", "Settings", "lucide-settings"],
-    ["/next/storage", "Storage", "lucide-database"],
-    ["/next/engines", "Engines", "lucide-cpu"],
-    ["/next/performance", "Performance", "lucide-gauge"],
-    ["/next/updates", "Updates", "lucide-refresh-cw"],
-    ["/next/repairs", "Repairs", "lucide-wrench"],
-    ["/next/backups", "Backups", "lucide-archive"],
-    ["/next/users", "Users", "lucide-users"],
-    ["/next/models", "AI models", "lucide-cpu"],
+    ["/chat", "Chat", "lucide-message-circle"],
+    ["/tools", "Tools", "lucide-layout-grid"],
+    ["/people", "People", "lucide-users"],
+    ["/people/person-sage", "People", "lucide-users"],
+    ["/settings", "Settings", "lucide-settings"],
+    ["/storage", "Storage", "lucide-database"],
+    ["/engines", "Engines", "lucide-cpu"],
+    ["/performance", "Performance", "lucide-gauge"],
+    ["/updates", "Updates", "lucide-refresh-cw"],
+    ["/repairs", "Repairs", "lucide-wrench"],
+    ["/backups", "Backups", "lucide-archive"],
+    ["/users", "Users", "lucide-users"],
+    ["/models", "AI models", "lucide-cpu"],
   ];
 
   for (const [pathname, label, iconClass] of cases) {
@@ -62,7 +62,7 @@ describe("NextPageHeaderTitle", () => {
   // NextPageHeaderLayout; chatHeaderBar.tsx owns that page's header
   // instead). A path in neither table is the real defensive case.
   test("a path in neither table renders nothing rather than crashing", () => {
-    const view = renderAt("/next/some-future-page-nobody-mapped-yet");
+    const view = renderAt("/some-future-page-nobody-mapped-yet");
     expect(view.container).toBeEmptyDOMElement();
   });
 });

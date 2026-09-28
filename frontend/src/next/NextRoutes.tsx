@@ -1,13 +1,9 @@
-import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
-import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
-import { useShellNext } from "@/next/useShellNext";
 import { useNextLook } from "@/next/useNextLook";
 import { useNextAppearance } from "@/next/useNextAppearance";
 import { NextPageHeaderTitle } from "@/next/nextPageHeaderTitle";
@@ -36,17 +32,15 @@ import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 
-/** The `/next/*` route tree (docs/plans/shell-on-shadcndashboard-
- * 2026-09-21.md, step 1): behind `ui.shell.next`, mounts the template's
+/** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
+ * 2026-09-21.md, step 1): mounts the template's
  * FullLayout with Home's sidebar items as data and the template's own
  * views on Home's real data - SHELL-01 and SHELL-03 through SHELL-08
- * have all landed (2026-09-21 to 25); SHELL-02 (`/next/chat`) is still
+ * have all landed (2026-09-21 to 25); SHELL-02 (`/chat`) is still
  * in progress, see below. The "own demo data" this comment used to say
- * is stale everywhere else, corrected 2026-09-25. Redirects to `/`
- * when the flag is off, so the URL itself never leaks a preview nobody
- * turned on.
+ * is stale everywhere else, corrected 2026-09-25.
  *
- * `/next/chat` (CHAT-SDK-01 landed the `@assistant-ui/react@0.15.21`
+ * `/chat` (CHAT-SDK-01 landed the `@assistant-ui/react@0.15.21`
  * bump the Elements need; SHELL-02 is the wiring, one slice at a
  * time): the Elements thread and composer on Home's existing
  * streaming adapter, real turns, reply text and reasoning rendering
@@ -54,25 +48,9 @@ import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
  * NextChatPage.tsx's own header names what's still a follow-up slice
  * (attachments, suggestions, tools, artifacts, read-aloud).
  *
- * SHELL-08: `person` is `Roster | null` now, not required - `App.tsx`
- * used to redirect a signed-out visitor straight to `/` before this
- * tree ever mounted (its own former comment: "the flag itself is a
- * household setting, so reading it needs a session"), which meant
- * `/next/sign-in` was never actually reachable, only a stub with no
- * props wired. A `null` person renders `NextSignedOutRoutes` instead
- * of the authenticated tree - `useShellNext()`'s own settings query
- * still resolves for this case because the household scope is
- * readable by ANY signed-in person (`assertCanAccessScope`'s own
- * read branch) and, for the realistic path this row's acceptance
- * actually asks for (a real sign-out from within an already-open
- * `/next`, not a cold browser typing the URL first), the query's own
- * cache from before signing out is still warm - no page reload
- * happens on a sign-out, only `App.tsx`'s own `setPerson(null)`. A
- * genuinely cold, never-authenticated load of `/next/sign-in` is a
- * real, separate, out-of-scope gap: `GET /api/settings` is
- * `requireAuth`, so nothing can resolve `ui.shell.next` at all before
- * a session exists - named in the plan doc's own gap paragraph, not
- * silently left to spin forever unremarked. */
+ * A null person renders `NextSignedOutRoutes` instead of the
+ * authenticated tree, including the profile picker at `/sign-in`.
+ */
 // CHAT-HEADER-02: a sibling of the chat route, never an ancestor of
 // it - `NextChatPage.tsx` already owns `HeaderExtraLeft` for its own
 // lifetime (`useHeaderExtra(ChatHeaderBar)`), and `useHeaderExtra`'s
@@ -81,11 +59,35 @@ import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 // the two calls' mount order on navigating into or out of chat,
 // sometimes leaving the slot on the wrong component (found designing
 // this, not live) - a true sibling route means only one of the two
-// is ever mounted for a given `/next/*` path, so each owns the slot
+// is ever mounted for a given `//*` path, so each owns the slot
 // cleanly for its own lifetime, the same pattern chat already proves.
 function NextPageHeaderLayout() {
+  const { pathname } = useLocation();
   useHeaderExtra(NextPageHeaderTitle);
-  return <Outlet />;
+  const titleByPath: Record<string, string> = {
+    "/tools": "Tools",
+    "/people": "People",
+    "/settings": "Settings",
+    "/storage": "Storage",
+    "/engines": "Engines",
+    "/performance": "Performance",
+    "/updates": "Updates",
+    "/repairs": "Repairs",
+    "/backups": "Backups",
+    "/voices": "Voices",
+    "/commands": "Commands",
+    "/devices": "Devices",
+    "/privacy": "Privacy",
+    "/users": "Users",
+    "/models": "Models",
+  };
+  const title = titleByPath[pathname.replace(/\/$/, "") || "/"];
+  return (
+    <>
+      {title ? <h1 className="sr-only">{title}</h1> : null}
+      <Outlet />
+    </>
+  );
 }
 
 // HOME-UI-04d: `useNextAppearance` calls the vendored `useTheme()`, so
@@ -163,7 +165,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
             an already-authenticated visit to this URL has nothing to do
             here, so it bounces to the dashboard instead of a blank
             no-match. */}
-        <Route path="sign-in" element={<Navigate to="/next" replace />} />
+        <Route path="sign-in" element={<Navigate to="/" replace />} />
         {/* SHELL-SEARCH-02: api.search, home's own header wiring for the
             kit's HeaderSearch remote prop (FullLayout -> Header ->
             HeaderSearch, a plain prop threaded down since FullLayout is
@@ -213,42 +215,6 @@ function NextSignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
   );
 }
 
-// HOME-UI-04g: while the household settings query is still loading, the
-// per-browser cache (read inside `useShellNext`) decides which palette
-// to paint. If it says "on", `useShellNext` itself paints the template's
-// look class on the body and the cache is seeded so `main.tsx` painted
-// it before React mounted; the old shell's RouteSkeleton stands as the
-// loading indicator. If it says null or "off", the old shell's navy
-// palette and RouteSkeleton stand - the person either never visited
-// /next or the flag was off, so the old shell's loading state is fine.
 export function NextRoutes({ person, onSignedIn, onPersonChange = () => {} }: { person: Roster | null; onSignedIn: () => void; onPersonChange?: () => void | Promise<void> }) {
-  const queryClient = useQueryClient();
-  const wasSignedOut = useRef(person === null);
-  // A code review, SHELL-08: `useShellNext()`'s own query, once it 401s
-  // (the race its own doc comment above names), stays in `isError`
-  // forever - `retry: false` and nothing else ever refetches it, so a
-  // person who then signs back in for real would be silently bounced
-  // back to `/` by the stale error, not the fresh, now-valid session.
-  // Invalidated the moment `person` goes from `null` to a real Roster
-  // (a genuine sign-in just completed, not a mere re-render) so the
-  // next read is a fresh one against the new session.
-  useEffect(() => {
-    if (wasSignedOut.current && person !== null) {
-      void queryClient.invalidateQueries({ queryKey: ["settings-values", "household"] });
-    }
-    wasSignedOut.current = person === null;
-  }, [person, queryClient]);
-
-  const shellNext = useShellNext();
-
-  if (shellNext === "loading") {
-    return (
-      <div data-testid="next-loading-branch">
-        <RouteSkeleton />
-      </div>
-    );
-  }
-  if (shellNext === "off") return <Navigate to="/" replace />;
-
   return <ThemeProvider>{person === null ? <NextSignedOutRoutes onSignedIn={onSignedIn} /> : <NextRoutesInner person={person} onPersonChange={onPersonChange} />}</ThemeProvider>;
 }

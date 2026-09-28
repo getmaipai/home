@@ -14,11 +14,6 @@ afterEach(() => {
   localStorage.removeItem("vite-ui-theme");
 });
 
-let shellNextState: "on" | "off" | "loading" = "on";
-mock.module("@/next/useShellNext", () => ({
-  useShellNext: () => shellNextState,
-}));
-
 function makePerson(): Roster {
   return {
     id: "person-abc123",
@@ -45,7 +40,7 @@ function makePerson(): Roster {
 // had a chance to run - stubs matchMedia to the OPPOSITE of the
 // setting each time, so a test that passed by coincidentally matching
 // the OS default would fail here. Still renders at "/sign-in": SHELL-08
-// made an authenticated visit there redirect to "/next" (the
+// made an authenticated visit there redirect to "/" (the
 // dashboard), which this isolated MemoryRouter has no matching route
 // for either, so it renders nothing - exactly what this test wants,
 // since useNextAppearance/useNextLook run in NextRoutesInner before
@@ -75,12 +70,14 @@ describe("NextRoutes appearance", () => {
 
     try {
       renderWithQueryClient(
-        <MemoryRouter initialEntries={["/sign-in"]}>
+        <MemoryRouter initialEntries={["/appearance-test"]}>
           <NextRoutes person={makePerson()} onSignedIn={() => {}} />
         </MemoryRouter>,
       );
-      await waitFor(() => expect(document.documentElement.classList.contains(expectedClass)).toBe(true));
-      expect(document.documentElement.classList.contains(otherClass)).toBe(false);
+      await waitFor(() => {
+        expect(document.documentElement.classList.contains(expectedClass)).toBe(true);
+        expect(document.documentElement.classList.contains(otherClass)).toBe(false);
+      });
     } finally {
       window.matchMedia = originalMatchMedia;
       globalThis.fetch = originalFetch;
@@ -124,7 +121,7 @@ describe("NextRoutes appearance", () => {
 
     try {
       renderWithQueryClient(
-        <MemoryRouter initialEntries={["/sign-in"]}>
+        <MemoryRouter initialEntries={["/appearance-test"]}>
           <NextRoutes person={makePerson()} onSignedIn={() => {}} />
         </MemoryRouter>,
       );
@@ -152,8 +149,8 @@ describe("NextRoutes appearance", () => {
 // effect of their own setup but have nothing for it to land on
 // ("renders nothing", their own comment), which proves the Navigate
 // fires but not where it actually goes.
-describe("NextRoutes sign-in redirect (SHELL-FLAG-01)", () => {
-  test("an authenticated visit to /next/sign-in lands on the real /next dashboard, not the sign-in form", async () => {
+describe("NextRoutes sign-in redirect", () => {
+  test("an authenticated visit to /sign-in lands on the root dashboard, not the sign-in form", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -183,19 +180,17 @@ describe("NextRoutes sign-in redirect (SHELL-FLAG-01)", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(
-        <MemoryRouter initialEntries={["/next/sign-in"]}>
+        <MemoryRouter initialEntries={["/sign-in"]}>
           <Routes>
-            <Route path="/next/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
+            <Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
           </Routes>
         </MemoryRouter>,
       );
-      // The header's own left slot (CHAT-HEADER-02: icon + "Home" on
-      // the dashboard route, replacing the shipped Search field there)
-      // proves the FullLayout shell mounted; the sign-in form's own
-      // field proves it's NOT still showing the sign-in screen. Scoped
-      // to the header's own unnamed <nav> - the sidebar's own "Home"
-      // group heading is a second, unrelated match otherwise.
-      expect(await view.findByRole("navigation")).toHaveTextContent("Home");
+      // The dashboard's own heading proves the redirect reached the
+      // root route; the sign-in form's field proves it left the PIN
+      // screen. The sidebar also has a navigation landmark, so this
+      // assertion targets the destination page directly.
+      expect(await view.findByRole("heading", { name: "Home" })).toBeTruthy();
       expect(view.queryByPlaceholderText("PIN or password")).toBeNull();
       fireEvent.click(await view.findByRole("button", { name: "Open account menu for Nova" }));
       expect(await view.findByRole("heading", { name: "Nova" })).toBeTruthy();
@@ -225,15 +220,15 @@ describe("NextRoutes tools path", () => {
     const view = renderWithQueryClient(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/next/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
+          <Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
         </Routes>
       </MemoryRouter>,
     );
     return { view, restore: () => { globalThis.fetch = originalFetch; } };
   }
 
-  test("/next/tools mounts the tools page and the sidebar points to it", async () => {
-    const { view, restore } = renderNextRoute("/next/tools");
+  test("/tools mounts the tools page and the sidebar points to it", async () => {
+    const { view, restore } = renderNextRoute("/tools");
     try {
       await waitFor(() => expect(document.title).toBe("Tools · MaiPai Home"));
       expect(view.container.querySelector('[data-slot="card-title"]')?.textContent).toContain("Tools");
@@ -243,103 +238,13 @@ describe("NextRoutes tools path", () => {
     }
   });
 
-  test("/next/apps no longer mounts the tools page", async () => {
-    const { view, restore } = renderNextRoute("/next/apps");
+  test("/apps no longer mounts the tools page", async () => {
+    const { view, restore } = renderNextRoute("/apps");
     try {
       expect(view.container.querySelector('[data-slot="card-title"]')).toBeNull();
       expect(view.queryByRole("table")).toBeNull();
     } finally {
       restore();
-    }
-  });
-});
-
-describe("NextRoutes loading (HOME-UI-04g)", () => {
-  // HOME-UI-04g: `readShellNextCache` (called from `useShellNext`, which
-  // `NextRoutes` calls on every render) is the whole loading-decision,
-  // so the loading-path test exercises it directly through a cache
-  // value rather than through a `useShellNext` module mock - a mock
-  // would pin the state independently of the cache and let the test
-  // pass even if the component ignored the cache.
-  test("loading with cached on paints the template palette and never shows RouteSkeleton", async () => {
-    localStorage.setItem(
-      "maipai.shell.next",
-      JSON.stringify({ on: true, look: "neutral", dark: false }),
-    );
-    const originalFetch = globalThis.fetch;
-    let resolveSettings!: () => void;
-    const settingsGate = new Promise<void>((resolve) => {
-      resolveSettings = resolve;
-    });
-    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/settings")) {
-        await settingsGate;
-        return Response.json([
-          { scope: "household", key: "ui.shell.next", value: true },
-          { scope: "person:person-abc123", key: "ui.appearance", value: "light" },
-          { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
-        ]);
-      }
-      return Promise.resolve(new Response("{}", { status: 200 }));
-    }) as unknown as typeof fetch;
-
-    try {
-      renderWithQueryClient(
-        <MemoryRouter initialEntries={["/sign-in"]}>
-          <NextRoutes person={makePerson()} onSignedIn={() => {}} />
-        </MemoryRouter>,
-      );
-      // While the fetch is pending the cache decides the palette:
-      // the look class is on <body>, the light class on <html>, and
-      // the old shell's RouteSkeleton is never mounted.
-      expect(document.body.classList.contains("style-neutral")).toBe(true);
-      expect(document.documentElement.classList.contains("light")).toBe(true);
-      expect(document.querySelector('[data-testid="route-skeleton"]')).toBeNull();
-      resolveSettings();
-      await waitFor(() => expect(document.querySelector('[data-testid="route-skeleton"]')).toBeNull());
-    } finally {
-      localStorage.removeItem("maipai.shell.next");
-      globalThis.fetch = originalFetch;
-    }
-  });
-
-  // HOME-UI-04g: the no-cache loading state. The file-level mock reads
-  // `shellNextState`, so this test sets it to "loading" before
-  // rendering; with no cache, `useShellNext` reports "loading" and
-  // `readShellNextCache` returns null: the old shell's RouteSkeleton
-  // stands and nothing is painted.
-  test("loading with no cache renders RouteSkeleton", async () => {
-    shellNextState = "loading";
-    localStorage.clear();
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/settings")) {
-        return Response.json([
-          { scope: "household", key: "ui.shell.next", value: true },
-          { scope: "person:person-abc123", key: "ui.appearance", value: "light" },
-          { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
-        ]);
-      }
-      return Promise.resolve(new Response("{}", { status: 200 }));
-    }) as unknown as typeof fetch;
-
-    try {
-      renderWithQueryClient(
-        <MemoryRouter initialEntries={["/sign-in"]}>
-          <NextRoutes person={makePerson()} onSignedIn={() => {}} />
-        </MemoryRouter>,
-      );
-      // No cache, so `useShellNext` reports "loading" and
-      // `readShellNextCache` returns null: the old shell's
-      // RouteSkeleton stands and nothing is painted.
-      const loadingBranch = document.querySelector('[data-testid="next-loading-branch"]');
-      expect(loadingBranch).not.toBeNull();
-      expect(loadingBranch?.querySelector('[role="status"]')).not.toBeNull();
-    } finally {
-      shellNextState = "on";
-      globalThis.fetch = originalFetch;
     }
   });
 });
@@ -352,13 +257,13 @@ describe("next Manage routes", () => {
   // useQuery, so they need a QueryClientProvider and a mocked API
   // response to reach the loaded state.
   const routeToApi: Record<string, string> = {
-    "/next/updates": "/api/updates",
-    "/next/repairs": "/api/repairs",
-    "/next/backups": "/api/backups",
+    "/updates": "/api/updates",
+    "/repairs": "/api/repairs",
+    "/backups": "/api/backups",
   };
   const routeToBody: Record<string, unknown> = {
-    "/next/updates": { installed: "1.0.0", latest: "1.0.1", summary: null, url: null, checkedAt: "2026-09-01T00:00:00Z", error: null, stack: null, stackError: null, reference: null, referenceError: null },
-    "/next/repairs": [{
+    "/updates": { installed: "1.0.0", latest: "1.0.1", summary: null, url: null, checkedAt: "2026-09-01T00:00:00Z", error: null, stack: null, stackError: null, reference: null, referenceError: null },
+    "/repairs": [{
       id: "issue-abc123",
       source: "backup",
       key: "stale",
@@ -372,13 +277,13 @@ describe("next Manage routes", () => {
       dismissed_at: null,
       hlc: "1000:0:abcdef12",
     }],
-    "/next/backups": [{ filename: "backup-2026-09-01.db", createdAt: "2026-09-01T00:00:00.000Z", bytes: 1048576 }],
+    "/backups": [{ filename: "backup-2026-09-01.db", createdAt: "2026-09-01T00:00:00.000Z", bytes: 1048576 }],
   };
 
   test.each([
-    ["/next/updates", NextUpdatesPage],
-    ["/next/repairs", NextRepairsPage],
-    ["/next/backups", NextBackupsPage],
+    ["/updates", NextUpdatesPage],
+    ["/repairs", NextRepairsPage],
+    ["/backups", NextBackupsPage],
   ])("%s renders the shared tables view", async (route, Page) => {
     const originalFetch = globalThis.fetch;
     const endpoint = routeToApi[route]!;

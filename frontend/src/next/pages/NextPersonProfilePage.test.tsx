@@ -61,7 +61,7 @@ function stubFetch(byPath: Record<string, unknown>) {
 function renderProfile(path: string, who: Roster = viewer()) {
   return renderWithQueryClient(
     <MemoryRouter initialEntries={[path]}>
-      <Routes><Route path="/next/people/:id" element={<NextPersonProfilePage person={who} onPersonChange={() => {}} />} /></Routes>
+      <Routes><Route path="/people/:id" element={<NextPersonProfilePage person={who} onPersonChange={() => {}} />} /></Routes>
     </MemoryRouter>,
   );
 }
@@ -70,7 +70,7 @@ describe("NextPersonProfilePage", () => {
   test("shows a person's overview and profile details", async () => {
     const restore = stubFetch({});
     try {
-      const view = renderProfile("/next/people/person-bramble", viewer({ role: "owner" }));
+      const view = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       expect(await view.findByText("Bramble")).toBeTruthy();
       expect(view.getByText("Child")).toBeTruthy();
       expect(view.getByText("Loves dinosaurs")).toBeTruthy();
@@ -81,7 +81,7 @@ describe("NextPersonProfilePage", () => {
   test("the signed-in person's own profile has Memories even for a child", async () => {
     const restore = stubFetch({ "/api/memory": [memory()] });
     try {
-      const view = renderProfile("/next/people/person-sage?tab=memories", viewer({ role: "child" }));
+      const view = renderProfile("/people/person-sage?tab=memories", viewer({ role: "child" }));
       expect(await view.findByText("Likes dinosaurs")).toBeTruthy();
       expect(view.getByRole("tab", { name: "Memories" })).toBeTruthy();
     } finally { restore(); }
@@ -90,7 +90,7 @@ describe("NextPersonProfilePage", () => {
   test("an owner sees another person's real memories and their own export/forget actions", async () => {
     const restore = stubFetch({ "/api/memory?person=person-bramble": [memory({ id: "mem-child", text: "Loves dinosaurs", person: "person-bramble" })] });
     try {
-      const view = renderProfile("/next/people/person-bramble?tab=memories", viewer({ role: "owner" }));
+      const view = renderProfile("/people/person-bramble?tab=memories", viewer({ role: "owner" }));
       expect(await view.findByText("Loves dinosaurs")).toBeTruthy();
       expect(view.queryByText("My own memory")).toBeNull();
       expect(await view.findByRole("button", { name: "Export Bramble's memories" })).toBeTruthy();
@@ -103,7 +103,7 @@ describe("NextPersonProfilePage", () => {
   test("a non-admin can view another profile but cannot see its Memories tab", async () => {
     const restore = stubFetch({});
     try {
-      const view = renderProfile("/next/people/person-bramble?tab=memories", viewer({ role: "adult" }));
+      const view = renderProfile("/people/person-bramble?tab=memories", viewer({ role: "adult" }));
       expect(await view.findByText("Bramble")).toBeTruthy();
       expect(view.queryByRole("tab", { name: "Memories" })).toBeNull();
       expect(view.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
@@ -113,7 +113,7 @@ describe("NextPersonProfilePage", () => {
   test("the ids query filters own memories and the unfiltered link returns to the full list", async () => {
     const restore = stubFetch({ "/api/memory": [memory(), memory({ id: "mem-two", text: "Allergic to peanuts" })] });
     try {
-      const view = renderProfile("/next/people/person-sage?tab=memories&ids=mem-one");
+      const view = renderProfile("/people/person-sage?tab=memories&ids=mem-one");
       expect(await view.findByText("Likes dinosaurs")).toBeTruthy();
       expect(view.queryByText("Allergic to peanuts")).toBeNull();
     } finally { restore(); }
@@ -122,21 +122,21 @@ describe("NextPersonProfilePage", () => {
   test("unknown ids show a plain not-found state", async () => {
     const restore = stubFetch({});
     try {
-      const view = renderProfile("/next/people/person-missing", viewer({ role: "owner" }));
+      const view = renderProfile("/people/person-missing", viewer({ role: "owner" }));
       expect(await view.findByText("No one in this household has that profile.")).toBeTruthy();
-      expect(view.getByRole("link", { name: "Back to People" }).getAttribute("href")).toBe("/next/people");
+      expect(view.getByRole("link", { name: "Back to People" }).getAttribute("href")).toBe("/people");
     } finally { restore(); }
   });
 
   test("the owner edit action remains available on self and for a child's profile", async () => {
     const restore = stubFetch({});
     try {
-      const self = renderProfile("/next/people/person-sage", viewer({ role: "owner" }));
+      const self = renderProfile("/people/person-sage", viewer({ role: "owner" }));
       expect(await self.findByRole("button", { name: "Edit" })).toBeTruthy();
       cleanup();
-      const other = renderProfile("/next/people/person-bramble", viewer({ role: "owner" }));
+      const other = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       expect(await other.findByRole("button", { name: "Edit" })).toBeTruthy();
-      expect(other.getByRole("link", { name: "Manage in Settings" }).getAttribute("href")).toContain("/next/settings?tab=household");
+      expect(other.getByRole("link", { name: "Manage in Settings" }).getAttribute("href")).toContain("/settings?tab=household");
     } finally { restore(); }
   });
 
@@ -157,7 +157,7 @@ describe("NextPersonProfilePage", () => {
       throw new Error(`unstubbed fetch: ${url}`);
     }) as unknown as typeof fetch;
     try {
-      const view = renderProfile("/next/people/person-bramble", viewer({ role: "owner" }));
+      const view = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       fireEvent.click(await view.findByRole("button", { name: "Edit" }));
       fireEvent.change(view.getByLabelText("Name"), { target: { value: "Bram" } });
       fireEvent.change(view.getByLabelText("Bio"), { target: { value: "Loves the beach" } });
@@ -179,7 +179,7 @@ describe("NextPersonProfilePage", () => {
   test("updates the tab query when changing tabs", async () => {
     const restore = stubFetch({ "/api/memory": [] });
     try {
-      const view = renderProfile("/next/people/person-sage", viewer({ role: "owner" }));
+      const view = renderProfile("/people/person-sage", viewer({ role: "owner" }));
       fireEvent.click(await view.findByRole("tab", { name: "Memories" }));
       expect(await view.findByText("Nothing remembered yet.")).toBeTruthy();
       expect(view.getByRole("tab", { name: "Memories" }).getAttribute("aria-selected")).toBe("true");

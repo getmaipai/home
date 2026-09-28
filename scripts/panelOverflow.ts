@@ -30,6 +30,16 @@ export function findOverflowingPanels(): string[] {
     if (!(el instanceof HTMLElement)) continue; // skip SVG icons and the like - scrollWidth there is noise, not a real layout bug
     if (el.children.length === 0) continue; // a leaf's own scrollWidth vs clientWidth is rarely meaningful
     const style = getComputedStyle(el);
+    // The sidebar wordmark intentionally crops the full logo to its
+    // 40px icon box on phone layouts (`FullLogo.tsx` sets
+    // `overflow-hidden`). Its child image can extend past that box in
+    // layout coordinates, but the overflow is clipped and never visible.
+    // A clipped child is not a visible horizontal spill.
+    if (style.overflowX === "hidden" || style.overflowX === "clip") continue;
+    // SimpleBar keeps a zero-sized observer wrapper with a child wider
+    // than its box so it can detect host size changes. It is an invisible
+    // measurement node, not page content.
+    if (el.matches(".simplebar-height-auto-observer-wrapper")) continue;
     // A deliberately horizontal-scrolling row (a shelf, a filter strip)
     // is SUPPOSED to have scrollWidth > clientWidth - that is what makes
     // it scroll. Its own overflow-x is "auto"/"scroll"; skip it and

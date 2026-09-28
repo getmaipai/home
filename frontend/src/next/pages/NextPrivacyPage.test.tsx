@@ -64,7 +64,7 @@ describe("NextPrivacyPage", () => {
       const inbound = await view.findByRole("list", { name: "Inbound connections" });
       expect(inbound.textContent).toContain("Scope:");
       expect(inbound.textContent).toContain("your own network only - nothing leaves the house for this row");
-      expect(inbound.querySelector("h3")?.textContent).toBe("MaiPai Home itself");
+      expect(inbound.querySelector("h2")?.textContent).toBe("MaiPai Home itself");
       const outbound = await view.findByRole("list", { name: "Outbound connections" });
       expect(outbound.querySelectorAll('[role="listitem"]')).toHaveLength(1);
       expect(outbound.textContent).not.toContain("your own network only");

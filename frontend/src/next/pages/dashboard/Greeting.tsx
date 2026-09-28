@@ -18,7 +18,7 @@ const MoonIcon = getIcon("moon");
  * `greetingFor()`/`timeOfDay()` - already the shell header's own source
  * for the identical text (`routeHeader.ts`) - which would have shown a
  * DIFFERENT greeting for the same person at the same moment on the old
- * shell vs. `/next`. Fixed to call the real function directly, un-
+ * shell vs. `/`. Fixed to call the real function directly, un-
  * memoized, on every render (the shell header's own pattern) rather
  * than freezing a computed value in `useState` from a mount-only
  * effect - the second bug the review found, since a frozen value never

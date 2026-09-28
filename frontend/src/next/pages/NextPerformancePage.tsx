@@ -21,7 +21,7 @@ import { DiskHardwareCard } from "@/next/pages/performance/DiskHardwareCard";
  * panel is still its own component under `performance/`, specifically
  * so registering one as a card later is a wiring change, not a
  * rewrite. Owner/admin only - the route itself carries no client-side
- * role check (matches every sibling `/next` page): a non-admin's 403
+ * role check (matches every sibling `/` page): a non-admin's 403
  * comes entirely from the backend, and this page is reachable only
  * through the Manage section, which `NextSettingsPage.tsx`'s Household
  * tab already hides from non-admins. */

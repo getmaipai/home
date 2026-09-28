@@ -368,9 +368,9 @@ export function ChatPage({ person }: ChatPageProps) {
   // Set by `SttAutoSend` once it mounts inside `AssistantRuntimeProvider`
   // (below); `onFinalReady` below just calls whatever's there.
   const sttAutoSendRef = useRef<(() => void) | null>(null);
-  // DICT-01 (a review finding): this page is still live-routed (not
-  // retired behind ui.shell.next), so the not-installed check needs the
-  // identical wiring NextChatPage.tsx got - without it, this mic button
+  // DICT-01 (a review finding): this legacy page still ships for old
+  // chat links, so the not-installed check needs the identical wiring
+  // NextChatPage.tsx got - without it, this mic button
   // would keep the same class of silent-dead-feature bug DICT-01 exists
   // to fix, just triggered by missing assets instead of the wire-shape
   // mismatch. No frozen-memo risk here the way NextChatPage.tsx had:

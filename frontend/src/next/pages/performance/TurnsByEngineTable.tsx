@@ -27,7 +27,7 @@ function toRow(e: PerformanceEngineStats): EngineRow {
  * the closest thing to "per model" a turn's own record carries - see
  * docs/dev.md's design note for why nothing here parses a model id out
  * of it. Home's shared table derives its columns from these plain rows,
- * the same way it does for every table in `/next`. */
+ * the same way it does for every table in `/`. */
 export function TurnsByEngineTable({ byEngine }: { byEngine: readonly PerformanceEngineStats[] }) {
   return (
     <Card className="flex flex-col gap-0!">

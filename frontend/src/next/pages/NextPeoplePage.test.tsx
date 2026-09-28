@@ -122,7 +122,7 @@ describe("NextPeoplePage", () => {
     try {
       renderPeoplePage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
       await waitFor(() => expect(document.body.textContent).toContain("Nova"));
-      const link = document.querySelector('a[href="/next/people/p1"]');
+      const link = document.querySelector('a[href="/people/p1"]');
       expect(link).not.toBeNull();
     } finally {
       restore();

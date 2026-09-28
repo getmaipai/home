@@ -5,29 +5,6 @@
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const UI_SETTINGS_KEYS: SettingsKey[] = [
-  // The shell-on-shadcndashboard stand-up's own flag (docs/plans/
-  // shell-on-shadcndashboard-2026-09-21.md, step 1): `household` scope,
-  // not `person`, because it governs a second route tree (`/next/*`)
-  // everyone in the house sees the same way, and there is no separate
-  // chat flag - this one governs both together. Off by default; the
-  // day it defaults on, `/next` becomes `/` and the old shell and chat
-  // are deleted in the same commit. `level: "advanced"`, not "expert"
-  // (2026-09-21, COORDINATOR correction): the settings renderer drops
-  // "expert" keys entirely (commons ui/src/settings/groupSettings.ts
-  // line 74), so an "expert" key is unreachable from Settings at any
-  // account level - "advanced" surfaces it behind "Show N advanced
-  // settings" in the System group instead.
-  SettingsKey.parse({
-    key: "ui.shell.next",
-    scope: "household",
-    selector: "boolean",
-    default: false,
-    label: "New shell (preview)",
-    help: "Try the shell and chat on the new design at /next before it becomes the default for everyone in this household.",
-    level: "advanced",
-    lives_in: "household.system",
-    honoured_by: ["home"],
-  }),
   SettingsKey.parse({
     key: "ui.show_turn_stats",
     scope: "person",

@@ -39,7 +39,7 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * failed fetch (an expired session, a 500) left the loading skeleton
  * showing forever, with no error text and no retry - `AsyncState`
  * (`@maipai/ui/src/primitives/AsyncState`, the kit's own shared
- * loading/error/data triad, already used by every sibling `/next`-
+ * loading/error/data triad, already used by every sibling `/`-
  * adjacent page) is the shipped fix, not a hand-rolled error branch.
  *
  * DASH-LOOK-01 (Jesse: shaded like Settings and dashboard-01, not
@@ -92,9 +92,10 @@ export function NextDashboardPage({ person }: { person: Roster }) {
         const showRepairs = data.repairs_open !== undefined;
         const showEngines = data.engines !== undefined;
 
-        return (
-          <div className="pb-4">
+          return (
             <div className="pb-4">
+              <h1 className="sr-only">Home</h1>
+              <div className="pb-4">
               <Greeting displayName={person.display_name} />
             </div>
             <div className="grid grid-cols-12 gap-4">

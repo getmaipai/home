@@ -1,6 +1,6 @@
-const KEY = "maipai.shell.next";
+const KEY = "maipai.shell.palette";
 
-export type ShellNextCacheValue = { on: boolean; look: string; dark: boolean } | null;
+export type ShellNextCacheValue = { look: string; dark: boolean } | null;
 
 export function readShellNextCache(): ShellNextCacheValue {
   try {
@@ -10,11 +10,10 @@ export function readShellNextCache(): ShellNextCacheValue {
     if (
       typeof parsed === "object" &&
       parsed !== null &&
-      typeof parsed.on === "boolean" &&
       typeof parsed.look === "string" &&
       typeof parsed.dark === "boolean"
     ) {
-      return { on: parsed.on, look: parsed.look, dark: parsed.dark };
+      return { look: parsed.look, dark: parsed.dark };
     }
     return null;
   } catch {
@@ -22,7 +21,7 @@ export function readShellNextCache(): ShellNextCacheValue {
   }
 }
 
-export function writeShellNextCache(v: { on: boolean; look: string; dark: boolean }): void {
+export function writeShellNextCache(v: { look: string; dark: boolean }): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(v));
   } catch {

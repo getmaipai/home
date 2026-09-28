@@ -278,8 +278,6 @@ const ROUTES: RouteSpec[] = [
   { slug: "home", path: "/" },
   { slug: "chat", path: "/chat" },
   { slug: "chat-list", path: "/chat?list=1" },
-  { slug: "search", path: "/search" },
-  { slug: "notifications", path: "/notifications" },
   { slug: "people", path: "/people" },
   { slug: "people-memories", path: "/memory" },
   // Missing since /apps existed at all (a gap this file's own header
@@ -616,18 +614,22 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     // which correctly aria-hides the page's own h1 behind it the whole
     // time it's open (found live: the generic h1 wait below hung the
     // full 15s on this exact route, phone and tablet). Its own visible
-    // heading is what a real capture of "Chat with the list open"
-    // needs anyway.
+    // page heading or title card is the readiness marker on either
+    // desktop (thread rail) or phone (open Sheet).
     if (route.slug === "chat-list") {
-      // state: "attached", not the default "visible": the sheet's own
-      // heading lives in an `sr-only` SheetHeader (screen-reader
-      // reachable, deliberately given zero rendered size) - Playwright's
-      // own visibility check treats that the same as truly hidden and
-      // never resolves, found live once the aria-hidden fix above
-      // stopped masking it behind a 15s timeout of its own.
-      await page.getByRole("heading", { name: "Chat" }).or(page.getByRole("heading", { name: "Conversations" })).first().waitFor({ timeout: 15000, state: "attached" });
+      await page.locator("h1, h2, h3, [data-slot='card-title']").first().waitFor({ timeout: 15000, state: "attached" });
+    } else if (route.slug === "chat") {
+      // The shipped chat page has no h1 yet (tracked as follow-up
+      // accessibility debt); wait for its visible conversation heading
+      // so that missing page-title semantics do not become a timeout.
+      await page.getByRole("heading").first().waitFor({ timeout: 15000 });
     } else {
-      await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+      // Next pages use either a real page h1 or the kit's CardTitle
+      // marker as their top-level title surface.
+      await Promise.race([
+        page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 }),
+        page.locator('[data-slot="card-title"]').first().waitFor({ timeout: 15000, state: "attached" }),
+      ]);
     }
     // A spinner can legitimately appear mid-load before the page's own h1
     // exists at all (App.tsx's own "Loading MaiPai Home" gate); once the
@@ -1735,7 +1737,7 @@ async function captureChatThreadActionsReview(browser: Browser, sessionValue: st
 }
 
 /** CHAT-LIST-01's own acceptance ("captured at 1440 and 390") - the
- * `/next/chat` thread list's own toolbar row with the new temporary-
+ * `/chat` thread list's own toolbar row with the new temporary-
  * chat button beside New Thread, both visible together. Seeded with
  * one real conversation (seedTitledConversation, the same helper
  * captureChatThreadActionsReview uses for the legacy `/chat` list) so
@@ -1749,12 +1751,6 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
   mkdirSync(outDir, { recursive: true });
   const cookie = { Cookie: `session=${sessionValue}` };
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...cookie },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureChatListReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   await seedTitledConversation("captureChatListReview", cookie, "Weekend garden plans");
 
@@ -1765,7 +1761,7 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        await page.goto(`${BASE_URL}/next/chat`);
+        await page.goto(`${BASE_URL}/chat`);
         await page.getByRole("textbox", { name: "Message input" }).waitFor();
         // On phone the rail column is still in the DOM (hidden, not
         // unmounted) once the Sheet's own copy of the same list opens
@@ -1811,19 +1807,13 @@ async function verifyChatFindHeaderAlignment(browser: Browser, sessionValue: str
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
   const cookie = { Cookie: `session=${sessionValue}` };
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...cookie },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`verifyChatFindHeaderAlignment: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const width of [1440, 2000]) {
     const context = await newContext(browser, { slug: "wide", width, height: 1000 }, "light", sessionValue);
     try {
       const page = await context.newPage();
       page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-      await page.goto(`${BASE_URL}/next/chat`);
+      await page.goto(`${BASE_URL}/chat`);
       await page.getByRole("textbox", { name: "Message input" }).waitFor();
       const bottoms = await page.evaluate(() => {
         const sidebarHeader = document.querySelector('[data-slot="sidebar-header"]');
@@ -1871,18 +1861,12 @@ async function verifyChatFindBubbleHoverWidth(browser: Browser, sessionValue: st
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
   const cookie = { Cookie: `session=${sessionValue}` };
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...cookie },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`verifyChatFindBubbleHoverWidth: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const context = await newContext(browser, { slug: "wide", width: 1440, height: 1000 }, "light", sessionValue);
   try {
     const page = await context.newPage();
     page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-    await page.goto(`${BASE_URL}/next/chat`);
+    await page.goto(`${BASE_URL}/chat`);
     await page.getByRole("textbox", { name: "Message input" }).fill("hi");
     await page.getByRole("button", { name: "Send message", exact: true }).click();
     // Wait for the reply to finish, so the user bubble is no longer the
@@ -1934,18 +1918,12 @@ async function verifyChatFindComposerShift(browser: Browser, sessionValue: strin
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
   const cookie = { Cookie: `session=${sessionValue}` };
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...cookie },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`verifyChatFindComposerShift: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const context = await newContext(browser, { slug: "wide", width: 1440, height: 1000 }, "light", sessionValue);
   try {
     const page = await context.newPage();
     page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-    await page.goto(`${BASE_URL}/next/chat`);
+    await page.goto(`${BASE_URL}/chat`);
     const textbox = page.getByRole("textbox", { name: "Message input" });
     await textbox.waitFor();
     await settleAnimations(page);
@@ -2074,7 +2052,7 @@ async function captureLookComparison(browser: Browser, sessionValue: string): Pr
 /** The shell-on-shadcndashboard stand-up's own acceptance (docs/plans/
  * shell-on-shadcndashboard-2026-09-21.md, step 1): "captures at 1440 and
  * 390, both looks, both themes, of every /next route, opened and judged
- * for one thing only, that nothing on them is Home-drawn." `ui.shell.next`
+ * for one thing only, that nothing on them is Home-drawn." `the migrated root shell`
  * (household) gates the whole tree; `ui.look` (person, the same key the
  * old shell's `useLook.ts` reads) drives the vendored template's own
  * `.style-calm`/`.style-studio` body class via `useNextLook.ts` - the
@@ -2082,7 +2060,7 @@ async function captureLookComparison(browser: Browser, sessionValue: string): Pr
  * the old shell, reused here rather than invented fresh. Written to
  * `docs/assets/screens/` (committed, unlike `captureLookComparison`'s
  * `data-scratch/`): a permanent record of the stand-up's own acceptance,
- * not a one-off review set. `/next/chat` is excluded - not wired yet
+ * not a one-off review set. `/chat` is excluded - not wired yet
  * (ui-v0.5.4's named gap, CHAT-SDK-01). */
 async function captureNextStandup(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(SCREENS_DIR, "next-standup");
@@ -2092,19 +2070,13 @@ async function captureNextStandup(browser: Browser, sessionValue: string): Promi
   const sage = people.find((p) => p.display_name === "Sage");
   if (!sage) throw new Error("captureNextStandup: seedHousehold() didn't create Sage");
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextStandup: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const pages: Array<{ slug: string; path: string; waitFor: string }> = [
-    { slug: "dashboard", path: "/next", waitFor: "text=Stay informed with today's activity" },
-    { slug: "tools", path: "/next/tools", waitFor: "table" },
-    { slug: "people", path: "/next/people", waitFor: "table" },
-    { slug: "settings", path: "/next/settings", waitFor: "text=Default Inputs" },
-    { slug: "sign-in", path: "/next/sign-in", waitFor: "form" },
+    { slug: "dashboard", path: "/", waitFor: "text=Stay informed with today's activity" },
+    { slug: "tools", path: "/tools", waitFor: "table" },
+    { slug: "people", path: "/people", waitFor: "table" },
+    { slug: "settings", path: "/settings", waitFor: "text=Default Inputs" },
+    { slug: "sign-in", path: "/sign-in", waitFor: "form" },
   ];
   const viewports = [VIEWPORTS.find((v) => v.slug === "phone")!, VIEWPORTS.find((v) => v.slug === "desktop")!];
 
@@ -2201,25 +2173,19 @@ async function flagTurnsAsMarlow(sessionValue: string, texts: readonly string[],
 // text findings: a throwaway review set (data-scratch, not the stand-
 // up's own committed acceptance captures), expanded vs. collapsed, both
 // themes, desktop only (the owner's own findings were both desktop-
-// only), plus one dark-only shot of /next/tools (the Employee Data
+// only), plus one dark-only shot of /tools (the Employee Data
 // Table row the owner's own third capture flagged).
 async function captureNextSidebarReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextSidebarReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
   for (const theme of THEMES) {
     const context = await newContext(browser, viewport, theme, sessionValue);
     try {
       const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next`);
+      await page.goto(`${BASE_URL}/`);
       await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-sidebar-expanded-desktop-${theme}.png`) });
@@ -2231,7 +2197,7 @@ async function captureNextSidebarReview(browser: Browser, sessionValue: string):
       console.log(`Wrote ${join(outDir, `next-sidebar-collapsed-desktop-${theme}.png`)}`);
 
       if (theme === "dark") {
-        await page.goto(`${BASE_URL}/next/tools`);
+        await page.goto(`${BASE_URL}/tools`);
         await page.locator("text=Employee Data Table").first().waitFor({ timeout: 15000 });
         await settleAnimations(page);
         await page.screenshot({ path: join(outDir, `next-tools-table-desktop-${theme}.png`) });
@@ -2253,12 +2219,6 @@ async function captureNextLookPresets(browser: Browser, sessionValue: string): P
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextLookPresets: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
   const sage = people.find((p) => p.display_name === "Sage");
@@ -2276,7 +2236,7 @@ async function captureNextLookPresets(browser: Browser, sessionValue: string): P
     const context = await newContext(browser, viewport, "dark", sessionValue);
     try {
       const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next`);
+      await page.goto(`${BASE_URL}/`);
       await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-look-${look}-desktop-dark.png`) });
@@ -2297,12 +2257,6 @@ async function captureNextAppearanceMismatch(browser: Browser, sessionValue: str
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextAppearanceMismatch: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
   const sage = people.find((p) => p.display_name === "Sage");
@@ -2324,7 +2278,7 @@ async function captureNextAppearanceMismatch(browser: Browser, sessionValue: str
     const context = await newContext(browser, viewport, osPref, sessionValue);
     try {
       const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next`);
+      await page.goto(`${BASE_URL}/`);
       await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`) });
@@ -2342,7 +2296,7 @@ async function captureNextAppearanceMismatch(browser: Browser, sessionValue: str
  * now doubling as SHELL-04's own permanent capture (2026-09-21):
  * extended to both themes, and its wait condition moved off
  * "Personal Information", the vendored `UserProfile`'s own demo
- * section heading that no real `/next/people` composition has ever
+ * section heading that no real `/people` composition has ever
  * shown (SHELL-04 dropped that section entirely - no Home counterpart
  * for email/phone/position/address). Waits on a real table row rather
  * than the profile card's own "This is your own profile." text - a
@@ -2355,12 +2309,6 @@ async function captureNextPeopleReview(browser: Browser, sessionValue: string): 
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextPeopleReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -2368,12 +2316,12 @@ async function captureNextPeopleReview(browser: Browser, sessionValue: string): 
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/people`);
+        await page.goto(`${BASE_URL}/people`);
         // SHELL-04 changed this route from a table to a card grid
         // (`NextPeoplePage.tsx`); the shared CardTitle is a div, so use
         // a real person-card link as the data-ready signal. These links
         // render only after the real `/api/people` query resolves.
-        await page.locator('a[href^="/next/people/"]').first().waitFor({ timeout: 15000 });
+        await page.locator('a[href^="/people/"]').first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "People");
         await settleAnimations(page);
         const path = join(outDir, `next-people-${viewport.width}-${theme}.png`);
@@ -2389,7 +2337,7 @@ async function captureNextPeopleReview(browser: Browser, sessionValue: string): 
 
 /** SHELL-01's own acceptance ("1440 and 390, dark and light, judged
  * against dashboard-01's rhythm"): both viewports, both themes, of
- * `/next` itself - the pair to `captureNextPeopleReview` above so the
+ * `/` itself - the pair to `captureNextPeopleReview` above so the
  * dashboard composition has the same permanent, re-runnable capture a
  * live-instance judgment call was originally made from ad hoc. Waits on
  * the greeting's subtitle rather than any one widget's own text: it
@@ -2400,12 +2348,6 @@ async function captureNextDashboardReview(browser: Browser, sessionValue: string
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextDashboardReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -2413,7 +2355,7 @@ async function captureNextDashboardReview(browser: Browser, sessionValue: string
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next`);
+        await page.goto(`${BASE_URL}/`);
         await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
         await settleAnimations(page);
         const path = join(outDir, `next-dashboard-${viewport.width}-${theme}.png`);
@@ -2435,18 +2377,12 @@ async function captureNextProfileSheetReview(browser: Browser, sessionValue: str
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextProfileSheetReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const viewport = VIEWPORTS.find((v) => v.slug === "phone")!;
   const context = await newContext(browser, viewport, "dark", sessionValue);
   try {
     const page = await context.newPage();
-    await page.goto(`${BASE_URL}/next`);
+    await page.goto(`${BASE_URL}/`);
     await page.getByText("Stay informed with today's activity").waitFor({ timeout: 15000 });
     await page.getByRole("button", { name: "Open account menu for Sage" }).click();
     const sheet = page.getByRole("dialog");
@@ -2468,7 +2404,7 @@ async function captureNextProfileSheetReview(browser: Browser, sessionValue: str
 }
 
 /** SHELL-03's own acceptance ("1440 and 390... judged, report what
- * Jesse sees at /next/tools"): both viewports, both themes, of that
+ * Jesse sees at /tools"): both viewports, both themes, of that
  * route - the same permanent-capture shape `captureNextDashboardReview`
  * above already established for the dashboard row. Waits on a real
  * table row rather than any one package's own display name: GET
@@ -2480,12 +2416,6 @@ async function captureNextAppsReview(browser: Browser, sessionValue: string): Pr
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextAppsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -2493,7 +2423,7 @@ async function captureNextAppsReview(browser: Browser, sessionValue: string): Pr
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/tools`);
+        await page.goto(`${BASE_URL}/tools`);
         await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Tools");
         await settleAnimations(page);
@@ -2523,12 +2453,6 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextChatReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   // SHELL-02's holistic review uses one persisted conversation with real
   // turns in the seeded backend. Keep the same conversation across all
@@ -2539,7 +2463,7 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   try {
     const page = await seedContext.newPage();
     page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-    await page.goto(`${BASE_URL}/next/chat?conversation=${conversation.id}`);
+    await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
     await page.getByRole("textbox", { name: "Message input" }).waitFor();
     for (const prompt of ["What's 2 plus 2?", "What herbs work well in a kitchen garden?", "Give me a simple bedtime story."]) {
       await page.getByRole("textbox", { name: "Message input" }).fill(prompt);
@@ -2579,7 +2503,7 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
         const page = await context.newPage();
         page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
         page.on("pageerror", (error) => consoleErrors.push(error.message));
-        await page.goto(`${BASE_URL}/next/chat?conversation=${conversation.id}`);
+        await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
         await page.getByRole("textbox", { name: "Message input" }).waitFor();
         await page.getByText("A few questions for today", { exact: true }).first().waitFor();
         await page.getByRole("button", { name: "Reasoning" }).first().click();
@@ -2587,7 +2511,7 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
         const filename = `next-chat-${viewport.width}-${theme}.png`;
         const path = join(outDir, filename);
         await page.screenshot({ path, fullPage: slug === "phone" });
-        dedicatedScreenshots.push({ file: filename, route: "/next/chat", viewport: viewport.slug, theme });
+        dedicatedScreenshots.push({ file: filename, route: "/chat", viewport: viewport.slug, theme });
         console.log(`Wrote ${path}`);
         if (consoleErrors.length) throw new Error(`captureNextChatReview: ${slug}/${theme} console errors: ${consoleErrors.join(" | ")}`);
         console.log(`captureNextChatReview: ${slug}/${theme} had no console errors`);
@@ -2621,12 +2545,6 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextChatToolsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
   // getmaipai/home#154: nodes/model.ts's own interim rule (the same
   // gap captureNextChatToolsSitesReview's own comment names) only
   // offers tools at all for the one catalog entry with a real
@@ -2644,7 +2562,7 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   const context = await newContext(browser, viewport, "dark", sessionValue);
   try {
     const page = await context.newPage();
-    await page.goto(`${BASE_URL}/next/chat`);
+    await page.goto(`${BASE_URL}/chat`);
     await page.getByRole("textbox", { name: "Message input" }).fill(`What's the weather like in ${WEATHER_HOUSEHOLD_PLACE} today?`);
     await page.getByRole("button", { name: "Send message", exact: true }).click();
     await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
@@ -2677,12 +2595,6 @@ async function captureNextChatToolsSitesReview(browser: Browser, sessionValue: s
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextChatToolsSitesReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
   // nodes/model.ts's own interim rule only forces a search
   // (`state.budget.always_search`) for the one catalog entry that flag
   // is set on (modelCatalog.ts, "qwen3-8b-instruct-q4-k-m") - the
@@ -2722,7 +2634,7 @@ async function captureNextChatToolsSitesReview(browser: Browser, sessionValue: s
     const context = await newContext(browser, viewport, theme, sessionValue);
     try {
       const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next/chat`);
+      await page.goto(`${BASE_URL}/chat`);
       await page.getByRole("textbox", { name: "Message input" }).fill("Who won the mariners game?");
       await page.getByRole("button", { name: "Send message", exact: true }).click();
       await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
@@ -2763,7 +2675,7 @@ async function captureNextChatToolsSitesReview(browser: Browser, sessionValue: s
     const context = await newContext(browser, viewport, "light", sessionValue);
     try {
       const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next/chat`);
+      await page.goto(`${BASE_URL}/chat`);
       await page.getByRole("textbox", { name: "Message input" }).fill("Tell me a bedtime story");
       await page.getByRole("button", { name: "Send message", exact: true }).click();
       await page.getByRole("status").first().waitFor({ timeout: 5000 });
@@ -2793,12 +2705,6 @@ async function captureChatHeaderTitleReview(browser: Browser, sessionValue: stri
   mkdirSync(outDir, { recursive: true });
   const cookie = { Cookie: `session=${sessionValue}` };
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...cookie },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureChatHeaderTitleReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   // Exactly 60 characters, the acceptance's own number. Persona-roster
   // names only (CLAUDE.md's Privacy rules), not the real people the
@@ -2814,7 +2720,7 @@ async function captureChatHeaderTitleReview(browser: Browser, sessionValue: stri
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        await page.goto(`${BASE_URL}/next/chat?conversation=${row.id}`);
+        await page.goto(`${BASE_URL}/chat?conversation=${row.id}`);
         // The same title also appears as a thread-list row in the rail
         // (`#next-chat-rail`) - scoped to the header's own <nav> (no
         // aria-label, unlike the sidebar's "Main navigation") to get
@@ -2836,19 +2742,13 @@ async function captureChatHeaderTitleReview(browser: Browser, sessionValue: stri
  * other app page show the same icon the sidebar shows for them" - the
  * chat side is `--chat-header-title-review` above (the icon is now
  * part of that same header); this covers the "one other page" half
- * with the dashboard route (`/next`, the sidebar's own "Home" entry,
+ * with the dashboard route (`/`, the sidebar's own "Home" entry,
  * `House` in `sidebaritems.ts`), the plainest page to seed - no
- * fixture data needed beyond `ui.shell.next`. */
+ * fixture data needed beyond `the migrated root shell`. */
 async function captureNextPageHeaderIconReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextPageHeaderIconReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -2857,7 +2757,7 @@ async function captureNextPageHeaderIconReview(browser: Browser, sessionValue: s
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        await page.goto(`${BASE_URL}/next`);
+        await page.goto(`${BASE_URL}/`);
         // Scoped to the header's own unnamed <nav> - the sidebar's own
         // "Home" group heading is a second, unrelated match otherwise
         // (found writing NextRoutes.test.tsx's own equivalent check).
@@ -2886,19 +2786,13 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextChatComposerReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     const context = await newContext(browser, viewport, "dark", sessionValue);
     try {
       const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next/chat`);
+      await page.goto(`${BASE_URL}/chat`);
       await page.getByRole("textbox", { name: "Message input" }).waitFor();
       await page.getByRole("button", { name: "Add", exact: true }).click();
       await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ timeout: 5000 });
@@ -2920,12 +2814,6 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
  * rendered geometry. */
 async function verifyLaneBTouchTargets(browser: Browser, sessionValue: string): Promise<void> {
   const headers = { "Content-Type": "application/json", Cookie: `session=${sessionValue}` };
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers,
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`verifyLaneBTouchTargets: enabling /next failed: ${setShellNext.status}`);
 
   let checked = 0;
   async function check(page: Page, locator: Locator, label: string): Promise<void> {
@@ -2956,7 +2844,7 @@ async function verifyLaneBTouchTargets(browser: Browser, sessionValue: string): 
     try {
       const page = await context.newPage();
       page.setDefaultTimeout(10000);
-      await page.goto(`${BASE_URL}/next/chat`);
+      await page.goto(`${BASE_URL}/chat`);
       await page.getByRole("textbox", { name: "Message input" }).waitFor();
       await check(page, page.getByRole("textbox", { name: "Message input" }), `Message input (${slug})`);
       await check(page, page.getByRole("button", { name: "Start voice input" }), `Start voice input (${slug})`);
@@ -3000,7 +2888,7 @@ async function verifyLaneBTouchTargets(browser: Browser, sessionValue: string): 
         created_at: "2026-09-21T00:00:00.000Z",
       }]),
     }));
-    await page.goto(`${BASE_URL}/next/repairs`);
+    await page.goto(`${BASE_URL}/repairs`);
     await page.getByText("A backup failed", { exact: true }).waitFor();
     await page.getByRole("button", { name: "More actions" }).click();
     await check(page, page.getByRole("menuitem", { name: "Fix", exact: true }), "Fix (Repairs)");
@@ -3018,7 +2906,7 @@ async function verifyLaneBTouchTargets(browser: Browser, sessionValue: string): 
       const body = url.includes("restore/pending") ? { pending: null } : [];
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
     });
-    await page.goto(`${BASE_URL}/next/backups`);
+    await page.goto(`${BASE_URL}/backups`);
     await check(page, page.getByRole("button", { name: "Back up now" }), "Back up now");
     await page.close();
   } finally {
@@ -3041,12 +2929,6 @@ async function captureNextChatChildComposerReview(browser: Browser, sessionValue
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextChatChildComposerReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
   const nova = people.find((p) => p.display_name === "Nova");
@@ -3065,7 +2947,7 @@ async function captureNextChatChildComposerReview(browser: Browser, sessionValue
     const context = await newContext(browser, viewport, "dark", novaSession);
     try {
       const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next/chat`);
+      await page.goto(`${BASE_URL}/chat`);
       await page.getByRole("textbox", { name: "Message input" }).waitFor();
       await settleAnimations(page);
       const path = join(outDir, `next-chat-child-composer-${viewport.width}-dark.png`);
@@ -3102,18 +2984,12 @@ async function captureNextChatArtifactReview(browser: Browser, sessionValue: str
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextChatArtifactReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
   const context = await newContext(browser, viewport, "dark", sessionValue);
   try {
     const page = await context.newPage();
-    await page.goto(`${BASE_URL}/next/chat`);
+    await page.goto(`${BASE_URL}/chat`);
     await page.getByRole("textbox", { name: "Message input" }).fill("Could you write me a short note about pizza night?");
     await page.getByRole("button", { name: "Send message", exact: true }).click();
     await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
@@ -3137,7 +3013,7 @@ async function captureNextChatArtifactReview(browser: Browser, sessionValue: str
 }
 
 /** SHELL-05's own acceptance ("1440 and 390... captures dark/light"):
- * both viewports, both themes, of `/next/settings`. Waits on "Family
+ * both viewports, both themes, of `/settings`. Waits on "Family
  * name", a real, always-present basic key under Household > System
  * (`spec/settings/keys.json`) - the tab a seeded owner/admin session
  * lands on by default - present only once both the registry and the
@@ -3146,12 +3022,6 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextSettingsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -3159,7 +3029,7 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/settings`);
+        await page.goto(`${BASE_URL}/settings`);
         await page.locator("text=Family name").first().waitFor({ timeout: 15000 });
         await settleAnimations(page);
         const path = join(outDir, `next-settings-${viewport.width}-${theme}.png`);
@@ -3178,12 +3048,6 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
 async function captureNextPersonalManagementReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextPersonalManagementReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     for (const theme of THEMES) {
@@ -3191,10 +3055,10 @@ async function captureNextPersonalManagementReview(browser: Browser, sessionValu
       try {
         const page = await context.newPage();
         for (const [name, path, readyText] of [
-          ["voices", "/next/voices", "Cloned voices"],
-          ["commands", "/next/commands", "Commands"],
-          ["devices", "/next/devices", "Signed-in sessions"],
-          ["settings-me", "/next/settings?tab=me", "Voices"],
+          ["voices", "/voices", "Cloned voices"],
+          ["commands", "/commands", "Commands"],
+          ["devices", "/devices", "Signed-in sessions"],
+          ["settings-me", "/settings?tab=me", "Voices"],
         ] as const) {
           await page.goto(`${BASE_URL}${path}`);
           await page.getByText(readyText, { exact: false }).first().waitFor({ timeout: 15000 });
@@ -3216,12 +3080,6 @@ async function captureNextPersonalManagementReview(browser: Browser, sessionValu
 async function captureNextPrivacyReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextPrivacyReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
   const privacyResponse = await fetch(`${BASE_URL}/api/privacy`, { headers: { Cookie: `session=${sessionValue}` } });
   if (!privacyResponse.ok) throw new Error(`captureNextPrivacyReview: GET /api/privacy failed: ${privacyResponse.status}`);
   const data = await privacyResponse.json() as { connections: Array<{ direction: string }>; offlinePlugins: string[] };
@@ -3234,7 +3092,7 @@ async function captureNextPrivacyReview(browser: Browser, sessionValue: string):
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/privacy`);
+        await page.goto(`${BASE_URL}/privacy`);
         await page.getByText("What leaves your house", { exact: false }).waitFor({ timeout: 15000 });
         await page.getByRole("list", { name: "Inbound connections" }).waitFor({ timeout: 15000 });
         await page.getByRole("list", { name: "Outbound connections" }).waitFor({ timeout: 15000 });
@@ -3256,12 +3114,6 @@ async function captureNextLaneA13Review(browser: Browser, sessionValue: string):
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextLaneA13Review: seeding ui.shell.next=true failed: ${setShellNext.status}`);
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     for (const theme of THEMES) {
@@ -3273,7 +3125,7 @@ async function captureNextLaneA13Review(browser: Browser, sessionValue: string):
         const context = await newContext(browser, viewport, theme, sessionValue);
         try {
           const page = await context.newPage();
-          await page.goto(`${BASE_URL}/next/${pageSpec.slug === "settings" ? "settings" : pageSpec.slug}`);
+          await page.goto(`${BASE_URL}/${pageSpec.slug === "settings" ? "settings" : pageSpec.slug}`);
           await page.getByText(pageSpec.ready(), { exact: false }).first().waitFor({ timeout: 20000 });
           if (pageSpec.slug === "settings") {
             await page.getByRole("link", { name: /^Users/ }).waitFor({ timeout: 15000 });
@@ -3298,11 +3150,6 @@ async function captureNextPersonProfileReview(browser: Browser, sessionValue: st
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
   const headers = { "Content-Type": "application/json", Cookie: `session=${sessionValue}` };
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT", headers,
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextPersonProfileReview: seeding ui.shell.next failed: ${setShellNext.status}`);
   const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } });
   if (!peopleResponse.ok) throw new Error(`captureNextPersonProfileReview: GET /api/people failed: ${peopleResponse.status}`);
   const people = await peopleResponse.json() as Array<{ id: string; display_name: string }>;
@@ -3320,7 +3167,7 @@ async function captureNextPersonProfileReview(browser: Browser, sessionValue: st
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        const ownPath = `${BASE_URL}/next/people/${sage.id}`;
+        const ownPath = `${BASE_URL}/people/${sage.id}`;
         await page.goto(ownPath);
         await page.getByText("This is your own profile.").waitFor({ timeout: 15000 });
         await settleAnimations(page);
@@ -3335,7 +3182,7 @@ async function captureNextPersonProfileReview(browser: Browser, sessionValue: st
         await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
         console.log(`Wrote ${join(outDir, file)}`);
 
-        await page.goto(`${BASE_URL}/next/people/${other.id}`);
+        await page.goto(`${BASE_URL}/people/${other.id}`);
         await page.getByText(`${other.display_name}'s profile in this household.`, { exact: true }).waitFor({ timeout: 15000 });
         await settleAnimations(page);
         file = `next-profile-other-overview-${viewport.width}-${theme}.png`;
@@ -3350,7 +3197,7 @@ async function captureNextPersonProfileReview(browser: Browser, sessionValue: st
 }
 
 /** SHELL-06's own acceptance ("1440 and 390... captures"): both
- * viewports, both themes, of `/next/engines`. This seeded demo
+ * viewports, both themes, of `/engines`. This seeded demo
  * household has no Stack configured (the same state the acceptance
  * asks to prove is honest, not an error), so the real, expected
  * capture is the calm "No Stack configured" empty state - waited on
@@ -3360,12 +3207,6 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextEnginesReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -3373,7 +3214,7 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/engines`);
+        await page.goto(`${BASE_URL}/engines`);
         await page.locator("text=No Stack configured").first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Engines");
         await settleAnimations(page);
@@ -3389,7 +3230,7 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
 }
 
 /** SHELL-07's own acceptance ("captures"): both viewports, both
- * themes, of `/next/updates`. Waits on "MaiPai Home" - the app's own
+ * themes, of `/updates`. Waits on "MaiPai Home" - the app's own
  * row is always present regardless of whether a Stack is configured,
  * and (unlike the sidebar's own "Shadcn Dashboard" logo text) only
  * renders once `GET /api/updates` has actually resolved. */
@@ -3397,12 +3238,6 @@ async function captureNextUpdatesReview(browser: Browser, sessionValue: string):
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextUpdatesReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -3410,7 +3245,7 @@ async function captureNextUpdatesReview(browser: Browser, sessionValue: string):
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/updates`);
+        await page.goto(`${BASE_URL}/updates`);
         // Not a substring match: the app's own generic boot skeleton
         // shows "Loading MaiPai Home" before anything mounts, which a
         // plain `text=MaiPai Home` locator matches too - found live,
@@ -3430,7 +3265,7 @@ async function captureNextUpdatesReview(browser: Browser, sessionValue: string):
   }
 }
 
-/** SHELL-07's own acceptance: both viewports, both themes, of `/next/
+/** SHELL-07's own acceptance: both viewports, both themes, of `/
  * repairs`. Found live, not assumed: this throwaway backend's own real
  * boot process raises a real issue (the Wyoming satellite server
  * failing to bind, logged on every run of this script), so the real
@@ -3440,12 +3275,6 @@ async function captureNextRepairsReview(browser: Browser, sessionValue: string):
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextRepairsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -3453,7 +3282,7 @@ async function captureNextRepairsReview(browser: Browser, sessionValue: string):
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/repairs`);
+        await page.goto(`${BASE_URL}/repairs`);
         // Not actually empty in this seeded backend: the real server
         // boot process raises a real issue (the Wyoming satellite
         // server failing to bind - found live, not fabricated for the
@@ -3474,7 +3303,7 @@ async function captureNextRepairsReview(browser: Browser, sessionValue: string):
 }
 
 /** ADMIN-PERF-01's own acceptance ("captures at 1440 and 390"): both
- * viewports, both themes, of `/next/performance`. This throwaway
+ * viewports, both themes, of `/performance`. This throwaway
  * backend has no Stack configured and no traced turns yet (the seeded
  * boot never ran `turn.pipeline.next`), so the real, expected capture
  * is the two honest empty states side by side - Layers' own "No traced
@@ -3485,12 +3314,6 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextPerformanceReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -3498,7 +3321,7 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/performance`);
+        await page.goto(`${BASE_URL}/performance`);
         await page.locator("text=No traced turns yet").first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Performance");
         await settleAnimations(page);
@@ -3514,7 +3337,7 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
 }
 
 /** STORE-PAGE-01's own acceptance: both viewports, both themes, of
- * `/next/storage`, signed in as Sage (owner) - seedHousehold() already
+ * `/storage`, signed in as Sage (owner) - seedHousehold() already
  * creates three real people (Sage, Marlow, Nova), so the data table
  * shows three real rows, each honestly at 0 bytes (createAttachment()
  * has no live HTTP caller anywhere in this codebase yet, checked
@@ -3529,12 +3352,6 @@ async function captureNextStorageReview(browser: Browser, sessionValue: string):
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextStorageReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -3542,7 +3359,7 @@ async function captureNextStorageReview(browser: Browser, sessionValue: string):
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/storage`);
+        await page.goto(`${BASE_URL}/storage`);
         await page.locator("text=Household total").first().waitFor({ timeout: 15000 });
         await page.locator("text=Household storage cap").first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Storage");
@@ -3633,7 +3450,7 @@ async function capturePeopleProfileMediaReview(browser: Browser, sessionValue: s
   }
 }
 
-/** SHELL-07's own acceptance: both viewports, both themes, of `/next/
+/** SHELL-07's own acceptance: both viewports, both themes, of `/
  * backups`. This throwaway backend's own fresh data directory has
  * never run a backup, so the real, expected capture is the vendored
  * `DataTable`'s own "No data available." empty state, the same honest-
@@ -3642,12 +3459,6 @@ async function captureNextBackupsReview(browser: Browser, sessionValue: string):
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextBackupsReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -3655,7 +3466,7 @@ async function captureNextBackupsReview(browser: Browser, sessionValue: string):
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/next/backups`);
+        await page.goto(`${BASE_URL}/backups`);
         await page.locator("text=No data available.").first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Backups");
         await settleAnimations(page);
@@ -3670,121 +3481,33 @@ async function captureNextBackupsReview(browser: Browser, sessionValue: string):
   }
 }
 
-/** SHELL-08's own acceptance: both viewports, both themes, of `/next/
- * sign-in`'s real profile picker. Unlike every other `/next` capture,
- * this one can't start from a fresh, cookie-only context - `useShellNext()`
- * needs `GET /api/settings` to resolve, which is `requireAuth` (the
- * plan doc's own SHELL-08 gap paragraph), so a person has to be signed
- * IN first for the settings query to warm, then sign OUT in the same
- * page (no reload, `setPerson(null)` only) the exact way the real app's
- * own acceptance works. The old shell's real "Sign out" control
- * (ProfileSwitcher.tsx) does that; a `pushState`+`popstate` pair moves
- * to `/next/sign-in` client-side after, since no in-app link between
- * the old and new shells exists yet to click instead - the same
- * no-reload transition a real browser back/forward or a future cross-
- * shell link would make. */
-async function captureNextSignInReview(browser: Browser, sessionValue: string): Promise<void> {
+/** Captures the now-public signed-out profile picker at its root route. */
+async function captureNextSignInReview(browser: Browser, _sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
+  const desktop = VIEWPORTS.find((viewport) => viewport.slug === "desktop")!;
+  const phone = VIEWPORTS.find((viewport) => viewport.slug === "phone")!;
 
-  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
-  });
-  if (!setShellNext.ok) throw new Error(`captureNextSignInReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
-
-  const seededPeople = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } });
-  if (!seededPeople.ok) throw new Error(`captureNextSignInReview: people lookup failed: ${seededPeople.status}`);
-  const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((p) => p.display_name === "Sage");
-  if (!sage) throw new Error("captureNextSignInReview: seedHousehold() didn't create Sage");
-
-  const desktopViewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
-  const phoneViewport = VIEWPORTS.find((v) => v.slug === "phone")!;
-
-  for (const theme of THEMES) {
-    // A fresh session per theme, not the shared `sessionValue`: the
-    // real "Sign out" click below calls the real `/api/auth/logout`,
-    // which invalidates whatever session cookie it's handed server-
-    // side - reusing the same one across iterations would 401 every
-    // context after the first sign-out actually runs.
-    const iterationLogin = await fetch(`${BASE_URL}/api/auth/verify-secret`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ personId: sage.id, secret: "correcthorsebattery" }),
-    });
-    if (!iterationLogin.ok) throw new Error(`captureNextSignInReview: verify-secret failed: ${iterationLogin.status}`);
-    const iterationCookie = iterationLogin.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
-    if (!iterationCookie) throw new Error("captureNextSignInReview: verify-secret carried no session cookie");
-
-    // One context and one real sign-out per theme, not per viewport:
-    // found live, opening the phone-only avatar menu (which folds
-    // Search/Theme/Notifications into the same popover as "Sign out")
-    // can still land a background refetch of this exact household-
-    // settings query right as `/api/auth/logout` invalidates the
-    // session, and `retry: false` means an errored query never
-    // recovers on its own afterward - a real, session-ending race, not
-    // something a retry of the same sign-out fixes. Signing out once on
-    // desktop (no phone-only menu content to race) and then resizing
-    // the same already-signed-out page for the phone screenshot avoids
-    // the race entirely rather than working around it.
-    const context = await newContext(browser, desktopViewport, theme, iterationCookie);
-    try {
-      const page = await context.newPage();
-      // Waits for the real network round trip, not just the header
-      // rendering (which shows before HomePage.tsx's own
-      // useHouseholdSettings() fetch resolves): the household settings
-      // query has to actually be IN the cache before signing out, or
-      // the very next read (NextSignInPage's own useShellNext()) finds
-      // nothing and spins in RouteSkeleton forever - the exact cold-
-      // load gap the plan doc names, just reached a different way
-      // (found live, debugging this capture).
-      const householdSettingsLoaded = page.waitForResponse((res) => res.url().includes("/api/settings") && res.url().includes("scope=household"));
-      await page.goto(`${BASE_URL}/`);
-      await householdSettingsLoaded;
-      const profileTrigger = page.getByRole("button", { name: /Sage, switch profile or sign out/i });
-      await profileTrigger.waitFor({ timeout: 15000 });
-      await profileTrigger.click();
-      await page.getByText("Sign out", { exact: true }).click();
-      // Confirms `person` really went to `null` in React state (no
-      // reload happened, so this same trigger just detaching proves
-      // AppShell unmounted) before trusting the settings cache is
-      // still the one warmed above, not a fresh cold load's own.
-      await profileTrigger.waitFor({ state: "detached", timeout: 15000 });
-      await page.evaluate(() => {
-        history.pushState({}, "", "/next/sign-in");
-        window.dispatchEvent(new PopStateEvent("popstate"));
+  for (const viewport of [desktop, phone]) {
+    for (const theme of THEMES) {
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        colorScheme: theme,
+        userAgent: viewport.userAgent,
+        isMobile: viewport.slug === "phone",
+        hasTouch: viewport.slug === "phone",
       });
-      await page.getByRole("button", { name: "Sage" }).waitFor({ timeout: 15000 });
-      // A short settle beyond the locator's own resolution: found
-      // live, this capture's own pushState-driven client-side nav (not
-      // a real browser navigation) can have the DOM genuinely updated
-      // a beat before the compositor paints it, so a screenshot taken
-      // the instant the locator resolves can still capture the prior
-      // frame.
-      await page.waitForTimeout(1000);
-      if (!page.url().endsWith("/next/sign-in")) {
-        throw new Error(`captureNextSignInReview: landed on ${page.url()} instead of /next/sign-in`);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/sign-in`);
+        await page.getByRole("button", { name: "Sage" }).waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `next-sign-in-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: viewport.slug === "phone" });
+        console.log(`Wrote ${path}`);
+      } finally {
+        await context.close();
       }
-      await settleAnimations(page);
-      const desktopPath = join(outDir, `next-sign-in-${desktopViewport.width}-${theme}.png`);
-      await page.screenshot({ path: desktopPath, fullPage: false });
-      console.log(`Wrote ${desktopPath}`);
-
-      // Resized, not a fresh phone context: the phone-only avatar menu
-      // content that races the settings query (above) only exists
-      // while that menu is open, already behind us here - so a resize
-      // is the same real, already-signed-in-then-out `/next/sign-in`
-      // render a phone would show, without re-running the sign-out.
-      await page.setViewportSize({ width: phoneViewport.width, height: phoneViewport.height });
-      await settleAnimations(page);
-      const phonePath = join(outDir, `next-sign-in-${phoneViewport.width}-${theme}.png`);
-      await page.screenshot({ path: phonePath, fullPage: true });
-      console.log(`Wrote ${phonePath}`);
-
-      await page.close();
-    } finally {
-      await context.close();
     }
   }
 }
@@ -3893,11 +3616,9 @@ async function capturePhoneHeaderFoldReview(browser: Browser, sessionValue: stri
   }
 }
 
-/** Reads the header's profile-switcher trigger's own computed
- * transition-duration (`ProfileSwitcher.tsx`'s own `Button`, a real,
- * always-mounted element on every signed-in route regardless of that
- * route's own body - its Popover content, unlike the trigger itself, is
- * the part that only mounts when opened) under the given `reducedMotion`
+/** Reads the migrated header's Sidebar trigger's own computed
+ * transition-duration (a real, always-mounted element on every
+ * signed-in route regardless of that route's own body) under the given `reducedMotion`
  * preference. `kit/ui/button.tsx` puts `transition-all` on every Button,
  * a real, non-zero-by-default Tailwind duration - a code review
  * (2026-09-06) found an earlier version selecting the DOM's first
@@ -3915,7 +3636,7 @@ async function buttonTransitionDuration(browser: Browser, sessionValue: string, 
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    const trigger = page.locator('button[aria-label*="switch profile or sign out"]');
+    const trigger = page.getByRole("button", { name: "Toggle Sidebar" });
     await trigger.waitFor({ timeout: 15000 });
     const duration = await trigger.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
     return duration;

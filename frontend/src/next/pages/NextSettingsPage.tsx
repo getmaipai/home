@@ -80,10 +80,10 @@ export function NextSettingsPage({ person }: { person: Roster }) {
       </CardHeader>
       {canManageHousehold || showDeviceSettings ? (
         <Tabs value={tab} onValueChange={(v) => setTab(v as "household" | "me" | "device")}>
-          <TabsList>
-            {canManageHousehold ? <TabsTrigger value="household">Household</TabsTrigger> : null}
-            <TabsTrigger value="me">Me</TabsTrigger>
-            {showDeviceSettings ? <TabsTrigger value="device">This device</TabsTrigger> : null}
+          <TabsList className="h-auto min-h-12">
+            {canManageHousehold ? <TabsTrigger className="min-h-12 min-w-12" value="household">Household</TabsTrigger> : null}
+            <TabsTrigger className="min-h-12 min-w-12" value="me">Me</TabsTrigger>
+            {showDeviceSettings ? <TabsTrigger className="min-h-12 min-w-12" value="device">This device</TabsTrigger> : null}
           </TabsList>
           {canManageHousehold ? (
             <TabsContent value="household" className="flex flex-col gap-4">
@@ -115,7 +115,7 @@ export function NextSettingsPage({ person }: { person: Roster }) {
           child's own row lives there too (GET /api/storage/usage's own
           row-visibility rule), so this link-out sits outside the
           canManageHousehold branch rather than inside either tab. */}
-      <Link to="/next/storage" className="block">
+      <Link to="/storage" className="block">
         <Card className="py-4 transition-colors hover:bg-accent">
           <CardHeader>
             <CardTitle>Storage</CardTitle>
@@ -125,7 +125,7 @@ export function NextSettingsPage({ person }: { person: Roster }) {
       </Link>
       {/* Privacy explains data flows for every signed-in person. Keep it
           outside both role tabs, like Storage, so the link is always visible. */}
-      <Link to="/next/privacy" className="block">
+      <Link to="/privacy" className="block">
         <Card className="py-4 transition-colors hover:bg-accent">
           <CardHeader>
             <CardTitle>Privacy</CardTitle>
@@ -139,9 +139,9 @@ export function NextSettingsPage({ person }: { person: Roster }) {
 
 function PersonalManagementLinks() {
   const links = [
-    ["Voices", "Browse voices and manage your voice recordings.", "/next/voices"],
-    ["Commands", "View and manage household commands.", "/next/commands"],
-    ["Devices", "Review your signed-in devices and sessions.", "/next/devices"],
+    ["Voices", "Browse voices and manage your voice recordings.", "/voices"],
+    ["Commands", "View and manage household commands.", "/commands"],
+    ["Devices", "Review your signed-in devices and sessions.", "/devices"],
   ] as const;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

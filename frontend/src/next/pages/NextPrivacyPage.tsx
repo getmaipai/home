@@ -12,7 +12,7 @@ function Disclosure({ row }: { row: PrivacyConnection }) {
   const inbound = row.direction === "inbound";
   return (
     <article className="flex min-w-0 flex-col gap-1 py-4 first:pt-0 last:pb-0">
-      <h3 className="text-base font-semibold">{inbound ? sourceName(row) : row.destination}</h3>
+      <h2 className="text-base font-semibold">{inbound ? sourceName(row) : row.destination}</h2>
       {inbound ? <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Scope:</span> {row.destination}</p> : null}
       <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">When:</span> {row.when}</p>
       <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">What it sends:</span> {row.what}</p>

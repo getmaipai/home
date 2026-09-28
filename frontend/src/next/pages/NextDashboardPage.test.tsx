@@ -108,9 +108,9 @@ describe("NextDashboardPage", () => {
       // permanent nav entry - the stat cards are now their real way
       // back, not just a status glance.
       for (const [label, href] of [
-        ["Updates", "/next/updates"],
-        ["Repairs", "/next/repairs"],
-        ["Engines", "/next/engines"],
+        ["Updates", "/updates"],
+        ["Repairs", "/repairs"],
+        ["Engines", "/engines"],
       ] as const) {
         const card = Array.from(document.querySelectorAll("a")).find((a) => a.textContent?.includes(label));
         expect(card).toBeDefined();

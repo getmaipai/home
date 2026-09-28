@@ -8,16 +8,16 @@ interface ManageLink {
 }
 
 const MANAGE_LINKS: readonly ManageLink[] = [
-  { title: "Engines", description: "Roles, state and health of the Stack's own engines.", to: "/next/engines" },
-  { title: "Updates", description: "What's available and what's already up to date.", to: "/next/updates" },
-  { title: "Repairs", description: "Open issues and the fix each one names.", to: "/next/repairs" },
-  { title: "Backups", description: "History, size, and anything staged to restore.", to: "/next/backups" },
-  { title: "Users", description: "Add, edit, and remove household accounts.", to: "/next/users" },
-  { title: "AI models", description: "Download, choose, and manage the household's AI models.", to: "/next/models" },
+  { title: "Engines", description: "Roles, state and health of the Stack's own engines.", to: "/engines" },
+  { title: "Updates", description: "What's available and what's already up to date.", to: "/updates" },
+  { title: "Repairs", description: "Open issues and the fix each one names.", to: "/repairs" },
+  { title: "Backups", description: "History, size, and anything staged to restore.", to: "/backups" },
+  { title: "Users", description: "Add, edit, and remove household accounts.", to: "/users" },
+  { title: "AI models", description: "Download, choose, and manage the household's AI models.", to: "/models" },
   // ADMIN-PERF-01: the backlog's own "reached from Settings' Manage
   // section and the System card" - the System card is DASH-CARDS-01's
   // (not landed), so Manage is this page's only entry point for now.
-  { title: "Performance", description: "How the hub is doing over time: reply times, engines, queues, disk.", to: "/next/performance" },
+  { title: "Performance", description: "How the hub is doing over time: reply times, engines, queues, disk.", to: "/performance" },
 ];
 
 /** Settings' own Household tab, bottom section (owner ruling, ui-v0.5.23's
@@ -33,7 +33,7 @@ const MANAGE_LINKS: readonly ManageLink[] = [
 export function NextManageSection() {
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium text-muted-foreground">Manage</h3>
+      <h2 className="text-sm font-medium text-muted-foreground">Manage</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {MANAGE_LINKS.map((link) => (
           <Link key={link.to} to={link.to} className="block">

@@ -101,12 +101,12 @@ export function NextDataTable<T extends Record<string, unknown>>({
         <Input
           type="search"
           aria-label="Search table rows"
-          className="min-w-0 sm:max-w-96"
+          className="min-h-12 min-w-0 sm:max-w-96"
           value={globalFilter}
           onChange={(event) => { setGlobalFilter(event.target.value); setPageIndex(0); }}
           placeholder="Search rows…"
         />
-        <Button type="button" variant="outline" aria-label="Download table as CSV" onClick={downloadCsv}>
+        <Button type="button" variant="outline" aria-label="Download table as CSV" className="min-h-12" onClick={downloadCsv}>
           <Download aria-hidden="true" className="size-4" />
           <span>Download CSV</span>
         </Button>
@@ -122,7 +122,7 @@ export function NextDataTable<T extends Record<string, unknown>>({
                       <Button
                         type="button"
                         variant="ghost"
-                        className="h-auto px-2 font-medium text-muted-foreground"
+                        className="h-auto min-h-12 min-w-12 px-2 font-medium text-muted-foreground"
                         onClick={() => {
                           setSort({ key, direction: direction === "asc" ? "desc" : "asc" });
                           setPageIndex(0);
@@ -151,7 +151,7 @@ export function NextDataTable<T extends Record<string, unknown>>({
                 {rowActions && (actionsForRow.length === 0 ? <TableCell /> : <TableCell className="w-10 p-1 text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger render={
-                      <Button type="button" variant="ghost" size="icon-lg" aria-label="More actions">
+                      <Button type="button" variant="ghost" size="icon-lg" className="size-12" aria-label="More actions">
                         <MoreHorizontal aria-hidden="true" className="size-4" />
                       </Button>
                     } />
@@ -160,7 +160,7 @@ export function NextDataTable<T extends Record<string, unknown>>({
                         <Fragment key={action.label}>
                           {actionIndex > 0 && Boolean(action.destructive) !== Boolean(actionsForRow[actionIndex - 1]?.destructive) && <DropdownMenuSeparator />}
                           <DropdownMenuItem
-                            className="min-w-12 min-h-13"
+                            className="min-w-12! min-h-13"
                             variant={action.destructive ? "destructive" : "default"}
                             disabled={action.disabled}
                             onClick={() => {
@@ -210,14 +210,14 @@ export function NextDataTable<T extends Record<string, unknown>>({
       </AlertDialog>
       <div className="flex flex-col items-center justify-between gap-4 px-4 pb-4 sm:flex-row">
         <div className="flex gap-2">
-          <Button type="button" variant="secondary" disabled={currentPage === 0} onClick={() => setPageIndex((page) => Math.max(0, page - 1))}>Previous</Button>
-          <Button type="button" disabled={currentPage + 1 >= pageCount} onClick={() => setPageIndex((page) => Math.min(pageCount - 1, page + 1))}>Next</Button>
+          <Button type="button" variant="secondary" className="min-h-12" disabled={currentPage === 0} onClick={() => setPageIndex((page) => Math.max(0, page - 1))}>Previous</Button>
+          <Button type="button" className="min-h-12" disabled={currentPage + 1 >= pageCount} onClick={() => setPageIndex((page) => Math.min(pageCount - 1, page + 1))}>Next</Button>
         </div>
         <p className="text-sm text-muted-foreground" aria-live="polite">Page {currentPage + 1} of {pageCount}</p>
         <div className="flex items-center gap-2">
           <Label htmlFor={pageSizeId} className="whitespace-nowrap text-sm">Rows per page:</Label>
           <Select value={String(pageSize)} onValueChange={(value) => { setPageSize(Number(value)); setPageIndex(0); }}>
-            <SelectTrigger id={pageSizeId} className="w-20"><SelectValue /></SelectTrigger>
+            <SelectTrigger id={pageSizeId} className="min-h-12 w-20"><SelectValue /></SelectTrigger>
             <SelectContent>
               {pageSizes.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}
             </SelectContent>

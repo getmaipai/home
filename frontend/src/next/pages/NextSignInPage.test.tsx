@@ -46,10 +46,10 @@ function stubFetch(byPath: Record<string, unknown | (() => Response)>) {
 
 function renderSignIn(onSignedIn: () => void = () => {}) {
   return renderWithQueryClient(
-    <MemoryRouter initialEntries={["/next/sign-in"]}>
+    <MemoryRouter initialEntries={["/sign-in"]}>
       <Routes>
         <Route path="/setup" element={<div>the setup wizard</div>} />
-        <Route path="/next/sign-in" element={<NextSignInPage onSignedIn={onSignedIn} />} />
+        <Route path="/sign-in" element={<NextSignInPage onSignedIn={onSignedIn} />} />
       </Routes>
     </MemoryRouter>,
   );

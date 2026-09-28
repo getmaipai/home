@@ -45,6 +45,26 @@ describe("findOverflowingPanels", () => {
     expect(findOverflowingPanels()).toEqual([]);
   });
 
+  test("does not report a child clipped by its own overflow-hidden container", () => {
+    document.body.innerHTML = `
+      <a id="logo" style="overflow-x: hidden"><img id="wordmark" alt="MaiPai Home" /></a>
+    `;
+    mockRect(document.getElementById("logo")!, { left: 0, right: 40 });
+    mockRect(document.getElementById("wordmark")!, { left: 0, right: 120 });
+
+    expect(findOverflowingPanels()).toEqual([]);
+  });
+
+  test("does not report SimpleBar's invisible height observer wrapper", () => {
+    document.body.innerHTML = `
+      <div class="simplebar-height-auto-observer-wrapper" id="observer"><div id="observer-child"></div></div>
+    `;
+    mockRect(document.getElementById("observer")!, { left: 0, right: 40 });
+    mockRect(document.getElementById("observer-child")!, { left: 0, right: 80 });
+
+    expect(findOverflowingPanels()).toEqual([]);
+  });
+
   // A real page against a real capture (settings-devices-far-dark,
   // 2026-09-20): one genuinely-too-wide rail pill pushed its own
   // parents' scrollWidth past their clientWidth too (a child's content

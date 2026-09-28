@@ -34,7 +34,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * the identical rule docs/SETTINGS.md Rule 4 both renderers honor: three
  * disclosure levels, expert filtered out, advanced folds once a section
  * has three or more). Sections render as the template's own `Card`/
- * `CardHeader`/`CardTitle` (the same shipped shell every other `/next`
+ * `CardHeader`/`CardTitle` (the same shipped shell every other `/`
  * page's own section heading already uses) in place of the kit's
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
@@ -180,7 +180,7 @@ export function NextSettingsRenderer({ scope, scopeValue, only }: NextSettingsRe
                           type="button"
                           variant="link"
                           onClick={() => setAdvancedOpen((prev) => ({ ...prev, [group.id]: true }))}
-                          className="h-auto w-fit p-0 pt-3 text-muted-foreground"
+                          className="h-auto min-h-12 w-fit p-0 pt-3 text-muted-foreground"
                         >
                           Show {group.advanced.length} advanced settings
                         </Button>

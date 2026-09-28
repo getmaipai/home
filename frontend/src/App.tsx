@@ -1,46 +1,21 @@
 import { lazy, Suspense, useEffect, useState, type ComponentProps, type ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
-import { SignIn } from "@/shell/SignIn";
-import { AppShell } from "@/shell/AppShell";
-import { useShellNext } from "@/next/useShellNext";
-import { shouldRedirectRootToNext, isRootStillResolving, signOutDestination } from "@/shell/oldShellRedirect";
-import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
+import { LegacyNextRedirect } from "@/next/LegacyNextRedirect";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
-import { ChatPage } from "@/apps/chat/ChatPage";
-import { HomePage } from "@/apps/home/HomePage";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
-import { api, type Roster, type SignedInPerson } from "@/lib/api";
+import { api, type SignedInPerson } from "@/lib/api";
 import { SessionLockGate } from "@/shell/sessionLockContext";
 
-// A small helper for a named export, since `lazy()` itself only takes a
-// promise of `{ default }` - every page below is a named export, not a
-// default one, and repeating `.then((m) => ({ default: m.X }))` 15 times
-// inline would bury the one line that actually matters (which route).
-// `P` defaults to "no props at all" so the four routes that really take
-// none (`NotificationsPage`, `DevicesPage`, `PeoplePage`, `PrivacyPage`)
-// need no type argument, rather than a second, separate convention
-// alongside the `ComponentProps<...>` calls below - a review, 2026-09-13.
-//
-// A failed chunk fetch (a stale tab's own index.html pointing at a
-// hash a newer deploy already dropped) needs no handling here: it
-// rejects as a plain `import()` failure, which Vite's own runtime
-// turns into a `vite:preloadError` on `window` - `src/lib/pwaBoot.ts`'s
-// `installStaleChunkRetry` (wired in `main.tsx`) already listens for
-// exactly that, reloading once against the SAME shared, capped retry
-// budget every other boot-resilience guard in this app uses. A review
-// (2026-09-13) first added a second, per-chunk reload path here before
-// finding that shared mechanism - reverted, since two uncoordinated
-// reload guards for the identical failure is the precise bug
-// `pwaBoot.ts`'s own header comment documents fixing once already
-// (2026-09-06, up to six reload cycles from two independent caps).
+// A failed chunk fetch uses the shared stale-chunk retry wired in
+// main.tsx; lazy routes do not need a separate reload path.
 function lazyNamed<P extends object = Record<string, never>>(
   loader: () => Promise<Record<string, unknown>>,
   name: string,
@@ -48,237 +23,24 @@ function lazyNamed<P extends object = Record<string, never>>(
   return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType<P> })));
 }
 
-// Shared between the "/*" and "/next/*" top-level routes below: both show
-// this while `person` is still `undefined` (the initial loadPerson() call
-// hasn't resolved yet).
-const LOADING_PERSON = (
-  <div className="flex h-screen items-center justify-center">
-    <Progress mode="spinner" label="Loading MaiPai Home" />
-  </div>
-);
-
-// SHELL-FLAG-01: with ui.shell.next on, the whole app is the new shell -
-// "/" redirects there, and signing out from here lands on /next/sign-in
-// instead of this shell's own inline <SignIn/>, which used to happen
-// unconditionally regardless of the flag (found live, 2026-09-21: a
-// person who turned the flag on, then signed out, landed right back on
-// the old dashboard's own sign-in with no way into /next except typing
-// it by hand). useShellNext() and useNavigate() both need a real
-// component under <BrowserRouter/> to call from - App() itself renders
-// BrowserRouter, so it isn't one - which is the only reason this is its
-// own function rather than staying an inline ternary the way it was.
-function OldShellRoutes({
-  person,
-  loadPerson,
-  revalidatePerson,
-  onSignedOut,
-}: {
-  person: Roster | null;
-  loadPerson: () => Promise<void>;
-  revalidatePerson: () => Promise<void>;
-  onSignedOut: () => void;
-}) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const shellNext = useShellNext();
-
-  // A code review caught this: checking the redirect before person, the
-  // first draft made even a signed-out visit to "/" wait on
-  // useShellNext()'s own settings fetch (requireAuth-gated - a
-  // never-authenticated browser only ever gets a 401 from it) before
-  // showing the sign-in form at all, a real extra round trip on top of
-  // the sign-in form's own real work. A signed-out visit never needs
-  // this redirect anyway: it's the sign-out flow below, not "/" itself,
-  // that sends a signed-out person to /next/sign-in once the flag is
-  // known - so this only runs once someone is actually signed in.
-  if (person !== null) {
-    // HOME-UI-04g (in flight, not yet on main) will seed useShellNext()'s
-    // own initial state from its per-browser cache, so this redirect
-    // becomes flash-free with no change here once it lands - today it's
-    // one query tick, usually already warm from HomePage's own identical
-    // settings fetch.
-    if (shouldRedirectRootToNext(location.pathname, shellNext)) return <Navigate to="/next" replace />;
-    if (isRootStillResolving(location.pathname, shellNext)) return <RouteSkeleton />;
-  }
-
-  if (person === null) {
-    return <SignIn onSignedIn={loadPerson} />;
-  }
-
-  return (
-    <AppShell
-      person={person}
-      onSignOut={() =>
-        api.logout().finally(() => {
-          onSignedOut();
-          const destination = signOutDestination(shellNext);
-          if (destination) navigate(destination, { replace: true });
-        })
-      }
-      onPersonChange={revalidatePerson}
-    >
-      <Suspense fallback={<RouteSkeleton />}>
-        <Routes>
-          <Route path="/" element={<HomePage person={person} />} />
-          <Route path="/apps" element={<AppsPage person={person} />} />
-          <Route path="/files" element={<FilesPage person={person} />} />
-          <Route path="/chat" element={<ChatPage person={person} />} />
-          {/* Conversations is Chat's own thread list now, not a
-              destination of its own (owner ruling, "Navigation,
-              corrected," 2026-09-20) - `?list=1` opens the phone
-              sheet ChatPage.tsx already renders; the desktop
-              column is always visible, so this redirect is
-              already "the list open" there without it. */}
-          <Route path="/conversations" element={<Navigate to="/chat?list=1" replace />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/search" element={<SearchPage person={person} />} />
-          <Route path="/people" element={<PeoplePage person={person} />} />
-          <Route path="/people/:id" element={<PersonProfilePage person={person} onPersonChange={revalidatePerson} />} />
-          {/* Memories belong to a person now (same ruling): both
-              spellings of the old destination redirect to the
-              signed-in person's own Memories tab, so nothing
-              bookmarked breaks. */}
-          <Route path="/memory" element={<MemoriesRedirect selfId={person.id} />} />
-          <Route path="/memories" element={<MemoriesRedirect selfId={person.id} />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route
-            path="/settings"
-            element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-          >
-            {/* Nested (2026-09-06), not sibling routes: navigating to
-                one of these used to unmount SettingsPage entirely,
-                taking the tree rail/Household-Me switcher/search box
-                down with it. SettingsPage renders these through its
-                own <Outlet/>, so its chrome stays put. */}
-            <Route path="users" element={<UsersPage person={person} />} />
-            <Route path="models" element={<ModelsPage person={person} />} />
-            <Route path="backups" element={<BackupsPage person={person} />} />
-            <Route path="voices" element={<VoicesPage person={person} />} />
-            <Route path="commands" element={<CommandsPage person={person} />} />
-            <Route path="devices" element={<DevicesPage person={person} />} />
-            <Route path="repairs" element={<RepairsPage person={person} />} />
-            <Route path="updates" element={<UpdatesPage person={person} />} />
-            {/* No AdminGatedContent wrapper, unlike Repairs
-                and Backups above it: Health is
-                informational for every signed-in household
-                member (app.ts's healthRoute is requireAuth,
-                not requireRole), so HealthSection gates
-                only its own restart control, not the page. */}
-            <Route path="health" element={<HealthSection person={person} />} />
-          </Route>
-        </Routes>
-      </Suspense>
-    </AppShell>
-  );
-}
-
-
-// Lane 10 item 2 (docs/BACKLOG.md's "Real code-splitting for the frontend
-// shell chunk"): every app EXCEPT Home and Chat becomes its own chunk,
-// dynamic-imported only once its route is actually visited - Home and
-// Chat are what a signed-in person's very first paint renders on
-// essentially every session, so keeping them eager avoids trading "a
-// smaller shell" for "a loading flash on the one screen everybody hits
-// every time." The shell and the kit stay in the entry chunk too (they
-// render on every route, lazy-loading them would just delay the first
-// paint instead of shrinking it).
-// `ComponentProps<typeof import("path")["Name"]>` - a type-only query,
-// erased at build, never a real eager import - derives each page's
-// props from its own real signature instead of a hand-typed copy that
-// could drift the moment that signature changes without this call site
-// changing to match (a review, 2026-09-13, found the hand-typed version
-// wouldn't have caught exactly that drift for any of these 15). Left
-// off entirely for the four pages that take no props at all
-// (`NotificationsPage`, `DevicesPage`, `PeoplePage`, `PrivacyPage`):
-// TypeScript infers `unknown`, not `{}`, from a truly zero-parameter
-// function component's `ComponentProps` (a documented inference quirk),
-// so `lazyNamed`'s own default (`Record<string, never>`, "no props")
-// covers them instead.
-const AppsPage = lazyNamed<ComponentProps<typeof import("@/apps/library/AppsPage")["AppsPage"]>>(
-  () => import("@/apps/library/AppsPage"),
-  "AppsPage",
-);
+// Setup remains a separate first-run route. The migrated application
+// shell owns every other route from the root, while `/next/*` remains a
+// compatibility prefix for bookmarks and links made during preview.
 const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWizard")["SetupWizard"]>>(
   () => import("@/apps/setup/SetupWizard"),
   "SetupWizard",
 );
-// STORE-SHARE-01: not on the curated nav yet (shell/nav.ts's own list -
-// how this actually surfaces is STORE-PAGE-01/PEOPLE-01's call), but a
-// real, working route today.
-const FilesPage = lazyNamed<ComponentProps<typeof import("@/apps/files/FilesPage")["FilesPage"]>>(
-  () => import("@/apps/files/FilesPage"),
-  "FilesPage",
-);
-const NotificationsPage = lazyNamed(() => import("@/apps/notifications/NotificationsPage"), "NotificationsPage");
-// The shell-on-shadcndashboard stand-up (docs/plans/shell-on-shadcndashboard-
-// 2026-09-21.md): its own chunk, not the entry bundle - the vendored kit
-// under it (55 shadcn primitives, the Elements) is real weight nobody
-// pays for until they actually turn ui.shell.next on and visit /next.
 const NextRoutes = lazyNamed<ComponentProps<typeof import("@/next/NextRoutes")["NextRoutes"]>>(
   () => import("@/next/NextRoutes"),
   "NextRoutes",
 );
-const SearchPage = lazyNamed<ComponentProps<typeof import("@/apps/search/SearchPage")["SearchPage"]>>(
-  () => import("@/apps/search/SearchPage"),
-  "SearchPage",
-);
-const SettingsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/SettingsPage")["SettingsPage"]>>(
-  () => import("@/apps/settings/SettingsPage"),
-  "SettingsPage",
-);
-const ModelsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/ModelsPage")["ModelsPage"]>>(
-  () => import("@/apps/settings/ModelsPage"),
-  "ModelsPage",
-);
-const BackupsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/BackupsPage")["BackupsPage"]>>(
-  () => import("@/apps/settings/BackupsPage"),
-  "BackupsPage",
-);
-const VoicesPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/VoicesPage")["VoicesPage"]>>(
-  () => import("@/apps/settings/VoicesPage"),
-  "VoicesPage",
-);
-const CommandsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/CommandsPage")["CommandsPage"]>>(
-  () => import("@/apps/settings/CommandsPage"),
-  "CommandsPage",
-);
-const RepairsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/RepairsPage")["RepairsPage"]>>(
-  () => import("@/apps/settings/RepairsPage"),
-  "RepairsPage",
-);
-const UpdatesPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/UpdatesPage")["UpdatesPage"]>>(
-  () => import("@/apps/settings/UpdatesPage"),
-  "UpdatesPage",
-);
-const HealthSection = lazyNamed<ComponentProps<typeof import("@/apps/settings/HealthSection")["HealthSection"]>>(
-  () => import("@/apps/settings/HealthSection"),
-  "HealthSection",
-);
-const UsersPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/UsersPage")["UsersPage"]>>(
-  () => import("@/apps/settings/UsersPage"),
-  "UsersPage",
-);
-const DevicesPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/DevicesPage")["DevicesPage"]>>(
-  () => import("@/apps/settings/DevicesPage"),
-  "DevicesPage",
-);
-const PeoplePage = lazyNamed<ComponentProps<typeof import("@/apps/people/PeoplePage")["PeoplePage"]>>(
-  () => import("@/apps/people/PeoplePage"),
-  "PeoplePage",
-);
-const PersonProfilePage = lazyNamed<
-  ComponentProps<typeof import("@/apps/people/PersonProfilePage")["PersonProfilePage"]>
->(() => import("@/apps/people/PersonProfilePage"), "PersonProfilePage");
-const PrivacyPage = lazyNamed(() => import("@/apps/privacy/PrivacyPage"), "PrivacyPage");
 
 // One QueryClient for the app's lifetime (docs/plans/session-b-ui.md
 // step 3): created once, outside the component, not per render.
 const queryClient = createQueryClient();
 
-// Sign-in gate -> shell -> routed pages. A router (react-router-dom)
-// landed with the Settings page, the second page to exist tonight -
-// docs/UI.md's "don't invent ahead of need" is why it wasn't added for
-// Chat alone.
+// The root route is the migrated shell. Setup stays separate because it
+// must remain addressable before a household profile exists.
 export function App() {
   const [person, setPerson] = useState<SignedInPerson | null | undefined>(undefined);
 
@@ -333,42 +95,31 @@ export function App() {
                         </Suspense>
                       }
                     />
-                    {/* The shell-on-shadcndashboard stand-up (docs/plans/
-                        shell-on-shadcndashboard-2026-09-21.md, step 1): a
-                        second route tree behind ui.shell.next. SHELL-08:
-                        reachable signed out too, not only once a person
-                        is signed in - NextRoutes itself now renders its
-                        own sign-in screen for a null person (the flag
-                        check still works for the realistic case, a real
-                        sign-out from within an already-open /next, since
-                        no reload happens and the settings query stays
-                        warm; a cold, never-authenticated load is its own
-                        named gap, see NextRoutes.tsx's own header).
-                        NextRoutes redirects to "/" when the flag is off. */}
                     <Route
                       path="/next/*"
-                      element={
-                        person === undefined ? (
-                          LOADING_PERSON
-                        ) : (
-                          <Suspense fallback={<RouteSkeleton />}>
-                            <NextRoutes person={person} onSignedIn={loadPerson} onPersonChange={revalidatePerson} />
-                          </Suspense>
-                        )
-                      }
+                      element={<LegacyNextRedirect />}
                     />
+                    <Route path="/apps" element={<LegacyNextRedirect />} />
+                    <Route path="/conversations" element={<LegacyNextRedirect />} />
+                    <Route path="/settings/users" element={<LegacyNextRedirect />} />
+                    <Route path="/settings/models" element={<LegacyNextRedirect />} />
+                    <Route path="/settings/backups" element={<LegacyNextRedirect />} />
+                    <Route path="/settings/voices" element={<LegacyNextRedirect />} />
+                    <Route path="/settings/commands" element={<LegacyNextRedirect />} />
+                    <Route path="/settings/devices" element={<LegacyNextRedirect />} />
+                    <Route path="/settings/repairs" element={<LegacyNextRedirect />} />
+                    <Route path="/settings/updates" element={<LegacyNextRedirect />} />
                     <Route
                       path="/*"
                       element={
                         person === undefined ? (
-                          LOADING_PERSON
+                          <div className="flex h-screen items-center justify-center">
+                            <Progress mode="spinner" label="Loading MaiPai Home" />
+                          </div>
                         ) : (
-                          <OldShellRoutes
-                            person={person}
-                            loadPerson={loadPerson}
-                            revalidatePerson={revalidatePerson}
-                            onSignedOut={() => setPerson(null)}
-                          />
+                          <Suspense fallback={<RouteSkeleton />}>
+                            <NextRoutes person={person} onSignedIn={loadPerson} onPersonChange={revalidatePerson} />
+                          </Suspense>
                         )
                       }
                     />

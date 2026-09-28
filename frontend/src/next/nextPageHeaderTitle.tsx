@@ -42,32 +42,35 @@ interface PageHeaderEntry {
 const sidebarEntries = new Map<string, PageHeaderEntry>();
 for (const group of SidebarContent) {
   for (const item of group.items ?? []) {
-    if (item.url && item.icon && item.name) sidebarEntries.set(item.url, { icon: item.icon, label: item.name });
+    if (item.url && item.icon && item.name) {
+      const path = item.url.replace(/^\/next(?=\/|$)/, "") || "/";
+      sidebarEntries.set(path, { icon: item.icon, label: item.name });
+    }
   }
 }
 
 const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
-  "/next/settings": { icon: SettingsIcon, label: "Settings" },
-  "/next/storage": { icon: StorageIcon, label: "Storage" },
-  "/next/engines": { icon: EnginesIcon, label: "Engines" },
-  "/next/performance": { icon: PerformanceIcon, label: "Performance" },
-  "/next/updates": { icon: UpdatesIcon, label: "Updates" },
-  "/next/repairs": { icon: RepairsIcon, label: "Repairs" },
-  "/next/backups": { icon: BackupsIcon, label: "Backups" },
-  "/next/voices": { icon: VoicesIcon, label: "Voices" },
-  "/next/commands": { icon: CommandsIcon, label: "Commands" },
-  "/next/devices": { icon: DevicesIcon, label: "Devices" },
-  "/next/privacy": { icon: PrivacyIcon, label: "Privacy" },
-  "/next/users": { icon: UsersIcon, label: "Users" },
-  "/next/models": { icon: ModelsIcon, label: "AI models" },
+  "/settings": { icon: SettingsIcon, label: "Settings" },
+  "/storage": { icon: StorageIcon, label: "Storage" },
+  "/engines": { icon: EnginesIcon, label: "Engines" },
+  "/performance": { icon: PerformanceIcon, label: "Performance" },
+  "/updates": { icon: UpdatesIcon, label: "Updates" },
+  "/repairs": { icon: RepairsIcon, label: "Repairs" },
+  "/backups": { icon: BackupsIcon, label: "Backups" },
+  "/voices": { icon: VoicesIcon, label: "Voices" },
+  "/commands": { icon: CommandsIcon, label: "Commands" },
+  "/devices": { icon: DevicesIcon, label: "Devices" },
+  "/privacy": { icon: PrivacyIcon, label: "Privacy" },
+  "/users": { icon: UsersIcon, label: "Users" },
+  "/models": { icon: ModelsIcon, label: "AI models" },
 };
 
 function entryFor(pathname: string): PageHeaderEntry | undefined {
-  if (pathname.startsWith("/next/people/")) return sidebarEntries.get("/next/people");
+  if (pathname.startsWith("/people/")) return sidebarEntries.get("/people");
   return sidebarEntries.get(pathname) ?? MANAGE_PAGE_ENTRIES[pathname];
 }
 
-/** Mounted once per non-chat `/next` page (`NextPageHeaderLayout` in
+/** Mounted once per non-chat `/` page (`NextPageHeaderLayout` in
  * `NextRoutes.tsx`) - a stable module-level reference (`useHeaderExtra`'s
  * own requirement), reading the current route itself via `useLocation()`
  * rather than needing a fresh identity per page. Chat has its own icon,

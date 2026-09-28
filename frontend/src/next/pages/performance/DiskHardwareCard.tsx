@@ -19,7 +19,7 @@ function toGb(bytes: number): string {
  * spec'd the hardware shape itself yet (routes/engines.ts's own
  * `HardwareSchema` takes the identical honest-passthrough posture), so
  * this card states whether a reading exists rather than guessing at
- * fields inside it. `GET /api/storage` has no `/next` page of its own
+ * fields inside it. `GET /api/storage` has no `/` page of its own
  * yet (`routes/storage.ts`'s own header: "none of it has a UI yet") -
  * no link to name here until one exists. */
 export function DiskHardwareCard({ disk, hardware }: { disk: PerformanceDisk; hardware: PerformanceHardware }) {

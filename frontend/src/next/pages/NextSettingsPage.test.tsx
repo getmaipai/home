@@ -171,44 +171,15 @@ describe("NextSettingsPage", () => {
       );
       await waitFor(() => expect(document.body.textContent).toContain("Manage"));
       for (const [title, href] of [
-        ["Engines", "/next/engines"],
-        ["Updates", "/next/updates"],
-        ["Repairs", "/next/repairs"],
-        ["Backups", "/next/backups"],
+        ["Engines", "/engines"],
+        ["Updates", "/updates"],
+        ["Repairs", "/repairs"],
+        ["Backups", "/backups"],
       ] as const) {
         const link = Array.from(document.querySelectorAll("a")).find((a) => a.textContent?.includes(title));
         expect(link).toBeDefined();
         expect(link!.getAttribute("href")).toBe(href);
       }
-    } finally {
-      restore();
-    }
-  });
-
-  test("a household boolean key folded under advanced toggles once expanded", async () => {
-    const b1 = makeKey({ key: "household.adv1", label: "Advanced One", level: "advanced", scope: "household", lives_in: "household.system" });
-    const b2 = makeKey({ key: "household.adv2", label: "Advanced Two", level: "advanced", scope: "household", lives_in: "household.system" });
-    const shellNext = makeKey({ key: "ui.shell.next", scope: "household", selector: "boolean", label: "New shell (preview)", level: "advanced", lives_in: "household.system" });
-    const { restore, puts } = mockSettingsFetch([b1, b2, shellNext], {
-      household: [makeValue(b1, "x"), makeValue(b2, "y"), makeValue(shellNext, false)],
-      "person:person-abc123": [],
-    });
-    try {
-      renderWithQueryClient(
-        <MemoryRouter>
-          <NextSettingsPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("Show 3 advanced settings"));
-      expect(document.body.textContent).not.toContain("New shell (preview)");
-      const showAdvanced = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("Show 3 advanced settings"));
-      expect(showAdvanced).toBeDefined();
-      fireEvent.click(showAdvanced!);
-      await waitFor(() => expect(document.body.textContent).toContain("New shell (preview)"));
-      const toggle = document.querySelector('[role="switch"]') as HTMLElement | null;
-      expect(toggle).not.toBeNull();
-      fireEvent.click(toggle!);
-      await waitFor(() => expect(puts.some((p) => p.key === "ui.shell.next" && p.value === true)).toBe(true));
     } finally {
       restore();
     }
@@ -226,14 +197,14 @@ describe("NextSettingsPage", () => {
     function GoToHouseholdTab() {
       const navigate = useNavigate();
       return (
-        <button type="button" onClick={() => navigate("/next/settings?tab=household")}>
+        <button type="button" onClick={() => navigate("/settings?tab=household")}>
           simulate a search result to the household tab
         </button>
       );
     }
     try {
       const { getByText } = renderWithQueryClient(
-        <MemoryRouter initialEntries={["/next/settings?tab=me"]}>
+        <MemoryRouter initialEntries={["/settings?tab=me"]}>
           <GoToHouseholdTab />
           <NextSettingsPage person={makePerson()} />
         </MemoryRouter>,
@@ -259,7 +230,7 @@ describe("NextSettingsPage", () => {
     function GoToSection({ section }: { section: string }) {
       const navigate = useNavigate();
       return (
-        <button type="button" onClick={() => navigate(`/next/settings?tab=household&section=${section}`)}>
+        <button type="button" onClick={() => navigate(`/settings?tab=household&section=${section}`)}>
           go to {section}
         </button>
       );
@@ -271,7 +242,7 @@ describe("NextSettingsPage", () => {
     };
     try {
       const { getByText } = renderWithQueryClient(
-        <MemoryRouter initialEntries={["/next/settings?tab=household&section=household.first"]}>
+        <MemoryRouter initialEntries={["/settings?tab=household&section=household.first"]}>
           <GoToSection section="household.first" />
           <GoToSection section="household.second" />
           <NextSettingsPage person={makePerson()} />

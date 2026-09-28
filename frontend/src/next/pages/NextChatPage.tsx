@@ -712,7 +712,7 @@ function ToolTimelineTool() {
 // "indicator" case, `useTurnActivity()` plus a 45s "still working"
 // timer) - `status` IS a real wire event (CHAT-16, `backend/src/wire.ts`,
 // BACKLOG.md's own "Engine emits `status` events at lookup start" item,
-// done 2026-09-15), unlike TOOL-EVENTS-01's tool events. `/next/chat`
+// done 2026-09-15), unlike TOOL-EVENTS-01's tool events. `/chat`
 // just never got this port. The kit's own `ThinkingIndicator` Element
 // (thinking-indicator.tsx) replaces its bare pulsing dot via the new
 // `Indicator` slot (ui-v0.5.29) - ported, not reinvented: same signal,
@@ -2643,6 +2643,7 @@ export function NextChatPage({ person }: { person: Roster }) {
           isSpeaking={isSpeaking}
           speakingEndedAt={speakingEndedAt}
         />
+        <h1 className="sr-only">Chat</h1>
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
             height a hard ceiling, not a floor a growing composer or a
             streaming reply could push past - FullLayout.tsx's own

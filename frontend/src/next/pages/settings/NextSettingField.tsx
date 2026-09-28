@@ -95,7 +95,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
       <div className="flex flex-col gap-2">
         <Input
           type="password"
-          className="w-64"
+          className="min-h-12 w-64"
           placeholder="Paste the new value"
           value={secretDraft}
           disabled={secretSaving}
@@ -104,13 +104,14 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
           autoComplete="off"
         />
         <div className="flex gap-2">
-          <Button type="button" size="sm" disabled={secretSaving || !secretDraft} onClick={commitSecret}>
+          <Button type="button" size="sm" className="min-h-12" disabled={secretSaving || !secretDraft} onClick={commitSecret}>
             {secretSaving ? "Saving…" : "Save"}
           </Button>
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="min-h-12"
             disabled={secretSaving}
             onClick={() => {
               setSecretDraft("");
@@ -124,7 +125,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
     ) : (
       <div className="flex items-center gap-3">
         <span className="text-sm text-muted-foreground">{resolved.isSet ? "Set" : "Not set"}</span>
-        <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setSecretEditing(true)}>
+        <Button type="button" size="sm" variant="outline" className="min-h-12 min-w-12" disabled={disabled} onClick={() => setSecretEditing(true)}>
           {resolved.isSet ? "Change" : "Set"}
         </Button>
       </div>
@@ -136,7 +137,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
     const getLabel = def.key === "household.locale" ? localeDisplayName : titleCaseOption;
     control = (
       <Select value={String(resolved.value)} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger className="w-40" aria-label={def.label}>
+        <SelectTrigger className="min-h-12 w-40" aria-label={def.label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -153,7 +154,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
     control = (
       <Input
         type="number"
-        className="w-32"
+        className="min-h-12 w-32"
         min={range?.min}
         max={range?.max}
         value={draft}
@@ -166,7 +167,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
   } else if (def.selector === "text") {
     control = (
       <Input
-        className="w-64"
+        className="min-h-12 w-64"
         value={draft}
         disabled={disabled}
         onChange={(e) => setDraft(e.target.value)}
@@ -198,7 +199,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
         <span className="text-sm">{def.label}</span>
         {def.help ? <span className="text-sm text-muted-foreground">{def.help}</span> : null}
         {canReset ? (
-          <Button type="button" variant="link" size="sm" onClick={onReset} disabled={disabled} className="h-auto w-fit p-0">
+          <Button type="button" variant="link" size="sm" onClick={onReset} disabled={disabled} className="h-auto min-h-12 w-fit p-0">
             Reset to default
           </Button>
         ) : null}

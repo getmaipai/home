@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 /** GET /api/dashboard, through the same `@tanstack/react-query` layer
- * `/next`'s other hooks already use (`useNextAppearance.ts`) - the
+ * `/`'s other hooks already use (`useNextAppearance.ts`) - the
  * vendored template's own view carries no SWR/global-fetcher of its own
  * to point anywhere (checked: nothing in `@maipai/ui/src/dashboard`
  * calls `useSWR`, and `swr`/`chance`/the mock API tree were stripped at

@@ -10,13 +10,11 @@ if ("serviceWorker" in navigator) {
   installReloadOnceOnNewServiceWorker(navigator.serviceWorker, window);
 }
 
-/** HOME-UI-04g: paint the `/next` template's palette before React
- * mounts, from the per-browser cache, so a reload of `/next` never
- * flashes the old shell's navy body or RouteSkeleton first. The
- * hooks (`useNextLook` / `useNextAppearance`) reconcile later. */
+/** Paint the migrated shell's palette before React mounts from the
+ * per-browser cache. Its appearance hooks reconcile after loading. */
 function applyCachedNextPalette(): void {
   const cached = readShellNextCache();
-  if (!cached || !cached.on) return;
+  if (!cached) return;
   document.body.classList.add(`style-${cached.look}`);
   document.documentElement.classList.toggle("dark", cached.dark);
   document.documentElement.classList.toggle("light", !cached.dark);

@@ -16,7 +16,7 @@ interface IssueRow extends Record<string, unknown> {
 /** ADMIN-PERF-01: no restart-history table exists (docs/dev.md's design
  * note), so "engine health history" here is Repairs' own issues that
  * named an engine or Stack source - each row's own createdAt/resolvedAt
- * is the closest real history this can show. `/next/engines` already
+ * is the closest real history this can show. `/engines` already
  * covers the live roster and current health in full; this panel links
  * there rather than duplicating it. */
 export function EnginesHealthCard({ engines }: { engines: PerformanceEngines }) {
@@ -43,7 +43,7 @@ export function EnginesHealthCard({ engines }: { engines: PerformanceEngines }) 
           <>
             <p className="px-4 pt-3 pb-2 text-sm text-muted-foreground">
               {engines.roles.length} role(s), {engines.engines.length} engine(s) -{" "}
-              <Link to="/next/engines" className="underline hover:text-foreground">
+              <Link to="/engines" className="underline hover:text-foreground">
                 see the live roster
               </Link>
             </p>
