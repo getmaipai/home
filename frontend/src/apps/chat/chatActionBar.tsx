@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { ActionBarMorePrimitive, ActionBarPrimitive, useAuiState, type FeedbackAdapter } from "@assistant-ui/react";
 import { toast } from "sonner";
 import { getIcon } from "@maipai/ui/src/icons";
-import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-button";
+import { HomeTooltipIconButton } from "@/apps/chat/HomeTooltipIconButton";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, type ReplyFeedback } from "@/lib/api";
 import { messageText } from "@/apps/chat/chatMessageText";
@@ -86,24 +86,24 @@ export function FeedbackButtons() {
   return (
     <>
       <ActionBarPrimitive.FeedbackPositive asChild>
-        <TooltipIconButton
+      <HomeTooltipIconButton
           tooltip="Helpful"
           aria-pressed={submittedFeedback === "positive"}
           className="data-[submitted=true]:bg-accent data-[submitted=true]:text-accent-foreground"
           onClick={() => { setReasonsOpen(false); setFeedbackOpen(false); }}
         >
           <ThumbsUp />
-        </TooltipIconButton>
+      </HomeTooltipIconButton>
       </ActionBarPrimitive.FeedbackPositive>
       <ActionBarPrimitive.FeedbackNegative asChild>
-        <TooltipIconButton
+      <HomeTooltipIconButton
           tooltip="Not helpful"
           aria-pressed={submittedFeedback === "negative"}
           className="data-[submitted=true]:bg-accent data-[submitted=true]:text-accent-foreground"
           onClick={() => { setReasonsOpen(!childBand); setFeedbackOpen(!childBand); }}
         >
           <ThumbsDown />
-        </TooltipIconButton>
+      </HomeTooltipIconButton>
       </ActionBarPrimitive.FeedbackNegative>
       {!childBand && reasonsOpen ? <FeedbackReasonRow turnId={turnId} /> : null}
     </>
@@ -122,13 +122,13 @@ export function ListenButton() {
   const isError = errorId === id;
 
   return (
-    <TooltipIconButton
+    <HomeTooltipIconButton
       tooltip={isError ? "Couldn't play - try again" : isPlaying ? "Playing…" : isLoading ? "Loading…" : "Listen"}
       disabled={isLoading}
       onClick={() => play(id, text)}
     >
       {isLoading ? <Loader className="animate-spin" /> : <Volume2 />}
-    </TooltipIconButton>
+    </HomeTooltipIconButton>
   );
 }
 
@@ -184,7 +184,7 @@ export function RememberThisButton() {
   const { turnId, alreadySaved, isSaving, isError, trigger } = useRememberThis();
 
   return (
-    <TooltipIconButton
+    <HomeTooltipIconButton
       tooltip={
         !turnId
           ? "Remember this (available once saved)"
@@ -198,7 +198,7 @@ export function RememberThisButton() {
       onClick={trigger}
     >
       {isSaving ? <Loader className="animate-spin" /> : <Brain />}
-    </TooltipIconButton>
+    </HomeTooltipIconButton>
   );
 }
 

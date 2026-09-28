@@ -11,8 +11,8 @@
 // NextChatPage.tsx already composes, same `DismissableLayer` dismiss
 // pattern - a design-resolver ruling, 2026-09-22, docs/dev.md, after
 // Popover was found to fight `ComposerMenu`'s own positioning), and the
-// kit's `IconTile`/`getIcon` (the same icon source `apps/library/
-// AppsPage.tsx`'s `kindStyle()` already established for a package's
+// kit's `IconTile`/`getIcon` (the same icon source
+// `apps/library/appPresentation.ts`'s `kindStyle()` already established for a package's
 // kind - manifests carry no icon field of their own).
 //
 // This is the composer's ONE "+" control (`ComposerAddAttachmentOverride`,
@@ -28,7 +28,7 @@ import { ComposerAttachButton, ComposerMenu, ComposerMenuItem } from "@maipai/ui
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
-import { kindStyle } from "@/apps/library/AppsPage";
+import { kindStyle } from "@/apps/library/appPresentation";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { api, type EnginesOverview, type InstalledPackage } from "@/lib/api";
 

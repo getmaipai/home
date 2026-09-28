@@ -16,7 +16,7 @@
 // live voice session (VOICE-LIVE-02, `liveVoiceSession.tsx`, already
 // landed) through `voiceSessionContext.tsx`'s `open`/`setOpen`.
 import { useQuery } from "@tanstack/react-query";
-import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-button";
+import { HomeTooltipIconButton } from "@/apps/chat/HomeTooltipIconButton";
 import { getIcon } from "@maipai/ui/src/icons";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
@@ -43,7 +43,7 @@ const AudioWaveformIcon = getIcon("audio-waveform");
 // simply safer than its un-augmented vendored neighbors already are.
 function WaveformButton({ onClick }: { onClick: () => void }) {
   return (
-    <TooltipIconButton
+    <HomeTooltipIconButton
       tooltip="Start a voice conversation"
       type="button"
       variant="default"
@@ -53,7 +53,7 @@ function WaveformButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
     >
       <AudioWaveformIcon className="size-4" />
-    </TooltipIconButton>
+    </HomeTooltipIconButton>
   );
 }
 

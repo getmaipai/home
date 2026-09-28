@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hasUpdate, rowsFrom } from "@/apps/settings/UpdatesSection";
+import { hasUpdate, rowsFrom } from "@/apps/settings/updatesData";
 import type { UpdateProjection } from "@/lib/api";
 
 function projection(reference: UpdateProjection["reference"]): UpdateProjection {

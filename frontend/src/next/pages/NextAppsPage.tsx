@@ -4,15 +4,15 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { NextDataTable } from "@/next/components/NextDataTable";
 import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
-import { kindStyle, packageState } from "@/apps/library/AppsPage";
+import { kindStyle, packageState } from "@/apps/library/appPresentation";
 import { api, ApiError, isOwnerOrAdminRole, type InstalledPackage, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/tools: SHELL-03's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - GET /api/plugins (the same real listing
- * `AppsPage.tsx`'s own `pluginsQuery` reads), rendered with Home's
+ * `apps/library/appPresentation.ts`'s shared presentation rules, rendered with Home's
  * shared table with a real Remove action. `kindStyle()` and `packageState()` are
- * imported from `AppsPage.tsx` rather than redefined here, so both
+ * imported from `appPresentation.ts` rather than redefined here, so both
  * routes read the identical kind label and Ready/Attention rule. The
  * shared table keeps the vendored table's sorting, search, pagination
  * and CSV behavior, without its demo title or inert Action column. */

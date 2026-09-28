@@ -5,21 +5,21 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { rowsFrom, hasUpdate, type UpdateRow } from "@/apps/settings/UpdatesSection";
+import { rowsFrom, hasUpdate, type UpdateRow } from "@/apps/settings/updatesData";
 import { api, ApiError, isOwnerOrAdminRole, type UpdateProjection, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 /** /next/updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/updates` through Home's
- * shared table, reusing `UpdatesSection.tsx`'s own `rowsFrom()`/
+ * shared table, reusing `updatesData.ts`'s own `rowsFrom()`/
  * `hasUpdate()` (exported, pure data logic) rather than a second
  * definition of "does this row have a real update" - one row for Home
  * itself, one per Stack engine and model when a Stack is configured,
  * exactly what the old page shows.
  *
  * Applying an engine update and rolling one back use this page's own
- * table actions. Gated to owner/admin like the old page
- * (`UpdatesPage.tsx`'s own `AdminGatedContent`) even though `GET /api/
+ * table actions. Gated to owner/admin like the old page's own access
+ * check even though `GET /api/
  * updates` itself is `requireAuth` only - matching the old page's own
  * visible gate is the parity this row asks for, not a new rule. */
 // Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this

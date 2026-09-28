@@ -1,6 +1,5 @@
 import { Fragment, useId, useMemo, useState } from "react";
-import { getIcon } from "@maipai/ui/src/icons";
-import type { PropertyAction } from "@maipai/ui/src/blocks/property-panel/PropertyPanel";
+import { getIcon, type IconName } from "@maipai/ui/src/icons";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
@@ -14,6 +13,16 @@ const ArrowDown = getIcon("arrow-down");
 const ArrowUp = getIcon("arrow-up");
 const Download = getIcon("download");
 const MoreHorizontal = getIcon("more-horizontal");
+
+interface PropertyAction {
+  label: string;
+  onClick: () => void | Promise<void>;
+  icon?: IconName;
+  disabled?: boolean;
+  destructive?: boolean;
+  confirmLabel?: string;
+  sentence?: string;
+}
 
 function titleFor(key: string): string {
   return key.replace(/([A-Z])/g, " $1").trim().replace(/\b\w/g, (letter) => letter.toUpperCase());
