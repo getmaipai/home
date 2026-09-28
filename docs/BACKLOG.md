@@ -7455,6 +7455,8 @@ approvals are still real, unstarted work for a future session.
 
 ## UI / shell
 
+- [x] **FAMILY-NAV-01: remove Tools and rename People to Family** (S, 2026-09-28). Commons `6bb0817` (`ui-v0.5.79`) removes Tools from the shared sidebar and labels the unchanged `/next/people` route Family; its search regression test now queries `fam` and expects Family. Home's UI pin is updated in this commit.
+
 - [x] **THEME-TOGGLE-01: drop the header's redundant light/dark button** (S) - 2026-09-26. Light/dark already lives at Settings > Me > Appearance (`ui.appearance`); the header's own shortcut duplicated it. Commons `Header.tsx` gets an opt-out `showThemeToggle` prop (ui-v0.5.67), defaulting true; Home passes false. Exit: `bash scripts/check.sh`, verified live on 8787.
 - [x] **INCOGNITO-12: cross-fade Incognito like the theme toggle does** (S) - 2026-09-26. The theme toggle wraps its class flip in `document.startViewTransition` (commons `Light-Dark.tsx`); Incognito's own `classList.toggle` had no such wrapping and flashed instead. `NextRoutes.tsx`'s `onIncognitoChange` now mirrors the same pattern, with `flushSync` forcing the state through before the transition's snapshot boundary. Exit: `bash scripts/check.sh`, verified live on 8787.
 
