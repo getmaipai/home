@@ -21,7 +21,7 @@ import { getEngineStatus } from "@/lib/llmSupervisor";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import { __setSamplingSeedForBench } from "@/lib/benchSampling";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
-import { buildStages4, QUESTION, BENCHMARKING_QUESTION, type Stage4 } from "./parity-bisect4-stages";
+import { buildStages4, buildCeilingGapStages, QUESTION, BENCHMARKING_QUESTION, type Stage4 } from "./parity-bisect4-stages";
 
 const REPS = Number(process.env.MAIPAI_BENCH_REPEATS ?? 5);
 const SEEDS = Array.from({ length: REPS }, (_, i) => i + 1);
@@ -103,6 +103,22 @@ async function runQuestion(persona: ReturnType<typeof resolvePersona>, question:
   return results;
 }
 
+// CEILING-GAP-01 shares this runner's fixed seed handling, stream
+// collection, and metric table. Run it with `--ceiling-gap`; the
+// historical PARITY-BISECT-04 stages remain the default invocation.
+async function runCeilingGapQuestion(persona: ReturnType<typeof resolvePersona>, question: string, label: string): Promise<StageResult[]> {
+  const stages: Stage4[] = [
+    { name: "floor-bare-thinking-off", messages: [{ role: "user", content: question }], opts: { temperature: 0.8, thinking: false } },
+    ...buildCeilingGapStages(persona, question),
+  ];
+  const results: StageResult[] = [];
+  for (const stage of stages) {
+    console.log(`=== [${label}] ${stage.name} ===`);
+    results.push(await runStage(stage));
+  }
+  return results;
+}
+
 function printTable(label: string, results: StageResult[]): void {
   const floorResult = results.find((r) => r.stage === "floor-bare-thinking-off")!;
   const floorTokens = floorResult.reps.map((r) => r.predictedTokens).filter((t): t is number => t !== null);
@@ -142,6 +158,20 @@ async function main() {
   await startBench();
 
   const persona = resolvePersona(getHouseholdSettingValue("persona.active_id"));
+
+  if (process.argv.includes("--ceiling-gap")) {
+    const primary = await runCeilingGapQuestion(persona, QUESTION, "prompt-cache");
+    const benchmarking = await runCeilingGapQuestion(persona, BENCHMARKING_QUESTION, "benchmarking-words");
+    printTable("CEILING-GAP-01 prompt-cache", primary);
+    printTable("CEILING-GAP-01 benchmarking-words", benchmarking);
+    console.log("\n=== CEILING-GAP-01 benchmarking-words replies, every seed ===");
+    for (const result of benchmarking) {
+      for (const rep of result.reps) console.log(`\n--- ${result.stage} seed=${rep.seed} ---\n${rep.text}`);
+    }
+    const executed = primary.reduce((n, r) => n + r.reps.length, 0) + benchmarking.reduce((n, r) => n + r.reps.length, 0);
+    finishBench({ executed, engine: `chat ${getEngineStatus().kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}` });
+    return;
+  }
 
   const primary = await runQuestion(persona, QUESTION, "prompt-cache");
   const benchmarking = await runQuestion(persona, BENCHMARKING_QUESTION, "benchmarking-words");

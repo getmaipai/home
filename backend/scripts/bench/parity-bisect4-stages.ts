@@ -11,6 +11,10 @@
 // stages files are: no `import "./setup"` at module scope, so a test
 // can import buildStages4() directly.
 import type { LlmMessage, LlmCompleteOptions, ToolSpec } from "@/lib/llm";
+import type { ContextItem } from "@/lib/turnMachine/contract";
+import { contextToMessages } from "@/lib/turnMachine/messages";
+import { planFor, type PlanInput } from "@/lib/register";
+import { fallbackSignal } from "@/lib/turnSignal";
 import {
   type Persona,
   FORMALITY_FRAGMENT_WRITTEN,
@@ -285,4 +289,56 @@ export function buildStages4(persona: Persona, question: string = QUESTION): Sta
   const armF = stage("arm-f-full-prefix-thinking-on", buildStablePrefix(persona, "written"), question, { thinking: true, max_tokens: THINKING_ON_MAX_TOKENS, tools: productionTools() });
 
   return [floor, armA, armB, armC, armD, ceiling, armE, armF];
+}
+
+// CEILING-GAP-01: the four controlled composition arms all use the
+// production contextToMessages() path. The measurement being explained
+// has no household context, so this bench supplies the same fixed,
+// content-only profile and roster fixture to every arm except the
+// profile/roster ablation. This keeps those lines present for an actual
+// cost comparison without reading household data into a bench.
+const CEILING_IDENTITY = "You are MaiPai, a private, self-hosted AI assistant for this household.";
+const CEILING_CONTEXT: ContextItem[] = [
+  { id: "ceiling-gap-profile", text: "Riley's profile: likes hiking.", source: "profile", subjects: [], disclosure: "adult_only" },
+  { id: "ceiling-gap-roster", text: "Riley is in this household.", source: "roster", subjects: [], disclosure: "adult_only" },
+];
+
+function ceilingGapMessages(persona: Persona, question: string, context: readonly ContextItem[], replaceIdentity: boolean): LlmMessage[] {
+  const signal = fallbackSignal(question, "adult");
+  const planInput: PlanInput = {
+    signal,
+    surface: "chat",
+    surfaceClass: "written",
+    brevity: false,
+    evidence: { choices: 0, sources: 0, deliverable: false },
+    companion: { directness: "diplomatic", engagement: "balanced", vocabulary: "advanced" },
+    band: "adult",
+    deferred: false,
+    disclosureWithheld: false,
+  };
+  const messages = contextToMessages(context, question, persona, planFor(planInput), signal, "written");
+  if (replaceIdentity) {
+    const stable = messages[0];
+    if (!stable || stable.role !== "system") throw new Error("ceiling-gap expected contextToMessages() to begin with its stable system message");
+    const identity = identityLine(persona);
+    if (!stable.content.startsWith(identity)) throw new Error("ceiling-gap could not find identityLine() at the start of the real stable message");
+    messages[0] = { ...stable, content: CEILING_IDENTITY + stable.content.slice(identity.length) };
+  }
+  return messages;
+}
+
+/** Additional CEILING-GAP-01 arms, separate from the historical stage
+ * builder above so that its established requests remain byte-identical. */
+export function buildCeilingGapStages(persona: Persona, question: string = QUESTION): Stage4[] {
+  const arms = [
+    { name: "arm-1-shipped-shape", context: CEILING_CONTEXT, replaceIdentity: false, tools: productionTools() },
+    { name: "arm-2-without-tools", context: CEILING_CONTEXT, replaceIdentity: false, tools: undefined },
+    { name: "arm-3-without-profile-roster", context: [], replaceIdentity: false, tools: productionTools() },
+    { name: "arm-4-ceiling-identity", context: CEILING_CONTEXT, replaceIdentity: true, tools: productionTools() },
+  ];
+  return arms.map((arm) => ({
+    name: arm.name,
+    messages: ceilingGapMessages(persona, question, arm.context, arm.replaceIdentity),
+    opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: false, tools: arm.tools },
+  }));
 }

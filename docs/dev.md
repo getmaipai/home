@@ -30922,3 +30922,57 @@ was the note); the build is STYLE-SPEC-01, STYLE-CORPUS-01,
 STYLE-TRAIN-01, STYLE-BENCH-01, STYLE-ADAPTER-01 and STYLE-ADAPTER-02,
 in that order, with CEILING-GAP-01 and PROFILE-CHANNEL-01 beside them,
 all in BACKLOG.md.
+
+## CEILING-GAP-01: tool removal carries most of the measured difference (2026-09-28)
+
+Ran `bun run scripts/bench/parity-bisect4.ts --ceiling-gap` against
+the resident Qwen3-8B engine, five matched seeds (1-5) per arm and
+question, through `contextToMessages()`. The four arms are the shipped
+written shape, the same without tools, the same without profile and
+roster context, and the same with the isolated ceiling's identity
+sentence verbatim. To expose and measure the optional profile/roster
+lines without reading household data, arms 1, 2 and 4 use fixed
+synthetic context items (`Riley's profile: likes hiking.` and `Riley is
+in this household.`); arm 3 omits them. The prior shipped measurement
+used an empty context, so arm 1 here is a controlled context-bearing
+baseline and its ratios are not a rerun of the historical 0.30x/0.26x
+numbers. All replies stopped normally; no tool calls were made.
+
+**Table: prompt-cache question** (same metric set as PARITY-BISECT-04)
+
+| stage | predicted tokens (seed 1-5) | avg | vs floor | headings | lists | lowercase |
+|---|---|---:|---:|---|---|---|
+| floor (bare, thinking off) | 798, 848, 845, 758, 785 | 806.8 | 1.00x | yes | yes | 0/5 |
+| arm 1 (shipped shape) | 297, 335, 358, 335, 435 | 352.0 | 0.44x | no | yes | 0/5 |
+| arm 2 (without tools) | 274, 452, 322, 534, 253 | 367.0 | 0.45x | yes | yes | 0/5 |
+| arm 3 (without profile/roster) | 234, 211, 327, 305, 354 | 286.2 | 0.35x | no | yes | 0/5 |
+| arm 4 (ceiling identity sentence) | 284, 335, 358, 335, 435 | 349.4 | 0.43x | no | yes | 0/5 |
+
+**Table: benchmarking-words question**
+
+| stage | predicted tokens (seed 1-5) | avg | vs floor | headings | lists | lowercase |
+|---|---|---:|---:|---|---|---|
+| floor (bare, thinking off) | 659, 692, 680, 562, 572 | 633.0 | 1.00x | yes | yes | 0/5 |
+| arm 1 (shipped shape) | 234, 227, 226, 204, 95 | 197.2 | 0.31x | no | yes | 0/5 |
+| arm 2 (without tools) | 290, 347, 246, 239, 319 | 288.2 | 0.46x | no | yes | 0/5 |
+| arm 3 (without profile/roster) | 255, 229, 226, 207, 238 | 231.0 | 0.36x | no | yes | 0/5 |
+| arm 4 (ceiling identity sentence) | 234, 227, 226, 204, 95 | 197.2 | 0.31x | no | yes | 0/5 |
+
+Arm 2 recovers the most of the gap in both questions: removing tools
+adds 15 tokens (0.02x of the floor) over arm 1 on prompt-cache and 91
+tokens (0.14x) on benchmarking-words. Removing profile/roster instead
+reduces prompt-cache by 65 tokens and raises benchmarking-words by 34;
+the identity swap changes neither result materially. This **partly
+confirms and narrows** the 2026-09-23 record's attribution of the
+isolated-ceiling gap to the tool block: tools lower both replies in this
+matched run, substantially for benchmarking-words, but barely for
+prompt-cache. The earlier attribution overstates a single common cause;
+the tool block alone does not explain both gaps. Since the historical
+shipped measurement had no profile/roster context, these controlled
+synthetic-context results do not directly partition its exact
+0.30x/0.26x figures.
+
+The reusable entry point is `bun run scripts/bench/parity-bisect4.ts
+--ceiling-gap`; without the flag, the original PARITY-BISECT-04 run
+still runs unchanged. The normal gate and code review results follow
+after verification.
