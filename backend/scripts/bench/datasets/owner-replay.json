@@ -140,6 +140,22 @@
         { "say": "wrong", "expect": { "toolRan": null, "mustNotContain": "paramedic" } }
       ]
     },
+    {
+      "id": "control-profile-longer-correction-remark",
+      "category": "memory",
+      "note": "PROFILE-CHANNEL-01: the reproduction the 2026-09-24 attempt lacked (dev.md 'MEMORY-RELEVANCE-01') - a longer surrounding conversation before the bare correction, closer to conv-19awhetzdf's own turn shape (roster content only, never the household's own words; that real conversation is cited only as the bug's own pointer, never reproduced here). Kept as a control beside control-profile-greeting-remark and control-profile-correction-remark: must recall nothing on either bare correction.",
+      "seedRecords": [{ "text": "The household's owner works night shifts as a paramedic.", "category": "identity", "scope": "person", "asProfile": true }],
+      "turns": [
+        { "say": "hey", "expect": {} },
+        { "say": "how's it going", "expect": {} },
+        { "say": "what's 12 plus 30", "expect": {} },
+        { "say": "what time is it in tokyo", "expect": {} },
+        { "say": "tell me something interesting", "expect": {} },
+        { "say": "huh, that is pretty cool", "expect": {} },
+        { "say": "wrong", "expect": { "toolRan": null, "mustNotContain": "paramedic" } },
+        { "say": "you're wrong again", "expect": { "toolRan": null, "mustNotContain": "paramedic" } }
+      ]
+    },
     { "id": "control-negative-dye-hair", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "should I dye my hair black", "expect": { "toolRan": null } }] },
     { "id": "control-negative-spiderman", "category": "tools", "note": "tool-call-corpus negative", "turns": [{ "say": "I might go see the new Spiderman movie", "expect": { "toolRan": null } }] },
     { "id": "control-negative-stephen-king", "category": "tools", "note": "tool-call-corpus fitting search (REPLAY-BAR-01)", "turns": [{ "say": "what's the latest Stephen king novel", "expect": { "toolRan": "websearch", "outcomeArgsMatch": { "packageId": "websearch", "args": { "expression": "stephen king" } }, "sourcesNonEmpty": true } }] },

@@ -1472,6 +1472,26 @@ describe("runConsolidation() - the profile paragraph (step 7)", () => {
     return created.value;
   }
 
+  // PROFILE-CHANNEL-01: the same shape categoryToTier() already gives a
+  // real judge-extracted "event" fact (episodic tier) - constructed
+  // directly here rather than through judgeTurn()'s extraction, the same
+  // "seed the stored shape, not the pipeline that produces it" pattern
+  // personFact() above already uses.
+  function eventFact(actor: PersonRow, text: string, validFrom: string) {
+    const created = remember(actor, {
+      text,
+      category: "event",
+      tier: "episodic",
+      scope: "person",
+      person: actor.id,
+      source: "test",
+      importance: 0.5,
+      valid_from: validFrom,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    return created.value;
+  }
+
   test("writes a fresh, pinned identity record from the person's own facts", async () => {
     const { actor } = await owner();
     personFact(actor, "Marlow works as a paramedic");
@@ -1574,6 +1594,135 @@ describe("runConsolidation() - the profile paragraph (step 7)", () => {
 
     expect(result.profilesRewritten).toBe(0);
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, PROFILE_SOURCE)).all().length).toBe(0);
+  });
+
+  // PROFILE-CHANNEL-01: the live leak (conv-19awhetzdf) - an event-like
+  // fact folded into the always-on profile paragraph, the one channel
+  // MEM-ELIG-01's eligibility gate never reaches. A name fact stays
+  // eligible for the paragraph; a dated event fact never reaches the
+  // synthesis prompt at all, because it is already its own episodic
+  // record - exactly the mechanism recall() (and MEM-ELIG-01's gate over
+  // it) can reach.
+  test("a consolidation input carrying a name fact and a dated event writes the name into the paragraph and the event as an episode", async () => {
+    const { actor } = await owner();
+    personFact(actor, "Marlow's job is paramedic");
+    const event = eventFact(actor, "Marlow has a dentist appointment", "2026-09-20T12:00:00-04:00");
+
+    let capturedPrompt = "";
+    await withScriptedJudge(
+      (schemaName, request) => {
+        if (schemaName === "profile_paragraph") {
+          capturedPrompt = request.messages.find((m) => m.role === "system")?.content ?? "";
+          return { text: "Marlow's job is paramedic." };
+        }
+        return { contradicts: false };
+      },
+      () => runConsolidation(),
+    );
+
+    // The name fact reached the synthesis prompt; the dated event never
+    // did - it is not this paragraph's to narrate.
+    expect(capturedPrompt).toContain("Marlow's job is paramedic");
+    expect(capturedPrompt).not.toContain("dentist appointment");
+
+    const profile = db.select().from(memoryRecords).where(eq(memoryRecords.source, PROFILE_SOURCE)).get()!;
+    expect(profile.text).not.toContain("dentist");
+
+    // The event stands as its own episodic record, untouched - already
+    // "an episode" in exactly the sense recall()/MEM-ELIG-01 read it.
+    const eventRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, event.id)).get()!;
+    expect(eventRow.status).toBe("active");
+    expect(eventRow.category).toBe("event");
+    expect(eventRow.tier).toBe("episodic");
+  });
+
+  // A code review on this item's first pass found the exclusion too
+  // narrow when it keyed off category "event" alone: memory-eval.ts's
+  // own fixture seeds a literal event ("Marlow's car got an oil change
+  // in March") as category "fact", and the extraction prompt's own
+  // STATE AND TRIP RULE writes a dated, already-happened trip as
+  // category "state" on purpose - both episodic, neither "event". The
+  // fix keys off tier instead (isProfileEligible()), so every episodic
+  // category is covered, not just this one.
+  test("an episodic fact of any category, not just event, stays out of the paragraph", async () => {
+    const { actor } = await owner();
+    personFact(actor, "Marlow's job is paramedic");
+    const oilChange = remember(actor, {
+      text: "Marlow's car got an oil change in March",
+      category: "fact",
+      tier: "episodic",
+      scope: "person",
+      person: actor.id,
+      source: "test",
+      importance: 0.3,
+    });
+    if (!oilChange.ok) throw new Error("setup failed");
+
+    let capturedPrompt = "";
+    await withScriptedJudge(
+      (schemaName, request) => {
+        if (schemaName === "profile_paragraph") {
+          capturedPrompt = request.messages.find((m) => m.role === "system")?.content ?? "";
+          return { text: "Marlow's job is paramedic." };
+        }
+        return { contradicts: false };
+      },
+      () => runConsolidation(),
+    );
+
+    expect(capturedPrompt).toContain("Marlow's job is paramedic");
+    expect(capturedPrompt).not.toContain("oil change");
+
+    const oilChangeRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, oilChange.value.id)).get()!;
+    expect(oilChangeRow.status).toBe("active");
+    // Pin down the shape this test claims to cover: category "fact",
+    // tier "episodic" - not "event" - the same gap the review found.
+    expect(oilChangeRow.category).toBe("fact");
+    expect(oilChangeRow.tier).toBe("episodic");
+  });
+
+  test("a paragraph already holding an event moves it (not duplicates it) to an episode on the next consolidation pass", async () => {
+    const { actor } = await owner();
+    personFact(actor, "Marlow's job is paramedic");
+    const event = eventFact(actor, "Marlow has a dentist appointment", "2026-09-20T12:00:00-04:00");
+
+    // Seeds the pre-fix leaked state directly: an existing pinned profile
+    // paragraph whose own text already narrates the event, the shape the
+    // old, ungated synthesis could produce before this item.
+    const stale = remember(actor, {
+      text: "Marlow's job is paramedic and he has a dentist appointment.",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    if (!stale.ok) throw new Error("setup failed");
+
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "profile_paragraph" ? { text: "Marlow's job is paramedic." } : { contradicts: false }),
+      () => runConsolidation(),
+    );
+
+    const oldProfile = db.select().from(memoryRecords).where(eq(memoryRecords.id, stale.value.id)).get()!;
+    expect(oldProfile.status).toBe("superseded");
+
+    const activeProfiles = db
+      .select()
+      .from(memoryRecords)
+      .where(and(eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
+      .all();
+    expect(activeProfiles.length).toBe(1);
+    expect(activeProfiles[0]!.text).not.toContain("dentist");
+
+    // Moved, not duplicated: the event is still exactly the one record
+    // it always was, never a second copy created by this pass.
+    const eventRows = db.select().from(memoryRecords).where(eq(memoryRecords.text, event.text)).all();
+    expect(eventRows.length).toBe(1);
+    expect(eventRows[0]!.id).toBe(event.id);
+    expect(eventRows[0]!.status).toBe("active");
   });
 });
 

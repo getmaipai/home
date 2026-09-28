@@ -30997,3 +30997,95 @@ The reusable entry point is `bun run scripts/bench/parity-bisect4.ts
 --ceiling-gap`; it now selects Buddy explicitly so arm 4 remains a real
 identity ablation even in a fresh database. Without the flag, the
 original PARITY-BISECT-04 run still runs unchanged.
+
+## PROFILE-CHANNEL-01: the profile paragraph carries identity only, measured (2026-09-28)
+
+The second finding parked on EVAL-03 (above): the profile paragraph
+(`getProfileParagraph()`, injected into every turn's prompt
+unconditionally, pinned, never through `recall()`) is a content
+question of the memory-judge's consolidation, not a voice question -
+`memoryJudge.ts`'s `rewriteProfileParagraph()` fed EVERY active
+person-scope fact into the synthesis prompt regardless of category or
+tier, so an event-like fact could be woven into pinned always-on text
+where MEM-ELIG-01's query-eligibility gate can never reach it (the live
+leak on `conv-19awhetzdf`, a bare "wrong" volunteering the profile's
+own event fact - cited only as the bug's own pointer, never reproduced
+here).
+
+**The fix** (`isProfileEligible()`, `memoryJudge.ts`): the fact-selection
+that feeds `rewriteProfileParagraph()`'s synthesis prompt now keeps only
+`tier: "durable"` facts. A first pass keyed the exclusion off category
+`"event"` alone; a medium code review on that diff found it too narrow
+- `memory-eval.ts`'s own fixture seeds a literal event ("Marlow's car
+got an oil change in March") as category `"fact"`, and the extraction
+prompt's own STATE AND TRIP RULE writes a dated, already-happened trip
+as category `"state"` on purpose - both episodic, neither `"event"`.
+Keying off tier instead reuses `categoryToTier()`'s own already-computed
+split (durable = identity, relationship, person, preference - word for
+word the backlog's own definition of "identity") rather than
+re-enumerating categories by hand, so every episodic category is
+covered, not just the one the live leak happened to show. An episodic
+fact needs no separate write to become "an episode": it is already
+stored as its own episodic-tier record at extraction time,
+`recall()`-reachable under MEM-ELIG-01's gate like any other episodic
+fact; excluding it from the paragraph's input is the whole fix. Because
+the paragraph is fully resynthesized (never appended to) on every
+consolidation pass, a fact that had leaked into an earlier paragraph is
+moved, not duplicated, the moment this exclusion applies: the next
+paragraph simply stops narrating it.
+
+**Tests** (`memoryJudge.test.ts`, `describe("runConsolidation() - the
+profile paragraph (step 7)")`), in the backlog's own words: a
+consolidation input carrying a name fact and a dated event writes the
+name into the paragraph and the event as an episode (asserted via the
+captured synthesis prompt and the event's own untouched record); a
+paragraph already holding an event moves it, not duplicates it, to an
+episode on the next consolidation pass (asserted via the stale
+PROFILE_SOURCE row superseding to text with no event mention, and
+exactly one record for the event, never two); plus a fourth test the
+review's own finding earned, that an episodic fact of any category, not
+just event, stays out of the paragraph (the "fact"-categorized oil-change
+shape). All four pass; full backend suite 4358/4358.
+
+**The reproduction row** (`owner-replay.json`,
+`control-profile-longer-correction-remark`): the 2026-09-24 attempt's
+own gap - both existing profile controls used a single question-answer
+turn before the bare "wrong"; the real leak's own turns
+(`conv-19awhetzdf`) carried more surrounding conversation. The new row
+mirrors `control-ten-turn-spoken-drift`'s small-talk shape (six
+unrelated turns - a greeting, small talk, a math question, a time
+question, more small talk) before two bare corrections ("wrong", "you're
+wrong again"), roster-safe throughout, seeded with the same paramedic
+`asProfile` identity fact as the other two controls.
+
+**Live numbers**, a dedicated measurement script (not committed - a
+throwaway driver reusing `conversationRunner.ts`'s real `runConversation()`
+and `liveHubQuiet.ts`'s gate check and quiet-wait, since `replay.ts`'s
+own `--hub-live` runs the FULL fixture at 3 repeats and is reserved for
+the U2d acceptance run per that file's own header), run after waiting
+out two peer sessions' own `scripts/check.sh` gates: new path
+(`turn.pipeline.next`), the resident 8B (`qwen3-8b-instruct-q4-k-m` at
+127.0.0.1:8788), `waitForHubQuiet` observed throughout, 5 live reps
+each, 2026-09-28T09:20 UTC -
+
+- `control-profile-greeting-remark`: **5/5 clean.**
+- `control-profile-correction-remark`: **5/5 clean.**
+- `control-profile-longer-correction-remark`: **5/5 clean.**
+
+15/15 total. `scripts/bench/memory-eval.ts` re-run live against the
+same engine both before and after the review fix: **15/19**, identical
+to MEM-ELIG-01's own recorded baseline, the same four pre-existing
+rows failing for the same pre-existing reasons (`durable-pref-food`,
+`durable-pref-para`, `durable-goal`, `entity-flood` - unrelated recall-
+floor gaps, not this item's) - no regression on any wanted-match row.
+
+**A judgment call, flagged rather than asked:** the backlog names two
+words, "identity" and "event," and the extraction schema's own category
+enum has an "event" value, so the first-pass reading (category ===
+"event") looked like the literal one. The review's finding is why tier
+is the better axis for the reasons above; recorded here in case a
+future reader wonders why the code does not simply check
+`category === "event"`.
+
+Out of scope, as the backlog specified: the voice adapter (untouched,
+content-preserving by construction) and the old path (frozen).

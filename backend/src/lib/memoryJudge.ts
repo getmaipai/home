@@ -1595,6 +1595,43 @@ const PROFILE_SCHEMA = {
   schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
 } as const;
 
+// PROFILE-CHANNEL-01: the paragraph this function writes is injected into
+// EVERY turn's prompt unconditionally (getProfileParagraph(), read
+// straight off the pinned PROFILE_SOURCE row - turnEngine.ts never sends
+// it through recall() at all), so it is the one memory channel MEM-ELIG-01's
+// query-eligibility gate can never reach, whatever the person's utterance
+// is. A fact that reads as an event (something that happened or is
+// scheduled) must never be folded into this paragraph's prose for
+// exactly that reason: once woven into pinned always-on text, it is
+// recallable by a bare topic-free remark ("wrong") the same way the live
+// leak on conv-19awhetzdf was. The extractor's own "event" category is
+// only the narrowest case of this - a code review on this item's first
+// pass found the SAME shape in "fact" (memory-eval.ts's own fixture
+// seeds a literal event, "Marlow's car got an oil change in March", as
+// category "fact"), and the extraction prompt's own STATE AND TRIP RULE
+// writes a dated, already-happened trip as category "state" on purpose
+// ("Sage was in Brazil ... [date]"). Rather than enumerate categories by
+// hand and risk missing the next one, this keys off tier instead -
+// categoryToTier() (above) already computes the identical durable/
+// episodic split from category at write time, and its durable set
+// (identity, relationship, person, preference) is word-for-word the
+// backlog's own definition of "identity" (who the person is: name,
+// role, preferences, standing facts); everything else is episodic and
+// stays out of the paragraph. An episodic fact needs no separate write
+// here to become "an episode": it is already stored as its own
+// episodic-tier memory record at extraction time, well before any
+// consolidation pass runs, reachable by an ordinary recall() query
+// under MEM-ELIG-01's gate like any other episodic fact - excluding it
+// from this prompt is the whole fix. Because the paragraph is fully
+// resynthesized (never appended to) on every consolidation pass, a fact
+// that leaked into an earlier paragraph is moved, not duplicated, the
+// moment it is excluded here: the next paragraph simply stops narrating
+// it (nothing new is written for it - it was never anything but its own
+// already-existing record).
+function isProfileEligible(tier: string): boolean {
+  return tier === "durable";
+}
+
 /** Synthesizes and writes/rewrites one person's profile paragraph from
  * their own active person-scope facts (never household-shared ones - a
  * profile is inherently personal). Returns whether it actually wrote
@@ -1605,11 +1642,14 @@ async function rewriteProfileParagraph(personRow: PersonRow): Promise<boolean> {
   // list()'s own ordering (pinned, then importance, then recency) already
   // picks the most representative facts first - reusing it here is the
   // same "don't re-invent a second ranking" the rest of this file already
-  // leans on. The profile's own prior record is excluded by source, and
-  // record_kind is restricted to plain facts: an entity record's "Name:
-  // description" text isn't a fact ABOUT this person.
+  // leans on. The profile's own prior record is excluded by source,
+  // record_kind is restricted to plain facts (an entity record's "Name:
+  // description" text isn't a fact ABOUT this person), and an episodic
+  // fact is excluded too (PROFILE-CHANNEL-01, isProfileEligible() above) -
+  // it stays exactly where categoryToTier() already put it, an episodic
+  // record recall() can reach, never this paragraph's prose.
   const facts = list(personRow, { scope: "person", person: personRow.id })
-    .filter((r) => r.source !== PROFILE_SOURCE && r.record_kind === "memory")
+    .filter((r) => r.source !== PROFILE_SOURCE && r.record_kind === "memory" && isProfileEligible(r.tier))
     .slice(0, MAX_PROFILE_INPUT_FACTS);
   if (facts.length === 0) return false;
 
