@@ -10,20 +10,31 @@ import { api, ApiError, type DeviceInfo } from "@/lib/api";
 
 // ROBOT-DEVICE-01: "the add flow refuses to finish while the unit's
 // published default SSH password stands and rotates it into the
-// credentials center." Pairing (Quick Connect's approve, AddRobotSection)
-// and this rotation step are deliberately separate: pairing needs only
-// the code the robot spoke, rotation needs the admin to also supply the
+// credentials center." Rotation still can't happen automatically the
+// moment the device row appears - it needs the admin to type the
 // vendor's own published default, which this hub never stores or
-// guesses at - so it can't happen automatically the moment the device
-// row appears.
-function RobotPasswordRow({ device }: { device: DeviceInfo }) {
+// guesses - but AddRobotSection now embeds this exact row, defaulted
+// open, right after a fresh pairing, so the add flow doesn't consider
+// itself finished until this succeeds. This standalone section (a
+// household-wide list, one row per already-paired robot) is what an
+// admin uses to rotate again later, or to catch a robot that was
+// somehow paired without going through that flow.
+export function RobotPasswordRow({
+  device,
+  defaultOpen = false,
+  onRotated,
+}: {
+  device: DeviceInfo;
+  defaultOpen?: boolean;
+  onRotated?: () => void;
+}) {
   const queryClient = useQueryClient();
   const statusQuery = useQuery({
     queryKey: ["robot-password-status", device.id],
     queryFn: () => api.robotPasswordStatus(device.id),
   });
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [host, setHost] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +49,7 @@ function RobotPasswordRow({ device }: { device: DeviceInfo }) {
       setHost("");
       setCurrentPassword("");
       await queryClient.invalidateQueries({ queryKey: ["robot-password-status", device.id] });
+      onRotated?.();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not rotate the password.");
     } finally {

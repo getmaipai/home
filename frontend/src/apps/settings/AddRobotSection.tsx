@@ -6,9 +6,11 @@ import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { List } from "@maipai/ui/src/primitives/List";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
-import { api, ApiError, type DiscoveredRobotInfo } from "@/lib/api";
+import { api, ApiError, type DeviceInfo, type DiscoveredRobotInfo } from "@/lib/api";
+import { RobotPasswordRow } from "./RobotPasswordSection";
 
 const TOTP_REQUIRED_MESSAGE = "A current TOTP code is required to approve a new device";
+const AWAIT_ROBOT_POLL_MS = 2000;
 
 // ROBOT-DEVICE-01 (bot/docs/dev/design-reachy-mini-2026-09-27.md sections
 // 9 and 10): the robot has no screen, so it speaks its own six-digit
@@ -21,6 +23,16 @@ const TOTP_REQUIRED_MESSAGE = "A current TOTP code is required to approve a new 
 // "robot"), so no new pairing route exists here - only discovery is new.
 // The robot's own side of this (requesting the code, polling for
 // approval) is bot repo's RM-05, not this page's job.
+//
+// "The add flow refuses to finish while the unit's published default SSH
+// password stands" (design record section 8): approving a code does not
+// itself create the Device row - the robot's own poll does, asynchronously,
+// once it finishes its side of Quick Connect - so this page can't just
+// show the rotation form for a device id it doesn't have yet. Instead, once
+// approved, it remembers which robot ids already existed and polls the
+// household-wide robot list until a new one appears, then embeds
+// RobotPasswordRow for exactly that device, defaulted open, and does not
+// call the flow "done" until that rotation succeeds.
 export function AddRobotSection() {
   const queryClient = useQueryClient();
   const discoveryQuery = useQuery<DiscoveredRobotInfo[]>({
@@ -35,23 +47,48 @@ export function AddRobotSection() {
   const [totpToken, setTotpToken] = useState("");
   const [needsTotp, setNeedsTotp] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [priorRobotIds, setPriorRobotIds] = useState<Set<string> | null>(null);
+  const [rotationDone, setRotationDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const awaitingRobot = priorRobotIds !== null && !rotationDone;
+  const robotsQuery = useQuery<DeviceInfo[]>({
+    queryKey: ["robot-devices"],
+    queryFn: () => api.robotDevices(),
+    enabled: awaitingRobot,
+    refetchInterval: (query) => {
+      if (query.state.status === "error") return false;
+      const data = query.state.data;
+      if (!data || priorRobotIds === null) return AWAIT_ROBOT_POLL_MS;
+      const found = data.some((d) => !priorRobotIds.has(d.id));
+      return found ? false : AWAIT_ROBOT_POLL_MS;
+    },
+  });
+  const newRobot = awaitingRobot
+    ? (robotsQuery.data ?? []).find((d) => priorRobotIds !== null && !priorRobotIds.has(d.id))
+    : undefined;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setSuccess(false);
+    setRotationDone(false);
+    // Cleared synchronously, not just reassigned once the snapshot below
+    // resolves: otherwise a second pairing right after the first one's
+    // rotation briefly re-derives `awaitingRobot` from the PRIOR robot's
+    // now-stale snapshot before the fresh one lands, flashing "waiting for
+    // the robot" with the code input already gone.
+    setPriorRobotIds(null);
     setSubmitting(true);
     try {
+      // Snapshot who already exists before approving, so the poll below
+      // can tell "the robot that just paired" apart from any other robot
+      // already on this household.
+      const existing = await api.robotDevices();
       await api.approveRobotCode(code.trim(), needsTotp ? totpToken.trim() : undefined);
       setCode("");
       setTotpToken("");
       setNeedsTotp(false);
-      setSuccess(true);
-      // The robot's own poll (not this page) is what actually finishes
-      // pairing and creates the Device row; refresh in case it already
-      // has by the time the admin looks at the devices list below.
+      setPriorRobotIds(new Set(existing.map((d) => d.id)));
       await queryClient.invalidateQueries({ queryKey: ["devices"] });
       await queryClient.invalidateQueries({ queryKey: ["robot-devices"] });
     } catch (err) {
@@ -108,37 +145,59 @@ export function AddRobotSection() {
         }
       </AsyncState>
 
-      <form onSubmit={handleSubmit} className="flex max-w-sm flex-col gap-3">
-        <Input
-          placeholder="Six-digit code"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          disabled={submitting}
-          required
-          maxLength={6}
-        />
-        {needsTotp ? (
+      {!awaitingRobot ? (
+        <form onSubmit={handleSubmit} className="flex max-w-sm flex-col gap-3">
           <Input
-            placeholder="Your current 2FA code"
-            value={totpToken}
-            onChange={(e) => setTotpToken(e.target.value)}
+            placeholder="Six-digit code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
             disabled={submitting}
             required
             maxLength={6}
           />
-        ) : null}
-        {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
-        {success ? (
+          {needsTotp ? (
+            <Input
+              placeholder="Your current 2FA code"
+              value={totpToken}
+              onChange={(e) => setTotpToken(e.target.value)}
+              disabled={submitting}
+              required
+              maxLength={6}
+            />
+          ) : null}
+          {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+          {rotationDone ? (
+            <p className="text-base text-[var(--primary)]">
+              Paired and its password is rotated - it's ready to use.
+            </p>
+          ) : null}
+          <Button type="submit" disabled={submitting} className="w-fit">
+            {submitting ? "Pairing…" : "Pair"}
+          </Button>
+        </form>
+      ) : newRobot ? (
+        <div className="flex max-w-sm flex-col gap-2">
           <p className="text-base text-[var(--primary)]">
-            Approved. The robot should finish pairing in a moment - then rotate its password
-            below before it's used day to day. It still has the vendor's published default
-            until you do.
+            Approved and paired. It still has the vendor's published default password - rotate
+            it now to finish adding it.
           </p>
-        ) : null}
-        <Button type="submit" disabled={submitting} className="w-fit">
-          {submitting ? "Pairing…" : "Pair"}
-        </Button>
-      </form>
+          <RobotPasswordRow device={newRobot} defaultOpen onRotated={() => setRotationDone(true)} />
+        </div>
+      ) : robotsQuery.isError ? (
+        <div className="flex max-w-sm flex-col gap-2">
+          <p className="text-base text-[var(--destructive)]">
+            Approved, but checking whether it finished pairing failed. It may still be paired -
+            check the robot list below, or try again.
+          </p>
+          <Button variant="outline" className="w-fit" onClick={() => robotsQuery.refetch()}>
+            Check again
+          </Button>
+        </div>
+      ) : (
+        <p className="text-base text-[var(--muted-foreground)]">
+          Approved. Waiting for the robot to finish pairing on its own end…
+        </p>
+      )}
     </Section>
   );
 }

@@ -2,7 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { DiscoveredRobotInfo } from "@/lib/api";
+import type { DeviceInfo, DiscoveredRobotInfo } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -43,12 +43,24 @@ function stubFetch(opts: StubOptions): () => void {
       }
       return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
     }
-    if (url.endsWith("/api/devices")) {
+    if (url.endsWith("/api/devices") || url.endsWith("/api/devices/robots")) {
       return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     }
     throw new Error(`unstubbed fetch: ${url}`);
   }) as unknown as typeof fetch;
   return () => (globalThis.fetch = original);
+}
+
+function pairedDevice(overrides: Partial<DeviceInfo> = {}): DeviceInfo {
+  return {
+    id: "device-robot-1",
+    kind: "robot",
+    name: "Reachy Mini",
+    area: null,
+    lastSeenAt: null,
+    createdAt: "2026-09-27T00:00:00.000Z",
+    ...overrides,
+  };
 }
 
 function renderSection() {
@@ -103,7 +115,7 @@ describe("AddRobotSection", () => {
       if (url.endsWith("/api/devices/discover-robots")) {
         return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       }
-      if (url.endsWith("/api/devices")) {
+      if (url.endsWith("/api/devices") || url.endsWith("/api/devices/robots")) {
         return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       }
       if (url.endsWith("/api/auth/quick-connect/approve")) {
@@ -153,6 +165,103 @@ describe("AddRobotSection", () => {
       await findByText("That code is no longer valid");
     } finally {
       restore();
+    }
+  });
+
+  test("the add flow does not call itself done until the new robot's password is rotated", async () => {
+    // ROBOT-DEVICE-01's own requirement: "the add flow refuses to finish
+    // while the unit's published default SSH password stands." The device
+    // row only exists once the robot's own poll creates it (not this
+    // page's approve call), so the stub only starts returning it after
+    // approve succeeds - proving the flow actually waits for that, not
+    // just trusting the approve response.
+    let approved = false;
+    let rotated = false;
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/devices/discover-robots")) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+      if (url.endsWith("/api/devices/robots")) {
+        const robots = approved ? [pairedDevice()] : [];
+        return Promise.resolve(new Response(JSON.stringify(robots), { status: 200 }));
+      }
+      if (url.endsWith("/api/auth/quick-connect/approve")) {
+        approved = true;
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
+      }
+      if (url.endsWith("/robot-password-status")) {
+        return Promise.resolve(new Response(JSON.stringify({ rotated }), { status: 200 }));
+      }
+      if (url.endsWith("/rotate-robot-password")) {
+        rotated = true;
+        return Promise.resolve(new Response(JSON.stringify({ success: true, rotatedAt: "now" }), { status: 200 }));
+      }
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    try {
+      const { findByPlaceholderText, findByRole, findByText, queryByPlaceholderText } = renderSection();
+      fireEvent.change(await findByPlaceholderText("Six-digit code"), { target: { value: "ABC123" } });
+      fireEvent.click(await findByRole("button", { name: "Pair" }));
+
+      // The rotation form for the newly-paired device opens on its own -
+      // no second click needed to reveal it, unlike the standing list.
+      await findByText(/still has the vendor's published default password/);
+      const hostInput = await findByPlaceholderText("Robot's LAN address");
+      expect(queryByPlaceholderText("Six-digit code")).toBeNull();
+
+      fireEvent.change(hostInput, { target: { value: "192.0.2.10" } });
+      fireEvent.change(await findByPlaceholderText("Current (default) password"), {
+        target: { value: "vendor-default" },
+      });
+      fireEvent.click(await findByRole("button", { name: "Rotate" }));
+
+      await findByText("Paired and its password is rotated - it's ready to use.");
+      await findByPlaceholderText("Six-digit code"); // the form is back, ready for another robot
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("a failed poll for the paired robot shows a retry, not a silent stall", async () => {
+    // The pre-approve snapshot call and the post-approve poll hit the same
+    // endpoint - only the poll (after approval) should fail here.
+    let approved = false;
+    let pollShouldFail = true;
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/devices/discover-robots")) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+      if (url.endsWith("/api/devices/robots")) {
+        if (!approved) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+        if (pollShouldFail) return Promise.resolve(new Response("", { status: 500 }));
+        return Promise.resolve(new Response(JSON.stringify([pairedDevice()]), { status: 200 }));
+      }
+      if (url.endsWith("/api/auth/quick-connect/approve")) {
+        approved = true;
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
+      }
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    try {
+      const { findByPlaceholderText, findByRole, findByText } = renderSection();
+      fireEvent.change(await findByPlaceholderText("Six-digit code"), { target: { value: "ABC123" } });
+      fireEvent.click(await findByRole("button", { name: "Pair" }));
+
+      const retryButton = await findByRole("button", { name: "Check again" });
+      await findByText(/checking whether it finished pairing failed/);
+
+      pollShouldFail = false;
+      fireEvent.click(retryButton);
+
+      await findByText(/still has the vendor's published default password/);
+    } finally {
+      globalThis.fetch = original;
     }
   });
 });
